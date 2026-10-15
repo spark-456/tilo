@@ -80,7 +80,9 @@ describe("STUDIO_2 Chat: the helper's mood follows the real request", () => {
     expect(mood(el)).toBe("idle");
     expect(status(el)).toBe("Ready when you are");
     await send(el, "What is the capital of France?");
-    expect(calls(api)).toEqual([["quick", "What is the capital of France?", "quick"]]);
+    expect(calls(api)).toEqual([
+      ["quick", "What is the capital of France?", "quick", [], { route: "/", history: [] }],
+    ]);
     expect(mood(el)).toBe("reading");
     expect(status(el)).toBe("Tilo is reading your question");
     expect(sch.live()).toHaveLength(0); // nothing is timed while the call is out: reading lasts exactly as long
@@ -118,6 +120,20 @@ describe("STUDIO_2 Chat: the helper's mood follows the real request", () => {
     await send(el, "Two");
     expect(calls(api)).toHaveLength(1);
     expect(input(el).value).toBe("Two"); // kept, not sent
+  });
+
+  it("FR_PA_19 chat sends the last answered turn as bounded context", async () => {
+    const api = quickApi(async () => ({
+      data: { kind: "answered", text: "First answer", cost: null },
+      source: "live",
+    }));
+    const { el } = await mountChat(api);
+    await send(el, "First question");
+    await send(el, "Second question");
+    expect(calls(api)[1]?.[4]).toEqual({
+      route: "/",
+      history: [{ question: "First question", answer: "First answer" }],
+    });
   });
 
   it("STUDIO_2 chat an empty or over-long question is not sent and says why", async () => {

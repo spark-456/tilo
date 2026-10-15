@@ -37,6 +37,8 @@ def _rows(rows: list[dict], truncated: bool = False) -> dict:
 def _empty() -> dict[str, Any]:
     return {
         "worlds": {"worlds": [], "truncated": False},
+        "teams": [],
+        "calendar": {"items": [], "truncated": False},
         **{key: {"items": [], "truncated": False} for key in ("work_items", "meetings", "pins")},
         "workspace": {"org_id": deps.ORG_ID, "role": None, "connectors": [], "skills": []},
         "unavailable": ["knowledge", "forecasts", "ledger", "routines", "notifications", "calendar"],
@@ -117,7 +119,7 @@ def _context(
             return None
         return None if parts is None else read(AccessRequest(action=action, **parts), directory)
 
-    overflow = {"work_items": False, "pins": False, "meetings": False}
+    overflow = {"work_items": False, "pins": False, "meetings": False, "calendar": False}
 
     def candidates(name, selectors):
         rows = {}
@@ -151,6 +153,16 @@ def _context(
     for record in candidates("meetings", [("owner", w.actor)]):
         if record.get("owner") == w.actor and (got := readable("meeting", record)) is not None:
             meetings.append(_project(got, ("id", "title", "status", "scheduled", "world_id", "created_at")))
+    calendar = []
+    for record in candidates("calendar", [("owner", w.actor)]):
+        if (
+            record.get("owner") == w.actor
+            and record.get("state") in ("accepted", "proposed")
+            and isinstance(record.get("start"), str)
+            and record["start"] >= w.now
+            and (got := readable("calendar_entry", record)) is not None
+        ):
+            calendar.append(_project(got, ("id", "title", "start", "state")))
     pins = {}
     for record in candidates("pins", [("scope.user", w.actor), *(("scope.team", team) for team in teams)]):
         scope = record.get("scope") or {}
@@ -168,8 +180,10 @@ def _context(
     own_skills = _guarded(lambda: skills.list_for_owner(w.org, w.actor))
     return {
         "worlds": worlds,
+        "teams": teams,
         "work_items": _rows(list(items.values()), overflow["work_items"]),
         "meetings": _rows(meetings, overflow["meetings"]),
+        "calendar": _rows(calendar, overflow["calendar"]),
         "pins": _rows(list(pins.values()), overflow["pins"]),
         "workspace": {
             "org_id": w.org,

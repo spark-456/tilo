@@ -9,7 +9,7 @@ export { peopleListsApi } from "./live/peopleLists";
 import { HttpClient, type QuickIntakeResult, TiloApiError, reasonOf } from "../../api/http";
 import { isSampleHidden, wantsSample } from "../sample/sampleChoice";
 import { coalesce } from "./coalesce";
-import { API_METHODS, type Api, type ApiMethod } from "./index";
+import { API_METHODS, type Api, type ApiMethod, type QuickClientContext } from "./index";
 import { agendaFromPlate, emptyAgenda } from "./live/agendaFromPlate";
 import { connectorsFromList } from "./live/connectorsFromList";
 import {
@@ -115,10 +115,11 @@ const BAD_REPLY = "Tilo sent a reply this page could not read.";
 async function quickAsk(
   http: HttpClient,
   query: string,
+  context?: QuickClientContext,
 ): Promise<{ data: QuickReply; source: "live" }> {
   let r: QuickIntakeResult;
   try {
-    r = await http.submitIntake(query, [], "quick");
+    r = await http.submitIntake(query, [], "quick", context);
   } catch (e) {
     if (e instanceof TiloApiError) throw e;
     throw new TiloApiError(BAD_REPLY, 200, true, true);
@@ -501,9 +502,10 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     query: string,
     effort?: Effort,
     files: readonly File[] = [],
+    context?: QuickClientContext,
   ) => {
     // Quick (COST-FAST-1): a direct answer or an offer to switch. No world, no event, and nothing is remembered.
-    if (effort === "quick") return quickAsk(http, query);
+    if (effort === "quick") return quickAsk(http, query, context);
     let intake: IntakeResult;
     try {
       intake = await http.submitIntake(query, [...files]);

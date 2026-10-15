@@ -45,6 +45,7 @@ from tilo_providers.router import Deadline, Router, RouterDeadlineError
 
 from tilo_api import deps, ephemeral, intake_requests, quick
 from tilo_api.assistant.metering import SpendLedger
+from tilo_api.assistant.quick_context import build_context, parse_client_context
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
 from tilo_api.intake_deadline import INTAKE_DEADLINE_DETAIL, load_intake_deadline
 from tilo_api.intake_uploads import FILE_SCREEN_UNAVAILABLE, RunUploads, UploadStorageError
@@ -173,7 +174,7 @@ async def _thinking(
         await run_in_threadpool(screen_task_text, request, safety=safety)
         if chosen and chosen[0] == "quick":  # COST-FAST-1: the rules answer, offer Thinking, or call the cheap role
             return await _quick(
-                http, request, principal.user_id, safety, model_router, allowance, flags, work_mode, scenario
+                http, request, principal, tasks, safety, model_router, allowance, flags, work_mode, scenario
             )
         file_screen = None
         if request.files and isinstance(store, RunUploads):
@@ -307,7 +308,8 @@ async def _abort_uncommitted(store: InMemoryArtifactStore, tasks: deps.Store, id
 async def _quick(
     http: Request,
     request: IntakeRequest,
-    uid: str,
+    principal: deps.Principal,
+    tasks: deps.Store,
     safety: SafetyProvider,
     model_router: Router,
     allowance: SpendLedger,
@@ -317,11 +319,13 @@ async def _quick(
 ) -> JSONResponse:
     """COST-FAST-1: nothing is created or stored; the body is the answer or the offer to switch to Thinking. Quick holds
     its own SEC-16 unit around the whole ask, so it gets the Router unmetered (`raw`): one hold, not one per call."""
+    history, route = parse_client_context((await http.form()).get("assistant_context"))
+    context = await run_in_threadpool(build_context, http, principal, tasks, history, route)
     try:
         body = await run_in_threadpool(
-            quick.respond, text=request.text, uid=uid, has_files=bool(request.files), scenario=scenario,
+            quick.respond, text=request.text, uid=principal.user_id, has_files=bool(request.files), scenario=scenario,
             safety=safety, router=getattr(model_router, "raw", model_router), allowance=allowance, switches=flags,
-            mode=work_mode,
+            mode=work_mode, context=context,
             caps=deps.caps_for(http), key=http.headers.get("idempotency-key"), ledger=deps.ledger_writer_for(http),
         )  # fmt: skip
     except quick.QuickRefusal as refusal:

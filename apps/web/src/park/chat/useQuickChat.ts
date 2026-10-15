@@ -5,7 +5,7 @@
 // The conversation lives in this component only: the server keeps no Quick question or answer (quick.py), so there
 // is no history to list (docs/open-questions.md BQ-STUDIO-2).
 import { useCallback, useEffect, useRef, useState } from "react";
-import { askQuick } from "../api/index";
+import { type QuickClientContext, askQuick } from "../api/index";
 import type { QuickCost, SwitchReason } from "../api/types";
 import { useParkApi, useSchedule } from "../app/context";
 import { quickErrorMessage } from "../app/store";
@@ -92,6 +92,16 @@ export function useQuickChat(now: () => number = Date.now): QuickChat {
       setTalkingId(null);
       const id = nextId.current++;
       const started = now();
+      const context: QuickClientContext = {
+        route: typeof window === "undefined" ? "/chat" : window.location.pathname,
+        history: turns
+          .filter((turn): turn is Extract<Turn, { state: "answered" }> => turn.state === "answered")
+          .slice(-6)
+          .map((turn) => ({
+            question: turn.question.slice(0, 500),
+            answer: turn.text.slice(0, 500),
+          })),
+      };
       setTurns((t) => [...t, { id, question, state: "asking" }]);
       const settle = (turn: Turn) => {
         busyRef.current = false;
@@ -106,7 +116,7 @@ export function useQuickChat(now: () => number = Date.now): QuickChat {
         }
       };
       new Promise<Awaited<ReturnType<typeof askQuick>>>((resolve) =>
-        resolve(askQuick(api, "quick", question)),
+        resolve(askQuick(api, "quick", question, context)),
       ).then(
         ({ data, source }) =>
           settle(
@@ -126,7 +136,7 @@ export function useQuickChat(now: () => number = Date.now): QuickChat {
       );
       return true;
     },
-    [api, schedule, now],
+    [api, schedule, now, turns],
   );
 
   const last = turns[turns.length - 1];

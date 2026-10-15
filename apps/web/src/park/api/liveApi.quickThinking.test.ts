@@ -35,6 +35,18 @@ function rig(status: number, body: unknown) {
 }
 
 describe("QUICK_THINKING_http: the mode field", () => {
+  it("FR_PA_19 sends only recent chat turns and the current route as context", async () => {
+    const r = rig(200, { mode: "quick", outcome: "answered", text: "Done." });
+    await askQuick(r.api, "quick", "What happened?", {
+      route: "/world/w_mine",
+      history: [{ question: "Earlier?", answer: "Earlier answer." }],
+    });
+    expect(JSON.parse(String(r.seen[0]?.form.get("assistant_context")))).toEqual({
+      route: "/world/w_mine",
+      history: [{ question: "Earlier?", answer: "Earlier answer." }],
+    });
+  });
+
   it("QUICK_THINKING_http_legacy_and_thinking_calls_send_no_quick_field", async () => {
     const r = rig(201, THINKING_201);
     const ack = await r.api.startWorld("quick", "Plan the offsite");

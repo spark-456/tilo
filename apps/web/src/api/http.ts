@@ -547,6 +547,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
         text: string;
         files: File[];
         mode: "quick" | undefined;
+        contextText: string;
         key: string;
         pending?: Promise<IntakeResult | QuickIntakeResult> | undefined;
       }
@@ -808,26 +809,34 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
    * "quick" (COST-FAST-1) returns a direct answer or an offer to switch, and makes no task.
    */
   submitIntake(text: string, files: File[]): Promise<IntakeResult>;
-  submitIntake(text: string, files: File[], mode: "quick"): Promise<QuickIntakeResult>;
+  submitIntake(
+    text: string,
+    files: File[],
+    mode: "quick",
+    context?: { route: string; history: { question: string; answer: string }[] },
+  ): Promise<QuickIntakeResult>;
   async submitIntake(
     text: string,
     files: File[],
     mode?: "quick",
+    context?: { route: string; history: { question: string; answer: string }[] },
   ): Promise<IntakeResult | QuickIntakeResult> {
     let intent = this.intakeIntent;
+    const contextText = mode === "quick" && context ? JSON.stringify(context) : "";
     if (
       !intent ||
       intent.text !== text ||
       intent.mode !== mode ||
+      intent.contextText !== contextText ||
       intent.files.length !== files.length ||
       !intent.files.every((file, i) => file === files[i])
     ) {
-      intent = { text, files: [...files], mode, key: crypto.randomUUID() };
+      intent = { text, files: [...files], mode, contextText, key: crypto.randomUUID() };
       this.intakeIntent = intent;
     }
     // QA-11: sharing the key alone still sends two POSTs while the first is pending.
     if (intent.pending) return intent.pending;
-    const pending = this.sendIntakeRecovering(text, intent.files, mode, intent.key);
+    const pending = this.sendIntakeRecovering(text, intent.files, mode, intent.key, contextText);
     intent.pending = pending;
     try {
       const result = await pending;
@@ -852,9 +861,10 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     files: File[],
     mode: "quick" | undefined,
     key: string,
+    contextText: string,
   ): Promise<IntakeResult | QuickIntakeResult> {
     try {
-      return await this.sendIntake(text, files, mode, key);
+      return await this.sendIntake(text, files, mode, key, contextText);
     } catch (error) {
       if (
         mode === "quick" ||
@@ -864,7 +874,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       ) {
         throw error;
       }
-      return this.sendIntake(text, files, mode, key);
+      return this.sendIntake(text, files, mode, key, contextText);
     }
   }
 
@@ -873,6 +883,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     files: File[],
     mode: "quick" | undefined,
     key: string,
+    contextText: string,
   ): Promise<IntakeResult | QuickIntakeResult> {
     const form = new FormData();
     form.append("text", text);
@@ -880,6 +891,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     const init = { method: "POST", body: form, headers: { "Idempotency-Key": key } };
     if (mode === "quick") {
       form.append("mode", mode);
+      if (contextText) form.append("assistant_context", contextText);
       const body = await this.request<unknown>("/intake", init, true);
       const quick = quickOf(body);
       if (!quick) throw new TiloApiError(BAD_REPLY, 200, true, true);

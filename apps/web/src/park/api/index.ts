@@ -115,12 +115,25 @@ export interface Api {
  * `types.test.ts` pins `startWorld`'s parameters and `keyof Api`; Thinking calls stay exactly two arguments.
  * `mode` is only the size on screen and never reaches the server. This one helper is the only caller.
  */
-export const askQuick = (api: Api, mode: TierKey, query: string): R<QuickReply> =>
-  (api.startWorld as unknown as (m: TierKey, q: string, effort: "quick") => R<QuickReply>)(
-    mode,
-    query,
-    "quick",
-  );
+export interface QuickClientContext {
+  route: string;
+  history: { question: string; answer: string }[];
+}
+export const askQuick = (
+  api: Api,
+  mode: TierKey,
+  query: string,
+  context?: QuickClientContext,
+): R<QuickReply> =>
+  (
+    api.startWorld as unknown as (
+      m: TierKey,
+      q: string,
+      effort: "quick",
+      files: File[],
+      context?: QuickClientContext,
+    ) => R<QuickReply>
+  )(mode, query, "quick", [], context);
 
 /**
  * WEB-W1: a Thinking start with attached files. Like `askQuick`, the files travel as a fourth run-time argument so
