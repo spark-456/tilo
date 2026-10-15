@@ -151,7 +151,7 @@ describe("WEB-W1 composer uploads", () => {
     const rig = await mountLiveHome(api);
     attach(rig.el, [exe()]);
     expect(rig.el.textContent).toContain(
-      "run.exe is not accepted; attach PDF, DOCX, PPTX, XLSX, CSV, PNG or JPG files.",
+      "run.exe is not accepted; attach PDF, DOCX, PPTX, XLSX, CSV, TXT, MD, JSON, PNG or JPG files.",
     );
     expect(rig.el.querySelector('[aria-label="Remove run.exe"]')).toBeNull();
     await startTask(rig, "Compare these quotes");

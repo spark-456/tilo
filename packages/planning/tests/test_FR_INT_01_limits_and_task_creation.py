@@ -98,7 +98,7 @@ def test_FR_INT_01_total_size_over_50mb_is_rejected_nothing_stored(safety_provid
     assert store.list_ids() == []
 
 
-@pytest.mark.parametrize("filename", ["macro.exe", "archive.zip", "notes.txt"])
+@pytest.mark.parametrize("filename", ["macro.exe", "archive.zip", "notes.rtf"])
 def test_FR_INT_01_disallowed_file_type_is_rejected_nothing_stored(safety_provider, filename):
     request = IntakeRequest(text="Some task.", files=[IntakeFile(filename=filename, content=b"whatever")])
     store = InMemoryArtifactStore()

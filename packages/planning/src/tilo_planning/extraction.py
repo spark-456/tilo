@@ -1,5 +1,5 @@
 """File typing and text extraction for intake (FR-INT-02), stdlib only. PDF, PNG and JPG go to models
-natively (no text); DOCX, PPTX, XLSX and CSV are converted to text. Uploads are untrusted (PRD 16.2
+natively (no text); DOCX, PPTX, XLSX, CSV, TXT, MD and JSON are converted to text. Uploads are untrusted (PRD 16.2
 cost abuse): the part count is checked before parsing, decompressed bytes come out of one budget per
 request, text past MAX_TEXT_CHARS fails the file, and an XML part with a DTD fails (OOXML has none).
 """
@@ -34,7 +34,12 @@ FILE_TYPES: dict[str, tuple[str, str, bytes]] = {
     ".pptx": ("converted", _OOXML + "presentationml.presentation", b"PK\x03\x04"),
     ".xlsx": ("converted", _OOXML + "spreadsheetml.sheet", b"PK\x03\x04"),
     ".csv": ("converted", "text/csv", b""),
+    # Plain text files are stored under the artifact contract's text types: a .txt is Markdown with no markup.
+    ".txt": ("converted", "text/markdown", b""),
+    ".md": ("converted", "text/markdown", b""),
+    ".json": ("converted", "application/json", b""),
 }
+TEXT_MIMES = frozenset({"text/csv", "text/markdown", "application/json"})
 
 # Text-bearing parts per format; every text run in them is kept, hidden or not, so screening sees it.
 _PARTS = {
@@ -68,12 +73,12 @@ def file_type(filename: str) -> tuple[str, str, bytes] | None:
 def extract(filename: str, content: bytes, budget: Budget | None = None) -> str | None:
     """Text of a converted file, None for a native one; ExtractionError if it cannot be read safely."""
     ext = PurePosixPath(filename.lower()).suffix
-    kind, _mime, magic = FILE_TYPES[ext]
+    kind, mime, magic = FILE_TYPES[ext]
     if not content.startswith(magic):
         raise ExtractionError(f"content does not look like a {ext} file")
     if kind == "native":
         return None
-    if ext == ".csv":
+    if mime in TEXT_MIMES:
         if len(content) > 4 * MAX_TEXT_CHARS:
             raise ExtractionError(_TOO_LARGE)
         text = content.decode("utf-8-sig", errors="replace")
