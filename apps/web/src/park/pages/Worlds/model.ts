@@ -1,5 +1,5 @@
-// Pure rules of the Worlds page (design "Tilo App Worlds.dc.html", renderVals()): which worlds a filter keeps,
-// in which order, and what the status chip says. No React, no clock.
+// Pure rules of the Worlds page (STUDIO-3, design/studio-v2 "Tilo S Worlds.dc.html"): which worlds a filter keeps,
+// in which order, what the status pill says and the town counts. No React, no clock.
 import type { TierName, World, WorldState } from "../../api/types";
 
 export type StatusFilter = "all" | WorldState;
@@ -12,10 +12,10 @@ export interface Status {
 
 export const STATUS_TABS: ReadonlyArray<readonly [StatusFilter, string]> = [
   ["all", "All"],
+  ["running", "Working"],
   ["needs", "Needs you"],
-  ["running", "Running"],
   ["scheduled", "Scheduled"],
-  ["finished", "Ready"],
+  ["finished", "Done"],
 ];
 export const SCALES: ReadonlyArray<readonly [TierFilter, string]> = [
   ["all", "All sizes"],
@@ -33,16 +33,16 @@ const TONE: Record<WorldState, Tone> = {
 };
 const WORD: Record<WorldState, string> = {
   needs: "",
-  running: "Running",
+  running: "Working",
   scheduled: "Scheduled",
-  finished: "Ready",
+  finished: "Done",
 };
 
 /** The search and scale filters, which the status tab counts also follow. */
 const inBase = (w: World, q: string, tier: TierFilter): boolean =>
   (!q.trim() || w.name.toLowerCase().includes(q.trim().toLowerCase())) &&
   (tier === "all" || w.tier === tier);
-/** "Running" also holds a world that needs you. */
+/** "Working" also holds a world that needs you. */
 const inStatus = (w: World, f: StatusFilter): boolean =>
   f === "all" || w.st === f || (f === "running" && w.st === "needs");
 
@@ -53,7 +53,7 @@ export const countFor = (
   f: StatusFilter,
 ): number => all.filter((w) => inBase(w, q, tier) && inStatus(w, f)).length;
 
-/** The worlds to draw: filtered, then needs first, running, scheduled, ready, each in source order. */
+/** The worlds to draw: filtered, then needs first, working, scheduled, done, each in source order. */
 export const visibleWorlds = (
   all: readonly World[],
   q: string,
@@ -78,3 +78,31 @@ export function statusOf(w: World, needsLeft: number): Status {
     tone: TONE[w.st],
   };
 }
+
+/** The "Your town" counts: every world by state, and the helpers (agents) of the worlds still at work. */
+export interface TownCounts {
+  worlds: number;
+  helpers: number;
+  working: number;
+  needs: number;
+  scheduled: number;
+  done: number;
+}
+
+export function townCounts(all: readonly World[]): TownCounts {
+  const n = (st: WorldState) => all.filter((w) => w.st === st).length;
+  return {
+    worlds: all.length,
+    helpers: all
+      .filter((w) => w.st === "running" || w.st === "needs")
+      .reduce((sum, w) => sum + (Number.isFinite(w.agents) ? w.agents : 0), 0),
+    working: n("running"),
+    needs: n("needs"),
+    scheduled: n("scheduled"),
+    done: n("finished"),
+  };
+}
+
+/** The line under a card's name: the list's own "when", else its subtitle and what comes next; never invented. */
+export const lastLine = (w: World): string =>
+  w.when || [w.meta, [w.nextL, w.nextV].filter(Boolean).join(" ")].filter(Boolean).join(" · ");

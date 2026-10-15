@@ -1,12 +1,14 @@
-// The Worlds page (design_handoff_tilo_web_app/design/"Tilo App Worlds.dc.html", ported to React; plan section
-// 10). Data comes only from the Api (getWorlds, getDecisions, getPlans for the city art, getConnectors for
-// FR-UX-17 Share to Slack); a person moves with app.go and approves with app.decide. Filters are page state.
-// No timers: nothing here moves by itself.
+// The Worlds page (STUDIO-3, design/studio-v2 "Tilo S Worlds.dc.html"; earlier "Tilo App Worlds.dc.html"): all of
+// a person's worlds in one town, the filters, one card per world and the routines that run on a schedule. Data
+// comes only from the Api (getWorlds, getDecisions, getPlans for the city art, getConnectors for FR-UX-17 Share to
+// Slack, getLedger for the spend so far) and the routines client; a person moves with app.go and approves with
+// app.decide. Filters are page state. No timers: nothing here moves by itself.
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoutinesClient } from "../../api/live/routines";
-import type { Connector, Decision, Plan, World } from "../../api/types";
+import type { Connector, Decision, Ledger, Plan, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
+import { money } from "../../app/ledgerKpis";
 import {
   SLACK_NOTE_MAX,
   type SlackShareRequest,
@@ -21,15 +23,22 @@ import { FirstRunOverview } from "../../sample/FirstRunOverview";
 import { SampleControls } from "../../sample/SampleControls";
 import { hideSample, showSample } from "../../sample/sampleChoice";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
-import { CityCard, TownCard, VillageCard } from "./Cards";
+import { WorldCard } from "./Cards";
 import { Filters } from "./Filters";
 import { Header } from "./Header";
 import { RoutinesPanel } from "./RoutinesPanel";
-import { CardSkeleton, EmptyBox, LoadingWorlds, Section } from "./Sections";
+import { CardSkeleton, EmptyBox, LoadingWorlds, Section, TownHero } from "./Sections";
 import { Spotlight } from "./Spotlight";
 import { makeArt, makeKit } from "./art";
 import "./Worlds.css";
-import { type StatusFilter, type TierFilter, countFor, statusOf, visibleWorlds } from "./model";
+import {
+  type StatusFilter,
+  type TierFilter,
+  countFor,
+  statusOf,
+  townCounts,
+  visibleWorlds,
+} from "./model";
 
 interface Loaded {
   worlds: World[];
@@ -37,6 +46,8 @@ interface Loaded {
   /** The worlds came from tilo-api: only then is there a sample project to hide or show (STARTER-1). */
   live: boolean;
   connectors: Connector[];
+  /** The ledger's total, in its own currency; null when the read failed or is not built. */
+  spent: string | null;
 }
 
 export function WorldsPage({ app }: { app: AppCtx }) {
@@ -67,13 +78,21 @@ export function WorldsPage({ app }: { app: AppCtx }) {
       typeof api.getConnectors === "function"
         ? api.getConnectors().catch(() => ({ data: [] as Connector[] }))
         : Promise.resolve({ data: [] as Connector[] });
+    const readLedger =
+      typeof api.getLedger === "function"
+        ? api.getLedger().then(
+            (r) => r.data,
+            () => null,
+          )
+        : Promise.resolve<Ledger | null>(null);
     Promise.all([
       api.getWorlds(dec, added),
       api.getDecisions().catch(() => ({ data: [] as Decision[] })),
       api.getPlans(dec).catch(() => ({ data: {} as Record<string, Plan> })),
       readConnectors,
+      readLedger,
     ]).then(
-      ([w, d, p, c]) => {
+      ([w, d, p, c, l]) => {
         if (!live) return;
         plans.current = p.data;
         setData({
@@ -81,6 +100,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
           live: w.source === "live",
           decisions: d.data,
           connectors: c.data,
+          spent: l && Number.isFinite(l.spent) ? money(l, l.spent) : null,
         });
         setFailed(false);
       },
@@ -111,14 +131,9 @@ export function WorldsPage({ app }: { app: AppCtx }) {
     [data],
   );
   const list = visibleWorlds(all, query, tier, status);
-  const by = (scale: World["tier"]) => list.filter((w) => w.tier === scale);
-  const cities = by("City");
-  const towns = by("Town");
-  const villages = by("Village");
-  // Cards are drawn one per task, in page order (the grids are auto-fill, so a card added later moves none).
-  const part = useStaged(2 + cities.length + towns.length + villages.length);
-  const at = (scale: World["tier"], i: number): number =>
-    3 + i + (scale === "City" ? 0 : cities.length + (scale === "Town" ? 0 : towns.length));
+  const counts = useMemo(() => townCounts(all), [all]);
+  // Cards are drawn one per task, in page order (the grid is fixed per width, so a card added later moves none).
+  const part = useStaged(2 + list.length);
 
   const openSlackDialog = (trigger: HTMLButtonElement) => {
     if (!slackState?.connected) return;
@@ -157,192 +172,169 @@ export function WorldsPage({ app }: { app: AppCtx }) {
   return (
     <div data-testid="park-page-worlds">
       <PageSheet>
-        <Header
-          art={art}
-          total={data ? all.length : null}
-          query={query}
-          onQuery={setQuery}
-          onNew={() => app.go("home")}
-          slack={slackState}
-          onShareSlack={openSlackDialog}
-        />
-        {preview ? <FirstRunOverview page="worlds" app={app} /> : null}
-        {routines ? <RoutinesPanel client={routines} /> : null}
-        {slackOpen && slackState ? (
-          <div className="park-worlds-slackbackdrop">
-            <div
-              ref={dialogRef}
-              // biome-ignore lint/a11y/useSemanticElements: custom modal dialog with focus trap and role="dialog"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Share to Slack"
-              className="park-worlds-slackdialog"
-              onKeyDown={(e) => handleSlackDialogKeyDown(e, dialogRef.current, closeSlackDialog)}
-            >
-              <div className="park-worlds-slackhead">
-                <div className="park-worlds-slacktitle">Share to Slack</div>
-                <div className="park-worlds-slacksub">{slackState.account}</div>
-              </div>
-              <label className="park-worlds-slackfield">
-                <span className="park-worlds-slacklabel">World</span>
-                <select
-                  aria-label="World to share"
-                  className="park-worlds-slackselect"
-                  value={slackWorldId}
-                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setSlackWorldId(e.target.value)}
-                >
-                  {all.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="park-worlds-slackfield">
-                <span className="park-worlds-slacklabel">Channel</span>
-                <select
-                  aria-label="Slack channel"
-                  className="park-worlds-slackselect"
-                  value={slackChannel}
-                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setSlackChannel(e.target.value)}
-                >
-                  {slackState.channels.map((ch) => (
-                    <option key={ch} value={ch}>
-                      {ch}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="park-worlds-slackfield">
-                <span className="park-worlds-slacklabel">
-                  {`Note (optional, up to ${SLACK_NOTE_MAX} characters)`}
-                </span>
-                <textarea
-                  aria-label="Optional note"
-                  className="park-worlds-slacknote"
-                  rows={3}
-                  maxLength={SLACK_NOTE_MAX}
-                  value={slackNote}
-                  onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
-                    setSlackNote(capSlackNote(e.target.value))
-                  }
-                />
-              </label>
-              <div className="park-worlds-slackactions">
-                <button
-                  type="button"
-                  className="park-worlds-dec__yes"
-                  onClick={submitSlackApproval}
-                >
-                  Ask for approval
-                </button>
-                <button type="button" className="park-worlds-dec__open" onClick={closeSlackDialog}>
-                  Cancel
-                </button>
+        <div className="park-worlds-stack">
+          <Header
+            art={art}
+            total={data ? all.length : null}
+            onNew={() => app.go("home")}
+            slack={slackState}
+            onShareSlack={openSlackDialog}
+          />
+          {preview ? <FirstRunOverview page="worlds" app={app} /> : null}
+          {slackOpen && slackState ? (
+            <div className="park-worlds-slackbackdrop">
+              <div
+                ref={dialogRef}
+                // biome-ignore lint/a11y/useSemanticElements: custom modal dialog with focus trap and role="dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Share to Slack"
+                className="park-worlds-slackdialog"
+                onKeyDown={(e) => handleSlackDialogKeyDown(e, dialogRef.current, closeSlackDialog)}
+              >
+                <div className="park-worlds-slackhead">
+                  <div className="park-worlds-slacktitle">Share to Slack</div>
+                  <div className="park-worlds-slacksub">{slackState.account}</div>
+                </div>
+                <label className="park-worlds-slackfield">
+                  <span className="park-worlds-slacklabel">World</span>
+                  <select
+                    aria-label="World to share"
+                    className="park-worlds-slackselect"
+                    value={slackWorldId}
+                    onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                      setSlackWorldId(e.target.value)
+                    }
+                  >
+                    {all.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="park-worlds-slackfield">
+                  <span className="park-worlds-slacklabel">Channel</span>
+                  <select
+                    aria-label="Slack channel"
+                    className="park-worlds-slackselect"
+                    value={slackChannel}
+                    onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                      setSlackChannel(e.target.value)
+                    }
+                  >
+                    {slackState.channels.map((ch) => (
+                      <option key={ch} value={ch}>
+                        {ch}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="park-worlds-slackfield">
+                  <span className="park-worlds-slacklabel">
+                    {`Note (optional, up to ${SLACK_NOTE_MAX} characters)`}
+                  </span>
+                  <textarea
+                    aria-label="Optional note"
+                    className="park-worlds-slacknote"
+                    rows={3}
+                    maxLength={SLACK_NOTE_MAX}
+                    value={slackNote}
+                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                      setSlackNote(capSlackNote(e.target.value))
+                    }
+                  />
+                </label>
+                <div className="park-worlds-slackactions">
+                  <button
+                    type="button"
+                    className="park-worlds-dec__yes"
+                    onClick={submitSlackApproval}
+                  >
+                    Ask for approval
+                  </button>
+                  <button
+                    type="button"
+                    className="park-worlds-dec__open"
+                    onClick={closeSlackDialog}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ) : null}
-        {failed ? (
-          <EmptyBox title="Worlds data is unavailable" />
-        ) : data ? (
-          <>
-            {data.live ? (
-              <SampleControls
-                listed={all.some((w) => w.sample)}
-                onHide={() => {
-                  hideSample();
-                  setReload((n) => n + 1);
-                }}
-                onShow={() => {
-                  showSample();
-                  setReload((n) => n + 1);
-                }}
+          ) : null}
+          {failed ? (
+            <EmptyBox title="Worlds data is unavailable" />
+          ) : data ? (
+            <>
+              {data.live ? (
+                <SampleControls
+                  listed={all.some((w) => w.sample)}
+                  onHide={() => {
+                    hideSample();
+                    setReload((n) => n + 1);
+                  }}
+                  onShow={() => {
+                    showSample();
+                    setReload((n) => n + 1);
+                  }}
+                />
+              ) : null}
+              <TownHero counts={counts} night={night} spent={data.spent} />
+              {/* Keep the decision summary above the grid in place while card art is staged. */}
+              <Spotlight
+                art={art}
+                decisions={data.decisions}
+                worldName={all.find((w) => w.id === data.decisions[0]?.world)?.name ?? ""}
+                dec={dec}
+                needsLeft={needsLeft}
+                onDecide={(key, text, option) =>
+                  text === undefined && option === undefined
+                    ? app.decide(key)
+                    : app.decide(key, text, option)
+                }
+                onOpen={open}
+                slackPending={slackPending}
               />
-            ) : null}
-            <Filters
-              status={status}
-              tier={tier}
-              count={(f) => countFor(all, query, tier, f)}
-              onStatus={setStatus}
-              onTier={setTier}
-            />
-            {/* Keep the decision summary above the grids in place while card art is staged. */}
-            <Spotlight
-              art={art}
-              decisions={data.decisions}
-              worldName={all.find((w) => w.id === data.decisions[0]?.world)?.name ?? ""}
-              dec={dec}
-              needsLeft={needsLeft}
-              onDecide={(key, text, option) =>
-                text === undefined && option === undefined
-                  ? app.decide(key)
-                  : app.decide(key, text, option)
-              }
-              onOpen={open}
-              slackPending={slackPending}
-            />
-            {cities.length > 0 ? (
-              <Section scale="City" count={cities.length}>
-                {cities.map((w, i) =>
-                  part(at("City", i)) ? (
-                    <CityCard
-                      key={w.id}
-                      w={w}
-                      art={art}
-                      status={statusOf(w, needsLeft)}
-                      onOpen={open}
-                    />
-                  ) : (
-                    <CardSkeleton key={w.id} scale="City" />
-                  ),
-                )}
-              </Section>
-            ) : null}
-            {towns.length > 0 ? (
-              <Section scale="Town" count={towns.length}>
-                {towns.map((w, i) =>
-                  part(at("Town", i)) ? (
-                    <TownCard
-                      key={w.id}
-                      w={w}
-                      art={art}
-                      status={statusOf(w, needsLeft)}
-                      onOpen={open}
-                    />
-                  ) : (
-                    <CardSkeleton key={w.id} scale="Town" />
-                  ),
-                )}
-              </Section>
-            ) : null}
-            {villages.length > 0 ? (
-              <Section scale="Village" count={villages.length}>
-                {villages.map((w, i) =>
-                  part(at("Village", i)) ? (
-                    <VillageCard
-                      key={w.id}
-                      w={w}
-                      art={art}
-                      status={statusOf(w, needsLeft)}
-                      onOpen={open}
-                    />
-                  ) : (
-                    <CardSkeleton key={w.id} scale="Village" />
-                  ),
-                )}
-              </Section>
-            ) : null}
-            {list.length === 0 ? (
-              <EmptyBox
-                title={status === "needs" ? "Nothing needs you right now" : "No worlds match"}
-                body="Try another filter, or start something new from Home."
+              <Filters
+                art={art}
+                status={status}
+                tier={tier}
+                query={query}
+                count={(f) => countFor(all, query, tier, f)}
+                onStatus={setStatus}
+                onTier={setTier}
+                onQuery={setQuery}
               />
-            ) : null}
-          </>
-        ) : (
-          <LoadingWorlds />
-        )}
+              {list.length > 0 ? (
+                <Section count={list.length}>
+                  {list.map((w, i) =>
+                    part(3 + i) ? (
+                      <WorldCard
+                        key={w.id}
+                        w={w}
+                        art={art}
+                        status={statusOf(w, needsLeft)}
+                        onOpen={open}
+                      />
+                    ) : (
+                      <CardSkeleton key={w.id} />
+                    ),
+                  )}
+                </Section>
+              ) : (
+                <EmptyBox
+                  title={status === "needs" ? "Nothing needs you right now" : "No worlds match"}
+                  body="Try another filter, or start something new from Home."
+                />
+              )}
+            </>
+          ) : (
+            <LoadingWorlds />
+          )}
+          {routines ? <RoutinesPanel client={routines} /> : null}
+        </div>
       </PageSheet>
     </div>
   );

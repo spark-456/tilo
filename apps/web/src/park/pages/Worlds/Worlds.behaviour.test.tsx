@@ -1,11 +1,9 @@
 import fc from "fast-check";
 // @vitest-environment happy-dom
-// WEB-5 acceptance: the Park "Worlds" page (design_handoff_tilo_web_app/design/Tilo App Worlds.dc.html, its
-// renderVals(); inventory.md "Tilo App Worlds.dc.html"; README "Worlds"; plan sections 8c and 10).
-// Pinned surface: pages/Worlds/WorldsPage.tsx exports `WorldsPage({ app }: { app: AppCtx })`, pages/Worlds/index.ts
-// default-exports it; the root carries data-testid="park-page-worlds" (the shell's own page test ids); data comes
-// only from useParkApi().getWorlds(app.dec, app.added) and getDecisions(); navigation only app.go; approval only
-// app.decide. Defaults taken where the reference is silent are listed in the WEB-5 test report.
+// WEB-5 acceptance, restructured for STUDIO-3 (design/studio-v2 "Tilo S Worlds.dc.html"): one card grid sorted
+// needs, working, scheduled, done (the size sections are gone; size is a filter), status tabs All / Working /
+// Needs you / Scheduled / Done, the "Find a world" search beside the tabs. The rules that stay: data only from
+// useParkApi().getWorlds(app.dec, app.added) and getDecisions(); navigation only app.go; approval only app.decide.
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, click, q, qa } from "../../../../test-support/park/componentsHarness";
@@ -32,14 +30,24 @@ import type { World } from "../../api/types";
 
 afterEach(cleanup);
 
-const SUBTITLE = "Every job Tilo is running, sized by scale: cities, towns and villages.";
-const SEC = ["Cities", "Towns", "Villages"] as const;
-const ALL = {
-  Cities: ["k1", "hires", "audit"],
-  Towns: ["northline", "invoice", "inbox", "pricing"],
-  Villages: ["calls", "venues", "comp", "reply"],
-};
-const sections = (c: HTMLElement) => Object.fromEntries(SEC.map((s) => [s, cardIds(c, s)]));
+const SUBTITLE = "Every bigger job gets its own little city. Here are all of yours.";
+const GRID = "Your worlds";
+const TABS = ["All", "Working", "Needs you", "Scheduled", "Done"];
+/** The fixture list as the grid draws it: needs, working, scheduled, done, each in source order. */
+const ALL = [
+  "k1",
+  "hires",
+  "northline",
+  "calls",
+  "venues",
+  "invoice",
+  "inbox",
+  "pricing",
+  "audit",
+  "comp",
+  "reply",
+];
+const shown = (c: HTMLElement) => cardIds(c, GRID);
 const text = (el: Element | null) => el?.textContent ?? "";
 /** Asserts `t` holds the string, or matches the pattern. */
 const has = (t: string, w: string | RegExp) =>
@@ -77,31 +85,30 @@ describe("WEB_5_worlds: header, search and New world", () => {
     api.getWorlds = vi.fn(() => Promise.reject(new NotBuilt("getWorlds")));
     const { c } = await renderWorlds({ api });
     expect(text(c)).toContain("Worlds data is unavailable");
-    expect(qa(c, "a[href]")).toHaveLength(0);
+    expect(qa(c, `section[aria-label="${GRID}"] a[href]`)).toHaveLength(0);
     expect(text(q(c, "h1"))).toBe("Worlds");
   });
 
   it("WEB_5_worlds_live_worlds_and_decisions_show_even_when_the_city_plans_are_not_built", async () => {
-    // The live Api serves worlds (all Villages) and decisions but not plans yet: plans only draw City art.
+    // The live Api serves worlds and decisions but not plans yet: plans only draw City art.
     const api = worldsApi();
     api.getPlans = vi.fn(() => Promise.reject(new NotBuilt("getPlans")));
     const { c } = await renderWorlds({ api });
     expect(text(c)).not.toContain("Worlds data is unavailable");
-    expect(cardIds(c, "Villages").length).toBeGreaterThan(0);
+    expect(shown(c)).toEqual(ALL);
     expect(spotlight(c)).not.toBeNull();
   });
 
   it("WEB_5_worlds_search_is_named_and_filters_by_name_ignoring_case", async () => {
     const { c } = await renderWorlds();
-    expect(search(c).placeholder).toBe("Search worlds");
+    expect(search(c).placeholder).toBe("Find a world");
     typeInto(search(c), "INVOICE");
     expect(search(c).value).toBe("INVOICE");
-    expect(sections(c)).toEqual({ Cities: [], Towns: ["invoice"], Villages: [] });
-    expect(section(c, "Cities")).toBeNull();
-    expect(tabCounts(c)).toEqual({ All: 1, "Needs you": 0, Running: 0, Scheduled: 1, Ready: 0 });
+    expect(shown(c)).toEqual(["invoice"]);
+    expect(tabCounts(c)).toEqual({ All: 1, Working: 0, "Needs you": 0, Scheduled: 1, Done: 0 });
     expect(leaf(c, "11 worlds")).not.toBeNull(); // the header total is every world, not the filtered ones
     typeInto(search(c), "northline");
-    expect(sections(c)).toEqual({ Cities: [], Towns: ["northline"], Villages: ["reply"] });
+    expect(shown(c)).toEqual(["northline", "reply"]);
   });
 
   it("WEB_5_worlds_new_world_goes_home", async () => {
@@ -112,48 +119,54 @@ describe("WEB_5_worlds: header, search and New world", () => {
   });
 });
 
-describe("WEB_5_worlds: status tabs and scale legend", () => {
+describe("WEB_5_worlds: status tabs and sizes", () => {
   it.each([
     ["All", ALL],
-    ["Needs you", { Cities: ["k1"], Towns: [], Villages: [] }],
-    ["Running", { Cities: ["k1", "hires"], Towns: ["northline"], Villages: ["calls", "venues"] }],
-    ["Scheduled", { Cities: [], Towns: ["invoice", "inbox", "pricing"], Villages: [] }],
-    ["Ready", { Cities: ["audit"], Towns: [], Villages: ["comp", "reply"] }],
+    ["Working", ["k1", "hires", "northline", "calls", "venues"]],
+    ["Needs you", ["k1"]],
+    ["Scheduled", ["invoice", "inbox", "pricing"]],
+    ["Done", ["audit", "comp", "reply"]],
   ])("WEB_5_worlds_status_tabs_count_and_filter_%s", async (label, expected) => {
     const { c } = await renderWorlds();
     expect(statusTabs(c).map((t) => t.getAttribute("role"))).toEqual(Array(5).fill("tab"));
     expect(statusTabs(c).map((t) => t.tagName)).toEqual(Array(5).fill("BUTTON"));
-    expect(tabCounts(c)).toEqual({ All: 11, "Needs you": 1, Running: 5, Scheduled: 3, Ready: 3 });
-    expect(Object.keys(tabCounts(c))).toEqual([
-      "All",
-      "Needs you",
-      "Running",
-      "Scheduled",
-      "Ready",
-    ]);
+    expect(tabCounts(c)).toEqual({ All: 11, Working: 5, "Needs you": 1, Scheduled: 3, Done: 3 });
+    expect(Object.keys(tabCounts(c))).toEqual(TABS);
     click(tab(c, label));
     expect(statusTabs(c).map((t) => t.getAttribute("aria-selected"))).toEqual(
-      ["All", "Needs you", "Running", "Scheduled", "Ready"].map((l) => String(l === label)),
+      TABS.map((l) => String(l === label)),
     );
-    expect(sections(c)).toEqual(expected);
+    expect(shown(c)).toEqual(expected);
   });
 
-  it("WEB_5_worlds_running_also_counts_a_world_that_needs_you_and_its_count_follows_decisions", async () => {
+  it("WEB_5_worlds_working_also_counts_a_world_that_needs_you_and_its_count_follows_decisions", async () => {
     const both = await renderWorlds({ dec: { depot: true, mail: true } });
     expect(tabCounts(both.c)).toEqual({
       All: 11,
+      Working: 5,
       "Needs you": 0,
-      Running: 5,
       Scheduled: 3,
-      Ready: 3,
+      Done: 3,
     });
   });
 
   it.each([
-    ["Cities", { All: 3, "Needs you": 1, Running: 2, Scheduled: 0, Ready: 1 }],
-    ["Towns", { All: 4, "Needs you": 0, Running: 1, Scheduled: 3, Ready: 0 }],
-    ["Villages", { All: 4, "Needs you": 0, Running: 2, Scheduled: 0, Ready: 2 }],
-  ])("WEB_5_worlds_scale_legend_%s_narrows_sections_and_tab_counts", async (label, counts) => {
+    [
+      "Cities",
+      { All: 3, Working: 2, "Needs you": 1, Scheduled: 0, Done: 1 },
+      ["k1", "hires", "audit"],
+    ],
+    [
+      "Towns",
+      { All: 4, Working: 1, "Needs you": 0, Scheduled: 3, Done: 0 },
+      ["northline", "invoice", "inbox", "pricing"],
+    ],
+    [
+      "Villages",
+      { All: 4, Working: 2, "Needs you": 0, Scheduled: 0, Done: 2 },
+      ["calls", "venues", "comp", "reply"],
+    ],
+  ])("WEB_5_worlds_size_%s_narrows_the_grid_and_tab_counts", async (label, counts, ids) => {
     const { c } = await renderWorlds();
     expect(qa(c, "button[aria-pressed]").map(text)).toEqual([
       "All sizes",
@@ -167,47 +180,34 @@ describe("WEB_5_worlds: status tabs and scale legend", () => {
       ["All sizes", "Cities", "Towns", "Villages"].map((l) => String(l === label)),
     );
     expect(tabCounts(c)).toEqual(counts);
-    expect(SEC.filter((s) => section(c, s))).toEqual([label]);
-    expect(leaf(c, "SCALE")).not.toBeNull();
+    expect(shown(c)).toEqual(ids);
   });
 
-  it("WEB_5_worlds_scale_status_and_search_combine", async () => {
+  it("WEB_5_worlds_size_status_and_search_combine", async () => {
     const { c } = await renderWorlds();
     click(scaleButton(c, "Villages"));
-    click(tab(c, "Ready"));
+    click(tab(c, "Done"));
     typeInto(search(c), "reply");
-    expect(sections(c)).toEqual({ Cities: [], Towns: [], Villages: ["reply"] });
-    expect(tabCounts(c)).toEqual({ All: 1, "Needs you": 0, Running: 0, Scheduled: 0, Ready: 1 });
+    expect(shown(c)).toEqual(["reply"]);
+    expect(tabCounts(c)).toEqual({ All: 1, Working: 0, "Needs you": 0, Scheduled: 0, Done: 1 });
   });
 
-  it("WEB_5_worlds_sections_title_count_and_blurb", async () => {
-    const { c } = await renderWorlds();
-    const blurb = {
-      Cities: "3 · big projects with districts and gates",
-      Towns: "4 · routines and small projects",
-      Villages: "4 · quick tasks, done in minutes",
-    };
-    for (const s of SEC) {
-      expect(leaf(section(c, s) as HTMLElement, s), s).not.toBeNull();
-      expect(leaf(section(c, s) as HTMLElement, blurb[s]), s).not.toBeNull();
-    }
-    click(tab(c, "Running"));
-    expect(
-      leaf(section(c, "Cities") as HTMLElement, "2 · big projects with districts and gates"),
-    ).not.toBeNull();
-    expect(
-      leaf(section(c, "Villages") as HTMLElement, "2 · quick tasks, done in minutes"),
-    ).not.toBeNull();
-  });
-
-  it("WEB_5_worlds_cards_sort_needs_then_running_then_scheduled_then_ready_keeping_source_order", async () => {
+  it("WEB_5_worlds_cards_sort_needs_then_working_then_scheduled_then_done_keeping_source_order", async () => {
     const api = worldsApi((d, a) => fx.worlds(d, a).reverse());
     const { c } = await renderWorlds({ api });
-    expect(sections(c)).toEqual({
-      Cities: ["k1", "hires", "audit"],
-      Towns: ["northline", "pricing", "inbox", "invoice"],
-      Villages: ["venues", "calls", "reply", "comp"],
-    });
+    expect(shown(c)).toEqual([
+      "k1",
+      "venues",
+      "calls",
+      "northline",
+      "hires",
+      "pricing",
+      "inbox",
+      "invoice",
+      "reply",
+      "comp",
+      "audit",
+    ]);
   });
 
   it("WEB_5_worlds_empty_state_names_the_filter", async () => {
@@ -217,7 +217,7 @@ describe("WEB_5_worlds: status tabs and scale legend", () => {
     click(tab(none.c, "Needs you"));
     expect(leaf(none.c, "Nothing needs you right now")).not.toBeNull();
     expect(leaf(none.c, BODY)).not.toBeNull();
-    expect(qa(none.c, "section[aria-label]")).toHaveLength(0);
+    expect(section(none.c, GRID)).toBeNull();
     click(tab(none.c, "All"));
     typeInto(search(none.c), "zzz");
     expect(leaf(none.c, "No worlds match")).not.toBeNull();
@@ -244,108 +244,66 @@ describe("WEB_5_worlds: cards", () => {
     },
   );
 
-  it.each<[string, (string | RegExp)[]]>([
+  it.each<[string, (string | RegExp)[], string]>([
     [
       "k1",
       [
-        "WORKSPACE",
         "K1 electric scooter",
-        "Concept to launch · Level 3 of 6",
+        "Concept to launch · Level 3 of 6 · Launch 14 Nov",
         "2 decisions",
         "46%",
-        "Spend",
+        "City · 38 helpers",
         /£1,386\s*of £4,000/,
-        "Agents",
-        "38",
-        "Launch",
-        "14 Nov",
       ],
-    ],
-    [
-      "hires",
-      [
-        "WORKSPACE",
-        "Onboard 12 new hires",
-        "Accounts, HR and training",
-        "Running",
-        "58%",
-        /£228\s*of £600/,
-        "14",
-        "Due",
-        "Fri 2 Oct",
-      ],
+      "img",
     ],
     [
       "audit",
       [
         "Q3 audit prep",
-        "Evidence pack signed off",
-        "Ready",
+        "Evidence pack signed off · Finished 12 Sep",
+        "Done",
         "100%",
         /£2,140\s*of £2,500/,
-        "22",
-        "Finished",
-        "12 Sep",
       ],
+      "img",
     ],
-  ])("WEB_5_worlds_city_card_%s_copy", async (id, wanted) => {
-    const { c } = await renderWorlds();
-    const t = text(card(c, id));
-    for (const w of wanted) has(t, w);
-    expect(card(c, id).querySelector("img"), "a mini world map").not.toBeNull();
-  });
-
-  it.each<[string, (string | RegExp)[], string[]]>([
     [
       "northline",
       [
-        "WORKSPACE",
         "Supplier onboarding · Northline",
-        "Contracts and portal access",
-        "Running",
-        "Due Wed 30 Sep",
+        "Contracts and portal access · Due Wed 30 Sep",
+        "Working",
+        "72%",
+        "Town · 7 helpers",
         /£342\s*of £500/,
       ],
-      ["Spend", "Agents"],
+      "img",
     ],
     [
       "invoice",
-      [
-        "ROUTINE",
-        "Weekly invoice match",
-        "Last run 142 matched, 3 flagged",
-        "Scheduled",
-        "Next run Mon 09:00",
-        /£0\.60\s*per run/,
-      ],
-      ["Spend", "%"],
+      ["Weekly invoice match", "Next run Mon 09:00", "Scheduled", "—", /£0\.60\s*per run/],
+      "img",
     ],
-  ])("WEB_5_worlds_town_card_%s_copy_and_strip", async (id, wanted, absent) => {
+    [
+      "calls",
+      ["Summarise yesterday’s calls", "About 3 min left", "Working", "80%", "£0.40"],
+      "img",
+    ],
+    ["comp", ["Competitor pricing", "Report · today 11:18", "Done", "Village · 1 helper"], "img"],
+  ])("STUDIO_3_worlds_card_%s_copy_and_picture", async (id, wanted, art) => {
     const { c } = await renderWorlds();
     const t = text(card(c, id));
     for (const w of wanted) has(t, w);
-    for (const a of absent) expect(t).not.toContain(a);
-    expect(card(c, id).querySelector("img"), "a building strip").not.toBeNull();
-  });
-
-  it.each<[string, string[]]>([
-    ["calls", ["Running", "Summarise yesterday’s calls", "About 3 min left"]],
-    ["comp", ["Ready", "Competitor pricing", "Report · today 11:18"]],
-  ])("WEB_5_worlds_village_card_%s_copy_and_single_building", async (id, wanted) => {
-    const { c } = await renderWorlds();
-    const t = text(card(c, id));
-    for (const w of wanted) expect(t).toContain(w);
-    for (const hidden of ["QUICK TASK", "Spend", "Agents", "%"])
-      expect(t, hidden).not.toContain(hidden);
-    expect(card(c, id).querySelector("img")).not.toBeNull();
+    expect(card(c, id).querySelector(art), "the world's own picture").not.toBeNull();
   });
 
   it.each([
     { when: "none_decided", dec: {}, id: "k1", chip: "2 decisions" },
     { when: "depot_decided", dec: { depot: true }, id: "k1", chip: "1 decision" },
-    { when: "both_decided", dec: { depot: true, mail: true }, id: "k1", chip: "Running" },
+    { when: "both_decided", dec: { depot: true, mail: true }, id: "k1", chip: "Working" },
     { when: "none_decided", dec: {}, id: "invoice", chip: "Scheduled" },
-    { when: "none_decided", dec: {}, id: "audit", chip: "Ready" },
+    { when: "none_decided", dec: {}, id: "audit", chip: "Done" },
   ])("WEB_5_worlds_status_chip_says [$when] $id: $chip, with a dot", async ({ dec, id, chip }) => {
     const { c } = await renderWorlds({ dec });
     const el = leaf(card(c, id), chip);
@@ -353,15 +311,14 @@ describe("WEB_5_worlds: cards", () => {
     expect(el?.firstElementChild, "the status dot").not.toBeNull();
   });
 
-  it("WEB_5_worlds_a_started_world_says_Starting_and_comes_first_in_its_section", async () => {
+  it("WEB_5_worlds_a_started_world_says_Starting_and_comes_first_among_working", async () => {
     const added: World[] = [
       fx.makeWorld("quick", "Compare three suppliers", 1),
       fx.makeWorld("workspace", "Plan the offsite", 2),
     ];
     const { c } = await renderWorlds({ added });
     expect(leaf(c, "13 worlds")).not.toBeNull();
-    expect(cardIds(c, "Villages")[0]).toBe("new1");
-    expect(cardIds(c, "Cities").slice(0, 2)).toEqual(["k1", "new2"]); // needs first, then running in source order
+    expect(shown(c).slice(0, 3)).toEqual(["k1", "new1", "new2"]); // needs first, then working in source order
     expect(leaf(card(c, "new1"), "Starting")).not.toBeNull();
     expect(text(card(c, "new1"))).toContain("Starting now");
     const t = text(card(c, "new2"));
@@ -380,9 +337,9 @@ describe("WEB_5_worlds: cards", () => {
   it("WEB_5_worlds_progress_bar_width_and_label_follow_prog", async () => {
     const { c } = await renderWorlds();
     expect(widths(card(c, "k1"))).toEqual(["46"]);
-    expect(widths(card(c, "northline"))).toEqual(["72"]); // a town draws the bar only when prog is set
-    expect(widths(card(c, "invoice"))).toEqual([]);
-    expect(widths(card(c, "calls")), "a village has no bar").toEqual([]);
+    expect(widths(card(c, "northline"))).toEqual(["72"]);
+    expect(widths(card(c, "invoice")), "no progress served: an empty bar").toEqual(["0"]);
+    expect(widths(card(c, "calls"))).toEqual(["80"]);
   });
 
   it("WEB_5_worlds_a_city_without_progress_shows_an_em_dash", async () => {
@@ -445,7 +402,7 @@ describe("WEB_5_worlds: waiting for you and all caught up", () => {
     expect(leaf(card(r.c, "k1"), "1 decision")).not.toBeNull();
     await r.update({ dec: { depot: true, mail: true } });
     expect(leaf(r.c, "WAITING FOR YOU")).toBeNull();
-    expect(leaf(card(r.c, "k1"), "Running")).not.toBeNull();
+    expect(leaf(card(r.c, "k1"), "Working")).not.toBeNull();
   });
 
   it("WEB_5_worlds_when_nothing_is_left_the_all_caught_up_banner_replaces_the_spotlight", async () => {
@@ -469,9 +426,7 @@ describe("WEB_5_worlds: invariants over any sequence of filter changes", () => {
   it("WEB_5_worlds_property_the_selected_count_equals_the_cards_shown", async () => {
     const { c } = await renderWorlds();
     const op = fc.oneof(
-      fc
-        .constantFrom("All", "Needs you", "Running", "Scheduled", "Ready")
-        .map((l) => () => click(tab(c, l))),
+      fc.constantFrom(...TABS).map((l) => () => click(tab(c, l))),
       fc
         .constantFrom("All sizes", "Cities", "Towns", "Villages")
         .map((l) => () => click(scaleButton(c, l))),
@@ -480,18 +435,14 @@ describe("WEB_5_worlds: invariants over any sequence of filter changes", () => {
     fc.assert(
       fc.property(fc.array(op, { minLength: 1, maxLength: 8 }), (ops) => {
         for (const o of ops) o();
-        const shown = SEC.flatMap((s) => cardIds(c, s));
+        const ids = shown(c);
         const on = statusTabs(c).filter((t) => t.getAttribute("aria-selected") === "true");
         expect(on).toHaveLength(1);
-        expect(tabCounts(c)[text(on[0] ?? null).replace(/\d+$/, "")]).toBe(shown.length);
-        expect(new Set(shown).size).toBe(shown.length);
-        for (const s of SEC) {
-          const n = cardIds(c, s).length;
-          expect(section(c, s) !== null, s).toBe(n > 0);
-          if (n > 0) expect(text(section(c, s)), s).toMatch(new RegExp(`${s}\\s*${n} · `));
-        }
+        expect(tabCounts(c)[text(on[0] ?? null).replace(/\d+$/, "")]).toBe(ids.length);
+        expect(new Set(ids).size).toBe(ids.length);
+        expect(section(c, GRID) !== null).toBe(ids.length > 0);
         expect(text(c).includes("Try another filter, or start something new from Home.")).toBe(
-          shown.length === 0,
+          ids.length === 0,
         );
         expect(leaf(c, "11 worlds")).not.toBeNull();
       }),

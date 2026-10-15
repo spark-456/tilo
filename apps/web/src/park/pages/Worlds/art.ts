@@ -16,8 +16,8 @@ export interface Art {
   icon(name: string, size: number): ReactNode;
   agent(): ReactNode;
   city(w: World): ReactNode;
-  strip(w: World): ReactNode;
-  single(w: World): ReactNode;
+  strip(w: World, size?: number): ReactNode;
+  single(w: World, size?: number): ReactNode;
 }
 
 /** One kit per mounted page; its plans come from the Api result the page last loaded. */
@@ -35,7 +35,7 @@ export function makeArt(kit: Kit, plans: PlanSource, dec: Dec, night: boolean): 
       // next visit (FR-UX-12).
       return cachedCity(plan, night, (p, n) => parkKit().TP.world(p, { night: n }) as ReactNode);
     },
-    strip: (w) => (w.row ? (kit.strip(w, 64, night) as ReactNode) : null),
-    single: (w) => (w.single ? (kit.art(w, 36, night) as ReactNode) : null),
+    strip: (w, size = 64) => (w.row ? (kit.strip(w, size, night) as ReactNode) : null),
+    single: (w, size = 36) => (w.single ? (kit.art(w, size, night) as ReactNode) : null),
   };
 }

@@ -1,5 +1,5 @@
-// The title row of the Worlds page: heading, total, subtitle, search, Share to Slack (FR-UX-17) and New world.
-import type { ChangeEvent } from "react";
+// The title row of the Worlds page (STUDIO-3, "Tilo S Worlds.dc.html"): heading, total, subtitle, Share to Slack
+// (FR-UX-17) and New world, the page's one filled button.
 import type { SlackConnectorState } from "../../app/slackShare";
 import type { Art } from "./art";
 
@@ -7,8 +7,6 @@ interface HeaderProps {
   art: Art;
   /** Every world, whatever the filters; null until the first load. */
   total: number | null;
-  query: string;
-  onQuery: (value: string) => void;
   onNew: () => void;
   slack?: SlackConnectorState | undefined;
   onShareSlack?: ((trigger: HTMLButtonElement) => void) | undefined;
@@ -16,7 +14,7 @@ interface HeaderProps {
 
 const NO_SLACK_ID = "park-worlds-noslack";
 
-export function Header({ art, total, query, onQuery, onNew, slack, onShareSlack }: HeaderProps) {
+export function Header({ art, total, onNew, slack, onShareSlack }: HeaderProps) {
   return (
     <div className="park-worlds-header">
       <div className="park-worlds-header__titles">
@@ -27,20 +25,10 @@ export function Header({ art, total, query, onQuery, onNew, slack, onShareSlack 
           )}
         </div>
         <p className="park-worlds-subtitle">
-          Every job Tilo is running, sized by scale: cities, towns and villages.
+          Every bigger job gets its own little city. Here are all of yours.
         </p>
       </div>
       <div className="park-worlds-header__actions">
-        <div className="park-worlds-search">
-          {art.icon("search", 16)}
-          <input
-            className="park-worlds-search__input"
-            aria-label="Search worlds"
-            placeholder="Search worlds"
-            value={query}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => onQuery(e.target.value)}
-          />
-        </div>
         {slack && onShareSlack ? (
           <>
             <button
