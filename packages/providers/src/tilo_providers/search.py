@@ -60,11 +60,24 @@ class SearchSource(BaseModel):  # one cited source
     resolved_url: str | None = None  # None here: LW-08 resolves the redirect through tilo-browser
 
 
+MAX_CITATIONS = 12  # GOOGLE-MAX: claim-to-source links kept per answer (it rides back to a model as a tool result)
+MAX_CITATION_TEXT = 160
+
+
+class SearchCitation(BaseModel):  # GOOGLE-MAX: one claim in the answer and the sources that support it
+    model_config = ConfigDict(extra="forbid")
+    start: int = Field(ge=0)  # character offsets of the claim in `answer`, as the provider gave them
+    end: int = Field(ge=0)
+    text: str = Field(max_length=MAX_CITATION_TEXT)
+    sources: list[int]  # indexes into `SearchResult.sources`
+
+
 class SearchResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
     query: str  # the redacted query that was sent
     answer: str
     sources: list[SearchSource]
+    citations: list[SearchCitation] = Field(default_factory=list)  # empty when the provider gave no claim-level links
     queries: list[str]  # what the provider searched for (Gemini: grounding_metadata.web_search_queries)
     suggestions_html: str | None = None  # the provider's suggestion chips: untrusted HTML, shown sandboxed
     profile_id: str

@@ -18,6 +18,9 @@ from tilo_providers.google_adapter import GoogleModelProvider
 from tilo_providers.interfaces import Capability, SearchProvider
 from tilo_providers.prompts import load_prompt
 from tilo_providers.search import (
+    MAX_CITATION_TEXT,
+    MAX_CITATIONS,
+    SearchCitation,
     SearchResult,
     SearchSource,
     clean_source_url,
@@ -85,22 +88,45 @@ class GoogleSearchProvider(SearchProvider):
         if isinstance(queries, list):  # the billing unit: one per entry, as Gemini reports them
             usage = {**(usage or {}), "search_queries": len(queries)}
         sources: dict[str, SearchSource] = {}
-        for chunk in getattr(metadata, "grounding_chunks", None) or []:
+        position: dict[int, int] = {}  # the provider's chunk index -> index in `sources` (a refused chunk has none)
+        for index, chunk in enumerate(getattr(metadata, "grounding_chunks", None) or []):
             web = getattr(chunk, "web", None)
             url = clean_source_url(getattr(web, "uri", None))
-            if url is not None and url not in sources:
+            if url is None:
+                continue
+            if url not in sources:
                 sources[url] = SearchSource(
                     title=_text_or_none(getattr(web, "title", None)),
                     domain=_text_or_none(getattr(web, "domain", None)),
                     redirect_url=url,
                 )
+            position[index] = list(sources).index(url)
         entry_point = getattr(metadata, "search_entry_point", None)
         return SearchResult(
             query=query,
             answer=reply.text or "",
             sources=list(sources.values()),
+            citations=self._citations(metadata, position),
             queries=[q for q in queries if isinstance(q, str)] if isinstance(queries, list) else [],
             suggestions_html=_text_or_none(getattr(entry_point, "rendered_content", None)),
             profile_id=self._profile_id,
             usage=usage,
         )
+
+    @staticmethod
+    def _citations(metadata: Any, position: dict[int, int]) -> list[SearchCitation]:
+        """GOOGLE-MAX: `grounding_supports` as claim-to-source links. A support whose chunks are all unusable is left
+        out; an index points into the returned `sources`, never into the provider's raw chunk list."""
+        citations: list[SearchCitation] = []
+        for support in getattr(metadata, "grounding_supports", None) or []:
+            segment = getattr(support, "segment", None)
+            start, end = getattr(segment, "start_index", None) or 0, getattr(segment, "end_index", None)
+            chunks = getattr(support, "grounding_chunk_indices", None) or []
+            linked = sorted({position[i] for i in chunks if isinstance(i, int) and i in position})
+            if not linked or not isinstance(end, int) or end < start:
+                continue
+            text = (_text_or_none(getattr(segment, "text", None)) or "")[:MAX_CITATION_TEXT]
+            citations.append(SearchCitation(start=start, end=end, text=text, sources=linked))
+            if len(citations) == MAX_CITATIONS:
+                break
+        return citations
