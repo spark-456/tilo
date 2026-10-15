@@ -18,6 +18,7 @@ import type {
   World,
 } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
+import { markPendingWorld } from "../../app/PendingWorldRoute";
 import { BUILD_SHA } from "../../app/buildStamp";
 import { useDemoSession, useParkApi, useParkStore, useSchedule } from "../../app/context";
 import { DEMO_START } from "../../app/store";
@@ -292,6 +293,7 @@ export function HomePage({ app }: { app: AppCtx }) {
         store.toast(
           `The run has started, but it was not set to repeat weekly. ${r.value.repeatRefused}`,
         );
+      markPendingWorld(r.value.worldId);
       go("world", { id: r.value.worldId });
     });
   };
