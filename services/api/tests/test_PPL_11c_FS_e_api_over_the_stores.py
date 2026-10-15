@@ -60,9 +60,17 @@ def _no_process_lock(monkeypatch):
     monkeypatch.setattr("tilo_api.people_writes._DIRECTORY_LOCK", contextlib.nullcontext(), raising=False)
 
 
+def _post_first(rig, body):
+    rig.email = body["email"]  # the sign-in's verified address (SELF-SERVE-TEAMS)
+    return rig.client.post("/v1/people/first", json=body)
+
+
 def _principal_from_header(rig):
     def principal(request: Request):
-        return rig.deps.Principal(user_id=request.headers["x-test-user"], role="owner", full_session=True)
+        uid = request.headers["x-test-user"]  # the token's verified address is the one each racer sends
+        return rig.deps.Principal(
+            user_id=uid, role="owner", full_session=True, verified_email=f"founder{uid[3:]}@example.com"
+        )
 
     rig.app.dependency_overrides[rig.deps.get_current_principal] = principal
 
@@ -157,13 +165,13 @@ def _fs_rig(people_rig, fs_backend):
 def test_PPL_11c_FS_14_first_on_firestore_writes_the_owner_the_address_and_the_founder_marker(people_rig, fs_backend):
     rig, org, stores = _fs_rig(people_rig, fs_backend)
     rig.require_route(R_PERSON_FIRST)
-    created = rig.client.post("/v1/people/first", json=_body())
+    created = _post_first(rig, _body())
     assert created.status_code == 201, created.text[:300]
     assert raw(fs_backend.client, founder_path(org)) == {"uid": FOUNDER}
     assert raw(fs_backend.client, email_path(org, "nina.patel@example.com")) == {"person_id": FOUNDER}
     assert stores.persons.get(org, FOUNDER).record["org_role"] == "owner"
     rig.as_user("u_late")
-    refused = rig.client.post("/v1/people/first", json=_body(email="late@example.com"))
+    refused = _post_first(rig, _body(email="late@example.com"))
     assert refused.status_code == 403 and refused.json() == {"detail": "forbidden"}
 
 
@@ -203,13 +211,13 @@ def test_PPL_11c_FS_14_racing_creates_of_one_address_on_firestore_leave_one(
 def test_PPL_11c_FS_14_an_emptied_org_cannot_be_refounded_over_the_api_on_firestore(people_rig, fs_backend):
     rig, org, stores = _fs_rig(people_rig, fs_backend)
     rig.require_route(R_PERSON_FIRST)
-    assert rig.client.post("/v1/people/first", json=_body()).status_code == 201
+    assert _post_first(rig, _body()).status_code == 201
     second = rig.post("/v1/people", _body(email="second@example.com", display_name="Second"))
     assert second.status_code == 201
     assert erase_person(stores, org, FOUNDER)["person"] == 1
     assert erase_person(stores, org, second.json()["id"])["person"] == 1
     assert stores.persons.list(org) == ()
-    again = rig.client.post("/v1/people/first", json=_body(email="again@example.com"))
+    again = _post_first(rig, _body(email="again@example.com"))
     assert again.status_code == 403 and again.json() == {"detail": "forbidden"}
 
 
@@ -221,15 +229,15 @@ def test_PPL_11c_FS_14_the_bootstrap_uid_gate_holds_over_firestore(people_rig, f
     rig.unwire("founder_gate")
     rig.require_route(R_PERSON_FIRST)
     rig.as_user("u_other")
-    joined = rig.client.post("/v1/people/first", json=_body(email="other@example.com"))
+    joined = _post_first(rig, _body(email="other@example.com"))
     assert joined.status_code == 201 and joined.json()["org_role"] == "member", "unconfigured founds nothing"
     monkeypatch.setenv("TILO_PEOPLE_BOOTSTRAP_UID", FOUNDER)
     rig.as_user("u_another")
-    joined = rig.client.post("/v1/people/first", json=_body(email="another@example.com"))
+    joined = _post_first(rig, _body(email="another@example.com"))
     assert joined.status_code == 201 and joined.json()["org_role"] == "member", "another uid joins as a member"
     assert stores.persons.founded(org) is False
     rig.as_user(FOUNDER)
-    assert rig.client.post("/v1/people/first", json=_body()).status_code == 201
+    assert _post_first(rig, _body()).status_code == 201
     assert stores.persons.founded(org) is True
 
 

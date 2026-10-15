@@ -32,6 +32,7 @@ def _rig(people_rig, monkeypatch):
 def _join(rig, uid: str, **body):
     rig.as_user(uid)
     name = uid[2:].capitalize()
+    rig.email = body.get("email", f"{uid[2:]}@example.com")  # the sign-in's verified address
     return rig.client.post(
         "/v1/people/first",
         json={**PERSON_BODY, "display_name": name, "aliases": [name], "email": f"{uid[2:]}@example.com", **body},

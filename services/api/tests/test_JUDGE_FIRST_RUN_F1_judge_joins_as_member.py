@@ -35,6 +35,7 @@ def _rig(people_rig, monkeypatch, declared: dict[str, str]):
 
 
 def _first(rig, **body):
+    rig.email = {**PERSON_BODY, **body}["email"]  # the sign-in's verified address (SELF-SERVE-TEAMS)
     return rig.client.post("/v1/people/first", json={**PERSON_BODY, **body})
 
 

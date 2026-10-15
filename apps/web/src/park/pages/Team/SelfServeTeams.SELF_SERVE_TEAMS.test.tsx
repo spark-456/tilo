@@ -134,3 +134,12 @@ it("SELF_SERVE_TEAMS a refused write says nothing changed", async () => {
   await settle();
   expect(el.textContent).toContain("That did not go through. Nothing was changed.");
 });
+
+it("SELF_SERVE_TEAMS a lapsed invitation is shown with Remove, which leaves it", async () => {
+  const client = fakeClient([{ team: "tm_old", lead: false, state: "lapsed", invitedBy: null }]);
+  const el = await mount(client);
+  expect(el.textContent).toContain("An invitation that no longer counts.");
+  await act(async () => button(el, "Remove").click());
+  await settle();
+  expect(client.leave).toHaveBeenCalledWith("tm_old", "u_me");
+});

@@ -42,7 +42,9 @@ def _clear_env(monkeypatch):
 
 def _first(rig, body=None):
     rig.require_route(R_PERSON_FIRST)
-    return rig.client.post("/v1/people/first", json=_body() if body is None else body)
+    body = _body() if body is None else body
+    rig.email = body["email"]  # the sign-in's verified address (SELF-SERVE-TEAMS)
+    return rig.client.post("/v1/people/first", json=body)
 
 
 def _assert_member_not_owner(rig, user: str) -> None:
@@ -217,7 +219,10 @@ def test_PPL_11c_FS_12_eight_principals_racing_one_bootstrap_uid_leave_its_owner
     rig.require_route(R_PERSON_FIRST)
 
     def principal(request: Request):
-        return rig.deps.Principal(user_id=request.headers["x-test-user"], role="owner", full_session=True)
+        uid = request.headers["x-test-user"]  # the token's verified address is the one each racer sends
+        return rig.deps.Principal(
+            user_id=uid, role="owner", full_session=True, verified_email=f"founder{uid[3:]}@example.com"
+        )
 
     rig.app.dependency_overrides[rig.deps.get_current_principal] = principal
 

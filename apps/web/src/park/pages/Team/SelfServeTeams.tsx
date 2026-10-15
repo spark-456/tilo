@@ -104,7 +104,22 @@ export function SelfServeTeams(props: { client?: TeamsClient | null }) {
       <h2 className="park-team-h2">Your teams</h2>
       {data.teams.length === 0 ? <p>You are not in a team yet.</p> : null}
       {data.teams.map((t) =>
-        t.state === "pending" ? (
+        t.state === "lapsed" ? (
+          <div className="park-team-details" key={t.team} data-testid="team-lapsed">
+            <p>An invitation that no longer counts. Remove it to free the place.</p>
+            {data.you ? (
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() =>
+                  void act(() => client.leave(t.team, data.you ?? ""), "Old invitation removed.")
+                }
+              >
+                Remove
+              </Button>
+            ) : null}
+          </div>
+        ) : t.state === "pending" ? (
           <div className="park-team-details" key={t.team} data-testid="team-invitation">
             <p>{`${t.invitedBy ?? "A team lead"} invited you to their team.`}</p>
             <Button

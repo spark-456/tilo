@@ -17,6 +17,7 @@ from __future__ import annotations
 import re
 import secrets
 from collections.abc import Callable, Mapping
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
@@ -42,6 +43,7 @@ _PERSON = re.compile(r"u_[0-9A-Za-z_]{1,48}")
 _SESSIONS = frozenset({"web", "mobile_web"})
 _ATTEMPTS = 3
 INVITED = {"status": "invited"}  # the one answer to an invitation (no existence oracle, PE-37)
+REMOVED = {"status": "done"}  # the one answer to a remove by a lead or an owner (no membership oracle, PE-37)
 
 
 class InviteIn(_Closed):
@@ -127,7 +129,9 @@ def _entry_view(d: Directory, actor: str, m: Mapping[str, Any], now: str) -> dic
     if pending(d, m, now):  # PE-20: the invited person reads the inviter's directory view while it is pending
         inviter = project("person", "directory", d.record(m["assigned_by"]["by"]) or {})
         return {"team": m["team"], "lead": False, "state": "pending", "invited_by": inviter}
-    return None  # an entry that counts for nothing is not shown
+    # An entry that counts for nothing (an invitation whose lead left, a stray lead flag): shown with no inviter, so
+    # its person can remove it and free the slot (the 8-membership limit counts every stored entry).
+    return {"team": m["team"], "lead": False, "state": "lapsed"}
 
 
 @router.get("/v1/teams")
@@ -141,6 +145,25 @@ def my_teams(principal: Principal, stores: Stores, clock: Clock) -> dict[str, An
         raise _not_found()
     rows = [_entry_view(d, principal.user_id, m, now) for m in me["memberships"]]
     return {"teams": [r for r in rows if r is not None], "you": principal.user_id}
+
+
+def _after_the_team(d: Directory, team: str, now: str) -> str:
+    """The invitation's stamp: the server clock, or 1 ms after the team's latest lead entry when the clock has not moved
+    past it (a founding entry must stay strictly the earliest, "Terms" (2); a create and an invite in one millisecond
+    would otherwise tie and found nothing)."""
+    latest = max(
+        (
+            m["assigned_by"]["at"]
+            for p in d.persons.values()
+            for m in p["memberships"]
+            if m["team"] == team and m.get("lead") is True
+        ),
+        default=None,
+    )
+    if latest is None or now > latest:
+        return now
+    later = datetime.strptime(latest, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=UTC) + timedelta(milliseconds=1)
+    return later.strftime("%Y-%m-%dT%H:%M:%S.") + f"{later.microsecond // 1000:03d}Z"
 
 
 @router.post("/v1/teams", status_code=201)
@@ -195,15 +218,17 @@ def invite(
     if me is None or not (me["org_role"] == "owner" or d.is_lead(principal.user_id, team, now)):
         raise _forbidden()
     wanted = body.email.lower()
+    stamp = {"by": principal.user_id, "at": now}
 
     def asked(d: Directory) -> TeamRequest | None:
         found = [uid for uid, p in d.persons.items() if p["email"].lower() == wanted]
         if len(found) != 1:
             return None
+        stamp["at"] = _after_the_team(d, team, now)
         return TeamRequest(principal.user_id, "add_member", deps.ORG_ID, now, person=found[0], team=team)
 
     def add(p: dict[str, Any]) -> dict[str, Any]:
-        entry = {"team": team, "assigned_by": {"by": principal.user_id, "at": now}}
+        entry = {"team": team, "assigned_by": dict(stamp)}
         return {**p, "memberships": [*p["memberships"], entry]}
 
     try:
@@ -238,16 +263,27 @@ def remove(
     clock: Clock,
 ) -> dict[str, Any]:  # fmt: skip
     """`remove_member`: an org owner any entry; a lead of the team any entry of it but another person's lead entry; a
-    person their own entry unless an org owner assigned it (decline, leave). Anything else is the one 403."""
+    person their own entry unless an org owner assigned it (decline, leave). A lead or an owner of the team gets the
+    same status and body whether the person had a pending entry, any entry or no record (a lead reads nothing of a
+    pending invitee, PE-20), and the write happens only when `decide_team` grants it. Anyone else: the one 403."""
     _session(principal)
     team, now = _team(team), clock()
     if _PERSON.fullmatch(person_id) is None:
         raise _forbidden()
+    d, _rows = _snapshot(stores)
+    me = d.record(principal.user_id)
+    manages = me is not None and (me["org_role"] == "owner" or d.is_lead(principal.user_id, team, now))
     asked = TeamRequest(principal.user_id, "remove_member", deps.ORG_ID, now, person=person_id, team=team)
 
     def drop(p: dict[str, Any]) -> dict[str, Any]:
         return {**p, "memberships": [m for m in p["memberships"] if m["team"] != team]}
 
-    if not _change(stores, lambda d: asked, drop):
+    try:
+        removed = _change(stores, lambda d: asked, drop)
+    except Refusal as refused:
+        if not manages or refused.status_code != 409:
+            raise
+        removed = False
+    if not (removed or manages):
         raise _forbidden()
-    return {"team": team, "removed": person_id}
+    return REMOVED

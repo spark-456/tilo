@@ -11,7 +11,7 @@ export interface TeamsTransport {
 export interface MyTeam {
   team: string;
   lead: boolean;
-  state: "member" | "pending";
+  state: "member" | "pending" | "lapsed"; // lapsed: an entry that counts for nothing, removable by its person
   invitedBy: string | null; // the inviter's display name, only while an invitation is pending (PE-20)
 }
 
@@ -32,7 +32,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 
 function teamRow(raw: unknown): MyTeam | null {
   if (!isObject(raw) || typeof raw.team !== "string" || !TEAM.test(raw.team)) return null;
-  if (raw.state !== "member" && raw.state !== "pending") return null;
+  if (raw.state !== "member" && raw.state !== "pending" && raw.state !== "lapsed") return null;
   const by = isObject(raw.invited_by) ? raw.invited_by.display_name : null;
   return {
     team: raw.team,

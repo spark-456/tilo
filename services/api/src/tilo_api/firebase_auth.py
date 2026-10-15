@@ -185,7 +185,9 @@ def user_id_for(uid: str) -> str:
 def principal_from_claims(claims: Mapping[str, Any], *, channel: Channel) -> Principal:
     """The `Principal` for verified claims: role owner (each person owns their own worlds), `full_session` True only
     for a Google sign-in (BQ-XWORLD-10: an anonymous demo session stays bound to its own world). Raises
-    `TokenRefused` for claims of the wrong shape. The principal never carries the email or name."""
+    `TokenRefused` for claims of the wrong shape. The principal never carries the name; it carries the email only as
+    `verified_email`, only for a Google sign-in whose `email_verified` is true, and never in its repr (SELF-SERVE-TEAMS:
+    the one address a self-join or founding may store)."""
     from tilo_api.deps import Principal  # noqa: PLC0415  (deps imports this module)
 
     sub, firebase = claims.get("sub") if isinstance(claims, Mapping) else None, claims.get("firebase")
@@ -193,7 +195,10 @@ def principal_from_claims(claims: Mapping[str, Any], *, channel: Channel) -> Pri
         raise TokenRefused("bad_claims")
     full = firebase.get("sign_in_provider") == "google.com"
     auth_time = claims.get("auth_time")  # a number: `_check_claims` already refused anything else (BK-06)
+    email = claims.get("email")
+    verified = email if full and claims.get("email_verified") is True and isinstance(email, str) else None
     return Principal(
+        verified_email=verified,
         user_id=user_id_for(sub),
         role="owner",
         channel=channel,

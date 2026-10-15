@@ -54,6 +54,7 @@ from tilo_api.people_writes import (
     remove_meeting,
     remove_team,
     set_role,
+    valid_email,
 )
 from tilo_api.request_work import while_connected
 
@@ -402,9 +403,16 @@ def create_first_person_route(
     even after members joined; anyone else in a full web or mobile_web sign-in that is not a demo session (FS-19, an
     allow-list) joins as a plain member (`self_join`), before or after founding. Nobody else ever becomes owner here.
     A person who already has a record gets it back with a 200 and nothing written (one record per uid). The session
-    is checked before any store is read; the role, org and stamps are never the request's."""
-    if not (principal.full_session and principal.channel in _FOUNDING_CHANNELS and not principal.demo_session):
+    is checked before any store is read; the role, org and stamps are never the request's. The stored address is the
+    sign-in's Google-verified email only (`Principal.verified_email`): a body naming another address is the same 403,
+    so nobody can claim someone else's address and receive their invitations."""
+    full = principal.full_session and not principal.demo_session and principal.world_id is None
+    if not (full and principal.channel in _FOUNDING_CHANNELS):
         raise Refusal(403, "forbidden")
+    verified = principal.verified_email
+    if verified is None or not valid_email(verified) or verified.lower() != body.email.lower():
+        raise Refusal(403, "forbidden")
+    body = body.model_copy(update={"email": verified})
     make = create_first_person if gate(principal.user_id) else create_self_member
 
     def join() -> dict[str, Any]:

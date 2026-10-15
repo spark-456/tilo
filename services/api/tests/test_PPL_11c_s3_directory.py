@@ -66,7 +66,9 @@ def _person(**changes):
 
 def _first(rig, body=None):
     rig.require_route(R_PERSON_FIRST)
-    return rig.client.post("/v1/people/first", json=_person() if body is None else body)
+    body = _person() if body is None else body
+    rig.email = body["email"]  # the sign-in's verified address (SELF-SERVE-TEAMS)
+    return rig.client.post("/v1/people/first", json=body)
 
 
 def _org_owner_rig(people_rig):
@@ -154,7 +156,10 @@ def test_PPL_11c_s3_PE_17_two_principals_racing_for_an_empty_org_leave_exactly_o
     rig.require_route(R_PERSON_FIRST)
 
     def principal(request: Request):
-        return rig.deps.Principal(user_id=request.headers["x-test-user"], role="owner", full_session=True)
+        uid = request.headers["x-test-user"]  # the token's verified address is the one each racer sends
+        return rig.deps.Principal(
+            user_id=uid, role="owner", full_session=True, verified_email=f"founder{uid[3:]}@example.com"
+        )
 
     rig.app.dependency_overrides[rig.deps.get_current_principal] = principal
 
