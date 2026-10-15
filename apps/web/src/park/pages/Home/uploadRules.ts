@@ -2,8 +2,8 @@
 // these are ported from the retired S-01 intakeRules (the server's own: packages/planning intake `_check_limits`).
 export const MAX_FILES = 10;
 export const MAX_BYTES = 50 * 1024 * 1024;
-export const ACCEPTED = "PDF, DOCX, PPTX, XLSX, CSV, PNG or JPG";
-export const ACCEPT_ATTR = ".pdf,.docx,.pptx,.xlsx,.csv,.png,.jpg,.jpeg";
+export const ACCEPTED = "PDF, DOCX, PPTX, XLSX, CSV, TXT, MD, JSON, PNG or JPG";
+export const ACCEPT_ATTR = ".pdf,.docx,.pptx,.xlsx,.csv,.txt,.md,.json,.png,.jpg,.jpeg";
 
 const EXTENSIONS = new Set(ACCEPT_ATTR.split(","));
 

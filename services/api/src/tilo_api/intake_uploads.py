@@ -9,7 +9,7 @@ from typing import Any
 from tilo_archive import RunArchive
 from tilo_memory.artifacts import ArtifactRefused, ArtifactStore, NewVersion, Origin, Scope, StoredVersion
 from tilo_planning.artifacts import InMemoryArtifactStore, StoredArtifact
-from tilo_planning.extraction import FILE_TYPES, Budget, ExtractionError, extract
+from tilo_planning.extraction import FILE_TYPES, TEXT_MIMES, Budget, ExtractionError, extract
 from tilo_planning.intake import IntakeRejected
 from tilo_providers.interfaces import SafetyProvider
 
@@ -65,7 +65,7 @@ class RunUploads(InMemoryArtifactStore):
         if not content:
             return None, "empty file", False, None
         kind, mime, _ = FILE_TYPES[PurePosixPath(name.lower()).suffix]
-        if mime == "text/csv":
+        if mime in TEXT_MIMES:
             try:
                 content.decode("utf-8-sig")
             except UnicodeDecodeError:
@@ -92,7 +92,7 @@ class RunUploads(InMemoryArtifactStore):
         if stored.screening == "unscreened":
             return None, FILE_SCREEN_UNAVAILABLE, False, None
         flagged = stored.screening == "flagged"
-        if mime == "text/csv":
+        if mime in TEXT_MIMES:
             text = stored.content.decode("utf-8-sig")  # the Director sees the exact redacted stored text
         return text, None, flagged, stored.screening_reason
 

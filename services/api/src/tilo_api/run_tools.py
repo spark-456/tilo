@@ -18,15 +18,33 @@ from tilo_harness.executor import DefaultUnitRunner, UnitContext, UnitOutcome
 from tilo_harness.quiz import validate_spec, verify_answers, wants_quiz
 from tilo_harness.tools import ToolRegistry
 from tilo_harness.unit_prompt import UpstreamItem
+from tilo_planning.extraction import ExtractionError, stored_text
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse
-from tilo_providers.media import check_parts
+from tilo_providers.media import ACCEPTED_MIME_TYPES, check_parts
 from tilo_providers.router import Router, RouterResult
 from tilo_providers.safety import SafetyProvider
 
 from tilo_api.access import Mode
 from tilo_api.quiz_apps import source_loader
 from tilo_api.report_render import render_report
-from tilo_api.web_tools import FetchTool, RunArchiveBridge, SearchTool, fetch_service
+from tilo_api.web_tools import FetchTool, RunArchiveBridge, SearchTool, fetch_service, typed_hosts
+
+FILE_TEXT_CAP = 4000  # characters of one converted upload a run agent reads (the prompt's upstream item cap)
+MAX_FILE_BYTES = 2_000_000  # a stored text or Office upload past this is not read for a run agent
+FILE_TEXT_TOTAL = 6000  # all uploads together: the rest of the upstream room stays for earlier units' output
+# FR-AGT-03: a specialist whose plan pins no skill still gets the two read-only (T1) web tools. They are the registry's
+# own: recorded search and fetch in replay, live only when the router is live (never this map's decision).
+DEFAULT_TOOLS = {"specialist": ("web_search", "fetch_url")}
+
+
+def brief_texts(run: Any) -> list[str]:
+    """Every string the person's task put into the brief and the intake answers, plus the brief's url sources."""
+    brief = run.brief if isinstance(run.brief, Mapping) else {}
+    texts = [brief.get("goal"), brief.get("audience"), *(brief.get("constraints") or [])]
+    texts += [d.get("title") for d in brief.get("deliverables") or [] if isinstance(d, Mapping)]
+    texts += [s.get("ref") for s in brief.get("sources") or [] if isinstance(s, Mapping) and s.get("kind") == "url"]
+    texts += [answer for _question, answer in getattr(run, "intake_answers", ())]
+    return [text for text in texts if isinstance(text, str)]
 
 
 class RunBudget:
@@ -100,8 +118,9 @@ class BoundRunRunner:
         self.router = router
         self.archive = RunArchiveBridge(run, archive)
         self.service = fetch_service(mode, self.archive, fixtures)
-        self.hosts: set[str] = set()
+        self.hosts: set[str] = typed_hosts(brief_texts(run))  # FR-CON-07: what the person typed or attached
         self.sources: dict[str, list[tuple[dict, Any]]] = {}
+        self.file_texts: dict[tuple[str, int], str | None] = {}
 
     def search(self, query: str) -> tuple[Any, float]:
         result, credits = self.budget.call(self.router.search, "search", query)
@@ -131,6 +150,7 @@ class BoundRunRunner:
             part.sha256: (ref, part) for ident in self.dependencies(unit) for ref, part in self.sources.get(ident, [])
         }
         stream = owner.store.events[owner.world_id]
+        texts: dict[str, tuple[str, str | None]] = {}
         load = source_loader(owner.seams.artifacts, owner.scope, stream)
         for event in stream:
             if event["type"] not in {"artifact.created", "artifact.versioned"}:
@@ -138,11 +158,14 @@ class BoundRunRunner:
             ref = event["data"]["artifact"]
             version = owner.seams.artifacts.head(owner.scope, ref)
             if version.record["origin"]["kind"] == "upload" and version.record["run_id"] == owner.run_id:
-                part = load(ref)
-                if part is not None:
+                if version.record["media_type"] not in ACCEPTED_MIME_TYPES:  # DOCX, XLSX, PPTX, CSV, text: as text
+                    label = (event.get("item") or {}).get("label") or "attached file"
+                    texts.setdefault(version.record["content_sha256"], (label, self.file_text(ref, version.record)))
+                elif (part := load(ref)) is not None:
                     native[part.sha256] = (ref, part)
         parts = [part for _, part in native.values()]
         check_parts(parts)
+        context = dataclasses.replace(context, upstream=(*self.file_items(texts), *context.upstream))
         if native:
             refs = json.dumps([ref for ref, _ in native.values()])
             context = dataclasses.replace(
@@ -164,6 +187,7 @@ class BoundRunRunner:
             models,
             clock=self.clock,
             tools=ToolRegistry([SearchTool(self.search, self.hosts), fetch]),
+            default_tools=DEFAULT_TOOLS,
             safety=self.safety,
             archive=self.archive,
             request_options={role: {"parts": parts} for role in models} if parts else {},
@@ -173,6 +197,36 @@ class BoundRunRunner:
             report_renderer=partial(render_report, fmt=render_format(unit, context.brief) or "pdf"),
         )
         return await runner.run(unit, context)
+
+    def file_text(self, ref: Mapping[str, Any], record: Mapping[str, Any]) -> str | None:
+        """The stored text of a converted upload (read again from its stored, redacted bytes), only if it was screened
+        clean and is small enough to read; None otherwise (a flagged or unreadable file is never given to a model)."""
+        key = (ref["artifact_id"], ref["version"])
+        if key not in self.file_texts:
+            text = None
+            if record["screening"] == "clean" and record["size_bytes"] <= MAX_FILE_BYTES:
+                try:
+                    text = stored_text(
+                        record["media_type"], self.run_owner.seams.artifacts.read(self.run_owner.scope, ref)
+                    )
+                except ExtractionError:
+                    text = None
+            self.file_texts[key] = text
+        return self.file_texts[key]
+
+    @staticmethod
+    def file_items(texts: Mapping[str, tuple[str, str | None]]) -> tuple[UpstreamItem, ...]:
+        """One untrusted upstream item per readable file, each cut to its cap and all to a shared one."""
+        items: list[UpstreamItem] = []
+        room = FILE_TEXT_TOTAL
+        for number, (label, text) in enumerate(texts.values(), 1):
+            if not text or not text.strip() or room <= 0:
+                continue
+            body = text.strip()[: min(FILE_TEXT_CAP, room)]
+            room -= len(body)
+            note = " (cut: the file is longer)" if len(text.strip()) > len(body) else ""
+            items.append(UpstreamItem(f"file{number}", f"File: {label}", body + note, screening="clean", tainted=True))
+        return tuple(items)
 
     async def before_handoff(self, unit: Mapping[str, Any], worker: str, announced: list[tuple[dict, str]]) -> bool:
         owner = self.run_owner

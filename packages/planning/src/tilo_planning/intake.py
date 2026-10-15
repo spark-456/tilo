@@ -25,7 +25,7 @@ MAX_TEXT_CHARS = 4000
 MAX_FILES = 10
 MAX_TOTAL_BYTES = 50_000_000  # BQ-98: "50 MB" in SI units, the stricter reading
 SAFETY_TOOL = "safety_provider"
-_ACCEPTED = "PDF, DOCX, PPTX, XLSX, CSV, PNG or JPG"
+_ACCEPTED = "PDF, DOCX, PPTX, XLSX, CSV, TXT, MD, JSON, PNG or JPG"
 
 
 class IntakeRejected(ValueError):

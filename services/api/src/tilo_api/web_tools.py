@@ -5,15 +5,44 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 import threading
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from tilo_browser.fetch import FetchService, RawArchiveStore, UpstreamResponse
+from tilo_browser.egress import EgressPolicy
+from tilo_browser.fetch import FetchService, RawArchiveStore, UpstreamResponse, is_forbidden_hostname
 from tilo_harness.tools import FakeFetchUrl, FakeWebSearch, ToolResult, archive_id
 from tilo_memory.artifacts import NewVersion, Origin
 from tilo_providers.media import MediaPart
+
+_URL = re.compile(r"https://[^\s<>\"'`\)\]}]+", re.IGNORECASE)
+MAX_TYPED_HOSTS = 20
+
+
+def typed_hosts(texts: Iterable[Any]) -> set[str]:
+    """FR-CON-07: the hosts of the https URLs a person typed or attached, found by code in the brief's text. A host the
+    fetch policy would refuse anyway (an IP, localhost, an internal or bare name), userinfo, another port and any
+    other scheme add nothing; the fetch itself still runs every egress, DNS and robots check."""
+    found: set[str] = set()
+    for text in texts:
+        for match in _URL.finditer(text) if isinstance(text, str) else ():
+            try:
+                parts = urlsplit(match.group().rstrip(".,;:!?"))
+                host, port = parts.hostname, parts.port
+                if not host or parts.username or parts.password or port not in (None, 443):
+                    continue
+                if is_forbidden_hostname(host):
+                    continue
+                EgressPolicy([host])  # ValueError for an IP literal or anything but a plain DNS name
+            except ValueError:
+                continue
+            found.add(host)
+            if len(found) >= MAX_TYPED_HOSTS:
+                return found
+    return found
 
 
 class RunArchiveBridge(RawArchiveStore):
