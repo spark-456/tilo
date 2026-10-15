@@ -410,6 +410,15 @@ def pytest_collection_modifyitems(items):
 
 
 @pytest.fixture(autouse=True)
+def _fresh_connection_views_cache():
+    """SKILLS-LIVE: a person's connector views are kept in the process for seconds; no test inherits another's."""
+    from tilo_api import deps
+
+    deps._CONNECTION_VIEWS_CACHE.forget()
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _fresh_missing_token_log():
     """The missing-token warning is sampled per process (once a minute): each test starts with a first one."""
     from tilo_api import appcheck

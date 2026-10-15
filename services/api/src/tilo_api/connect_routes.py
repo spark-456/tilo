@@ -148,6 +148,8 @@ def callback(
         got = client.connect_callback(user, state=body.state, code=body.code, error=body.error)
     except HostRpcError as exc:
         raise _failed(exc) from None
+    finally:
+        deps.forget_connection_views(user)  # SKILLS-LIVE: the list must show the change at once
     alerts = _apply(user, got.parts, outbox_store, store)
     if alerts:
         logger.warning("connector callback: alert ids %s", ",".join(alerts))
@@ -178,6 +180,8 @@ def disconnect(
         got = client.connect_disconnect(user, body.connector)
     except HostRpcError as exc:
         raise _failed(exc) from None
+    finally:
+        deps.forget_connection_views(user)
     alerts = _apply(user, got.parts, outbox_store, store)
     if alerts:  # the ids find connectors' retry record; nothing here or there retries it on its own
         logger.warning("connector disconnect: revoke at Google not confirmed, alert ids %s", ",".join(alerts))

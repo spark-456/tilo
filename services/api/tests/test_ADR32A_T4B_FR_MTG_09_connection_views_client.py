@@ -223,6 +223,7 @@ def test_ADR32A_T4B_FR_MTG_09_a_configured_provider_gives_a_callable_that_never_
     views = deps.get_connection_views_rpc()
     got = views(USER)
     assert [v.connector for v in got] == ["gmail", "google_drive", "meeting_host"]
+    deps.forget_connection_views(USER)  # SKILLS-LIVE: a person's views are kept for a few seconds; this asks again
     assert views(USER) is None  # the lost connection: unknown, not a raise
     assert "lovable" in registry_ids  # the order given to the client is the oauth2 subset
     assert rig.transport.calls[0]["json"] == {"user_id": USER}

@@ -24,7 +24,16 @@ export interface HelpProps {
   onRateDown: (rateId: string) => void;
   onSaveFix: (entry: SkillFixEntry) => void;
   onReview: (skillId: string, skillName: string, decision: "trusted" | "learning") => void;
+  /**
+   * SKILLS-LIVE: true when the data came from the real API. "Who helped this month" then shows only what the page
+   * has loaded (never the sample numbers), and an answer or fix given here is not counted: nothing saves it yet.
+   */
+  live?: boolean;
 }
+
+/** The current month's name from the clock, for the "Who helped this month" hint on a live page. */
+export const currentMonthLabel = (now: Date = new Date()): string =>
+  now.toLocaleString("en-GB", { month: "long" });
 
 function ThumbIcon({ down }: { down?: boolean }) {
   return (
@@ -58,6 +67,7 @@ export function HelpSection({
   onRateDown,
   onSaveFix,
   onReview,
+  live = false,
 }: HelpProps) {
   const [fixing, setFixing] = useState<string | null>(null);
   const [fixStep, setFixStep] = useState<number | null>(null);
@@ -65,7 +75,10 @@ export function HelpSection({
 
   const asksSrc = skills.filter((s) => s.ask);
   const qLeftN = asksSrc.filter((s) => !ans[s.id]).length;
-  const mine = Object.keys(ans).length + Object.keys(fixed).length + Object.keys(rate).length;
+  // On a live page an answer, rating or fix made here is only on this page (no route saves it), so it is not counted.
+  const mine = live
+    ? 0
+    : Object.keys(ans).length + Object.keys(fixed).length + Object.keys(rate).length;
   const helpersWithMine = learn.helpers.map((p) => ({
     id: p.id,
     name: p.you ? `${p.name} (you)` : p.name,
@@ -75,6 +88,7 @@ export function HelpSection({
     n: p.n + (p.you ? mine : 0),
   }));
   const maxH = Math.max(1, ...helpersWithMine.map((p) => p.n));
+  const liveTotal = helpersWithMine.reduce((sum, p) => sum + p.n, 0);
 
   return (
     <section aria-label="Help your agents get better" className="park-skills-section">
@@ -131,7 +145,7 @@ export function HelpSection({
                   ) : (
                     <div className="park-skills-ask-done">
                       {icon("check", 12)}
-                      {`“${a}” · every agent now knows`}
+                      {live ? `“${a}” · noted on this page only` : `“${a}” · every agent now knows`}
                     </div>
                   )}
                 </div>
@@ -344,23 +358,38 @@ export function HelpSection({
             <div className="park-skills-help-card-head">
               <h3 className="park-skills-h3">Who helped this month</h3>
               <span className="park-skills-help-hint">
-                {HELPER_SUMMARY_FIXTURE.helperMonthLabel}
+                {live ? currentMonthLabel() : HELPER_SUMMARY_FIXTURE.helperMonthLabel}
               </span>
             </div>
-            <div className="park-skills-who-stats">
-              <div className="park-skills-who-stat park-skills-who-stat--ok">
-                <div className="park-skills-who-stat-k">Mistakes since July</div>
-                <div className="park-skills-who-stat-v">
-                  {HELPER_SUMMARY_FIXTURE.mistakesDeltaSinceJuly}
+            {live ? (
+              liveTotal > 0 ? (
+                <div className="park-skills-who-stats">
+                  <div className="park-skills-who-stat park-skills-who-stat--hero">
+                    <div className="park-skills-who-stat-k">Answers and fixes</div>
+                    <div className="park-skills-who-stat-v">{String(liveTotal)}</div>
+                  </div>
+                </div>
+              ) : (
+                <p className="park-skills-help-hint" data-testid="skills-who-empty">
+                  No answers or fixes yet this month
+                </p>
+              )
+            ) : (
+              <div className="park-skills-who-stats">
+                <div className="park-skills-who-stat park-skills-who-stat--ok">
+                  <div className="park-skills-who-stat-k">Mistakes since July</div>
+                  <div className="park-skills-who-stat-v">
+                    {HELPER_SUMMARY_FIXTURE.mistakesDeltaSinceJuly}
+                  </div>
+                </div>
+                <div className="park-skills-who-stat park-skills-who-stat--hero">
+                  <div className="park-skills-who-stat-k">Answers and fixes</div>
+                  <div className="park-skills-who-stat-v">
+                    {String(HELPER_SUMMARY_FIXTURE.baseMonthlyAnswersAndFixes + mine)}
+                  </div>
                 </div>
               </div>
-              <div className="park-skills-who-stat park-skills-who-stat--hero">
-                <div className="park-skills-who-stat-k">Answers and fixes</div>
-                <div className="park-skills-who-stat-v">
-                  {String(HELPER_SUMMARY_FIXTURE.baseMonthlyAnswersAndFixes + mine)}
-                </div>
-              </div>
-            </div>
+            )}
             {helpersWithMine.map((p) => (
               <div key={p.id} className="park-skills-helper-row">
                 <div className="park-skills-helper-init" style={{ background: p.c }}>
