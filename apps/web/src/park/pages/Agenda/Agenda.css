@@ -1057,3 +1057,85 @@
     text-overflow: clip;
   }
 }
+
+/* ---- UI-STUDIO-5: the live Agenda in two columns (Studio look in Agenda.studio.css) ---- */
+[data-park] .park-agenda-studio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 360px);
+  gap: 24px;
+  align-items: start;
+}
+[data-park] .park-agenda-studiomain,
+[data-park] .park-agenda-studioside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+[data-park] .park-agenda-studio .park-agenda-state {
+  align-items: stretch;
+  gap: 10px;
+  padding: 20px 22px;
+  border: 1px solid var(--line2);
+  border-radius: 24px;
+  background: var(--card);
+  color: var(--ink);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-agenda-studio .park-agenda-state h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+[data-park] .park-agenda-studio .park-agenda-state ul {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-agenda-studio .park-agenda-state li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--sunk);
+}
+[data-park] .park-agenda-studio .park-agenda-state p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink2);
+}
+[data-park] .park-agenda-weeknote {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+[data-park] .park-agenda-weeknote h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+[data-park] .park-agenda-studio .park-agenda-sidecard {
+  border-style: dashed;
+}
+[data-park] .park-agenda-studio .park-agenda-sidecard .park-agenda-sidena {
+  font-weight: 700;
+  color: var(--ink);
+}
+[data-park] .park-agenda-date {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+@media (max-width: 1099px) {
+  [data-park] .park-agenda-studio {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
