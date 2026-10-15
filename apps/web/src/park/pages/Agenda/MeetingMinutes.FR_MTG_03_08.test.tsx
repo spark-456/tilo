@@ -2,7 +2,7 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, click, mount } from "../../../../test-support/park/componentsHarness";
-import { HttpClient, TiloApiError } from "../../../api/http";
+import { TiloApiError } from "../../../api/http";
 import { meetingMinutesApi } from "../../api/live/meetingMinutes";
 import { MeetingMinutes } from "./MeetingMinutes";
 import { PeopleLists } from "./PeopleLists";
@@ -29,7 +29,6 @@ const attendees = [
   { user: null, name: "Unresolved guest" },
 ];
 const mockHttp = () => ({
-  hasPostRoute: vi.fn().mockResolvedValue(true),
   getJson: vi.fn(async (path: string) =>
     path.endsWith("/minutes") ? doc : { id: "mt_a", minutes_confirmed_by: null, attendees },
   ),
@@ -56,38 +55,41 @@ const press = async (root: HTMLElement, text: string) => {
 };
 
 describe("FR_MTG_03_08 Park minutes owner flow", () => {
-  it.each([404, 405])(
-    "Agenda hides absent routes and exposes registered routes (%s) without a write",
-    async (routeStatus) => {
-      const fetcher = vi.fn(async (url: string, init: RequestInit) => {
-        if (init.method === "OPTIONS") return new Response("{}", { status: routeStatus });
-        return new Response(
-          JSON.stringify({
-            items: url.endsWith("/meetings")
-              ? [
-                  {
-                    id: "mt_a",
-                    title: "Review call",
-                    status: "ended",
-                    scheduled: null,
-                    created_at: "2026-10-14T00:00:00Z",
-                  },
-                ]
-              : [],
-            truncated: false,
-          }),
-        );
-      });
-      vi.stubGlobal("fetch", fetcher);
-      const m = mount(<PeopleLists />);
-      await act(async () => undefined);
-      expect(m.container.textContent).toContain("Review call");
-      expect(Boolean(button(m.container, "Analyze minutes"))).toBe(routeStatus === 405);
-      expect(
-        fetcher.mock.calls.every(([, init]) => !init.method || init.method === "OPTIONS"),
-      ).toBe(true);
-    },
-  );
+  it("FR_MTG_03 Agenda sends no capability probe and no OPTIONS: the real route is called only on a click", async () => {
+    const fetcher = vi.fn(async (url: string, init: RequestInit) => {
+      if (init?.method === "POST") return new Response("{}", { status: 404 });
+      return new Response(
+        JSON.stringify({
+          items: url.endsWith("/meetings")
+            ? [
+                {
+                  id: "mt_a",
+                  title: "Review call",
+                  status: "ended",
+                  scheduled: null,
+                  created_at: "2026-10-14T00:00:00Z",
+                },
+              ]
+            : [],
+          truncated: false,
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const m = mount(<PeopleLists />);
+    await act(async () => undefined);
+    expect(m.container.textContent).toContain("Review call");
+    expect(fetcher.mock.calls.some(([url]) => String(url).includes("capability_probe"))).toBe(
+      false,
+    );
+    expect(fetcher.mock.calls.every(([, init]) => init?.method !== "OPTIONS")).toBe(true);
+    expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(
+      true,
+    );
+    await press(m.container, "Analyze minutes");
+    // a server that never installed the minutes router answers 404: the control goes away
+    expect(button(m.container, "Analyze minutes")).toBeUndefined();
+  });
   it("does not analyze or draft on mount; requires review and explicit confirmation before drafting", async () => {
     const http = mockHttp();
     const m = mount(<MeetingMinutes id="mt_a" status="ended" api={meetingMinutesApi(http)} />);
@@ -150,37 +152,6 @@ describe("FR_MTG_03_08 Park minutes owner flow", () => {
     await press(m.container, "Confirm these minutes");
     expect(m.container.querySelector('[role="alert"]')).not.toBeNull();
     expect(button(m.container, "Draft follow-up")).toBeUndefined();
-  });
-  it("discovers both routes without OpenAPI, providers or writes; absent route stays off", async () => {
-    const http = mockHttp();
-    http.hasPostRoute.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
-    expect(await meetingMinutesApi(http).available()).toBe(false);
-    expect(http.getJson).not.toHaveBeenCalled();
-    expect(http.postJson).not.toHaveBeenCalled();
-  });
-  it("route discovery uses existing authentication and App Check with OPTIONS", async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(new Response('{"detail":"Method Not Allowed"}', { status: 405 }));
-    const http = new HttpClient({
-      baseUrl: "https://api.example.test",
-      fetch: fetcher,
-      authToken: async () => "owner-token",
-      appCheckToken: async () => "app-check",
-    });
-    expect(await http.hasPostRoute("/v1/meetings/mt_probe/analyze-minutes")).toBe(true);
-    const init = fetcher.mock.calls[0]?.[1];
-    if (!init) throw new Error("Missing discovery request");
-    expect(init.method).toBe("OPTIONS");
-    expect(new Headers(init.headers).get("authorization")).toBe("Bearer owner-token");
-    expect(new Headers(init.headers).get("X-Firebase-AppCheck")).toBe("app-check");
-  });
-  it.each([404, 401, 403, 503])("route discovery fails closed for %s", async (status) => {
-    const http = new HttpClient({
-      baseUrl: "https://api.example.test",
-      fetch: vi.fn().mockResolvedValue(new Response("{}", { status })),
-    });
-    expect(await http.hasPostRoute("/v1/meetings/mt_probe/analyze-minutes")).toBe(false);
   });
   it("refuses malformed or duplicate recipients before writing", async () => {
     const http = mockHttp();

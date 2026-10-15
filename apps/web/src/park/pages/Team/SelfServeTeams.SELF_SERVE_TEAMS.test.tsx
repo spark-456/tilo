@@ -143,3 +143,19 @@ it("SELF_SERVE_TEAMS a lapsed invitation is shown with Remove, which leaves it",
   await settle();
   expect(client.leave).toHaveBeenCalledWith("tm_old", "u_me");
 });
+
+it("FR_TEAM_01 SELF_SERVE_TEAMS reports the person's teams after the first read and after Create", async () => {
+  const client = fakeClient([]);
+  const seen: [string | null, { name: string; lead: boolean }[]][] = [];
+  host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  act(() =>
+    root?.render(createElement(SelfServeTeams, { client, onLoaded: (y, t) => seen.push([y, t]) })),
+  );
+  await settle();
+  expect(seen.at(-1)).toEqual(["u_me", []]);
+  await act(async () => button(host as HTMLElement, "Create a team").click());
+  await settle();
+  expect(seen.at(-1)).toEqual(["u_me", [{ name: "Me's team", lead: true }]]);
+});

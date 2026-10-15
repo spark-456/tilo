@@ -9,7 +9,7 @@ import {
   teamsClient,
 } from "../../api/selfServeTeams";
 import { Button } from "../../components";
-import { isValidEmail } from "./teamModel";
+import { type MyTeamName, isValidEmail } from "./teamModel";
 
 export const INVITE_SENT =
   "Invitation saved. If that address belongs to someone who has signed in, they will see it on their Team page.";
@@ -63,7 +63,12 @@ function Invite({
   );
 }
 
-export function SelfServeTeams(props: { client?: TeamsClient | null }) {
+export function SelfServeTeams(props: {
+  client?: TeamsClient | null;
+  /** The person's own teams after every read, for the people table beside this panel. */
+  onLoaded?: (you: string | null, teams: MyTeamName[]) => void;
+}) {
+  const { onLoaded } = props;
   const [client] = useState(() => (props.client === undefined ? teamsClient() : props.client));
   const [data, setData] = useState<Loaded | null>(null);
   const [note, setNote] = useState("");
@@ -72,11 +77,18 @@ export function SelfServeTeams(props: { client?: TeamsClient | null }) {
   const refresh = useCallback(async () => {
     if (!client) return;
     try {
-      setData(await load(client));
+      const next = await load(client);
+      setData(next);
+      onLoaded?.(
+        next.you,
+        next.teams.flatMap((t) =>
+          t.state === "member" ? [{ name: teamName(next.rosters[t.team]), lead: t.lead }] : [],
+        ),
+      );
     } catch {
       setData(null);
     }
-  }, [client]);
+  }, [client, onLoaded]);
 
   useEffect(() => {
     void refresh();
