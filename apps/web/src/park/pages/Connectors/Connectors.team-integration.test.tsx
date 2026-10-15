@@ -67,7 +67,7 @@ it("TEAM_WEB_integration_catalogue_remains_when_owner_opens_team_controls", asyn
     "https://api.test/v1/team",
   ]);
   expect(container.textContent).toContain("Actual Mail");
-  expect(container.querySelector('select[aria-label="Access level for mail"]')).not.toBeNull();
+  expect(container.querySelector('fieldset[aria-label="Access level for mail"]')).not.toBeNull();
 });
 
 it("TEAM_WEB_integration_people_directory_survives_failed_team_controls_read", async () => {

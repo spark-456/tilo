@@ -2,16 +2,66 @@
 // what the server does know: each tool's team access level (off, read, draft, act) from GET /v1/team, changed
 // with PUT /v1/team/tools/{connector} by the Owner only. Optimistic, rolled back on failure (useLiveTeam).
 // A saved level for each skill (FR-ACC-02) needs a contract change and stays not built.
-import { TOOL_LEVELS, type TeamView } from "../../api/live/teamLive";
+// UI-STUDIO-5 (design/studio-v2 "Tilo S Connectors"): "What Tilo may do" in plain words, one choice per app:
+// Always (act, within policy), Ask me (draft only: you send), Read only, Never (off). The same four server levels.
+import type { TeamView, ToolLevelName } from "../../api/live/teamLive";
 import { type LiveTeam, READ_ONLY } from "../../app/useLiveTeam";
 
-const LABEL: Record<string, string> = { off: "Off", read: "Read", draft: "Draft", act: "Act" };
+/** The design's order, most to least: each label is the server level it saves. */
+const CHOICES: readonly (readonly [ToolLevelName, string])[] = [
+  ["act", "Always"],
+  ["draft", "Ask me"],
+  ["read", "Read only"],
+  ["off", "Never"],
+];
 const WORDS: Record<string, string> = {
   off: "Agent runs cannot use this tool. Email Autopilot and calendar sync do not check this yet.",
   read: "Agents can read from this tool.",
   draft: "Agents can prepare drafts, never send.",
   act: "Agents can act, within policy.",
 };
+
+/** One app's level as a row of radio choices (a real radio group: arrow keys move, a disabled set says so). */
+function LevelPicker({
+  connector,
+  level,
+  disabled,
+  onPick,
+}: {
+  connector: string;
+  level: string;
+  disabled: boolean;
+  onPick: (next: string) => void;
+}) {
+  return (
+    <fieldset
+      className="park-connectors-levels"
+      aria-label={`Access level for ${connector}`}
+      disabled={disabled}
+    >
+      {CHOICES.map(([value, label]) => (
+        <label
+          key={value}
+          className={
+            level === value
+              ? "park-connectors-level park-connectors-level--on"
+              : "park-connectors-level"
+          }
+        >
+          <input
+            type="radio"
+            className="park-connectors-levelinput"
+            name={`level-${connector}`}
+            value={value}
+            checked={level === value}
+            onChange={() => onPick(value)}
+          />
+          {label}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
 
 export function ToolAccess({
   live,
@@ -33,32 +83,28 @@ export function ToolAccess({
       </output>
       <section className="park-connectors-section" aria-label="Tool access">
         <div className="park-connectors-sechead">
-          <span className="park-connectors-sectitle">Tool access</span>
+          <span className="park-connectors-sectitle">What Tilo may do</span>
           <span className="park-connectors-count">{view.tools.length} tools</span>
         </div>
         {view.tools.map((t) => (
-          <div key={t.connector} className="park-connectors-usedrow">
+          <div key={t.connector} className="park-connectors-usedrow park-connectors-levelrow">
             <span className="park-connectors-usedname">{t.connector}</span>
-            <select
-              className="park-team-select"
-              aria-label={`Access level for ${t.connector}`}
-              value={t.level}
+            <LevelPicker
+              connector={t.connector}
+              level={t.level}
               disabled={off}
-              onChange={(e) =>
+              onPick={(next) =>
                 void live
-                  .send({ kind: "tool", connector: t.connector, level: e.target.value })
-                  .then((ok) => ok && toast(`${t.connector}: ${WORDS[e.target.value] ?? "saved"}`))
+                  .send({ kind: "tool", connector: t.connector, level: next })
+                  .then((ok) => ok && toast(`${t.connector}: ${WORDS[next] ?? "saved"}`))
               }
-            >
-              {TOOL_LEVELS.map((l) => (
-                <option key={l} value={l}>
-                  {LABEL[l]}
-                </option>
-              ))}
-            </select>
+            />
             <span className="park-connectors-lvsub">{WORDS[t.level] ?? ""}</span>
           </div>
         ))}
+        <div className="park-connectors-note">
+          Payments, sharing outside the team and anything that can’t be undone still ask a person.
+        </div>
         <div className="park-connectors-note">A saved level for each skill is not built yet.</div>
       </section>
     </>

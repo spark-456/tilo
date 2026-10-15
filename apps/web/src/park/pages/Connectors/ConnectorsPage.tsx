@@ -15,6 +15,7 @@ import { isNotBuilt, useLiveTeam } from "../../app/useLiveTeam";
 import { PageSheet } from "../../components";
 import { ToolAccess } from "./ToolAccess";
 import "./Connectors.css";
+import "./Connectors.studio.css";
 import { ConnectionsSection } from "../../shared/RunAdmin";
 import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
@@ -61,10 +62,27 @@ function Heading({ count, children }: { count?: string; children?: ReactNode }) 
           {count ? <span className="park-connectors-count">{count}</span> : null}
         </div>
         <p className="park-connectors-sub">
-          The tools your agents can use, and how far each one can go.
+          The apps Tilo can use for you. You decide what it may do in each one.
         </p>
       </div>
       {children}
+    </div>
+  );
+}
+
+/** UI-STUDIO-5 (design "Tilo S Connectors"): the apps on the left, what Tilo may do in each on the right. */
+function Studio({ main, side }: { main: ReactNode; side: ReactNode }) {
+  return (
+    <div className="park-connectors-studio">
+      <div className="park-connectors-main">{main}</div>
+      <aside className="park-connectors-aside" aria-label="Permissions">
+        <h2 className="park-connectors-asidetitle">What Tilo may do</h2>
+        <p className="park-connectors-asideline">
+          Each app has one choice: Always, Ask me, Read only or Never. Payments, sharing outside the
+          team and anything that can’t be undone always ask a person.
+        </p>
+        {side}
+      </aside>
     </div>
   );
 }
@@ -117,13 +135,17 @@ export function ConnectorsPage({
     return (
       <Frame>
         <Heading />
-        <div className="park-connectors-empty">
-          <div className="park-connectors-empty-title">Connector data is unavailable</div>
-          <div className="park-connectors-empty-line">
-            The connector list is unavailable. No connection status can be shown.
-          </div>
-        </div>
-        <TeamTools app={app} />
+        <Studio
+          main={
+            <div className="park-connectors-empty">
+              <div className="park-connectors-empty-title">Connector data is unavailable</div>
+              <div className="park-connectors-empty-line">
+                The connector list is unavailable. No connection status can be shown.
+              </div>
+            </div>
+          }
+          side={<TeamTools app={app} />}
+        />
       </Frame>
     );
 
@@ -131,13 +153,24 @@ export function ConnectorsPage({
     return (
       <Frame>
         <Heading />
-        {live ? <GoogleAccess flow={live} /> : null}
-        <MeetingHostAccess flow={live} />
-        <LiveConnectors connectors={load.connectors} />
-        <details onToggle={(e) => setToolsOpen(e.currentTarget.open)}>
-          <summary>Manage team tool access</summary>
-          {toolsOpen ? <TeamTools app={app} /> : null}
-        </details>
+        <Studio
+          main={
+            <>
+              {live ? <GoogleAccess flow={live} /> : null}
+              <MeetingHostAccess flow={live} />
+              <LiveConnectors connectors={load.connectors} />
+            </>
+          }
+          side={
+            <details
+              className="park-connectors-disclosure"
+              onToggle={(e) => setToolsOpen(e.currentTarget.open)}
+            >
+              <summary className="park-connectors-summary">Manage team tool access</summary>
+              {toolsOpen ? <TeamTools app={app} /> : null}
+            </details>
+          }
+        />
       </Frame>
     );
   }

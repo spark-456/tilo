@@ -1,0 +1,172 @@
+/* UI-STUDIO-5 Connectors (design/studio-v2 "Tilo S Connectors", canvas section 10): values read from the artboard's
+   inline styles. Only under the Studio theme, so Connectors.css keeps the Park look. Colours are role tokens (light
+   and dark). No transition, animation or keyframes: the artboard's card lift on hover is left out (HR-2). */
+[data-park][data-theme="studio"] [data-testid="park-page-connectors"] > .park-sheet {
+  max-width: 1296px;
+  margin: 0 auto;
+  padding: 8px 8px 64px;
+  gap: 24px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+[data-park][data-theme="studio"] .park-connectors-titles {
+  gap: 8px;
+}
+[data-park][data-theme="studio"] .park-connectors-h1 {
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: -2px;
+}
+[data-park][data-theme="studio"] .park-connectors-sub {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink2);
+}
+[data-park][data-theme="studio"] .park-connectors-search {
+  width: 340px;
+  height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+}
+[data-park][data-theme="studio"] .park-connectors-search-input {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* ---- Sections and tiles: hairlines, r22, a soft shadow ---- */
+[data-park][data-theme="studio"] .park-connectors-sectitle {
+  font-size: 15px;
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-connectors-tile,
+[data-park][data-theme="studio"] .park-connectors-avail {
+  padding: 18px;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park][data-theme="studio"] .park-connectors-grid {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+[data-park][data-theme="studio"] .park-connectors-avail-mono {
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--sunk);
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-connectors-tile-name,
+[data-park][data-theme="studio"] .park-connectors-avail-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-connectors-live p:not(.park-connectors-livestate) {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink3);
+}
+[data-park][data-theme="studio"] .park-connectors-avail-blurb,
+[data-park][data-theme="studio"] .park-connectors-count,
+[data-park][data-theme="studio"] .park-connectors-note {
+  font-weight: 500;
+  color: var(--ink3);
+}
+[data-park][data-theme="studio"] .park-connectors-connect {
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 12px;
+  background: var(--card);
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-connectors-disconnect {
+  min-height: 44px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--redInk);
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-connectors-empty {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+}
+
+/* ---- What Tilo may do: the aside card, one radio row per app ---- */
+[data-park][data-theme="studio"] .park-connectors-aside {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: var(--sh);
+}
+[data-park][data-theme="studio"] .park-connectors-asidetitle {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+[data-park][data-theme="studio"] .park-connectors-asideline {
+  font-size: 14.5px;
+  font-weight: 500;
+}
+[data-park][data-theme="studio"] .park-connectors-usedrow.park-connectors-levelrow {
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  padding: 14px 0 6px;
+}
+[data-park][data-theme="studio"] .park-connectors-levelrow .park-connectors-usedname {
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+[data-park][data-theme="studio"] .park-connectors-levels {
+  border-radius: 12px;
+  background: var(--sunk);
+}
+[data-park][data-theme="studio"] .park-connectors-level {
+  color: var(--ink3);
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-connectors-level.park-connectors-level--on {
+  background: var(--card);
+  color: var(--ink);
+}
+[data-park][data-theme="studio"]
+  .park-connectors-level:has(.park-connectors-levelinput:focus-visible),
+[data-park][data-theme="studio"] .park-connectors-summary:focus-visible,
+[data-park][data-theme="studio"] .park-connectors-connect:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+[data-park][data-theme="studio"] .park-connectors-lvsub {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink3);
+}
+
+/* ---- A phone: one column, the search fills the width ---- */
+@media (max-width: 560px) {
+  [data-park][data-theme="studio"] [data-testid="park-page-connectors"] > .park-sheet {
+    padding: 0 0 48px;
+  }
+  [data-park][data-theme="studio"] .park-connectors-h1 {
+    font-size: 36px;
+    letter-spacing: -1.2px;
+  }
+  [data-park][data-theme="studio"] .park-connectors-search {
+    width: 100%;
+  }
+  [data-park][data-theme="studio"] .park-connectors-aside {
+    padding: 18px 16px;
+    border-radius: 24px;
+  }
+}
