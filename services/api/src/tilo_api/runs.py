@@ -153,10 +153,20 @@ def run_seams(
         built = dict(
             zip([f.name for f in dataclasses.fields(Seams) if f.name != "team"], map(build, names.split()), strict=True)
         )
+        built["artifacts"] = screened_by_run(built["artifacts"], mode, meter)
         return Seams(**built, team=team_store.team_reader(overrides))
     except Exception as exc:
         logger.warning("the run seams are not wired, so no run starts: %s", type(exc).__name__)
         return None
+
+
+def screened_by_run(artifacts: Any, mode: Mode, meter: Any) -> Any:
+    """RESULT-LIVE: the shared store screens through `deps.get_safety(mode)` with no request, so no meter, which
+    deployed is replay: a miss, every run output `unscreened` (AR-07) and none of it ever opens. A live, metered run
+    screens what it stores with its own metered safety provider (SEC-16), as its tool results already are."""
+    if mode != "live" or meter is None:
+        return artifacts
+    return artifacts.with_screener(deps.get_safety(mode, meter=meter))
 
 
 def _tool_access(seams: Any, connector: str, action: str, tier: str, skill_ids: Any = ()) -> None:

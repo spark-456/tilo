@@ -1,6 +1,7 @@
 import type { Api } from "./index";
 
-type ResultReader = (world: string) => Promise<Blob>;
+/** RESULT-LIVE: no `artifact` reads the main delivered item; an id reads that delivered item. */
+type ResultReader = (world: string, artifact?: string) => Promise<Blob>;
 const readers = new WeakMap<Api, ResultReader>();
 export function installResultReader(api: Api, reader: ResultReader): void {
   readers.set(api, reader);
@@ -11,17 +12,17 @@ export function hasResultReader(api: Api): boolean {
 export function carryResultReader(from: Api, to: Api, enabled: () => boolean = () => true): Api {
   const reader = readers.get(from);
   if (reader)
-    installResultReader(to, (world) => {
+    installResultReader(to, (world, artifact) => {
       if (!enabled()) return Promise.reject(new Error("Result unavailable"));
-      return reader(world);
+      return reader(world, artifact);
     });
   return to;
 }
 
 /** Reads the run's delivered output (the owner route); rejects when none can be read. */
-export function readResult(api: Api, world: string): Promise<Blob> {
+export function readResult(api: Api, world: string, artifact?: string): Promise<Blob> {
   const reader = readers.get(api);
-  return reader ? reader(world) : Promise.reject(new Error("Result unavailable"));
+  return reader ? reader(world, artifact) : Promise.reject(new Error("Result unavailable"));
 }
 
 /** Saves a result already read; the file name follows its type. */

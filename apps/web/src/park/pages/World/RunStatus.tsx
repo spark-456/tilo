@@ -3,7 +3,7 @@
 // with Open and Download. Every word comes from a recorded event (HR-1..HR-7); with no event it says so.
 import { useState } from "react";
 import type { Api } from "../../api";
-import { openResult, saveResult } from "../../api/results";
+import { openResult, readResult, saveResult } from "../../api/results";
 import { Button } from "../../components";
 import { Markdown } from "./markdown";
 import { isRestartStop, restartApproval } from "./runProgress";
@@ -115,8 +115,65 @@ function ResultBody({ view, retry }: { view: ResultView; retry: () => void }) {
   );
 }
 
+/** RESULT-LIVE: the distinct items recorded as delivered, in delivery order. */
+function deliveredIds(events: readonly RunEvent[]): string[] {
+  const ids: string[] = [];
+  for (const e of events) {
+    const id = (e.data as { artifact?: { artifact_id?: unknown } } | undefined)?.artifact
+      ?.artifact_id;
+    if (e.type === "artifact.delivered" && typeof id === "string" && !ids.includes(id))
+      ids.push(id);
+  }
+  return ids;
+}
+
+/** Each delivered item, read only when asked for: the page shows the main one above. */
+function DeliveredItems({ api, worldId, ids }: { api: Api; worldId: string; ids: string[] }) {
+  const [failed, setFailed] = useState(false);
+  const readItem = (id: string, use: (blob: Blob) => void): void => {
+    setFailed(false);
+    readResult(api, worldId, id).then(use, () => setFailed(true));
+  };
+  return (
+    <div data-testid="delivered-items">
+      <h3 className="park-world-sub">{`All ${ids.length} delivered items`}</h3>
+      <ul>
+        {ids.map((id, n) => (
+          <li key={id} className="park-world-resultactions">
+            <span className="park-world-sub">{`Item ${n + 1}`}</span>
+            <Button variant="secondary" size="sm" onClick={() => readItem(id, openResult)}>
+              {`Open item ${n + 1}`}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => readItem(id, (blob) => saveResult(blob, `${worldId}-${n + 1}`))}
+            >
+              {`Download item ${n + 1}`}
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {failed ? (
+        <p className="park-world-noruns" role="alert">
+          That item could not be loaded. Nothing is lost.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /** The delivered result, read here; Open and Download are the same bytes the owner route serves. */
-function RunResult({ api, worldId }: { api: Api; worldId: string }) {
+function RunResult({
+  api,
+  worldId,
+  events,
+}: {
+  api: Api;
+  worldId: string;
+  events: readonly RunEvent[];
+}) {
+  const ids = deliveredIds(events);
   const [attempt, setAttempt] = useState(0);
   const view = useRunResult(api, worldId, true, attempt);
   const blob = view.status === "text" || view.status === "file" ? view.blob : null;
@@ -137,6 +194,7 @@ function RunResult({ api, worldId }: { api: Api; worldId: string }) {
           </Button>
         </div>
       ) : null}
+      {ids.length > 1 ? <DeliveredItems api={api} worldId={worldId} ids={ids} /> : null}
     </section>
   );
 }
@@ -186,7 +244,7 @@ export function RunStatus({
           </div>
         ) : null}
       </section>
-      {view.deliverable ? <RunResult api={api} worldId={worldId} /> : null}
+      {view.deliverable ? <RunResult api={api} worldId={worldId} events={events} /> : null}
     </>
   );
 }

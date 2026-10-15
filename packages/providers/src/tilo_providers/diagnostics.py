@@ -41,10 +41,17 @@ def log_caught(error: BaseException, module: str, context: Mapping[str, Any]) ->
         value = context.get(key)
         if isinstance(value, str):
             ids[key] = value
+    where = ""
+    if (frame := error.__traceback__) is not None:  # RESULT-LIVE: the catch module and the raising code line
+        while frame.tb_next is not None:  # (Cloud Run prints no logger name); file and line only, never text
+            frame = frame.tb_next
+        raised = frame.tb_frame.f_code.co_filename.replace("\\", "/").rsplit("/", 1)[-1]
+        where = f" in={module} raised={raised}:{frame.tb_lineno}"
     logging.getLogger(module).error(
-        "caught error run=%s unit=%s world=%s exception=%s",
+        "caught error run=%s unit=%s world=%s exception=%s%s",
         ids.get("run_id", "-"),
         ids.get("unit_id", "-"),
         ids.get("world_id", "-"),
         type(error).__name__,
+        where,
     )
