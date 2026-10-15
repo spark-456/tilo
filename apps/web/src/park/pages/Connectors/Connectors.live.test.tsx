@@ -47,13 +47,13 @@ it("FR_ACC_01_03_04 live page loads the existing route without needing skills or
     "contacts.read",
     "2026-10-10T00:00:00Z",
     "Access level not available yet",
-    "Usage not available yet",
   ])
     expect(text).toContain(word);
   expect(text).not.toMatch(
     /Synced|Healthy|Connected just now|Not used yet|60\+|HubSpot|reconnected for/,
   );
-  expect(root.querySelectorAll("button")).toHaveLength(0);
+  const labels = [...root.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"));
+  expect(labels).toEqual(["Manage Actual CRM", "Manage Actual Mail", "Manage Actual Chat"]);
   const search = root.querySelector<HTMLInputElement>('input[aria-label="Search connectors"]');
   expect(search).not.toBeNull();
   typeInto(search as HTMLInputElement, "Actual Mail");

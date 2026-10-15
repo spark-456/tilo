@@ -17,7 +17,7 @@ const CHOICES: readonly (readonly [ToolLevelName, string])[] = [
 /** A level in the design's words (what the person sees beside each app). */
 export const levelLabel = (level: string): string =>
   CHOICES.find(([value]) => value === level)?.[1] ?? level;
-const WORDS: Record<string, string> = {
+export const WORDS: Record<string, string> = {
   off: "Agent runs cannot use this tool. Email Autopilot and calendar sync do not check this yet.",
   read: "Agents can read from this tool.",
   draft: "Agents can prepare drafts, never send.",
@@ -25,13 +25,16 @@ const WORDS: Record<string, string> = {
 };
 
 /** One app's level as a row of radio choices (a real radio group: arrow keys move, a disabled set says so). */
-function LevelPicker({
+export function LevelPicker({
   connector,
   level,
   disabled,
   onPick,
+  group = "level",
 }: {
   connector: string;
+  /** Radio-group name prefix: two pickers for the same app on one page must not share a group. */
+  group?: string;
   level: string;
   disabled: boolean;
   onPick: (next: string) => void;
@@ -54,7 +57,7 @@ function LevelPicker({
           <input
             type="radio"
             className="park-connectors-choiceinput"
-            name={`level-${connector}`}
+            name={`${group}-${connector}`}
             value={value}
             checked={level === value}
             onChange={() => onPick(value)}

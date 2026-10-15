@@ -153,6 +153,253 @@
   color: var(--ink3);
 }
 
+/* ---- CONNECTORS-DESIGN: search height, one sample strip, tile foot, live cards, manage panel, run cards ---- */
+[data-park][data-theme="studio"] .park-connectors-search-input {
+  align-self: stretch;
+  min-height: 40px;
+}
+[data-park][data-theme="studio"] .park-connectors-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  margin: 0;
+  padding: 8px 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--sunk);
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 500;
+}
+[data-park][data-theme="studio"] .park-connectors-strip strong {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 99px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-connectors-tile-acct {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+[data-park][data-theme="studio"] .park-connectors-tile-foot {
+  flex-wrap: wrap;
+}
+[data-park][data-theme="studio"] .park-connectors-sync {
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: var(--okSoft);
+  color: var(--okInk);
+}
+[data-park][data-theme="studio"] .park-connectors-sync--attn {
+  background: var(--redSoft);
+  color: var(--redInk);
+}
+[data-park][data-theme="studio"] .park-connectors-manage {
+  margin-left: auto;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+[data-park][data-theme="studio"] .park-connectors-tile:focus-visible,
+[data-park][data-theme="studio"] .park-connectors-manage-btn:focus-visible,
+[data-park][data-theme="studio"] .park-connectors-panel-close:focus-visible,
+[data-park][data-theme="studio"] .park-connectors-panel-name:focus-visible,
+[data-park][data-theme="studio"] .park-runconn-link:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+[data-park][data-theme="studio"] .park-connectors-live {
+  gap: 8px;
+}
+[data-park][data-theme="studio"] .park-connectors-live--sel {
+  border: 2px solid var(--ink);
+}
+[data-park][data-theme="studio"] .park-connectors-live p:not(.park-connectors-livestate) {
+  font-size: 13px;
+  color: var(--ink2);
+}
+[data-park][data-theme="studio"] .park-connectors-manage-btn {
+  align-self: flex-start;
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 0 18px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+[data-park][data-theme="studio"] .park-connectors-manage-btn[aria-pressed="true"] {
+  background: var(--sunk);
+  border-color: var(--ink);
+}
+[data-park][data-theme="studio"] .park-connectors-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+[data-park][data-theme="studio"] .park-connectors-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+[data-park][data-theme="studio"] .park-connectors-panel-titles {
+  flex: 1;
+  min-width: 0;
+}
+[data-park][data-theme="studio"] .park-connectors-panel-name {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+[data-park][data-theme="studio"] .park-connectors-panel-titles .park-connectors-livestate {
+  margin: 0;
+}
+[data-park][data-theme="studio"] .park-connectors-panel-close {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--sunk);
+  color: var(--ink);
+  cursor: pointer;
+}
+[data-park][data-theme="studio"] .park-connectors-panel .park-connectors-h3 {
+  margin: 4px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-connectors-panel-note {
+  color: var(--redInk);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-connectors-panel-note:empty {
+  display: none;
+}
+[data-park][data-theme="studio"] .park-connectors-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+[data-park][data-theme="studio"] .park-connectors-facts dt {
+  color: var(--ink3);
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-connectors-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+[data-park][data-theme="studio"] .park-runconn {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park][data-theme="studio"] .park-runconn-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-runconn-line,
+[data-park][data-theme="studio"] .park-runconn-empty,
+[data-park][data-theme="studio"] .park-runconn-sample {
+  margin: 0;
+  color: var(--ink2);
+  font-size: 14.5px;
+  font-weight: 500;
+}
+[data-park][data-theme="studio"] .park-runconn-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park][data-theme="studio"] .park-runconn-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  min-height: 52px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+[data-park][data-theme="studio"] .park-runconn-name {
+  flex: 1 1 140px;
+  font-size: 15px;
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-runconn-label {
+  color: var(--ink3);
+  font-size: 13px;
+  font-weight: 500;
+}
+[data-park][data-theme="studio"] .park-runconn-pill {
+  padding: 4px 12px;
+  border-radius: 99px;
+  background: var(--sunk);
+  color: var(--ink2);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-runconn-pill--connected,
+[data-park][data-theme="studio"] .park-runconn-pill--policy {
+  background: var(--okSoft);
+  color: var(--okInk);
+}
+[data-park][data-theme="studio"] .park-runconn-pill--requested,
+[data-park][data-theme="studio"] .park-runconn-pill--wait {
+  background: var(--amberSoft);
+  color: var(--amberInk);
+}
+[data-park][data-theme="studio"] .park-runconn-pill--failed {
+  background: var(--redSoft);
+  color: var(--redInk);
+}
+[data-park][data-theme="studio"] .park-runconn-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 /* ---- A phone: one column, the search fills the width ---- */
 @media (max-width: 560px) {
   [data-park][data-theme="studio"] [data-testid="park-page-connectors"] > .park-sheet {
@@ -168,5 +415,16 @@
   [data-park][data-theme="studio"] .park-connectors-aside {
     padding: 18px 16px;
     border-radius: 24px;
+  }
+  [data-park][data-theme="studio"] .park-connectors-search-input {
+    min-height: 44px;
+  }
+  [data-park][data-theme="studio"] .park-connectors-strip {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  [data-park][data-theme="studio"] .park-runconn {
+    padding: 18px 16px;
   }
 }

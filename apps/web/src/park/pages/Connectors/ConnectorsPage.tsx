@@ -8,6 +8,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import type { ConnectFlow } from "../../../api/connect";
 import { liveConnectFlow } from "../../../api/connectEnv";
+import type { Api } from "../../api";
 import type { Connector, ConnectorTerms, Skill, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi } from "../../app/context";
@@ -20,10 +21,12 @@ import { ConnectionsSection } from "../../shared/RunAdmin";
 import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
 import { GoogleAccess } from "./GoogleAccess";
-import { LiveConnectorsWithLevels } from "./LiveConnectorsWithLevels";
+import { LiveConnectors } from "./LiveConnectors";
+import { useToolLevels } from "./LiveConnectorsWithLevels";
+import { ManagePanel } from "./ManagePanel";
 import { MeetingHostAccess } from "./MeetingHostAccess";
 import { icon } from "./icons";
-import { type Overrides, type UsedRow, isOn, matches, merge, usedBy } from "./view";
+import { type Overrides, SAMPLE_STRIP, type UsedRow, isOn, matches, merge, usedBy } from "./view";
 
 type Load =
   | { kind: "loading" }
@@ -71,16 +74,24 @@ function Heading({ count, children }: { count?: string; children?: ReactNode }) 
 }
 
 /** UI-STUDIO-5 (design "Tilo S Connectors"): the apps on the left, what Tilo may do in each on the right. */
-function Studio({ main, side }: { main: ReactNode; side: ReactNode }) {
+function Studio({
+  main,
+  side,
+  managing,
+}: { main: ReactNode; side: ReactNode; managing?: boolean }) {
   return (
     <div className="park-connectors-studio">
       <div className="park-connectors-main">{main}</div>
       <aside className="park-connectors-aside" aria-label="Permissions">
-        <h2 className="park-connectors-asidetitle">What Tilo may do</h2>
-        <p className="park-connectors-asideline">
-          Each app has one choice: Always, Ask me, Read only or Never. Payments, sharing outside the
-          team and anything that can’t be undone always ask a person.
-        </p>
+        {managing ? null : (
+          <>
+            <h2 className="park-connectors-asidetitle">What Tilo may do</h2>
+            <p className="park-connectors-asideline">
+              Each app has one choice: Always, Ask me, Read only or Never. Payments, sharing outside
+              the team and anything that can’t be undone always ask a person.
+            </p>
+          </>
+        )}
         {side}
       </aside>
     </div>
@@ -99,7 +110,6 @@ export function ConnectorsPage({
   const api = useParkApi();
   // ADR-0035 L4: the live Google connect flow, or null (fixture world, demo session): then the page is exactly as before.
   const live = useMemo(() => (flow === undefined ? liveConnectFlow() : flow), [flow]);
-  const [toolsOpen, setToolsOpen] = useState(false);
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
@@ -149,31 +159,13 @@ export function ConnectorsPage({
       </Frame>
     );
 
-  if (load.kind === "live") {
+  if (load.kind === "live")
     return (
       <Frame>
         <Heading />
-        <Studio
-          main={
-            <>
-              {live ? <GoogleAccess flow={live} /> : null}
-              <MeetingHostAccess flow={live} />
-              <LiveConnectorsWithLevels api={api} connectors={load.connectors} />
-            </>
-          }
-          side={
-            <details
-              className="park-connectors-disclosure"
-              onToggle={(e) => setToolsOpen(e.currentTarget.open)}
-            >
-              <summary className="park-connectors-summary">Manage team tool access</summary>
-              {toolsOpen ? <TeamTools app={app} /> : null}
-            </details>
-          }
-        />
+        <LiveBody api={api} app={app} flow={live} connectors={load.connectors} />
       </Frame>
     );
-  }
 
   if (load.kind === "unavailable") {
     return (
@@ -224,12 +216,17 @@ export function ConnectorsPage({
           <input
             className="park-connectors-search-input"
             aria-label="Search connectors"
-            placeholder="Search 60+ tools"
+            placeholder="Find an app"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
       </Heading>
+
+      <p className="park-connectors-strip" role="note">
+        <strong>Example connections</strong>
+        {SAMPLE_STRIP}
+      </p>
 
       {live ? <GoogleAccess flow={live} /> : null}
       {live ? <MeetingHostAccess flow={live} /> : null}
@@ -287,6 +284,50 @@ export function ConnectorsPage({
         />
       ) : null}
     </Frame>
+  );
+}
+
+/** The live list beside its manage panel: one app's access level, scopes and expiry, changed by the Owner only. */
+function LiveBody({
+  api,
+  app,
+  flow,
+  connectors,
+}: { api: Api; app: AppCtx; flow: ConnectFlow | null; connectors: Connector[] }) {
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [sel, setSel] = useState<string | null>(null);
+  const control = useToolLevels(api);
+  const cur = connectors.find((c) => c.id === sel);
+  return (
+    <Studio
+      managing={!!cur}
+      main={
+        <>
+          {flow ? <GoogleAccess flow={flow} /> : null}
+          <MeetingHostAccess flow={flow} />
+          <LiveConnectors
+            connectors={connectors}
+            levels={control.levels}
+            selected={sel}
+            onManage={(id) => setSel(id)}
+          />
+        </>
+      }
+      side={
+        <>
+          {cur ? (
+            <ManagePanel key={cur.id} c={cur} control={control} onClose={() => setSel(null)} />
+          ) : null}
+          <details
+            className="park-connectors-disclosure"
+            onToggle={(e) => setToolsOpen(e.currentTarget.open)}
+          >
+            <summary className="park-connectors-summary">Manage team tool access</summary>
+            {toolsOpen ? <TeamTools app={app} /> : null}
+          </details>
+        </>
+      }
+    />
   );
 }
 
