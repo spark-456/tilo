@@ -2102,6 +2102,24 @@
   border-radius: 8px;
 }
 
+[data-park] .park-skills-access-more {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+[data-park] .park-skills-access-more:focus-visible {
+  outline: 3px solid var(--focus, #5a3fe0);
+  outline-offset: 2px;
+}
+
 /* LIVE-P2-A (QA row 26): on a phone a skill's name and its line wrap instead of ending in an ellipsis */
 @media (max-width: 480px) {
   [data-park] .park-skills-lib-row-name,

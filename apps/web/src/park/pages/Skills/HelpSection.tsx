@@ -122,7 +122,7 @@ export function HelpSection({
                 >
                   <div className="park-skills-ask-top">
                     <div className="park-skills-ask-avatar">
-                      {agent({ role: s.role, expr: a ? "delighted" : "puzzled" }, 36, app.night)}
+                      {agent({ role: s.role, expr: a ? "delighted" : "puzzled" }, 44, app.night)}
                     </div>
                     <div className="park-skills-ask-body">
                       <div className="park-skills-ask-skill">{s.name}</div>

@@ -106,7 +106,7 @@ export interface ComposerProps {
   readonly sending?: boolean;
   /** QA-DEMO-1: a demo session. The plan is a labelled sample and confirming opens the sample world. */
   readonly sample?: boolean;
-  /** A phone: the input cannot wrap its placeholder, so it shows the example in few words. */
+  /** A phone: the input cannot wrap its placeholder, so it shows the example in few words, without "e.g.". */
   readonly compact?: boolean;
   /** The task box: the page focuses it when the plan card closes. */
   readonly inputRef?: Ref<HTMLInputElement>;
@@ -158,7 +158,11 @@ export function ComposerPanel(p: ComposerProps) {
               aria-label="Describe your task"
               value={p.query}
               placeholder={
-                quickMode ? "Ask a quick question" : `e.g. ${p.compact ? mode.short : mode.example}`
+                quickMode
+                  ? "Ask a quick question"
+                  : p.compact
+                    ? mode.short // POLISH-1: no "e.g. " on a phone, so the whole example fits the 390px box
+                    : `e.g. ${mode.example}`
               }
               onChange={(e) => p.onQuery(e.target.value)}
               onKeyDown={(e) => {

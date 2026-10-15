@@ -2,9 +2,9 @@
    Only under the Studio theme, so Team.css keeps the Park look. Colours are role tokens (light and dark). No
    transition, animation or keyframes (HR-1..7). Every tap target is 44px or more. */
 [data-park][data-theme="studio"] [data-testid="park-page-team"] > .park-sheet {
-  max-width: 1232px;
+  max-width: var(--park-page-max, 1296px);
   margin: 0 auto;
-  padding: 8px 8px 64px;
+  padding: 8px var(--park-page-pad, 8px) 64px;
   gap: 28px;
   border: 0;
   border-radius: 0;

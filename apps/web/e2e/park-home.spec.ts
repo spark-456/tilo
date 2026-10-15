@@ -718,7 +718,7 @@ for (const [sizeName, viewport] of Object.entries(SIZES)) {
         // A phone's input cannot wrap its placeholder, so it shows the example in few words (13 Oct QA).
         expect(await input(page).getAttribute("placeholder")).toBe(
           sizeName === "mobile"
-            ? "e.g. Summarise this week’s feedback"
+            ? "Summarise this week’s feedback"
             : "e.g. Summarise this week’s customer feedback",
         );
         const s = await facts(start(page), [
