@@ -36,4 +36,6 @@ Questions (INTAKE-QUALITY-1 slice 2, FR-INT-04): `director/brief_system.md` also
 
 `skill_describe/` is capture by describing (SKILLS-4, FR-SKL-01/02), run on the role in `tilo_api.skills_capture.CAPTURE_ROLE`: `capture_*` turns the delimited, untrusted description (`neutralise_marker(..., "DESCRIPTION")`) into steps; `version_*` turns the captured steps (`STEPS` block) into plan steps from the closed list of `config/connectors.yaml` actions (`$actions`) and at most one question. Code checks every reply; the model never sets must_ask, ask_first or an estimate.
 
+`meeting_analyst/meeting_brief.md` is the owner's meeting brief (ADR-0047, MB-03, `tilo_api.meeting_brief`): the system instruction (`$max_points`, `$max_chars`) for talk points over the delimited, untrusted agenda lines and prior-minutes items in the user turn (`<<<DATA ... DATA>>>`, each with a source id `a<n>` or `p<n>`). Code copies the agenda and carry-over and keeps a point only if its text is a clean line and every source id was offered (MB-04, MB-05).
+
 `speech/live_read_aloud.md` is the system instruction of the optional Gemini Live voice (FR-MTG-11, M2, `tilo_providers.gemini_live_voice_adapter`): read the reply aloud, once, as written; it takes no variables, and the reply text is the user turn (data, never instructions).
