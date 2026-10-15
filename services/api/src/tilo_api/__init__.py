@@ -18,6 +18,7 @@ from tilo_api import cors as _cors
 from tilo_api import deps as _deps
 from tilo_api import dev as _dev
 from tilo_api import durable_store as _durable_store
+from tilo_api import invite_links as _invite_links
 from tilo_api import meeting_host_routes as _meeting_host_routes
 from tilo_api import meeting_minutes_flag as _meeting_minutes_flag
 from tilo_api import meeting_voice_meter as _meeting_voice_meter
@@ -169,6 +170,7 @@ app.include_router(_results.router)
 app.include_router(_connect_routes.router)
 app.include_router(_people_list_router)
 app.include_router(_people_teams_router)
+app.include_router(_invite_links.router)
 app.include_router(_skills_router)
 app.include_router(_skills_capture_router)
 app.include_router(_skills_feedback_router)

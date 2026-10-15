@@ -1,13 +1,15 @@
 """ADR-0046 invite decisions must agree with the contract's cross-reference cases."""
 
+import importlib
 import json
 
-import _invite_link_lib as reference
 import _ppl10_testlib as t
-import _teams_lib as teams_reference
 import pytest
 from tilo_people.directory import Directory
 from tilo_people.teams import LinkRequest, TeamRequest, decide_link, decide_team
+
+reference = importlib.import_module("_invite_link_lib")
+teams_reference = importlib.import_module("_teams_lib")
 
 
 @pytest.mark.parametrize("kind", ("valid", "invalid"))
