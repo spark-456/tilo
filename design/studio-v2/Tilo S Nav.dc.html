@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}</style>
+</helmet>
+<header style="position:relative;height:72px;box-sizing:border-box;padding:0 32px;display:flex;align-items:center;gap:28px;background:var(--card);border-bottom:1px solid var(--line);font-family:var(--fB);color:var(--ink)">
+  <div style="display:flex;align-items:center;gap:10px;flex:none">
+    <div style="width:36px;height:36px;border-radius:12px;background:var(--pri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;justify-content:center"><div style="width:22px;height:12px;border-radius:6px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:5px"><div style="width:3px;height:3px;border-radius:9px;background:#0B0B0C"></div><div style="width:3px;height:3px;border-radius:9px;background:#0B0B0C"></div></div></div>
+    <div style="font-family:var(--fH);font-weight:800;font-size:26px;letter-spacing:-1px;color:var(--ink)">tilo</div>
+  </div>
+  <nav aria-label="Main" style="display:flex;gap:2px">
+    <sc-for list="{{ items }}" as="it" hint-placeholder-count="8">
+      <a href="#" style="height:44px;padding:0 13px;border-radius:14px;display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;white-space:nowrap;background:{{ it.bg }};color:{{ it.fg }}" style-hover="background:var(--sunk)">{{ it.label }}<sc-if value="{{ it.badge }}"><span style="min-width:22px;height:22px;padding:0 6px;box-sizing:border-box;border-radius:99px;background:var(--amber);color:#1A1407;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center">3</span></sc-if></a>
+    </sc-for>
+  </nav>
+  <div style="flex:1"></div>
+  <div style="height:44px;width:196px;box-sizing:border-box;padding:0 8px 0 14px;border-radius:14px;background:var(--sunk);display:flex;align-items:center;gap:10px;color:var(--ink3);font-size:15px;font-weight:500;flex:none">
+    <span>{{ iSearch }}</span><span style="flex:1;white-space:nowrap">Search</span>
+    <span style="height:26px;padding:0 8px;border-radius:8px;background:var(--card);border:1px solid var(--line);font-family:var(--mono);font-size:11px;display:flex;align-items:center">⌘K</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;flex:none">
+    <span title="Switch theme" style="width:44px;height:44px;border-radius:14px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center"><span style="width:16px;height:16px;border-radius:99px;box-sizing:border-box;{{ themeIc }}"></span></span>
+    <span style="position:relative;width:44px;height:44px;border-radius:14px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink2)">{{ iBell }}<span style="position:absolute;top:9px;right:10px;width:8px;height:8px;border-radius:99px;background:var(--red);box-shadow:0 0 0 2px var(--card)"></span></span>
+    <div style="width:44px;height:44px;border-radius:99px;background:var(--lilacSoft);color:var(--lilacInk);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;box-shadow:{{ avRing }}">MR</div>
+  </div>
+  <sc-if value="{{ menu }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;right:24px;top:72px;width:300px;z-index:20;background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--sh3);padding:8px;display:flex;flex-direction:column;gap:2px;font-size:14.5px">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 10px 14px;border-bottom:1px solid var(--line);margin-bottom:4px">
+        <span style="width:44px;height:44px;border-radius:99px;background:var(--lilacSoft);color:var(--lilacInk);display:flex;align-items:center;justify-content:center;font-weight:700">MR</span>
+        <span style="display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:600">Maya Rao</span><span style="font-size:13px;color:var(--ink3)">maya@raostudio.co · Plus</span></span>
+      </div>
+      <sc-for list="{{ menuItems }}" as="m" hint-placeholder-count="5">
+        <span style="height:40px;padding:0 12px;border-radius:12px;display:flex;align-items:center;gap:10px;background:{{ m.bg }}"><span style="flex:1">{{ m.t }}</span><span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">{{ m.k }}</span></span>
+      </sc-for>
+      <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:4px 0">
+        <span style="font-size:12.5px;font-weight:600;color:var(--ink3)">Theme</span>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:3px;border-radius:12px;background:var(--sunk)">
+          <sc-for list="{{ themes }}" as="t" hint-placeholder-count="3"><span style="height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;background:{{ t.bg }};color:{{ t.fg }};box-shadow:{{ t.sh }}">{{ t.t }}</span></sc-for>
+        </div>
+      </div>
+      <span style="height:40px;padding:0 12px;border-radius:12px;display:flex;align-items:center;color:var(--redInk)">Sign out</span>
+    </div>
+  </sc-if>
+</header>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:72},&quot;active&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;home&quot;,&quot;chat&quot;,&quot;worlds&quot;,&quot;skills&quot;,&quot;needs&quot;,&quot;agenda&quot;,&quot;team&quot;,&quot;connectors&quot;,&quot;settings&quot;],&quot;default&quot;:&quot;home&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;menu&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloR) this.t = setInterval(() => { if (window.TiloR && window.TiloCity) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const R = window.TiloR ? window.TiloR(React.createElement) : null;
+    const a = this.props.active ?? 'home', dark = (this.props.theme ?? 'studio') === 'studioDark', menu = !!this.props.menu;
+    const items = [['home', 'Home'], ['chat', 'Chat'], ['worlds', 'Worlds'], ['skills', 'Skills'], ['needs', 'Needs you'], ['agenda', 'Agenda'], ['team', 'Team'], ['connectors', 'Connectors']].map(([k, label]) => {
+      const on = k === a;
+      return { label, badge: k === 'needs', bg: on ? 'var(--priSoft)' : 'transparent', fg: on ? 'var(--priInk)' : 'var(--ink2)' };
+    });
+    const on = { bg: 'var(--card)', fg: 'var(--ink)', sh: '0 1px 2px rgba(0,0,0,.14)' }, off = { bg: 'transparent', fg: 'var(--ink3)', sh: 'none' };
+    return {
+      items, menu,
+      iSearch: R ? R.ic('search', 17) : null, iBell: R ? R.ic('clock', 18) : null,
+      themeIc: dark ? 'background:var(--ink);box-shadow:inset -5px -3px 0 0 var(--card)' : 'border:2.5px solid var(--ink);box-shadow:0 0 0 3px var(--card),0 0 0 4.5px var(--line2)',
+      avRing: menu ? '0 0 0 2px var(--card),0 0 0 4px var(--ink)' : '0 0 0 2px var(--card),0 0 0 4px var(--line2)',
+      themes: [['Light', !dark], ['Dark', dark], ['System', false]].map(([t, s]) => ({ t, bg: s ? on.bg : off.bg, fg: s ? on.fg : off.fg, sh: s ? on.sh : off.sh })),
+      menuItems: [['Profile and settings', '⌘,'], ['Spending and limits', ''], ['Connectors', ''], ['Keyboard shortcuts', '?'], ['Help and feedback', '']].map(([t, k], i) => ({ t, k, bg: i === 0 ? 'var(--sunk)' : 'transparent' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

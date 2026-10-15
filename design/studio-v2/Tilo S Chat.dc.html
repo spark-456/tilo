@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="position:relative;width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:15px;line-height:1.5;overflow:hidden">
+  <dc-import name="Tilo S Nav" active="chat" theme="{{ theme }}" hint-size="100%,72px"></dc-import>
+  <main style="flex:1;min-height:0;width:100%;max-width:1440px;box-sizing:border-box;margin:0 auto;padding:20px 32px 28px;display:flex;flex-direction:column;gap:16px">
+    <div style="flex:none;display:flex;align-items:flex-end;gap:10px;font-size:14px">
+      <div style="display:flex;flex-direction:column;gap:2px"><a href="#" style="font-size:14px;font-weight:600;color:var(--ink3)">← All chats</a><h1 style="margin:0;font-family:var(--fH);font-weight:700;font-size:32px;letter-spacing:-1px;line-height:1.2">What to pack for Gokarna</h1></div>
+      <span style="height:22px;padding:0 8px;border-radius:6px;background:var(--priSoft);color:var(--priInk);font-family:var(--mono);font-size:10.5px;font-weight:600;display:flex;align-items:center;margin-left:6px">QUICK ANSWER · 1 HELPER</span>
+      <div style="flex:1"></div>
+      <span style="font-family:var(--mono);font-size:12px;color:var(--ink3);margin-right:6px">This chat £0.03</span>
+      <span style="height:36px;padding:0 12px;border-radius:10px;border:1px solid var(--line);display:flex;align-items:center;font-weight:500">Turn into a world</span>
+      <span style="width:36px;height:36px;border-radius:10px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink2)">⋯</span>
+    </div>
+    <div style="flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:24px">
+      <div style="min-height:0">
+        <div style="position:relative;height:100%;border-radius:28px;overflow:hidden;border:1px solid var(--line);background:{{ sky }}">
+          <div style="position:absolute;inset:0;filter:var(--sceneFx)">
+            <sc-if value="{{ office }}" hint-placeholder-val="{{ true }}">
+              <div style="position:absolute;inset:0;background:#ECEAE4"></div>
+              <div style="position:absolute;left:8%;top:12%;width:42%;height:38%;border-radius:14px;background:#FFFFFF;padding:10px;box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div style="border-radius:6px;background:#D3E5EF;position:relative;overflow:hidden"><div style="position:absolute;left:10%;bottom:0;width:22%;height:55%;background:#B9CDD9"></div><div style="position:absolute;left:40%;bottom:0;width:18%;height:80%;background:#AFC4D1"></div><div style="position:absolute;left:66%;bottom:0;width:26%;height:40%;background:#B9CDD9"></div></div>
+                <div style="border-radius:6px;background:#D3E5EF;position:relative;overflow:hidden"><div style="position:absolute;left:8%;bottom:0;width:30%;height:65%;background:#AFC4D1"></div><div style="position:absolute;left:50%;bottom:0;width:20%;height:45%;background:#B9CDD9"></div><div style="position:absolute;right:12%;top:18%;width:22px;height:22px;border-radius:99px;background:#FFF1B8"></div></div>
+                <div style="border-radius:6px;background:#D9E9F1"></div><div style="border-radius:6px;background:#D9E9F1"></div>
+              </div>
+              <div style="position:absolute;right:8%;top:16%;width:30%;display:flex;flex-direction:column;gap:0">
+                <div style="display:flex;align-items:flex-end;gap:4px;height:64px;padding:0 10px"><span style="width:14px;height:52px;border-radius:3px;background:#C9A27E"></span><span style="width:12px;height:60px;border-radius:3px;background:#8AA6B8"></span><span style="width:16px;height:46px;border-radius:3px;background:#D6C59A"></span><span style="width:12px;height:56px;border-radius:3px;background:#B98A86"></span><span style="flex:1"></span><span style="width:34px;height:34px;border-radius:99px;background:#86B98A;margin-bottom:6px"></span></div>
+                <div style="height:8px;border-radius:4px;background:#BDB6A6"></div>
+                <div style="display:flex;align-items:flex-end;gap:4px;height:58px;padding:0 10px"><span style="width:44px;height:30px;border-radius:6px;background:#E6DED0"></span><span style="width:12px;height:50px;border-radius:3px;background:#9DB59F"></span><span style="width:14px;height:44px;border-radius:3px;background:#C7B07E"></span></div>
+                <div style="height:8px;border-radius:4px;background:#BDB6A6"></div>
+              </div>
+              <div style="position:absolute;left:0;right:0;bottom:0;height:26%;background:#DCD8CE"></div>
+              <div style="position:absolute;left:6%;bottom:22%;width:56px;height:64px;border-radius:0 0 12px 12px;background:#C9B79C"></div>
+              <div style="position:absolute;left:calc(6% - 18px);bottom:calc(22% + 50px);width:50px;height:50px;border-radius:99px;background:#7FB77E"></div>
+              <div style="position:absolute;left:calc(6% + 22px);bottom:calc(22% + 70px);width:56px;height:56px;border-radius:99px;background:#6FA96F"></div>
+            </sc-if>
+            <sc-if value="{{ beach }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;background:#CFE6F0"></div>
+              <div style="position:absolute;right:14%;top:12%;width:92px;height:92px;border-radius:99px;background:#FFE08A;box-shadow:0 0 0 18px rgba(255,224,138,.35)"></div>
+              <div style="position:absolute;left:0;right:0;top:44%;height:22%;background:#8CC9DC;overflow:hidden">
+                <div style="position:absolute;left:-40px;right:-40px;top:22%;height:6px;border-radius:99px;background:#B6E0EC;animation:tsWaves 6s ease-in-out infinite"></div>
+                <div style="position:absolute;left:-40px;right:-40px;top:58%;height:5px;border-radius:99px;background:#A9D8E6;animation:tsWaves 7s ease-in-out -2s infinite"></div>
+              </div>
+              <div style="position:absolute;left:0;right:0;bottom:0;height:36%;background:#F1E3C3"></div>
+              <div style="position:absolute;left:10%;bottom:30%;width:6px;height:190px;background:#8A7A66;border-radius:3px"></div>
+              <div style="position:absolute;left:calc(10% - 92px);bottom:calc(30% + 168px);width:190px;height:86px;border-radius:190px 190px 0 0;background:#F07B62;overflow:hidden"><div style="position:absolute;left:62px;top:0;width:66px;height:86px;background:#FFF4E8"></div></div>
+              <div style="position:absolute;left:50%;bottom:9%;transform:translateX(-50%);width:300px;height:64px;border-radius:16px;background:repeating-linear-gradient(90deg,#FFFFFF 0 26px,#9BD3E3 26px 52px)"></div>
+              <div style="position:absolute;right:16%;bottom:12%;width:54px;height:54px;border-radius:99px;background:conic-gradient(#F07B62 0 25%,#FFFFFF 0 50%,#FFD36E 0 75%,#FFFFFF 0)"></div>
+            </sc-if>
+            <sc-if value="{{ balcony }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;background:#F3D6C6"></div>
+              <div style="position:absolute;left:0;right:0;top:22%;height:30%;background:#EFC6B6"></div>
+              <div style="position:absolute;left:58%;top:10%;width:70px;height:70px;border-radius:99px;background:#FFE7B5"></div>
+              <div style="position:absolute;left:0;right:0;top:30%;height:36%;display:flex;align-items:flex-end;gap:8px;padding:0 12px">
+                <span style="flex:1;height:52%;background:#A79FB3;border-radius:4px 4px 0 0"></span><span style="flex:.7;height:80%;background:#9B92A9;border-radius:4px 4px 0 0;background-image:radial-gradient(#FFE7A8 2px,transparent 2.5px);background-size:16px 18px"></span><span style="flex:1.2;height:62%;background:#AFA7BA;border-radius:4px 4px 0 0;background-image:radial-gradient(#FFE7A8 2px,transparent 2.5px);background-size:18px 20px"></span><span style="flex:.6;height:96%;background:#958CA3;border-radius:4px 4px 0 0"></span><span style="flex:1;height:58%;background:#A79FB3;border-radius:4px 4px 0 0;background-image:radial-gradient(#FFE7A8 2px,transparent 2.5px);background-size:16px 18px"></span><span style="flex:.8;height:74%;background:#9B92A9;border-radius:4px 4px 0 0"></span>
+              </div>
+              <div style="position:absolute;left:0;right:0;bottom:0;height:34%;background:#D9CBBE"></div>
+              <div style="position:absolute;left:6%;right:6%;top:16%;height:2px;background:#6B6170;border-radius:2px;transform:rotate(-2deg)"></div>
+              <div style="position:absolute;left:6%;right:6%;top:16%;display:flex;justify-content:space-between;transform:rotate(-2deg)"><span style="width:10px;height:10px;border-radius:99px;background:#FFD86B;margin-top:4px"></span><span style="width:10px;height:10px;border-radius:99px;background:#FF9F7A;margin-top:6px"></span><span style="width:10px;height:10px;border-radius:99px;background:#FFD86B;margin-top:7px"></span><span style="width:10px;height:10px;border-radius:99px;background:#9ED9A9;margin-top:6px"></span><span style="width:10px;height:10px;border-radius:99px;background:#FFD86B;margin-top:4px"></span><span style="width:10px;height:10px;border-radius:99px;background:#FF9F7A;margin-top:2px"></span></div>
+              <div style="position:absolute;left:5%;bottom:30%;width:60px;height:56px;border-radius:0 0 12px 12px;background:#B98763"></div>
+              <div style="position:absolute;left:calc(5% - 6px);bottom:calc(30% + 46px);width:72px;height:60px;border-radius:99px;background:#78AE7C"></div>
+            </sc-if>
+            <sc-if value="{{ room }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;background:#E9DFD3"></div>
+              <div style="position:absolute;left:10%;top:12%;width:30%;height:34%;border-radius:12px;background:#FFFFFF;padding:8px;box-sizing:border-box"><div style="position:relative;width:100%;height:100%;border-radius:6px;background:#2E3550;overflow:hidden"><div style="position:absolute;right:18%;top:20%;width:30px;height:30px;border-radius:99px;background:#FFF1C9"></div><div style="position:absolute;left:20%;top:30%;width:3px;height:3px;border-radius:9px;background:#FFFFFF"></div><div style="position:absolute;left:40%;top:16%;width:3px;height:3px;border-radius:9px;background:#FFFFFF"></div><div style="position:absolute;left:30%;top:60%;width:2px;height:2px;border-radius:9px;background:#FFFFFF"></div></div></div>
+              <div style="position:absolute;right:10%;top:10%;width:26%;height:52%;border-radius:10px;background:#C29A74;padding:8px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px">
+                <div style="flex:1;border-radius:4px;background:#A9805B;display:flex;align-items:flex-end;gap:3px;padding:0 6px"><span style="width:10px;height:80%;background:#E8C27A;border-radius:2px"></span><span style="width:12px;height:70%;background:#8FB3C7;border-radius:2px"></span><span style="width:9px;height:88%;background:#D98E7E;border-radius:2px"></span><span style="width:12px;height:64%;background:#A7C59A;border-radius:2px"></span></div>
+                <div style="flex:1;border-radius:4px;background:#A9805B;display:flex;align-items:flex-end;gap:3px;padding:0 6px"><span style="width:12px;height:76%;background:#C9B3E0;border-radius:2px"></span><span style="width:10px;height:86%;background:#E8C27A;border-radius:2px"></span><span style="flex:1"></span><span style="width:22px;height:22px;border-radius:99px;background:#7FB77E;margin-bottom:2px"></span></div>
+                <div style="flex:1;border-radius:4px;background:#A9805B"></div>
+              </div>
+              <div style="position:absolute;left:0;right:0;bottom:0;height:28%;background:#CDB8A2"></div>
+              <div style="position:absolute;left:50%;bottom:4%;transform:translateX(-50%);width:420px;height:70px;border-radius:50%;background:#D9A99A"></div>
+              <div style="position:absolute;left:50%;bottom:16%;transform:translateX(-50%);width:330px;height:250px;border-radius:60px 60px 24px 24px;background:#B07D55"></div>
+              <div style="position:absolute;left:8%;bottom:26%;width:6px;height:240px;background:#6B5B4A"></div>
+              <div style="position:absolute;left:calc(8% - 34px);bottom:calc(26% + 224px);width:74px;height:46px;border-radius:12px 12px 4px 4px;background:#F5D99A;box-shadow:0 30px 60px 10px rgba(255,214,130,.35)"></div>
+            </sc-if>
+          </div>
+          <div style="position:absolute;left:50%;bottom:{{ budB }};transform:translateX(-50%)"><dc-import name="Tilo S Buddy" size="300" mood="{{ mood }}" hint-size="254px,300px"></dc-import></div>
+          <sc-if value="{{ office }}" hint-placeholder-val="{{ true }}">
+            <div style="position:absolute;left:12%;right:12%;bottom:0;height:120px;border-radius:18px 18px 0 0;background:#2B2B2E;filter:var(--sceneFx)"></div>
+            <div style="position:absolute;left:18%;bottom:120px;width:120px;height:10px;border-radius:4px;background:#CFCFCA;filter:var(--sceneFx)"></div>
+            <div style="position:absolute;right:20%;bottom:120px;width:30px;height:36px;border-radius:4px 4px 8px 8px;background:#F07B62;filter:var(--sceneFx)"></div>
+          </sc-if>
+          <sc-if value="{{ balcony }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:0;right:0;bottom:0;height:130px;filter:var(--sceneFx)"><div style="position:absolute;left:0;right:0;top:0;height:10px;background:#3B3540;border-radius:4px"></div><div style="position:absolute;left:0;right:0;top:10px;bottom:0;background:repeating-linear-gradient(90deg,#3B3540 0 6px,transparent 6px 36px)"></div></div>
+          </sc-if>
+          <div style="position:absolute;left:16px;right:16px;top:16px;display:flex;align-items:center;gap:8px">
+            <div style="display:flex;padding:3px;border-radius:12px;background:var(--card);box-shadow:var(--sh2)">
+              <sc-for list="{{ scenes }}" as="s" hint-placeholder-count="4"><span style="height:32px;padding:0 12px;border-radius:9px;display:flex;align-items:center;font-size:13px;font-weight:600;background:{{ s.bg }};color:{{ s.fg }}">{{ s.t }}</span></sc-for>
+            </div>
+            <div style="flex:1"></div>
+            <span style="height:38px;padding:0 12px;border-radius:12px;background:var(--card);box-shadow:var(--sh2);display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600">Voice<span style="width:30px;height:18px;border-radius:99px;background:var(--ink);display:flex;justify-content:flex-end;padding:2px;box-sizing:border-box"><span style="width:14px;height:14px;border-radius:99px;background:var(--card)"></span></span></span>
+          </div>
+          <div style="position:absolute;right:24px;top:{{ bubT }};max-width:300px;background:var(--card);color:var(--ink);border-radius:18px 18px 18px 4px;box-shadow:var(--sh3);padding:14px 16px;font-size:15px;line-height:1.45">
+            <div style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);margin-bottom:4px;letter-spacing:.4px">{{ bubLabel }}</div>{{ bubText }}<span style="display:inline-block;width:2px;height:16px;margin-left:2px;vertical-align:-2px;background:var(--ink);animation:tsCaret 1s steps(1) infinite"></span>
+          </div>
+          <div style="position:absolute;left:16px;right:16px;bottom:16px;height:48px;box-sizing:border-box;padding:0 8px 0 14px;border-radius:14px;background:var(--card);box-shadow:var(--sh2);display:flex;align-items:center;gap:10px;font-size:13.5px">
+            <span style="display:flex;align-items:center;gap:3px;height:16px"><span style="width:3px;height:16px;border-radius:2px;background:var(--ink);animation:tsBar .6s ease-in-out infinite"></span><span style="width:3px;height:16px;border-radius:2px;background:var(--ink);animation:tsBar .6s ease-in-out .15s infinite"></span><span style="width:3px;height:16px;border-radius:2px;background:var(--ink);animation:tsBar .6s ease-in-out .3s infinite"></span><span style="width:3px;height:16px;border-radius:2px;background:var(--ink);animation:tsBar .6s ease-in-out .45s infinite"></span></span>
+            <span style="flex:1;font-weight:500">{{ statusText }}</span>
+            <span style="font-family:var(--mono);font-size:11.5px;color:var(--ink3)">0:14</span>
+            <span style="height:32px;padding:0 12px;border-radius:9px;border:1px solid var(--line);display:flex;align-items:center;font-weight:600;font-size:13px">Stop</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="min-height:0;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);overflow:hidden">
+        <div style="flex:1;min-height:0;overflow:hidden;padding:24px 28px;display:flex;flex-direction:column;gap:20px">
+          <div style="align-self:center;font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.6px">TODAY · 3:02 PM</div>
+          <div style="align-self:flex-end;max-width:78%;background:var(--pri);color:var(--onPri);border-radius:18px 18px 4px 18px;padding:11px 15px">What should I pack for Gokarna in late October? Two adults, one kid, mostly beaches.</div>
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <span style="width:30px;height:30px;border-radius:9px;background:var(--lime);display:flex;align-items:center;justify-content:center;flex:none"><span style="width:18px;height:11px;border-radius:4px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:4px"><span style="width:2px;height:3px;background:#0B0B0C;border-radius:2px"></span><span style="width:2px;height:3px;background:#0B0B0C;border-radius:2px"></span></span></span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:12px">
+              <div style="font-family:var(--mono);font-size:11px;color:var(--ink3)">TILO · ANSWERED IN 9S · £0.02</div>
+              <div style="font-size:15.5px;line-height:1.6">Late October is warm, around 31°C, with the odd evening shower. Pack light, quick-drying and easy to layer.</div>
+              <div style="border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">
+                <sc-for list="{{ pack }}" as="g" hint-placeholder-count="3">
+                  <div style="display:flex;flex-direction:column;gap:7px"><span style="font-size:12px;font-weight:600;color:var(--ink3)">{{ g.t }}</span>
+                    <sc-for list="{{ g.i }}" as="x" hint-placeholder-count="3"><span style="display:flex;align-items:center;gap:8px;font-size:13.5px"><span style="width:14px;height:14px;border-radius:4px;border:1.5px solid var(--line2);box-sizing:border-box;flex:none"></span>{{ x }}</span></sc-for>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+                <span style="font-size:12px;color:var(--ink3);margin-right:2px">Sources</span>
+                <span style="height:26px;padding:0 10px;border-radius:8px;background:var(--sunk);font-size:12px;font-weight:500;display:flex;align-items:center">IMD · October averages</span>
+                <span style="height:26px;padding:0 10px;border-radius:8px;background:var(--sunk);font-size:12px;font-weight:500;display:flex;align-items:center">Karnataka Tourism</span>
+                <span style="height:26px;padding:0 10px;border-radius:8px;background:var(--sunk);font-size:12px;font-weight:500;display:flex;align-items:center">+1</span>
+              </div>
+              <div style="display:flex;gap:6px">
+                <span style="height:32px;padding:0 10px;border-radius:9px;border:1px solid var(--line);font-size:12.5px;font-weight:500;display:flex;align-items:center">Copy</span>
+                <span style="height:32px;padding:0 10px;border-radius:9px;border:1px solid var(--line);font-size:12.5px;font-weight:500;display:flex;align-items:center">Save as note</span>
+                <span style="height:32px;padding:0 12px;border-radius:9px;background:var(--priSoft);color:var(--priInk);font-size:12.5px;font-weight:600;display:flex;align-items:center">Plan the whole trip as a world →</span>
+              </div>
+            </div>
+          </div>
+          <div style="align-self:flex-end;max-width:78%;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+            <span style="height:44px;box-sizing:border-box;padding:0 12px 0 6px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;gap:10px"><span style="width:32px;height:32px;border-radius:7px;background:var(--redSoft);color:var(--redInk);font-family:var(--mono);font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center">PDF</span><span style="display:flex;flex-direction:column;line-height:1.2"><span style="font-size:13px;font-weight:600">hotel_booking.pdf</span><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3)">2 pages</span></span></span>
+            <div style="background:var(--pri);color:var(--onPri);border-radius:18px 18px 4px 18px;padding:11px 15px">Does this booking include breakfast?</div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <span style="width:30px;height:30px;border-radius:9px;background:var(--lime);display:flex;align-items:center;justify-content:center;flex:none"><span style="width:18px;height:11px;border-radius:4px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:4px"><span style="width:2px;height:3px;background:#0B0B0C;border-radius:2px"></span><span style="width:2px;height:3px;background:#0B0B0C;border-radius:2px"></span></span></span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+              <div style="font-family:var(--mono);font-size:11px;color:var(--ink3)">TILO · READING PAGE 2 OF 2…</div>
+              <div style="font-size:15.5px;line-height:1.6">Yes. Page 2 says breakfast is included for 2 adults. For your son it’s ₹350 a day extra, paid at the hotel<span style="display:inline-block;width:2px;height:17px;margin-left:2px;vertical-align:-3px;background:var(--ink);animation:tsCaret 1s steps(1) infinite"></span></div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:12px 20px 18px;flex:none">
+          <div style="border:1px solid var(--line2);border-radius:16px;box-shadow:var(--sh1);padding:6px 6px 6px 6px;display:flex;align-items:center;gap:6px">
+            <span style="width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:19px;color:var(--ink2)">+</span>
+            <span style="flex:1;color:var(--ink3);font-size:15px">Ask a follow-up…</span>
+            <span style="height:32px;padding:0 10px;border-radius:9px;background:var(--sunk);font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:99px;background:var(--lime);box-shadow:0 0 0 2px var(--limeK)"></span>Quick answer ▾</span>
+            <span style="width:38px;height:38px;border-radius:10px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center"><span style="width:8px;height:14px;border-radius:5px;border:2px solid var(--ink2);box-sizing:border-box"></span></span>
+            <span style="width:38px;height:38px;border-radius:10px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700">↑</span>
+          </div>
+          <div style="padding:8px 4px 0;font-size:12px;color:var(--ink3)">Quick answers use one helper and never act for you. Need sending, buying or booking? Make it a world.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:960},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;scene&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;office&quot;,&quot;beach&quot;,&quot;balcony&quot;,&quot;room&quot;],&quot;default&quot;:&quot;office&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;mood&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;talk&quot;,&quot;think&quot;,&quot;happy&quot;,&quot;idle&quot;],&quot;default&quot;:&quot;talk&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'studio', sc = this.props.scene ?? 'office', mood = this.props.mood ?? 'talk';
+    const names = { office: 'Office', beach: 'Beach', balcony: 'Balcony', room: 'Cosy room' };
+    const sky = { office: '#ECEAE4', beach: '#CFE6F0', balcony: '#F3D6C6', room: '#E9DFD3' }[sc];
+    return {
+      theme, mood, sky, office: sc === 'office', beach: sc === 'beach', balcony: sc === 'balcony', room: sc === 'room',
+      scenes: Object.keys(names).map(k => ({ t: names[k], bg: k === sc ? 'var(--ink)' : 'transparent', fg: k === sc ? 'var(--card)' : 'var(--ink2)' })),
+      budB: sc === 'office' ? '70px' : sc === 'balcony' ? '62px' : sc === 'beach' ? '64px' : '96px',
+      bubT: '96px',
+      bubLabel: mood === 'think' ? 'THINKING' : 'SPEAKING',
+      bubText: mood === 'think' ? 'Let me check the booking… reading page 2.' : 'Yes! Breakfast is included for both of you. Your son’s is ₹350 a day',
+      statusText: mood === 'think' ? 'Tilo is reading hotel_booking.pdf' : 'Tilo is answering · 1 helper',
+      pack: [{ t: 'Clothes', i: ['Cotton tees, shorts', 'Light rain jacket', 'One warm layer'] }, { t: 'Beach', i: ['Reef-safe sunscreen', 'Quick-dry towels', 'Water shoes for rocks'] }, { t: 'For your son', i: ['Sun hat', 'Swim vest', 'Snacks for the drive'] }]
+    };
+  }
+}
+</script>
+</body>
+</html>

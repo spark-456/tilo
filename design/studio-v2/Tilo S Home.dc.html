@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="position:relative;width:100%;min-height:100%;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:16px;line-height:1.5;overflow:hidden">
+  <dc-import name="Tilo S Nav" active="home" theme="{{ theme }}" menu="{{ menu }}" hint-size="100%,72px"></dc-import>
+  <main style="max-width:1232px;margin:0 auto;padding:48px 32px 64px;display:flex;flex-direction:column;gap:36px">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.3px">{{ dateLine }}</div>
+        <h1 style="margin:0;font-family:var(--fH);font-weight:700;font-size:52px;line-height:1.05;letter-spacing:-2px">{{ greet }}, Maya</h1>
+        <p style="margin:0;font-size:18px;color:var(--ink2)">Two things finished since this morning, and one needs a quick yes.</p>
+      </div>
+      <div style="position:relative;display:flex;align-items:flex-end;gap:4px;padding:0 16px 6px;flex:none">
+        <div style="position:absolute;left:0;right:0;bottom:0;height:22px;border-radius:50%;background:var(--sunk)"></div>
+        <div style="position:relative;display:flex;flex-direction:column;align-items:center"><dc-import name="Tilo S Buddy" role="research" mood="happy" size="74" delay="-.4" hint-size="63px,74px"></dc-import></div>
+        <div style="position:relative;display:flex;flex-direction:column;align-items:center">
+          <span style="position:absolute;left:50%;top:-34px;transform:translateX(-50%);height:28px;padding:0 10px;border-radius:10px 10px 10px 3px;background:var(--card);border:1px solid var(--line);box-shadow:var(--sh1);font-size:12.5px;font-weight:600;white-space:nowrap;display:flex;align-items:center">Hi Maya! 3 of us are on it</span>
+          <dc-import name="Tilo S Buddy" role="director" mood="talk" size="100" hint-size="85px,100px"></dc-import>
+        </div>
+        <div style="position:relative"><dc-import name="Tilo S Buddy" role="designer" mood="idle" size="70" delay="-1.6" hint-size="59px,70px"></dc-import></div>
+        <div style="position:relative"><dc-import name="Tilo S Buddy" role="finance" mood="think" size="62" delay="-2.3" hint-size="53px,62px"></dc-import></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh2);padding:24px;display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;align-items:flex-start;gap:16px">
+          <div style="width:52px;height:52px;border-radius:16px;background:var(--sunk);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none"><dc-import name="Tilo S Buddy" size="50" mood="{{ heroMood }}" hint-size="42px,50px"></dc-import></div>
+          <sc-if value="{{ idle }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:1;min-height:88px;display:flex;flex-direction:column;gap:6px;padding-top:6px">
+              <div style="display:flex;align-items:center;gap:2px"><span style="width:2px;height:34px;border-radius:2px;background:var(--ink);animation:tsCaret 1s steps(1) infinite"></span><span style="font-family:var(--fH);font-weight:600;font-size:30px;letter-spacing:-.8px;line-height:1.2;color:var(--ink3)">What do you want done?</span></div>
+              <div style="font-size:16px;color:var(--ink3)">Ask a quick question and one helper answers right away. Describe a bigger job and Tilo builds a world for it.</div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ attach }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;display:flex;flex-direction:column;gap:14px;padding-top:8px">
+              <div style="font-family:var(--fH);font-weight:600;font-size:26px;letter-spacing:-.6px;line-height:1.3">Summarise these two contracts and flag anything unusual<span style="display:inline-block;width:2px;height:28px;margin-left:3px;vertical-align:-4px;background:var(--ink);animation:tsCaret 1s steps(1) infinite"></span></div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <sc-for list="{{ files }}" as="f" hint-placeholder-count="3">
+                  <span style="height:56px;box-sizing:border-box;padding:0 8px 0 8px;border-radius:14px;border:1px solid var(--line);background:var(--bg);display:flex;align-items:center;gap:10px;width:290px">
+                    <span style="width:40px;height:40px;border-radius:10px;background:{{ f.bg }};color:{{ f.fg }};font-family:var(--mono);font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">{{ f.ext }}</span>
+                    <span style="flex:1;display:flex;flex-direction:column;line-height:1.25;min-width:0"><span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.n }}</span><span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">{{ f.s }}</span><span style="height:3px;border-radius:99px;background:var(--sunk);margin-top:4px;width:{{ f.barW }}"><span style="display:block;height:100%;width:{{ f.p }};border-radius:99px;background:var(--ink)"></span></span></span>
+                    <span style="width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--ink3);font-size:18px">×</span>
+                  </span>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="height:44px;padding:0 16px;border-radius:14px;border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600"><span style="font-size:20px;line-height:1">+</span>Attach</span>
+          <span style="height:44px;padding:0 16px;border-radius:14px;border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--ink2)"><span style="font-family:var(--mono)">@</span>Use a skill</span>
+          <div style="display:flex;padding:4px;border-radius:14px;background:var(--sunk)">
+            <span style="height:36px;padding:0 14px;border-radius:10px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;background:{{ qBg }};color:{{ qFg }};box-shadow:{{ qSh }}"><span style="width:7px;height:7px;border-radius:99px;background:var(--lime);box-shadow:0 0 0 2px var(--limeK)"></span>Quick answer</span>
+            <span style="height:36px;padding:0 14px;border-radius:10px;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;background:{{ wBg }};color:{{ wFg }};box-shadow:{{ wSh }}">Make a world</span>
+          </div>
+          <div style="flex:1"></div>
+          <span style="font-family:var(--mono);font-size:12.5px;color:var(--ink3)">{{ costHint }}</span>
+          <span style="height:52px;padding:0 24px;border-radius:16px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;gap:10px;font-family:var(--fH);font-weight:700;font-size:17px">{{ goLabel }}<span style="font-size:19px">→</span></span>
+        </div>
+      </div>
+      <sc-if value="{{ attach }}" hint-placeholder-val="{{ false }}">
+        <div style="border-radius:16px;background:var(--priSoft);color:var(--priInk);padding:12px 16px;display:flex;align-items:center;gap:12px;font-size:15px">
+          <span style="font-family:var(--mono);font-size:11px;font-weight:600;padding:4px 8px;border-radius:7px;background:var(--card);color:var(--ink)">1 HELPER</span>
+          <span style="flex:1"><strong>Tilo will answer this directly</strong> in about 40 seconds. It reads both files and nothing gets sent anywhere.</span>
+          <span style="font-weight:600;text-decoration:underline;text-underline-offset:3px">Make it a world instead</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ idle }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <sc-for list="{{ sugg }}" as="s" hint-placeholder-count="4">
+            <span style="height:44px;box-sizing:border-box;padding:0 8px 0 8px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;transition:transform .2s" style-hover="transform:translateY(-2px)"><span style="width:28px;height:28px;border-radius:99px;background:{{ s.cb }};color:{{ s.cf }};display:flex;align-items:center;justify-content:center">{{ s.ic }}</span>{{ s.t }}<span style="height:24px;padding:0 8px;border-radius:99px;background:{{ s.bg }};color:{{ s.fg }};font-family:var(--mono);font-size:10.5px;font-weight:600;display:flex;align-items:center">{{ s.k }}</span></span>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:32px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:32px">
+        <section style="display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between"><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:28px;letter-spacing:-.8px">Your worlds</h2><a href="#" style="font-weight:600;font-size:15px">See all 6 →</a></div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">
+            <sc-for list="{{ worlds }}" as="w" hint-placeholder-count="3">
+              <a href="#" style="display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--sh1);overflow:hidden;color:var(--ink);transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s" style-hover="transform:translateY(-3px);box-shadow:var(--sh2);color:var(--ink)">
+                <div style="position:relative;height:150px;margin:8px 8px 0;border-radius:14px;background:var(--cityBg);overflow:hidden">
+                  <div style="position:absolute;inset:8px 4px 0;filter:var(--cityFx)">{{ w.city }}</div>
+                  <span style="position:absolute;top:10px;left:10px;height:28px;padding:0 10px 0 8px;border-radius:99px;background:{{ w.pbg }};color:{{ w.pfg }};font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;box-shadow:var(--sh1)"><span style="width:8px;height:8px;border-radius:99px;background:{{ w.dot }}"></span>{{ w.pill }}</span>
+                </div>
+                <div style="padding:14px 16px 16px;display:flex;align-items:center;gap:12px">
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><div style="font-weight:700;font-size:16px;line-height:1.3">{{ w.name }}</div><div style="font-size:14px;color:var(--ink3);font-weight:500">{{ w.meta }}</div></div>
+                  <div style="position:relative;width:48px;height:48px;flex:none"><svg width="48" height="48" viewBox="0 0 48 48" style="display:block;transform:rotate(-90deg)"><circle cx="24" cy="24" r="19" style="fill:none;stroke:var(--sunk);stroke-width:5"></circle><circle cx="24" cy="24" r="19" style="fill:none;stroke:{{ w.ring }};stroke-width:5;stroke-linecap:round;stroke-dasharray:119.4;stroke-dashoffset:{{ w.off }}"></circle></svg><span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:600">{{ w.pct }}</span></div>
+                </div>
+              </a>
+            </sc-for>
+          </div>
+        </section>
+        <section style="display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <div style="display:flex;align-items:baseline;gap:12px"><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:28px;letter-spacing:-.8px">Chat history</h2><span style="font-size:15px;color:var(--ink3)">Quick answers from your single helper</span></div>
+            <a href="#" style="font-weight:600;font-size:15px">Open chat →</a>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--sh1);padding:6px">
+            <sc-for list="{{ chats }}" as="c" hint-placeholder-count="4">
+              <a href="#" style="display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:14px;border-bottom:1px solid {{ c.bd }}" style-hover="background:var(--sunk)">
+                <span style="width:40px;height:40px;border-radius:12px;background:var(--lime);display:flex;align-items:center;justify-content:center;flex:none"><span style="width:22px;height:13px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:5px"><span style="width:2.5px;height:4px;border-radius:2px;background:#0B0B0C"></span><span style="width:2.5px;height:4px;border-radius:2px;background:#0B0B0C"></span></span></span>
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.4"><span style="font-weight:600;font-size:15.5px">{{ c.t }}</span><span style="font-size:14px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.s }}</span></span>
+                <sc-if value="{{ c.file }}"><span style="height:26px;padding:0 8px;border-radius:8px;background:var(--sunk);font-family:var(--mono);font-size:11px;color:var(--ink2);display:flex;align-items:center;flex:none">{{ c.file }}</span></sc-if>
+                <span style="font-family:var(--mono);font-size:12px;color:var(--ink3);flex:none;width:44px;text-align:right">{{ c.w }}</span>
+              </a>
+            </sc-for>
+          </div>
+        </section>
+      </div>
+      <aside style="display:flex;flex-direction:column;gap:16px;padding-top:52px">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--sh1);padding:20px;display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:20px">Needs you</h2>
+            <span style="min-width:26px;height:26px;padding:0 8px;box-sizing:border-box;border-radius:99px;background:var(--amber);color:#1A1407;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center">3</span>
+            <div style="flex:1"></div><a href="#" style="font-weight:600;font-size:14px">See all</a>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <sc-for list="{{ tray }}" as="t" hint-placeholder-count="3">
+              <a href="#" style="min-height:60px;padding:8px;margin:0 -8px;border-radius:14px;display:flex;align-items:center;gap:12px;color:var(--ink)" style-hover="background:var(--sunk);color:var(--ink)">
+                <span style="width:40px;height:40px;border-radius:12px;background:{{ t.bg }};color:{{ t.fg }};display:flex;align-items:center;justify-content:center;flex:none">{{ t.ic }}</span>
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-size:15px;font-weight:600;line-height:1.35">{{ t.title }}</span><span style="font-size:13px;color:var(--ink3)">{{ t.sub }}</span></span>
+                <span style="color:var(--ink3);font-size:18px">›</span>
+              </a>
+            </sc-for>
+          </div>
+        </div>
+        <div style="position:relative;background:var(--mintSoft);border-radius:20px;padding:20px;display:flex;align-items:center;gap:14px;overflow:hidden">
+          <span style="position:absolute;top:14px;right:22px;width:8px;height:8px;background:var(--lime);transform:rotate(45deg);border-radius:2px"></span>
+          <span style="position:absolute;bottom:18px;right:34px;width:6px;height:6px;background:var(--mint);border-radius:99px"></span>
+          <div style="width:56px;height:56px;border-radius:16px;background:var(--card);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ doneAgent }}</div>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <div style="font-weight:700;font-size:15px;color:var(--mintInk)">Just finished</div>
+            <div style="font-size:15px;font-weight:500">Your reply to Northline is ready to send.</div>
+            <a href="#" style="font-weight:700;font-size:14px">Open result →</a>
+          </div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;color:var(--ink3)"><span>Spent today</span><span style="font-family:var(--mono);font-weight:500">cap £20</span></div>
+          <div style="font-family:var(--fH);font-weight:700;font-size:32px;line-height:1;letter-spacing:-1px">£4.60</div>
+          <div style="height:8px;border-radius:99px;background:var(--sunk);overflow:hidden"><div style="width:23%;height:100%;border-radius:99px;background:var(--lime)"></div></div>
+          <div style="font-size:14px;color:var(--ink2)">Plenty left. Tilo asks before anything over £50.</div>
+        </div>
+      </aside>
+    </div>
+  </main>
+  <dc-import name="Tilo S Bubble" theme="{{ theme }}" open="{{ bub }}" hint="{{ hint }}" style="position:absolute;right:40px;bottom:40px" hint-size="64px,64px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1400},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;idle&quot;,&quot;attach&quot;,&quot;bubble&quot;,&quot;menu&quot;],&quot;default&quot;:&quot;idle&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloR) this.t = setInterval(() => { if (window.TiloR && window.TiloCity) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const R = window.TiloR ? window.TiloR(React.createElement) : null;
+    const theme = this.props.theme ?? 'studio', st = this.props.state ?? 'idle', att = st === 'attach';
+    const ic = (n, s) => R ? R.ic(n, s) : null, ag = (r, e, s, k) => R ? R.agent(r, e, s, k) : null;
+    const now = new Date(), hr = now.getHours();
+    const greet = hr < 5 ? 'Still up' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+    const dateLine = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + ' · ' + now.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
+    const S = { working: ['Working', 'var(--priSoft)', 'var(--priInk)', 'var(--lime)', 'var(--pri)'], needs: ['Needs you', 'var(--amberSoft)', 'var(--amberInk)', 'var(--amber)', 'var(--amber)'], done: ['Done', 'var(--mintSoft)', 'var(--mintInk)', 'var(--mint)', 'var(--mint)'] };
+    const worlds = [['Road trip to Gokarna', '5 helpers · £1.90 so far', 'working', 62, 'trip'], ['Compare 3 suppliers', '4 helpers · £0.80 so far', 'needs', 48, 'suppliers'], ['Reply to Northline', 'Finished 11:20 · £0.12', 'done', 100, 'email']].map(([name, meta, s, p, plan]) => ({ name, meta, pill: S[s][0], pbg: S[s][1], pfg: S[s][2], dot: S[s][3], ring: S[s][4], pct: p + '%', off: (119.4 * (1 - p / 100)).toFixed(1), city: R ? R.city(plan, { labels: false, tags: false }) : null }));
+    const chats = [['What to pack for Gokarna', 'Light layers, quick-dry towels and a rain jacket for the evenings.', '', '2m'], ['Does the hotel include breakfast?', 'Yes for 2 adults. Your son’s is ₹350 a day, paid at the hotel.', 'hotel_booking.pdf', '1h'], ['Summarise the Brightcell contract', '3 things to watch: auto-renewal, late fees and a 90-day notice period.', 'Brightcell.pdf', 'Tue'], ['Is £86 fair for a battery sample?', 'A little high. Similar sample packs are usually £60 to £75.', '', 'Mon']].map(([t, s, file, w], i, a) => ({ t, s, file, w, bd: i < a.length - 1 ? 'var(--line)' : 'transparent' }));
+    const sugg = [['What should I pack for Gokarna?', 'QUICK', 'help', 'var(--skySoft)', 'var(--skyInk)'], ['Compare 3 suppliers', 'WORLD', 'chart', 'var(--tealSoft)', 'var(--tealInk)'], ['Reply to this email', 'QUICK', 'mail', 'var(--lilacSoft)', 'var(--lilacInk)'], ['Plan a road trip', 'WORLD', 'flag', 'var(--amberSoft)', 'var(--amberInk)']].map(([t, k, i, cb, cf]) => ({ t, k, cb, cf, ic: ic(i, 15), bg: k === 'QUICK' ? 'var(--priSoft)' : 'var(--sunk)', fg: k === 'QUICK' ? 'var(--priInk)' : 'var(--ink2)' }));
+    const files = [['PDF', 'Brightcell_supply_agreement.pdf', '14 pages · 2.1 MB', '100%', 'var(--redSoft)', 'var(--redInk)', '0px'], ['DOC', 'Voltway_terms_v3.docx', '6 pages · 380 KB', '100%', 'var(--skySoft)', 'var(--skyInk)', '0px'], ['PDF', 'Nordpack_quote.pdf', 'Uploading · 64%', '64%', 'var(--redSoft)', 'var(--redInk)', '140px']].map(([ext, n, s, p, bg, fg, barW]) => ({ ext, n, s, p, bg, fg, barW }));
+    const tray = [['Email 3 suppliers for a price?', 'Compare 3 suppliers · 12 min', 'mail', 'var(--amberSoft)', 'var(--amberInk)'], ['Spend £86 on a battery sample?', 'Compare 3 suppliers · 12 min', 'coin', 'var(--amberSoft)', 'var(--amberInk)'], ['Which beach for night 2?', 'Road trip to Gokarna · 3 min', 'help', 'var(--skySoft)', 'var(--skyInk)']].map(([title, sub, i, bg, fg]) => ({ title, sub, bg, fg, ic: ic(i, 18) }));
+    const on = ['var(--card)', 'var(--ink)', '0 1px 2px rgba(0,0,0,.12)'], off = ['transparent', 'var(--ink3)', 'none'];
+    return {
+      theme, greet, dateLine, worlds, chats, sugg, files, tray, idle: !att, attach: att, bub: st === 'bubble', hint: st === 'idle', menu: st === 'menu',
+      heroMood: att ? 'think' : 'idle', costHint: att ? '1 helper · about £0.08' : 'You see the cost first',
+      goLabel: att ? 'Ask' : 'Plan it', qBg: on[0], qFg: on[1], qSh: on[2], wBg: off[0], wFg: off[1], wSh: off[2],
+      crew: R ? [ag('research', 'delighted', 64), ag(null, 'focused', 78, 'director'), ag('designer', 'talking', 64)] : null,
+      doneAgent: ag('connector', 'delighted', 50)
+    };
+  }
+}
+</script>
+</body>
+</html>
