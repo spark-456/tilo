@@ -71,6 +71,43 @@ def _genai_module(name: str) -> Any:
     return importlib.import_module(name)
 
 
+MAX_CODE_RUNS = 8  # GOOGLE-MAX: runs kept per reply
+MAX_CODE_FIELD_CHARS = 4000  # GOOGLE-MAX: code and output kept per run (a run is evidence, not a data channel)
+
+
+def _enum_text(value: Any) -> str:
+    return str(getattr(value, "value", value) or "")
+
+
+def _code_runs_and_text(response: Any) -> tuple[list[dict[str, str]] | None, str | None]:
+    """GOOGLE-MAX: Gemini code execution comes back as `executable_code` then `code_execution_result` parts. Returns the
+    runs (code, outcome, output; capped) and the reply's own text, or (None, None) when no part ran code. The text is
+    joined here because the SDK's `response.text` logs a warning for a reply with non-text parts."""
+    candidates = getattr(response, "candidates", None) or []
+    content = getattr(candidates[0], "content", None) if candidates else None
+    parts = getattr(content, "parts", None)
+    if not isinstance(parts, list):
+        return None, None
+    runs: list[dict[str, str]] = []
+    texts: list[str] = []
+    ran = False
+    for part in parts:
+        code, result = getattr(part, "executable_code", None), getattr(part, "code_execution_result", None)
+        if code is not None:
+            ran = True
+            language = _enum_text(getattr(code, "language", None))
+            body = str(getattr(code, "code", "") or "")[:MAX_CODE_FIELD_CHARS]
+            runs.append({"language": language, "code": body, "outcome": "", "output": ""})
+        elif result is not None:
+            ran = True
+            if runs:
+                runs[-1]["outcome"] = _enum_text(getattr(result, "outcome", None))
+                runs[-1]["output"] = str(getattr(result, "output", "") or "")[:MAX_CODE_FIELD_CHARS]
+        elif isinstance(getattr(part, "text", None), str) and not getattr(part, "thought", False):
+            texts.append(part.text)
+    return (runs[:MAX_CODE_RUNS], "".join(texts) or None) if ran else (None, None)
+
+
 # Finish reasons the SDK uses to mark a *generated* response as blocked
 # (distinct from `prompt_feedback.block_reason`, which blocks the prompt
 # before generation starts). Mirrors openai_compat_adapter's
@@ -207,6 +244,19 @@ class GoogleModelProvider(ModelProvider):
             declarations.append(declaration)
         return [{"function_declarations": declarations}, *others] if declarations else others
 
+    def _check_code_execution(self, tools: list[dict[str, Any]]) -> None:
+        """GOOGLE-MAX: `{"code_execution": {}}` is Gemini's sandboxed Python tool. Only a profile that declares the
+        `code_execution` capability may send it, and it takes no options: refused before anything is sent."""
+        for tool in tools:
+            if "code_execution" not in tool:
+                continue
+            if tool["code_execution"] != {}:
+                raise RequestError("GOOGLE-MAX: the code_execution tool takes no options")
+            if Capability.CODE_EXECUTION.value not in self._profile.caps:
+                raise RequestError(
+                    f"GOOGLE-MAX: profile {self._profile_id!r} does not declare the code_execution capability"
+                )
+
     def _thinking_for_send(self, level: str) -> str:
         """Vertex answers HTTP 400 to thinking level "minimal" (live, 5 Oct 2026; packages/providers/CLAUDE.md, "the
         smoke sends no `thinking_level`"), so it goes out as "low". This adapter is Vertex-only, so no other
@@ -226,6 +276,7 @@ class GoogleModelProvider(ModelProvider):
         if request.system is not None:
             kwargs["system_instruction"] = request.system
         if request.tools is not None:
+            self._check_code_execution(request.tools)
             kwargs["tools"] = self._tools_for_send(request.tools)
         if request.max_output_tokens is not None:
             kwargs["max_output_tokens"] = request.max_output_tokens
@@ -323,7 +374,11 @@ class GoogleModelProvider(ModelProvider):
             if audio is not None:
                 usage["audio_tokens"] = audio
 
-        return GenerateResponse(text=response.text, profile_id=self._profile_id, tool_calls=tool_calls, usage=usage)
+        code_runs, code_text = _code_runs_and_text(response)
+        text = code_text if code_runs is not None else response.text
+        return GenerateResponse(
+            text=text, profile_id=self._profile_id, tool_calls=tool_calls, usage=usage, code_runs=code_runs
+        )
 
     def _contents(self, request: GenerateRequest) -> Any:
         """The prompt as is, or (LW-06) one user turn of `inline_data` parts then the prompt. The bytes ride only in

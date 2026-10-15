@@ -13,13 +13,13 @@ profiles:
     provider: google
     model: gemini-3.8-flash
     context: 1000000
-    caps: [json, tools, vision, audio, video, documents, thinking, computer_use, grounding]
+    caps: [json, tools, vision, audio, video, documents, thinking, computer_use, grounding, code_execution]
     media_tokens: { image: 1120, pdf_page: 1120, audio_per_second: 25, video_per_second: 258 }
   flash-37:
     provider: google
     model: gemini-3.7-flash
     context: 1000000
-    caps: [json, tools, vision, audio, video, documents, thinking]
+    caps: [json, tools, vision, audio, video, documents, thinking, code_execution]
     media_tokens: { image: 1120, pdf_page: 1120, audio_per_second: 25, video_per_second: 258 }
   lite-31:
     provider: google
@@ -27,6 +27,8 @@ profiles:
     context: 1000000
     caps: [json, tools, vision, audio, video, documents]
     media_tokens: { image: 1120, pdf_page: 1120, audio_per_second: 25, video_per_second: 258 }
+  # GOOGLE-MAX: `code_execution` on the two flash profiles lets a caller send tools=[{"code_execution": {}}] (Gemini's
+  # sandboxed Python; no fee beyond the tokens it adds) and read GenerateResponse.code_runs. No role sends it yet.
   # ADR-0029 decision 7: the search role's profile. Same model as flash-38, its own price row (a fee per search
   # query on top of the token rates). The SearchProvider adapter sends Gemini's google_search tool and refuses the
   # URL-context tool: every fetch goes through tilo-browser (egress allowlist, robots.txt, raw archive; LW-08).
