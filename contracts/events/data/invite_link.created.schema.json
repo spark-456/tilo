@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/invite_link.created.schema.json",
+  "x-version": "1.0.0",
+  "title": "InviteLinkCreatedData",
+  "description": "data of invite_link.created (registry 1.6.0, ADR-0046, PE-38). A lead of the team (or an org owner) made a team invite link. tilo-api writes it after the link record was written, never an agent or a model: actor and target are the maker, the world is the maker's Desk world (PE-12), district is null and vis is [] (owner-only, ADR-0009). Ids and the expiry only: never the token, nonce, signature, URL or key. It grants nothing by itself and sends nothing, so it is not a side effect and authz is null.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["invite_id", "team", "expires_at"],
+  "properties": {
+    "invite_id": {
+      "$ref": "../../team_invite_link.schema.json#/$defs/id"
+    },
+    "team": {
+      "$ref": "../../common.schema.json#/$defs/team_id"
+    },
+    "expires_at": {
+      "$ref": "../../common.schema.json#/$defs/timestamp"
+    }
+  }
+}

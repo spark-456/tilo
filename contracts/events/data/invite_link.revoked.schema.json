@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/invite_link.revoked.schema.json",
+  "x-version": "1.0.0",
+  "title": "InviteLinkRevokedData",
+  "description": "data of invite_link.revoked (registry 1.6.0, ADR-0046, PE-38). A lead of the team (or an org owner) withdrew a pending team invite link. tilo-api writes it after the link record changed to revoked, never an agent or a model: actor and target are the person who revoked it, the world is that person's Desk world (PE-12), district is null and vis is [] (owner-only, ADR-0009). Ids only. Expiry and redemption write no revocation. It removes nobody and sends nothing, so it is not a side effect and authz is null.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["invite_id", "team"],
+  "properties": {
+    "invite_id": {
+      "$ref": "../../team_invite_link.schema.json#/$defs/id"
+    },
+    "team": {
+      "$ref": "../../common.schema.json#/$defs/team_id"
+    }
+  }
+}

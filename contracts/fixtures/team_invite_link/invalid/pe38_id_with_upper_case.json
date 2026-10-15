@@ -1,0 +1,15 @@
+{
+  "id": "til_0A1B2C3D4E5F60718293A4B5",
+  "org_id": "org_example",
+  "team": "tm_5f3a9c2e7b1d4e6f8a0b2c4d",
+  "created_by": {
+    "by": "u_lena",
+    "at": "2026-10-15T08:40:00.000Z"
+  },
+  "expires_at": "2026-10-22T08:40:00.000Z",
+  "key_id": "key_a",
+  "nonce_sha256": "03deb1635f966dd8e9ee36472094a3c89c0111a8c5875d127cf26de89992b072",
+  "status": "pending",
+  "redeemed": null,
+  "revoked": null
+}

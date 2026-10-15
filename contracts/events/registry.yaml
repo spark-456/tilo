@@ -19,7 +19,7 @@
 # (PRD 10.4 Audit, HR-7). Such an event carries authz (EV-03) from one of authz_by (EV-04), and
 # event.schema.json lists the same types (contracts-check fails if the lists drift).
 
-version: 1.5.0
+version: 1.6.0
 unknown_types: trace_only
 types:
   world.requested:
@@ -1278,3 +1278,42 @@ types:
     trace_row: "team={data.team} state={data.state}"
     data_schema: events/data/world.share_changed.schema.json
     fixture: fixtures/events/valid/world.share_changed.json
+  invite_link.created:
+    family: invite_link
+    verb: created
+    priority: should
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "A sealed invitation card is pinned beside Your Desk."
+    hud_effect: "The Team page lists the link as unused, with its expiry."
+    story_template: "{actor} made a team invite link that expires at {data.expires_at}."
+    trace_row: "invite={data.invite_id} team={data.team} expires_at={data.expires_at}"
+    data_schema: events/data/invite_link.created.schema.json
+    fixture: fixtures/events/valid/invite_link.created.json
+  invite_link.accepted:
+    family: invite_link
+    verb: accepted
+    priority: should
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "A new team badge is pinned on Your Desk."
+    hud_effect: "The Team page shows the team just joined."
+    story_template: "{actor} joined a team through an invite link."
+    trace_row: "invite={data.invite_id} team={data.team}"
+    data_schema: events/data/invite_link.accepted.schema.json
+    fixture: fixtures/events/valid/invite_link.accepted.json
+  invite_link.revoked:
+    family: invite_link
+    verb: revoked
+    priority: should
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "The sealed invitation card beside Your Desk is torn and taken down."
+    hud_effect: "The Team page marks the link as withdrawn."
+    story_template: "{actor} withdrew a team invite link."
+    trace_row: "invite={data.invite_id} team={data.team}"
+    data_schema: events/data/invite_link.revoked.schema.json
+    fixture: fixtures/events/valid/invite_link.revoked.json
