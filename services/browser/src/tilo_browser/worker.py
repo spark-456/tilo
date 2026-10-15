@@ -124,6 +124,14 @@ class BrowserWorker(HandsProvider):
         self._alive()
         return self._land(self._driver.click(ref))
 
+    def scroll(self, ref: Any) -> None:
+        """Scroll a currently identified target into view when the browser driver supports it."""
+        self._alive()
+        scroll = getattr(self._driver, "scroll", None)
+        if not callable(scroll):
+            raise NotImplementedError("this browser driver does not support scroll")
+        scroll(ref)
+
     def classify_recorded_input(self, ref: str) -> str:
         """Trusted recording check: return nonsecure, secure, or invalid from the fresh page tree."""
         self._alive()

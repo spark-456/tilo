@@ -196,6 +196,8 @@ class FakeDriver:
         self.blocked_subrequests: list[str] = []
         self.typed: list[tuple[str, str]] = []
         self.clicked: list[str] = []
+        self.scrolled: list[str] = []
+        self.downloaded: list[str] = []
         self.uploaded: list[tuple[str, str]] = []
         self.screenshot_mask_refs: list[list[str]] = []
         self.close_calls = 0
@@ -264,6 +266,10 @@ class FakeDriver:
             return {"chain": [], "aborted": None, "final_url": self.current_url}
         return self._load(target)
 
+    def scroll(self, ref: str) -> None:
+        self._alive()
+        self.scrolled.append(ref)
+
     def type(self, ref: str, text: str) -> None:
         self._alive()
         self.typed.append((ref, text))
@@ -305,6 +311,7 @@ class FakeDriver:
 
     def download(self, ref: str) -> bytes:
         self._alive()
+        self.downloaded.append(ref)
         return b"downloaded-bytes"
 
     def close(self) -> None:
