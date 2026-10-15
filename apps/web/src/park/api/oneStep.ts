@@ -18,7 +18,7 @@ export const MAX_RUN_CREDITS = 300;
 
 /** `min_run_grant_credits` in config/run_grant.yaml (BQ-BUDGET-FLOOR-1): a Start always grants at least this many. The
  *  approaches reply's own `min_grant` wins when it is there, so a changed config never needs a web deploy. */
-export const MIN_RUN_GRANT_CREDITS = 30;
+export const MIN_RUN_GRANT_CREDITS = 60;
 
 export interface RunLine {
   /** The brief field the person's answer to the skipped question goes to, or null when it cannot be edited. */

@@ -5,7 +5,9 @@ otherwise; issue #549 item 1). Spec: `API_PPL_11c_FS.md` sections 4 and 5. None 
 The PPL-11a `Rig` lets every principal found an empty org (its `get_founder_gate` override says yes, as the PPL-11c S3
 tests assume); the FS-12 tests `unwire("founder_gate")` to get the production gate, which reads
 `TILO_PEOPLE_BOOTSTRAP_UID` on every call. A refused `/v1/people/first` is always the same 403 `forbidden`, whatever
-the reason (not the bootstrap uid, the org already has a person, the org was founded before).
+the reason (a session that is not a full web sign-in, the org was founded before). SELF-SERVE-TEAMS (ADR-0044): any
+other full, non-demo web sign-in now joins as a plain member instead of a 403, before or after founding; the bootstrap
+uid still founds as owner even after members joined, and nobody else ever becomes owner.
 """
 
 from __future__ import annotations
@@ -40,7 +42,15 @@ def _clear_env(monkeypatch):
 
 def _first(rig, body=None):
     rig.require_route(R_PERSON_FIRST)
-    return rig.client.post("/v1/people/first", json=_body() if body is None else body)
+    body = _body() if body is None else body
+    rig.email = body["email"]  # the sign-in's verified address (SELF-SERVE-TEAMS)
+    return rig.client.post("/v1/people/first", json=body)
+
+
+def _assert_member_not_owner(rig, user: str) -> None:
+    stored = rig.stored("persons", user)
+    assert stored is not None and stored["org_role"] == "member", user
+    assert rig.real.persons.founded(rig.org) is False, "a member never founds the org"
 
 
 def _prod_gate_rig(people_rig, monkeypatch, *, configured: str | None = None):
@@ -58,16 +68,14 @@ def _prod_gate_rig(people_rig, monkeypatch, *, configured: str | None = None):
 
 
 def test_PPL_11c_FS_12_with_no_bootstrap_uid_configured_nobody_founds_an_empty_org(people_rig, monkeypatch):
-    """BQ default (docs/open-questions.md BQ-PPL11C-15): unconfigured is closed. A declared visitor or judge cannot
-    claim an empty org (issue #541 item 1)."""
+    """BQ default (docs/open-questions.md BQ-PPL11C-15): unconfigured founds nothing. SELF-SERVE-TEAMS: everyone who
+    signs in joins as a member instead, and nobody becomes owner (issue #541 item 1)."""
     rig = _prod_gate_rig(people_rig, monkeypatch)
-    before = rig.snapshot()
-    for user in (FOUNDER, "u_dev_owner", "u_anyone", OWNER):
+    for i, user in enumerate((FOUNDER, "u_dev_owner", "u_anyone", OWNER)):
         rig.as_user(user)
-        refused = _first(rig)
-        assert refused.status_code == 403 and refused.json() == FORBIDDEN, (user, refused.status_code, refused.text)
-    assert rig.snapshot() == before and rig.stored("persons", FOUNDER) is None
-    assert rig.store_calls == [], "the gate is checked before any store is read or written"
+        joined = _first(rig, _body(email=f"p{i}@example.com"))
+        assert joined.status_code == 201 and joined.json()["org_role"] == "member", (user, joined.text[:200])
+        _assert_member_not_owner(rig, user)
 
 
 def test_PPL_11c_FS_12_the_configured_uid_founds_the_org_as_its_owner(people_rig, monkeypatch):
@@ -78,37 +86,33 @@ def test_PPL_11c_FS_12_the_configured_uid_founds_the_org_as_its_owner(people_rig
     stored = rig.stored("persons", FOUNDER)
     assert (stored["id"], stored["org_id"], stored["org_role"]) == (FOUNDER, rig.org, "owner")
     assert rig.real.persons.founded(rig.org) is True, "`/first` writes the founder marker with the person"
-    assert _first(rig).status_code == 403, "once"
+    again = _first(rig)
+    assert again.status_code == 200 and again.json() == created.json(), "once: a second call writes nothing"
 
 
-def test_PPL_11c_FS_12_any_other_principal_is_refused_with_the_same_403(people_rig, monkeypatch):
+def test_PPL_11c_FS_12_any_other_principal_joins_as_a_member_and_never_becomes_owner(people_rig, monkeypatch):
     rig = _prod_gate_rig(people_rig, monkeypatch, configured=FOUNDER)
     rig.as_user("u_other")
-    before = rig.snapshot()
-    wrong_uid = _first(rig)
-    assert wrong_uid.status_code == 403 and wrong_uid.json() == FORBIDDEN
-    assert rig.snapshot() == before and rig.store_calls == []
+    early = _first(rig, _body(email="other@example.com"))
+    assert early.status_code == 201 and early.json()["org_role"] == "member"
+    _assert_member_not_owner(rig, "u_other")
     rig.as_user(FOUNDER)
-    assert _first(rig).status_code == 201
-    rig.as_user("u_other")
-    already_founded = _first(rig)  # the uid is wrong AND the org is founded: still the same body
-    rig.as_user(FOUNDER)
-    founder_again = _first(rig)  # the right uid, the org is founded
-    assert {wrong_uid.text, already_founded.text, founder_again.text} == {wrong_uid.text}, (
-        "one refusal for every reason"
-    )
-    assert {r.status_code for r in (wrong_uid, already_founded, founder_again)} == {403}
+    assert _first(rig).status_code == 201, "members who joined first do not block founding"
+    rig.as_user("u_late")
+    late = _first(rig, _body(email="late@example.com"))
+    assert late.status_code == 201 and late.json()["org_role"] == "member"
+    owners = [s.record["id"] for s in rig.real.persons.list(rig.org) if s.record["org_role"] == "owner"]
+    assert owners == [FOUNDER]
 
 
-def test_PPL_11c_FS_12_the_gate_runs_before_the_body_is_checked_against_the_schema(people_rig, monkeypatch):
-    """A body the closed request model accepts but the person schema refuses (a lower-case zone): the bootstrap uid
-    learns it is a 422, anyone else only ever sees the 403 (no oracle on an empty org)."""
+def test_PPL_11c_FS_12_a_body_the_person_schema_refuses_is_a_422_for_everyone(people_rig, monkeypatch):
+    """A body the closed request model accepts but the person schema refuses (a lower-case zone) is a 422 for the
+    bootstrap uid and for a joining member alike (SELF-SERVE-TEAMS: both may write a record now), and writes nothing."""
     rig = _prod_gate_rig(people_rig, monkeypatch, configured=FOUNDER)
     bad = _body(time_zone="nowhere")
     rig.as_user("u_other")
-    refused = _first(rig, bad)
-    assert refused.status_code == 403 and refused.json() == FORBIDDEN
-    assert rig.store_calls == []
+    assert _first(rig, bad).status_code == 422
+    assert rig.stored("persons", "u_other") is None
     rig.as_user(FOUNDER)
     assert _first(rig, bad).status_code == 422
     assert rig.stored("persons", FOUNDER) is None
@@ -118,9 +122,13 @@ def test_PPL_11c_FS_12_the_gate_runs_before_the_body_is_checked_against_the_sche
 def test_PPL_11c_FS_12_the_match_is_exact(people_rig, monkeypatch, principal):
     rig = _prod_gate_rig(people_rig, monkeypatch, configured=FOUNDER)
     rig.as_user(principal)
-    refused = _first(rig)
-    assert refused.status_code == 403 and refused.json() == FORBIDDEN, principal
-    assert rig.stored("persons", principal) is None
+    joined = _first(rig)
+    if principal == "U_FOUNDER":  # not a user id at all: no record can carry it
+        assert joined.status_code == 422 and rig.stored("persons", principal) is None
+        assert rig.real.persons.founded(rig.org) is False
+        return
+    assert joined.status_code == 201 and joined.json()["org_role"] == "member", principal
+    _assert_member_not_owner(rig, principal)
 
 
 @pytest.mark.parametrize(
@@ -143,16 +151,18 @@ def test_PPL_11c_FS_12_a_value_that_is_not_a_user_id_configures_nothing(people_r
     """The value must be a `common#user_id` as it stands (no trimming, no list, no wildcard): anything else is the
     unconfigured default, so a typo in the deploy closes the door instead of opening it."""
     rig = _prod_gate_rig(people_rig, monkeypatch, configured=configured)
-    refused = _first(rig)
-    assert refused.status_code == 403 and refused.json() == FORBIDDEN, repr(configured)
-    assert rig.stored("persons", FOUNDER) is None
+    joined = _first(rig)
+    assert joined.status_code == 201 and joined.json()["org_role"] == "member", repr(configured)
+    _assert_member_not_owner(rig, FOUNDER)
 
 
 def test_PPL_11c_FS_12_the_variable_is_read_on_every_request(people_rig, monkeypatch):
     rig = _prod_gate_rig(people_rig, monkeypatch, configured="u_someone_else")
-    assert _first(rig).status_code == 403
-    monkeypatch.setenv(ENV_UID, FOUNDER)
-    assert _first(rig).status_code == 201, "no per-process cache of the setting"
+    assert _first(rig).json()["org_role"] == "member"
+    monkeypatch.setenv(ENV_UID, "u_next")
+    rig.as_user("u_next")
+    founded = _first(rig, _body(email="next@example.com"))
+    assert founded.status_code == 201 and founded.json()["org_role"] == "owner", "no per-process cache of the setting"
 
 
 def test_PPL_11c_FS_12_the_seam_is_a_predicate_over_the_configured_uid(monkeypatch):
@@ -167,13 +177,13 @@ def test_PPL_11c_FS_12_the_seam_is_a_predicate_over_the_configured_uid(monkeypat
         assert gate(other) is False, repr(other)
 
 
-def test_PPL_11c_FS_12_an_org_that_already_has_people_is_refused_to_the_bootstrap_uid_too(people_rig, monkeypatch):
+def test_PPL_11c_FS_12_an_org_whose_members_joined_first_is_founded_by_the_bootstrap_uid(people_rig, monkeypatch):
+    """SELF-SERVE-TEAMS (ADR-0044, PE-17): only the founder marker refuses founding; people already there do not."""
     rig = _prod_gate_rig(people_rig, monkeypatch, configured=FOUNDER)
     rig.add_people()
-    before = rig.snapshot()
-    refused = _first(rig)
-    assert refused.status_code == 403 and refused.json() == FORBIDDEN
-    assert rig.snapshot() == before
+    founded = _first(rig)
+    assert founded.status_code == 201 and founded.json()["org_role"] == "owner"
+    assert rig.real.persons.founded(rig.org) is True
 
 
 def test_PPL_11c_FS_12_an_erased_org_cannot_be_refounded_not_even_by_the_bootstrap_uid(people_rig, monkeypatch):
@@ -209,7 +219,10 @@ def test_PPL_11c_FS_12_eight_principals_racing_one_bootstrap_uid_leave_its_owner
     rig.require_route(R_PERSON_FIRST)
 
     def principal(request: Request):
-        return rig.deps.Principal(user_id=request.headers["x-test-user"], role="owner", full_session=True)
+        uid = request.headers["x-test-user"]  # the token's verified address is the one each racer sends
+        return rig.deps.Principal(
+            user_id=uid, role="owner", full_session=True, verified_email=f"founder{uid[3:]}@example.com"
+        )
 
     rig.app.dependency_overrides[rig.deps.get_current_principal] = principal
 
@@ -219,8 +232,9 @@ def test_PPL_11c_FS_12_eight_principals_racing_one_bootstrap_uid_leave_its_owner
             return client.post("/v1/people/first", json=body, headers={"x-test-user": f"u_f{i}"}).status_code
 
     statuses = run_threads(8, claim)
-    assert sorted(statuses) == [201] + [403] * 7, statuses
-    assert [s.record["id"] for s in rig.real.persons.list(rig.org)] == ["u_f3"]
+    assert statuses == [201] * 8, statuses  # SELF-SERVE-TEAMS: the other seven join as members
+    roles = {s.record["id"]: s.record["org_role"] for s in rig.real.persons.list(rig.org)}
+    assert roles == {f"u_f{i}": "owner" if i == 3 else "member" for i in range(8)}
 
 
 # --- FS-13: how the process gets its people stores --------

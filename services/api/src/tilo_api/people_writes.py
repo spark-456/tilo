@@ -24,6 +24,7 @@ from tilo_people.dates import resolve_due
 from tilo_people.directory import Directory
 from tilo_people.errors import AlreadyExists, EmailTaken, NotFound, OrgAlreadyFounded, VersionConflict
 from tilo_people.stores import PeopleStores, RecordStore, meeting_tombstone
+from tilo_people.teams import TeamRequest, decide_team
 from tilo_people.text import clean_line
 from tilo_people.world_share import reader_share
 from tilo_people.writes import check_write
@@ -514,10 +515,16 @@ def create_person(w: Writer, body: PersonIn) -> dict[str, Any]:
     return project("person", "membership", made) or {}
 
 
+def own_view(w: Writer) -> dict[str, Any] | None:
+    """The principal's own record as the membership view, or None (`/first` is idempotent: no second record)."""
+    me = w.stores.persons.get(w.org, w.actor)
+    return None if me is None else _view(me.record)
+
+
 def create_first_person(w: Writer, body: PersonIn) -> dict[str, Any]:
-    """The first person of an empty org is the signed-in principal, as its owner (PE-17, BQ-PPL10-3: minted by
-    tilo-api, outside `decide`). The route has already checked the bootstrap uid; the store's `create_founder` is the
-    one atomic step, so an org with a person or a founder marker is a 403 with no reason."""
+    """The org's owner record, for the configured bootstrap uid only (PE-17 as amended by ADR-0044, BQ-PPL10-3: minted
+    by tilo-api, outside `decide`). The route has already checked the bootstrap uid; the store's `create_founder` is
+    the one atomic step and refuses only an org that was founded before (members who joined first do not block it)."""
     record = _person_record(w, body, w.actor, "owner")
     if not conforms("person.schema.json", record):
         raise Refusal(422, "invalid_record")
@@ -530,26 +537,24 @@ def create_first_person(w: Writer, body: PersonIn) -> dict[str, Any]:
         raise Refusal(403, "forbidden") from None
     except EmailTaken:
         raise Refusal(409, "email_taken", code="email_taken") from None
-    return project("person", "membership", record) or {}
+    return _view(record)
 
 
-def create_judge_member(w: Writer, body: PersonIn) -> dict[str, Any]:
-    """A signed-in judge joins the org as a plain member (JUDGE-FIRST-RUN F1): the record is the principal's own and
-    its role is always `member`, never `owner`. The route has checked the judge declaration and the web session; a
-    person who already has a record, or an org its owner has not founded yet (a member must never close the door on the
-    founder), is the same 403 as `/first`."""
+def create_self_member(w: Writer, body: PersonIn) -> dict[str, Any]:
+    """`self_join` (PE-17 as amended, ADR-0044): the principal's own record as a plain `member` with no team, before
+    or after founding, decided by `tilo_people.teams.decide_team` on the whole stored org. Never an owner."""
     record = _person_record(w, body, w.actor, "member")
     if not conforms("person.schema.json", record):
         raise Refusal(422, "invalid_record")
-    if not w.stores.persons.founded(w.org):  # type: ignore[attr-defined]  # only the person store has it
-        raise Refusal(403, "forbidden")  # a judge never takes the place of the owner who founds the org
+    if not decide_team(TeamRequest(w.actor, "self_join", w.org, w.now, record=record), w.org_directory()):
+        raise Refusal(403, "forbidden")
     try:
         w.stores.persons.create(record)
     except AlreadyExists:
         raise Refusal(403, "forbidden") from None
     except EmailTaken:
         raise Refusal(409, "email_taken", code="email_taken") from None
-    return project("person", "membership", record) or {}
+    return _view(record)
 
 
 def _view(person: Mapping[str, Any]) -> dict[str, Any]:
@@ -565,7 +570,7 @@ def change_person(
     me, stored = w.stores.persons.get(w.org, w.actor), w.stores.persons.get(w.org, person_id)
     if me is None or stored is None:
         raise _not_found()
-    d = Directory.of({r["id"]: r for r in (me.record, stored.record)}.values())
+    d = w.org_directory()  # the whole org: membership now depends on every entry of a team (ADR-0044)
     before = dict(stored.record)
     request = AccessRequest(w.actor, action, "person", before, w.now)
     after = change(before)

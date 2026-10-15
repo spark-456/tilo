@@ -25,6 +25,7 @@ import { LiveMembers } from "./LiveMembers";
 import { LiveBody, LiveInvite, StatusLine } from "./LiveTeam";
 import { Members } from "./Members";
 import { MatrixCard, RulesCard } from "./Rules";
+import { SelfServeTeams } from "./SelfServeTeams";
 import "./Team.css";
 import { agentArt, icon } from "./teamKit";
 import {
@@ -217,6 +218,7 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
       {liveTeam ? (
         <>
           <LiveMembers team={liveTeam} />
+          {!liveTeam.setupRequired ? <SelfServeTeams /> : null}
           {!liveTeam.setupRequired ? (
             <details onToggle={(e) => setControlsOpen(e.currentTarget.open)}>
               <summary>Manage team settings</summary>

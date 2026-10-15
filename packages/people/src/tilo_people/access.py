@@ -16,6 +16,7 @@ from typing import Any
 
 from ._schema import is_agent_id, is_timestamp, is_user_id, valid
 from .directory import Directory
+from .teams import pending
 from .world_share import in_force
 
 ACTIONS = (
@@ -417,8 +418,9 @@ def _person(r: AccessRequest, d: Directory, tilo: bool) -> bool:
         return actor == rec["id"]
     if action == "read_membership":
         return actor == rec["id"] or org_owner
-    if action == "read_directory":
-        return actor == rec["id"] or org_owner or d.teammates(actor, rec["id"], r.now)
+    if action == "read_directory":  # PE-20 (ADR-0044): also the lead who invited the actor, while it is pending
+        invited = any(m["assigned_by"]["by"] == rec["id"] and pending(d, m, r.now) for m in me["memberships"])
+        return actor == rec["id"] or org_owner or d.teammates(actor, rec["id"], r.now) or invited
     return False
 
 

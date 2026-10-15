@@ -44,7 +44,8 @@ def test_CC_PEOPLE_FR_WLD_02_schema_file_follows_the_contract_conventions(repo_r
         assert tuple(map(int, schema["x-version"].split("."))) >= (1, 1, 0), "work_item is 1.1.0 or later"
     elif name == "meeting":  # 1.1.0 adds world_id (ADR-0020); 1.2.0 tightens the link check (ADR-0016 decision 14)
         assert tuple(map(int, schema["x-version"].split("."))) >= (1, 2, 0), "meeting is 1.2.0 or later"
-    elif name in ("calendar_entry", "pinboard_item"):  # 1.1.0: agenda_item.joinable (MJ-10); placement (ADR-0038)
+    elif name in ("calendar_entry", "pinboard_item", "person"):  # 1.1.0: joinable (MJ-10); placement (ADR-0038);
+        # membership lead and accepted_at (ADR-0044)
         assert tuple(map(int, schema["x-version"].split("."))) >= (1, 1, 0), f"{name} is 1.1.0 or later"
     else:
         assert schema["x-version"] == "1.0.0"

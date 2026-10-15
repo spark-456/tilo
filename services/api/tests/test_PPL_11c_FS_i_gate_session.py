@@ -44,6 +44,7 @@ def _rig(people_rig, monkeypatch, gate: str):
 
 
 def _first(rig, **body):
+    rig.email = {**PERSON_BODY, **body}["email"]  # the sign-in's verified address (SELF-SERVE-TEAMS)
     return rig.client.post("/v1/people/first", json={**PERSON_BODY, **body})
 
 
@@ -79,19 +80,19 @@ def test_PPL_11c_FS_19_guard_a_full_web_or_mobile_web_session_of_the_bootstrap_u
 
 
 def test_PPL_11c_FS_19_every_refusal_of_first_is_one_body(people_rig, monkeypatch):
-    """Not the bootstrap uid, an email session, a session that is not a full sign-in, an org that already has a person:
-    one status and one body, so a refusal says nothing about which rule closed the door."""
-    rig = _rig(people_rig, monkeypatch, "bootstrap_uid")
+    """An email session, a session that is not a full sign-in, an org founded before: one status and one body, so a
+    refusal says nothing about which rule closed the door. (SELF-SERVE-TEAMS: another uid on a full session joins as a
+    member, and people already there no longer block founding; neither is a refusal any more.)"""
+    rig = _rig(people_rig, monkeypatch, "any_uid")
     refusals = []
-    rig.as_user("u_other")
-    refusals.append(_first(rig))  # wrong uid, a full web session
     rig.as_user(FOUNDER)
     for channel, full_session in (("email", True), ("web", False), ("mobile_web", False)):
         rig.channel, rig.full_session = channel, full_session
         refusals.append(_first(rig))
     rig.channel, rig.full_session = "web", True
-    rig.add_people()
-    refusals.append(_first(rig))  # right uid, right session, an org that already has people
+    assert _first(rig).status_code == 201
+    rig.as_user("u_other")  # the rig's gate calls everyone the bootstrap uid: the org was founded before
+    refusals.append(_first(rig, email="other@example.com"))
     assert {r.status_code for r in refusals} == {403}
     assert len({r.text for r in refusals}) == 1 and refusals[0].json() == FORBIDDEN, [r.text for r in refusals]
 

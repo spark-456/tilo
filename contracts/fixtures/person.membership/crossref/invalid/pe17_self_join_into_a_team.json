@@ -1,0 +1,170 @@
+{
+  "rule": "PE-17",
+  "note": "A self-joined record has no team.",
+  "now": "2026-10-15T09:00:00.000Z",
+  "org_id": "org_example",
+  "persons": {
+    "u_owner": {
+      "id": "u_owner",
+      "org_id": "org_example",
+      "display_name": "Asha Rao",
+      "aliases": ["Asha"],
+      "email": "asha@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "owner",
+      "memberships": [
+        {
+          "team": "tm_ops",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-14T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-14T09:00:00.000Z"
+      }
+    },
+    "u_kim": {
+      "id": "u_kim",
+      "org_id": "org_example",
+      "display_name": "Kim Lee",
+      "aliases": ["Kim"],
+      "email": "kim@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_ops",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-14T09:05:00.000Z"
+          },
+          "lead": true
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-14T09:00:00.000Z"
+      }
+    },
+    "u_lena": {
+      "id": "u_lena",
+      "org_id": "org_example",
+      "display_name": "Lena Park",
+      "aliases": ["Lena"],
+      "email": "lena@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_5f3a9c2e7b1d4e6f8a0b2c4d",
+          "assigned_by": {
+            "by": "u_lena",
+            "at": "2026-10-15T08:10:00.000Z"
+          },
+          "lead": true
+        }
+      ],
+      "created_by": {
+        "by": "u_lena",
+        "at": "2026-10-15T08:00:00.000Z"
+      }
+    },
+    "u_omar": {
+      "id": "u_omar",
+      "org_id": "org_example",
+      "display_name": "Omar Haddad",
+      "aliases": ["Omar"],
+      "email": "omar@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_5f3a9c2e7b1d4e6f8a0b2c4d",
+          "assigned_by": {
+            "by": "u_lena",
+            "at": "2026-10-15T08:20:00.000Z"
+          },
+          "accepted_at": "2026-10-15T08:30:00.000Z"
+        }
+      ],
+      "created_by": {
+        "by": "u_omar",
+        "at": "2026-10-15T08:00:00.000Z"
+      }
+    },
+    "u_pia": {
+      "id": "u_pia",
+      "org_id": "org_example",
+      "display_name": "Pia Sen",
+      "aliases": ["Pia"],
+      "email": "pia@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_5f3a9c2e7b1d4e6f8a0b2c4d",
+          "assigned_by": {
+            "by": "u_lena",
+            "at": "2026-10-15T08:20:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_pia",
+        "at": "2026-10-15T08:00:00.000Z"
+      }
+    },
+    "u_ravi": {
+      "id": "u_ravi",
+      "org_id": "org_example",
+      "display_name": "Ravi Das",
+      "aliases": ["Ravi"],
+      "email": "ravi@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [],
+      "created_by": {
+        "by": "u_ravi",
+        "at": "2026-10-15T08:00:00.000Z"
+      }
+    }
+  },
+  "request": {
+    "actor": "u_mia",
+    "action": "self_join",
+    "person": null,
+    "team": null,
+    "record": {
+      "id": "u_mia",
+      "org_id": "org_example",
+      "display_name": "Mia Cho",
+      "aliases": ["Mia"],
+      "email": "mia@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_ops",
+          "assigned_by": {
+            "by": "u_mia",
+            "at": "2026-10-15T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_mia",
+        "at": "2026-10-15T09:00:00.000Z"
+      }
+    }
+  }
+}

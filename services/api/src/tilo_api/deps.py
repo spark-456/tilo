@@ -95,6 +95,8 @@ class Principal:
     # session, never from anything in a request; needed to answer, or read in full, another owned world's cards
     auth_time: float | None = None  # ADR-0041 BK-06: the verified token's `auth_time` (epoch s), server-set only; a key
     # act older than 10 minutes needs a fresh sign-in. None (a dev, email or test session) is never fresh.
+    verified_email: str | None = field(default=None, repr=False)  # SELF-SERVE-TEAMS: the Google-verified `email`
+    # claim, server-set only (never a body or header); the one address `/v1/people/first` may store. Not in a repr.
 
 
 def full_world_session(principal: Principal) -> bool:
@@ -656,12 +658,12 @@ def budget_cap_ceiling() -> float:
     return float(value)
 
 
-DEFAULT_MIN_RUN_GRANT_CREDITS = 30.0  # BQ-BUDGET-FLOOR-1: the owner's floor (US$0.15), used when the file gives none
+DEFAULT_MIN_RUN_GRANT_CREDITS = 60.0  # BQ-BUDGET-FLOOR-2: the floor (US$0.30), used when the file gives none
 
 
 def min_run_grant() -> float:
     """The least one run's budget grant may be: `min_run_grant_credits` in config/run_grant.yaml (BQ-BUDGET-FLOOR-1),
-    or 30 when the file or the value is missing or unusable. Never above the run ceiling, so the floor and the
+    or 60 when the file or the value is missing or unusable. Never above the run ceiling, so the floor and the
     300-credit cap can never contradict each other."""
     try:
         import yaml
