@@ -107,9 +107,9 @@ harness-skeleton:
 test-outbox-emulator:
     uv run --package tilo-api pytest services/api/tests/test_FR_CON_02_ADR35_L2_outbox_store_contract.py -q -k emulator --outbox-emulator -m emulator
 
-# Replay the eval set (no paid calls) into the git-ignored evals/results.local.md (evals/results.md is the committed pass record); exit 0 all passed, 1 a case failed, 2 error, 3 stopped at the credit cap (EFF-07).
+# Run the fake-provider bank and available recorded replays; publish separate outcome counts (CX-EVALS-REAL).
 eval:
-    uv run python -m tilo_evals run --pass full --results-md evals/results.local.md
+    uv run python -m tilo_evals real
 
 # EV-01..EV-15 metrics report from the replay set and the bank on fakes into the git-ignored evals/metrics.local.md; no paid calls; exit 2 if LIVE, K_SERVICE or CLOUD_RUN_JOB is set.
 eval-metrics:

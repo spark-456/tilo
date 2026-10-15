@@ -84,6 +84,8 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--results-md", dest="results_md", default="evals/results.md")
     run.add_argument("--results-json", dest="results_json", default=None)
     run.add_argument("--live", action="store_true")
+    real = commands.add_parser("real", help="run fake-provider bank and recorded replays into one honest report")
+    real.add_argument("--report", default="evals/REPORT.md")
     return parser
 
 
@@ -118,6 +120,30 @@ def _run(args: argparse.Namespace) -> int:
     print(summary_text(result))
     print(f"results: {md_path.as_posix()}")
     return EXIT_FAILED if result.failed else EXIT_PARTIAL if result.stopped_at_cap else EXIT_OK
+
+
+def _real(args: argparse.Namespace) -> int:
+    from .bank import BankError, load_bank  # noqa: PLC0415
+    from .bank_report import run_bank  # noqa: PLC0415
+    from .bank_run import BankRefused  # noqa: PLC0415
+    from .real_report import render_report  # noqa: PLC0415
+
+    try:
+        bank = load_bank("evals/bank")
+        if len(bank) < 20:
+            raise BankError(f"the fake-provider bank has only {len(bank)} cases; at least 20 are required")
+        bank_results = run_bank(bank)
+        replay = run_pass(pass_kind="full", config=EvalsConfig.load("config/evals.yaml"))
+    except (BankError, BankRefused, EvalsConfigError, CaseError, SelectionError) as exc:
+        print(f"tilo_evals: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+    _write(Path(args.report), render_report(bank_results, replay, build_hash=build_hash()))
+    failures = sum(not r.passed for r in bank_results) + len(replay.failed)
+    print(
+        f"eval: {len(bank_results) + len(replay.ran)} executed, {failures} failed, "
+        f"{len(replay.not_runnable)} not runnable; report: {args.report}"
+    )
+    return EXIT_FAILED if failures else EXIT_PARTIAL if replay.stopped_at_cap else EXIT_OK
 
 
 def _bank(args: argparse.Namespace) -> int:
@@ -284,6 +310,8 @@ def main(
         return _metrics(args)
     if args.command == "latency":
         return _latency(args)
+    if args.command == "real":
+        return _real(args)
     return _bank(args) if args.command == "bank" else _run(args)
 
 
