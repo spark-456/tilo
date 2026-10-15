@@ -24,6 +24,26 @@ function Block({ title, children }: { title: string; children: ReactNode }) {
     </Card>
   );
 }
+const STARTING = {
+  connected: "Connected",
+  locked: "Not connected",
+  requested: "Waiting for your consent",
+  failed: "Access lost",
+} as const;
+/** The Connectors page's run-connection cards (Studio card look: Connectors.studio.css, `park-runconn-*`). */
+function ConnBlock({
+  title,
+  line,
+  children,
+}: { title: string; line: string; children: ReactNode }) {
+  return (
+    <section className="park-runconn" aria-label={title}>
+      <h2 className="park-runconn-title">{title}</h2>
+      <p className="park-runconn-line">{line}</p>
+      {children}
+    </section>
+  );
+}
 function Events({
   events,
   empty,
@@ -107,55 +127,72 @@ function Recorded({ section, worldId }: { section: Section; worldId: string }) {
   else if (section === "connections")
     content = (
       <>
-        <Block title="Run connections">
+        <ConnBlock
+          title="Run connections"
+          line="What this run starts with, and what waits for you."
+        >
           {layout.status === "ready" ? (
             <>
-              <ul data-testid="connected-accounts">
+              <ul className="park-runconn-list" data-testid="connected-accounts">
                 {layout.value.semantic.islands.map((island) => (
-                  <li key={island.id}>
-                    {island.name} · Starting state:{" "}
-                    {
-                      {
-                        connected: "Connected",
-                        locked: "Not connected",
-                        requested: "Waiting for your consent",
-                        failed: "Access lost",
-                      }[island.state]
-                    }
+                  <li key={island.id} className="park-runconn-row">
+                    <span className="park-runconn-name">{island.name}</span>
+                    <span className="park-runconn-label">Starting state:</span>
+                    <span className={`park-runconn-pill park-runconn-pill--${island.state}`}>
+                      {STARTING[island.state]}
+                    </span>
                   </li>
                 ))}
               </ul>
-              <ul>
+              <ul className="park-runconn-list">
                 {layout.value.semantic.gates.map((gate) => (
-                  <li key={gate.id}>
-                    {nameOf(gate.guards)} ·{" "}
-                    {gate.policy_ref ? "Policy: runs on its own" : "Waits for you"}
+                  <li key={gate.id} className="park-runconn-row">
+                    <span className="park-runconn-name">{nameOf(gate.guards)}</span>
+                    <span
+                      className={`park-runconn-pill park-runconn-pill--${gate.policy_ref ? "policy" : "wait"}`}
+                    >
+                      {gate.policy_ref ? "Policy: runs on its own" : "Waits for you"}
+                    </span>
                   </li>
                 ))}
               </ul>
             </>
           ) : layout.status === "error" ? (
-            <p role="alert">
+            <p role="alert" className="park-runconn-empty">
               {layout.message}{" "}
-              <button type="button" onClick={retry}>
+              <button type="button" className="park-runconn-link" onClick={retry}>
                 Try again
               </button>
             </p>
           ) : (
-            <output>Loading connections…</output>
+            <output className="park-runconn-empty">Loading connections…</output>
           )}
-        </Block>
-        <Block title="Waiting for your consent">
-          <ul>
-            {consent.map((event) => (
-              <li key={event.seq}>
-                {nameOf(String(field(event, "connector")))} · {event.summary}{" "}
-                <a href={`/needs-you/consent?world=${encodeURIComponent(worldId)}`}>Review</a>
-              </li>
-            ))}
-          </ul>
-          {!consent.length && <p>No access request is waiting.</p>}
-        </Block>
+        </ConnBlock>
+        <ConnBlock
+          title="Waiting for your consent"
+          line="Access Tilo asked for that nobody has answered yet."
+        >
+          {consent.length ? (
+            <ul className="park-runconn-list">
+              {consent.map((event) => (
+                <li key={event.seq} className="park-runconn-row">
+                  <span className="park-runconn-name">
+                    {nameOf(String(field(event, "connector")))}
+                  </span>
+                  <span className="park-runconn-label">{event.summary}</span>
+                  <a
+                    className="park-runconn-link"
+                    href={`/needs-you/consent?world=${encodeURIComponent(worldId)}`}
+                  >
+                    Review
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="park-runconn-empty">No access request is waiting.</p>
+          )}
+        </ConnBlock>
       </>
     );
   else {
@@ -223,7 +260,9 @@ function Recorded({ section, worldId }: { section: Section; worldId: string }) {
   }
   return (
     <div>
-      {sample && <p>Sample recorded run · no live action is shown.</p>}
+      {sample && (
+        <p className="park-runconn-sample">Sample recorded run · no live action is shown.</p>
+      )}
       {content}
     </div>
   );

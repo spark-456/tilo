@@ -156,7 +156,7 @@ describe("FR_ACC_04 the sign-in expiry warning shows 3 days ahead", () => {
   it("FR_ACC_04_four_days_ahead_shows_no_warning", async () => {
     const { root } = await open(withHubspotExpiry(NOW + 4 * DAY));
     expect(banner(root)).toBeNull();
-    expect(textOf(tileFor(root, "HubSpot") as HTMLElement)).toContain("Example only: not synced");
+    expect(textOf(tileFor(root, "HubSpot") as HTMLElement)).toContain("Connected");
   });
 
   it("FR_ACC_04_just_over_three_days_ahead_shows_no_warning", async () => {

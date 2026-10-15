@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 // STUDIO-WIRE-1 (FR-ACC-01/03/04): the live Connectors list shows only what GET /v1/connectors and GET /v1/team serve.
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup } from "../../../../test-support/park/componentsHarness";
-import { makeApp, renderPage, textOf } from "../../../../test-support/park/connectorsDom";
+import { cleanup, click } from "../../../../test-support/park/componentsHarness";
+import { flush, makeApp, renderPage, textOf } from "../../../../test-support/park/connectorsDom";
 import { createLiveApi } from "../../api/liveApi";
 
 afterEach(cleanup);
@@ -95,6 +95,7 @@ it("FR_ACC_04_STUDIO_WIRE_1 scopes and expiry come from the list; null expiry sa
 it("FR_ACC_01_STUDIO_WIRE_1 the contradictory connect note is gone and usage stays unavailable", async () => {
   const { api } = setup("member");
   const { container } = await renderPage(makeApp(), api);
+  click(container.querySelector('[aria-label="Manage Actual CRM"]') as HTMLElement);
   const text = textOf(container);
   expect(text).not.toContain("Connecting and reconnecting these apps is not available");
   expect(text).toContain("What Tilo may do in each app is set beside this list.");
