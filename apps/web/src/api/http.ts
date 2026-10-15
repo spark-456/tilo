@@ -255,6 +255,8 @@ export function displayApiError(error: unknown): string {
     source_not_found: "Tilo could not find the source for this.",
     stale: "This changed while you were working. Reload and try again.",
     start_again: "Start the connection again.",
+    teach_not_understood:
+      "Tilo could not match your steps to the apps it can use. Name the app and the action in each step, for example Read the new mail in Gmail or Save the summary to Google Drive, then try again.",
     too_large: "This is too large to send. Reduce its size and try again.",
     transcript_unavailable: "The meeting transcript is unavailable right now.",
     try_again: "This could not finish. Try again in a moment.",

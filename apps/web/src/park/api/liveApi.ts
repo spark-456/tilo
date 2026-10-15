@@ -409,7 +409,15 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
   };
   api.proposeVersion = async (captureId) => {
     const path = `/v1/skills/captures/${encodeURIComponent(captureId)}/version`;
-    const data = versionOfBody(await http.postJson(path, {}));
+    // TEACH-COPY: this route's 422 is `not_understood` (no step matched an app the person can use); the page says what
+    // to change instead of the generic refusal. Mapped here, so no other call's 422 changes.
+    const body = await http.postJson(path, {}).catch((e: unknown) => {
+      if (e instanceof TiloApiError && e.status === 422) {
+        throw new TiloApiError("teach_not_understood", 422, false, true, "teach_not_understood");
+      }
+      throw e;
+    });
+    const data = versionOfBody(body);
     if (!data) throw new TiloApiError(BAD_REPLY, 200, true, true);
     return { data, source: "live" };
   };

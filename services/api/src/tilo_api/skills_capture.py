@@ -31,6 +31,7 @@ from tilo_providers.router import Router
 from tilo_providers.schema_guard import first_error
 
 from tilo_api import deps, events
+from tilo_api.connectors_list import _optional_views
 from tilo_api.people import _PeopleRoute
 from tilo_api.people_events import _DESK_WORLD, WorkEvents, get_work_events
 from tilo_api.people_writes import Refusal, Writer, _capped_body, _Closed, json_body
@@ -57,6 +58,7 @@ _DROPPED = frozenset(
 _JOINED = re.compile(
     r"\band\s+(?:what|which|who|whom|whose|when|where|how|why|should|do|does|did|can|could|would|will|is|are)\b", re.I
 )
+_GOOGLE_DEFAULTS = ("gmail", "google_drive", "google_calendar")  # the sign-in tools every person has (TEACH-PAIRS)
 _LINE = {"type": "string", "minLength": 1, "maxLength": 200, "pattern": "^[^\\r\\n]+$"}
 _VERBS = ["read", "draft", "write", "send", "post", "pay", "delete", "share", "book"]
 _CAPTURE_SCHEMA: dict[str, Any] = {
@@ -197,10 +199,27 @@ def _fold(name: str) -> str:
     return re.sub(r"[\s\-]+", "_", name.strip().lower())
 
 
-def _listed(registry: Any, doc: dict[str, Any]) -> list[StepIn]:
-    """The reply's steps whose pair config/connectors.yaml lists; no invented channel or action. A pair written as a
-    model writes it (`tool.action` in either field, other case, spaces for underscores) is read as the listed pair."""
-    kept = []
+def _usable(registry: Any, views: Any, user_id: str) -> list[str]:
+    """TEACH-PAIRS: the tools this person can use now, in the registry's order: their connected connectors, the Google
+    sign-in tools, and any tool that needs no sign-in. A view that cannot be read counts as not connected."""
+    connected = set(_GOOGLE_DEFAULTS)
+    for tool in registry.ids():
+        if registry.get(tool)["auth"] != "oauth2" or views is None:
+            continue
+        try:
+            if views.view(user_id, tool)[0] == "connected":
+                connected.add(tool)
+        except Exception:  # noqa: BLE001, S112 - unknown state is never "connected"; no text is shown
+            continue
+    return [t for t in registry.ids() if t in connected or registry.get(t)["auth"] != "oauth2"]
+
+
+def _listed(registry: Any, doc: dict[str, Any], usable: list[str]) -> tuple[list[StepIn], int]:
+    """The reply's steps whose pair config/connectors.yaml lists and the person can use (`usable`); no invented
+    channel or action. Also how many listed pairs were dropped for a tool the person has not connected. A pair written
+    as a model writes it (`tool.action` in either field, other case, spaces for underscores) is read as the listed
+    pair."""
+    kept, steered = [], 0
     for s in doc["steps"]:
         tool, action = _fold(s["tool"]), _fold(s["action"])
         if "." in tool:  # `gmail.read_email` in the tool field
@@ -208,9 +227,13 @@ def _listed(registry: Any, doc: dict[str, Any]) -> list[StepIn]:
             action = action or joined
         if action.startswith(tool + "."):  # `gmail.read_email` in the action field
             action = action[len(tool) + 1 :]
-        if _declared(registry, tool, action) is not None:
-            kept.append(StepIn(text=s["text"], tool=tool, action=action, verb=s["verb"]))
-    return kept
+        if _declared(registry, tool, action) is None:
+            continue
+        if tool not in usable:
+            steered += 1
+            continue
+        kept.append(StepIn(text=s["text"], tool=tool, action=action, verb=s["verb"]))
+    return kept, steered
 
 
 def _ready(flags: FlagStore) -> None:
@@ -351,6 +374,7 @@ def version_route(
     model_router: Annotated[Router, Depends(deps.get_router)],
     flags: Annotated[FlagStore, Depends(deps.get_flag_store)],
     registry: Annotated[Any, Depends(deps.get_connector_registry)],
+    views: Annotated[Any, Depends(_optional_views)],
     we: Annotated[WorkEvents, Depends(get_work_events)],
 ) -> dict[str, Any]:
     """Tilo's version of the person's own draft; asked twice it answers the same version (no new call, no new event)."""
@@ -371,20 +395,24 @@ def version_route(
         return _view(draft)
     _ready(flags)
     steps_block = "\n".join(f"{n}. {neutralise_marker(c['text'], 'STEPS')}" for n, c in enumerate(draft["captured"], 1))
+    usable = _usable(registry, views, principal.user_id)
     actions = "\n".join(
         f'tool "{tool}", action "{a["id"]}": {a["description"]}'
-        for tool in registry.ids()
+        for tool in usable
         for a in registry.get(tool)["actions"]
     )
-    system = load_prompt("skill_describe", "version_system.md", {"actions": actions})
+    preferred = ", ".join(t for t in usable if registry.get(t)["auth"] == "oauth2")
+    system = load_prompt("skill_describe", "version_system.md", {"actions": actions, "preferred": preferred})
     doc, used = _ask(
         model_router, system, load_prompt("skill_describe", "version_task.md", {"steps": steps_block}), _VERSION_SCHEMA
     )
-    kept = _listed(registry, doc)
-    if not kept:  # SKILL-TEACH-422: no listed pair at all; one more ask that says so, then the 422
-        retry = load_prompt("skill_describe", "version_retry.md", {"steps": steps_block})
-        doc, again = _ask(model_router, system, retry, _VERSION_SCHEMA)
-        kept = _listed(registry, doc)
+    kept, steered = _listed(registry, doc, usable)
+    if not kept or steered:  # SKILL-TEACH-422 / TEACH-PAIRS: nothing usable, or a step lost to an unconnected tool
+        retry = load_prompt("skill_describe", "version_retry.md", {"steps": steps_block, "preferred": preferred})
+        again_doc, again = _ask(model_router, system, retry, _VERSION_SCHEMA)
+        again_kept, _skipped = _listed(registry, again_doc, usable)
+        if len(again_kept) >= len(kept):  # the first reply stays when the second keeps fewer steps
+            doc, kept = again_doc, again_kept
         used = {"credits": used["credits"] + again["credits"], "trace": again["trace"]}
 
     def save() -> dict[str, Any]:

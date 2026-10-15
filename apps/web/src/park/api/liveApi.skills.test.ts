@@ -3,7 +3,7 @@
 // improvement are not served, so they read as 0, null and "" ; a failed answer rejects (the page shows its
 // unavailable state) and a save that did not happen is never an Ack.
 import { describe, expect, it, vi } from "vitest";
-import { TiloApiError } from "../../api/http";
+import { TiloApiError, displayApiError } from "../../api/http";
 import { createLiveApi } from "./liveApi";
 import type { Skill } from "./types";
 
@@ -358,6 +358,19 @@ describe("SKILLS_5_proposeVersion: POST /v1/skills/captures/{id}/version", () =>
       expect((err as TiloApiError).status).toBe(status);
     },
   );
+
+  it("FR_SKL_02_TEACH_COPY_a_422_not_understood_has_its_own_plain_sentence_for_this_call_only", async () => {
+    const refused = () => json({ detail: "not_understood" }, 422);
+    const err = await failure(live(vi.fn(async () => refused())).proposeVersion("tsk_C1"));
+    expect(err).toBeInstanceOf(TiloApiError);
+    expect((err as TiloApiError).status).toBe(422);
+    expect(displayApiError(err)).toMatch(/Name the app and the action in each step/);
+    expect(displayApiError(err)).not.toMatch(/could not understand/);
+    const other = await failure(live(vi.fn(async () => refused())).captureSkill("x"));
+    expect(displayApiError(other)).toBe(
+      "Tilo could not understand this request. Check it and try again.",
+    );
+  });
 
   it.each([
     ["no plan_steps", { ...VERSION, plan_steps: undefined }],

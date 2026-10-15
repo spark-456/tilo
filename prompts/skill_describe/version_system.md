@@ -16,5 +16,7 @@ or, with a question:
 {"steps": [...], "question": {"text": "...", "options": ["...", "..."]}}
 Give 1 to 12 steps. Never add other keys.
 
+The person can use these apps and no others: $preferred. Prefer them. Never choose an app that is not in this list, even when a step names one by theme (for example a CRM): use the listed tool that reads or saves the same text.
+
 Allowed pairs, as tool "..." and action "...": what it does
 $actions

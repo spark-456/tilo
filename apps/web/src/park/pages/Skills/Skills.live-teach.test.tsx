@@ -89,6 +89,9 @@ const SAVED_TOAST = "Saved “Match invoices”. It starts as Learning";
 // M2-CODES-1 (5b57e7ef): a retryable 5xx on a POST may still have happened, so the page says it is unconfirmed.
 const ERR_TRY = "We could not confirm it. Reload before trying again.";
 const ERR_UNDERSTOOD = "Check the information and try again.";
+// TEACH-COPY (FR-SKL-02): the version call's own 422 sentence tells the person what to change.
+const ERR_TEACH_UNDERSTOOD =
+  "Tilo could not match your steps to the apps it can use. Name the app and the action in each step, for example Read the new mail in Gmail or Save the summary to Google Drive, then try again.";
 const NOT_CONNECTED = ERR_TRY;
 
 type Handler = (init: RequestInit) => Response | Promise<Response>;
@@ -360,7 +363,7 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
   it.each([
     [503, NOT_CONNECTED],
     [502, ERR_TRY],
-    [422, ERR_UNDERSTOOD],
+    [422, ERR_TEACH_UNDERSTOOD],
   ])("SKILLS_5_live_teach_version_http_%i_says_so_and_stays_on_step_1", async (status, line) => {
     const r = await rig({
       "POST /v1/skills/captures/tsk_C1/version": () => json({ detail: "x" }, status),
