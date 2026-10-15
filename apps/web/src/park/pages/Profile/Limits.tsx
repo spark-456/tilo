@@ -126,7 +126,7 @@ export function AskBefore() {
                 </div>
                 <Switch
                   label={label}
-                  description={s.must_ask ? note : undefined}
+                  description={note}
                   checked={s.on}
                   disabled={off || s.must_ask}
                   onChange={(next) => void live.send({ kind: "switch", key: s.key, on: next })}
