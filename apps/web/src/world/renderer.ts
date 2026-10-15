@@ -25,7 +25,15 @@ import {
 } from "./art/ground";
 import { P } from "./art/iso";
 import type { Pt } from "./art/iso";
-import { buildingTag, districtTag, islandTag, makePill, policyTag } from "./art/labels";
+import {
+  buildingTag,
+  districtTag,
+  drawTool,
+  islandTag,
+  makeBubble,
+  makePill,
+  policyTag,
+} from "./art/labels";
 import { type PinKind, drawPin } from "./art/pins";
 import { type Frame, type FrameBuilding, type FrameRect, standZone } from "./frame";
 import { BUILDING_STATE, ISLAND_STATE } from "./runSummary";
@@ -78,11 +86,16 @@ export interface WorldLayer {
   readonly labels: Container;
   /** The selection ring: redrawn only when the selection or the ringed thing's place changes. */
   readonly ring: Graphics;
+  /** WORLD-LIVE: speech bubbles and tool icons, above the ring (a separate layer: the tag layer keeps only tags). */
+  readonly speech: Container;
   readonly items: Map<string, Item>;
   readonly figures: Map<string, { g: Graphics; key: string }>;
   readonly tags: Map<string, { c: Container; text: string }>;
   /** Rank tags over the characters, made only in Professional density. */
   readonly agentTags: Map<string, { c: Container; text: string }>;
+  /** WORLD-LIVE: a handoff note's speech bubble over its speaker, and the tool icon over a working agent. */
+  readonly bubbles: Map<string, { c: Container; text: string }>;
+  readonly tools: Map<string, Graphics>;
   /** The display density, read when something is drawn. */
   readonly density: () => Density;
   readonly size: () => { width: number; height: number };
@@ -108,7 +121,8 @@ export function createLayer(
   const pins = new Graphics();
   const labels = new Container();
   const ring = new Graphics();
-  content.addChild(ground, objects, pins, labels, ring);
+  const speech = new Container(); // WORLD-LIVE: bubbles and tool icons, over everything else
+  content.addChild(ground, objects, pins, labels, ring, speech);
   world.addChild(content);
   return {
     content,
@@ -117,10 +131,13 @@ export function createLayer(
     pins,
     labels,
     ring,
+    speech,
     items: new Map(),
     figures: new Map(),
     tags: new Map(),
     agentTags: new Map(),
+    bubbles: new Map(),
+    tools: new Map(),
     density,
     size,
     tagScale: 1,
@@ -472,9 +489,45 @@ export function renderAgents(
       }
       rank.c.position.set(p.x, p.y - 30 * scale - 12);
     }
+    const head = p.y - 30 * scale - (rankTags ? 26 : 14); // above the rank tag when there is one
+    // WORLD-LIVE: the tool icon, there only while agent.working is the agent's latest event.
+    let tool = layer.tools.get(agent.id);
+    if (agent.working && !tool) {
+      tool = new Graphics();
+      drawTool(tool);
+      layer.speech.addChild(tool);
+      layer.tools.set(agent.id, tool);
+    }
+    if (tool) {
+      tool.visible = agent.working;
+      tool.position.set(p.x + 16 * scale, p.y - 30 * scale);
+      tool.scale.set(Math.max(1, layer.tagScale));
+    }
+    // WORLD-LIVE: the handoff note, there only until the speaker's next event; it names who got it.
+    const said = agent.say;
+    const heading = said ? (said.head ?? `To ${said.to}`) : "";
+    const wording = said ? `${heading}\n${said.text}` : "";
+    let bubble = layer.bubbles.get(agent.id);
+    if (bubble && bubble.text !== wording) {
+      bubble.c.destroy({ children: true });
+      layer.bubbles.delete(agent.id);
+      bubble = undefined;
+    }
+    if (said && !bubble) {
+      bubble = { c: makeBubble(heading, said.text), text: wording };
+      layer.speech.addChild(bubble.c);
+      layer.bubbles.set(agent.id, bubble);
+    }
+    if (bubble) {
+      bubble.c.visible = true;
+      bubble.c.scale.set(Math.max(1, layer.tagScale));
+      bubble.c.position.set(p.x, head);
+    }
   }
   for (const [id, fig] of layer.figures) if (!shown.has(id)) fig.g.visible = false;
   for (const [id, rank] of layer.agentTags) rank.c.visible = rankTags && shown.has(id);
+  for (const [id, tool] of layer.tools) if (!shown.has(id)) tool.visible = false;
+  for (const [id, bubble] of layer.bubbles) if (!shown.has(id)) bubble.c.visible = false;
 }
 
 /** FR-WLD-06: outlines the selected agent (an ellipse at its drawn place), building, district or

@@ -39,6 +39,13 @@ export interface ClientWorldState {
   readonly retry: (() => void) | null;
 }
 
+/** The words of a meeting-room turn, read from the room (WORLD-LIVE), or null. */
+export type RoomWords = (
+  roomId: string,
+  turn: number,
+  kind: "asked" | "replied",
+) => Promise<string | null>;
+
 interface Host {
   readonly world: Container;
   readonly requestRender: () => void;
@@ -46,7 +53,11 @@ interface Host {
 }
 
 /** `worldId` is the world to draw, or null (no world in the address, or a ?fixture= replay). */
-export function useClientWorld(client: TiloClient, worldId: string | null): ClientWorldState {
+export function useClientWorld(
+  client: TiloClient,
+  worldId: string | null,
+  words?: RoomWords,
+): ClientWorldState {
   const [host, setHost] = useState<Host | null>(null);
   const [seq, setSeq] = useState(0);
   const [note, setNote] = useState<string | null>(null);
@@ -56,6 +67,8 @@ export function useClientWorld(client: TiloClient, worldId: string | null): Clie
   const chunkFailed = useRef(false); // runWorld.ts did not load
   const [selected] = useSelection(worldId ?? "");
   const reducedMotion = useRef(false);
+  const wordsRef = useRef(words);
+  wordsRef.current = words;
   reducedMotion.current = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   // The stage hands its Pixi container over once, when its renderer is ready.
@@ -96,6 +109,8 @@ export function useClientWorld(client: TiloClient, worldId: string | null): Clie
           layout,
           watch: (onEvent) => watchRun(client, worldId, onEvent),
           reducedMotion: () => reducedMotion.current,
+          words: (roomId, turn, kind) =>
+            wordsRef.current?.(roomId, turn, kind) ?? Promise.resolve(null),
           onSeq: (n) => !cancelled && setSeq(n), // no onTrace: the Trace lens lists every event
         });
       },

@@ -1,14 +1,17 @@
 """The default layout builder for a run (CL-INT-2, PRD 9.1, 9.3; services/api/tests/API_CL_INT_2.md): plain
-code, no model. One level; one Director; per district a Lead and a workshop holding its units; one worker per
-unit by role; one island per connector the plan uses; one gate per plan gate, between the guarded unit's
-workshop and its connector's island. Geometry is the solver's (CL-INT-6, `tilo_world.solve`, FR-WLD-01): attached
-only after the whole layout validates against layout.schema.json; on any solver or schema failure it stays null."""
+code, no model. One level; one Director; per district a Lead and one building per unit of work, named from the
+unit's plan title (WORLD-LIVE: a district of more than three units shares them out), a Meeting Hall in the first
+district and a Delivery Dock in the last; one worker per unit by role; one island per connector the plan uses; one
+gate per plan gate, between the guarded unit's building and its connector's island. Geometry is the solver's
+(CL-INT-6, `tilo_world.solve`, FR-WLD-01): attached only after the whole layout validates against
+layout.schema.json; on any solver or schema failure it stays null."""
 
 from __future__ import annotations
 
 import functools
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -104,6 +107,52 @@ def attach_geometry(layout: dict[str, Any], plan: dict[str, Any]) -> None:
         _log.warning("layout solver failed: %s", type(exc).__name__)
 
 
+_UNIT_BUILDINGS = 3  # a district holds at most 5 buildings (layout.schema.json); two are left for the hall and the dock
+
+
+def _common(building_id: str, name: str, common_type: str) -> dict[str, Any]:
+    """A common building no unit works in (the Meeting Hall, the Delivery Dock)."""
+    return {"id": building_id, "name": name, "kind": "common", "common_type": common_type, "plan_units": []}
+
+
+_COMMON_OF_ROLE = {"specialist": "workshop", "writer": "library", "verifier": "watchtower"}
+_NAME_CHARS = re.compile(r"[^A-Za-z0-9 &'.,()/+-]+")
+
+
+def _groups(units: list[dict[str, Any]], limit: int) -> list[list[dict[str, Any]]]:
+    """The units in order, in at most `limit` runs of near-equal length (one building each when they fit)."""
+    if not units:
+        return []
+    size = -(-len(units) // limit)
+    return [units[i : i + size] for i in range(0, len(units), size)]
+
+
+def _plain_name(text: str, fallback: str, *, room: int = 24) -> str:
+    """A building name from a unit title: plain characters only, whole words where it can, 2-24 long (plain_name)."""
+    words = _NAME_CHARS.sub(" ", text).split()
+    name = ""
+    for word in words:
+        if len(f"{name} {word}".strip()) > room:
+            break
+        name = f"{name} {word}".strip()
+    name = name or " ".join(words)[:room]
+    name = name.strip(" &'.,/+-(")
+    return name if len(name) >= 2 and name[0].isalnum() and (name[-1].isalnum() or name[-1] in ").") else fallback
+
+
+def _unit_building(building_id: str, group: list[dict[str, Any]]) -> dict[str, Any]:
+    """One building for one unit of work, named from its plan title; a run of units takes the first's, plus the rest."""
+    more = f" +{len(group) - 1}" if len(group) > 1 else ""
+    name = _plain_name(str(group[0].get("title", "")), "Workshop", room=24 - len(more)) + more
+    return {
+        "id": building_id,
+        "name": name,
+        "kind": "common",
+        "common_type": _COMMON_OF_ROLE.get(group[0]["role"], "workshop"),
+        "plan_units": [unit["id"] for unit in group],
+    }
+
+
 def build_layout(plan: dict[str, Any], *, world_id: str) -> dict[str, Any]:
     units = plan["units"]
     agents: list[dict[str, str]] = [{"id": "A_director", "rank": "director"}]
@@ -116,18 +165,30 @@ def build_layout(plan: dict[str, Any], *, world_id: str) -> dict[str, Any]:
     district_ids = sorted({unit["district"] for unit in units})
     building_of: dict[str, str] = {}
     districts = []
+    number = 0  # buildings are numbered B1.. across the districts, in district order
     for n, district_id in enumerate(district_ids, start=1):
         agents.append({"id": f"A_lead{n}", "rank": "lead"})
-        members = [unit["id"] for unit in units if unit["district"] == district_id]
-        building_of |= dict.fromkeys(members, f"B{n}")
-        workshop = {"id": f"B{n}", "name": "Workshop", "kind": "common", "common_type": "workshop"}
+        members = [unit for unit in units if unit["district"] == district_id]
+        last = n == len(district_ids)
+        buildings = []
+        for group in _groups(members, _UNIT_BUILDINGS):
+            number += 1
+            building = _unit_building(f"B{number}", group)
+            building_of |= dict.fromkeys(building["plan_units"], building["id"])
+            buildings.append(building)
+        if n == 1:  # where a person calls the team to talk (the meeting room): one labelled hall for the world
+            number += 1
+            buildings.append(_common(f"B{number}", "Meeting Hall", "meeting_hall"))
+        if last:  # where the finished work is handed over: the one labelled delivery spot of the world
+            number += 1
+            buildings.append(_common(f"B{number}", "Delivery Dock", "delivery_dock"))
         districts.append(
             {
                 "id": district_id,
                 "name": f"Workstream {n}",
                 "icon": "inbox",
                 "lead": f"A_lead{n}",
-                "buildings": [{**workshop, "plan_units": members}],
+                "buildings": buildings,
             }
         )
 

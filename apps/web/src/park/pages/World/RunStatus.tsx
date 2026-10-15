@@ -5,11 +5,12 @@ import { useState } from "react";
 import type { Api } from "../../api";
 import { openResult, readResult, saveResult } from "../../api/results";
 import { Button } from "../../components";
+import type { SharedResult } from "./ResultPanel";
 import { Markdown } from "./markdown";
 import { isRestartStop, restartApproval } from "./runProgress";
 import type { RunView } from "./runView";
 import type { RunEvent } from "./useRunEvents";
-import { type ResultView, useRunResult } from "./useRunResult";
+import type { ResultView } from "./useRunResult";
 
 /** What the card needs to start a stopped run again: the one call, and where the new world is opened. */
 export interface StartAgain {
@@ -170,14 +171,16 @@ export function RunResult({
   api,
   worldId,
   events,
+  shared,
 }: {
   api: Api;
   worldId: string;
   events: readonly RunEvent[];
+  /** The page's one read of the result (WORLD-LIVE), also used by the Delivery Dock. */
+  shared: SharedResult;
 }) {
   const ids = deliveredIds(events);
-  const [attempt, setAttempt] = useState(0);
-  const view = useRunResult(api, worldId, true, attempt);
+  const view = shared.view;
   const blob = view.status === "text" || view.status === "file" ? view.blob : null;
   return (
     <section aria-label="Result" className="park-world-section" data-testid="run-result">
@@ -194,7 +197,7 @@ export function RunResult({
       ) : (
         <span className="park-world-sub">Delivered by this run</span>
       )}
-      <ResultBody view={view} retry={() => setAttempt((n) => n + 1)} />
+      <ResultBody view={view} retry={shared.retry} />
       {ids.length > 1 ? <DeliveredItems api={api} worldId={worldId} ids={ids} /> : null}
     </section>
   );

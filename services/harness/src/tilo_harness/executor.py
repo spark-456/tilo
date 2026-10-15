@@ -76,6 +76,7 @@ from tilo_harness.verifier import Verifier
 log = logging.getLogger(__name__)
 _WORKER_RANKS = ("specialist", "verifier", "writer")  # ranks that execute units (PRD 8.1)
 _LEVELS = 3  # Director -> Lead -> worker
+_HALLS = ("meeting_hall", "delivery_dock")  # the world's own buildings: planned with the rest, no unit works in them
 
 
 class PlanRefused(Exception):
@@ -190,6 +191,17 @@ def _date_window_fail(context: UnitContext, today: date) -> WindowFail | None:
 
 
 @dataclass(frozen=True)
+class _Site:
+    """A building that holds at least one unit of this plan (WORLD-LIVE: the world draws it from these events)."""
+
+    id: str
+    district: str
+    name: str
+    units: tuple[str, ...]  # the plan's units in it, in plan order (none for the world's own halls)
+    common: str | None = None  # the layout's common_type, to tell the Meeting Hall and the Delivery Dock
+
+
+@dataclass(frozen=True)
 class _Roster:
     director: str
     leads: dict[str, str]  # district -> Lead
@@ -197,6 +209,8 @@ class _Roster:
     workers: dict[str, str]  # unit -> worker agent
     sites: dict[str, str]  # unit -> building
     ranks: dict[str, str] = field(default_factory=dict)  # agent -> rank, in layout order (FR-AGT-09 successors)
+    buildings: dict[str, _Site] = field(default_factory=dict)  # building -> what it holds, in layout order
+    homes: dict[str, str] = field(default_factory=dict)  # district -> its Lead's post: the district's first building
 
 
 def _dependency_order(units: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -253,7 +267,18 @@ def _roster(units: list[dict[str, Any]], layout: dict[str, Any], config: AgentsC
         leads[district["id"]] = district["lead"]
         levels[district["id"]] = level_id
         workers[unit["id"]] = pool[unit["role"]].pop(0)
-    return _Roster(directors[0], leads, levels, workers, sites, rank)
+    wanted = {unit["id"] for unit in units}
+    buildings: dict[str, _Site] = {}
+    homes: dict[str, str] = {}
+    for _, district in districts.values():
+        for building in district["buildings"]:
+            held = tuple(u for u in building.get("plan_units", []) if u in wanted)
+            common = building.get("common_type")
+            if held or common in _HALLS:
+                buildings[building["id"]] = _Site(building["id"], district["id"], building["name"], held, common)
+            if held:
+                homes.setdefault(district["id"], building["id"])
+    return _Roster(directors[0], leads, levels, workers, sites, rank, buildings, homes)
 
 
 NL2 = chr(10) * 2
@@ -289,6 +314,12 @@ def _upstream_item(
     return UpstreamItem(
         unit["id"], unit["title"], NL2.join(texts)[:UPSTREAM_ITEM_CAP] or None, refs, verdict, outcome.read_external
     )
+
+
+def _line(text: str, cap: int = 140) -> str:
+    """One plain line of at most `cap` characters for an event `summary` (event.schema.json: 1-140)."""
+    one = " ".join(str(text).split())
+    return one if len(one) <= cap else one[: cap - 3].rstrip() + "..."
 
 
 def _envelope(outcome: UnitOutcome, worker: str, lead: str, unit: dict[str, Any]) -> dict[str, Any] | None:
@@ -357,6 +388,10 @@ class _Run:
         self.handoffs: dict[str, str] = {}  # unit -> the agent.handoff event that carried its artifacts
         self.brief, self.intake_answers = brief, tuple((str(q), str(a)) for q, a in intake_answers)
         self.results: dict[str, UpstreamItem] = {}  # unit -> what it made, for the units that depend on it
+        self.unit_types: dict[str, str] = {}  # WORLD-LIVE: unit -> plan unit type, for building.completed
+        self.constructing: set[str] = set()  # buildings that have had building.constructing
+        self.operational: set[str] = set()  # buildings that have had building.operational
+        self.finished: dict[str, int] = {}  # building -> its units handed over so
 
     def emit(self, type_: str, actor: str, target: str, summary: str, data: dict[str, Any], **kw: Any) -> str:
         district = kw.get("district")
@@ -389,6 +424,78 @@ class _Run:
                 cause=cause,
             )
 
+    def plan_world(self) -> None:
+        """WORLD-LIVE (PRD 9.4/9.5): the buildings the plan needs are planned (a wireframe, named in the layout from the
+        plan's titles), then each Lead takes a post at its district's first building and the Director at the first of
+        all, so every agent that talks in the world is on the stage. A building the plan has no unit for is not."""
+        roster = self.roster
+        for site in roster.buildings.values():
+            data = {"plan_units": list(site.units)}
+            planned = self.emit("building.planned", roster.director, site.id, _line(f"{site.name} is planned."), data,
+                                district=site.district)  # fmt: skip
+            if site.common == "meeting_hall":  # open from the start: a person can call the team in at any time
+                done = {"unit_type": "meeting", "unit_count": 0}
+                self.emit("building.completed", roster.director, site.id, _line(f"{site.name} is open."), done,
+                          cause=planned, district=site.district)  # fmt: skip
+        for district, lead in roster.leads.items():
+            if home := roster.homes.get(district):
+                words = _line(f"The Lead took a post at {roster.buildings[home].name}.")
+                self.emit("agent.moved", lead, home, words, {"from": home}, district=district)
+        if first := next(iter(roster.homes.values()), None):
+            district = roster.buildings[first].district
+            self.emit(
+                "agent.moved", roster.director, first, "The Director took a post.", {"from": first}, district=district
+            )
+
+    def arrive(self, unit: dict[str, Any], lead: str, worker: str, site: str, cause: str) -> str:
+        """The worker's building goes up and the worker walks to it from its Lead's post, as they are recorded:
+        building.constructing (once per building), agent.moved (not when the building is the Lead's own post),
+        building.operational (once). A site that is not a plan building (the district fallback) records nothing."""
+        roster, district = self.roster, unit["district"]
+        building = roster.buildings.get(site)
+        if building is None:
+            return cause
+        if site not in self.constructing:
+            self.constructing.add(site)
+            words = _line(f"Work is starting at {building.name}.")
+            cause = self.emit(
+                "building.constructing", lead, site, words, {"unit": unit["id"]}, cause=cause, district=district
+            )
+        home = roster.homes.get(district)
+        if home is not None and home != site:
+            words = _line(f"The agent walked to {building.name}.")
+            cause = self.emit("agent.moved", worker, site, words, {"from": home}, cause=cause, district=district)
+        if site not in self.operational:
+            self.operational.add(site)
+            words = _line(f"{building.name} is at work.")
+            cause = self.emit(
+                "building.operational", lead, site, words, {"unit": unit["id"]}, cause=cause, district=district
+            )
+        return cause
+
+    def walk_back(self, unit: dict[str, Any], worker: str, cause: str) -> str:
+        """The worker walks to its Lead's post to hand over (the receiver is there), when it is not already."""
+        roster, site = self.roster, self.roster.sites.get(unit["id"], "")
+        home = roster.homes.get(unit["district"])
+        if site not in roster.buildings or home is None or home == site:
+            return cause
+        words = _line(f"The agent walked back to the Lead from {roster.buildings[site].name}.")
+        return self.emit("agent.moved", worker, home, words, {"from": site}, cause=cause, district=unit["district"])
+
+    def finish(self, unit: dict[str, Any], lead: str, cause: str) -> None:
+        """building.completed once every unit of the building has handed over (a failed or skipped one never does)."""
+        site = self.roster.sites.get(unit["id"], "")
+        building = self.roster.buildings.get(site)
+        if building is None:
+            return
+        self.finished[site] = self.finished.get(site, 0) + 1
+        if self.finished[site] == len(building.units):
+            data = {"unit_type": self.unit_types[building.units[0]], "unit_count": len(building.units)}
+            words = _line(
+                f"{building.name} finished {len(building.units)} {'unit' if len(building.units) == 1 else 'units'}."
+            )
+            self.emit("building.completed", lead, site, words, data, cause=cause, district=unit["district"])
+
     async def work(self, unit: dict[str, Any], slot: _Slot) -> UnitOutcome | None:
         """None when the unit was parked to ask a person first."""
         unit_id, district = unit["id"], unit["district"]
@@ -396,9 +503,8 @@ class _Run:
         trail: list[dict[str, Any]] = []
         at = {"district": district, "trail": trail}
         cause = self.emit("agent.spawned", lead, worker, "An agent joined the team.", {"role": unit["role"]}, **at)
-        cause = self.emit(
-            "agent.assigned", lead, worker, "The Lead gave it a unit.", {"unit": unit_id}, cause=cause, **at
-        )
+        words = _line(f"The Lead gave it: {unit['title']}")
+        cause = self.emit("agent.assigned", lead, worker, words, {"unit": unit_id}, cause=cause, **at)
         answer: Answer | None = None
         decision: str | None = None
         intake_answers = self.intake_answers
@@ -473,6 +579,7 @@ class _Run:
                 data = {"skill": skill.id, "version": skill.version}
                 cause = self.emit("skill.loaded", worker, worker, "The agent loaded a skill.", data, cause=cause, **at)
             site = self.roster.sites.get(unit_id, district)
+            cause = self.arrive(unit, lead, worker, site, cause)
             cause = self.emit(
                 "agent.working", worker, site, "The agent is working.", {"unit": unit_id}, cause=cause, **at
             )
@@ -507,8 +614,11 @@ class _Run:
                 outcome = UnitOutcome(success=False, summary="The unit's step before its handoff did not finish.")
                 envelope = None
         if envelope is not None:
-            summary = "The agent handed its result to the Lead."
+            summary = (
+                "The agent handed its result to the Lead."  # FR-AGT-08: the agent's own words ride only in the envelope
+            )
             try:
+                cause = self.walk_back(unit, worker, cause)
                 cause = self.emit("agent.handoff", worker, lead, summary, {"envelope": envelope}, cause=cause, **at)
             except EventRejected as error:  # the writer refused the handoff and wrote nothing: this unit fails
                 log_caught(error, __name__, locals())
@@ -519,6 +629,7 @@ class _Run:
                 )
             else:
                 self.handoffs[unit_id] = cause
+                self.finish(unit, lead, cause)
         self.emit("agent.retired", lead, worker, "The agent finished and left.", {}, cause=cause, **at)
         if outcome.success is True:
             # the store read is synchronous: keep it off the event loop
@@ -749,6 +860,9 @@ async def run_plan(
         intake_answers,
     )
     run.spawn_team()
+    if reuse is None:  # a branch continues the parent run's world: its buildings and posts are already recorded
+        run.plan_world()
+    run.unit_types = {unit["id"]: unit["unit_type"] for unit in order}
     slots = asyncio.Semaphore(config.limits.max_specialists)
     loop = asyncio.get_running_loop()
     finished: dict[str, asyncio.Future[bool]] = {unit["id"]: loop.create_future() for unit in order}

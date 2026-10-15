@@ -850,11 +850,27 @@ class Run:
         ours = {card_id, *(c for c, origin in list(self.reraised.items()) if origin == card_id)}
         return next((c for c in list(self.resolved) if c in ours), None)
 
-    def _deliver(self, unit: dict, worker: str, item: dict, data: dict, cause: str) -> None:
+    def _dock(self) -> str | None:
+        """The layout's Delivery Dock (WORLD-LIVE), or None for a world laid out without one."""
+        return next(
+            (b["id"] for lv in self.layout["semantic"]["levels"] for d in lv["districts"] for b in d["buildings"]
+             if b.get("common_type") == "delivery_dock"), None)  # fmt: skip
+
+    def _deliver(self, unit: dict, worker: str, item: dict, data: dict, cause: str, *, here: str | None = None) -> None:
+        """WORLD-LIVE: the worker carries the item to the Delivery Dock, then it is recorded delivered, then the dock
+        records the handover (building.completed); an older world with no dock records the delivery alone."""
+        dock, district = self._dock(), unit["district"]
+        here = here or self._building(unit)
+        if dock is not None and dock != here:
+            self.put("agent.moved", worker, dock, "The agent carried the item to the Delivery Dock.", {"from": here},
+                     district=district, cause=cause)  # fmt: skip
         delivered = self.put(
             "artifact.delivered", worker, item["artifact_id"], "The item was delivered.", data,
-            district=unit["district"], cause=cause,
+            district=district, cause=cause,
         )  # fmt: skip
+        if dock is not None:
+            self.put("building.completed", worker, dock, "The Delivery Dock handed an item over.",
+                     {"unit_type": "delivery", "unit_count": 1}, district=district, cause=delivered["id"])  # fmt: skip
         self.titles[item["artifact_id"]] = unit["title"]
         self.delivered.append(delivered["id"])
 
@@ -870,7 +886,7 @@ class Run:
                     continue
                 seen.add(item["artifact_id"])
                 data = {"artifact": item, "format": "in_app", "outbox_id": None}
-                self._deliver(producer, worker, item, data, made)
+                self._deliver(producer, worker, item, data, made, here=self._building(unit))
 
     async def _send(self, entry: dict, evidence: dict[str, Any]) -> dict:
         """Enqueue with the person's authz, then dispatch until the outbox records the entry sent."""
