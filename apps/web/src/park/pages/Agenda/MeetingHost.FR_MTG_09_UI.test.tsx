@@ -28,11 +28,12 @@ const NOW = Date.parse("2026-10-15T10:00:00Z");
 const form = { title: "Q4 plan", start: "2026-10-17T18:00", minutes: 30, attested: true };
 
 describe("FR_MTG_09_UI form rules", () => {
-  it("FR_MTG_09_UI_a_start_must_be_future_length_at_most_60_and_the_notice_ticked", () => {
+  it("FR_MTG_09_UI_a_start_must_be_future_length_at_most_45_and_the_notice_ticked", () => {
     expect(hostFormError(form, NOW)).toBeNull();
     expect(hostFormError({ ...form, start: "2026-10-13T09:00" }, NOW)).toMatch(/future/);
     expect(hostFormError({ ...form, start: "" }, NOW)).toMatch(/starts/);
-    expect(hostFormError({ ...form, minutes: 90 }, NOW)).toMatch(/15, 30, 45 or 60/);
+    expect(hostFormError({ ...form, minutes: 90 }, NOW)).toMatch(/15, 30 or 45/);
+    expect(hostFormError({ ...form, minutes: 60 }, NOW)).toMatch(/15, 30 or 45/); // the bot leaves at 45
     expect(hostFormError({ ...form, attested: false }, NOW)).toMatch(/notice/);
     expect(hostFormError({ ...form, title: "  " }, NOW)).toMatch(/title/);
     expect(hostFormError({ ...form, title: "see https://x.test" }, NOW)).toMatch(/links/);
@@ -125,7 +126,7 @@ describe("FR_MTG_09_UI host a meeting", () => {
     expect(m.container.querySelector('[role="alert"]')?.textContent).toMatch(/notice/);
     expect(http.postJson).not.toHaveBeenCalled();
     const options = Array.from(m.container.querySelectorAll("option")).map((o) => o.value);
-    expect(options).toEqual(["15", "30", "45", "60"]);
+    expect(options).toEqual(["15", "30", "45"]);
   });
   it("FR_MTG_09_UI_f_submit_is_create_then_world_then_host_and_points_to_needs_you", async () => {
     const { api, http } = rig();

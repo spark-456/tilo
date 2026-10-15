@@ -185,6 +185,8 @@ class LiveSession:
         self.trace = TurnTrace(self.out_dir / "turns.jsonl", self.clock, self.start)
         self.bot_tap: WavTap | None = None
         self.others_seen, self.alone_since = False, None
+        self.unreadable_since: float | None = None  # when the People panel and head count both went unreadable
+        self._activity_seen = 0  # transcript and caption lines so far: any new one means the call is not empty
         self.last_wait_msg, self.intro_sent = None, False
         self.leave_requested = False
 
@@ -857,6 +859,8 @@ class LiveSession:
             if now - self.alone_since >= cfg.alone_grace_s:
                 log.info("everyone else left; leaving")
                 return True
+        if self._unreadable_too_long(others_count, now):
+            return True
         if brain:
             brain.present = present
 
@@ -885,6 +889,23 @@ class LiveSession:
             log.info("hit MAX_MEETING_MINUTES; leaving")
             return True
         return False
+
+    def _unreadable_too_long(self, others_count: int | None, now: float) -> bool:
+        """Panel and head count both unreadable (`others_count` None) for `unreadable_leave_s` with no caption or chat
+        line in that time: nobody can be heard and nobody can be counted, so leave rather than sit in the call."""
+        activity = len(self.store.items) + len(self.captions_store.items)
+        if others_count is not None or activity != self._activity_seen:
+            self.unreadable_since = None
+        self._activity_seen = activity
+        if others_count is not None:
+            return False
+        self.unreadable_since = now if self.unreadable_since is None else self.unreadable_since
+        if now - self.unreadable_since < self.cfg.unreadable_leave_s:
+            return False
+        log.info(
+            "People panel and head count unreadable for %.0fs with no captions; leaving", now - self.unreadable_since
+        )
+        return True
 
     # -- shutdown ---------------------------------------------------------------------------------------------------
     async def _shutdown(self) -> None:

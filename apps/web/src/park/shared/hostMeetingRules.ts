@@ -7,7 +7,7 @@ export const NOTICE_VERSION = "1.0.0";
  * `Tilo leave` stops it) and FR-MTG-10 retention. The bot posts the same facts in the meeting chat before it records. */
 export const NOTICE_TEXT =
   "I have the right to record this meeting. Tilo joins as an AI notetaker named Tilo notetaker and posts a notice in the meeting chat before it records. The transcript is kept for 30 days and the minutes for 90 days. Only I can see them. Anyone in the meeting can stop it by typing Tilo leave.";
-export const LENGTHS = [15, 30, 45, 60] as const; // MH-02: at most 60 minutes (meeting_host.max_duration_min)
+export const LENGTHS = [15, 30, 45] as const; // MH-02: at most 45 minutes (meeting_host.max_duration_min); the bot leaves at 45
 /** The "Send Tilo" button shows from this long before the start. */
 export const EARLY_MS = 10 * 60_000;
 
@@ -38,7 +38,7 @@ export function hostFormError(f: HostForm, nowMs: number): string | null {
   if (!f.start || Number.isNaN(s)) return "Choose when the meeting starts.";
   if (s <= nowMs) return "Choose a start time in the future.";
   if (!(LENGTHS as readonly number[]).includes(f.minutes))
-    return "A hosted meeting lasts 15, 30, 45 or 60 minutes.";
+    return "A hosted meeting lasts 15, 30 or 45 minutes.";
   if (!f.attested) return "Confirm the notice before Tilo can host.";
   return null;
 }

@@ -98,6 +98,7 @@ class Config:
     voice_nudges: bool
     mic_policy: str
     guest: bool = False
+    unreadable_leave_s: float = 300.0  # People panel and head count unreadable, no captions: leave after this long
 
     @classmethod
     def from_env(cls) -> Config:
@@ -142,6 +143,7 @@ class Config:
             or ("gemini" if e("HYBRID_TRANSCRIPT", "0") == "1" else "captions"),
             answer_mode="addressed" if e("ANSWER_MODE", "questions") == "addressed" else "questions",
             guest=_choice("BOT_JOIN_MODE", "signed-in", ("signed-in", "guest")) == "guest",
+            unreadable_leave_s=_num("UNREADABLE_LEAVE_SECONDS", 300),
         )
 
 

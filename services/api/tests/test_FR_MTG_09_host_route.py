@@ -161,6 +161,7 @@ def _raw_row(hr: HostRig, record: dict) -> None:
 def _refusal_cases() -> list:
     long_zone = "America/Argentina/ComodRivadavia"
     return [
+        pytest.param("MH-02", {"meeting": _window("2030-01-15T09:46:00.000Z")}, id="MH-02-46-minutes"),
         pytest.param("MH-02", {"meeting": _window("2030-01-15T10:01:00.000Z")}, id="MH-02-61-minutes"),
         pytest.param("MH-02", {"meeting": _window(None)}, id="MH-02-no-end"),
         pytest.param("MH-02", {"now": T_START}, id="MH-02-start-not-after-now"),
@@ -226,7 +227,7 @@ def test_FR_MTG_09_host_route_422_with_the_MH_rule_id_for_a_draft_the_adapter_re
     assert _snapshot(hr) == before, "a refused draft starts no run and makes no artifact"
 
 
-def test_FR_MTG_09_host_route_the_limits_pass_at_exactly_60_minutes_and_50_recipients(hr):
+def test_FR_MTG_09_host_route_the_limits_pass_at_exactly_45_minutes_and_50_recipients(hr):
     hr.rig.require_route(R_HOST)
     hr.rig.add_people(_persons_p(49))
     hr.rig.real.meetings.replace(
@@ -234,7 +235,7 @@ def test_FR_MTG_09_host_route_the_limits_pass_at_exactly_60_minutes_and_50_recip
             scheduled={"start": T_START, "end": T_END}, attendees=attendees_of(*[f"u_p{n:02d}" for n in range(49)])
         ),
         expected_version=1,
-    )  # 49 attendee users and the owner: 50 recipients; 60 minutes: both at the limit
+    )  # 49 attendee users and the owner: 50 recipients; 45 minutes: both at the limit
     assert hr.host().status_code == 200
     card = hr.wait_gate()
     assert len(card["gate"]["recipients"]) == 50 and card["gate"]["recipients"][0] == ASHA
