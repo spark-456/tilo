@@ -1,6 +1,7 @@
 // The event detail aside (reference: the `Event detail` region of Tilo App Agenda.dc.html): who is
 // there, Tilo's brief, notes and follow-ups of a past meeting, and the three switches of an upcoming one.
 import type { AppCtx } from "../../app/AppCtx";
+import { MeetingBrief } from "./MeetingBrief";
 import { face } from "./icons";
 import { CAL, type DetailVm, PERSON } from "./model";
 import type { AgendaUi } from "./useAgenda";
@@ -8,6 +9,8 @@ import type { AgendaUi } from "./useAgenda";
 export function Detail({ vm, ui, app }: { vm: DetailVm; ui: AgendaUi; app: AppCtx }) {
   const { e, det } = vm;
   const joins = vm.toggles[0]?.[2] ?? false;
+  const liveBrief = /^mt_[A-Za-z0-9_]{1,48}$/.test(e.id) ? ui.briefApi : null;
+  const toggles = liveBrief ? vm.toggles.filter((t) => t[3] !== "brief") : vm.toggles;
   return (
     <aside aria-label="Event detail" className="park-agenda-detail">
       <div className="park-agenda-detailhead">
@@ -38,7 +41,8 @@ export function Detail({ vm, ui, app }: { vm: DetailVm; ui: AgendaUi; app: AppCt
           </span>
         ) : null}
       </div>
-      {vm.hasBrief ? (
+      {liveBrief ? <MeetingBrief key={e.id} id={e.id} api={liveBrief} /> : null}
+      {!liveBrief && vm.hasBrief ? (
         <div className="park-agenda-brief">
           <div className="park-agenda-briefhead">
             <span className="park-agenda-briefname">TILO’S BRIEF</span>
@@ -52,7 +56,7 @@ export function Detail({ vm, ui, app }: { vm: DetailVm; ui: AgendaUi; app: AppCt
           ))}
         </div>
       ) : null}
-      {vm.needsBrief ? (
+      {!liveBrief && vm.needsBrief ? (
         <button
           type="button"
           className="park-agenda-askbrief"
@@ -99,7 +103,7 @@ export function Detail({ vm, ui, app }: { vm: DetailVm; ui: AgendaUi; app: AppCt
       {vm.empty ? <div className="park-agenda-empty">No notes for this one.</div> : null}
       {vm.upcoming ? (
         <div className="park-agenda-toggles">
-          {vm.toggles.map(([label, sub, on, k]) => (
+          {toggles.map(([label, sub, on, k]) => (
             <button
               key={k}
               type="button"
@@ -123,10 +127,12 @@ export function Detail({ vm, ui, app }: { vm: DetailVm; ui: AgendaUi; app: AppCt
               </span>
             </button>
           ))}
-          <div className="park-agenda-togglenote">
-            Not connected yet. These switches are kept on this page only, so Tilo does not act on
-            them yet.
-          </div>
+          {!liveBrief ? (
+            <div className="park-agenda-togglenote">
+              Not connected yet. These switches are kept on this page only, so Tilo does not act on
+              them yet.
+            </div>
+          ) : null}
         </div>
       ) : null}
     </aside>

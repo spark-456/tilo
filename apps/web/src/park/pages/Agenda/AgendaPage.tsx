@@ -183,7 +183,7 @@ function Plate({ A }: { A: LiveAgenda }) {
       <div className="park-agenda-titles">
         <h1 className="park-agenda-title">Agenda</h1>
         <p className="park-agenda-lede">
-          Tilo prepares a brief before each meeting and takes notes in the ones you invite it to.
+          Ask Tilo for a brief when you need one. Tilo takes notes in meetings you invite it to.
         </p>
         <p className="park-agenda-date">{A.plate.today}</p>
       </div>
@@ -231,11 +231,7 @@ function Plate({ A }: { A: LiveAgenda }) {
 
 /** The design's side panels with no read behind them yet: `[region, heading, what it will hold]`. */
 const SIDE: readonly (readonly [string, string, string])[] = [
-  [
-    "Event details",
-    "Tilo’s brief",
-    "Before a meeting Tilo joins, its brief for that meeting shows here.",
-  ],
+  ["Event details", "Tilo’s brief", "When you ask Tilo for a brief, it shows here."],
   [
     "Available times",
     "Tilo suggests",

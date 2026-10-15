@@ -44,10 +44,10 @@ const mount = () =>
     }),
   });
 
-it("STUDIO_5 agenda live: today and the plate on the left, brief and suggestions on the right", async () => {
+it("MB_T2 STUDIO_5 agenda live keeps the brief promise manual until the sweep exists", async () => {
   const { container } = await mount();
   expect(container.textContent).toContain(
-    "Tilo prepares a brief before each meeting and takes notes in the ones you invite it to.",
+    "Ask Tilo for a brief when you need one. Tilo takes notes in meetings you invite it to.",
   );
   const main = container.querySelector(".park-agenda-studiomain");
   const side = container.querySelector(".park-agenda-studioside");
@@ -57,6 +57,9 @@ it("STUDIO_5 agenda live: today and the plate on the left, brief and suggestions
   expect(main?.querySelector('[aria-label="Your plate"]')?.textContent).toContain("Send the quote");
   expect(side?.querySelector('[aria-label="Event details"]')?.textContent).toContain(
     "Tilo’s brief",
+  );
+  expect(side?.querySelector('[aria-label="Event details"]')?.textContent).toContain(
+    "When you ask Tilo for a brief",
   );
   expect(side?.querySelector('[aria-label="Available times"]')?.textContent).toContain(
     "Tilo suggests",
