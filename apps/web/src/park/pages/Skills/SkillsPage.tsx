@@ -232,9 +232,14 @@ function Ready({ app, data, retryRead }: { app: AppCtx; data: Data; retryRead: (
         rate={rate}
         fixed={fixed}
         rev={rev}
+        live={source !== "fixture"}
         onAnswer={(skillId, skillName, label) => {
           setAns((prev) => ({ ...prev, [skillId]: label }));
-          app.toast(`Thanks. Every agent using “${skillName}” now knows`);
+          app.toast(
+            source === "fixture"
+              ? `Thanks. Every agent using “${skillName}” now knows`
+              : `Noted on this page only. Tilo cannot save an answer for “${skillName}” yet`,
+          );
         }}
         onRateUp={(rateId) => setRate((prev) => ({ ...prev, [rateId]: "up" }))}
         onRateDown={(rateId) => setRate((prev) => ({ ...prev, [rateId]: "down" }))}

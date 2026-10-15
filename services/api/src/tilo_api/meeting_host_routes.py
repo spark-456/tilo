@@ -78,6 +78,8 @@ def disconnect(
         got = client.disconnect(user)
     except HostRpcError as exc:
         raise _failed(exc) from None
+    finally:
+        deps.forget_connection_views(user)  # SKILLS-LIVE
     alerts: list[str] = []
     for part in got.parts:
         if isinstance(part, MeetingHostRpcAlertPart):

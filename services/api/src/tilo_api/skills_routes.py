@@ -295,6 +295,17 @@ def _readable(
     return _sorted([r for r in store.list_visible(deps.ORG_ID, principal.user_id, teams) if r["status"] != "draft"])
 
 
+INTERNAL_BUILTIN_DOMAINS = frozenset(
+    {"automation"}
+)  # SKILLS-LIVE: Tilo's own machinery, not skills a person's agent uses
+
+
+def _internal_builtin(registry: SkillRegistry, skill_id: str) -> bool:
+    """A built-in in an internal domain (`skills/automation/`) runs Tilo itself; it is never offered to a person."""
+    folder = registry.folder(skill_id)
+    return folder is not None and folder.parent.name in INTERNAL_BUILTIN_DOMAINS
+
+
 @router.get("/v1/skills")
 def list_skills_route(
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
@@ -310,8 +321,9 @@ def list_skills_route(
         result = {"skills": _readable(store, stores, principal, clock, allow_unfounded=include_builtin)}
         if include_builtin:
             result["builtins"] = [
-                {"id": skill_id, "description": description, "version": registry.load(skill_id).version}
+                {"id": skill_id, "description": description, "version": registry.version(skill_id)}
                 for skill_id, description in registry.catalog()
+                if not _internal_builtin(registry, skill_id)
             ]
         return result
 

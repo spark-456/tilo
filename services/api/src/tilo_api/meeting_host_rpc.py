@@ -130,12 +130,25 @@ class RequestsTransport:
             raise TransportError from None
 
 
+# SKILLS-LIVE: Google's ID tokens last an hour; one is reused for half of that (one metadata trip, not one per call).
+_ID_TOKEN_REUSE_S = 1800.0
+_id_tokens: dict[str, tuple[float, str]] = {}
+id_token_clock: Callable[[], float] = time.monotonic  # read at call time, so a test can replace it
+
+
 def metadata_id_token(audience: str) -> str:
-    """The runtime account's Google-signed ID token for `audience` (google-auth, from the metadata server)."""
+    """The runtime account's Google-signed ID token for `audience` (google-auth, from the metadata server), reused for
+    `_ID_TOKEN_REUSE_S` per audience. A failed mint is never cached."""
+    now = id_token_clock()
+    hit = _id_tokens.get(audience)
+    if hit is not None and hit[0] > now:
+        return hit[1]
     from google.auth.transport.requests import Request  # noqa: PLC0415
     from google.oauth2 import id_token  # noqa: PLC0415
 
-    return str(id_token.fetch_id_token(Request(), audience))
+    token = str(id_token.fetch_id_token(Request(), audience))
+    _id_tokens[audience] = (now + _ID_TOKEN_REUSE_S, token)
+    return token
 
 
 class _JoinRefusal(BaseModel):
