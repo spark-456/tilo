@@ -18,21 +18,30 @@ def test_SELF_SERVE_TEAMS_INVITE_LINK_decide_matches_the_reference_check(kind):
     for path in sorted(folder.glob("*.json")):
         case = json.loads(path.read_text(encoding="utf-8"))
         req = case["request"]
-        got = decide_link(
-            LinkRequest(
-                req["actor"],
-                req["action"],
-                case["org_id"],
-                case["now"],
-                team=req["team"],
-                link=req["link"],
-                nonce_sha256=req["nonce_sha256"],
-                verified_email=req["verified_email"],
-                record=req["record"],
-            ),
-            Directory.of(case["persons"].values()),
-            case["links"],
-        )
+        directory = Directory.of(case["persons"].values())
+        if req["action"] == "remove_member":
+            got = decide_team(
+                TeamRequest(
+                    req["actor"], "remove_member", case["org_id"], case["now"], person=req["person"], team=req["team"]
+                ),
+                directory,
+            )
+        else:
+            got = decide_link(
+                LinkRequest(
+                    req["actor"],
+                    req["action"],
+                    case["org_id"],
+                    case["now"],
+                    team=req["team"],
+                    link=req["link"],
+                    nonce_sha256=req["nonce_sha256"],
+                    verified_email=req["verified_email"],
+                    record=req["record"],
+                ),
+                directory,
+                case["links"],
+            )
         assert got is reference.link_permits(case) is (kind == "valid"), path.name
 
 

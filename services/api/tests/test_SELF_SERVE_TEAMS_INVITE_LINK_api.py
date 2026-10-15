@@ -72,3 +72,102 @@ def test_SELF_SERVE_TEAMS_INVITE_LINK_create_and_accept_need_a_usable_key(people
     rig.as_user(SAM)
     rig.email = "sam@example.com"
     assert rig.post("/v1/team-invite-links/accept", {"token": token}).json() == {"detail": "not_configured"}
+
+
+def test_SELF_SERVE_TEAMS_INVITE_LINK_tampered_or_malformed_tokens_get_the_one_404(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    token = _make(rig).json()["token"]
+    rig.as_user(SAM)
+    rig.email = "sam@example.com"
+    parts = token.split(".")
+    bad = [
+        token[:-1] + ("A" if token[-1] != "A" else "B"),
+        token.replace("key_a", "key_b"),
+        "v2." + token[3:],
+        token + ".x",
+        token + "x" * 201,
+        ".".join([*parts[:3], parts[3][:-1] + "=", parts[4]]),
+    ]
+    answers = [rig.post("/v1/team-invite-links/accept", {"token": value}) for value in bad]
+    assert all(r.status_code == 404 and r.json() == {"detail": "invite_unavailable"} for r in answers)
+    assert len({r.content for r in answers}) == 1
+
+
+def test_SELF_SERVE_TEAMS_INVITE_LINK_create_lives_7_days_and_caps_10_pending_per_team(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    for _ in range(10):
+        made = _make(rig)
+        assert made.status_code == 201, made.text
+        assert made.json()["expires_at"] == "2026-10-13T10:00:00.000Z"
+    assert _make(rig).json() == {"detail": "too_many_links"}
+    rig.set_now("2026-10-13T10:00:00.000Z")
+    assert _make(rig).status_code == 201
+
+
+def test_SELF_SERVE_TEAMS_INVITE_LINK_accept_needs_a_verified_full_session(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    token = _make(rig).json()["token"]
+    rig.as_user(SAM)
+    rig.email = None
+    before = len(rig.store_calls)
+    assert rig.post("/v1/team-invite-links/accept", {"token": token}).status_code == 403
+    assert not any(method in ("get", "list") for _, method, _ in rig.store_calls[before:])
+
+
+def test_SELF_SERVE_TEAMS_INVITE_LINK_membership_limit_is_409_and_consumes_nothing(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    made = _make(rig).json()
+    old = rig.real.persons.get(ORG, SAM)
+    extra = [{"team": f"tm_extra_{i}", "assigned_by": {"by": OWNER, "at": rig.clock}} for i in range(7)]
+    rig.real.persons.replace(
+        {**old.record, "memberships": [*old.record["memberships"], *extra]}, expected_version=old.version
+    )
+    rig.as_user(SAM)
+    rig.email = "sam@example.com"
+    assert rig.post("/v1/team-invite-links/accept", {"token": made["token"]}).json() == {"detail": "membership_limit"}
+    assert rig.stores.persons._invite_links.get(ORG, made["invite_id"]).record["status"] == "pending"
+
+
+def test_SELF_SERVE_TEAMS_INVITE_LINK_failure_after_the_claim_undoes_the_entry_and_leaves_the_link_used(
+    people_rig,
+    monkeypatch,
+):
+    rig = _rig(people_rig, monkeypatch)
+    made = _make(rig).json()
+    rig.as_user(SAM)
+    rig.email = "sam@example.com"
+    original = rig.events.append
+
+    def fail_accept(world, part):
+        if part["type"] == "invite_link.accepted":
+            raise RuntimeError("offline")
+        return original(world, part)
+
+    monkeypatch.setattr(rig.events, "append", fail_accept)
+    assert rig.post("/v1/team-invite-links/accept", {"token": made["token"]}).status_code == 503
+    assert all(m["team"] != TEAM for m in rig.stored("persons", SAM)["memberships"])
+    assert rig.stores.persons._invite_links.get(ORG, made["invite_id"]).record["status"] == "redeemed"
+
+
+def test_SELF_SERVE_TEAMS_INVITE_LINK_revoke_answers_done_and_writes_only_when_granted(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    made = _make(rig).json()
+    path = f"/v1/teams/{TEAM}/invite-links/{made['invite_id']}/revoke"
+    rig.as_user(SAM)
+    assert rig.post(path, {}).status_code == 403
+    rig.as_user(OWNER)
+    assert rig.post(path, {}).json() == {"status": "done"}
+    assert rig.post(path, {}).json() == {"status": "done"}
+    assert rig.stores.persons._invite_links.get(ORG, made["invite_id"]).record["status"] == "revoked"
+    assert rig.post(f"/v1/teams/{TEAM}/invite-links/til_{'a' * 24}/revoke", {}).json() == {"status": "done"}
+    rows = rig.client.get(f"/v1/teams/{TEAM}/invite-links").json()
+    assert rows == [
+        {"id": made["invite_id"], "created_at": rig.clock, "expires_at": made["expires_at"], "state": "withdrawn"}
+    ]
+
+
+def test_SELF_SERVE_TEAMS_INVITE_LINK_no_get_route_takes_a_token(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    token = _make(rig).json()["token"]
+    rig.as_user(SAM)
+    assert rig.client.get("/v1/team-invite-links/accept", params={"token": token}).status_code in (404, 405)
