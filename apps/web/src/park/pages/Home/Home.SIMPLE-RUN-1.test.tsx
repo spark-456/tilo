@@ -22,6 +22,8 @@ import {
 } from "../../../../test-support/park/liveHomeHarness";
 import { BRIEF_SUPPLIER_COMPARISON } from "../../../api/fixtures/brief";
 import { createLiveApi } from "../../api/liveApi";
+import { pendingWorld } from "../../app/PendingWorldRoute";
+import { handDraft } from "../../chat/handoff";
 
 afterEach(() => {
   cleanup();
@@ -99,7 +101,22 @@ const card = (rig: LiveRig) => q(rig.el, '[data-testid="run-card"]');
 const cardStart = (rig: LiveRig): HTMLElement => q(card(rig), "button.park-home-confirm");
 
 describe("SIMPLE-RUN-1 Home starts a run in one step", () => {
-  it("SIMPLE-RUN-1 Home: Start reaches one confirm card with no example plan and no question, then its Start opens the world", async () => {
+  it("test_FR_INT_01_run_opens_world_from_a_chat_handoff", async () => {
+    const { api, posts } = serverWith();
+    handDraft("Plan a road trip to Gokarna");
+    const rig = await mountLiveHome(api);
+    expect(taskInput(rig.el).value).toBe("Plan a road trip to Gokarna");
+    const label = MODES.map((m) => m.start).find((text) => hasControl(rig.el, text)) ?? "";
+    clickEl(control(rig.el, label));
+    await settle();
+    clickEl(cardStart(rig));
+    await settle();
+    expect(posts.at(-1)).toBe("/tasks/t_1/approve");
+    expect(opened(rig, "w_1")).toBe(true);
+    expect(pendingWorld("w_1")).toBe(true);
+  });
+
+  it("test_FR_INT_01_run_opens_world_after_approval", async () => {
     const { api, posts } = serverWith();
     const rig = await mountLiveHome(api);
     await start(rig, "Plan the offsite");
@@ -122,6 +139,7 @@ describe("SIMPLE-RUN-1 Home starts a run in one step", () => {
     await settle();
     expect(posts.at(-1)).toBe("/tasks/t_1/approve");
     expect(opened(rig, "w_1"), "the run's own world").toBe(true);
+    expect(pendingWorld("w_1"), "the world route waits for a recorded plan or start").toBe(true);
     expect(
       rig.navigate.mock.calls.some((c) => /understanding|approaches/.test(String(c[0]))),
       "no navigation to the old screens",

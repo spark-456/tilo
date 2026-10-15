@@ -15,7 +15,8 @@ import { themeFor } from "../tokens/themes";
 import { PAGE_LABEL } from "./AppCtx";
 import { NotFound } from "./NotFound";
 import "./park-app.css";
-import { ParkProvider, usePageApp, useSessionAuth } from "./context";
+import { PendingWorldRoute } from "./PendingWorldRoute";
+import { ParkProvider, usePageApp, useSessionAuth, useWorldClient } from "./context";
 import { PageTitleContext } from "./pageTitle";
 import { PAGES } from "./pages";
 import { isHomeAddress, useParkRoute, useQuizAppRoute } from "./router";
@@ -81,6 +82,7 @@ export interface RoutedView {
 
 function Shell({ routed }: { routed?: RoutedView | undefined }) {
   const app = usePageApp();
+  const worldClient = useWorldClient();
   const route = useParkRoute();
   const quizRoute = useQuizAppRoute();
   const [named, setNamed] = useState<string | null>(null);
@@ -118,6 +120,14 @@ function Shell({ routed }: { routed?: RoutedView | undefined }) {
           <Suspense fallback={null}>
             {routed ? (
               routed.content
+            ) : Page && route?.page === "world" ? (
+              <PendingWorldRoute
+                key={routeKey}
+                worldId={route.params.id ?? ""}
+                client={worldClient}
+              >
+                <Page app={app} />
+              </PendingWorldRoute>
             ) : Page ? (
               <Page app={app} />
             ) : quizRoute ? (

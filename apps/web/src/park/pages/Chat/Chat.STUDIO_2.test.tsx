@@ -169,7 +169,7 @@ describe("STUDIO_2 Chat: honest data", () => {
     expect(qa(el, "main")).toHaveLength(0);
   });
 
-  it("STUDIO_2 chat Make it a world hands the question to Home without the address", async () => {
+  it("test_FR_INT_01_run_opens_world_chat_hands_its_question_to_home", async () => {
     const api = quickApi(async () => ({
       data: { kind: "answered", text: "Pack light.", cost: null },
       source: "live",
