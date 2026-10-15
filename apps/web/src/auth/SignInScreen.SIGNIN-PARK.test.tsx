@@ -60,8 +60,11 @@ describe("SIGNIN-PARK the sign-in screen", () => {
     ]);
     expect(hrefs).toEqual([
       ["How it works", "#how"],
-      ["Safety", "#safety"],
       ["Skills", "#skills"],
+      ["Meetings", "#meetings"],
+      ["Teams", "#teams"],
+      ["Connectors", "#connectors"],
+      ["Why Tilo", "#why"],
       ["Terms", "/terms"],
       ["Privacy Policy", "/privacy"],
     ]);

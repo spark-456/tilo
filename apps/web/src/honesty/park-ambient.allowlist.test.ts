@@ -64,7 +64,12 @@ describe("WEB-MOTION-1 honesty: ambient city motion is allowed, agent motion is 
     const rest = ALLOWLIST.filter((a) => !a.file.startsWith("src/park/")).map(
       (a) => `${a.file}|${a.rule}`,
     );
-    expect(rest.sort()).toEqual(["src/stage/Stage.tsx|raf", "src/world/runWorld.ts|raf"]);
+    // LANDING-2 added the signed-out landing's one css-transition (landing.motion.css).
+    expect(rest.sort()).toEqual([
+      "src/landing/landing.motion.css|css-transition",
+      "src/stage/Stage.tsx|raf",
+      "src/world/runWorld.ts|raf",
+    ]);
   });
 
   it(

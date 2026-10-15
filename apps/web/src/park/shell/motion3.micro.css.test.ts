@@ -178,6 +178,7 @@ describe("WEB-MOTION-3 css: the limits of the earlier tickets still hold", () =>
         "src/park/shell/park.shell.css:css-keyframes",
         "src/park/shell/park.shell.css:css-animation",
         "src/park/shell/park.shell.css:css-transition",
+        "src/landing/landing.motion.css:css-transition", // LANDING-2
       ].sort(),
     );
   });
