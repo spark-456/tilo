@@ -181,7 +181,17 @@
     top: 61px;
   }
   [data-park][data-theme="studio"] .park-shell__tools {
-    gap: 4px;
+    gap: 2px;
+  }
+  /* 40 wide and 44 tall, without the hairline, so the page button keeps room for its name. */
+  [data-park][data-theme="studio"] .park-shell__iconbtn {
+    width: 40px;
+    border-color: transparent;
+  }
+  [data-park][data-theme="studio"] .park-shell__avatar {
+    width: 40px;
+    height: 40px;
+    margin-left: 4px;
   }
   [data-park][data-theme="studio"] .park-shell__wordmark {
     font-size: 22px;

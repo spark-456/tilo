@@ -24,6 +24,12 @@ import type { H } from "../engines/types";
 import "../tokens/park.css";
 import "../tokens/park.opaque.css";
 import "../tokens/fonts";
+import "../tokens/themes.css";
+import "../studio/fonts";
+import "../studio/studio.css";
+import { EmptyState, ErrorState, Skeleton } from "../studio/States";
+import { type Appearance, ThemeSwitch } from "../studio/ThemeSwitch";
+import { DEFAULT_THEME } from "../tokens/themes";
 
 const h: H = (tag, props, ...children) => createElement(tag, props, ...(children as ReactNode[]));
 // One kit for the page (its art is memoised per key).
@@ -53,6 +59,7 @@ function ThemePanel({ time }: { time: "day" | "night" }) {
   const [pins, setPins] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [said, setSaid] = useState("Nothing chosen yet");
+  const [look, setLook] = useState<Appearance>(time);
 
   const menuItems: MenuItem[] = [
     { id: "profile", label: "Profile and settings", icon: icon("pen", 17), onSelect: noop },
@@ -70,6 +77,7 @@ function ThemePanel({ time }: { time: "day" | "night" }) {
     <section
       data-park=""
       data-time={time}
+      data-theme={DEFAULT_THEME}
       data-testid={`panel-${time}`}
       className="park-dev__panel"
     >
@@ -338,6 +346,31 @@ function ThemePanel({ time }: { time: "day" | "night" }) {
               />
             ) : null}
           </div>
+        </Demo>
+
+        {/* UI-STUDIO-1: the theme switch and the shared states (design/studio-v2 "Tilo R States"). */}
+        <Demo id="theme-switch" title="Theme switch">
+          <ThemeSwitch value={look} onChange={setLook} />
+        </Demo>
+
+        <Demo id="state-empty" title="Empty state">
+          <EmptyState
+            title="Nothing waiting for you"
+            line="When a helper has a question, it shows up here."
+            action={<Button variant="secondary">Back to Home</Button>}
+          />
+        </Demo>
+
+        <Demo id="state-loading" title="Loading skeleton">
+          <Skeleton label="Loading worlds" lines={3} card />
+        </Demo>
+
+        <Demo id="state-error" title="Error state">
+          <ErrorState
+            title="Web search is not connected yet"
+            detail="Try again, or continue without it. Without web search, answers may be out of date."
+            action={<Button variant="secondary">Try again</Button>}
+          />
         </Demo>
 
         <Demo id="scrim" title="Modal scrim">
