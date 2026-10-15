@@ -75,6 +75,9 @@ function unavailableMessage(text: string): string {
     if (typeof body?.detail === "string" && SAFETY_DETAILS.has(body.detail)) {
       return SAFETY_UNAVAILABLE;
     }
+    if ((body?.detail as { code?: unknown } | null | undefined)?.code === "intake_deadline") {
+      return INTAKE_DEADLINE;
+    }
   } catch {
     // An unreadable refusal still gets fixed web copy.
   }
@@ -82,8 +85,11 @@ function unavailableMessage(text: string): string {
 }
 const BAD_REPLY = "Tilo sent a reply this page could not read.";
 /** A8: how long a start waits for the intake's reply before the person is told, instead of a spinner for ever.
- * The Director's brief takes up to about a minute; the intake's own provider timeouts sit inside this. */
-export const INTAKE_TIMEOUT_MS = 120_000;
+ * NFR-03: the server's Director deadline (config/intake.yaml, 80 s) sits at least 10 s inside this, so a slow model
+ * ends as the server's own plain 503 `intake_deadline`, never as a reply that lands after the page gave up. */
+export const INTAKE_TIMEOUT_MS = 100_000;
+/** NFR-22: the web's own sentence for the server's `intake_deadline` 503 (its text is never shown). */
+const INTAKE_DEADLINE = "Making the plan took too long, so nothing was started. Try again.";
 const TOOK_TOO_LONG =
   "Tilo is taking too long to answer. Nothing is shown as started; check your worlds before you try again.";
 
@@ -188,6 +194,7 @@ export function displayApiError(error: unknown): string {
     insufficient_scope: "Grant the required access before continuing.",
     intake_already_committed:
       "This task was already submitted. Check your worlds before starting another task.",
+    intake_deadline: INTAKE_DEADLINE,
     invalid_arguments: "Check the information and try again.",
     invalid_body: "Check the information you are sending and try again.",
     invalid_capture: "This recording cannot be used.",
@@ -276,6 +283,7 @@ export function displayApiError(error: unknown): string {
     NOT_CONFIGURED,
     BAD_REPLY,
     INTAKE_COMMITTED,
+    INTAKE_DEADLINE,
     OUT_OF_DATE,
     NOT_BUILT,
     NO_WORLD_BUILT,
@@ -828,7 +836,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     }
     // QA-11: sharing the key alone still sends two POSTs while the first is pending.
     if (intent.pending) return intent.pending;
-    const pending = this.sendIntake(text, intent.files, mode, intent.key);
+    const pending = this.sendIntakeRecovering(text, intent.files, mode, intent.key);
     intent.pending = pending;
     try {
       const result = await pending;
@@ -842,6 +850,30 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       throw error;
     } finally {
       intent.pending = undefined;
+    }
+  }
+
+  /** NFR-03: a reply that is lost (the wait ended, or the connection dropped) may follow a plan the server made. The
+   * same Idempotency-Key is asked once more: the server hands back that plan, or waits for it, or answers 409
+   * `intake_already_committed`. A refusal the server did send is never asked again. Quick has no key semantics. */
+  private async sendIntakeRecovering(
+    text: string,
+    files: File[],
+    mode: "quick" | undefined,
+    key: string,
+  ): Promise<IntakeResult | QuickIntakeResult> {
+    try {
+      return await this.sendIntake(text, files, mode, key);
+    } catch (error) {
+      if (
+        mode === "quick" ||
+        !(error instanceof TiloApiError) ||
+        !error.retryable ||
+        error.status !== null
+      ) {
+        throw error;
+      }
+      return this.sendIntake(text, files, mode, key);
     }
   }
 
