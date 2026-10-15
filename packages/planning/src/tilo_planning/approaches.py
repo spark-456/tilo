@@ -21,7 +21,7 @@ from tilo_contracts import PlanApproach
 from tilo_providers.clock import real_today, time_facts
 from tilo_providers.interfaces import Capability, GenerateRequest
 from tilo_providers.prompts import load_prompt, neutralise_marker
-from tilo_providers.router import Router, RouterError, RouterResult
+from tilo_providers.router import Deadline, Router, RouterError, RouterResult
 
 from tilo_planning.brief import DIRECTOR_ROLE
 from tilo_planning.events import build_event
@@ -106,7 +106,9 @@ def _data(text: str, marker: str) -> str:
     return neutralise_marker(text, marker)
 
 
-def _ask(router: Router, prompt: str, budget: float | None) -> tuple[RouterResult, list[dict[str, Any]]]:
+def _ask(
+    router: Router, prompt: str, budget: float | None, deadline: Deadline | None
+) -> tuple[RouterResult, list[dict[str, Any]]]:
     request = GenerateRequest(
         system=load_prompt(DIRECTOR_ROLE, "approaches_system.md"),
         prompt=prompt,
@@ -115,7 +117,9 @@ def _ask(router: Router, prompt: str, budget: float | None) -> tuple[RouterResul
         thinking_level=APPROACHES_THINKING,
     )
     try:
-        run = router.generate(DIRECTOR_ROLE, request, budget=budget, required_capability=Capability.JSON)
+        run = router.generate(
+            DIRECTOR_ROLE, request, budget=budget, required_capability=Capability.JSON, deadline=deadline
+        )
     except RouterError as error:
         raise ApproachProposalError(f"FR-INT-06: no approaches from the Director: {error}") from error
     if run.outcome != "ok" or run.response is None:
@@ -136,6 +140,7 @@ def propose_approaches(
     budget: float | None = None,
     gaps: Sequence[Gap] = (),
     today: date | None = None,
+    deadline: Deadline | None = None,
 ) -> ApproachesResult:
     """`base` holds the event's v/ts/world_id/run_id/actor; the event gets `seq`. The brief goes in as data. FR-INT-15:
     the model is told its skips room (5 minus the gaps); on a usable set code puts the gap lines first in every
@@ -144,7 +149,7 @@ def propose_approaches(
     brief_text = _data(json.dumps(brief, ensure_ascii=False, indent=2), "BRIEF")
     facts = time_facts(today or real_today(), brief.get("deadline"))  # a calendar fact from the clock, not a guess
     prompt = load_prompt(DIRECTOR_ROLE, "approaches_task.md", {"brief": brief_text, "skip_room": room, **facts})
-    run, approaches = _ask(router, prompt, budget)
+    run, approaches = _ask(router, prompt, budget, deadline)
     approaches = trim_skips(approaches, room)  # over the room: cut in code, never a repair call (COST-FAST-2)
     runs = [run]
     if found := problems(approaches, skip_room=room):  # PG-07/08/09 only: one repair, then reject
@@ -152,7 +157,9 @@ def propose_approaches(
         listed = _data("\n".join(f"- {p}" for p in found), "PROBLEMS")
         variables = {"problems": listed, "brief": brief_text, "previous": previous, **facts}
         remaining = None if budget is None else run.budget
-        run, approaches = _ask(router, load_prompt(DIRECTOR_ROLE, "approaches_repair.md", variables), remaining)
+        run, approaches = _ask(
+            router, load_prompt(DIRECTOR_ROLE, "approaches_repair.md", variables), remaining, deadline
+        )
         runs.append(run)
         approaches = trim_skips(approaches, room)
         if found := problems(approaches, skip_room=room):

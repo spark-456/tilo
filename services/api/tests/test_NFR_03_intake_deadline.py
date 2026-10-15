@@ -89,6 +89,27 @@ def test_NFR_22_a_503_then_a_slow_fallback_is_the_deadline_answer_not_a_model_ou
     assert "replay_only" not in response.json()
 
 
+def test_FR_INT_06_NFR_03_approaches_deadline_stores_no_proposal(clear_flow, repo_root, monkeypatch):
+    from tilo_api import tasks  # noqa: PLC0415
+    from tilo_api.intake_deadline import IntakeDeadline  # noqa: PLC0415
+
+    intake = clear_flow.new_task()
+    task_id, world_id = intake["task_id"], intake["world_id"]
+    before = list(clear_flow.events(world_id))
+    monkeypatch.setattr(tasks, "load_intake_deadline", lambda: IntakeDeadline(0.2, 0.5), raising=False)
+    clear_flow.router = _router(repo_root, flash_38=_Timed(0.6), flash_37=_Timed(0.6))
+    start = time.monotonic()
+
+    response = clear_flow.approaches(task_id)
+
+    assert response.status_code == 503, response.text
+    assert response.json()["detail"]["code"] == "intake_deadline"
+    assert time.monotonic() - start < 1.0
+    time.sleep(0.7)  # abandoned fake calls must not publish a late proposal
+    assert clear_flow.events(world_id) == before
+    assert clear_flow.store.tasks[task_id].approaches is None
+
+
 def test_NFR_03_the_shipped_deadline_is_inside_the_webs_wait(repo_root):
     """The server must answer (201 or a refusal) before the web gives up, with room for sign-in checks and storage."""
     from tilo_api.intake_deadline import load_intake_deadline  # noqa: PLC0415
