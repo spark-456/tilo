@@ -1,0 +1,273 @@
+/* UI-STUDIO-1: the shared pieces the Studio sheet adds (design/studio-v2 "Tilo S Components", "Tilo R States"): the
+   theme switch, the empty / loading / error states, the read state box and the question answer. Every selector sits
+   under [data-park]; colours are tokens (a Studio-only token falls back to a Park one), so they read in every theme.
+   No transition, animation or keyframes: the skeleton is still (it says "coming", never "working", HR-2). */
+
+[data-park] .park-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- Theme switch (account menu and Profile): Light, Dark, System ---- */
+[data-park] .park-theme {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+}
+[data-park] .park-theme__label {
+  float: left; /* keeps the legend inside the box, above the options */
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--ink3);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+[data-park] .park-theme__group {
+  clear: both;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--sunk);
+}
+[data-park] .park-theme__opt {
+  min-height: 32px;
+  min-width: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+[data-park] .park-theme__opt--on {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+}
+[data-park] .park-theme__opt:focus-visible {
+  outline: 3px solid var(--focus, var(--hero));
+  outline-offset: 2px;
+}
+
+/* ---- Empty and error states ---- */
+[data-park] .park-state {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 32px 28px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+  color: var(--ink);
+}
+[data-park] .park-state--empty {
+  align-items: center;
+  justify-content: center;
+  min-height: 360px;
+  text-align: center;
+}
+[data-park] .park-state__art {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 150px;
+  height: 150px;
+  border-radius: 99px;
+  background: var(--okSoft);
+  overflow: hidden;
+}
+[data-park] .park-state__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.4px;
+}
+[data-park] .park-state__line {
+  margin: 0;
+  max-width: 340px;
+  color: var(--ink2);
+  font-size: 15px;
+  line-height: 1.5;
+}
+[data-park] .park-state--error .park-state__line {
+  max-width: none;
+}
+[data-park] .park-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: inherit;
+}
+[data-park] .park-state__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+[data-park] .park-state__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: var(--redSoft);
+  color: var(--redInk);
+  font-size: 24px;
+  font-weight: 800;
+}
+
+/* ---- Loading skeleton: still shapes ---- */
+[data-park] .park-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+[data-park] .park-skeleton__block {
+  display: block;
+  height: 110px;
+  border-radius: 14px;
+  background: var(--sunk);
+}
+[data-park] .park-skeleton__line {
+  display: block;
+  height: 14px;
+  border-radius: 99px;
+  background: var(--sunk);
+}
+[data-park] .park-skeleton__line--1 {
+  width: 40%;
+}
+[data-park] .park-skeleton__line--2 {
+  width: 85%;
+}
+[data-park] .park-skeleton__line--3 {
+  width: 62%;
+}
+
+/* ---- The read state box (ApiReadState): the reserved 176px stays; content centres in it ---- */
+[data-park] .park-readstate {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  color: var(--ink);
+  text-align: center;
+}
+[data-park] .park-readstate__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+}
+[data-park] .park-readstate__body .park-skeleton__line {
+  align-self: stretch;
+}
+[data-park] .park-readstate__title {
+  font-size: 16px;
+  font-weight: 700;
+}
+[data-park] .park-readstate__line {
+  margin: 0;
+  color: var(--ink2);
+  font-size: 14.5px;
+}
+
+/* ---- The question answer (FR-HIL-10): options as 48px tiles, then "Type my own answer" and Send ---- */
+[data-park] .park-question {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+[data-park] .park-question__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+[data-park] .park-question__option {
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-park] .park-question__option:hover {
+  border-color: var(--hero);
+}
+[data-park] .park-question__own {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+[data-park] .park-question__label {
+  color: var(--amberInk);
+  font-size: 13px;
+  font-weight: 700;
+}
+[data-park] .park-question__field {
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border: 1px dashed var(--amberLine);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  resize: vertical;
+}
+[data-park] .park-question__send {
+  align-self: flex-start;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--amber);
+  color: #1a1407;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+[data-park] .park-question__error {
+  margin: 0;
+  color: var(--redInk);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+[data-park] .park-question__option:focus-visible,
+[data-park] .park-question__field:focus-visible,
+[data-park] .park-question__send:focus-visible {
+  outline: 3px solid var(--focus, var(--hero));
+  outline-offset: 2px;
+}

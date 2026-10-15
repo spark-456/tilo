@@ -4,6 +4,7 @@
 // seam (FR-UX-10): with no seam it only says this is a prototype; with one that is not signed in it is left out.
 import type { PageId } from "../app/AppCtx";
 import { Menu, type MenuItem } from "../components";
+import { type Appearance, ThemeSwitch } from "../studio/ThemeSwitch";
 import { icon } from "./kit";
 
 /** Who the header shows: from the Api's user (fixture or live), or from the sign-in layer (no org or plan). */
@@ -27,6 +28,9 @@ export interface AccountMenuProps {
   go: (page: PageId) => void;
   onSignOut: () => void;
   onClose: () => void;
+  /** UI-STUDIO-1: the Light, Dark or System theme, switched in the menu (the `time` preference). */
+  appearance?: Appearance;
+  onAppearance?: (next: Appearance) => void;
 }
 
 export function AccountMenu({
@@ -38,6 +42,8 @@ export function AccountMenu({
   go,
   onSignOut,
   onClose,
+  appearance,
+  onAppearance,
 }: AccountMenuProps) {
   const items: MenuItem[] = [
     {
@@ -70,7 +76,14 @@ export function AccountMenu({
       ? [{ id: "signout", label: "Sign out", icon: icon("logout", 17), onSelect: onSignOut }]
       : []),
   ];
-  const header = user ? (
+  const theme =
+    appearance !== undefined && onAppearance ? (
+      <>
+        <ThemeSwitch value={appearance} onChange={onAppearance} />
+        <div className="park-shell__rule" />
+      </>
+    ) : null;
+  const person = user ? (
     <>
       <div className="park-shell__who">
         <div className="park-shell__whoav">{user.initials}</div>
@@ -83,5 +96,12 @@ export function AccountMenu({
       <div className="park-shell__rule" />
     </>
   ) : null;
+  const header =
+    person || theme ? (
+      <>
+        {person}
+        {theme}
+      </>
+    ) : null;
   return <Menu label="Account" width={300} items={items} header={header} onClose={onClose} />;
 }

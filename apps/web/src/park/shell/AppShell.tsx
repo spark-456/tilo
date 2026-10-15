@@ -22,6 +22,7 @@ import { Button, Popover, Toast } from "../components";
 import { FirstRunBanner } from "../sample/FirstRunBanner";
 import { useFirstRun } from "../sample/useFirstRun";
 import "../tokens/fonts";
+import { appearanceOf } from "../studio/ThemeSwitch";
 import { AccountMenu, type AccountPerson } from "./AccountMenu";
 import { BootSplash } from "./BootSplash";
 import { CityBackdrop } from "./CityBackdrop";
@@ -287,6 +288,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             go={navTo}
             onSignOut={signOutViaSeam}
             onClose={store.closeMenu}
+            appearance={appearanceOf(app.prefs.time)}
+            onAppearance={(next) => app.setPref("time", next)}
           />
         </Enter>
       ) : null}

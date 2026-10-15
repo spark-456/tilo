@@ -172,7 +172,7 @@ function readStoredPrefs(): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   try {
     const t = window.localStorage.getItem(TIME_STORAGE_KEY);
-    if (t === "day" || t === "night") out.time = t;
+    if (t === "day" || t === "night" || t === "system") out.time = t;
     const m = window.localStorage.getItem(MOTION_STORAGE_KEY);
     if (m === "lively" || m === "calm" || m === "still") out.motion = m;
     const th = window.localStorage.getItem(THEME_STORAGE_KEY); // FR-WLD-15: validated by themeFor where it is used
@@ -193,8 +193,24 @@ function writeStoredPref(key: string, value: unknown): void {
   }
 }
 
+/** UI-STUDIO-1: the colour scheme the device asks for, read when the appearance pref is "system". */
+function darkScheme(): MediaQueryList | null {
+  try {
+    return typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-color-scheme: dark)")
+      : null;
+  } catch {
+    return null; // no window (Node tests)
+  }
+}
+
+/** The light (day) or dark (night) theme for the stored appearance: day, night or system (the device's choice). */
+export function timeFor(pref: unknown, systemDark: boolean): "day" | "night" {
+  return pref === "night" || (pref === "system" && systemDark) ? "night" : "day";
+}
+
 const derive = (prefs: Record<string, unknown>, dec: Dec) => ({
-  time: prefs.time === "night" ? ("night" as const) : ("day" as const),
+  time: timeFor(prefs.time, darkScheme()?.matches === true),
   motion: MOTIONS.find((m) => m === prefs.motion) ?? "calm",
   needsLeft: countNeedsLeft(dec),
 });
@@ -235,6 +251,14 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
   let asking: Promise<QuickOutcome> | null = null;
   let cancelToast: (() => void) | null = null;
   let cancelLoader: (() => void) | null = null;
+  // UI-STUDIO-1: with the "system" appearance the theme follows the device when it changes.
+  const scheme = darkScheme();
+  const onScheme = (): void => {
+    if (state.prefs.time !== "system") return;
+    const time = timeFor("system", scheme?.matches === true);
+    if (time !== state.time) set({ ...state, time });
+  };
+  scheme?.addEventListener?.("change", onScheme);
 
   const set = (next: ParkState): void => {
     state = next;
@@ -499,6 +523,7 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
     dispose() {
       stopLoader();
       clearTimer();
+      scheme?.removeEventListener?.("change", onScheme);
     },
   };
 }

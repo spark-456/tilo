@@ -165,6 +165,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | @playwright/test | Apache-2.0 | https://www.npmjs.com/package/@playwright/test |
 | @axe-core/playwright | MPL-2.0 | https://www.npmjs.com/package/@axe-core/playwright |
 | @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono (self-hosted fonts; each installed 5.3.0 package declares OFL-1.1 and includes `LICENSE`) | OFL-1.1 | https://github.com/fontsource/font-files |
+| @fontsource/geist-sans, @fontsource/geist-mono (UI-STUDIO-1: the Studio theme's Geist and Geist Mono, self-hosted; the installed 5.3.0 packages declare OFL-1.1 and include `LICENSE`, (C) 2023 Vercel with basement.studio) | OFL-1.1 | https://github.com/fontsource/font-files |
 | fast-check (property tests, ticket P0-08b-player, FR-WLD-04) | MIT | https://www.npmjs.com/package/fast-check |
 | happy-dom (DOM for React component unit tests, AGW-01; dev only) | MIT | https://www.npmjs.com/package/happy-dom |
 | ajv (JSON Schema validator for the PPL-40a plate reducer test; dev only) | MIT | https://www.npmjs.com/package/ajv |
@@ -233,7 +234,8 @@ Pinned in `cloudbuild.yaml`. They run only inside Google Cloud Build; nothing fr
 ## Fonts, icons and design assets
 
 The web app imports self-hosted Nunito, Nunito Sans and JetBrains Mono from the Fontsource packages
-listed above (`apps/web/src/park/tokens/fonts.ts` and `apps/web/src/main.tsx`); their font files ship
+listed above (`apps/web/src/park/tokens/fonts.ts` and `apps/web/src/main.tsx`), and Geist and Geist Mono for the
+Studio theme (`apps/web/src/park/studio/fonts.ts`); their font files ship
 with the web build. `design/source/` is read-only reference material, not a dependency; its
 licence terms are tracked in `design/source/INDEX.md`, not here.
 

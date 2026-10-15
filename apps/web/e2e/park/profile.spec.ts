@@ -202,9 +202,9 @@ for (const [vpName, viewport] of Object.entries(SIZES)) {
       await tab(page, "Appearance").click();
       const card = page.getByRole("region", { name: "Appearance" });
       const root = page.locator("[data-park]").first();
-      await card.getByText("Night", { exact: true }).click();
+      await card.getByText("Dark", { exact: true }).click();
       await expect(root).toHaveAttribute("data-time", "night");
-      await card.getByText("Day", { exact: true }).click();
+      await card.getByText("Light", { exact: true }).click();
       await expect(root).toHaveAttribute("data-time", "day");
       await card.getByText("Still", { exact: true }).click();
       await expect(

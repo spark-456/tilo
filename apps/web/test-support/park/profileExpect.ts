@@ -87,10 +87,12 @@ export const NOTIF_COPY = {
 
 export const APPEARANCE_COPY = {
   sub: "Your city, your way. Changes apply straight away.",
-  timeTitle: "Time of day",
+  // UI-STUDIO-1: the Studio settings' Light, Dark and System (follows the device).
+  timeTitle: "Theme",
   times: [
-    ["Day", "Bright lawns"],
-    ["Night", "Lamps and glow"],
+    ["Light", "Bright lawns"],
+    ["Dark", "Lamps and glow"],
+    ["System", "Follows your device"],
   ],
   motionTitle: "Motion in the city",
   motions: ["Lively", "Calm", "Still"],

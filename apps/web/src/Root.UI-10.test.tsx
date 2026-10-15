@@ -78,7 +78,7 @@ it("UI-10 W8b Settings Appearance changes the shell and persists to Profile", as
     expect(el, label).toBeDefined();
     return el as HTMLButtonElement;
   };
-  click(button("Night"));
+  click(button("Dark")); // UI-STUDIO-1: the night card is Dark
   click(button("Still"));
   expect(q(m.container, "[data-park]").getAttribute("data-time")).toBe("night");
   expect(q(m.container, "[data-park]").getAttribute("data-motion")).toBe("still");
@@ -92,6 +92,6 @@ it("UI-10 W8b Settings Appearance changes the shell and persists to Profile", as
     window.dispatchEvent(new PopStateEvent("popstate"));
     await vi.dynamicImportSettled();
   });
-  await vi.waitFor(() => expect(button("Night").getAttribute("aria-pressed")).toBe("true"));
+  await vi.waitFor(() => expect(button("Dark").getAttribute("aria-pressed")).toBe("true"));
   expect(button("Still").getAttribute("aria-pressed")).toBe("true");
 });

@@ -10,6 +10,11 @@ export interface Staging {
 }
 
 const clip = (s: string, n = 80) => (s.length <= n ? s : `${s.slice(0, n - 1)}…`);
+/** UI-STUDIO-1: the type tile of a file chip ("PDF", "CSV"), from the name's extension. */
+const kindOf = (name: string): string => {
+  const dot = name.lastIndexOf(".");
+  return dot > 0 ? name.slice(dot + 1, dot + 5) : "file";
+};
 
 export function StagedFiles({ staging, children }: { staging: Staging; children: ReactNode }) {
   const picker = useRef<HTMLInputElement>(null);
@@ -87,6 +92,9 @@ export function StagedFiles({ staging, children }: { staging: Staging; children:
         <ul className="park-home-attach__chips" aria-label="Attached files">
           {staging.files.map((file, i) => (
             <li key={`${file.name}-${i}`} className="park-home-attach__chip">
+              <span className="park-home-attach__kind" aria-hidden="true">
+                {kindOf(file.name)}
+              </span>
               <span>{file.name}</span>
               <button
                 type="button"
