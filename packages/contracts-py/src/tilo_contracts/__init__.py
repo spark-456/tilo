@@ -68,6 +68,9 @@
 # events/data/data.transfer.schema.json 1.0.0 sha256:18d6fed4359341a6
 # events/data/district.completed.schema.json 1.0.0 sha256:cc8c8eea92dbd3e5
 # events/data/district.created.schema.json 1.0.0 sha256:1b25e3de1fa3e1fb
+# events/data/invite_link.accepted.schema.json 1.0.0 sha256:5e15078f018ac568
+# events/data/invite_link.created.schema.json 1.0.0 sha256:aa85dd4aac02f8ac
+# events/data/invite_link.revoked.schema.json 1.0.0 sha256:9f5de48aff993cfb
 # events/data/level.completed.schema.json 1.0.0 sha256:b99d3220a8e24536
 # events/data/level.created.schema.json 1.0.0 sha256:f404c2d35df9da17
 # events/data/meeting.adjourned.schema.json 1.0.0 sha256:0c3fb38b0ad2732a
@@ -111,7 +114,7 @@
 # events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
 # events/data/world.share_changed.schema.json 1.0.0 sha256:7de879d9ec364699
 # events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
-# events/registry.schema.json 1.2.0 sha256:5a2b8514c1e7e2b1
+# events/registry.schema.json 1.3.0 sha256:35f29774adf2ad0b
 # handoff.schema.json 1.0.0 sha256:7ed882f92b634672
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
@@ -139,13 +142,14 @@
 # skill.schema.json 1.1.0 sha256:9eeee7768b667afa
 # spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
 # taught_skill.schema.json 1.1.0 sha256:b23321ed0cd570d4
+# team_invite_link.schema.json 1.0.0 sha256:922bbc7001e36e40
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
 # transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
 # ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
 # user_settings.schema.json 1.0.0 sha256:dfc439371ba69131
 # work_item.schema.json 1.1.0 sha256:9ee739ef8bdb7579
 # world_share.schema.json 1.0.0 sha256:89d31e9968dc95cc
-# events/registry.yaml 1.5.0 sha256:ffb369c84ae3eff7
+# events/registry.yaml 1.6.0 sha256:83d7c6e9b0232059
 
 from __future__ import annotations
 
@@ -1674,9 +1678,9 @@ class WorldStartedData(BaseModel):
     budget_cap: Credits
 
 
-type EventRegistryFamily = Literal["world", "plan", "budget", "level", "district", "building", "agent", "skill", "question", "meeting", "connection", "data", "channel", "artifact", "approval", "policy", "alert", "memory", "app", "work_item", "pinboard", "mention", "calendar", "assistant", "team_rule"]
+type EventRegistryFamily = Literal["world", "plan", "budget", "level", "district", "building", "agent", "skill", "question", "meeting", "connection", "data", "channel", "artifact", "approval", "policy", "alert", "memory", "app", "work_item", "pinboard", "mention", "calendar", "assistant", "team_rule", "invite_link"]
 """
-Event families of PRD 9.5, plus work_item, pinboard, mention, calendar and assistant (CC-PEOPLE, registry 1.1.0) and team_rule (registry 1.2.0, ADR-0027).
+Event families of PRD 9.5, plus work_item, pinboard, mention, calendar and assistant (CC-PEOPLE, registry 1.1.0) and team_rule (registry 1.2.0, ADR-0027), and invite_link (registry 1.6.0, schema 1.3.0, ADR-0046).
 """
 
 
@@ -3716,6 +3720,30 @@ class TaughtSkillMistakes(BaseModel):
     last_month: Annotated[int, Field(ge=0)]
 
 
+type TeamInviteLinkId = Annotated[str, Field(pattern="^til_[0-9a-f]{24}$")]
+"""
+til_ and 24 lowercase hex characters (96 random bits), minted by tilo-api.
+"""
+
+
+type TeamInviteLinkKeyId = Annotated[str, Field(pattern="^[A-Za-z0-9_-]{1,32}$")]
+"""
+Which configured HMAC key signed the token (the token's kid). Never the key itself.
+"""
+
+
+type TeamInviteLinkDigest = Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+"""
+SHA-256 of the 32 raw nonce bytes, 64 lowercase hex characters.
+"""
+
+
+type TeamInviteLinkStatus = Literal["pending", "redeemed", "revoked"]
+"""
+pending, then redeemed or revoked, never back. Expired is derived from expires_at and never stored.
+"""
+
+
 class TeamLeadAssignment(BaseModel):
     """
     Who made an assignment and when: only the world's owner assigns a Team Lead's domain (PRD 16.2) or a gate's Approver (PRD 10.1; approval.requested approver). OB-01 requires by to be the owner and at to be no later than the answer.
@@ -4585,6 +4613,43 @@ class DataTransferData(BaseModel):
     artifact: ArtifactRef | None
     outbox_id: Ulid | None
     risk_tier: RiskTier
+
+
+class InviteLinkAcceptedData(BaseModel):
+    """
+    data of invite_link.accepted (registry 1.6.0, ADR-0046, PE-39). A signed-in person redeemed a team invite link and joined its team. tilo-api writes it after the link was claimed and the membership written, never an agent or a model: actor and target are the person who joined, the world is that person's Desk world (PE-12), district is null and vis is [] (owner-only, ADR-0009). Ids only: never the token, nonce, an address or a name. A membership is not a send, so it is not a side effect and authz is null.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    invite_id: TeamInviteLinkId
+    team: TeamId
+
+
+class InviteLinkCreatedData(BaseModel):
+    """
+    data of invite_link.created (registry 1.6.0, ADR-0046, PE-38). A lead of the team (or an org owner) made a team invite link. tilo-api writes it after the link record was written, never an agent or a model: actor and target are the maker, the world is the maker's Desk world (PE-12), district is null and vis is [] (owner-only, ADR-0009). Ids and the expiry only: never the token, nonce, signature, URL or key. It grants nothing by itself and sends nothing, so it is not a side effect and authz is null.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    invite_id: TeamInviteLinkId
+    team: TeamId
+    expires_at: Timestamp
+
+
+class InviteLinkRevokedData(BaseModel):
+    """
+    data of invite_link.revoked (registry 1.6.0, ADR-0046, PE-38). A lead of the team (or an org owner) withdrew a pending team invite link. tilo-api writes it after the link record changed to revoked, never an agent or a model: actor and target are the person who revoked it, the world is that person's Desk world (PE-12), district is null and vis is [] (owner-only, ADR-0009). Ids only. Expiry and redemption write no revocation. It removes nobody and sends nothing, so it is not a side effect and authz is null.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    invite_id: TeamInviteLinkId
+    team: TeamId
 
 
 class MeetingAdjournedData(BaseModel):
@@ -5561,6 +5626,26 @@ class TaughtSkillHelpersReport(BaseModel):
     month: Annotated[str, Field(pattern="^[0-9]{4}-(0[1-9]|1[0-2])$")]
     helpers: Annotated[list[TaughtSkillHelper], Field(max_length=500)]
     mistakes: TaughtSkillMistakes
+
+
+class TeamInviteLink(BaseModel):
+    """
+    A team invite link (ADR-0046, people.rules.md PE-38 and PE-39): a single-use, expiring bearer link that a lead of `team` (or an org owner) makes, and that one signed-in person of the org redeems to join that team. The record is tilo-api's own and never leaves it as is: it holds no token, nonce, signature or URL, only `nonce_sha256` (the SHA-256 of the token's 32 random nonce bytes, lowercase hex) and the `key_id` whose HMAC key signed the token. `created_by` is the maker and the server clock (PE-19). `status` is `pending` until one redemption (`redeemed`, the redeemer's stamp) or a revocation (`revoked`, the revoker's stamp) ends it; neither ever returns to `pending`. Expiry is never stored: a `pending` link with `expires_at` at or before the request is expired and redeems nothing. Who may make, revoke and redeem a link, and what a redemption writes, are rules this schema cannot see (PE-38, PE-39).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: TeamInviteLinkId
+    org_id: OrgId
+    team: TeamId
+    created_by: TeamLeadAssignment
+    expires_at: Timestamp
+    key_id: TeamInviteLinkKeyId
+    nonce_sha256: TeamInviteLinkDigest
+    status: TeamInviteLinkStatus
+    redeemed: TeamLeadAssignment | None
+    revoked: TeamLeadAssignment | None
 
 
 class TeamLead(BaseModel):
@@ -6943,6 +7028,9 @@ type RegisteredEventType = Literal[
     "assistant.replied",
     "team_rule.changed",
     "world.share_changed",
+    "invite_link.created",
+    "invite_link.accepted",
+    "invite_link.revoked",
 ]
 
 EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
@@ -7042,6 +7130,9 @@ EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
     "assistant.replied",
     "team_rule.changed",
     "world.share_changed",
+    "invite_link.created",
+    "invite_link.accepted",
+    "invite_link.revoked",
 )
 
 SIDE_EFFECT_EVENT_TYPES: Final[frozenset[RegisteredEventType]] = frozenset(
@@ -7152,10 +7243,13 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
     "assistant.replied": AssistantRepliedData,
     "team_rule.changed": TeamRuleChangedData,
     "world.share_changed": WorldShareChangedData,
+    "invite_link.created": InviteLinkCreatedData,
+    "invite_link.accepted": InviteLinkAcceptedData,
+    "invite_link.revoked": InviteLinkRevokedData,
 }
 
 EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
-    {'version': '1.5.0',
+    {'version': '1.6.0',
      'unknown_types': 'trace_only',
      'types': {'world.requested': {'family': 'world',
                                    'verb': 'requested',
@@ -8438,5 +8532,47 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                                          'this world.',
                                        'trace_row': 'team={data.team} state={data.state}',
                                        'data_schema': 'events/data/world.share_changed.schema.json',
-                                       'fixture': 'fixtures/events/valid/world.share_changed.json'}}}
+                                       'fixture': 'fixtures/events/valid/world.share_changed.json'},
+               'invite_link.created': {'family': 'invite_link',
+                                       'verb': 'created',
+                                       'priority': 'should',
+                                       'pillar': 'P4',
+                                       'default_severity': 'info',
+                                       'side_effect': False,
+                                       'world_effect': 'A sealed invitation card is pinned beside Your '
+                                                       'Desk.',
+                                       'hud_effect': 'The Team page lists the link as unused, with its '
+                                                     'expiry.',
+                                       'story_template': '{actor} made a team invite link that expires '
+                                                         'at {data.expires_at}.',
+                                       'trace_row': 'invite={data.invite_id} team={data.team} '
+                                                    'expires_at={data.expires_at}',
+                                       'data_schema': 'events/data/invite_link.created.schema.json',
+                                       'fixture': 'fixtures/events/valid/invite_link.created.json'},
+               'invite_link.accepted': {'family': 'invite_link',
+                                        'verb': 'accepted',
+                                        'priority': 'should',
+                                        'pillar': 'P4',
+                                        'default_severity': 'info',
+                                        'side_effect': False,
+                                        'world_effect': 'A new team badge is pinned on Your Desk.',
+                                        'hud_effect': 'The Team page shows the team just joined.',
+                                        'story_template': '{actor} joined a team through an invite '
+                                                          'link.',
+                                        'trace_row': 'invite={data.invite_id} team={data.team}',
+                                        'data_schema': 'events/data/invite_link.accepted.schema.json',
+                                        'fixture': 'fixtures/events/valid/invite_link.accepted.json'},
+               'invite_link.revoked': {'family': 'invite_link',
+                                       'verb': 'revoked',
+                                       'priority': 'should',
+                                       'pillar': 'P4',
+                                       'default_severity': 'info',
+                                       'side_effect': False,
+                                       'world_effect': 'The sealed invitation card beside Your Desk is '
+                                                       'torn and taken down.',
+                                       'hud_effect': 'The Team page marks the link as withdrawn.',
+                                       'story_template': '{actor} withdrew a team invite link.',
+                                       'trace_row': 'invite={data.invite_id} team={data.team}',
+                                       'data_schema': 'events/data/invite_link.revoked.schema.json',
+                                       'fixture': 'fixtures/events/valid/invite_link.revoked.json'}}}
 )

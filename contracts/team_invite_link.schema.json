@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/team_invite_link.schema.json",
+  "x-version": "1.0.0",
+  "title": "TeamInviteLink",
+  "description": "A team invite link (ADR-0046, people.rules.md PE-38 and PE-39): a single-use, expiring bearer link that a lead of `team` (or an org owner) makes, and that one signed-in person of the org redeems to join that team. The record is tilo-api's own and never leaves it as is: it holds no token, nonce, signature or URL, only `nonce_sha256` (the SHA-256 of the token's 32 random nonce bytes, lowercase hex) and the `key_id` whose HMAC key signed the token. `created_by` is the maker and the server clock (PE-19). `status` is `pending` until one redemption (`redeemed`, the redeemer's stamp) or a revocation (`revoked`, the revoker's stamp) ends it; neither ever returns to `pending`. Expiry is never stored: a `pending` link with `expires_at` at or before the request is expired and redeems nothing. Who may make, revoke and redeem a link, and what a redemption writes, are rules this schema cannot see (PE-38, PE-39).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "org_id",
+    "team",
+    "created_by",
+    "expires_at",
+    "key_id",
+    "nonce_sha256",
+    "status",
+    "redeemed",
+    "revoked"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/id"
+    },
+    "org_id": {
+      "$ref": "common.schema.json#/$defs/org_id"
+    },
+    "team": {
+      "$ref": "common.schema.json#/$defs/team_id"
+    },
+    "created_by": {
+      "$ref": "team_lead.schema.json#/$defs/assignment"
+    },
+    "expires_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "key_id": {
+      "$ref": "#/$defs/key_id"
+    },
+    "nonce_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "status": {
+      "$ref": "#/$defs/status"
+    },
+    "redeemed": {
+      "anyOf": [
+        {
+          "$ref": "team_lead.schema.json#/$defs/assignment"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "revoked": {
+      "anyOf": [
+        {
+          "$ref": "team_lead.schema.json#/$defs/assignment"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "if": {
+    "description": "PE-38: a pending link carries neither end stamp.",
+    "properties": { "status": { "const": "pending" } },
+    "required": ["status"]
+  },
+  "then": {
+    "properties": { "redeemed": { "type": "null" }, "revoked": { "type": "null" } }
+  },
+  "else": {
+    "if": {
+      "description": "PE-38: a redeemed link carries the redeemer's stamp and no revocation; a revoked one the revoker's stamp and no redemption.",
+      "properties": { "status": { "const": "redeemed" } },
+      "required": ["status"]
+    },
+    "then": {
+      "properties": {
+        "redeemed": { "$ref": "team_lead.schema.json#/$defs/assignment" },
+        "revoked": { "type": "null" }
+      }
+    },
+    "else": {
+      "properties": {
+        "redeemed": { "type": "null" },
+        "revoked": { "$ref": "team_lead.schema.json#/$defs/assignment" }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "description": "til_ and 24 lowercase hex characters (96 random bits), minted by tilo-api.",
+      "type": "string",
+      "pattern": "^til_[0-9a-f]{24}$",
+      "not": { "pattern": "\\n" }
+    },
+    "key_id": {
+      "description": "Which configured HMAC key signed the token (the token's kid). Never the key itself.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,32}$",
+      "not": { "pattern": "\\n" }
+    },
+    "digest": {
+      "description": "SHA-256 of the 32 raw nonce bytes, 64 lowercase hex characters.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "not": { "pattern": "\\n" }
+    },
+    "status": {
+      "description": "pending, then redeemed or revoked, never back. Expired is derived from expires_at and never stored.",
+      "type": "string",
+      "enum": ["pending", "redeemed", "revoked"]
+    }
+  }
+}
