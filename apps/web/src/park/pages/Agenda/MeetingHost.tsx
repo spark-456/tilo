@@ -1,6 +1,6 @@
 // FR-MTG-01, FR-MTG-09, FR-MTG-10 (ADR-0024): host a Google Meet with the Tilo notetaker, and send Tilo to it.
 // Every line is one the API's reply supports; nothing retries by itself, and there is no progress bar (HR-1).
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { HostState } from "../../../api/connect";
 import { displayApiError } from "../../../api/http";
 import { ENDED_TEXT, type MeetingHostApi } from "../../api/live/meetingHost";
@@ -35,15 +35,25 @@ export function HostMeeting({
   const [done, setDone] = useState(false);
   const made = useRef<Made>({ id: null, world: false });
   const [key] = useState(() => crypto.randomUUID());
-  useEffect(() => {
+  // One failed or unconfirmed read must not stick: "Check again" reads it afresh (the same read the Connectors page makes).
+  const read = useCallback(() => {
     hostState().then(setConn, () => setConn("unknown"));
   }, [hostState]);
+  useEffect(() => read(), [read]);
   if (conn === null) return null;
   if (conn !== "connected")
     return (
       <p data-testid="host-meeting-gate">
         {conn === "unknown" ? "Tilo could not confirm the meeting host. " : ""}
         <AppLink to="/connectors">Sign in the meeting host first</AppLink>
+        {conn === "unknown" ? (
+          <>
+            {" "}
+            <button type="button" className="secondary" onClick={read}>
+              Check again
+            </button>
+          </>
+        ) : null}
       </p>
     );
   if (done)

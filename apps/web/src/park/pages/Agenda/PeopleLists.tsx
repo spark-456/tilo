@@ -4,7 +4,8 @@
 // A demo session or a build with no API has no lists, so nothing is drawn.
 import { useEffect, useMemo, useState } from "react";
 import { API_URL, appCheckToken, authToken, sessionView } from "../../../api/ClientProvider";
-import { type HostState, createConnectFlow } from "../../../api/connect";
+import type { HostState } from "../../../api/connect";
+import { liveConnectFlow } from "../../../api/connectEnv";
 import { HttpClient } from "../../../api/http";
 import { type MeetingHostApi, meetingHostApi } from "../../api/live/meetingHost";
 import { type MeetingMinutesApi, meetingMinutesApi } from "../../api/live/meetingMinutes";
@@ -110,10 +111,11 @@ export function PeopleLists() {
   );
   const api = useMemo(() => (http ? peopleListsApi(http) : null), [http]);
   const minutes = useMemo(() => (http ? meetingMinutesApi(http) : null), [http]);
-  const host = useMemo(
-    () => (http ? { api: meetingHostApi(http), state: createConnectFlow(http).meetingHost } : null),
-    [http],
-  );
+  // The host's state is read by the one flow the Connectors page uses, so both pages say the same thing.
+  const host = useMemo(() => {
+    const flow = http ? liveConnectFlow() : null;
+    return http && flow ? { api: meetingHostApi(http), state: () => flow.meetingHost() } : null;
+  }, [http]);
   if (!api) return null;
   return (
     <>
