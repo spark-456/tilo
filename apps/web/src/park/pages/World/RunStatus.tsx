@@ -115,78 +115,78 @@ function ResultBody({ view, retry }: { view: ResultView; retry: () => void }) {
   );
 }
 
-/** The delivered result, read here; Open and Download are the same bytes the owner route serves. */
-function RunResult({ api, worldId }: { api: Api; worldId: string }) {
+/** The delivered result, read here; Open and Download are the same bytes the owner route serves (STUDIO-3: it sits
+ * in the Result tab, where Share is the one filled button, so both are quiet). */
+export function RunResult({ api, worldId }: { api: Api; worldId: string }) {
   const [attempt, setAttempt] = useState(0);
   const view = useRunResult(api, worldId, true, attempt);
   const blob = view.status === "text" || view.status === "file" ? view.blob : null;
   return (
     <section aria-label="Result" className="park-world-section" data-testid="run-result">
-      <div className="park-world-sechead">
-        <h2 className="park-world-h2">Result</h2>
-        <span className="park-world-sub">Delivered by this run</span>
-      </div>
-      <ResultBody view={view} retry={() => setAttempt((n) => n + 1)} />
       {blob ? (
         <div className="park-world-resultactions">
-          <Button variant="primary" size="sm" onClick={() => openResult(blob)}>
-            Open result
-          </Button>
+          <span className="park-world-sub">Delivered by this run</span>
           <Button variant="secondary" size="sm" onClick={() => saveResult(blob, worldId)}>
             Download
           </Button>
+          <Button variant="secondary" size="sm" onClick={() => openResult(blob)}>
+            Open result
+          </Button>
         </div>
-      ) : null}
+      ) : (
+        <span className="park-world-sub">Delivered by this run</span>
+      )}
+      <ResultBody view={view} retry={() => setAttempt((n) => n + 1)} />
     </section>
   );
 }
 
+/** What the run assumed instead of asking (FR-INT-04), as chips beside the tabs; nothing when none is recorded. */
+export function AssumedChips({ assumptions }: { assumptions: readonly string[] }) {
+  if (assumptions.length === 0) return null;
+  return (
+    <ul className="park-world-assumed" aria-label="What Tilo assumed instead of asking">
+      {assumptions.map((a) => (
+        <li key={a} className="park-world-assumedchip">{`Assumed: ${a}`}</li>
+      ))}
+    </ul>
+  );
+}
+
+/** The one status banner: the progress line and bar, and a stopped run's recorded reason with "Start it again". The
+ * assumptions sit beside the tabs (AssumedChips) and the result in the Result tab (RunResult). */
 export function RunStatus({
   view,
   events,
-  api,
-  worldId,
   again,
 }: {
   view: RunView;
   events: readonly RunEvent[];
-  api: Api;
-  worldId: string;
   again?: StartAgain | undefined;
 }) {
   return (
-    <>
-      <section
-        aria-label="Run status"
-        className="park-world-runstatus"
-        data-phase={view.phase}
-        data-testid="run-status"
-      >
-        <output className="park-world-runline">{view.line}</output>
-        {view.percent !== null && view.phase !== "failed" ? (
-          <progress
-            className="park-world-progress"
-            aria-label="Progress of the plan"
-            max={100}
-            value={view.percent}
-          />
-        ) : null}
-        {view.assumptions.length > 0 ? (
-          <ul className="park-world-assumed" aria-label="What Tilo assumed instead of asking">
-            {view.assumptions.map((a) => (
-              <li key={a} className="park-world-assumedchip">{`Assumed: ${a}`}</li>
-            ))}
-          </ul>
-        ) : null}
-        {view.failure ? (
-          <div className="park-world-failed" data-testid="run-failed">
-            <h2 className="park-world-h2">This run stopped</h2>
-            <p className="park-world-failreason">{`Why: ${view.failure.reason}`}</p>
-            {again ? <StartItAgain again={again} events={events} /> : null}
-          </div>
-        ) : null}
-      </section>
-      {view.deliverable ? <RunResult api={api} worldId={worldId} /> : null}
-    </>
+    <section
+      aria-label="Run status"
+      className="park-world-runstatus"
+      data-phase={view.phase}
+      data-testid="run-status"
+    >
+      <output className="park-world-runline">{view.line}</output>
+      {view.percent !== null && view.phase !== "failed" ? (
+        <progress
+          className="park-world-progress"
+          aria-label="Progress of the plan"
+          max={100}
+          value={view.percent}
+        />
+      ) : null}
+      {view.failure ? (
+        <div className="park-world-failed" data-testid="run-failed">
+          <h2 className="park-world-h2">This run stopped</h2>
+          <p className="park-world-failreason">{`Why: ${view.failure.reason}`}</p>
+          {again ? <StartItAgain again={again} events={events} /> : null}
+        </div>
+      ) : null}
+    </section>
   );
 }

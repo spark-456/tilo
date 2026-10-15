@@ -15,10 +15,10 @@ const NEEDS_FILL = "#F0A500";
 const NEEDS_INK = "#1F1D2B";
 
 const STATES: Record<WorldState, StateLook> = {
-  needs: ["Needs you", NEEDS_FILL, NEEDS_INK, NEEDS_INK, "var(--amber)"],
-  running: ["Running", "var(--chip)", "var(--ink)", "var(--run)", "var(--run)"],
+  needs: ["Needs you", "var(--amberSoft)", "var(--amberInk)", "var(--amber)", "var(--amber)"],
+  running: ["Working", "var(--heroSoft)", "var(--heroInk)", "var(--run)", "var(--run)"],
   scheduled: ["Scheduled", "var(--chip)", "var(--ink)", "var(--sch)", "var(--sch)"],
-  finished: ["Ready", "var(--okSoft)", "var(--okInk)", "var(--ok)", "var(--ok)"],
+  finished: ["Done", "var(--okSoft)", "var(--okInk)", "var(--ok)", "var(--ok)"],
 };
 const PAUSED: StateLook = ["Paused", "var(--chip)", "var(--ink)", "var(--ink3)", "var(--ink3)"];
 const STARTING: StateLook = [

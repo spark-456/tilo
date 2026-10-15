@@ -100,7 +100,7 @@ export function runView(events: readonly RunEvent[]): RunView {
     const all = total === null ? "" : `. All ${plural(total, "step", "steps")} finished`;
     const out =
       made > 0
-        ? `, ${plural(made, "deliverable", "deliverables")} ready below`
+        ? `, ${plural(made, "deliverable", "deliverables")} ready in the Result tab`
         : ", nothing was delivered";
     return {
       ...base,

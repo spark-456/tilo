@@ -130,7 +130,7 @@ describe("WEB_6_shell: /park/world/<id> inside the shell", () => {
 
   it("WEB_6_shell_the_breadcrumb_goes_back_to_worlds_and_the_Spend_link_to_the_ledger", async () => {
     const m = await visit("/park/world/k1");
-    click(control(breadcrumb(m.container), "Worlds"));
+    click(control(breadcrumb(m.container), "All worlds"));
     await settle();
     expect(window.location.pathname).toBe("/worlds");
     expect(m.container.querySelector('[data-testid="park-page-worlds"]')).not.toBeNull();

@@ -14,7 +14,9 @@
   padding: 24px 32px 36px;
 }
 
-/* ---- Breadcrumb ---- */
+/* ---- STUDIO-3 (design/studio-v2 "Tilo S World.dc.html"): the back link, the title block with its progress, the
+   tab row, the city beside the tabs. Colours are role tokens (config/themes/studio.json): --ground is the design's
+   cityBg, --priFill/--onPri/--priLip its primary, --heroSoft/--heroInk its priSoft/priInk. ---- */
 [data-park] .park-world-crumb {
   display: flex;
   align-items: center;
@@ -23,37 +25,34 @@
   font-weight: 700;
   color: var(--ink3);
 }
-[data-park] .park-world-crumbname {
-  color: var(--ink);
-}
 [data-park] .park-world-back {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
-  padding: 0 10px 0 6px;
-  border-radius: 10px;
-  color: var(--ink2);
-  font-weight: 800;
+  min-height: 24px;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--ink3);
+  font-size: 14px;
+  font-weight: 700;
   text-decoration: none;
 }
 [data-park] .park-world-back:hover {
-  background: var(--chip);
-  color: var(--ink);
+  color: var(--ink2);
 }
 
-/* ---- Title block ---- */
+/* ---- Title block: titles | progress | actions ---- */
 [data-park] .park-world-head {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 20px 32px;
 }
 [data-park] .park-world-titles {
   display: flex;
+  flex: 1 1 360px;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
 }
 [data-park] .park-world-eyebrowrow {
@@ -64,67 +63,99 @@
 }
 [data-park] .park-world-eyebrow {
   font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.7px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
   color: var(--ink3);
+}
+[data-park] .park-world-titleline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 [data-park] .park-world-chip {
   display: flex;
   align-items: center;
-  gap: 7px;
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 8px;
-  font-size: 12.5px;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px 0 10px;
+  border-radius: 99px;
+  font-size: 14px;
   font-weight: 800;
   white-space: nowrap;
 }
 [data-park] .park-world-dot {
   flex: none;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 99px;
 }
 [data-park] .park-world-h1 {
   margin: 0;
-  font-family: "Nunito", sans-serif;
-  font-weight: 900;
-  font-size: 36px;
-  letter-spacing: -0.8px;
-  line-height: 1.05;
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: -0.6px;
+  line-height: 1.15;
   text-wrap: balance;
 }
 [data-park] .park-world-meta {
   margin: 0;
-  font-size: 15.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--ink2);
+}
+[data-park] .park-world-headprog {
+  display: flex;
+  flex: 0 1 400px;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 260px;
+}
+[data-park] .park-world-proghead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 15px;
+}
+[data-park] .park-world-progtitle {
+  font-weight: 800;
+}
+[data-park] .park-world-progsub {
+  color: var(--ink3);
+  font-weight: 600;
+}
+[data-park] .park-world-spentline {
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 600;
 }
 [data-park] .park-world-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
+/* The live view and replay links: quiet outlined controls (the page keeps one filled button). */
 [data-park] .park-world-live {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 42px;
+  height: 44px;
   padding: 0 18px;
-  border-radius: 12px;
-  background: var(--heroFill);
-  color: #ffffff;
-  font-size: 14.5px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 15px;
   font-weight: 800;
   text-decoration: none;
   white-space: nowrap;
 }
 [data-park] .park-world-live:hover {
-  color: #ffffff;
-  filter: brightness(1.08);
+  background: var(--sunk);
+  color: var(--ink);
 }
 
-/* QA-DEMO-1 m3: a disabled stage link looks disabled (muted, not the pressable purple, no hover) and the reason is
+/* QA-DEMO-1 m3: a disabled stage link looks disabled (muted, not pressable, no hover) and the reason is
    written beside the lenses (.park-world-nostage) */
 [data-park] .park-world-live[aria-disabled="true"] {
   background: var(--chip);
@@ -164,30 +195,77 @@
   border: 0;
 }
 
-/* ---- Top grid: the map card ---- */
+/* ---- Tab row: Story / Steps / Result, and what the run assumed ---- */
+[data-park] .park-world-tabrow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+[data-park] .park-world-tabs {
+  display: flex;
+  flex: none;
+  padding: 4px;
+  border-radius: 16px;
+  background: var(--sunk);
+  gap: 4px;
+}
+[data-park] .park-world-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink2);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+[data-park] .park-world-tab--on {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line);
+}
+[data-park] .park-world-tab__n {
+  color: var(--ink3);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+[data-park] .park-world-tab:focus-visible,
+[data-park] .park-world-back:focus-visible,
+[data-park] .park-world-live:focus-visible,
+[data-park] .park-world-panel:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---- Top grid: the city (left) and the tabs (right); columns are set inline from the window width ---- */
 [data-park] .park-world-top {
   display: grid;
   align-items: start;
-  gap: 18px;
+  gap: 24px;
 }
 [data-park] .park-world-mapcard {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--line2);
-  border-radius: 22px;
-  background: var(--card);
 }
 [data-park] .park-world-map {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 440px;
-  border-radius: 16px;
-  background: var(--sunk);
+  height: 640px;
+  padding: 64px 12px 72px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: var(--ground);
   overflow: hidden;
 }
 [data-park] .park-world-bigart {
@@ -209,17 +287,17 @@
 }
 [data-park] .park-world-tag {
   position: absolute;
-  left: 14px;
-  top: 14px;
+  left: 20px;
+  top: 20px;
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 10px;
-  background: var(--pop);
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 99px;
+  background: var(--card);
   box-shadow: var(--sh);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
 }
 [data-park] .park-world-overlay {
@@ -242,56 +320,47 @@
   font-size: 14px;
   font-weight: 800;
 }
-/* The links to the live stage's lenses (not in the design): a pill like the hero tag, at the other corner. */
+/* The links to the live stage's lenses: a card pill at the top right corner of the city. */
 [data-park] .park-world-lenses {
   position: absolute;
-  left: 14px;
-  bottom: 14px;
+  right: 20px;
+  top: 20px;
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 32px;
-  max-width: calc(100% - 28px); /* UI-10 B4: never past the map's right edge (the nav clipped at 320) */
+  height: 36px;
+  max-width: calc(100% - 40px); /* UI-10 B4: never past the map's edge (the nav clipped at 320) */
   padding: 0 4px;
-  border-radius: 10px;
-  background: var(--pop);
+  border-radius: 12px;
+  background: var(--card);
   box-shadow: var(--sh);
 }
 [data-park] .park-world-lenses a {
   display: flex;
   align-items: center;
-  height: 24px;
+  height: 28px;
   padding: 0 8px;
-  border-radius: 7px;
-  color: var(--heroInk);
+  border-radius: 8px;
+  color: var(--ink);
   font-size: 13px;
   font-weight: 800;
   text-decoration: none;
 }
 [data-park] .park-world-lenses a:hover {
-  background: var(--chip);
+  background: var(--sunk);
 }
 
-/* ---- Progress row ---- */
-[data-park] .park-world-progrow {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 18px;
-  padding: 2px 6px 4px;
-}
+/* ---- Progress (in the title block) ---- */
 [data-park] .park-world-progwrap {
   display: flex;
   align-items: center;
-  flex: 1;
-  min-width: 200px;
   gap: 10px;
 }
 [data-park] .park-world-track {
   flex: 1;
-  height: 6px;
+  height: 12px;
   border-radius: 99px;
-  background: var(--track);
+  background: var(--sunk);
   overflow: hidden;
 }
 [data-park] .park-world-fill {
@@ -303,12 +372,24 @@
   text-align: right;
   font-size: 13.5px;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
+/* The city's legend: a card at its bottom left; each colour has its word (colour never carries meaning alone). */
 [data-park] .park-world-legend {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 14px;
-  font-size: 12.5px;
+  gap: 6px 16px;
+  max-width: calc(100% - 40px);
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--sh);
+  font-size: 13px;
   font-weight: 700;
   color: var(--ink2);
 }
@@ -318,9 +399,241 @@
   gap: 6px;
 }
 [data-park] .park-world-swatch {
-  width: 9px;
-  height: 9px;
-  border-radius: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 99px;
+}
+
+/* ---- The tab panels: one card, the chosen panel shown; a long story scrolls inside it ---- */
+[data-park] .park-world-panels {
+  min-width: 0;
+}
+[data-park] .park-world-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: 640px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: var(--card);
+  overflow: hidden;
+}
+[data-park] .park-world-panel[hidden] {
+  display: none;
+}
+[data-park] .park-world-panelhead {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid var(--line);
+}
+[data-park] .park-world-paneltitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+[data-park] .park-world-panelsub {
+  color: var(--ink3);
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-park] .park-world-panelaside {
+  margin-left: auto;
+  color: var(--ink3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+[data-park] .park-world-panelbody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 20px 20px;
+  overflow-y: auto;
+}
+[data-park] .park-world-emptypanel {
+  padding: 28px 12px;
+  border: 1.5px dashed var(--lineStrong);
+  border-radius: 18px;
+  text-align: center;
+}
+[data-park] .park-world-emptytitle {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+}
+[data-park] .park-world-emptyline {
+  margin: 0;
+  color: var(--ink2);
+  font-size: 14px;
+}
+[data-park] .park-world-story,
+[data-park] .park-world-steps {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  gap: 4px;
+  list-style: none;
+}
+[data-park] .park-world-storyrow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line);
+}
+[data-park] .park-world-storytext {
+  font-size: 16px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+[data-park] .park-world-storymeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink3);
+  font-size: 13px;
+  font-weight: 600;
+}
+[data-park] .park-world-step {
+  display: flex;
+  gap: 14px;
+  padding: 12px 10px;
+  border-radius: 16px;
+}
+[data-park] .park-world-step--stopped {
+  background: var(--amberSoft);
+}
+[data-park] .park-world-stepmark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1.5px dashed var(--lineStrong);
+  border-radius: 99px;
+  color: var(--ink3);
+  font-size: 13px;
+  font-weight: 700;
+}
+[data-park] .park-world-step--done .park-world-stepmark {
+  border: 0;
+  background: var(--ok);
+  color: #ffffff;
+}
+[data-park] .park-world-step--working .park-world-stepmark,
+[data-park] .park-world-step--started .park-world-stepmark {
+  border: 0;
+  background: var(--priFill);
+  color: var(--onPri);
+}
+[data-park] .park-world-step--stopped .park-world-stepmark {
+  border: 0;
+  background: var(--amber);
+  color: #1f1d2b;
+}
+[data-park] .park-world-stepinfo {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+[data-park] .park-world-steptitle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 15.5px;
+  font-weight: 600;
+}
+[data-park] .park-world-stepline,
+[data-park] .park-world-stepdetail {
+  color: var(--ink2);
+  font-size: 14px;
+}
+[data-park] .park-world-stepdetail {
+  color: var(--ink3);
+}
+[data-park] .park-world-stepat {
+  flex: none;
+  color: var(--ink3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+[data-park] .park-world-steptag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 99px;
+  background: var(--sunk);
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 700;
+}
+[data-park] .park-world-steptag--done {
+  background: var(--okSoft);
+  color: var(--okInk);
+}
+[data-park] .park-world-steptag--working,
+[data-park] .park-world-steptag--started {
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+[data-park] .park-world-steptag--stopped {
+  background: var(--amberSoft);
+  color: var(--amberInk);
+}
+[data-park] .park-world-sharerow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+/* Below the city and tabs: spend, facts, skills and tools side by side. */
+[data-park] .park-world-more {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  align-items: start;
+  gap: 18px;
+}
+@media (max-width: 760px) {
+  [data-park] .park-world-map {
+    height: 300px;
+    padding: 56px 8px 64px;
+  }
+  [data-park] .park-world-panel {
+    max-height: none;
+  }
+  [data-park] .park-world-headprog {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  [data-park] .park-world-h1 {
+    font-size: 26px;
+  }
+  [data-park] .park-world-tabs {
+    flex: 1 1 100%;
+  }
+  [data-park] .park-world-tab {
+    flex: 1;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 8px;
+  }
+  [data-park] .park-world-lenses {
+    top: auto;
+    right: auto;
+    left: 12px;
+    bottom: 12px;
+  }
+  [data-park] .park-world-legend {
+    display: none;
+  }
 }
 
 /* ---- Side column ---- */

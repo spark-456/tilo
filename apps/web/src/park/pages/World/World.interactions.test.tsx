@@ -94,7 +94,7 @@ describe("WEB_6_world_interactions: Approve and Ask me later", () => {
     const rig = await mountWorld();
     await rig.setDec({ depot: true, mail: true });
     expect(pageText(rig.el)).not.toContain("WAITING FOR YOU");
-    expect(elWithText(rig.el, "Running")).toBeTruthy();
+    expect(elWithText(rig.el, "Working")).toBeTruthy();
     await rig.setDec({ mail: true }); // Undo on the toast
     expect(elWithText(rig.el, "WAITING FOR YOU")).toBeTruthy();
     expect(hasControl(rig.el, DECISIONS.depot.yes)).toBe(true);
@@ -188,15 +188,15 @@ describe("WEB_6_world_interactions: Pause and Resume", () => {
     expect(elWithText(rig.el, "2 decisions")).toBeTruthy();
   });
 
-  it("WEB_6_world_interactions_a_running_world_shows_Paused_then_Running_again", async () => {
+  it("WEB_6_world_interactions_a_running_world_shows_Paused_then_Working_again", async () => {
     const rig = await mountWorld({ id: "calls" });
-    expect(elWithText(rig.el, "Running")).toBeTruthy();
+    expect(elWithText(rig.el, "Working")).toBeTruthy();
     expect(pageText(rig.el)).toContain("Recorded sample state, not live"); // UI-10 B2
     click(control(rig.el, "Pause"));
     expect(elWithText(rig.el, "Paused")).toBeTruthy();
-    expect(elWithText(rig.el, "Running")).toBeUndefined();
+    expect(elWithText(rig.el, "Working")).toBeUndefined();
     click(control(rig.el, "Resume"));
-    expect(elWithText(rig.el, "Running")).toBeTruthy();
+    expect(elWithText(rig.el, "Working")).toBeTruthy();
   });
 
   it("WEB_6_world_interactions_the_paused_state_is_per_world_in_one_mounted_page", async () => {
@@ -349,7 +349,7 @@ describe("WEB_6_world_interactions: Town and Village buttons", () => {
 describe("WEB_6_world_interactions: links that stay in the Park app", () => {
   it("WEB_6_world_interactions_the_breadcrumb_Worlds_link_goes_to_worlds", async () => {
     const rig = await mountWorld();
-    const link = control(breadcrumb(rig.el), "Worlds");
+    const link = control(breadcrumb(rig.el), "All worlds");
     expect(link.tagName).toBe("A");
     expect(clickEl(link)).toBe(false); // a plain click is handled in the page
     expect(lastGo(rig.app)).toEqual(["worlds", undefined]);
@@ -373,7 +373,7 @@ describe("WEB_6_world_interactions: links that stay in the Park app", () => {
     async (_n, init) => {
       const rig = await mountWorld();
       for (const link of [
-        control(breadcrumb(rig.el), "Worlds"),
+        control(breadcrumb(rig.el), "All worlds"),
         control(
           climb(elWithText(rig.el, "Spend"), (n) => textOf(n).includes("Ledger")),
           "Ledger",

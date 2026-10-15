@@ -60,66 +60,57 @@ function closest(rules: readonly CssRule[], want: Decls): string {
 const BUNDLES: readonly [string, Decls][] = [
   // breadcrumb
   ["breadcrumb", { gap: "8px", "font-size": "14px", "font-weight": "700", color: "var(--ink3)" }],
+  // STUDIO-3 ("Tilo S World.dc.html"): the back link, title block, city and tabs take the Studio values.
   [
     "back link",
     {
       gap: "6px",
-      height: "32px",
-      padding: "0 10px 0 6px",
-      "border-radius": "10px",
-      color: "var(--ink2)",
+      "min-height": "24px",
+      "font-size": "14px",
+      "font-weight": "700",
+      color: "var(--ink3)",
     },
   ],
   // title block
-  ["head row", { gap: "20px" }],
+  ["head row", { gap: "20px 32px" }],
   [
     "eyebrow",
-    { "font-size": "12px", "font-weight": "800", "letter-spacing": "0.7px", color: "var(--ink3)" },
+    { "font-size": "12px", "font-weight": "700", "letter-spacing": "0.6px", color: "var(--ink3)" },
   ],
   [
     "status chip",
     {
-      height: "26px",
-      padding: "0 10px",
-      "border-radius": "8px",
-      "font-size": "12.5px",
+      height: "30px",
+      padding: "0 12px 0 10px",
+      "border-radius": "99px",
+      "font-size": "14px",
       "font-weight": "800",
-      gap: "7px",
+      gap: "6px",
     },
   ],
-  ["chip dot", { width: "7px", height: "7px", "border-radius": "99px" }],
+  ["chip dot", { width: "8px", height: "8px", "border-radius": "99px" }],
   [
     "h1",
     {
       margin: "0",
-      "font-weight": "900",
-      "font-size": "36px",
-      "letter-spacing": "-0.8px",
-      "line-height": "1.05",
+      "font-weight": "700",
+      "letter-spacing": "-0.6px",
+      "line-height": "1.15",
       "text-wrap": "balance",
     },
   ],
-  ["meta", { margin: "0", "font-size": "15.5px", "font-weight": "600", color: "var(--ink2)" }],
+  ["meta", { margin: "0", "font-size": "15px", "font-weight": "600", color: "var(--ink2)" }],
   ["header buttons", { gap: "8px" }],
-  // top grid, map card and map
-  ["top grid", { "align-items": "start", gap: "18px" }],
-  [
-    "map card",
-    {
-      background: "var(--card)",
-      border: "1px solid var(--line2)",
-      "border-radius": "22px",
-      padding: "12px",
-      gap: "12px",
-    },
-  ],
+  // top grid, city and tabs
+  ["top grid", { "align-items": "start", gap: "24px" }],
+  ["map card", { gap: "10px", "min-width": "0" }],
   [
     "map",
     {
       position: "relative",
-      height: "440px",
-      "border-radius": "16px",
-      background: "var(--sunk)",
+      border: "1px solid var(--line)",
+      "border-radius": "28px",
+      background: "var(--ground)",
       overflow: "hidden",
     },
   ],
@@ -127,17 +118,31 @@ const BUNDLES: readonly [string, Decls][] = [
     "hero tag",
     {
       position: "absolute",
-      left: "14px",
-      top: "14px",
-      height: "32px",
-      padding: "0 12px",
-      "border-radius": "10px",
-      background: "var(--pop)",
+      left: "20px",
+      top: "20px",
+      height: "36px",
+      padding: "0 14px",
+      "border-radius": "99px",
+      background: "var(--card)",
       "box-shadow": "var(--sh)",
       gap: "8px",
-      "font-size": "13px",
+      "font-size": "14px",
       "font-weight": "800",
     },
+  ],
+  [
+    "tab",
+    {
+      height: "40px",
+      "border-radius": "12px",
+      "font-size": "15px",
+      "font-weight": "800",
+    },
+  ],
+  ["tab list", { padding: "4px", "border-radius": "16px", background: "var(--sunk)", gap: "4px" }],
+  [
+    "tab panel",
+    { border: "1px solid var(--line)", "border-radius": "28px", background: "var(--card)" },
   ],
   ["paused overlay", { position: "absolute", background: "var(--scrim)" }],
   [
@@ -153,15 +158,14 @@ const BUNDLES: readonly [string, Decls][] = [
       "font-weight": "800",
     },
   ],
-  ["progress row", { gap: "18px", padding: "2px 6px 4px" }],
-  ["progress wrap", { flex: "1", "min-width": "200px", gap: "10px" }],
+  ["progress wrap", { gap: "10px" }],
   [
     "progress track",
     {
       flex: "1",
-      height: "6px",
+      height: "12px",
       "border-radius": "99px",
-      background: "var(--track)",
+      background: "var(--sunk)",
       overflow: "hidden",
     },
   ],
@@ -169,9 +173,19 @@ const BUNDLES: readonly [string, Decls][] = [
     "progress label",
     { "font-size": "13.5px", "font-weight": "800", "min-width": "40px", "text-align": "right" },
   ],
-  ["legend", { gap: "14px", "font-size": "12.5px", "font-weight": "700", color: "var(--ink2)" }],
+  [
+    "legend",
+    {
+      position: "absolute",
+      "border-radius": "14px",
+      background: "var(--card)",
+      "font-size": "13px",
+      "font-weight": "700",
+      color: "var(--ink2)",
+    },
+  ],
   ["legend item", { gap: "6px" }],
-  ["legend swatch", { width: "9px", height: "9px", "border-radius": "3px" }],
+  ["legend swatch", { width: "10px", height: "10px", "border-radius": "99px" }],
   // side column
   ["side column", { gap: "18px" }],
   [
@@ -508,13 +522,13 @@ describe("WEB_6_world_styles: World.css exists and follows the Park conventions"
     ).toBeGreaterThanOrEqual(1);
   });
 
-  it("WEB_6_world_styles_the_h1_is_Nunito_900_36px", () => {
-    const h1 = [...groups(parsed().rules).values()].filter(
-      (g) => g.get("font-size") === "36px" && g.get("font-weight") === "900",
+  // STUDIO-3: the h1 is the Studio title, 34px 700 on desktop (the theme sets the Geist family on every element).
+  it("STUDIO_3_world_styles_the_h1_is_700_34px_on_desktop", () => {
+    const desktop = parseRules(css().replace(/@media[^{]*\{[\s\S]*?\n\}/g, "")).rules;
+    const h1 = [...groups(desktop).values()].filter(
+      (g) => g.get("font-size") === "34px" && g.get("font-weight") === "700",
     );
     expect(h1.length).toBeGreaterThanOrEqual(1);
-    expect(h1[0]?.get("font-family")).toContain("nunito");
-    expect(h1[0]?.get("font-family")).not.toContain("nunito sans");
   });
 });
 
@@ -532,14 +546,10 @@ describe("WEB_6_world_styles: every block of the reference's inline styles", () 
 });
 
 describe("WEB_6_world_styles: states are states, not motion", () => {
-  it("WEB_6_world_styles_the_back_link_hovers_to_chip_and_ink", () => {
-    const hover = parsed().rules.filter((r) => /:hover/.test(r.selector));
-    const ok = hover.some(
-      (r) =>
-        norm(r.decls.get("background")) === "var(--chip)" &&
-        norm(r.decls.get("color")) === "var(--ink)",
-    );
-    expect(ok, "reference style-hover: background var(--chip); color var(--ink)").toBe(true);
+  // STUDIO-3: "← All worlds" is a quiet text link: it darkens on hover ("Tilo S World": a:hover ink2).
+  it("STUDIO_3_world_styles_the_back_link_hovers_to_ink2", () => {
+    const hover = parsed().rules.filter((r) => /\.park-world-back:hover/.test(r.selector));
+    expect(hover.some((r) => norm(r.decls.get("color")) === "var(--ink2)")).toBe(true);
   });
 
   it("WEB_6_world_styles_links_and_chips_carry_the_README_focus_ring", () => {

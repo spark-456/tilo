@@ -99,11 +99,12 @@ describe("WEB_6_world_render: the page frame", () => {
 });
 
 describe("WEB_6_world_render: breadcrumb", () => {
-  it("WEB_6_world_render_breadcrumb_reads_Worlds_slash_the_world_name_with_a_real_link_to_Worlds", async () => {
+  // STUDIO-3 ("Tilo S World.dc.html"): the breadcrumb is one back link, "← All worlds"; the name is the h1 below it.
+  it("STUDIO_3_world_render_breadcrumb_reads_All_worlds_with_a_real_link_to_Worlds", async () => {
     const { el } = await mountWorld();
     const nav = breadcrumb(el);
-    expect(flat(textOf(nav))).toBe(flat(`Worlds / ${K1.name}`));
-    const link = controlFlat(nav, "Worlds");
+    expect(flat(textOf(nav))).toBe(flat("All worlds"));
+    const link = controlFlat(nav, "All worlds");
     expect(link.tagName).toBe("A");
     expect(link.getAttribute("href")).toBeTruthy();
     expect(link.querySelector("svg"), "the back arrow of the reference").not.toBeNull();
@@ -143,15 +144,15 @@ describe("WEB_6_world_render: header (eyebrow, status chip, name, meta)", () => 
     cleanup();
     const none = await mountWorld({ dec: { depot: true, mail: true } });
     expect(
-      elWithText(none.el, "Running"),
+      elWithText(none.el, "Working"),
       "no decision is open: the world is running",
     ).toBeTruthy();
     expect(pageText(none.el)).not.toMatch(/\d decisions?\b/);
   });
 
-  it("WEB_6_world_render_a_finished_world_says_Ready", async () => {
+  it("WEB_6_world_render_a_finished_world_says_Done", async () => {
     const { el } = await mountWorld({ id: "audit" });
-    expect(elWithText(el, "Ready")).toBeTruthy();
+    expect(elWithText(el, "Done")).toBeTruthy();
     expect(elWithText(el, "CITY · WORKSPACE")).toBeTruthy();
   });
 
@@ -191,7 +192,8 @@ describe("WEB_6_world_render: the map card (art, hero tag, progress, legend)", (
     const legend = elWithFlat(el, "Building Needs you Done Planned");
     expect(legend, "the four legend items in the reference order").toBeTruthy();
     expect(legend?.children).toHaveLength(4);
-    expect(map.contains(legend ?? null), "the legend is under the map, not on it").toBe(false);
+    // STUDIO-3 ("Tilo S World.dc.html"): the legend is a card on the city, at its bottom left.
+    expect(map.contains(legend ?? null), "the legend sits on the city").toBe(true);
   });
 
   it("WEB_6_world_render_the_second_city_art_is_its_own_plan", async () => {
