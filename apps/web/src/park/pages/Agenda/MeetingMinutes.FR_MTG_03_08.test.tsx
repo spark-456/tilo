@@ -86,15 +86,15 @@ describe("FR_MTG_03_08 Park minutes owner flow", () => {
     expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(
       true,
     );
-    await press(m.container, "Analyze minutes");
-    // a server that never installed the minutes router answers 404: the control goes away
-    expect(button(m.container, "Analyze minutes")).toBeUndefined();
+    await press(m.container, "Wrap up");
+    // A server without the router gives an explicit switched-off state.
+    expect(m.container.textContent).toContain("Meeting minutes are switched off");
   });
   it("does not analyze or draft on mount; requires review and explicit confirmation before drafting", async () => {
     const http = mockHttp();
     const m = mount(<MeetingMinutes id="mt_a" status="ended" api={meetingMinutesApi(http)} />);
     expect(http.postJson).not.toHaveBeenCalled();
-    await press(m.container, "Analyze minutes");
+    await press(m.container, "Wrap up");
     expect(http.postJson).toHaveBeenCalledWith("/v1/meetings/mt_a/analyze-minutes", {});
     expect(m.container.textContent).toContain("Agreed scope");
     expect(m.container.textContent).toContain("Check dates");
@@ -128,12 +128,12 @@ describe("FR_MTG_03_08 Park minutes owner flow", () => {
     await press(m.container, "Review minutes");
     expect(http.postJson).not.toHaveBeenCalled();
   });
-  it("hides controls when a route disappears; a denied owner never sees minutes", async () => {
+  it("shows an unavailable wrap-up state; a denied owner never sees minutes", async () => {
     const http = mockHttp();
     http.postJson.mockRejectedValue(new TiloApiError("Missing", 404, false));
     const m = mount(<MeetingMinutes id="mt_a" status="ended" api={meetingMinutesApi(http)} />);
-    await press(m.container, "Analyze minutes");
-    expect(m.container.textContent).toBe("");
+    await press(m.container, "Wrap up");
+    expect(m.container.textContent).toContain("Meeting minutes are switched off");
     expect(http.getJson).not.toHaveBeenCalled();
   });
   it("does not offer work on a scheduled or deleted meeting", () => {

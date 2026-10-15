@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { TiloApiError } from "../../../api/http";
+import { TiloApiError, displayApiError } from "../../../api/http";
 import type { DraftCard, MeetingMinutesApi, MinutesView } from "../../api/live/meetingMinutes";
 
 /** Explicit owner actions only. Confirmation and drafting are separate person decisions. */
@@ -16,14 +16,16 @@ export function MeetingMinutes({
   const [cards, setCards] = useState<DraftCard[]>([]);
   const [hidden, setHidden] = useState(false);
   if (hidden || !["ended", "minuted"].includes(status)) return null;
-  const run = async (action: () => Promise<void>) => {
+  const run = async (action: () => Promise<void>, wrapUp = false) => {
     setBusy(true);
     setError("");
     try {
       await action();
     } catch (e) {
-      if (e instanceof TiloApiError && e.status === 404) setHidden(true);
-      else setError("This step could not finish. Review the current meeting before trying again.");
+      if (wrapUp && e instanceof TiloApiError && [403, 404, 409].includes(e.status ?? 0))
+        setError("Meeting minutes are switched off");
+      else if (e instanceof TiloApiError && e.status === 404) setHidden(true);
+      else setError(displayApiError(e));
     } finally {
       setBusy(false);
     }
@@ -43,10 +45,10 @@ export function MeetingMinutes({
             void run(async () => {
               if (status === "ended") await api.analyze(id);
               await read();
-            })
+            }, status === "ended")
           }
         >
-          {status === "ended" ? "Analyze minutes" : "Review minutes"}
+          {status === "ended" ? (busy ? "Writing the minutes..." : "Wrap up") : "Review minutes"}
         </button>
       )}
       {minutes && (
@@ -121,11 +123,11 @@ export function MeetingMinutes({
           )}
         </>
       )}
-      {busy && <output>Working…</output>}
+      {busy && (minutes || status !== "ended") && <output>Working…</output>}
       {error && (
         <>
           <p role="alert">{error}</p>
-          {!minutes && (
+          {!minutes && status !== "ended" && (
             <button type="button" disabled={busy} onClick={() => void run(read)}>
               Review stored minutes
             </button>
