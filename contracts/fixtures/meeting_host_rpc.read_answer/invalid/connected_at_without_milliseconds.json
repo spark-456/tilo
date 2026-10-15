@@ -1,0 +1,28 @@
+{
+  "tool": "search_email",
+  "outcome": "ok",
+  "connected_at": "2026-10-01T08:00:00Z",
+  "result": {
+    "messages": [
+      {
+        "id": "18c2f0a9b7d4e611",
+        "thread_id": "18c2f0a9b7d4e600",
+        "sender": "Ana Example <ana@example.org>",
+        "subject": "Invoice 1042 for October",
+        "date": "2026-10-15T07:12:00.000Z",
+        "snippet": "Hi, please find the October invoice attached. Payment is due on the 31st.",
+        "unread": true
+      },
+      {
+        "id": "18c2e1f00a1b2c3d",
+        "thread_id": "18c2e1f00a1b2c00",
+        "sender": "Ben Example <ben@example.org>",
+        "subject": "Re: supplier visit",
+        "date": null,
+        "snippet": "Thursday at 4 works for us.",
+        "unread": false
+      }
+    ]
+  },
+  "parts": []
+}

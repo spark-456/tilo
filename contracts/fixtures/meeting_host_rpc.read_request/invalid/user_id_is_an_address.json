@@ -1,0 +1,7 @@
+{
+  "user_id": "ana@example.org",
+  "tool": "read_email",
+  "args": {
+    "message_id": "18c2f0a9"
+  }
+}

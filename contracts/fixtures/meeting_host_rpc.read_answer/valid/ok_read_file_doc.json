@@ -1,0 +1,14 @@
+{
+  "tool": "read_file",
+  "outcome": "ok",
+  "connected_at": "2026-10-01T08:00:00.000Z",
+  "result": {
+    "id": "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-",
+    "name": "Q3 plan",
+    "mime_type": "application/vnd.google-apps.document",
+    "text": "Q3 plan\n\nGoals: open the second store; hire two people; keep costs flat.",
+    "pdf_b64": null,
+    "truncated": false
+  },
+  "parts": []
+}

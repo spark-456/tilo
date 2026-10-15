@@ -1,0 +1,8 @@
+{
+  "user_id": "u_owner",
+  "tool": "read_events",
+  "args": {
+    "start": "2026-10-17T09:00:00.5Z",
+    "end": "2026-10-17T18:00Z"
+  }
+}

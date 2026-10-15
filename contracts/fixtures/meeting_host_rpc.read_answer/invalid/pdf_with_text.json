@@ -1,0 +1,14 @@
+{
+  "tool": "read_file",
+  "outcome": "ok",
+  "connected_at": "2026-10-01T08:00:00.000Z",
+  "result": {
+    "id": "1PdFfIlE0123456789",
+    "name": "Lease.pdf",
+    "mime_type": "application/pdf",
+    "text": "Lease",
+    "pdf_b64": "JVBERi0xLjcKJcTl8uXrp/Og0MTGCg==",
+    "truncated": false
+  },
+  "parts": []
+}
