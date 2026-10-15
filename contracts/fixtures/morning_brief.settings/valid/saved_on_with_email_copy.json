@@ -1,0 +1,10 @@
+{
+  "owner_id": "u_alex",
+  "org_id": "org_example",
+  "enabled": true,
+  "time": "07:00",
+  "time_zone": "Asia/Kolkata",
+  "email_copy": true,
+  "email_rule_ready": true,
+  "updated_at": "2026-10-16T02:45:00.000Z"
+}
