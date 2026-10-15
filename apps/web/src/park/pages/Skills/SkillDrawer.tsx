@@ -6,6 +6,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import type { Skill } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { type CurrencyCode, runMoney } from "../../app/ledgerKpis";
+import { handDraft } from "../../chat/handoff";
 import { Button } from "../../components";
 import { cx } from "../../components/cx";
 import { agent, icon } from "./skillsKit";
@@ -126,12 +127,32 @@ export function SkillDrawer({
           </button>
         </div>
         <div className="park-skill-drawer__body">
-          {skill.description ? (
-            <section className="park-skill-drawer__sec">
-              <h3 className="park-skill-drawer__h3">What it does</h3>
-              <p className="park-skill-drawer__p">{skill.description}</p>
-            </section>
-          ) : null}
+          <section className="park-skill-drawer__sec" aria-label="How Tilo uses this skill">
+            <h3 className="park-skill-drawer__h3">How Tilo uses this skill</h3>
+            {skill.description ? (
+              <p className="park-skill-drawer__p">
+                <strong>When Tilo picks it:</strong> {skill.description}
+              </p>
+            ) : null}
+            {skill.tools.length ? (
+              <p className="park-skill-drawer__p">
+                <strong>What it needs:</strong> {skill.tools.map(([tool]) => tool).join(", ")}
+              </p>
+            ) : null}
+            <Button
+              variant="secondary"
+              onClick={() => {
+                handDraft(`Help me with ${skill.name}.`);
+                onClose();
+                app.go("home");
+              }}
+            >
+              Try it
+            </Button>
+            <p className="park-skill-drawer__p">
+              Opens a draft on Home. Nothing starts until you choose.
+            </p>
+          </section>
           {skill.steps.length ? (
             <section className="park-skill-drawer__sec">
               <h3 className="park-skill-drawer__h3">Steps it follows</h3>
