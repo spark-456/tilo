@@ -1,11 +1,13 @@
 // Loads the Agenda through the Park Api and keeps its `source` (HR-1..HR-7): a NotBuilt rejection (the live
 // Api before its endpoint exists) is its own state, and the page shows "Not connected yet", never sample
 // pins. `useAgendaUi` holds the page's own UI state (the reference's `state`), seeded from the Api data.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Api } from "../../api/index";
+import { meetingBriefApi } from "../../api/live/meetingBrief";
 import { NotBuilt } from "../../api/liveApi";
 import type { Agenda, AgendaData, AgendaPin, AgendaSlot, Decision, Source } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
+import { useWorldClient } from "../../app/context";
 import {
   type BoardKey,
   DEFAULT_RULE,
@@ -48,6 +50,8 @@ export function useAgenda(api: Api): AgendaState {
 }
 
 export function useAgendaUi(A: Agenda, decisions: Decision[], app: AppCtx, api: Api) {
+  const http = useWorldClient();
+  const briefApi = useMemo(() => (http ? meetingBriefApi(http) : null), [http]);
   const [style, setStyle] = useState<"cork" | "soft">("cork");
   const [newVal, setNewVal] = useState<Record<BoardKey, string>>({ team: "", me: "" });
   const [pins, setPins] = useState<AgendaPin[]>(A.pins);
@@ -61,7 +65,6 @@ export function useAgendaUi(A: Agenda, decisions: Decision[], app: AppCtx, api: 
   const [finding, setFinding] = useState(false);
   const [booked, setBooked] = useState<AgendaSlot | null>(null);
   const [flags, setFlags] = useState<Flags>({});
-  const [briefed, setBriefed] = useState<Record<string, boolean>>({});
   const [done, setDone] = useState<Record<string, boolean>>({});
   const counter = useRef(0);
 
@@ -92,7 +95,7 @@ export function useAgendaUi(A: Agenda, decisions: Decision[], app: AppCtx, api: 
     openMeeting: (title: string) => app.toast(`The meeting page for ${title} is not connected yet`),
     booked,
     flags,
-    briefed,
+    briefApi,
     done,
     setDone: (id: string, on: boolean) => setDone((d) => ({ ...d, [id]: on })),
     dismiss: (id: string) => setPins((ps) => ps.filter((q) => q.id !== id)),
@@ -128,13 +131,13 @@ export function useAgendaUi(A: Agenda, decisions: Decision[], app: AppCtx, api: 
       if (k === "join") app.toast(cur ? "Tilo won’t join this one" : `Tilo will join ${title}`);
       if (k === "brief")
         app.toast(
-          cur ? `No brief before ${title}` : `Tilo will brief you 15 minutes before ${title}`,
+          cur
+            ? `Brief preference off for ${title}`
+            : `Automatic briefs are not available yet for ${title}`,
         );
     },
-    askBrief: (id: string, title: string) => {
-      setBriefed((b) => ({ ...b, [id]: true }));
-      setFlags((f) => ({ ...f, [`${id}:brief`]: true }));
-      app.toast(`Tilo will brief you 15 minutes before ${title}`);
+    askBrief: (_id: string, title: string) => {
+      app.toast(`Brief generation is not available in this sample for ${title}`);
     },
   };
 }

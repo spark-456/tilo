@@ -89,7 +89,7 @@ describe("WEB_9_agenda_copy: the designed text, verbatim", () => {
       "Turn action items into pins",
       "Pinned to the Team board with owners",
       "Brief before it starts",
-      "15 minutes ahead, in your inbox",
+      "Automatic briefs are not available yet",
     ])
       expect(d, s).toContain(s);
     expect(
@@ -202,12 +202,13 @@ describe("WEB_9_agenda_week: the calendar", () => {
     expect(text(detail(container))).toContain("No notes for this one.");
   });
 
-  it("FR_UX_16 WEB_9_agenda_ask_tilo_for_a_brief_and_the_switches", async () => {
+  it("MB_T2 FR_UX_16 WEB_9_agenda_ask_tilo_for_a_brief_and_the_switches", async () => {
     const { container, ...h } = await renderAgenda();
     click(event(container, "read"));
     click(byText(detail(container), "button", "Ask Tilo for a brief"));
-    toasted(h, "Tilo will brief you 15 minutes before Read Tilo’s brief");
-    expect(text(detail(container))).toContain("Queued · arrives 15 min before");
+    // MB-10: no T-15 sweep exists, so the sample action cannot claim a queued brief.
+    toasted(h, "Brief generation is not available in this sample for Read Tilo’s brief");
+    expect(text(detail(container))).not.toContain("Queued · arrives");
     click(event(container, "sync"));
     click(q(detail(container), '[role="switch"]'));
     toasted(h, "Tilo won’t join this one");

@@ -210,7 +210,7 @@ export function Week({ A, ui, app }: { A: Agenda; ui: AgendaUi; app: AppCtx }) {
         style={{ gridTemplateColumns: app.vw >= 1100 ? "minmax(0,1fr) 340px" : "minmax(0,1fr)" }}
       >
         <Calendar A={A} EV={EV} ui={ui} app={app} />
-        <Detail vm={detailOf(A, EV, ui.sel, ui.flags, ui.briefed, app.dec)} ui={ui} app={app} />
+        <Detail vm={detailOf(A, EV, ui.sel, ui.flags, app.dec)} ui={ui} app={app} />
       </div>
     </section>
   );

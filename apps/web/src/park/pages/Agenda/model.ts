@@ -306,14 +306,7 @@ export interface DetailVm {
   toggles: [string, string, boolean, "join" | "pins" | "brief"][];
 }
 
-export function detailOf(
-  A: Agenda,
-  EV: Ev[],
-  sel: string,
-  flags: Flags,
-  briefed: Record<string, boolean>,
-  dec: Dec,
-): DetailVm {
+export function detailOf(A: Agenda, EV: Ev[], sel: string, flags: Flags, dec: Dec): DetailVm {
   const e = EV.find((x) => x.id === sel) ?? EV.find((x) => x.brief) ?? EV[0];
   if (!e) throw new Error("the Agenda has no events");
   // A series ("su1", "su2" ...) shares the detail keyed by its stem ("su").
@@ -325,14 +318,13 @@ export function detailOf(
       people: ["AM"],
     };
   const days = A.days.concat(A.wkend);
-  const wasBriefed = !!briefed[e.id];
   const flag = (k: string, def: boolean) => flags[`${e.id}:${k}`] ?? def;
   // The brief switch decides whether a brief is claimed: off, there is none to show and none is queued.
-  const briefOn = flag("brief", !!det.brief || wasBriefed);
+  const briefOn = flag("brief", !!det.brief);
   const joins = joinsOf(e, flags);
   let brief = det.brief ?? [
-    "Tilo will gather the latest emails, docs and notes for this meeting.",
-    "You’ll get it 15 minutes before it starts.",
+    "No brief has been made for this meeting.",
+    "Ask Tilo to make one when you need it.",
   ];
   for (const r of A.rules?.briefRewrites ?? [])
     if (r.event === e.id && dec[r.dec])
@@ -343,10 +335,10 @@ export function detailOf(
     det,
     when: `${days[e.d]}${month ? ` ${month}` : ""} · ${fmt(e.s)}–${fmt(e.e)}${e.cal === "booked" ? " · booked by Tilo" : ""}`,
     calLabel: CAL[e.cal][0] + (e.cal === "tilo" || e.cal === "booked" ? "" : " · Google Calendar"),
-    hasBrief: !e.past && briefOn,
+    hasBrief: !e.past && briefOn && !!det.brief,
     brief,
-    briefMeta: det.briefMeta ?? "Queued · arrives 15 min before",
-    needsBrief: !e.past && !briefOn && !e.tiloOnly,
+    briefMeta: det.briefMeta ?? "No automatic brief is scheduled",
+    needsBrief: !e.past && (!det.brief || !briefOn) && !e.tiloOnly,
     past: !!e.past && !!det.notes,
     empty: !!e.past && !det.notes,
     upcoming: !e.past && !e.tiloOnly,
@@ -364,7 +356,7 @@ export function detailOf(
         flag("pins", true),
         "pins",
       ],
-      ["Brief before it starts", "15 minutes ahead, in your inbox", briefOn, "brief"],
+      ["Brief before it starts", "Automatic briefs are not available yet", briefOn, "brief"],
     ],
   };
 }

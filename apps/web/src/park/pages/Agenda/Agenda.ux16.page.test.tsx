@@ -99,43 +99,44 @@ describe("FR_UX_16 the brief switch decides whether Tilo briefs", () => {
     const { container, ...h } = await renderAgenda();
     click(sw(container, BRIEF));
     expect(sw(container, BRIEF).getAttribute("aria-checked")).toBe("false");
-    expect(h.toast()).toBe("No brief before Supplier sync · Northline");
+    expect(h.toast()).toBe("Brief preference off for Supplier sync · Northline");
     const d = text(detail(container));
     expect(d).not.toContain("TILO’S BRIEF");
     expect(d).not.toContain("From 14 emails · 08:10");
     expect(d).not.toContain("Northline wants 60-day payment terms");
     expect(d).not.toContain("arrives 15 min before");
-    // The switch is not the only way back: the same ask as for any meeting with no brief.
+    // MB-10: the sample ask cannot queue an automatic brief.
     click(byText(detail(container), "button", "Ask Tilo for a brief"));
-    expect(sw(container, BRIEF).getAttribute("aria-checked")).toBe("true");
-    expect(h.toast()).toBe("Tilo will brief you 15 minutes before Supplier sync · Northline");
-    expect(text(detail(container))).toContain("TILO’S BRIEF");
-    expect(text(detail(container))).toContain("From 14 emails · 08:10");
+    expect(sw(container, BRIEF).getAttribute("aria-checked")).toBe("false");
+    expect(h.toast()).toBe(
+      "Brief generation is not available in this sample for Supplier sync · Northline",
+    );
+    expect(text(detail(container))).not.toContain("TILO’S BRIEF");
   });
 
   it("FR_UX_16 on again with the switch: the brief comes back and the toast says so", async () => {
     const { container, ...h } = await renderAgenda();
     click(sw(container, BRIEF));
     click(sw(container, BRIEF));
-    expect(h.toast()).toBe("Tilo will brief you 15 minutes before Supplier sync · Northline");
+    expect(h.toast()).toBe("Automatic briefs are not available yet for Supplier sync · Northline");
     expect(text(detail(container))).toContain("TILO’S BRIEF");
     expect(qa(detail(container), "button").map((b) => b.textContent)).not.toContain(
       "Ask Tilo for a brief",
     );
   });
 
-  it("FR_UX_16 turning the switch on for a meeting with no brief queues one, as asking does", async () => {
+  it("FR_UX_16 MB_10 turning on a sample switch does not invent a brief", async () => {
     const { container } = await renderAgenda();
     click(chip(container, "jin"));
     expect(sw(container, BRIEF).getAttribute("aria-checked")).toBe("false");
     expect(text(detail(container))).not.toContain("TILO’S BRIEF");
     click(sw(container, BRIEF));
-    expect(text(detail(container))).toContain("TILO’S BRIEF");
-    expect(text(detail(container))).toContain("Queued · arrives 15 min before");
-    expect(qa(detail(container), "button").map((b) => b.textContent)).not.toContain(
+    expect(text(detail(container))).not.toContain("TILO’S BRIEF");
+    expect(text(detail(container))).not.toContain("Queued · arrives 15 min before");
+    expect(qa(detail(container), "button").map((b) => b.textContent)).toContain(
       "Ask Tilo for a brief",
     );
-    // Off again: the queue claim goes away.
+    // Off again: still no brief has been made.
     click(sw(container, BRIEF));
     expect(text(detail(container))).not.toContain("Queued · arrives 15 min before");
     expect(text(detail(container))).not.toContain("TILO’S BRIEF");
