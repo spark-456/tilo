@@ -40,3 +40,9 @@ def test_CX_PUBLIC_SNAPSHOT_redacts_internal_references_in_text():
     for marker in (r"C:\Users", "agy-bridge/", ".claude/", "support.js"):
         assert marker not in cleaned
     assert "<local-home>" in cleaned
+
+
+def test_CX_PUBLIC_SNAPSHOT_redacts_placeholder_windows_home():
+    cleaned = export_public.sanitize_text(r"Create C:\Users\<you>\.wslconfig")
+    assert r"C:\Users" not in cleaned
+    assert "<local-home>" in cleaned

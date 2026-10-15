@@ -75,7 +75,7 @@ def excluded(name: str) -> bool:
 
 def sanitize_text(value: str) -> str:
     """Remove machine-specific and private-workflow references from exported text."""
-    value = re.sub(r"C:[/\\]+Users[/\\]+[^/\\\s`'\"<>:]+", "<local-home>", value, flags=re.I)
+    value = re.sub(r"C:[/\\]+Users[/\\]+(?:<[^>]+>|[^/\\\s`'\"<>:]+)", "<local-home>", value, flags=re.I)
     value = re.sub(r"agy-bridge[/\\]", "<private-workflow>/", value, flags=re.I)
     value = re.sub(r"\.claude[/\\]", "<private-tooling>/", value, flags=re.I)
     return re.sub(r"support\.js", "external-design-runtime", value, flags=re.I)
