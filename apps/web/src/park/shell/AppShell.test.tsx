@@ -18,6 +18,7 @@ import {
   seen,
   settle,
 } from "../../../test-support/park/shellHarness";
+import { wideWindow } from "../../../test-support/park/wideWindow";
 import { ParkApp } from "../app/ParkApp";
 import { AppShell } from "./AppShell";
 
@@ -162,6 +163,7 @@ describe("WEB_3b_parkapp: the real ParkApp wears the shell", () => {
   });
 
   it("WEB_3b_parkapp_a_tab_click_changes_the_page_and_the_current_tab_without_a_load", async () => {
+    wideWindow();
     const m = await visit("/park/home");
     const ledger = qa<HTMLAnchorElement>(m.container, "header nav a").find((a) =>
       (a.textContent ?? "").startsWith("Ledger"),
@@ -183,12 +185,13 @@ describe("WEB_3b_parkapp: the real ParkApp wears the shell", () => {
     ]);
   });
 
-  it("WEB_3b_parkapp_the_Worlds_badge_reads_2", async () => {
+  // STUDIO-4: the count sits on the Needs you tab (design "Tilo S Nav").
+  it("WEB_3b_parkapp_the_Needs_you_badge_reads_2", async () => {
     const m = await visit("/park/home");
     const worlds = qa(m.container, "header nav a").find((a) =>
-      (a.textContent ?? "").startsWith("Worlds"),
+      (a.textContent ?? "").startsWith("Needs you"),
     );
-    expect(worlds?.textContent).toBe("Worlds2");
+    expect(worlds?.textContent).toBe("Needs you2");
   });
 
   it("WEB_3b_parkapp_the_day_night_button_flips_data_time_on_the_one_root", async () => {

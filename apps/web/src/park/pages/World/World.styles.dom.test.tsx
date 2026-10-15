@@ -77,21 +77,20 @@ describe("WEB_6_world_styles_dom: the sheet and the title", () => {
     expect(norm(d.get("border"))).toBe("1px solid var(--gbd)");
   });
 
-  it("WEB_6_world_styles_dom_the_h1_is_Nunito_900_36px_tracking_minus_0_8_line_1_05", async () => {
+  // STUDIO-3: the Studio h1 ("Tilo S World": 34px 700, tracking -0.6, line 1.15; the family is the theme's Geist).
+  it("STUDIO_3_world_styles_dom_the_h1_is_700_34px_tracking_minus_0_6_line_1_15", async () => {
     const { el } = await mountWorld();
     const d = declared(q(el, "h1"), RULES());
-    expect(px(d, "font-size")).toBe(36);
-    expect(norm(d.get("font-weight"))).toBe("900");
-    expect(norm(d.get("letter-spacing"))).toBe("-.8px");
-    expect(norm(d.get("line-height"))).toBe("1.05");
+    expect(px(d, "font-size")).toBe(34);
+    expect(norm(d.get("font-weight"))).toBe("700");
+    expect(norm(d.get("letter-spacing"))).toBe("-.6px");
+    expect(norm(d.get("line-height"))).toBe("1.15");
     expect(norm(d.get("margin"))).toBe("0");
-    expect(norm(d.get("font-family"))).toContain("nunito");
-    expect(norm(d.get("font-family"))).not.toContain("nunito sans");
   });
 });
 
 describe("WEB_6_world_styles_dom: the buttons", () => {
-  it("WEB_6_world_styles_dom_Pause_and_Share_are_h42_r12_secondary", async () => {
+  it("WEB_6_world_styles_dom_Pause_is_h42_r12_secondary", async () => {
     const { el } = await mountWorld();
     const want: Look = {
       height: 42,
@@ -102,17 +101,20 @@ describe("WEB_6_world_styles_dom: the buttons", () => {
       gap: 8,
     };
     check("Pause", control(el, "Pause"), want);
-    check("Share", control(el, "Share"), want);
   });
 
-  it("WEB_6_world_styles_dom_Open_live_view_is_h42_0_18_hero_on_white", async () => {
+  // STUDIO-3: the header holds one quiet outlined control per action ("Tilo S World" secBtn: h44 r14 15/800).
+  it("STUDIO_3_world_styles_dom_Open_live_view_is_h44_0_18_outlined_on_card", async () => {
     const { el } = await mountWorld();
     check("Open live view", control(el, "Open live view"), {
-      height: 42,
+      height: 44,
       pad: [0, 18, 0, 18],
-      radius: 12,
-      font: 14.5,
-      ...LOOK.hero,
+      radius: 14,
+      font: 15,
+      weight: "800",
+      bg: "var(--card)",
+      color: "var(--ink)",
+      border: "1px solid var(--linestrong)",
       gap: 8,
     });
   });

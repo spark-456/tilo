@@ -354,6 +354,7 @@
 [data-park] .park-team-more[aria-expanded="true"] {
   background: var(--chip);
 }
+[data-park] .park-team-matrix:focus-visible,
 [data-park] .park-team-select:focus-visible,
 [data-park] .park-team-more:focus-visible,
 [data-park] .park-team-btn:focus-visible {
@@ -651,5 +652,183 @@
   [data-park] .park-team-sub {
     white-space: normal;
     overflow-wrap: anywhere;
+  }
+}
+
+/* ---- UI-STUDIO-5: the live page's two columns, directory table, side cards and helpers (Studio look in
+   Team.studio.css) ---- */
+[data-park] .park-team-studio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
+  gap: 24px;
+  align-items: start;
+}
+[data-park] .park-team-main,
+[data-park] .park-team-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+[data-park] .park-team-directory {
+  padding: 0;
+  overflow: hidden;
+}
+[data-park] .park-team-dirtable {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 14.5px;
+}
+[data-park] .park-team-dirhead th {
+  padding: 14px 20px;
+  background: var(--sunk);
+  color: var(--ink3);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+[data-park] .park-team-dirrow td {
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+  color: var(--ink2);
+  vertical-align: middle;
+}
+[data-park] .park-team-dirwho {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: var(--ink);
+}
+[data-park] .park-team-dirnote {
+  margin: 0;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+  color: var(--ink3);
+}
+[data-park] .park-team-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--line2);
+  border-radius: 24px;
+  background: var(--card);
+  color: var(--ink);
+}
+[data-park] .park-team-sidetitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+}
+[data-park] .park-team-sidetitle.park-team-sidetitle--sm {
+  font-size: 15px;
+}
+[data-park] .park-team-sideline,
+[data-park] .park-team-sidenote {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink2);
+}
+[data-park] .park-team-alwayslist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-team-always {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--sunk);
+  line-height: 1.3;
+}
+[data-park] .park-team-alwaystitle {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+[data-park] .park-team-alwayssub {
+  font-size: 13px;
+  color: var(--ink3);
+}
+[data-park] .park-team-summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-park] .park-team-helpers {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+[data-park] .park-team-helpershead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+[data-park] .park-team-helperstitle {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+}
+[data-park] .park-team-helpersnote {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+[data-park] .park-team-helpergrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-team-helper {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
+}
+[data-park] .park-team-helperart {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  flex: none;
+}
+[data-park] .park-team-helpertext {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+[data-park] .park-team-helpername {
+  font-size: 16px;
+  font-weight: 800;
+}
+[data-park] .park-team-helperwhat {
+  font-size: 13.5px;
+  color: var(--ink3);
+}
+@media (max-width: 1099px) {
+  [data-park] .park-team-studio {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

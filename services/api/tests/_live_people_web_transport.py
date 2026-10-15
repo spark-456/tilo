@@ -9,6 +9,9 @@ from _ppl11a_lib import Rig
 patch = pytest.MonkeyPatch()
 rig = Rig(patch)
 rig.as_user("u_web_founder")
+rig.email = (
+    "founder@example.test"  # the address the web test signs in with: /v1/people/first stores only the verified one
+)
 rig.unwire("founder_gate")
 patch.setenv("TILO_PEOPLE_BOOTSTRAP_UID", "u_web_founder")
 print(json.dumps({"ready": True}), flush=True)

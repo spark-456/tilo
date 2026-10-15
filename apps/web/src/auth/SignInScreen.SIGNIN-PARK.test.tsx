@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
-// SIGNIN-PARK: the sign-in screen matches the user's target (a glass card over the Park city): the copy, the two
-// real buttons, the legal links and the theme toggle. Tilo never handles passwords: no field and no form (PRD 16.1).
+// SIGNIN-PARK: the sign-in screen: the copy, the two real buttons, the legal links and the theme toggle. Tilo never
+// handles passwords: no field and no form (PRD 16.1). STUDIO-6 moved it to the Studio landing (heading, lead, the
+// light/dark toggle and the header's on-page links changed; the buttons, the demo line and the legal line did not).
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, click, mount, q, qa } from "../../test-support/park/componentsHarness";
 import { SignInScreen } from "./SignInScreen";
@@ -31,12 +32,9 @@ const button = (re: RegExp) =>
 describe("SIGNIN-PARK the sign-in screen", () => {
   it("SIGNIN-PARK shows the heading, the lead, the demo line and the legal line from the design", () => {
     screen();
-    expect(q(document.body, "h1")?.textContent).toBe("Sign in to your city");
-    expect(text()).toContain(
-      "Your agents keep working while you’re away. Sign in to see what needs you.",
-    );
+    expect(q(document.body, "h1")?.textContent).toBe("Describe the work. Watch your team do it.");
+    expect(text()).toContain("Plain words in.");
     expect(text()).toContain("A sample company to explore. Demo sessions replay recorded runs.");
-    expect(text()).toContain("OR");
   });
 
   it("SIGNIN-PARK Continue with Google and Explore a demo session are real buttons that start their sign-in once", () => {
@@ -61,6 +59,12 @@ describe("SIGNIN-PARK the sign-in screen", () => {
       a.getAttribute("href"),
     ]);
     expect(hrefs).toEqual([
+      ["How it works", "#how"],
+      ["Skills", "#skills"],
+      ["Meetings", "#meetings"],
+      ["Teams", "#teams"],
+      ["Connectors", "#connectors"],
+      ["Why Tilo", "#why"],
       ["Terms", "/terms"],
       ["Privacy Policy", "/privacy"],
     ]);
@@ -73,13 +77,13 @@ describe("SIGNIN-PARK the sign-in screen", () => {
     );
   });
 
-  it("SIGNIN-PARK the theme toggle switches between the day and the night city", () => {
+  it("SIGNIN-PARK the theme toggle switches between light and dark", () => {
     screen();
     const root = q(document.body, '[data-testid="sign-in"]') as HTMLElement;
     expect(root.dataset.time).toBe("day");
-    click(button(/night city/i) as HTMLElement);
+    click(button(/switch to dark/i) as HTMLElement);
     expect(root.dataset.time).toBe("night");
-    click(button(/day city/i) as HTMLElement);
+    click(button(/switch to light/i) as HTMLElement);
     expect(root.dataset.time).toBe("day");
   });
 });

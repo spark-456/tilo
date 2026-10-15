@@ -7,6 +7,7 @@ import type { RunEvent } from "./useRunEvents";
 export type RunPhase =
   | "none"
   | "planning"
+  | "starting"
   | "ready"
   | "working"
   | "waiting"
@@ -34,6 +35,8 @@ export interface RunView {
 
 const ASSUMED = /^\s*assumed\s*:\s*(.+)$/is;
 const UNIT_EVENT = /^(agent\.(assigned|working)|building\.(constructing|operational))$/;
+// Recorded after the questions: the person answered, took the defaults or approved the run.
+const PROCEEDED = /^(question\.answered|approval\.resolved|budget\.granted|plan\.revised)$/;
 const ACTIVITY = /^(agent|building|skill|data|artifact|approval|connection|meeting)\./;
 
 const objectOf = (data: unknown): Record<string, unknown> =>
@@ -100,7 +103,7 @@ export function runView(events: readonly RunEvent[]): RunView {
     const all = total === null ? "" : `. All ${plural(total, "step", "steps")} finished`;
     const out =
       made > 0
-        ? `, ${plural(made, "deliverable", "deliverables")} ready below`
+        ? `, ${plural(made, "deliverable", "deliverables")} ready in the Result tab`
         : ", nothing was delivered";
     return {
       ...base,
@@ -129,6 +132,15 @@ export function runView(events: readonly RunEvent[]): RunView {
       };
     }
     const asked = last("plan.questions_asked");
+    if (asked && events.slice(events.lastIndexOf(asked) + 1).some((e) => PROCEEDED.test(e.type))) {
+      // Answered, defaulted or approved: the run is not waiting for answers (HR-1), it is about to start.
+      return {
+        ...base,
+        phase: "starting",
+        percent: null,
+        line: "Starting: the team is getting ready.",
+      };
+    }
     if (asked) {
       const n = Number(objectOf(asked.data).question_count) || 1;
       return {
@@ -153,6 +165,9 @@ export function runView(events: readonly RunEvent[]): RunView {
       percent,
       line: `Waiting for you: ${plural(open, "decision", "decisions")}.${goes}`,
     };
+  }
+  if (!events.some((e) => e.type.startsWith("agent."))) {
+    return { ...base, phase: "working", percent, line: "Starting: the team is getting ready." };
   }
   const head = step || "Working";
   return {

@@ -4,14 +4,15 @@
 //   README "Skills" items 1 and 2, inventory.md "Tilo App Skills.dc.html" (static copy and labelled regions).
 // Strings keep the design's typographic quotes and apostrophes. Nothing here is bundled.
 
+/** STUDIO-4 (design/studio-v2 "Tilo S Skills"). */
 export const INTRO =
-  "Teach your agents new work, help them get better, and choose which tools they may touch. Every repeat of a skill gets faster and cheaper.";
+  "Things your helpers already know how to do. Open one to see its steps, or teach Tilo something new.";
 export const CARD_TITLE = "Teach Tilo something new";
 export const CARD_SUB =
   "Show it once. Tilo repeats it, you check the result, and it becomes a skill your agents can reuse.";
 
-/** The step bar, in order. */
-export const STEP_LABELS = ["Show it", "Tilo’s version", "Try run", "Save"] as const;
+/** The step bar, in order (STUDIO-4: the 3-step wizard). */
+export const STEP_LABELS = ["Describe it", "Show an example", "Review the steps"] as const;
 
 export const DEFAULT_NAME = "Log new supplier invoices";
 export const DEFAULT_DESC =

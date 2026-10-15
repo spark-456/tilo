@@ -22,6 +22,7 @@ import { icon } from "./icons";
 import { BOARDS, boardLimits } from "./model";
 import { useAgenda, useAgendaUi } from "./useAgenda";
 import "./Agenda.css";
+import "./Agenda.studio.css";
 
 export interface AgendaPageProps {
   app: AppCtx;
@@ -174,35 +175,71 @@ function Plate({ A }: { A: LiveAgenda }) {
     ) : (
       <p>{empty}</p>
     );
+  // UI-STUDIO-5 (design/studio-v2 "Tilo S Agenda"): today and the meetings on the left; the brief and Tilo's
+  // suggestions on the right. Only what the plate, meetings and pinboard reads send is shown; the parts with no
+  // read yet (a week grid, a prepared brief, suggested times, boards) say "Not available yet".
   return (
     <>
       <div className="park-agenda-titles">
         <h1 className="park-agenda-title">Agenda</h1>
-        <p className="park-agenda-lede">{A.plate.today}</p>
+        <p className="park-agenda-lede">
+          Tilo prepares a brief before each meeting and takes notes in the ones you invite it to.
+        </p>
+        <p className="park-agenda-date">{A.plate.today}</p>
       </div>
-      <section aria-label="Your plate" className="park-agenda-state">
-        <h2>Your plate</h2>
-        {list(
-          A.plate.rows.filter((r) => !isCalendarEntry(r)),
-          "Nothing on your plate",
-        )}
-        {A.plate.truncated ? <p>Showing a limited list.</p> : null}
-      </section>
-      <section aria-label="Today's calendar" className="park-agenda-state">
-        <h2>Today's calendar</h2>
-        {list(A.plate.rows.filter(isCalendarEntry), "No calendar entries for today.")}
-      </section>
-      <section aria-label="Parked work" className="park-agenda-state">
-        <h2>Parked work</h2>
-        {list(A.plate.parked, "No parked work.")}
-      </section>
-      <PeopleLists />
-      {["Boards", "Week view", "Event details", "Available times"].map((name) => (
-        <section key={name} aria-label={name} className="park-agenda-state">
-          <h2>{name}</h2>
-          <p>Not available yet</p>
-        </section>
-      ))}
+      <div className="park-agenda-studio">
+        <div className="park-agenda-studiomain">
+          <section aria-label="Today's calendar" className="park-agenda-state park-agenda-daycard">
+            <h2>Today's calendar</h2>
+            {list(A.plate.rows.filter(isCalendarEntry), "No calendar entries for today.")}
+            <section aria-label="Week view" className="park-agenda-weeknote">
+              <h3>Week view</h3>
+              <p>Not available yet</p>
+            </section>
+          </section>
+          <section aria-label="Your plate" className="park-agenda-state">
+            <h2>Your plate</h2>
+            {list(
+              A.plate.rows.filter((r) => !isCalendarEntry(r)),
+              "Nothing on your plate",
+            )}
+            {A.plate.truncated ? <p>Showing a limited list.</p> : null}
+          </section>
+          <PeopleLists />
+          <section aria-label="Parked work" className="park-agenda-state">
+            <h2>Parked work</h2>
+            {list(A.plate.parked, "No parked work.")}
+          </section>
+        </div>
+        <aside className="park-agenda-studioside">
+          {SIDE.map(([label, title, line]) => (
+            <section
+              key={label}
+              aria-label={label}
+              className="park-agenda-state park-agenda-sidecard"
+            >
+              <h2>{title}</h2>
+              <p className="park-agenda-sidena">Not available yet</p>
+              <p>{line}</p>
+            </section>
+          ))}
+        </aside>
+      </div>
     </>
   );
 }
+
+/** The design's side panels with no read behind them yet: `[region, heading, what it will hold]`. */
+const SIDE: readonly (readonly [string, string, string])[] = [
+  [
+    "Event details",
+    "Tilo’s brief",
+    "Before a meeting Tilo joins, its brief for that meeting shows here.",
+  ],
+  [
+    "Available times",
+    "Tilo suggests",
+    "Times and focus blocks Tilo suggests show here to accept or dismiss.",
+  ],
+  ["Boards", "Boards", "The pinboard view shows here. Pinboard items are listed under Pinboards."],
+];

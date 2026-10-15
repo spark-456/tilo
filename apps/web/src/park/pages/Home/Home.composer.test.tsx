@@ -84,7 +84,8 @@ describe("WEB_4_home_composer: idle", () => {
     cleanup();
     const phone = await mountHome({ app: { vw: 390 } });
     const placeholder = taskInput(phone.el).placeholder;
-    expect(placeholder).toBe("e.g. Summarise this week’s feedback");
+    // POLISH-1: the phone drops "e.g. " as well, so the whole example fits the 390px box.
+    expect(placeholder).toBe("Summarise this week’s feedback");
     expect(placeholder.length).toBeLessThan(`e.g. ${QUICK.example}`.length);
   });
 

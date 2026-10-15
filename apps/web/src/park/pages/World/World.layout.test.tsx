@@ -11,7 +11,8 @@ import { mountWorld, topGridColumns } from "../../../../test-support/park/worldH
 
 afterEach(cleanup);
 
-const WIDE = "minmax(0,1.7fr)minmax(300px,1fr)";
+// STUDIO-3 ("Tilo S World.dc.html"): the city takes 3 parts and the tabs 2.
+const WIDE = "minmax(0,3fr)minmax(0,2fr)";
 const ONE = "minmax(0,1fr)";
 
 describe("WEB_6_world_layout: the top grid", () => {

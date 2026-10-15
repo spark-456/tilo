@@ -9,6 +9,9 @@ export interface PeopleRow {
   scope: string | null;
   setter: string | null;
   personalUser: string | null;
+  /** Meetings only (FR-MTG-09): `bot` is a Tilo-hosted one; `end` is the scheduled end. */
+  source: string | null;
+  end: string | null;
 }
 export interface PeopleList {
   rows: PeopleRow[];
@@ -37,6 +40,7 @@ export function peopleListFromReply(v: unknown, kind: "meetings" | "pinboards"):
     let scope: string | null = null;
     let setter: string | null = null;
     let personalUser: string | null = null;
+    let end: string | null = null;
     if (kind === "meetings") {
       if (
         !["scheduled", "joining", "live", "ended", "minuted", "discarded", "deleted"].includes(
@@ -47,6 +51,7 @@ export function peopleListFromReply(v: unknown, kind: "meetings" | "pinboards"):
       if (r.scheduled !== null) {
         if (!object(r.scheduled) || !text(r.scheduled.start)) throw bad();
         at = r.scheduled.start;
+        end = text(r.scheduled.end) ? r.scheduled.end : null;
       }
     } else {
       if (
@@ -62,7 +67,19 @@ export function peopleListFromReply(v: unknown, kind: "meetings" | "pinboards"):
       setter = text(r.set_up_by) ? r.set_up_by : null;
       personalUser = r.scope.kind === "personal" ? String(r.scope.user) : null;
     }
-    return { id: r.id, title: r.title, status: r.status, at, body, scope, setter, personalUser };
+    const source = kind === "meetings" && text(r.source) ? r.source : null;
+    return {
+      id: r.id,
+      title: r.title,
+      status: r.status,
+      at,
+      body,
+      scope,
+      setter,
+      personalUser,
+      source,
+      end,
+    };
   });
   if (new Set(rows.map((r) => r.id)).size !== rows.length) throw bad();
   return {

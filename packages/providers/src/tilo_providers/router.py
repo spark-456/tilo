@@ -4,7 +4,9 @@ recorded for the PRD 9.3 trace. Error policy and stream rules: packages/provider
 
 from __future__ import annotations
 
+import contextvars
 import json
+import threading
 import time
 from collections.abc import Callable, Collection, Iterator
 from contextlib import contextmanager
@@ -18,6 +20,7 @@ from tilo_providers.byok import CredentialRefused, OrgBinding
 from tilo_providers.config import ProvidersConfig
 from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import (
+    AttemptTimeoutError,
     MissingCapabilityError,
     OutputTruncatedError,
     ProviderError,
@@ -70,6 +73,9 @@ class TokenCapExceededError(RouterError): ...  # EFF-03: over max_input_tokens e
 
 
 class RouterExhaustedError(RouterError): ...  # every candidate failed, or none has the required capability
+
+
+class RouterDeadlineError(RouterExhaustedError): ...  # the caller's `Deadline` passed before any candidate answered
 
 
 # PL-03, no fallback: a request rejected as such, a stream or embed blocked on safety grounds, a stream that
@@ -176,6 +182,10 @@ def _fail(run: RouterResult, attempt: RouterAttempt, error: Exception, *, output
 
 
 def _exhausted(run: RouterResult) -> RouterError:
+    if (
+        run.attempts and run.attempts[-1].error_type == AttemptTimeoutError.__name__
+    ):  # the last candidate ran out of time
+        return RouterDeadlineError(f"PL-03: role {run.role_id!r} ran out of time", run.attempts)
     if run.attempts and run.attempts[-1].error_type == "BudgetExceededError":  # the budget ended the run
         message = f"PL-03: role {run.role_id!r} has no candidate left that fits the remaining budget"
         return BudgetExceededError(message, run.attempts)
@@ -183,6 +193,48 @@ def _exhausted(run: RouterResult) -> RouterError:
         message = f"EFF-03: role {run.role_id!r} is over max_input_tokens for every candidate"
         return TokenCapExceededError(message, run.attempts)
     return RouterExhaustedError(f"PL-03: role {run.role_id!r} exhausted every candidate", run.attempts)
+
+
+@dataclass(frozen=True)
+class Deadline:
+    """An overall time limit for one `Router.generate` call (NFR-03, live defect 15 Oct 2026: a 503 on the primary made
+    an intake outlast the web's wait). No attempt starts after `at`; a candidate that has others behind it waits at most
+    `first_share` of what is left, the last one all of it, so a hung primary hands over to the fallback in time."""
+
+    at: float  # time.monotonic()
+    first_share: float
+
+    @classmethod
+    def after(cls, seconds: float, first_share: float) -> Deadline:
+        return cls(time.monotonic() + seconds, first_share)
+
+    def remaining(self) -> float:
+        return self.at - time.monotonic()
+
+
+def _within[T](seconds: float | None, call: Callable[[], T]) -> T:
+    """Runs `call`, giving up after `seconds` (None: on this thread, no limit). The abandoned call finishes on its own
+    daemon thread and its answer is dropped (never charged or kept), like a client that hung up."""
+    if seconds is None:
+        return call()
+    box: list[Any] = []
+    context = contextvars.copy_context()
+
+    def run() -> None:
+        try:
+            box.append((True, context.run(call)))
+        except BaseException as error:  # noqa: BLE001 - re-raised on the caller's thread
+            box.append((False, error))
+
+    worker = threading.Thread(target=run, name="router-attempt", daemon=True)
+    worker.start()
+    worker.join(seconds)
+    if not box:
+        raise AttemptTimeoutError(f"PL-03: no answer within {seconds:.1f}s")
+    ok, value = box[0]
+    if ok:
+        return value  # type: ignore[no-any-return]
+    raise value
 
 
 def _embed_inputs(request: Any) -> list[str]:
@@ -478,18 +530,27 @@ class Router:
         confidence: Callable[[GenerateResponse], float] | None = None,
         confidence_threshold: float | None = None,
         tool_outputs: list[str] | None = None,
+        deadline: Deadline | None = None,
     ) -> RouterResult:
         run = self._start(role_id, request, tool_outputs, required_capability, budget)
         threshold, schema, reason = confidence_threshold or 0.0, run.request.response_schema, None
         for profile_id in run.candidates:  # EFF-02: cheapest first
             prompt: str | None = None  # None: the role's own input; else the one schema-repair prompt
             for is_repair in (False, True):
+                wait = None  # no deadline: no limit
+                if deadline is not None:
+                    left = deadline.remaining()
+                    if left <= 0:
+                        raise RouterDeadlineError(
+                            f"PL-03: role {role_id!r} ran out of time", run.attempts
+                        ) from run.last_error
+                    wait = left if profile_id == run.candidates[-1] else left * deadline.first_share
                 try:
                     with self._candidate(run, profile_id, reason) as attempt:
                         provider = self._provider(role_id, profile_id)
                         sent, estimate, attempt.ceiling_credits = self._prepare(run, profile_id, provider, prompt)
                         attempt.quoted_credits = estimate
-                        response = provider.generate(sent)
+                        response = _within(wait, lambda: provider.generate(sent))
                 except RouterSafetyError:  # a safety outcome, never a silent fallback
                     return replace(run, outcome="safety_blocked")
                 if attempt.error_type:

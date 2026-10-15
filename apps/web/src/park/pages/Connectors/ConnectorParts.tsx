@@ -84,6 +84,7 @@ export function ConnectedTile({ c, onOpen }: { c: Merged; onOpen: () => void }) 
           {syncLine(c)}
         </span>
         <span className="park-connectors-used">{usedLine(c)}</span>
+        <span className="park-connectors-manage">Manage</span>
       </span>
     </button>
   );

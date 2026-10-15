@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="position:relative;width:100%;min-height:100%;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:16px;line-height:1.5">
+  <dc-import name="Tilo S Nav" active="settings" theme="{{ theme }}" hint-size="100%,72px"></dc-import>
+  <main style="max-width:1232px;margin:0 auto;padding:48px 32px 64px;display:grid;grid-template-columns:240px minmax(0,1fr);gap:40px;align-items:start">
+    <nav style="display:flex;flex-direction:column;gap:2px">
+      <h1 style="margin:0 0 16px;font-family:var(--fH);font-weight:700;font-size:36px;letter-spacing:-1.4px">Settings</h1>
+      <sc-for list="{{ sub }}" as="s" hint-placeholder-count="7"><a href="#" style="height:44px;padding:0 14px;border-radius:12px;display:flex;align-items:center;font-size:15px;font-weight:600;background:{{ s.bg }};color:{{ s.fg }}">{{ s.t }}</a></sc-for>
+    </nav>
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <section style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh1);padding:28px;display:flex;flex-direction:column;gap:20px">
+        <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:22px">Profile</h2>
+        <div style="display:flex;align-items:center;gap:20px">
+          <span style="width:88px;height:88px;border-radius:99px;background:var(--lilacSoft);color:var(--lilacInk);display:flex;align-items:center;justify-content:center;font-family:var(--fH);font-weight:700;font-size:30px">MR</span>
+          <div style="display:flex;gap:8px"><span style="height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600;font-size:14.5px">Upload a photo</span><span style="height:44px;padding:0 16px;border-radius:12px;display:flex;align-items:center;font-weight:600;font-size:14.5px;color:var(--ink3)">Remove</span></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
+          <sc-for list="{{ fields }}" as="f" hint-placeholder-count="4"><label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13.5px;font-weight:600;color:var(--ink3)">{{ f.l }}</span><span style="height:48px;box-sizing:border-box;padding:0 14px;border-radius:14px;border:1px solid var(--line2);display:flex;align-items:center;font-size:15.5px">{{ f.v }}</span></label></sc-for>
+        </div>
+      </section>
+
+      <section style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh1);padding:28px;display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;flex-direction:column;gap:4px"><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:22px">Appearance</h2><span style="font-size:15px;color:var(--ink2)">Pick a look. System follows your computer’s setting.</span></div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">
+          <sc-for list="{{ looks }}" as="k" hint-placeholder-count="3">
+            <div style="border-radius:20px;border:{{ k.bd }};padding:10px;display:flex;flex-direction:column;gap:10px">
+              <div style="height:120px;border-radius:14px;overflow:hidden;display:flex;border:1px solid var(--line)">
+                <div style="flex:1;background:{{ k.a }};padding:12px;display:flex;flex-direction:column;gap:8px"><span style="height:10px;width:50%;border-radius:4px;background:{{ k.ink }}"></span><span style="height:34px;border-radius:8px;background:{{ k.card }}"></span><span style="display:flex;gap:6px"><span style="height:24px;flex:1;border-radius:6px;background:{{ k.card }}"></span><span style="height:24px;width:36px;border-radius:6px;background:{{ k.acc }}"></span></span></div>
+                <div style="flex:{{ k.split }};background:{{ k.b }};padding:12px;display:flex;flex-direction:column;gap:8px"><span style="height:10px;width:50%;border-radius:4px;background:#F4F4F2"></span><span style="height:34px;border-radius:8px;background:#141416"></span><span style="height:24px;width:36px;border-radius:6px;background:#C8F23A"></span></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:0 4px 4px"><span style="width:20px;height:20px;border-radius:99px;box-sizing:border-box;border:{{ k.radio }}"></span><span style="font-weight:600">{{ k.t }}</span></div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px">
+          <div style="display:flex;flex-direction:column;gap:8px"><span style="font-weight:600;font-size:15px">Motion</span><span style="font-size:13.5px;color:var(--ink3)">Off also follows your system’s reduce-motion setting.</span>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;border-radius:14px;background:var(--sunk)"><span style="height:38px;border-radius:10px;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px">Lively</span><span style="height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;color:var(--ink3)">Calm</span><span style="height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;color:var(--ink3)">Off</span></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px"><span style="font-weight:600;font-size:15px">Your Tilo hangs out in</span><span style="font-size:13.5px;color:var(--ink3)">The scene behind your helper in Chat.</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap"><span style="height:38px;padding:0 14px;border-radius:99px;background:var(--ink);color:var(--card);display:flex;align-items:center;font-weight:600;font-size:14px">Office</span><span style="height:38px;padding:0 14px;border-radius:99px;border:1px solid var(--line);display:flex;align-items:center;font-weight:600;font-size:14px">Beach</span><span style="height:38px;padding:0 14px;border-radius:99px;border:1px solid var(--line);display:flex;align-items:center;font-weight:600;font-size:14px">Balcony</span><span style="height:38px;padding:0 14px;border-radius:99px;border:1px solid var(--line);display:flex;align-items:center;font-weight:600;font-size:14px">Cosy room</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh1);padding:28px;display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;flex-direction:column;gap:4px"><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:22px">Spending and limits</h2><span style="font-size:15px;color:var(--ink2)">Tilo never goes over these. It stops and asks instead.</span></div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">
+          <sc-for list="{{ caps }}" as="c" hint-placeholder-count="3">
+            <div style="border-radius:18px;background:var(--sunk);padding:16px;display:flex;flex-direction:column;gap:10px">
+              <span style="font-size:14px;font-weight:600;color:var(--ink2)">{{ c.t }}</span>
+              <span style="font-family:var(--fH);font-weight:700;font-size:30px;letter-spacing:-1px;line-height:1">{{ c.v }}</span>
+              <div style="position:relative;height:6px;border-radius:99px;background:var(--line2)"><div style="height:100%;border-radius:99px;background:var(--ink);width:{{ c.p }}"></div><span style="position:absolute;top:-7px;left:{{ c.p }};width:20px;height:20px;margin-left:-10px;border-radius:99px;background:var(--card);box-shadow:0 0 0 2px var(--ink)"></span></div>
+              <span style="font-size:13px;color:var(--ink3)">{{ c.s }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh1);padding:28px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;flex-direction:column;gap:4px;padding-bottom:8px"><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:22px">Ask me before Tilo…</h2><span style="font-size:15px;color:var(--ink2)">These show up in Needs you. Turn one off and Tilo just goes ahead.</span></div>
+        <sc-for list="{{ asks }}" as="a" hint-placeholder-count="5">
+          <div style="min-height:60px;display:flex;align-items:center;gap:14px;border-top:1px solid var(--line)"><span style="flex:1;display:flex;flex-direction:column;line-height:1.35"><span style="font-weight:600">{{ a.t }}</span><span style="font-size:13.5px;color:var(--ink3)">{{ a.s }}</span></span><span style="width:44px;height:26px;border-radius:99px;background:{{ a.tb }};display:flex;align-items:center;padding:3px;box-sizing:border-box;justify-content:{{ a.tj }}"><span style="width:20px;height:20px;border-radius:99px;background:#FFFFFF"></span></span></div>
+        </sc-for>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1700},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'studio', dark = theme === 'studioDark';
+    const sel = dark ? 1 : 0;
+    return {
+      theme,
+      sub: ['Profile', 'Appearance', 'Spending and limits', 'Ask before', 'Notifications', 'Your Tilo', 'Privacy and data'].map((t, i) => ({ t, bg: i === 0 ? 'var(--sunk)' : 'transparent', fg: i === 0 ? 'var(--ink)' : 'var(--ink2)' })),
+      fields: [['Name', 'Maya Rao'], ['Email', 'maya@raostudio.co'], ['Time zone', 'London (GMT+1)'], ['Currency', 'Pounds (£)']].map(([l, v]) => ({ l, v })),
+      looks: [['Light', '#F6F6F4', '#F6F6F4', '#0B0B0C', '#FFFFFF', '#0B0B0C', '0'], ['Dark', '#0A0A0B', '#0A0A0B', '#F4F4F2', '#141416', '#C8F23A', '0'], ['System', '#F6F6F4', '#0A0A0B', '#0B0B0C', '#FFFFFF', '#0B0B0C', '1']].map(([t, a, b, ink, card, acc, split], i) => ({ t, a, b, ink, card, acc, split, bd: i === sel ? '2px solid var(--ink)' : '1px solid var(--line)', radio: i === sel ? '6px solid var(--ink)' : '1.5px solid var(--line2)' })),
+      caps: [['Each day', '£20', '40%', 'Spent £4.60 today'], ['Each world', '£50', '50%', 'Unless you raise it for one'], ['Ask before any single cost over', '£50', '50%', 'Like the £86 sample']].map(([t, v, p, s]) => ({ t, v, p, s })),
+      asks: [['Sending emails or messages', 'To anyone, from any app', true], ['Spending money', 'Over £50 at once', true], ['Sharing files outside the team', 'Links, attachments and uploads', true], ['Booking or cancelling', 'Travel, meetings, orders', true], ['Joining a meeting', 'Tilo only joins calls you invite it to', false]].map(([t, s, on]) => ({ t, s, tb: on ? 'var(--ink)' : 'var(--line2)', tj: on ? 'flex-end' : 'flex-start' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

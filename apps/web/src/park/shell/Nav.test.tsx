@@ -28,8 +28,10 @@ afterEach(() => {
 
 const TABS = [
   ["Home", "/"],
+  ["Chat", "/chat"],
   ["Worlds", "/worlds"],
   ["Skills", "/skills"],
+  ["Needs you", "/needs"], // STUDIO-4: the Needs you page joins the tabs (design/studio-v2 "Tilo S Nav")
   ["Ledger", "/ledger"],
   ["Agenda", "/agenda"],
   ["Team", "/team"],
@@ -166,23 +168,25 @@ describe("WEB_3b_nav: tabs navigate through app.go", () => {
   });
 });
 
-describe("WEB_3b_nav: the Worlds badge shows what still needs you", () => {
-  const worlds = (root: ParentNode) => tabs(root).find((a) => label(a) === "Worlds") as HTMLElement;
+// STUDIO-4: the count moved from Worlds to the Needs you tab, where the decisions are answered (design "Tilo S Nav").
+describe("WEB_3b_nav: the Needs you badge shows what still needs you", () => {
+  const worlds = (root: ParentNode) =>
+    tabs(root).find((a) => label(a) === "Needs you") as HTMLElement;
 
-  it("WEB_3b_nav_two_decisions_wait_so_the_badge_reads_2_on_Worlds_only", async () => {
+  it("WEB_3b_nav_two_decisions_wait_so_the_badge_reads_2_on_Needs_you_only", async () => {
     const { m } = await mountApp();
-    expect(worlds(m.container).textContent).toBe("Worlds2");
+    expect(worlds(m.container).textContent).toBe("Needs you2");
     expect(tabs(m.container).filter((a) => /\d/.test(a.textContent ?? ""))).toHaveLength(1);
   });
 
   it("WEB_3b_nav_each_approval_lowers_it_and_at_zero_it_is_gone_not_0", async () => {
     const { m } = await mountApp();
     await act(async () => seen.app.decide("depot"));
-    expect(worlds(m.container).textContent).toBe("Worlds1");
+    expect(worlds(m.container).textContent).toBe("Needs you1");
     await act(async () => seen.app.decide("mail"));
-    expect(worlds(m.container).textContent).toBe("Worlds");
+    expect(worlds(m.container).textContent).toBe("Needs you");
     await act(async () => seen.store.getState().toast?.action?.()); // Undo the supplier brief
-    expect(worlds(m.container).textContent).toBe("Worlds1");
+    expect(worlds(m.container).textContent).toBe("Needs you1");
   });
 });
 

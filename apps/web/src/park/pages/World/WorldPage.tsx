@@ -1,7 +1,9 @@
 import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
-// The Park "World" page (WEB-6; design "Tilo App World.dc.html"): one world's overview. The title block and
-// its buttons, the map with its progress, the decisions it waits on, spend, facts, skills and tools, and then
-// Districts (a City), Run history (a Town) or Result (a Village) beside Activity. The worlds, plans,
+// The Park "World" page (STUDIO-3, design/studio-v2 "Tilo S World.dc.html"; first WEB-6 "Tilo App World.dc.html"):
+// one world. The title block with its progress and buttons, the run's status banner, then the city on the left and
+// the Story / Steps / Result tabs on the right (Story: what the team did, from the recorded events or the list's
+// activity, with the decisions it waits on; Steps: the plan in order, or Districts / Run history; Result: the
+// delivered output with Download and Share), then spend, facts, skills, tools and the meeting hall. The worlds, plans,
 // decisions, skills and connectors come through useParkApi(); pausing is page state and writes nothing
 // (docs/park-designed-not-in-prd/World.md). A decision is taken with app.decide (the store toasts it with
 // Undo), navigation inside the Park app is app.go, and the links to the live stage and its lenses are real
@@ -37,10 +39,20 @@ import { Button, PageSheet } from "../../components";
 import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
+import { MapToast, ZoomableMap, latestLine } from "./MapChrome";
 import { MeetingHall } from "./MeetingHall";
+import {
+  EmptyPanel,
+  RunStepList,
+  RunStory,
+  TabPanel,
+  type WorldTab,
+  WorldTabs,
+  stepsCount,
+} from "./Panels";
 import { RecordedWorldArt } from "./RecordedWorldArt";
 import { RunProgressCard } from "./RunProgressCard";
-import { RunStatus } from "./RunStatus";
+import { AssumedChips, RunResult, RunStatus } from "./RunStatus";
 import { ShareLine } from "./ShareLine";
 import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
 import { SkillProposals } from "./SkillProposals";
@@ -50,7 +62,8 @@ import { runProgress } from "./runProgress";
 import { runView } from "./runView";
 import { useRunEvents } from "./useRunEvents";
 import "./World.css";
-import { cityArt, rowArt, singleArt } from "./worldArt";
+import "./World.studio.css";
+import { labelledCityArt, rowArt, singleArt } from "./worldArt";
 import {
   LEGEND,
   STOPPED,
@@ -137,7 +150,8 @@ function MapArt({
 }: { w: World; plans: Record<string, Plan>; app: AppCtx }): ReactNode {
   if (w.tier === "City") {
     const plan = w.plan ? plans[w.plan] : undefined;
-    return w.plan && plan ? cityArt(plan, w.plan, app.dec, app.night) : null;
+    // Building names on a map wide enough to read them (the artboard's labelled city); district tags always.
+    return w.plan && plan ? labelledCityArt(plan, app.night, (app.vw || 1440) >= 760) : null;
   }
   return (
     <div className="park-world-bigart">
@@ -181,6 +195,8 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const [roomClient] = useState(createRoomClient);
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
   const [paused, setPaused] = useState<Record<string, boolean>>({});
+  // STUDIO-3: the chosen tab; until a person picks one, Story (or Result once a run's result is delivered).
+  const [tab, setTab] = useState<WorldTab | null>(null);
   const [slackOpen, setSlackOpen] = useState(false);
   const [slackChannel, setSlackChannel] = useState("");
   const [slackNote, setSlackNote] = useState("");
@@ -397,43 +413,105 @@ export function WorldPage({ app }: { app: AppCtx }) {
     triggerRef.current?.focus();
   };
 
+  // STUDIO-3: the header's progress block. A real run's words come from its events (runView, runProgress); any
+  // other world's from the list. Nothing is estimated: no time left, no cap the data does not carry.
+  const live = trackRun && runEvents.length > 0 ? runProgress(runEvents) : null;
+  const progressHead = view
+    ? view.phase === "failed"
+      ? "Stopped"
+      : view.percent !== null
+        ? `${view.percent}% done`
+        : look[0]
+    : w.prog != null
+      ? `${w.prog}% done`
+      : look[0];
+  const progressSub =
+    view && view.total !== null && view.begun > 0
+      ? `Step ${view.begun} of ${view.total}`
+      : !view && !recorded && w.prog != null && w.nextL
+        ? `${w.nextL} ${w.nextV}`
+        : "";
+  const spentLine = live
+    ? `${live.credits} credits used`
+    : w.spend
+      ? `${w.spend} spent so far${w.of ? ` · ${w.of}` : ""}`
+      : "";
+  const steps = trackRun ? stepsCount(runEvents) : null;
+  // WORLD-DESIGN: the artboard's card on the map says the newest recorded line, or nothing.
+  const toastLine = latestLine(trackRun ? runEvents : null, w.activity);
+  const shown: WorldTab = tab ?? (view?.deliverable ? "result" : "story");
+  const delivered = trackRun && view !== null && view.deliverable;
+
+  // A finished quick task's own Result card already carries Share to Slack: the row does not repeat it.
+  const slackInResult = !trackRun && !isCity && !isTown && w.st === "finished";
+  const shareRow = (
+    <div className="park-world-sharerow">
+      <Button
+        variant={delivered ? "primary" : "secondary"}
+        size="sm"
+        icon={icon("share", 16)}
+        onClick={share}
+      >
+        Share
+      </Button>
+      {slackInResult ? null : (
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={!slackState.connected}
+          aria-disabled={!slackState.connected ? "true" : undefined}
+          aria-describedby={!slackState.connected ? NO_SLACK_ID : undefined}
+          title={
+            !slackState.connected ? slackState.disabledReason : "Share this world link to Slack"
+          }
+          onClick={(e) => openSlackDialog(e.currentTarget)}
+        >
+          Share to Slack
+        </Button>
+      )}
+      {loaded.live && worldClient && !w.sample ? (
+        <ShareWithTeam client={worldClient} worldId={w.id} worldName={w.name} />
+      ) : null}
+      {!slackState.connected ? (
+        <span id={NO_SLACK_ID} className="park-world-sr">
+          {slackState.disabledReason}
+        </span>
+      ) : null}
+    </div>
+  );
+
   return (
     <Frame worldId={w.id}>
       <PageTitle title={w.name} />
-      <nav aria-label="Breadcrumb" className="park-world-crumb">
-        <GoLink className="park-world-back" href="/worlds" onGo={() => app.go("worlds")}>
-          {icon("arrowL", 15)}Worlds
-        </GoLink>
-        <span>/</span>
-        <span className="park-world-crumbname">{w.name}</span>
-      </nav>
-
       <div className="park-world-head">
         <div className="park-world-titles">
+          <nav aria-label="Breadcrumb" className="park-world-crumb">
+            <GoLink className="park-world-back" href="/worlds" onGo={() => app.go("worlds")}>
+              {icon("arrowL", 15)}All worlds
+            </GoLink>
+          </nav>
           <div className="park-world-eyebrowrow">
             <span className="park-world-eyebrow">
               {[w.tier, w.tool].filter(Boolean).join(" · ").toUpperCase()}
-            </span>
-            <span className="park-world-chip" style={{ background: look[1], color: look[2] }}>
-              <span className="park-world-dot" style={{ background: look[3] }} />
-              {chip}
             </span>
             {recorded && !isPaused ? (
               <span className="park-world-sub">Recorded sample state, not live</span>
             ) : null}
           </div>
-          <h1 className="park-world-h1" tabIndex={-1}>
-            {w.name}
-            {w.sample || demo ? <SampleBadge /> : null}
-          </h1>
+          <div className="park-world-titleline">
+            <h1 className="park-world-h1" tabIndex={-1}>
+              {w.name}
+              {w.sample || demo ? <SampleBadge /> : null}
+            </h1>
+            <span className="park-world-chip" style={{ background: look[1], color: look[2] }}>
+              <span className="park-world-dot" style={{ background: look[3] }} />
+              {chip}
+            </span>
+          </div>
           <p className="park-world-meta">
             {w.sample
               ? `Recorded ${w.started}`
-              : metaLine(
-                  w.owner,
-                  w.started,
-                  trackRun && runEvents.length > 0 ? runProgress(runEvents).agents : w.agents,
-                )}
+              : metaLine(w.owner, w.started, live ? live.agents : w.agents)}
           </p>
           {w.sample ? <SampleNote /> : null}
           {demo && !w.sample ? (
@@ -445,6 +523,22 @@ export function WorldPage({ app }: { app: AppCtx }) {
             <ShareLine client={worldClient} worldId={w.id} />
           ) : null}
         </div>
+        <div className="park-world-headprog">
+          <div className="park-world-proghead">
+            <span className="park-world-progtitle">{progressHead}</span>
+            {progressSub ? <span className="park-world-progsub">{progressSub}</span> : null}
+          </div>
+          <div className="park-world-progwrap">
+            <div className="park-world-track">
+              <div
+                className="park-world-fill"
+                style={{ width: `${w.prog ?? 0}%`, background: look[4] }}
+              />
+            </div>
+            <span className="park-world-proglabel">{w.prog != null ? `${w.prog}%` : w.nextV}</span>
+          </div>
+          {spentLine ? <div className="park-world-spentline">{spentLine}</div> : null}
+        </div>
         <div className="park-world-actions">
           {canPause(w) || isPaused ? (
             <Button
@@ -455,30 +549,6 @@ export function WorldPage({ app }: { app: AppCtx }) {
             >
               {isPaused ? "Resume" : "Pause"}
             </Button>
-          ) : null}
-          <Button variant="secondary" icon={icon("share", 16)} onClick={share}>
-            Share
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={!slackState.connected}
-            aria-disabled={!slackState.connected ? "true" : undefined}
-            aria-describedby={!slackState.connected ? NO_SLACK_ID : undefined}
-            title={
-              !slackState.connected ? slackState.disabledReason : "Share this world link to Slack"
-            }
-            onClick={(e) => openSlackDialog(e.currentTarget)}
-          >
-            Share to Slack
-          </Button>
-          {loaded.live && worldClient && !w.sample ? (
-            <ShareWithTeam client={worldClient} worldId={w.id} worldName={w.name} />
-          ) : null}
-          {!slackState.connected ? (
-            <span id={NO_SLACK_ID} className="park-world-sr">
-              {slackState.disabledReason}
-            </span>
           ) : null}
           {showRunViews ? (
             <StageLink className="park-world-live" href={stage(stagePath(w.id))} reason={noStage}>
@@ -499,8 +569,6 @@ export function WorldPage({ app }: { app: AppCtx }) {
         <RunStatus
           view={view ?? runView([])}
           events={runEvents}
-          api={api}
-          worldId={w.id}
           {...(loaded.live && !w.sample
             ? {
                 again: {
@@ -587,16 +655,29 @@ export function WorldPage({ app }: { app: AppCtx }) {
         </div>
       ) : null}
 
+      <div className="park-world-tabrow">
+        <WorldTabs
+          on={shown}
+          onPick={setTab}
+          counts={steps ? { steps: `${steps.done}/${steps.of}` } : {}}
+        />
+        {view ? <AssumedChips assumptions={view.assumptions} /> : null}
+      </div>
+
       <div
         className="park-world-top"
         style={{
-          gridTemplateColumns: wide ? "minmax(0,1.7fr) minmax(300px,1fr)" : "minmax(0,1fr)",
+          gridTemplateColumns: wide ? "minmax(0,3fr) minmax(0,2fr)" : "minmax(0,1fr)",
         }}
       >
         <div className="park-world-mapcard">
           <div className={isCity ? "park-world-map" : "park-world-map park-world-map--art"}>
             {trackRun ? (
               <RecordedWorldArt events={runEvents} />
+            ) : isCity ? (
+              <ZoomableMap key={w.id} controls={Boolean(w.plan && loaded.plans[w.plan])}>
+                <MapArt w={w} plans={loaded.plans} app={app} />
+              </ZoomableMap>
             ) : (
               <MapArt w={w} plans={loaded.plans} app={app} />
             )}
@@ -630,25 +711,6 @@ export function WorldPage({ app }: { app: AppCtx }) {
                 </StageLink>
               </nav>
             ) : null}
-          </div>
-          {showRunViews && !hasStage ? (
-            // QA-DEMO-1 m3: the reason the lens links and "Open live view" are off is words on the page, not a tooltip
-            <p id={NO_STAGE_ID} className="park-world-nostage">
-              {noStage}
-            </p>
-          ) : null}
-          <div className="park-world-progrow">
-            <div className="park-world-progwrap">
-              <div className="park-world-track">
-                <div
-                  className="park-world-fill"
-                  style={{ width: `${w.prog ?? 0}%`, background: look[4] }}
-                />
-              </div>
-              <span className="park-world-proglabel">
-                {w.prog != null ? `${w.prog}%` : w.nextV}
-              </span>
-            </div>
             {isCity ? (
               <div className="park-world-legend">
                 {LEGEND.map(([colour, label]) => (
@@ -660,107 +722,157 @@ export function WorldPage({ app }: { app: AppCtx }) {
               </div>
             ) : null}
           </div>
+          {toastLine ? <MapToast line={toastLine} /> : null}
+          {showRunViews && !hasStage ? (
+            // QA-DEMO-1 m3: the reason the lens links and "Open live view" are off is words on the page, not a tooltip
+            <p id={NO_STAGE_ID} className="park-world-nostage">
+              {noStage}
+            </p>
+          ) : null}
         </div>
 
-        {part(2) ? (
-          <div className="park-world-side">
-            {loaded.gaps.decisions ? (
-              <NotYetCard title="Waiting on you" />
-            ) : open > 0 ? (
-              <WaitingCard
-                mine={mine}
-                dec={dec}
-                night={app.night}
-                onDecide={(key, text, option) =>
-                  text === undefined && option === undefined
-                    ? app.decide(key)
-                    : app.decide(key, text, option)
-                }
-                onLater={() => app.toast("Tilo will remind you at 16:00")}
-                slackPending={slackPending}
+        <div className="park-world-panels">
+          <TabPanel tab="story" on={shown} title="Story" sub="What your team is doing, in order">
+            {part(2) ? (
+              <>
+                {loaded.gaps.decisions ? (
+                  <NotYetCard title="Waiting on you" />
+                ) : open > 0 ? (
+                  <WaitingCard
+                    mine={mine}
+                    dec={dec}
+                    night={app.night}
+                    onDecide={(key, text, option) =>
+                      text === undefined && option === undefined
+                        ? app.decide(key)
+                        : app.decide(key, text, option)
+                    }
+                    onLater={() => app.toast("Tilo will remind you at 16:00")}
+                    slackPending={slackPending}
+                  />
+                ) : null}
+                {handoff ? (
+                  <LovableCard
+                    handoff={handoff}
+                    dec={dec}
+                    sample={Boolean(w.sample)}
+                    onDecide={(key, text, option) =>
+                      text === undefined && option === undefined
+                        ? app.decide(key)
+                        : app.decide(key, text, option)
+                    }
+                  />
+                ) : null}
+                {trackRun ? <RunProgressCard events={runEvents} steps={false} /> : null}
+                {trackRun ? (
+                  <RunStory events={runEvents} />
+                ) : (
+                  <Activity
+                    items={
+                      w.activity ?? [
+                        {
+                          t: w.started,
+                          rank: "director",
+                          who: "Director",
+                          text: `Started “${w.name}”.`,
+                          kind: "info",
+                        },
+                      ]
+                    }
+                    night={app.night}
+                  />
+                )}
+              </>
+            ) : null}
+          </TabPanel>
+          <TabPanel
+            tab="steps"
+            on={shown}
+            title="Steps"
+            sub="The plan, in order"
+            {...(steps ? { aside: `${steps.done} of ${steps.of} done` } : {})}
+          >
+            {trackRun ? <RunStepList events={runEvents} /> : null}
+            {!trackRun && isCity ? <Districts districts={w.districts ?? []} /> : null}
+            {!trackRun && isTown ? (
+              <RunHistory
+                runs={w.runs ?? []}
+                onRunNow={() => app.toast(SAMPLE_RUN)}
+                onAgenda={() => app.go("agenda")}
+                {...(real ? { runNowOff: RUN_OFF } : {})}
               />
             ) : null}
-            {handoff ? (
-              <LovableCard
-                handoff={handoff}
-                dec={dec}
-                sample={Boolean(w.sample)}
-                onDecide={(key, text, option) =>
-                  text === undefined && option === undefined
-                    ? app.decide(key)
-                    : app.decide(key, text, option)
+            {!trackRun && !isCity && !isTown ? (
+              <EmptyPanel
+                title="One step"
+                line="A quick task is one job for one agent: its progress is the bar above."
+              />
+            ) : null}
+          </TabPanel>
+          <TabPanel tab="result" on={shown} title="Result" sub="What this world delivered">
+            {delivered ? <RunResult api={api} worldId={w.id} events={runEvents} /> : null}
+            {trackRun && !delivered ? (
+              <EmptyPanel
+                title={view?.phase === "failed" ? "No result" : "No result yet"}
+                line={
+                  view?.phase === "failed"
+                    ? "This run stopped before it delivered anything."
+                    : "The result shows here once the run records it as delivered."
                 }
               />
             ) : null}
-            <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
-            <FactsCard
-              w={w}
-              recorded={recorded}
-              skills={skills}
-              tools={tools}
-              onSkill={(skill) => app.go("skills", { id: skill })}
-              onTools={() => app.go("connectors")}
-            />
-            {loaded.connectors.some((c) => c.id === "meeting_host" && c.live?.notConfigured) ? (
-              <p>{HOST_NOT_CONNECTED_TEXT}</p>
+            {!trackRun && !isCity && !isTown ? (
+              <Result
+                w={w}
+                recorded={recorded}
+                onOpen={() => {
+                  if (!real) {
+                    app.toast(SAMPLE_OPEN);
+                    return;
+                  }
+                  void downloadResult(api, w.id).catch(() =>
+                    app.toast("The result could not be opened. Try again."),
+                  );
+                }}
+                {...(real && !hasResultReader(api) ? { openOff: OPEN_OFF } : {})}
+                onSlack={openSlackDialog}
+                slackConnected={slackState.connected}
+                slackReason={slackState.disabledReason}
+                noSlackId={NO_SLACK_ID}
+              />
             ) : null}
-            {loaded.gaps.skills || loaded.gaps.connectors ? (
-              <NotYetCard title={loaded.gaps.skills ? "Skills" : "Tools"} />
+            {!trackRun && (isCity || isTown) ? (
+              <EmptyPanel
+                title="No single result"
+                line="A bigger world delivers through its districts and runs, listed under Steps."
+              />
             ) : null}
-          </div>
-        ) : null}
+            {shareRow}
+          </TabPanel>
+        </div>
       </div>
 
+      {part(3) ? (
+        <div className="park-world-more">
+          <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
+          <FactsCard
+            w={w}
+            recorded={recorded}
+            skills={skills}
+            tools={tools}
+            onSkill={(skill) => app.go("skills", { id: skill })}
+            onTools={() => app.go("connectors")}
+          />
+          {loaded.connectors.some((c) => c.id === "meeting_host" && c.live?.notConfigured) ? (
+            <p>{HOST_NOT_CONNECTED_TEXT}</p>
+          ) : null}
+          {loaded.gaps.skills || loaded.gaps.connectors ? (
+            <NotYetCard title={loaded.gaps.skills ? "Skills" : "Tools"} />
+          ) : null}
+        </div>
+      ) : null}
       {hasStage && roomClient && !w.sample ? (
         <MeetingHall key={w.id} worldId={w.id} client={roomClient} />
-      ) : null}
-      {part(3) ? (
-        <div className="park-world-lower">
-          {trackRun ? <RunProgressCard events={runEvents} /> : null}
-          {isCity ? <Districts districts={w.districts ?? []} /> : null}
-          {isTown ? (
-            <RunHistory
-              runs={w.runs ?? []}
-              onRunNow={() => app.toast(SAMPLE_RUN)}
-              onAgenda={() => app.go("agenda")}
-              {...(real ? { runNowOff: RUN_OFF } : {})}
-            />
-          ) : null}
-          {!isCity && !isTown && !trackRun ? (
-            <Result
-              w={w}
-              recorded={recorded}
-              onOpen={() => {
-                if (!real) {
-                  app.toast(SAMPLE_OPEN);
-                  return;
-                }
-                void downloadResult(api, w.id).catch(() =>
-                  app.toast("The result could not be opened. Try again."),
-                );
-              }}
-              {...(real && !hasResultReader(api) ? { openOff: OPEN_OFF } : {})}
-              onSlack={openSlackDialog}
-              slackConnected={slackState.connected}
-              slackReason={slackState.disabledReason}
-              noSlackId={NO_SLACK_ID}
-            />
-          ) : null}
-          <Activity
-            items={
-              w.activity ?? [
-                {
-                  t: w.started,
-                  rank: "director",
-                  who: "Director",
-                  text: `Started “${w.name}”.`,
-                  kind: "info",
-                },
-              ]
-            }
-            night={app.night}
-          />
-        </div>
       ) : null}
     </Frame>
   );

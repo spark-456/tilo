@@ -22,7 +22,6 @@ import {
   flat,
   mountHome,
   pageText,
-  progressOf,
   settle,
   sizeGroup,
   type spiedApi,
@@ -36,6 +35,15 @@ import { makeWorld } from "../../api/fixtures";
 afterEach(cleanup);
 // QA row 21: the greeting follows the local hour, so every test pins one (09:00 unless it says otherwise).
 beforeEach(() => vi.setSystemTime(new Date(2026, 8, 24, 9, 0)));
+
+// UI-STUDIO-2: the worlds are cards in their own section ("Sample worlds" on the fixture path, "Your worlds" live),
+// three at most; the ring's percent is the card's progress.
+const worldsRegion = (root: ParentNode): HTMLElement =>
+  q(root, 'section[aria-label="Sample worlds"]');
+const ringOf = (card: Element): number | null => {
+  const pct = card.querySelector(".park-home-ring__pct")?.textContent ?? "";
+  return /^\d+%$/.test(pct) ? Number.parseInt(pct, 10) : null;
+};
 
 const SUMMARY_DAY_2 = "38 agents are at work across 4 worlds. Two things need you.";
 const SUMMARY_NIGHT_2 = "Your city keeps working overnight. Two things need you before morning.";
@@ -114,25 +122,26 @@ describe("WEB_4_home_render: the greeting panel", () => {
 });
 
 describe("WEB_4_home_render: Today panel", () => {
-  it("WEB_4_home_render_live_now_lists_the_five_worlds_with_their_lines_and_progress", async () => {
+  it("STUDIO_2_home_render_sample_worlds_lists_three_cards_with_their_lines_and_progress", async () => {
     const { el } = await mountHome();
-    const today = todayRegion(el);
-    expect(textOf(today)).toContain("Sample worlds"); // fixture rows: never titled "Live now" (HR-1)
+    const worlds = worldsRegion(el);
+    expect(textOf(worlds)).toContain("Sample worlds"); // fixture cards: never titled "Your worlds" (HR-1)
     let last = -1;
-    for (const w of LIVE_OPEN) {
-      const row = controlWith(today, w.name);
-      expect(flat(textOf(row)), w.name).toBe(flat(`${w.name} ${w.sub}`));
-      expect(progressOf(row), `${w.name} progress`).toBe(w.prog);
-      expect(row.querySelector("svg, img"), `${w.name} art`).not.toBeNull();
-      const at = textOf(today).indexOf(w.name);
+    for (const w of LIVE_OPEN.slice(0, 3)) {
+      const card = controlWith(worlds, w.name);
+      expect(textOf(card), w.name).toContain(w.sub);
+      expect(ringOf(card), `${w.name} progress`).toBe(w.prog);
+      expect(card.querySelector("svg, img"), `${w.name} art`).not.toBeNull();
+      const at = textOf(worlds).indexOf(w.name);
       expect(at, `${w.name} keeps the reference order`).toBeGreaterThan(last);
       last = at;
     }
+    for (const w of LIVE_OPEN.slice(3)) expect(textOf(worlds)).not.toContain(w.name);
   });
 
   it("WEB_4_home_render_live_now_leaves_out_finished_and_scheduled_worlds", async () => {
     const { el } = await mountHome();
-    const text = textOf(todayRegion(el));
+    const text = textOf(worldsRegion(el));
     for (const gone of [
       "Q3 audit prep",
       "Invoice match",
@@ -175,12 +184,14 @@ describe("WEB_4_home_render: Today panel", () => {
 
   it("WEB_4_home_render_sections_follow_the_reference_order", async () => {
     const { el } = await mountHome();
+    // UI-STUDIO-2 order: greeting, ask box, Your worlds, Chat history; the side column Needs you, Up next, spend.
     const today = textOf(todayRegion(el));
-    expect(today.indexOf("Sample worlds")).toBeLessThan(today.indexOf("Up next today"));
+    expect(today.indexOf("Needs you")).toBeLessThan(today.indexOf("Up next today"));
     expect(today.indexOf("Up next today")).toBeLessThan(today.indexOf("September spend"));
     const page = pageText(el);
-    expect(page.indexOf("Good morning")).toBeLessThan(page.indexOf("Sample worlds"));
-    expect(page.indexOf("September spend")).toBeLessThan(page.indexOf(QUICK.start));
+    expect(page.indexOf("Good morning")).toBeLessThan(page.indexOf(QUICK.start));
+    expect(page.indexOf(QUICK.start)).toBeLessThan(page.indexOf("Sample worlds"));
+    expect(page.indexOf("Sample worlds")).toBeLessThan(page.indexOf("Chat history"));
   });
 
   // UI-10 / A2 (14 Oct QA, ruled 05:52): this used to say the Today panel and the spend tiles are left out under
@@ -194,7 +205,7 @@ describe("WEB_4_home_render: Today panel", () => {
         wide ? 1 : 0,
       );
       expect(
-        qa(el, 'section[aria-label="Sample worlds and spend"]'),
+        qa(el, 'section[aria-label="Today and spend"]'),
         `stacked block at ${vw}`,
       ).toHaveLength(wide ? 0 : 1);
       expect(qa(el, '[aria-label="Spend at a glance"] .park-kpi'), `tiles at ${vw}`).toHaveLength(
@@ -208,19 +219,19 @@ describe("WEB_4_home_render: Today panel", () => {
     }
   });
 
-  it("WEB_4_home_render_a_started_world_leads_the_live_list_and_the_list_stays_at_five", async () => {
+  it("STUDIO_2_home_render_a_started_world_leads_the_cards_and_the_cards_stay_at_three", async () => {
     const added = makeWorld("quick", "Compare three suppliers", 1);
     const { el, api } = await mountHome({ app: { added: [added] } });
-    const today = todayRegion(el);
-    const first = controlWith(today, "Compare three suppliers");
-    expect(flat(textOf(first))).toBe(flat("Compare three suppliers Starting now"));
-    expect(progressOf(first)).toBe(4);
-    const text = textOf(today);
+    const worlds = worldsRegion(el);
+    const first = controlWith(worlds, "Compare three suppliers");
+    expect(flat(textOf(first))).toBe(flat("Starting Compare three suppliers Starting now"));
+    expect(ringOf(first)).toBeNull(); // a world just started shows no progress it has not made
+    const text = textOf(worlds);
     expect(text.indexOf("Compare three suppliers")).toBeLessThan(
       text.indexOf("K1 electric scooter"),
     );
-    expect(text).not.toContain("Venue options"); // pushed out: five rows at most
-    for (const w of LIVE_OPEN.slice(0, 4)) expect(text, w.name).toContain(w.name);
+    expect(text).not.toContain("Northline onboarding"); // pushed out: three cards at most
+    for (const w of LIVE_OPEN.slice(0, 2)) expect(text, w.name).toContain(w.name);
     const calls = (api as ReturnType<typeof spiedApi>).getWorlds.mock.calls;
     const lastCall = calls[calls.length - 1];
     expect(lastCall?.[1], "the Api is asked with the started worlds").toEqual([added]);

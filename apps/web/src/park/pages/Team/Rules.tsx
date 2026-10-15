@@ -56,9 +56,15 @@ export function RulesCard({ rules, on, art, locked, log, onToggle, readOnly }: R
   );
 }
 
+/** POLISH-1: on a phone the table scrolls inside its card, so the card is a named, focusable region (axe scrollable-region-focusable). */
 export function MatrixCard({ team }: { team: Pick<Team, "roles" | "matrix"> }) {
   return (
-    <section className="park-team-card park-team-matrix" aria-label="What each role can do">
+    <section
+      className="park-team-card park-team-matrix"
+      aria-label="What each role can do"
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable named region must take focus to scroll by keyboard
+      tabIndex={0}
+    >
       <h2 className="park-team-h2 park-team-h2--matrix">What each role can do</h2>
       <table className="park-team-blk">
         <thead className="park-team-blk">

@@ -15,6 +15,8 @@ export const PAGE_IDS = [
   "settings",
   "library",
   "more",
+  "chat",
+  "needs",
 ] as const;
 
 export type PageId = (typeof PAGE_IDS)[number];
@@ -35,6 +37,8 @@ export const PAGE_LABEL: Record<PageId, string> = {
   settings: "Settings",
   library: "Library",
   more: "More",
+  chat: "Chat",
+  needs: "Needs you",
 };
 
 export interface AppCtx {

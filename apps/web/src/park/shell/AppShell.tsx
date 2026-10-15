@@ -22,6 +22,7 @@ import { Button, Popover, Toast } from "../components";
 import { FirstRunBanner } from "../sample/FirstRunBanner";
 import { useFirstRun } from "../sample/useFirstRun";
 import "../tokens/fonts";
+import { appearanceOf } from "../studio/ThemeSwitch";
 import { AccountMenu, type AccountPerson } from "./AccountMenu";
 import { BootSplash } from "./BootSplash";
 import { CityBackdrop } from "./CityBackdrop";
@@ -37,6 +38,8 @@ import { loadShellFonts } from "./fonts";
 import { type Bar, useLeavingCard, useMotionOff, usePageSwap } from "./motion";
 import { useParkTour } from "./tour";
 import "./park.shell.css";
+import { themeFor } from "../tokens/themes";
+import { TiloBubble } from "./TiloBubble";
 import { backdropScene } from "./scene";
 
 const SIGN_OUT = "This is a prototype, so you stay signed in";
@@ -221,7 +224,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         scene={scene}
         vw={app.vw}
         vh={app.vh}
-        veiled={inner}
+        veiled={inner || themeFor(app.prefs.theme) === "studio"}
         lite={appearance.lite}
         hidden={appearance.hidden}
         loading={state.wl != null}
@@ -257,6 +260,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         contextOpen={contextOpen}
         onContext={toggleContext}
         compact={app.vw > 0 && app.vw < COMPACT_NAV_BELOW}
+        vw={app.vw}
       />
       {contextOpen && <ContextPanel key={contextPerson} onClose={toggleContext} />}
       {state.menu === "notif" ? (
@@ -287,6 +291,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             go={navTo}
             onSignOut={signOutViaSeam}
             onClose={store.closeMenu}
+            appearance={appearanceOf(app.prefs.time)}
+            onAppearance={(next) => app.setPref("time", next)}
           />
         </Enter>
       ) : null}
@@ -336,6 +342,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         />
       ) : null}
       <RunBar />
+      {/* UI-STUDIO-2: the Tilo bubble on every page but Chat, which is the same conversation full size */}
+      {ready && page !== null && page !== "chat" ? (
+        <TiloBubble page={page} vw={app.vw} vh={app.vh} go={navTo} />
+      ) : null}
       {card ? (
         <WorldLoader
           launch={card}

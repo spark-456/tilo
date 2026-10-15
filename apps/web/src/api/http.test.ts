@@ -253,6 +253,15 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
     });
   });
 
+  it("FR-WLD-05 LIVE-LAYOUT getLayout asks once, not five times, when a finished run has no layout", async () => {
+    const done = script(
+      events("world.started", "world.completed"),
+      json({ detail: "Not Found" }, 404),
+    );
+    await expect(client(done.fetch, 1).getLayout("w1")).rejects.toMatchObject({ status: 404 });
+    expect(done.calls.filter((c) => c.url.includes("/layout"))).toHaveLength(1);
+  });
+
   it("FR-WLD-05 getLayout rejects plainly when the run failed before it built a world, and a retry asks again", async () => {
     const failed = script(events("world.failed"));
     const c = client(failed.fetch, 1);

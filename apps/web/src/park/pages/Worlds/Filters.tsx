@@ -1,16 +1,30 @@
-// The status tabs (with counts) and the scale legend of the Worlds page.
+// The filter row of the Worlds page (STUDIO-3): status tabs with counts, the search box and the size buttons.
+import type { ChangeEvent } from "react";
 import { cx } from "../../components/cx";
+import type { Art } from "./art";
 import { SCALES, STATUS_TABS, type StatusFilter, type TierFilter } from "./model";
 
 interface FiltersProps {
+  art: Art;
   status: StatusFilter;
   tier: TierFilter;
+  query: string;
   count: (f: StatusFilter) => number;
   onStatus: (f: StatusFilter) => void;
   onTier: (t: TierFilter) => void;
+  onQuery: (value: string) => void;
 }
 
-export function Filters({ status, tier, count, onStatus, onTier }: FiltersProps) {
+export function Filters({
+  art,
+  status,
+  tier,
+  query,
+  count,
+  onStatus,
+  onTier,
+  onQuery,
+}: FiltersProps) {
   return (
     <div className="park-worlds-filters">
       <div role="tablist" aria-label="Status" className="park-worlds-tabs">
@@ -28,8 +42,18 @@ export function Filters({ status, tier, count, onStatus, onTier }: FiltersProps)
           </button>
         ))}
       </div>
-      <div className="park-worlds-scale">
-        <span className="park-worlds-scale__label">SCALE</span>
+      <div className="park-worlds-search">
+        {art.icon("search", 17)}
+        <input
+          className="park-worlds-search__input"
+          aria-label="Search worlds"
+          placeholder="Find a world"
+          value={query}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => onQuery(e.target.value)}
+        />
+      </div>
+      {/* biome-ignore lint/a11y/useSemanticElements: a group of toggle buttons, not a form fieldset */}
+      <div role="group" aria-label="Size" className="park-worlds-scale">
         {SCALES.map(([t, label]) => (
           <button
             key={t}

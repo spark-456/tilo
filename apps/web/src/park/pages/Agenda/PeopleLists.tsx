@@ -4,9 +4,12 @@
 // A demo session or a build with no API has no lists, so nothing is drawn.
 import { useEffect, useMemo, useState } from "react";
 import { API_URL, appCheckToken, authToken, sessionView } from "../../../api/ClientProvider";
+import { type HostState, createConnectFlow } from "../../../api/connect";
 import { HttpClient } from "../../../api/http";
+import { type MeetingHostApi, meetingHostApi } from "../../api/live/meetingHost";
 import { type MeetingMinutesApi, meetingMinutesApi } from "../../api/live/meetingMinutes";
 import { type PeopleList, peopleListsApi } from "../../api/live/peopleLists";
+import { HostMeeting, MeetingAttend } from "./MeetingHost";
 import { MeetingMinutes } from "./MeetingMinutes";
 
 type Kind = "meetings" | "pinboards";
@@ -24,13 +27,19 @@ function List({
   kind,
   api,
   minutes,
-}: { kind: Kind; api: ReturnType<typeof peopleListsApi>; minutes: MeetingMinutesApi | null }) {
+  host,
+}: {
+  kind: Kind;
+  api: ReturnType<typeof peopleListsApi>;
+  minutes: MeetingMinutesApi | null;
+  host: { api: MeetingHostApi; state: () => Promise<HostState> } | null;
+}) {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<State>("loading");
   // biome-ignore lint/correctness/useExhaustiveDependencies: attempt is the explicit retry trigger.
   useEffect(() => {
     let live = true;
-    setState("loading");
+    setState((s) => (typeof s === "object" ? s : "loading")); // a refresh keeps the rows (and an open attend)
     api[READ[kind]]().then(
       (reply) => live && setState(reply.data),
       () => live && setState("failed"),
@@ -46,6 +55,7 @@ function List({
       data-testid={`agenda-${kind}`}
     >
       <h2>{TITLE[kind]}</h2>
+      {host ? <HostMeeting api={host.api} hostState={host.state} /> : null}
       {state === "loading" ? (
         <output>Loading…</output>
       ) : state === "failed" ? (
@@ -68,6 +78,14 @@ function List({
                   {cap(row.status)} · {row.at}
                 </p>
                 {row.body ? <p>{row.body}</p> : null}
+                {host ? (
+                  <MeetingAttend
+                    id={row.id}
+                    row={row}
+                    api={host.api}
+                    onChanged={() => setAttempt((n) => n + 1)}
+                  />
+                ) : null}
                 {minutes ? (
                   <MeetingMinutes key={row.id} id={row.id} status={row.status} api={minutes} />
                 ) : null}
@@ -92,25 +110,15 @@ export function PeopleLists() {
   );
   const api = useMemo(() => (http ? peopleListsApi(http) : null), [http]);
   const minutes = useMemo(() => (http ? meetingMinutesApi(http) : null), [http]);
-  const [available, setAvailable] = useState(false);
-  useEffect(() => {
-    let live = true;
-    setAvailable(false);
-    minutes?.available().then(
-      (value) => {
-        if (live) setAvailable(value);
-      },
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [minutes]);
+  const host = useMemo(
+    () => (http ? { api: meetingHostApi(http), state: createConnectFlow(http).meetingHost } : null),
+    [http],
+  );
   if (!api) return null;
   return (
     <>
-      <List kind="meetings" api={api} minutes={available ? minutes : null} />
-      <List kind="pinboards" api={api} minutes={null} />
+      <List kind="meetings" api={api} minutes={minutes} host={host} />
+      <List kind="pinboards" api={api} minutes={null} host={null} />
     </>
   );
 }

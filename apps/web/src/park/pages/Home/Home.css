@@ -1,501 +1,533 @@
-/* The Home page (WEB-4), transcribed from the inline styles of design_handoff_tilo_web_app/design/
-   Tilo App Home.dc.html. Every selector sits under [data-park] and a park-home- class; colours are tokens
-   except the README's hard-coded #F0A500 / #1F1D2B (needs), #FFFFFF (on the hero fill) and the #5A3FE0 focus
-   ring. No motion here (BQ-WEB-3): where the design moves, a marker says what returns in WEB-3. Night comes
-   from the tokens. */
+/* The Home page in the Studio layout (UI-STUDIO-2), from the inline styles of design/studio-v2 "Tilo S Home"
+   (canvas section 02, 1440 light and dark). One column under the nav: the greeting, the ask box, then Your worlds and
+   Chat history beside the Needs you and spend column. Every selector sits under [data-park] and a park-home- class;
+   colours are role tokens (config/themes/studio.json; the Metropolis theme falls back to its own roles), except the
+   README's #F0A500 / #1F1D2B (needs), #FFFFFF and the #5A3FE0 focus ring. No motion (HR-1, HR-2): hover is a
+   state, never a lift. Night comes from the tokens. */
 
-/* ---- the page: a positioned box the three panels and the pins are placed in ---- */
+/* ---- the page: one centred column ----
+   POLISH-1: 1296 wide and an 8px side gutter are the shell's --park-page-max and --park-page-pad, the same as Worlds and
+   Team, so the left edge is 80px at 1440 on all three. */
 [data-park] .park-home-root {
-  position: relative;
-  height: 100vh;
-  min-height: 720px;
-  overflow: hidden;
+  box-sizing: border-box;
+  max-width: 1296px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 120px 8px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  color: var(--ink);
+}
+/* the sample banner is pinned under the nav on Home (sample.css): the column starts below it */
+[data-park] .park-shell__main:has(.park-first-run-banner--home) .park-home-root {
+  padding-top: 172px;
 }
 [data-park] .park-home-root button,
 [data-park] .park-home-root input {
   font-family: inherit;
 }
 
-/* ---- glass (README "Glass (nav and Home only)") ---- */
-[data-park] .park-home-glass {
-  background: var(--gBg);
-  backdrop-filter: var(--gFx);
-  -webkit-backdrop-filter: var(--gFx);
-  border: 1px solid var(--gBd);
-  box-shadow: var(--sh);
-}
-
-/* ---- greeting panel (top left) ---- */
-/* the greeting panel and the spend tiles under it share one column, so the tiles follow the panel's real height
-   (a longer greeting or summary pushes them down) and stop above the composer, never over either */
-[data-park] .park-home-leftcol {
-  position: absolute;
-  left: 24px;
-  top: 96px;
-  /* the composer's measured height (useComposerClearance) + its 24px edge + a 12px gap; 218px before it is measured */
-  bottom: calc(var(--park-home-composer-h, 182px) + 36px);
-  width: 500px;
-  max-width: calc(100% - 48px);
+/* ---- the greeting and its crew ---- */
+[data-park] .park-home-top {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  z-index: 3;
-  pointer-events: none;
-}
-[data-park] .park-home-leftcol > * {
-  pointer-events: auto;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
 }
 [data-park] .park-home-hero {
-  flex: none;
-  box-sizing: border-box;
-  padding: 24px 26px 22px;
-  border-radius: 28px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  z-index: 3;
+  align-items: flex-start;
+  gap: 8px;
 }
 [data-park] .park-home-date {
   font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.7px;
-  color: var(--ink2);
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  color: var(--ink3);
 }
 [data-park] .park-home-h1 {
   margin: 0;
-  font-family: "Nunito", sans-serif;
-  font-weight: 900;
-  font-size: 50px;
-  line-height: 1;
-  letter-spacing: -1.4px;
-}
-/* a phone: the stacked composer is tall, so the greeting is a size smaller to keep the suggestion chips off the panel */
-@media (max-width: 480px) {
-  [data-park] .park-home-h1 {
-    font-size: 40px;
-    letter-spacing: -1.1px;
-  }
-  [data-park] .park-home-hero {
-    padding: 20px 22px 18px;
-    gap: 10px;
-  }
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -2px;
+  overflow-wrap: anywhere;
 }
 [data-park] .park-home-summary {
   margin: 0;
-  font-size: 17px;
-  line-height: 1.45;
+  font-size: 18px;
+  line-height: 1.5;
   color: var(--ink2);
-  font-weight: 600;
   text-wrap: pretty;
 }
+[data-park] .park-home-crew {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 0 16px 6px;
+}
+[data-park] .park-home-crew__floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--sunk);
+}
+[data-park] .park-home-crew .park-buddy {
+  position: relative;
+}
 
-/* the one amber "Needs you" pill, and the state that replaces it */
+/* the amber "Needs you" pill under the summary, and the state that replaces it */
 [data-park] .park-home-needs {
-  align-self: flex-start;
+  margin-top: 6px;
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--amberSoft);
+  min-height: 44px;
+  padding: 4px 5px 4px 4px;
   border: 1px solid var(--amberLine);
   border-radius: 999px;
-  padding: 4px 5px 4px 4px;
+  background: var(--amberSoft);
   color: var(--ink);
+  font-size: 15px;
   font-weight: 600;
-  font-size: 14.5px;
-  cursor: pointer;
   text-align: left;
+  cursor: pointer;
 }
 [data-park] .park-home-needs__tile {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  background: var(--amberTile);
+  flex: none;
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  width: 34px;
+  height: 34px;
   overflow: hidden;
-  flex: none;
+  border-radius: 999px;
+  background: var(--amberTile);
 }
 [data-park] .park-home-needs__bold {
-  font-weight: 800;
+  font-weight: 700;
 }
 [data-park] .park-home-needs__review {
-  height: 30px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 34px;
   padding: 0 14px;
   border-radius: 999px;
   background: #f0a500;
   color: #1f1d2b;
-  font-weight: 800;
-  font-size: 13.5px;
-  display: flex;
-  align-items: center;
-  flex: none;
+  font-size: 14px;
+  font-weight: 700;
 }
 [data-park] .park-home-caught {
-  align-self: flex-start;
+  margin-top: 6px;
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--okSoft);
-  border-radius: 999px;
   padding: 6px 16px 6px 6px;
-  font-size: 14.5px;
-  font-weight: 700;
+  border-radius: 999px;
+  background: var(--okSoft);
+  font-size: 15px;
+  font-weight: 600;
 }
 [data-park] .park-home-caught__disc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 28px;
   height: 28px;
   border-radius: 99px;
   background: var(--ok);
   color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-/* ---- Today panel (top right, from 1180 px) ---- */
-[data-park] .park-home-today {
-  position: absolute;
-  right: 24px;
-  top: 96px;
-  width: 352px;
-  max-height: calc(100% - 330px);
-  overflow-y: auto;
-  box-sizing: border-box;
-  padding: 8px;
-  border-radius: 26px;
+/* ---- the ask box ---- */
+[data-park] .park-home-composer {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  z-index: 3;
+  gap: 12px;
 }
-[data-park] .park-home-head {
+[data-park] .park-home-panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park] .park-home-input-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 10px 4px;
+  gap: 16px;
 }
-[data-park] .park-home-head--next {
-  padding: 6px 10px 2px;
-}
-[data-park] .park-home-title {
-  font-size: 15px;
-  font-weight: 800;
-}
-[data-park] .park-home-link {
-  font-size: 13.5px;
-  font-weight: 800;
-  color: var(--heroInk);
-  text-decoration: none;
-}
-[data-park] .park-home-link:hover {
-  color: var(--hero);
-}
-[data-park] .park-home-rule {
-  height: 1px;
-  background: var(--line2);
-  margin: 4px 10px;
-}
-
-/* Live now */
-[data-park] .park-home-live {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 7px 10px 7px 7px;
-  border: 0;
-  border-radius: 16px;
-  background: transparent;
-  color: var(--ink);
-  text-align: left;
-  cursor: pointer;
-}
-[data-park] .park-home-tile {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+[data-park] .park-home-logo {
+  flex: none;
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  width: 52px;
+  height: 52px;
   overflow: hidden;
-}
-[data-park] .park-home-tile--needs {
-  background: var(--amberTile);
-}
-[data-park] .park-home-tile--run {
+  border-radius: 16px;
   background: var(--sunk);
 }
-[data-park] .park-home-live__text {
+[data-park] .park-home-panel .park-home-input {
+  flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-[data-park] .park-home-live__name {
-  font-size: 14px;
-  font-weight: 800;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-[data-park] .park-home-live__sub {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--ink2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-[data-park] .park-home-live__sub--needs {
-  color: var(--amberInk);
-}
-[data-park] .park-home-track {
-  width: 44px;
-  height: 5px;
-  border-radius: 99px;
-  background: var(--track);
-  overflow: hidden;
-}
-[data-park] .park-home-bar {
-  display: block;
-  height: 100%;
-  border-radius: 99px;
-}
-[data-park] .park-home-bar--needs {
-  background: var(--amber);
-}
-[data-park] .park-home-bar--run {
-  background: var(--run);
-}
-
-/* Up next today */
-[data-park] .park-home-event {
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
-  padding: 8px 10px;
+  height: 64px;
+  padding: 0;
   border: 0;
-  border-radius: 14px;
+  border-radius: 0;
+  outline: none;
   background: transparent;
   color: var(--ink);
-  text-align: left;
-  cursor: pointer;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.8px;
 }
-[data-park] .park-home-event__time {
-  font-size: 14px;
-  font-weight: 800;
-  color: var(--ink2);
+[data-park] .park-home-input::placeholder {
+  color: var(--ink3);
 }
-[data-park] .park-home-event__body {
-  min-width: 0;
+/* the design draws no ring on the input; a keyboard user still needs to see where they are */
+[data-park] .park-home-panel .park-home-input:focus-visible {
+  outline: 3px solid var(--focus, #5a3fe0);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+[data-park] .park-home-mode-row {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-left: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
 }
-[data-park] .park-home-event__body--work {
-  border-left: 3px solid var(--hero);
+[data-park] .park-home-effort .park-seg {
+  box-sizing: border-box;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--sunk);
 }
-[data-park] .park-home-event__body--personal {
-  border-left: 3px solid var(--ok);
-}
-[data-park] .park-home-event__body--tilo {
-  border-left: 3px solid var(--sch);
-}
-[data-park] .park-home-event__title {
+[data-park] .park-home-effort .park-seg__item {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
   font-size: 14px;
-  font-weight: 800;
-  line-height: 1.3;
+  font-weight: 600;
 }
-[data-park] .park-home-event__sub {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--ink2);
+[data-park] .park-home-effort .park-seg__thumb {
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  border-radius: 10px;
+  /* !important: SegmentedControl sets its own width inline; this track has 4px padding and two items */
+  width: calc((100% - 8px) / 2) !important;
 }
-
-/* September spend */
-[data-park] .park-home-spend {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 10px 12px;
+[data-park] .park-home-hint {
+  flex: 1;
+  min-width: 180px;
+  text-align: right;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink3);
+}
+[data-park] .park-home-start {
+  flex: none;
+  height: 52px;
+  padding: 0 24px;
   border: 0;
   border-radius: 16px;
-  background: transparent;
-  color: var(--ink);
-  text-align: left;
+  background: var(--priFill, var(--heroFill));
+  color: var(--onPri, #ffffff);
+  box-shadow: 0 3px 0 var(--priLip, var(--heroFill));
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
 }
-[data-park] .park-home-spend__head {
-  display: flex;
+[data-park] .park-home-start:hover,
+[data-park] .park-home-confirm:hover {
+  filter: brightness(1.08);
+}
+/* "Size of job" behind Options (JUDGE-FIRST-RUN F7) */
+[data-park] .park-home-options {
+  flex: none;
+  max-width: 100%;
+}
+[data-park] .park-home-options__summary {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-}
-[data-park] .park-home-spend__link {
-  font-size: 13.5px;
-  font-weight: 800;
-  color: var(--heroInk);
-}
-[data-park] .park-home-spend__figures {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-[data-park] .park-home-spend__amount {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.4px;
-}
-[data-park] .park-home-spend__of {
-  font-size: 13.5px;
-  font-weight: 700;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
   color: var(--ink2);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
 }
-[data-park] .park-home-spend__bar {
-  width: 100%;
-  height: 6px;
-  border-radius: 99px;
-  background: var(--track);
-  overflow: hidden;
-  display: flex;
+[data-park] .park-home-options__now {
+  color: var(--ink3);
+  font-weight: 500;
 }
-[data-park] .park-home-spend__spent {
-  background: var(--hero);
-}
-[data-park] .park-home-spend__waiting {
-  background: var(--amber);
-  opacity: 0.85;
-}
-[data-park] .park-home-spend__note {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--ink2);
-}
-
-/* row hover (the .2s fade returns in WEB-3) */
-[data-park] .park-home-live:hover,
-[data-park] .park-home-event:hover,
-[data-park] .park-home-spend:hover {
-  background: var(--rowHover);
-}
-
-/* ---- composer column (bottom centre) ---- */
-[data-park] .park-home-composer {
-  position: absolute;
-  left: 50%;
-  bottom: 24px;
-  transform: translateX(-50%);
-  width: 1040px;
-  max-width: calc(100% - 48px);
+[data-park] .park-home-options__body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  align-items: center;
-  z-index: 4;
-}
-[data-park] .park-home-chips {
-  display: flex;
+  align-items: flex-start;
   gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
+  padding: 10px 4px 4px;
 }
-/* motion: restored in WEB-3 (BQ-WEB-3): the chip lifts 2px on hover over .3s */
-[data-park] .park-home-chip {
-  height: 38px;
-  padding: 0 16px;
-  border-radius: 999px;
-  background: var(--gBg);
-  backdrop-filter: var(--gFx);
-  -webkit-backdrop-filter: var(--gFx);
-  border: 1px solid var(--gBd);
-  font-weight: 800;
+[data-park] .park-home-options__help {
+  margin: 0;
+  max-width: 390px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink3);
+}
+[data-park] .park-home-size {
+  position: relative;
+  width: 390px;
+  max-width: 100%;
+}
+[data-park] .park-home-size .park-seg {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px;
+  border-radius: 14px;
+}
+[data-park] .park-home-size .park-seg__item {
+  height: 36px;
   font-size: 14px;
-  color: var(--ink);
-  cursor: pointer;
-  white-space: nowrap;
 }
-[data-park] .park-home-chip:hover {
-  transform: translateY(-2px);
+[data-park] .park-home-size .park-seg__thumb {
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  border-radius: 10px;
+  /* !important: SegmentedControl sets its own width inline ((100% - 6px) / N); this track has 4px padding */
+  width: calc((100% - 8px) / 3) !important;
+}
+/* files: the attach button and the chips (WEB-W1) */
+[data-park] .park-home-intake {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--ink2);
+  font-size: 14px;
+}
+[data-park] .park-home-intake__label {
+  font-size: 12px;
+}
+[data-park] .park-home-intake__status {
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--chip);
+}
+[data-park] .park-home-intake textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--field);
+  color: var(--ink);
+}
+[data-park] .park-home-intake ul {
+  max-height: 192px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-home-attach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+[data-park] .park-home-attach__note {
+  font-size: 13px;
+  color: var(--ink3);
+}
+[data-park] .park-home-attach [aria-disabled="true"] {
+  color: var(--ink3);
+  cursor: not-allowed;
+}
+[data-park] .park-home-attach__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-home-attach__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 290px;
+  min-height: 48px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-park] .park-home-attach__kind {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--redSoft);
+  color: var(--redInk);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+[data-park] .park-home-attach__remove {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--ink3);
+  font-size: 18px;
+  cursor: pointer;
 }
 
-/* the drafting line: the ring turns in WEB-3 (BQ-WEB-3) */
+/* the answer, the drafting line, the plan card and the chips under the ask box */
+[data-park] .park-home-quick {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px;
+  border-radius: 16px;
+  background: var(--heroSoft);
+  color: var(--ink);
+}
+[data-park] .park-home-quick__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+[data-park] .park-home-quick__sample {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-home-quick__text {
+  margin: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  font-size: 16px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-home-quick__cost {
+  font-size: 13px;
+  color: var(--ink2);
+}
+[data-park] .park-home-quick--note {
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  font-size: 15px;
+}
+[data-park] .park-home-quick--note > span {
+  flex: 1;
+  min-width: 0;
+}
+[data-park] .park-home-tier {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+[data-park] .park-home-drafting {
+  box-sizing: border-box;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 18px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  font-size: 15px;
+  font-weight: 500;
+}
 [data-park] .park-home-drafting__text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-[data-park] .park-home-drafting {
-  max-width: 100%;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 44px;
-  padding: 0 18px 0 14px;
-  border-radius: 999px;
-  background: var(--pop);
-  border: 1px solid var(--line2);
-  box-shadow: var(--sh);
-  font-size: 14.5px;
-  font-weight: 700;
-}
 [data-park] .park-home-spin {
+  flex: none;
+  display: block;
+  box-sizing: border-box;
   width: 18px;
   height: 18px;
-  box-sizing: border-box;
-  border-radius: 99px;
   border: 2.5px solid var(--track);
   border-top-color: var(--hero);
-  display: block;
-  flex: none;
+  border-radius: 99px;
 }
-
-/* the plan card */
 [data-park] .park-home-plan {
-  width: 100%;
   box-sizing: border-box;
-  background: var(--pop);
-  border: 1px solid var(--line2);
-  border-radius: 24px;
-  box-shadow: var(--sh);
-  padding: 18px 18px 18px 22px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 20px;
   align-items: center;
+  gap: 20px;
+  padding: 20px 20px 20px 24px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: var(--sh);
 }
 [data-park] .park-home-plan__main {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-width: 0;
 }
 [data-park] .park-home-plan__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
 }
-[data-park] .park-home-tier {
-  height: 24px;
-  padding: 0 9px;
-  border-radius: 7px;
+[data-park] .park-home-plan .park-home-tier,
+[data-park] .park-home-run .park-home-tier {
   background: var(--heroSoft);
   color: var(--heroInk);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  display: flex;
-  align-items: center;
 }
 [data-park] .park-home-plan__query {
-  font-size: 17px;
-  font-weight: 800;
   min-width: 0;
+  font-size: 17px;
+  font-weight: 700;
   /* A3: a long unbroken task wraps inside the card and stops at three lines (the full text is the title) */
   overflow-wrap: anywhere;
   display: -webkit-box;
@@ -506,16 +538,14 @@
 }
 [data-park] .park-home-plan__sample {
   margin: 0;
-  font-size: 13.5px;
-  font-weight: 700;
+  font-size: 14px;
   color: var(--ink3);
 }
 [data-park] .park-home-meta {
   display: flex;
-  gap: 22px;
   flex-wrap: wrap;
-  font-size: 13.5px;
-  font-weight: 700;
+  gap: 22px;
+  font-size: 14px;
   color: var(--ink2);
 }
 [data-park] .park-home-meta__k {
@@ -523,7 +553,7 @@
 }
 [data-park] .park-home-meta__v {
   color: var(--ink);
-  font-weight: 800;
+  font-weight: 700;
 }
 [data-park] .park-home-steps {
   margin: 0;
@@ -531,27 +561,26 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 [data-park] .park-home-step {
   display: flex;
   gap: 10px;
   font-size: 14px;
-  font-weight: 600;
   color: var(--ink2);
 }
 [data-park] .park-home-step__n {
-  width: 20px;
-  height: 20px;
-  border-radius: 99px;
-  background: var(--chip);
-  color: var(--ink);
-  font-size: 11.5px;
-  font-weight: 800;
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--sunk);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
 }
 [data-park] .park-home-plan__actions {
   display: flex;
@@ -559,689 +588,53 @@
   gap: 8px;
 }
 [data-park] .park-home-confirm {
-  height: 46px;
+  height: 48px;
   padding: 0 22px;
   border: 0;
   border-radius: 14px;
-  background: var(--heroFill);
-  color: #ffffff;
+  background: var(--priFill, var(--heroFill));
+  color: var(--onPri, #ffffff);
+  box-shadow: 0 3px 0 var(--priLip, var(--heroFill));
   font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
+  font-weight: 700;
   white-space: nowrap;
+  cursor: pointer;
 }
 [data-park] .park-home-change {
-  height: 40px;
-  padding: 0 18px;
+  min-height: 44px;
+  padding: 0 16px;
   border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--btn2);
+  border-radius: 14px;
+  background: var(--card);
   color: var(--ink);
-  font-size: 14px;
-  font-weight: 800;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-/* the glass panel with the task input and the size of job */
-[data-park] .park-home-panel {
-  width: 100%;
-  box-sizing: border-box;
-  border-radius: 28px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-[data-park] .park-home-input-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding-left: 12px;
-}
-[data-park] .park-home-logo {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  background: var(--hero);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-}
-[data-park] .park-home-logo__face {
-  width: 22px;
-  height: 12px;
-  border-radius: 5px;
-  background: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-}
-[data-park] .park-home-logo__dot {
-  width: 3px;
-  height: 3px;
-  border-radius: 9px;
-  background: #1f1d2b;
-}
-[data-park] .park-home-input {
-  flex: 1;
-  min-width: 0;
-  height: 58px;
-  border: 0;
-  outline: none;
-  background: transparent;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--ink);
-}
-[data-park] .park-home-input::placeholder {
-  color: var(--ink3);
-}
-/* the design draws no ring on the input; a keyboard user still needs to see where they are */
-[data-park] .park-home-input:focus-visible {
-  outline: 3px solid #5a3fe0;
-  outline-offset: 2px;
-}
-/* motion: restored in WEB-3 (BQ-WEB-3): filter .2s and transform .15s */
-[data-park] .park-home-start {
-  height: 54px;
-  padding: 0 24px;
-  border: 0;
-  border-radius: 18px;
-  background: var(--heroFill);
-  color: #ffffff;
-  font-size: 16px;
-  font-weight: 800;
-  cursor: pointer;
-  flex: none;
-  white-space: nowrap;
-}
-/* QA-DEMO-1 m8: on a phone the input had about 120px beside the logo and the button. The logo gives its place up and the
-   button its padding, so the placeholder reads. */
-@media (max-width: 480px) {
-  [data-park] .park-home-input-row {
-    gap: 8px;
-  }
-  [data-park] .park-home-logo {
-    display: none;
-  }
-  [data-park] .park-home-input {
-    font-size: 16px;
-  }
-  [data-park] .park-home-start {
-    padding: 0 16px;
-  }
-}
-@media (max-width: 360px) {
-  [data-park] .park-home-input-row {
-    padding-left: 8px;
-  }
-  [data-park] .park-home-start {
-    padding: 0 12px;
-  }
-}
-[data-park] .park-home-start:hover,
-[data-park] .park-home-confirm:hover {
-  filter: brightness(1.08);
-}
-[data-park] .park-home-start:active {
-  transform: translateY(2px);
-}
-[data-park] .park-home-mode-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 0 4px 2px;
-  flex-wrap: wrap;
-}
-/* "Size of job": the sliding SegmentedControl at the design's size (track 390 r16 p4, items h36 14px,
-   thumb r12 and a third of the inside) */
-[data-park] .park-home-size {
-  position: relative;
-  width: 390px;
-  max-width: 100%;
-  flex: none;
-}
-[data-park] .park-home-size .park-seg {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 4px;
-  border-radius: 16px;
-}
-[data-park] .park-home-size .park-seg__item {
-  height: 36px;
-  font-size: 14px;
-}
-[data-park] .park-home-size .park-seg__thumb {
-  top: 4px;
-  bottom: 4px;
-  left: 4px;
-  border-radius: 12px;
-  /* !important: SegmentedControl sets its own width inline ((100% - 6px) / N); this track has 4px padding */
-  width: calc((100% - 8px) / 3) !important;
-}
-[data-park] .park-home-hint {
-  flex: 1;
-  min-width: 200px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--ink2);
-  line-height: 1.35;
-}
-
-/* ---- map pins (positions come from app.pins) ---- */
-[data-park] .park-home-pin {
-  position: absolute;
-  transform: translate(-50%, -100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  z-index: 2;
-}
-/* motion: restored in WEB-3 (BQ-WEB-3): the card lifts 3px on hover over .3s */
-[data-park] .park-home-pin__card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 5px 16px 5px 5px;
-  border-radius: 999px;
-  border: 1px solid var(--line2);
-  background: var(--pop);
-  box-shadow: var(--sh);
+  font-size: 15px;
+  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
-  color: var(--ink);
-  text-align: left;
 }
-[data-park] .park-home-pin__card:hover {
-  transform: translateY(-3px);
-}
-[data-park] .park-home-pin__icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-}
-[data-park] .park-home-pin__icon--needs {
-  background: #f0a500;
-  color: #1f1d2b;
-}
-[data-park] .park-home-pin__icon--run {
-  background: var(--heroFill);
-  color: #ffffff;
-}
-[data-park] .park-home-pin__icon--sch {
-  background: var(--sch);
-  color: #ffffff;
-}
-[data-park] .park-home-pin__text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
-}
-[data-park] .park-home-pin__name {
-  font-weight: 800;
-  font-size: 14.5px;
-}
-[data-park] .park-home-pin__sub {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--ink2);
-}
-[data-park] .park-home-pin__stem {
-  width: 2px;
-  height: 26px;
-  background: var(--stem);
-}
-[data-park] .park-home-pin__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 99px;
-  background: var(--pin);
-  box-shadow: 0 0 0 5px var(--halo);
-}
-
-/* ---- the five spend tiles (FR-SPD-01), under the greeting panel ---- */
-[data-park] .park-home-kpis {
-  flex: 0 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  box-sizing: border-box;
-  padding: 8px;
-  border-radius: 26px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  z-index: 3;
-}
-
-/* ---- A2 (14 Oct QA, 1024x768 / 768x1024 / 390x844): under 1180px the page is one scrolling column ----
-   The spend tiles and the Today panel used to be left out below 1180px (no side to put them on). They now stack
-   under the composer, so a tablet or a phone sees the same numbers as a laptop: greeting, composer, spend tiles,
-   Sample worlds / Up next today / October spend, the legal strip. Nothing is placed by a top or bottom offset,
-   so nothing can lay over anything. The city pins stay out of a tablet column (the worlds are listed in it). ---- */
-@media (max-width: 1179px) {
-  [data-park] .park-home-root {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    box-sizing: border-box;
-    height: 100vh;
-    min-height: 0;
-    padding: 96px 24px 16px;
-    overflow-x: hidden;
-    overflow-y: auto;
-  }
-  [data-park] .park-shell__main:has(.park-first-run-banner--home) .park-home-root {
-    padding-top: 148px;
-  }
-  /* the greeting column gives its two children to the page column, so the composer can sit between them */
-  [data-park] .park-home-leftcol {
-    display: contents;
-  }
-  [data-park] .park-home-root .park-home-hero,
-  [data-park] .park-home-root .park-home-composer,
-  [data-park] .park-home-root .park-home-kpis,
-  [data-park] .park-home-root .park-home-today {
-    position: static;
-    transform: none;
-    box-sizing: border-box;
-    flex: none;
-    width: 100%;
-    max-width: 760px;
-    align-self: center;
-  }
-  [data-park] .park-home-hero {
-    order: 0;
-  }
-  [data-park] .park-home-composer {
-    order: 1;
-  }
-  [data-park] .park-home-kpis {
-    order: 2;
-    overflow: visible;
-    min-height: auto;
-  }
-  [data-park] .park-home-root .park-home-today {
-    order: 3;
-    max-height: none;
-    overflow: visible;
-  }
-  [data-park] .park-home-root .park-home-today .park-home-live:nth-child(n + 5) {
-    display: grid;
-  }
-  [data-park] .park-home-legal {
-    order: 4;
-    position: static;
-    align-self: flex-end;
-    flex: none;
-  }
-}
-@media (min-width: 481px) and (max-width: 1179px) {
-  [data-park] .park-home-kpis {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  [data-park] .park-home-pin {
-    display: none;
-  }
-}
-
-/* ---- focus: the README ring on every control of the page ---- */
-[data-park] .park-home-needs:focus-visible,
-[data-park] .park-home-link:focus-visible,
-[data-park] .park-home-live:focus-visible,
-[data-park] .park-home-event:focus-visible,
-[data-park] .park-home-spend:focus-visible,
-[data-park] .park-home-chip:focus-visible,
-[data-park] .park-home-start:focus-visible,
-[data-park] .park-home-confirm:focus-visible,
-[data-park] .park-home-change:focus-visible,
-[data-park] .park-home-pin__card:focus-visible {
-  outline: 3px solid #5a3fe0;
-  outline-offset: 2px;
-}
-
-/* ---- legal links (WEB-LEGAL): a quiet strip on the page's bottom edge, at the right ---- */
-[data-park] .park-home-legal {
-  position: absolute;
-  right: 24px;
-  bottom: 0;
-  z-index: 4;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: var(--pop);
-  border: 1px solid var(--line2);
-  box-shadow: var(--sh);
-  box-sizing: border-box;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--ink2);
-  white-space: nowrap;
-}
-/* a phone: the composer's "Start a real task" is centred, so the strip hugs the right edge and shrinks to leave a gap */
-@media (max-width: 480px) {
-  [data-park] .park-home-legal {
-    right: 12px;
-    gap: 4px;
-    padding: 0 8px;
-    font-size: 11px;
-  }
-  /* the links stay 24px tall to the eye; their touch target reaches 44px (WCAG 2.2 target size) */
-  [data-park] .park-home-legal a {
-    position: relative;
-  }
-  [data-park] .park-home-legal a::after {
-    content: "";
-    position: absolute;
-    inset: -10px -6px;
-  }
-}
-[data-park] .park-home-legal a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  color: var(--ink2);
-}
-
-/* ---- Quick / Thinking (COST-FAST-1): the depth control beside the size of job, and the Quick answer card.
-   Nothing here animates. ---- */
-[data-park] .park-home-effort {
-  position: relative;
-  width: 210px;
-  max-width: 100%;
-  flex: none;
-}
-[data-park] .park-home-effort .park-seg {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 4px;
-  border-radius: 16px;
-}
-[data-park] .park-home-effort .park-seg__item {
-  height: 36px;
-  font-size: 14px;
-}
-[data-park] .park-home-effort .park-seg__thumb {
-  top: 4px;
-  bottom: 4px;
-  left: 4px;
-  border-radius: 12px;
-  /* !important: SegmentedControl sets its own width inline; this track has 4px padding and two items */
-  width: calc((100% - 8px) / 2) !important;
-}
-[data-park] .park-home-quick {
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--pop);
-  border: 1px solid var(--line2);
-  border-radius: 24px;
-  box-shadow: var(--sh);
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-[data-park] .park-home-quick__head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-[data-park] .park-home-quick__sample {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--ink2);
-}
-[data-park] .park-home-quick__text {
-  margin: 0;
-  font-size: 15.5px;
-  font-weight: 700;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  max-height: 220px;
-  overflow-y: auto;
-}
-[data-park] .park-home-quick__cost {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--ink2);
-}
-[data-park] .park-home-quick--note {
-  flex-direction: row;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 20px;
-  font-size: 14.5px;
-  font-weight: 700;
-}
-[data-park] .park-home-quick--note > span {
-  flex: 1;
-  min-width: 0;
-}
-[data-park] .park-home-intake {
-  border: 0;
-  margin: 0;
-  padding: 0;
-  min-width: 0;
-  color: var(--ink2);
-  font-size: 0.875rem;
-}
-[data-park] .park-home-intake__label {
-  font-size: 0.75rem;
-}
-[data-park] .park-home-intake__status {
-  background: var(--chip);
-  border-radius: 0.5rem;
-  padding: 0.25rem 0.5rem;
-}
-[data-park] .park-home-intake textarea {
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--field);
-  color: var(--ink);
-}
-[data-park] .park-home-intake ul {
-  max-height: 12rem;
-  overflow-y: auto;
-  overflow-wrap: anywhere;
-}
-
-/* WEB-W1: the composer's attach row and its chips */
-[data-park] .park-home-attach {
+[data-park] .park-home-chips {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 8px;
-  margin-top: 8px;
 }
-[data-park] .park-home-attach__note {
-  font-size: 12px;
-  opacity: 0.75;
-}
-[data-park] .park-home-attach [aria-disabled="true"] {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-[data-park] .park-home-attach__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  list-style: none;
-  margin: 8px 0 0;
-  padding: 0;
-}
-[data-park] .park-home-attach__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
+[data-park] .park-home-chip {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  font-size: 12px;
-  background: var(--chip);
+  background: var(--card);
   color: var(--ink);
-}
-[data-park] .park-home-attach__remove {
-  background: none;
-  border: 0;
-  color: inherit;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
-  padding: 0 2px;
 }
-
-/* ---- a phone (13 Oct QA, 390x844): the greeting and the stacked composer are taller than the screen together,
-   so two panels pinned by offsets lay chips over the "decisions waiting" pill. Here the page is one column that
-   scrolls: nothing is placed by a fixed top or bottom, so nothing can overlap, whatever height the panels take. ---- */
-@media (max-width: 480px) {
-  [data-park] .park-home-root {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    box-sizing: border-box;
-    height: 100vh;
-    min-height: 0;
-    padding: 96px 24px 16px;
-    overflow-x: hidden;
-    overflow-y: auto;
-  }
-  /* the sample banner is pinned under the nav (sample.css); the column starts below it */
-  [data-park] .park-shell__main:has(.park-first-run-banner--home) .park-home-root {
-    padding-top: 148px;
-  }
-  [data-park] .park-home-leftcol,
-  [data-park] .park-home-composer {
-    position: static;
-    transform: none;
-    width: auto;
-    max-width: none;
-    flex: none;
-  }
-  [data-park] .park-home-legal {
-    position: static;
-    align-self: flex-end;
-    flex: none;
-    max-width: 100%;
-    height: auto;
-    min-height: 24px;
-    flex-wrap: wrap;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-  /* the input gets the full width of its row (its placeholder is the only hint of what to write) and the start
-     button the row under it, at its own size on the right: the reference's input height and button size stay */
-  [data-park] .park-home-input-row {
-    flex-wrap: wrap;
-  }
-  [data-park] .park-home-input {
-    flex: 1 1 100%;
-  }
-  [data-park] .park-home-start {
-    flex: none;
-    margin-left: auto;
-  }
-}
-
-/* ---- A1 (14 Oct QA, 1440x900 and 1280x720): the panels stop above the composer, whatever it holds ----
-   The greeting column's bottom is the composer's measured height (above). The Today panel keeps its reference
-   box (right 24, top 96, 352 wide, p 8, max-height root - 330) wherever the composer is the 198px the reference
-   drew; where it is taller, the panel ends 12px above the composer instead (under 1390 px the chips row reaches
-   the panel, from 1390 only the glass panel does). Under 1120px of height the five spend tiles go compact
-   (value beside label and sub: 3 rows of about 48px, so all five show at 1440x900) and the Today panel lists
-   its first three worlds; where the column is shorter than its content it scrolls as one (A3 below). ---- */
-@media (min-width: 481px) {
-  [data-park] .park-home-today {
-    max-height: min(calc(100% - 330px), calc(100% - var(--park-home-composer-h, 198px) - 132px));
-  }
-}
-@media (min-width: 1390px) {
-  [data-park] .park-home-today {
-    max-height: min(calc(100% - 330px), calc(100% - var(--park-home-panel-h, 184px) - 132px));
-  }
-}
-@media (min-width: 481px) and (max-height: 1120px) {
-  [data-park] .park-home-kpis {
-    gap: 6px;
-    padding: 6px;
-  }
-  [data-park] .park-home-kpis .park-kpi {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    column-gap: 10px;
-    row-gap: 0;
-    align-items: center;
-    padding: 7px 12px;
-    border-radius: 16px;
-  }
-  [data-park] .park-home-kpis .park-kpi__value {
-    grid-row: 1 / span 2;
-    font-size: 22px;
-    letter-spacing: -0.4px;
-  }
-  [data-park] .park-home-kpis .park-kpi__label,
-  [data-park] .park-home-kpis .park-kpi__sub {
-    grid-column: 2;
-    min-width: 0;
-    font-size: 12px;
-    line-height: 1.3;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-@media (min-width: 481px) and (max-height: 960px) {
-  /* children: head, rows, [sample], rule ...: the 4th row on is the "All worlds" page's to show */
-  [data-park] .park-home-today .park-home-live:nth-child(n + 5) {
-    display: none;
-  }
-}
-/* A3: whenever the column is shorter than hero + tiles (a short window, or the plan card open under it) it
-   scrolls as one, so the card never lies over a tile */
-@media (min-width: 481px) {
-  [data-park] .park-home-leftcol {
-    overflow-y: auto;
-    scrollbar-width: thin;
-  }
-  [data-park] .park-home-kpis {
-    flex: none;
-    overflow: visible;
-  }
-}
-
-/* LIVE-P2-A (QA row 20): while the plan card is open on the wide layout the stat tiles and the longer Today list
-   step aside, so nothing inside a glass card scrolls and no row is half hidden. They come back when the card closes. */
-@media (min-width: 1180px) {
-  [data-park] .park-home-root:has(.park-home-plan) .park-home-kpis {
-    display: none;
-  }
-  [data-park] .park-home-root:has(.park-home-plan) .park-home-leftcol {
-    overflow-y: visible;
-  }
-  [data-park] .park-home-root:has(.park-home-plan) .park-home-today {
-    overflow-y: visible;
-  }
-  [data-park] .park-home-root:has(.park-home-plan) .park-home-live:nth-child(n + 4) {
-    display: none;
-  }
-  [data-park] .park-home-root:has(.park-home-plan) .park-home-spend {
-    display: none;
-  }
-}
-
 /* SIMPLE-RUN-1: the one confirm card's changeable assumption lines */
 [data-park] .park-home-run__edit {
-  display: flex;
-  gap: 8px;
-  align-items: center;
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 [data-park] .park-home-run__edit input {
   flex: 1;
@@ -1251,11 +644,10 @@
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--btn2);
+  background: var(--card);
   color: var(--ink);
   font: inherit;
   font-size: 14px;
-  font-weight: 600;
 }
 [data-park] .park-home-run__link {
   min-height: 24px;
@@ -1265,7 +657,7 @@
   color: var(--heroInk);
   font: inherit;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   text-decoration: underline;
   cursor: pointer;
 }
@@ -1274,14 +666,13 @@
   outline: 2px solid var(--heroInk);
   outline-offset: 2px;
 }
-
-/* OLD-UI-OUT wave 1: the budget meter and the "Repeat weekly" option of the confirm card (ported from S-03) */
+/* the budget meter and the "Repeat weekly" option of the confirm card */
 [data-park] .park-home-meter {
   position: relative;
   height: 10px;
+  overflow: hidden;
   border-radius: 99px;
   background: var(--track);
-  overflow: hidden;
 }
 [data-park] .park-home-meter__band {
   position: absolute;
@@ -1301,8 +692,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 13.5px;
-  font-weight: 700;
+  font-size: 14px;
   color: var(--ink2);
 }
 [data-park] .park-home-repeat__toggle {
@@ -1327,7 +717,7 @@
   padding: 0 8px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--btn2);
+  background: var(--card);
   color: var(--ink);
   font: inherit;
 }
@@ -1335,25 +725,528 @@
   color: var(--ink3);
 }
 
-/* M2-PHONE-1: keep the priced plan readable and its editing controls tappable. */
-@media (max-width: 480px) {
-  [data-park] .park-home-plan {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  [data-park] .park-home-plan__query,
-  [data-park] .park-home-step > span {
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-  [data-park] .park-home-run__link,
-  [data-park] .park-home-run__edit input,
-  [data-park] .park-home-change {
-    min-height: 44px;
-    min-width: 44px;
-  }
-  [data-park] .park-home-run__link {
-    flex: none;
-  }
+/* ---- Your worlds and Chat history beside the side column ---- */
+[data-park] .park-home-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: start;
+  gap: 32px;
+}
+[data-park] .park-home-maincol {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+[data-park] .park-home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+[data-park] .park-home-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+[data-park] .park-home-section__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+[data-park] .park-home-section__sub {
+  font-size: 15px;
+  color: var(--ink3);
+}
+[data-park] .park-home-h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+}
+[data-park] .park-home-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--lineStrong, var(--line));
+  text-underline-offset: 3px;
+}
+[data-park] .park-home-link:hover {
+  color: var(--ink2);
+}
+[data-park] .park-home-none {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink3);
+}
+[data-park] .park-home-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+[data-park] .park-home-live {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--sh);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-home-live:hover {
+  border-color: var(--lineStrong, var(--line));
+}
+[data-park] .park-home-live__art {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 150px;
+  margin: 8px 8px 0;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--sunk);
+}
+[data-park] .park-home-live__pic {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 12px;
+}
+[data-park] .park-home-pill {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px 0 8px;
+  border-radius: 99px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--sh);
+  font-size: 13px;
+  font-weight: 700;
+}
+[data-park] .park-home-pill__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--ink3);
+}
+[data-park] .park-home-pill--run {
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+[data-park] .park-home-pill--run .park-home-pill__dot {
+  background: var(--lime, var(--hero));
+}
+[data-park] .park-home-pill--needs {
+  background: var(--amberSoft);
+  color: var(--amberInk);
+}
+[data-park] .park-home-pill--needs .park-home-pill__dot {
+  background: var(--amber);
+}
+[data-park] .park-home-live__foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+[data-park] .park-home-live__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+[data-park] .park-home-live__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-home-live__sub {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink3);
+}
+[data-park] .park-home-live__sub--needs {
+  color: var(--amberInk);
+}
+[data-park] .park-home-ring {
+  position: relative;
+  flex: none;
+  width: 48px;
+  height: 48px;
+}
+[data-park] .park-home-ring svg {
+  display: block;
+  transform: rotate(-90deg);
+}
+[data-park] .park-home-ring__track {
+  fill: none;
+  stroke: var(--sunk);
+  stroke-width: 5;
+}
+[data-park] .park-home-ring__fill {
+  fill: none;
+  stroke: var(--priFill, var(--hero));
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+[data-park] .park-home-ring__fill--needs {
+  stroke: var(--amber);
+}
+[data-park] .park-home-ring__pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+}
+[data-park] .park-home-history {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park] .park-home-history__face {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--lime, var(--hero));
+}
+[data-park] .park-home-history__visor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 22px;
+  height: 13px;
+  border-radius: 5px;
+  background: #ffffff;
+}
+[data-park] .park-home-history__visor span {
+  width: 2.5px;
+  height: 4px;
+  border-radius: 2px;
+  background: #1f1d2b;
+}
+[data-park] .park-home-history__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.4;
+}
+[data-park] .park-home-history__title {
+  font-size: 15.5px;
+  font-weight: 600;
+}
+[data-park] .park-home-history__line {
+  font-size: 14px;
+  color: var(--ink3);
+}
+
+/* ---- the side column: Needs you, Up next today, Just finished, spend and the spend tiles ---- */
+[data-park] .park-home-today {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 52px;
+}
+[data-park] .park-home-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park] .park-home-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+[data-park] .park-home-head__gap {
+  flex: 1;
+}
+[data-park] .park-home-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+[data-park] .park-home-count {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 99px;
+  background: #f0a500;
+  color: #1f1d2b;
+  font-size: 13px;
+  font-weight: 800;
+}
+[data-park] .park-home-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+[data-park] .park-home-tray {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  margin: 0 -8px;
+  padding: 8px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-home-tile {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--sunk);
+}
+[data-park] .park-home-tile--needs {
+  background: var(--amberSoft);
+}
+[data-park] .park-home-tray__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+[data-park] .park-home-tray__title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+[data-park] .park-home-tray__sub {
+  font-size: 13px;
+  color: var(--ink3);
+}
+[data-park] .park-home-tray__go {
+  color: var(--ink3);
+  font-size: 18px;
+}
+[data-park] .park-home-event {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 0 -8px;
+  padding: 8px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-home-event__time {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-home-event__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 10px;
+}
+[data-park] .park-home-event__body--work {
+  border-left: 3px solid var(--hero);
+}
+[data-park] .park-home-event__body--personal {
+  border-left: 3px solid var(--ok);
+}
+[data-park] .park-home-event__body--tilo {
+  border-left: 3px solid var(--sch);
+}
+[data-park] .park-home-event__title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+[data-park] .park-home-event__sub {
+  font-size: 13px;
+  color: var(--ink3);
+}
+[data-park] .park-home-done {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 20px;
+  background: var(--okSoft);
+}
+[data-park] .park-home-done__face {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--card);
+}
+[data-park] .park-home-done__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+[data-park] .park-home-done__label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--okInk);
+}
+[data-park] .park-home-done__name {
+  font-size: 15px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-home-spend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-home-spend__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+[data-park] .park-home-spend .park-home-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+[data-park] .park-home-spend__link {
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+[data-park] .park-home-spend__figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+[data-park] .park-home-spend__amount {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -1px;
+}
+[data-park] .park-home-spend__of {
+  font-size: 14px;
+  color: var(--ink3);
+}
+[data-park] .park-home-spend__bar {
+  display: flex;
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--sunk);
+}
+[data-park] .park-home-spend__spent {
+  background: var(--lime, var(--hero));
+}
+[data-park] .park-home-spend__waiting {
+  background: var(--amber);
+}
+[data-park] .park-home-spend__note {
+  font-size: 14px;
+  color: var(--ink2);
+}
+[data-park] .park-home-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+/* POLISH-1: five tiles in two columns leave one alone: the last tile of an odd count takes the whole row. */
+[data-park] .park-home-kpis > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+[data-park] .park-home-tray:hover,
+[data-park] .park-home-event:hover,
+[data-park] .park-home-spend:hover,
+[data-park] .park-home-chip:hover,
+[data-park] .park-home-change:hover {
+  background: var(--rowHover);
+}
+
+/* ---- focus: a 3px ring on every control of the page ---- */
+[data-park] .park-home-needs:focus-visible,
+[data-park] .park-home-link:focus-visible,
+[data-park] .park-home-live:focus-visible,
+[data-park] .park-home-tray:focus-visible,
+[data-park] .park-home-event:focus-visible,
+[data-park] .park-home-spend:focus-visible,
+[data-park] .park-home-chip:focus-visible,
+[data-park] .park-home-start:focus-visible,
+[data-park] .park-home-confirm:focus-visible,
+[data-park] .park-home-change:focus-visible,
+[data-park] .park-home-options__summary:focus-visible {
+  outline: 3px solid var(--focus, #5a3fe0);
+  outline-offset: 2px;
 }
 
 /* ---- JUDGE-FIRST-RUN F6: still loading shapes (no motion) ---- */
@@ -1369,43 +1262,145 @@
 [data-park] .park-home-skeleton--mid {
   width: 60%;
 }
+[data-park] .park-home-hero--loading {
+  width: min(560px, 100%);
+}
 [data-park] .park-home-skeleton--wide {
   width: 85%;
-  height: 28px;
+  height: 40px;
 }
 
-/* ---- JUDGE-FIRST-RUN F7: the size and depth choices live behind "Options" ---- */
-[data-park] .park-home-options {
-  flex: none;
-  max-width: 100%;
+/* ---- legal links (WEB-LEGAL): a quiet line at the end of the page ---- */
+[data-park] .park-home-legal {
+  align-self: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  font-size: 12px;
+  color: var(--ink3);
 }
-[data-park] .park-home-options__summary {
+[data-park] .park-home-legal a {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-height: 36px;
-  padding: 0 4px;
+  min-height: 24px;
   color: var(--ink2);
-  font-size: 14px;
-  font-weight: 800;
-  cursor: pointer;
 }
-[data-park] .park-home-options__now {
-  color: var(--ink3);
-  font-weight: 700;
+
+/* ---- under 1180px: one column, the side column under Your worlds ---- */
+@media (max-width: 1179px) {
+  [data-park] .park-home-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-park] .park-home-today {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    padding-top: 0;
+  }
+  [data-park] .park-home-kpis {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
-[data-park] .park-home-options__body {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 4px 4px;
+/* POLISH-1: in three columns five tiles end 3 + 2 with a gap: a six-column grid lets the last two share the row. */
+@media (min-width: 841px) and (max-width: 1179px) {
+  [data-park] .park-home-kpis {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  [data-park] .park-home-kpis > * {
+    grid-column: span 2;
+  }
+  [data-park] .park-home-kpis > :nth-child(4):nth-last-child(2),
+  [data-park] .park-home-kpis > :nth-child(5):last-child {
+    grid-column: span 3;
+  }
 }
-[data-park] .park-home-options__help {
-  margin: 0;
-  max-width: 390px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink3);
-  line-height: 1.35;
+
+/* ---- a phone (390x844): one scrolling column, nothing placed by an offset, every target 44px ---- */
+@media (max-width: 840px) {
+  [data-park] .park-home-root {
+    padding: 96px 16px 112px;
+    gap: 24px;
+  }
+  [data-park] .park-home-crew {
+    display: none;
+  }
+  [data-park] .park-home-h1 {
+    font-size: 36px;
+    letter-spacing: -1.2px;
+  }
+  [data-park] .park-home-summary {
+    font-size: 16px;
+  }
+  [data-park] .park-home-panel {
+    gap: 14px;
+    padding: 16px;
+  }
+  [data-park] .park-home-input-row {
+    gap: 12px;
+  }
+  [data-park] .park-home-logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+  [data-park] .park-home-panel .park-home-input {
+    height: 52px;
+    font-size: 19px;
+    letter-spacing: -0.3px;
+  }
+  [data-park] .park-home-hint {
+    flex: 1 1 100%;
+    order: 3;
+    text-align: left;
+  }
+  [data-park] .park-home-start {
+    margin-left: auto;
+  }
+  [data-park] .park-home-cards,
+  [data-park] .park-home-today {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-park] .park-home-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  [data-park] .park-home-h2 {
+    font-size: 24px;
+  }
+  [data-park] .park-home-plan {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-park] .park-home-plan__query,
+  [data-park] .park-home-step > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  [data-park] .park-home-run__link,
+  [data-park] .park-home-run__edit input,
+  [data-park] .park-home-change {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  [data-park] .park-home-run__link {
+    flex: none;
+  }
+  [data-park] .park-home-legal a {
+    position: relative;
+  }
+  /* the links stay 24px tall to the eye; their touch target reaches 44px (WCAG 2.2 target size) */
+  [data-park] .park-home-legal a::after {
+    content: "";
+    position: absolute;
+    inset: -10px -6px;
+  }
+}
+
+/* POLISH-1: the 390px placeholder ("e.g. Summarise this week's feedback") was cut at "fe"; 16px with no tracking fits. */
+@media (max-width: 430px) {
+  [data-park] .park-home-panel .park-home-input {
+    font-size: 16px;
+    letter-spacing: 0;
+  }
 }

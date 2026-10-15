@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="position:relative;width:100%;min-height:100%;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:16px;line-height:1.5">
+  <dc-import name="Tilo S Nav" active="needs" theme="{{ theme }}" hint-size="100%,72px"></dc-import>
+  <main style="max-width:1296px;margin:0 auto;padding:40px 32px 64px;display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;align-items:flex-end;gap:24px">
+      <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:14px"><h1 style="margin:0;font-family:var(--fH);font-weight:700;font-size:48px;line-height:1.05;letter-spacing:-2px">Needs you</h1><span style="height:34px;padding:0 14px;border-radius:99px;background:var(--amber);color:#1A1407;font-weight:700;font-size:15px;display:flex;align-items:center">3 waiting</span></div>
+        <p style="margin:0;font-size:18px;color:var(--ink2)">Tilo has paused these until you decide. Pick one, read what will happen, then say yes or no.</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--ink3)"><span style="height:28px;padding:0 8px;border-radius:8px;border:1px solid var(--line);display:flex;align-items:center;color:var(--ink)">J</span><span style="height:28px;padding:0 8px;border-radius:8px;border:1px solid var(--line);display:flex;align-items:center;color:var(--ink)">K</span>to move</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:380px minmax(0,1fr);gap:24px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh1);padding:8px;display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px 6px"><span style="font-weight:700;font-size:15px">Waiting on you</span><span style="font-size:13px;color:var(--ink3);font-weight:600">Soonest first</span></div>
+          <sc-for list="{{ queue }}" as="q" hint-placeholder-count="3">
+            <div style="padding:14px;border-radius:18px;background:{{ q.bg }};box-shadow:{{ q.ring }};display:flex;gap:12px;align-items:flex-start">
+              <span style="width:40px;height:40px;border-radius:12px;background:{{ q.ibg }};color:{{ q.ifg }};display:flex;align-items:center;justify-content:center;flex:none">{{ q.ic }}</span>
+              <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+                <span style="font-weight:700;font-size:15.5px;line-height:1.35">{{ q.t }}</span>
+                <span style="font-size:13px;color:var(--ink3)">{{ q.w }}</span>
+                <span style="display:flex;gap:6px;flex-wrap:wrap"><span style="height:24px;padding:0 8px;border-radius:7px;background:{{ q.kbg }};color:{{ q.kfg }};font-size:12px;font-weight:700;display:flex;align-items:center">{{ q.k }}</span><span style="height:24px;padding:0 8px;border-radius:7px;background:var(--card);border:1px solid var(--line);font-family:var(--mono);font-size:11px;display:flex;align-items:center">{{ q.due }}</span></span>
+              </span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:18px 20px;display:flex;flex-direction:column;gap:10px">
+          <span style="font-weight:700;font-size:15px">Decided today</span>
+          <sc-for list="{{ done }}" as="d" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:10px;font-size:14px"><span style="width:24px;height:24px;border-radius:99px;background:{{ d.bg }};color:{{ d.fg }};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:none">{{ d.i }}</span><span style="flex:1">{{ d.t }}</span><span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">{{ d.w }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+
+      <article style="background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh2);overflow:hidden;display:flex;flex-direction:column">
+        <div style="padding:20px 28px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);font-size:14px">
+          <span style="width:44px;height:32px;border-radius:9px;background:var(--cityBg);overflow:hidden;flex:none;filter:var(--cityFx)">{{ supCity }}</span>
+          <span style="font-weight:600">Compare 3 suppliers</span><span style="color:var(--ink3)">· asked 12 min ago by the Director</span>
+          <div style="flex:1"></div>
+          <span style="font-family:var(--mono);font-size:12px;color:var(--ink3)">1 of 3</span>
+          <span style="width:36px;height:36px;border-radius:10px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink3)">‹</span>
+          <span style="width:36px;height:36px;border-radius:10px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center">›</span>
+        </div>
+        <div style="padding:28px 28px 24px;display:flex;flex-direction:column;gap:24px">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="align-self:flex-start;height:28px;padding:0 10px;border-radius:8px;background:var(--amberSoft);color:var(--amberInk);font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px"><span style="display:flex">{{ iMailS }}</span>Sends email · answer by 6 pm</span>
+            <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:36px;line-height:1.12;letter-spacing:-1.4px">Can Tilo email 3 suppliers for a price?</h2>
+            <p style="margin:0;font-size:17px;color:var(--ink2)">You asked for prices by Friday. These three made the shortlist out of 11, so the team wants to ask them directly.</p>
+          </div>
+          <div style="display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) 220px;gap:12px">
+            <div style="border-radius:20px;background:var(--mintSoft);padding:18px;display:flex;flex-direction:column;gap:10px">
+              <span style="font-weight:700;color:var(--mintInk)">If you say yes</span>
+              <sc-for list="{{ yes }}" as="y" hint-placeholder-count="3"><span style="display:flex;gap:10px;font-size:15px;line-height:1.4"><span style="color:var(--mintInk);font-weight:800">✓</span>{{ y }}</span></sc-for>
+            </div>
+            <div style="border-radius:20px;background:var(--sunk);padding:18px;display:flex;flex-direction:column;gap:10px">
+              <span style="font-weight:700">If you say no</span>
+              <sc-for list="{{ no }}" as="n" hint-placeholder-count="3"><span style="display:flex;gap:10px;font-size:15px;line-height:1.4"><span style="color:var(--ink3);font-weight:800">–</span>{{ n }}</span></sc-for>
+            </div>
+            <div style="border-radius:20px;border:1px solid var(--line);padding:18px;display:flex;flex-direction:column;gap:6px">
+              <span style="font-weight:700">Cost</span>
+              <span style="font-family:var(--fH);font-weight:700;font-size:40px;line-height:1;letter-spacing:-1.4px">£0.30</span>
+              <span style="font-size:14px;color:var(--ink2)">Leaves £7.70 of this world’s £8 cap.</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-weight:700">Exactly what will be sent</span><a href="#" style="font-size:14px;font-weight:600;text-decoration:underline;text-underline-offset:3px">Edit the email</a></div>
+            <div style="border:1px solid var(--line);border-radius:20px;overflow:hidden">
+              <div style="padding:14px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--line);font-size:14px"><span style="color:var(--ink3);width:56px">To</span>
+                <sc-for list="{{ to }}" as="p" hint-placeholder-count="3"><span style="height:32px;padding:0 10px 0 3px;border-radius:99px;background:var(--sunk);display:flex;align-items:center;gap:8px;font-weight:600"><span style="width:26px;height:26px;border-radius:99px;background:{{ p.bg }};color:{{ p.fg }};font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center">{{ p.i }}</span>{{ p.n }}</span></sc-for>
+              </div>
+              <div style="padding:12px 18px;display:flex;gap:10px;border-bottom:1px solid var(--line);font-size:14px"><span style="color:var(--ink3);width:56px">Subject</span><span style="font-weight:600">Price for 2,000 battery packs</span></div>
+              <div style="padding:16px 18px 18px 84px;font-size:15px;line-height:1.6;color:var(--ink2)">Hi Lin, I’m sourcing batteries for our K1 scooter and would love a price for 2,000 of your 48V packs, shipped to Bristol. Could you reply by Friday? Thanks, Maya</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;border-radius:16px;background:var(--sunk);padding:12px 16px;font-size:14.5px"><span style="width:28px;height:28px;border-radius:9px;background:var(--card);display:flex;align-items:center;justify-content:center;flex:none">{{ iHelp }}</span><span style="flex:1"><strong>Why you’re seeing this:</strong> your rule says Tilo always asks before sending an email.</span><a href="#" style="font-weight:600;text-decoration:underline;text-underline-offset:3px">Change rule</a></div>
+        </div>
+        <div style="padding:18px 28px;border-top:1px solid var(--line);background:var(--bg);display:flex;align-items:center;gap:10px">
+          <span style="height:56px;padding:0 26px;border-radius:16px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;gap:12px;font-family:var(--fH);font-weight:700;font-size:18px">Yes, send the emails<span style="height:24px;padding:0 7px;border-radius:7px;background:rgba(127,127,127,.28);font-family:var(--mono);font-size:11px;display:flex;align-items:center">Y</span></span>
+          <span style="height:56px;padding:0 20px;border-radius:16px;border:1px solid var(--line2);background:var(--card);display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px">Change something<span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">C</span></span>
+          <span style="height:56px;padding:0 18px;border-radius:16px;display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;color:var(--redInk)">No, don’t send<span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">N</span></span>
+          <div style="flex:1"></div>
+          <span style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink2)"><span style="width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line2);box-sizing:border-box"></span>Don’t ask again for these 3 suppliers</span>
+        </div>
+      </article>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1250},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloR) this.t = setInterval(() => { if (window.TiloR && window.TiloCity) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const R = window.TiloR ? window.TiloR(React.createElement) : null;
+    const theme = this.props.theme ?? 'studio', ic = (n, s) => R ? R.ic(n, s) : null;
+    const queue = [['Can Tilo email 3 suppliers for a price?', 'Compare 3 suppliers', 'Sends email', 'BY 6 PM', 'mail', 'amber', true], ['Spend £86 on one battery sample?', 'Compare 3 suppliers', 'Spends money', 'BY TOMORROW', 'coin', 'amber', false], ['Which beach for night 2?', 'Road trip to Gokarna', 'Question', 'BY 6 PM · OR TILO PICKS', 'help', 'sky', false]].map(([t, w, k, due, i, c, sel]) => ({ t, w, k, due, ic: ic(i, 18), ibg: `var(--${c}Soft)`, ifg: `var(--${c}Ink)`, kbg: `var(--${c}Soft)`, kfg: `var(--${c}Ink)`, bg: sel ? 'var(--sunk)' : 'transparent', ring: sel ? 'inset 0 0 0 2px var(--ink)' : 'none' }));
+    const P = (i, n, c) => ({ i, n, bg: `var(--${c}Soft)`, fg: `var(--${c}Ink)` });
+    return {
+      theme, queue,
+      yes: ['One short email to each of 3 people', 'Sent from maya@raostudio.co', 'Replies come straight back to this world'],
+      no: ['Nothing is sent', 'Tilo checks their websites for prices instead', 'The rest of the world keeps going'],
+      to: [P('LC', 'Lin Chen · Brightcell', 'sky'), P('OB', 'Oskar Berg · Voltway', 'lilac'), P('PN', 'Priya Nair · Nordpack', 'pink')],
+      done: [['✓', 'Reply to Northline sent', '11:20', 'mint'], ['✓', '£12 for map data', '9:05', 'mint'], ['×', 'Share the sales sheet', '8:40', 'red']].map(([i, t, w, c]) => ({ i, t, w, bg: `var(--${c}Soft)`, fg: `var(--${c}Ink)` })),
+      supCity: R ? R.city('suppliers', { labels: false, tags: false }) : null, iMailS: ic('mail', 14), iHelp: ic('help', 16)
+    };
+  }
+}
+</script>
+</body>
+</html>

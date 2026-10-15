@@ -4,6 +4,7 @@
 // question once (`POST /access/declaration`), and renders the app for a judge only. It decides nothing itself, never
 // renders the product behind a refusal, and a server it cannot reach is a plain "try again", not the app.
 import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { AccessScreen } from "./AccessScreen";
 import { SignUpDeclaration } from "./SignUpDeclaration";
 import type { Declaration } from "./SignUpDeclaration";
 import { UnderConstruction } from "./UnderConstruction";
@@ -63,13 +64,15 @@ export function AccessLayer({
   if (view.kind === "loading") return null;
   if (view.kind === "failed") {
     return (
-      <div className="screen-body" data-testid="access-failed" role="alert">
-        <h1>Tilo could not check your access</h1>
-        <p>Something went wrong on the way to Tilo. Please try again.</p>
-        <button type="button" className="primary" onClick={read}>
-          Try again
-        </button>
-      </div>
+      <AccessScreen>
+        <div data-testid="access-failed" role="alert">
+          <h1>Tilo could not check your access</h1>
+          <p>Something went wrong on the way to Tilo. Please try again.</p>
+          <button type="button" className="primary park-access__continue" onClick={read}>
+            Try again
+          </button>
+        </div>
+      </AccessScreen>
     );
   }
   if (view.declaration === null) return <SignUpDeclaration onSubmit={declare} busy={busy} />;

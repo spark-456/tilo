@@ -89,11 +89,13 @@ export const matches = (c: Connector, q: string): boolean =>
  * HR-1: this list is the sample company's, so no sync event stands behind a tool's "synced 2 min ago" or "synced
  * live". A connected tool says so plainly; only the sign-in warning (worked out from `expires`) keeps its text.
  */
-export const SAMPLE_SYNC_LINE = "Example only: not synced";
+export const SAMPLE_STRIP =
+  "Not synced: no sign-in or health check has run on these. Sign in to use your own tools.";
 export const SAMPLE_DRAWER_LINE = "Example only · no sync or health check recorded";
 
+/** One line per tile: the sign-in warning, else the plain state. The "not synced" note is said once, in SAMPLE_STRIP. */
 export const syncLine = (c: Connector): string =>
-  c.st === "attention" ? (c.sync ?? "") : SAMPLE_SYNC_LINE;
+  c.st === "attention" ? (c.sync ?? "") : "Connected";
 
 export const usedLine = (c: Connector): string =>
   c.used?.length ? `Used by ${c.used.length}` : "Not used yet";

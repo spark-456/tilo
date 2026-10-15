@@ -135,7 +135,7 @@ export const MATRIX: readonly (readonly [string, readonly boolean[]])[] = [
 export const COPY = {
   title: "Team",
   count: "5 people",
-  intro: "Who can start work, who signs off, and the rules every agent follows.",
+  intro: "The people who share this space, and the helpers who work for all of you.", // UI-STUDIO-5
   invite: "Invite",
   headers: ["PERSON", "ROLE", "SPEND LIMIT", "HELPED TILO", "ACTIVE"],
   you: "You",

@@ -37,7 +37,10 @@ describe("WEB_4_home_golink: modified clicks belong to the browser", () => {
   for (const [name, init] of MODIFIED) {
     it(`WEB_4_home_golink_${name.replace(" ", "_")}_click_is_left_to_the_browser`, async () => {
       const rig = await mountHome();
-      const link = control(todayRegion(rig.el), "All worlds");
+      const link = control(
+        rig.el.querySelector('section[aria-label="Sample worlds"]') as HTMLElement,
+        "All worlds",
+      );
       expect(link.tagName).toBe("A");
       expect(click(link, init)).toBe(true);
       expect(goCalls(rig.app)).toBe(0);
@@ -46,7 +49,10 @@ describe("WEB_4_home_golink: modified clicks belong to the browser", () => {
 
   it("WEB_4_home_golink_a_plain_left_click_goes_through_app_go_and_is_cancelled", async () => {
     const rig = await mountHome();
-    const link = control(todayRegion(rig.el), "All worlds");
+    const link = control(
+      rig.el.querySelector('section[aria-label="Sample worlds"]') as HTMLElement,
+      "All worlds",
+    );
     expect(click(link, { button: 0 })).toBe(false);
     expect(goCalls(rig.app)).toBe(1);
   });

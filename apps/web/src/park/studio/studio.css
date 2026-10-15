@@ -1,0 +1,500 @@
+/* UI-STUDIO-1: the Studio theme's shape and type over the Park shell and the shared components (design/studio-v2:
+   "Tilo S Nav", "Tilo S Components", "Tilo R Components", "Tilo R States"; values read from their inline styles).
+   The colours are role tokens from config/themes/studio.json (generated into tokens/themes.css by `just tokens`): day
+   is Studio light, night is Studio dark. This file holds what a colour token cannot: the font, radii, sizes and the
+   shadows. Every rule sits under [data-park][data-theme="studio"], so the Metropolis theme keeps the Park look.
+   No transition, animation or keyframes here (HR-1..7): nothing in Studio moves that did not move before. */
+
+/* ---- Theme values that are not colours ---- */
+[data-park][data-theme="studio"] {
+  color-scheme: light;
+  --sh: 0 1px 2px rgba(11, 11, 12, 0.06), 0 12px 32px -18px rgba(11, 11, 12, 0.25);
+  --shPop: 0 30px 80px -30px rgba(11, 11, 12, 0.4);
+  --gFx: none;
+}
+[data-park][data-theme="studio"][data-time="night"] {
+  color-scheme: dark;
+  --sh: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 18px 40px -20px rgba(0, 0, 0, 0.8);
+  --shPop: 0 30px 80px -30px rgba(0, 0, 0, 0.9);
+}
+
+/* ---- Type: one family, Geist (Geist Mono for code). Page stylesheets name the Park faces literally, so the theme
+   sets the family for every element under its root; code keeps the mono face. ---- */
+[data-park][data-theme="studio"],
+[data-park][data-theme="studio"] *:not(code):not(pre):not(kbd):not(samp) {
+  font-family: "Geist Sans", ui-sans-serif, system-ui, sans-serif !important;
+}
+[data-park][data-theme="studio"] code,
+[data-park][data-theme="studio"] pre,
+[data-park][data-theme="studio"] kbd,
+[data-park][data-theme="studio"] samp {
+  font-family: "Geist Mono", ui-monospace, monospace !important;
+}
+
+/* ---- Focus: 3px in the theme's focus colour (ink by day, lime by night), offset 2px ---- */
+[data-park][data-theme="studio"] .park-btn:focus-visible,
+[data-park][data-theme="studio"] .park-seg__item:focus-visible,
+[data-park][data-theme="studio"] .park-switch:focus-visible,
+[data-park][data-theme="studio"] .park-kpi:focus-visible,
+[data-park][data-theme="studio"] .park-row:focus-visible,
+[data-park][data-theme="studio"] .park-menu__row:focus-visible,
+[data-park][data-theme="studio"] .park-toast__action:focus-visible,
+[data-park][data-theme="studio"] .park-shell__nav button:focus-visible,
+[data-park][data-theme="studio"] .park-shell__nav a:focus-visible,
+[data-park][data-theme="studio"] .park-shell__nrow:focus-visible,
+[data-park][data-theme="studio"] .park-shell__settings:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+:where([data-park][data-theme="studio"]) :where(input, textarea, select):focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* ---- Top nav (S Nav, 1440): a 72px bar across the top, card fill, a hairline under it, no glass ---- */
+[data-park][data-theme="studio"] .park-shell__nav {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 72px;
+  gap: 28px;
+  padding: 0 32px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--card);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+[data-park][data-theme="studio"] .park-shell__bar {
+  left: 0;
+  right: 0;
+  top: 69px;
+  border-radius: 0;
+}
+[data-park][data-theme="studio"] .park-shell__logo {
+  color: var(--ink);
+}
+[data-park][data-theme="studio"] .park-shell__logomark {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--priFill);
+  box-shadow: 0 3px 0 var(--priLip);
+}
+[data-park][data-theme="studio"] .park-shell__eye {
+  background: #0b0b0c;
+}
+[data-park][data-theme="studio"] .park-shell__wordmark {
+  color: var(--ink);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+[data-park][data-theme="studio"] .park-shell__tabs {
+  gap: 2px;
+}
+[data-park][data-theme="studio"] .park-shell__tab {
+  gap: 8px;
+  height: 44px;
+  padding: 0 13px;
+  border-radius: 14px;
+  color: var(--ink2);
+  font-size: 15px;
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-shell__tab--on,
+[data-park][data-theme="studio"] .park-shell__tab--on:hover {
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+[data-park][data-theme="studio"] .park-shell__tab:not(.park-shell__tab--on):hover,
+[data-park][data-theme="studio"] .park-shell__tab:not(.park-shell__tab--on):focus-visible,
+[data-park][data-theme="studio"] .park-shell__iconbtn:hover,
+[data-park][data-theme="studio"] .park-shell__iconbtn:focus-visible {
+  background: var(--sunk);
+}
+[data-park][data-theme="studio"] .park-shell__badge {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  background: var(--amber);
+  color: #1a1407;
+  font-size: 12px;
+  font-weight: 800;
+}
+[data-park][data-theme="studio"] .park-shell__pagebtn {
+  height: 44px;
+  border-radius: 14px;
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-shell__pagedot,
+[data-park][data-theme="studio"] .park-shell__unread {
+  background: var(--amber);
+  box-shadow: 0 0 0 2px var(--card);
+}
+[data-park][data-theme="studio"] .park-shell__tools {
+  gap: 8px;
+}
+[data-park][data-theme="studio"] .park-shell__iconbtn {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--ink2);
+}
+[data-park][data-theme="studio"] .park-shell__iconbtn--on {
+  background: var(--sunk);
+}
+[data-park][data-theme="studio"] .park-shell__unread {
+  top: 9px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+}
+[data-park][data-theme="studio"] .park-shell__avatar {
+  width: 44px;
+  height: 44px;
+  margin-left: 0;
+  background: var(--lilacSoft);
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--lineStrong);
+  color: var(--lilacInk);
+  font-size: 15px;
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-shell__avatar--ring {
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--ink);
+}
+/* STUDIO-INT: below a roomy bar the sides, gaps and tab padding give back room before a tab moves into More
+   (shell/navFit.ts holds the same numbers). */
+@media (max-width: 1199px) {
+  [data-park][data-theme="studio"] .park-shell__nav {
+    gap: 16px;
+    padding: 0 20px;
+  }
+  [data-park][data-theme="studio"] .park-shell__tab {
+    padding: 0 10px;
+  }
+}
+/* The page column starts under the 72px bar. */
+[data-park][data-theme="studio"] .park-shell__page {
+  padding-top: 104px;
+}
+/* A phone: the bar is 64px and the tools sit closer. */
+@media (max-width: 560px) {
+  /* POLISH-1: the nav controls are 44px boxes now, so the gaps and sides give back the room (the page name keeps its
+     four letters at 390). */
+  [data-park][data-theme="studio"] .park-shell__nav {
+    height: 64px;
+    gap: 4px;
+    padding: 0 6px;
+  }
+  [data-park][data-theme="studio"] .park-shell__pagebtn {
+    padding: 0 6px 0 10px;
+  }
+  [data-park][data-theme="studio"] .park-shell__bar {
+    top: 61px;
+  }
+  [data-park][data-theme="studio"] .park-shell__tools {
+    gap: 0;
+  }
+  /* 40 wide and 44 tall, without the hairline, so the page button keeps room for its name. */
+  [data-park][data-theme="studio"] .park-shell__iconbtn {
+    width: 40px;
+    border-color: transparent;
+  }
+  [data-park][data-theme="studio"] .park-shell__avatar {
+    width: 40px;
+    height: 40px;
+    margin-left: 0;
+  }
+  [data-park][data-theme="studio"] .park-shell__wordmark {
+    font-size: 22px;
+  }
+  [data-park][data-theme="studio"] .park-shell__page {
+    padding-top: 88px;
+  }
+}
+@media (max-width: 360px) {
+  [data-park][data-theme="studio"] .park-shell__iconbtn,
+  [data-park][data-theme="studio"] .park-shell__avatar {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* ---- Popovers, menus and the account menu (S Nav menu: 300 wide, r20, hairline, rows 40 r12) ---- */
+[data-park][data-theme="studio"] .park-popover {
+  top: 80px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shPop);
+}
+[data-park][data-theme="studio"] .park-menu__row {
+  height: 40px;
+  padding: 0 12px;
+  font-size: 14.5px;
+  font-weight: 500;
+}
+[data-park][data-theme="studio"] .park-menu__hint {
+  font-weight: 500;
+}
+[data-park][data-theme="studio"] .park-shell__whoav {
+  background: var(--lilacSoft);
+  color: var(--lilacInk);
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-shell__whoname {
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-shell__whomail,
+[data-park][data-theme="studio"] .park-shell__whoorg {
+  color: var(--ink3);
+  font-weight: 500;
+}
+[data-park][data-theme="studio"] .park-shell__rule {
+  background: var(--line);
+}
+
+/* ---- Buttons (R Components: every tap target 44px or more; primary is ink by day, lime by night, with a lip) ---- */
+[data-park][data-theme="studio"] .park-btn {
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-btn--primary {
+  background: var(--priFill);
+  color: var(--onPri);
+  box-shadow: 0 3px 0 var(--priLip);
+}
+[data-park][data-theme="studio"] .park-btn--primary.park-btn--md,
+[data-park][data-theme="studio"] .park-btn--secondary.park-btn--md {
+  height: 48px;
+  padding: 0 20px;
+  border-radius: 14px;
+  font-size: 15px;
+}
+[data-park][data-theme="studio"] .park-btn--primary.park-btn--sm,
+[data-park][data-theme="studio"] .park-btn--secondary.park-btn--sm,
+[data-park][data-theme="studio"] .park-btn--needs.park-btn--sm {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+[data-park][data-theme="studio"] .park-btn--secondary {
+  background: var(--card);
+  border: 1px solid var(--lineStrong);
+  color: var(--ink);
+}
+[data-park][data-theme="studio"] .park-btn--needs {
+  background: var(--amber);
+  color: #1a1407;
+}
+[data-park][data-theme="studio"] .park-btn--needs.park-btn--md {
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 14px;
+  font-size: 15px;
+}
+[data-park][data-theme="studio"] .park-btn:disabled {
+  opacity: 1;
+  border-color: transparent;
+  background: var(--sunk);
+  box-shadow: none;
+  color: var(--ink3);
+}
+
+/* ---- Segmented control and switch ---- */
+[data-park][data-theme="studio"] .park-seg {
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--sunk);
+}
+[data-park][data-theme="studio"] .park-seg__item {
+  border-radius: 9px;
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-seg__item--on,
+[data-park][data-theme="studio"] .park-seg__thumb {
+  background: var(--tabOn);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* ---- Chips and status pills (R Components "Status and progress": round, with the soft fill and its ink) ---- */
+[data-park][data-theme="studio"] .park-chip {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 99px;
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-chip--sm {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 99px;
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-pill {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 99px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* ---- Cards, tiles, rows and the page sheet: hairlines instead of shadows ---- */
+[data-park][data-theme="studio"] .park-card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+[data-park][data-theme="studio"] .park-sheet {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: none;
+}
+[data-park][data-theme="studio"] .park-kpi {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+[data-park][data-theme="studio"] .park-kpi__label,
+[data-park][data-theme="studio"] .park-kpi__sub {
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-kpi__value {
+  font-weight: 700;
+  letter-spacing: -0.8px;
+}
+[data-park][data-theme="studio"] .park-row {
+  border-radius: 14px;
+}
+[data-park][data-theme="studio"] .park-row__title {
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-row__sub,
+[data-park][data-theme="studio"] .park-row__cost {
+  font-weight: 500;
+}
+[data-park][data-theme="studio"] .park-art {
+  border-radius: 14px;
+}
+
+/* ---- Toast (S Components "Steps and toasts": ink, a round check, the action in lime) ---- */
+[data-park][data-theme="studio"] .park-toast {
+  top: 88px;
+  padding: 10px 10px 10px 16px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-toast__dot {
+  width: 28px;
+  height: 28px;
+  background: var(--ok);
+  color: var(--inv);
+}
+[data-park][data-theme="studio"] .park-toast__action {
+  height: 34px;
+  border-radius: 10px;
+  background: var(--lime);
+  color: #0b0b0c;
+  font-weight: 700;
+}
+
+/* ---- Inputs: a field, a hairline, r12. :where() keeps this under any page's own field rule ---- */
+:where([data-park][data-theme="studio"])
+  :where(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+    textarea,
+    select
+  ) {
+  border: 1px solid var(--lineStrong);
+  border-radius: 12px;
+  background: var(--field);
+  color: var(--ink);
+}
+
+/* ---- Home composer (S Components "Composer · files and the two speeds"; the layout is Home.css, UI-STUDIO-2) ---- */
+[data-park][data-theme="studio"] .park-home-chip {
+  height: 44px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  font-weight: 600;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+[data-park][data-theme="studio"] .park-home-start,
+[data-park][data-theme="studio"] .park-home-confirm {
+  border-radius: 14px;
+  background: var(--priFill);
+  box-shadow: 0 3px 0 var(--priLip);
+  color: var(--onPri);
+  font-weight: 700;
+}
+/* The World page's handoff link has white text on --hero, which is lime by night: it takes the primary pair instead. */
+[data-park][data-theme="studio"] .park-world-lovablelink {
+  background: var(--priFill);
+  color: var(--onPri);
+}
+[data-park][data-theme="studio"] .park-home-change {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-home-attach__chips {
+  gap: 8px;
+}
+[data-park][data-theme="studio"] .park-home-attach__chip {
+  min-height: 44px;
+  gap: 10px;
+  padding: 0 6px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-home-attach__kind {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--sunk);
+  color: var(--ink2);
+  font-family: "Geist Mono", ui-monospace, monospace !important;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+[data-park][data-theme="studio"] .park-home-attach__remove {
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 8px;
+  color: var(--ink3);
+  font-size: 16px;
+}
+
+/* ---- Steps list (S Components "Steps"): a 30px round marker per step ---- */
+[data-park][data-theme="studio"] .park-home-steps {
+  gap: 4px;
+}
+[data-park][data-theme="studio"] .park-home-step {
+  align-items: center;
+  gap: 12px;
+  padding: 6px 4px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-home-step__n {
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid var(--lineStrong);
+  background: transparent;
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 700;
+}

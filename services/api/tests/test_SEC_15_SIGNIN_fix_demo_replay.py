@@ -44,10 +44,10 @@ SRC = pathlib.Path(__file__).resolve().parents[1] / "src" / "tilo_api"
 def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in ENV_CLEAR:
         monkeypatch.delenv(name, raising=False)
-    # LW-05 / PL-06 (BQ-LW-11, BQ-LW5-1): a live router refuses to build unless GOOGLE_LOCATION is the price sheet's
-    # region, so every test that sets LIVE=1 needs the deploy's setting. Without it the router is "not configured"
+    # PL-06 / LIVE-GLOBAL-1 (ADR-0029): a live router refuses to build unless GOOGLE_LOCATION is the price sheet's
+    # region, now global, so every test that sets LIVE=1 needs that setting. Without it the router is "not configured"
     # before the demo flag is ever consulted, and these tests never reach what they assert.
-    monkeypatch.setenv("GOOGLE_LOCATION", "asia-southeast1")
+    monkeypatch.setenv("GOOGLE_LOCATION", "global")
 
 
 # --- (2) a process that is not deployed: the demo flag comes from the resolved principal --------------------------

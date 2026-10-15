@@ -72,7 +72,7 @@ def test_PL_02_the_director_out_of_scope_is_sent_as_the_list_of_category_and_par
 def test_PL_02_every_sent_router_schema_is_materially_smaller_and_has_no_bounds_or_null_branches() -> None:
     """The live probe (8 Oct 2026): any ONE of three unrelated reductions made the refused Director schema pass, so the
     limit is Vertex's structured-output complexity budget. Every schema is sent well under what failed (the Director's
-    raw schema scored 117; 66 is sent now) and carries nothing the caller validates itself."""
+    raw schema scored 117; 79 is sent now, with the FR-INT-04 questions) and carries nothing the caller validates."""
     schemas = {
         "brief": (brief.output_schema(), 80),
         "approaches": (approaches._Reply.model_json_schema(), 70),
@@ -87,7 +87,9 @@ def test_PL_02_every_sent_router_schema_is_materially_smaller_and_has_no_bounds_
         text = str(sent)
         for dropped in ("minItems", "maxItems", "minimum", "maximum", "pattern", "uniqueItems", "'null'"):
             assert dropped not in text, (name, dropped)
-    assert complexity(to_gemini_schema(brief.output_schema())) <= 0.6 * complexity(brief.output_schema())
+    # 0.7 (was 0.6): FR-INT-04's `questions` array (up to 3 task-specific questions) is in the wire schema and adds
+    # 13 points the raw (router-side, unconstrained) schema does not carry; 79/120 stays under the absolute 80 above.
+    assert complexity(to_gemini_schema(brief.output_schema())) <= 0.7 * complexity(brief.output_schema())
 
 
 def test_PL_02_a_nullable_branch_is_collapsed_to_nullable_on_the_wire() -> None:

@@ -32,7 +32,10 @@ it("FR_ACC_01_03_04 live page loads the existing route without needing skills or
   });
   const app = makeApp();
   const { container: root } = await renderPage(app, api);
-  expect(fetch).toHaveBeenCalledTimes(1);
+  expect((fetch.mock.calls as unknown[][]).map(([u]) => new URL(String(u)).pathname)).toEqual([
+    "/v1/connectors",
+    "/v1/people",
+  ]);
   expect(fetch.mock.calls[0]?.[0]).toBe("https://api.test/v1/connectors");
   const text = textOf(root);
   for (const word of [
@@ -44,13 +47,13 @@ it("FR_ACC_01_03_04 live page loads the existing route without needing skills or
     "contacts.read",
     "2026-10-10T00:00:00Z",
     "Access level not available yet",
-    "Usage not available yet",
   ])
     expect(text).toContain(word);
   expect(text).not.toMatch(
     /Synced|Healthy|Connected just now|Not used yet|60\+|HubSpot|reconnected for/,
   );
-  expect(root.querySelectorAll("button")).toHaveLength(0);
+  const labels = [...root.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"));
+  expect(labels).toEqual(["Manage Actual CRM", "Manage Actual Mail", "Manage Actual Chat"]);
   const search = root.querySelector<HTMLInputElement>('input[aria-label="Search connectors"]');
   expect(search).not.toBeNull();
   typeInto(search as HTMLInputElement, "Actual Mail");

@@ -1,0 +1,9 @@
+id: job-description-writer
+version: "1.0.0"
+domain: productivity
+author: "Tilo Skills Library"
+reviewer: "Tilo Product Review"
+tools_allowed: ["web_search","fetch_url"]
+inputs: {"type":"object","additionalProperties":false,"required":["job_title","responsibilities"],"properties":{"job_title":{"type":"string","description":"Role title."},"team_context":{"type":"string","description":"Team purpose and reporting context."},"responsibilities":{"type":"array","items":{"type":"string","description":"User-supplied job responsibility."},"description":"Responsibilities to include."},"required_qualifications":{"type":"array","items":{"type":"string","description":"User-supplied essential qualification."},"description":"Essential qualifications only."},"preferred_qualifications":{"type":"array","items":{"type":"string","description":"User-supplied preferred qualification."},"description":"Optional qualifications."},"location_and_terms":{"type":"string","description":"Location, work arrangement, and employment terms supplied by the user."}}}
+outputs: {"type":"object","additionalProperties":false,"required":["job_description","missing_details","review_flags","sources"],"properties":{"job_description":{"type":"string","description":""},"missing_details":{"type":"array","items":{"type":"string","description":""}},"review_flags":{"type":"array","items":{"type":"string","description":""}},"sources":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["title","archive_ref","url"],"properties":{"title":{"type":"string","description":"Source title."},"archive_ref":{"type":"string","description":"Raw archive reference for the source."},"url":{"type":"string","description":"Public source URL."}}}}}}
+description: "Write a job description; est. max 17.6 credits/run (~$0.088)."

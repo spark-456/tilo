@@ -5,7 +5,7 @@ import type { Event, Layout } from "@tilo/contracts";
 import { type ReactNode, useMemo } from "react";
 import { useClient } from "../api/ClientProvider";
 import { useRemote } from "../park/shared/remote";
-import { buildingCount, levelRows } from "../world/levels";
+import { buildingCount, buildingStatus, levelRows } from "../world/levels";
 import { type PauseView, usePause } from "../world/pause";
 import { reduce } from "../world/reducer";
 import { useReplayedLog } from "../world/replay";
@@ -25,7 +25,7 @@ import { useSelection } from "../world/selection";
 import { withWorld } from "../world/worldContext";
 import { ViewLink } from "./ViewLink";
 import { inspectPath } from "./routes";
-import { plural, words } from "./text";
+import { levelTitle, plural, words } from "./text";
 
 /** One outline row: a toggle button that selects its object for every lens (FR-WLD-06). Rows keep the same box
  * selected or not (the mark is an outline), so choosing one moves nothing. */
@@ -283,8 +283,10 @@ export function StageRail({
                 return (
                   <section key={level.id}>
                     <h2 className="park-view-h2">
-                      <ViewLink to={inspectPath(worldId, level.id)}>Level {level.name}</ViewLink>
-                      {row ? (
+                      <ViewLink to={inspectPath(worldId, level.id)}>
+                        {levelTitle(level.name)}
+                      </ViewLink>
+                      {row?.measured ? (
                         <span className="park-view-pct">
                           {" "}
                           {row.percent}%
@@ -307,7 +309,11 @@ export function StageRail({
                                 <small>{d.name}</small>
                               </span>
                               <span className="park-view-rowstate">
-                                {BUILDING_STATE[state?.buildings[b.id]?.status ?? "hidden"]}
+                                {
+                                  BUILDING_STATE[
+                                    state ? buildingStatus(state, b.id, events) : "hidden"
+                                  ]
+                                }
                               </span>
                             </Pick>
                           </li>

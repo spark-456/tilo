@@ -171,6 +171,13 @@ export const ALLOWLIST: readonly AllowEntry[] = [
     reason:
       "UI chrome only, non-agent: the page change fade and slide, the top progress bar and its fill, the enter fade of a toast, popover or menu, and pointer-only hover and press feedback on controls and on page cards, tiles, pins and events under the page outlet (a lift or a press; it carries no run or decision state), plus the slide of a control's thumb or knob. It also covers the paint-only colour fades of the same chrome (user approved 8 Oct): the hover wash on the nav and on list rows, the track of a switch while its knob slides, a chosen chip filling, and the text colour of a segmented control, each on an exact selector list pinned in motion3.micro.css.test.ts. Each starts from a person's pointer or click or from the UI state that click set (menu open, toast shown, switch on), and animates transform, opacity, background-color or color only, never a layout property, box-shadow or filter; reduced motion and the still preference turn them off. Nothing here shows or implies an agent, a run or a decision; world, stage and agent motion is not covered, and agents animate only from recorded events (HR-1).",
   },
+  // The signed-out landing's scroll reveal and hover lift (LANDING-2): page chrome, no agent, run or decision.
+  {
+    file: "src/landing/landing.motion.css",
+    rule: "css-transition",
+    reason:
+      "Landing page chrome only, non-agent: sections and cards fade and rise into view as they scroll on, and cards lift a few pixels under a pointer. Opacity, translate and transform only, never a layout property. Reveal.tsx marks elements only when motion is welcome (none under reduced motion); no agent picture, world or run state moves here, and agents animate only from recorded events (HR-1).",
+  },
 ];
 
 export interface Violation {

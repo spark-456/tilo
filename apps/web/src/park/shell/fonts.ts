@@ -9,6 +9,11 @@ const FACES = [
   '600 14px "Nunito Sans"',
   '700 14px "Nunito Sans"',
   '800 14px "Nunito Sans"',
+  // UI-STUDIO-1: the Studio theme (the default) draws the same chrome in Geist.
+  '500 15px "Geist Sans"',
+  '600 15px "Geist Sans"',
+  '700 15px "Geist Sans"',
+  '800 26px "Geist Sans"',
 ] as const;
 
 export function loadShellFonts(): Promise<void> {

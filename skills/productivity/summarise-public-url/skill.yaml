@@ -1,0 +1,9 @@
+id: summarise-public-url
+version: "1.0.0"
+domain: productivity
+author: "Tilo Skills Library"
+reviewer: "Tilo Product Review"
+tools_allowed: ["fetch_url"]
+inputs: {"type":"object","additionalProperties":false,"required":["url"],"properties":{"url":{"type":"string","description":"Public page URL to summarise."},"focus":{"type":"string","description":"Optional question or focus for the summary."},"length_words":{"type":"integer","description":"Approximate summary length.","minimum":50,"maximum":800}}}
+outputs: {"type":"object","additionalProperties":false,"required":["title","summary","key_points","caveats","sources"],"properties":{"title":{"type":"string","description":""},"summary":{"type":"string","description":""},"key_points":{"type":"array","items":{"type":"string","description":""}},"caveats":{"type":"array","items":{"type":"string","description":""}},"sources":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["title","archive_ref","url"],"properties":{"title":{"type":"string","description":"Source title."},"archive_ref":{"type":"string","description":"Raw archive reference for the source."},"url":{"type":"string","description":"Public source URL."}}}}}}
+description: "Summarise a public URL; est. max 9 credits/run (~$0.045)."

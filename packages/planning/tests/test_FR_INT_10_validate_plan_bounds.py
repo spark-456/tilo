@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 from _plan_validator_lib import make_gate, make_plan, make_unit, rule_ids
 from tilo_api import skills_capture
+from tilo_contracts import Minutes
 from tilo_planning import approaches, brief, compiler, plangraph, revision
 from tilo_planning.plangraph import MAX_PLAN_BYTES, MAX_PLAN_DEPTH, Violation, validate_plan
 from tilo_providers import conformance, schema_guard
@@ -147,6 +148,7 @@ _ROUTER_SCHEMAS = {
     "packages/planning/src/tilo_planning/compiler.py": compiler._Reply.model_json_schema(),
     "packages/planning/src/tilo_planning/revision.py": revision.RevisionReply.model_json_schema(),
     "packages/providers/src/tilo_providers/conformance.py": conformance._SCHEMA,
+    "services/api/src/tilo_api/meeting_analysis.py": Minutes.model_json_schema(),
     "services/api/src/tilo_api/skills_capture.py": {
         "oneOf": [skills_capture._CAPTURE_SCHEMA, skills_capture._VERSION_SCHEMA],
     },

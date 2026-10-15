@@ -1,8 +1,8 @@
 // The side column of the World page: the Waiting for you card, Spend, the Lovable handoff card, and the facts with skills and tools.
 import type { MouseEvent, ReactNode } from "react";
 import type { BuildHandoff, Dec, Decision, DecisionKey, Skill, World } from "../../api/types";
-import { QuestionAnswer } from "../../app/QuestionAnswer";
 import { DecisionFields } from "../../app/DecisionFields";
+import { QuestionAnswer } from "../../app/QuestionAnswer";
 import {
   type SlackShareRequest,
   slackApprovalBody,
@@ -230,7 +230,17 @@ export function LovableCard({ handoff, dec, onDecide, sample = false }: LovableC
         <span className="park-world-lovabletitle">Build this in Lovable</span>
         <span className="park-world-lovablesub">Nothing is sent by Tilo itself</span>
       </div>
-      <pre className="park-world-lovableprompt">{handoff.prompt}</pre>
+      {/* A long prompt scrolls inside its own box (capped height); it is a labelled stop for the keyboard. */}
+      <pre
+        className="park-world-lovableprompt"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable block must be reachable by keyboard (axe scrollable-region-focusable)
+        tabIndex={0}
+        // biome-ignore lint/a11y/useSemanticElements: the prompt is a <pre> (its line breaks are the content), named as a region
+        role="region"
+        aria-label="The prompt that goes to Lovable, scroll to read all of it"
+      >
+        {handoff.prompt}
+      </pre>
       <div className="park-world-lovablefiles">
         <span className="park-world-rowlabel">Link carries the prompt shown above</span>
         <div className="park-world-lovablesummary">

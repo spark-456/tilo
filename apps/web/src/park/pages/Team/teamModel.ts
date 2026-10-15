@@ -30,6 +30,33 @@ export function canChangeRole(
   return actor.id !== target.id && actor.role === "Owner";
 }
 
+/** "1 person", "6 people": the header count agrees in number. */
+export const peopleCount = (n: number): string => `${n} ${n === 1 ? "person" : "people"}`;
+
+/** A team of the signed-in person as the "Your teams" panel shows it. */
+export interface MyTeamName {
+  name: string;
+  lead: boolean;
+}
+
+/** FR-TEAM-01: the directory row of the signed-in person shows their own teams and a lead role from the same
+ * data the "Your teams" panel reads (the people read can be older than a team just created). An Owner stays Owner. */
+export function withMyTeams(team: Team, you: string | null, mine: readonly MyTeamName[]): Team {
+  if (!you || mine.length === 0) return team;
+  return {
+    ...team,
+    people: team.people.map((p) =>
+      p.id !== you
+        ? p
+        : {
+            ...p,
+            memberships: mine.map((t) => t.name),
+            role: p.role === "Member" && mine.some((t) => t.lead) ? "Team lead" : p.role,
+          },
+    ),
+  };
+}
+
 export const initialsOf = (name: string): string =>
   name
     .split(" ")

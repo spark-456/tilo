@@ -3,9 +3,13 @@
 // one this tab saved before leaving (`ConnectFlow.finish`), then says plainly what happened and offers the way back to
 // Connectors. It shows no code, no state and no Google text, loads no third-party asset and reads nothing but its props.
 import { useEffect, useRef, useState } from "react";
-import "../park/tokens/fonts";
+import { Logo } from "../landing/Logo";
+import { usePrefersDark } from "../landing/media";
 import "../park/tokens/park.css";
 import "../park/tokens/park.opaque.css";
+import "../park/tokens/themes.css";
+import "../park/studio/fonts";
+import "../landing/landing.css";
 import {
   type CallbackParams,
   type ConnectFlow,
@@ -28,6 +32,7 @@ export default function CallbackPage({
   readonly back: () => void;
 }) {
   const [shown, setShown] = useState<Shown>({ kind: "working" });
+  const night = usePrefersDark();
   const started = useRef(false);
   useEffect(() => {
     if (started.current) return; // one post, however often the effect runs
@@ -45,25 +50,35 @@ export default function CallbackPage({
         ? HOST_CONNECTED_TEXT
         : RESULT_TEXT[shown.kind];
   return (
-    <div data-park data-time="day" className="oauth-root">
-      <main className="oauth-main" data-testid="oauth-callback">
-        <h1>{heading}</h1>
-        {shown.kind === "connected" ? (
-          <>
-            <p>Tilo can now use this access, and no more:</p>
-            <ul>
-              {shown.lines.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          </>
-        ) : null}
-        {shown.kind === "working" ? <p>One moment.</p> : null}
-        {done ? (
-          <button type="button" className="oauth-back" onClick={back}>
-            {shown.kind === "connected" ? "Back to Connectors" : "Try again from Connectors"}
-          </button>
-        ) : null}
+    <div
+      data-park
+      data-theme="studio"
+      data-time={night ? "night" : "day"}
+      className="studio-page oauth-root"
+    >
+      <header className="studio-page__head">
+        <Logo />
+      </header>
+      <main className="studio-page__main">
+        <div className="studio-card oauth-main" data-testid="oauth-callback">
+          <h1>{heading}</h1>
+          {shown.kind === "connected" ? (
+            <>
+              <p>Tilo can now use this access, and no more:</p>
+              <ul>
+                {shown.lines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          {shown.kind === "working" ? <p>One moment.</p> : null}
+          {done ? (
+            <button type="button" className="oauth-back" onClick={back}>
+              {shown.kind === "connected" ? "Back to Connectors" : "Try again from Connectors"}
+            </button>
+          ) : null}
+        </div>
       </main>
     </div>
   );

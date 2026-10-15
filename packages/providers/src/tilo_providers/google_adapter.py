@@ -119,6 +119,8 @@ def refuse_service_account_key(environ: Mapping[str, str] | None = None) -> None
     try:
         with open(path, encoding="utf-8") as handle:  # only the `type` field is read; ADC reports anything else
             content = json.load(handle)
+    except FileNotFoundError:  # normal on Cloud Run: the attached identity answers, there is no ADC file to inspect
+        content = None
     except (OSError, ValueError) as caught_error:
         log_caught(caught_error, __name__, locals())
         content = None

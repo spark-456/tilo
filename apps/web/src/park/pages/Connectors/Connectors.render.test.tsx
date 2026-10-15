@@ -51,7 +51,7 @@ describe("WEB_11_connectors_render: every designed element", () => {
     expect(root.querySelectorAll("h1")).toHaveLength(1);
     const search = labelled(root, "Search connectors");
     expect(search?.tagName).toBe("INPUT");
-    expect(search?.getAttribute("placeholder")).toBe("Search 60+ tools");
+    expect(search?.getAttribute("placeholder")).toBe("Find an app");
     expect(labelled(root, "Connected")).not.toBeNull();
     expect(labelled(root, "Available")).not.toBeNull();
     // PageSheet with the design's 22px gap: the default of .park-sheet or an explicit gap of 22.
@@ -68,7 +68,7 @@ describe("WEB_11_connectors_render: every designed element", () => {
     on.forEach((c, i) => {
       const t = textOf(tiles[i] as HTMLElement);
       const level = LV[c.level ?? 1] as string;
-      const sync = c.st === "attention" ? c.sync : "Example only: not synced";
+      const sync = c.st === "attention" ? c.sync : "Connected";
       expect(t.startsWith(c.mono), `${c.name} monogram (BQ-WEB-1: monograms stay)`).toBe(true);
       expect(t, `${c.name} name`).toContain(c.name);
       expect(t, `${c.name} account`).toContain(c.acct ?? "");
@@ -81,11 +81,12 @@ describe("WEB_11_connectors_render: every designed element", () => {
   it("WEB_11_connectors_render_literal_spot_checks_of_the_first_and_the_attention_tile", async () => {
     const { root } = await open();
     const gmail = textOf(tileFor(root, "Gmail") as HTMLElement);
-    for (const s of ["alex@northwind.co", "Act", "Example only: not synced", "Used by 3"]) {
+    for (const s of ["alex@northwind.co", "Act", "Connected", "Manage", "Used by 3"]) {
       expect(gmail).toContain(s);
     }
     const cal = textOf(tileFor(root, "Google Calendar") as HTMLElement);
-    expect(cal).toContain("Example only: not synced");
+    expect(cal).toContain("Connected");
+    expect(cal).not.toContain("Example only");
     expect(cal).not.toMatch(/synced (live|\d)/i); // no sync event stands behind a sample tool
     const hub = textOf(tileFor(root, "HubSpot") as HTMLElement);
     expect(hub).toContain("Northwind sales");
@@ -138,7 +139,7 @@ describe("WEB_11_connectors_copy: verbatim from inventory.md", () => {
     const { root } = await open();
     for (const s of [
       "Connectors",
-      "The tools your agents can use, and how far each one can go.",
+      "The apps Tilo can use for you. You decide what it may do in each one.", // UI-STUDIO-5 lede
       "HubSpot sign-in expires in 3 days",
       "Scan competitor prices reads contacts from it. Reconnect to keep it running.",
       "Connected",
@@ -217,8 +218,12 @@ describe("WEB_11_connectors_honesty: fixture data is labelled, statuses come fro
 
   it("WEB_11_connectors_honesty_connected_status_appears_only_for_fixture_connected_tools", async () => {
     const { root } = await open();
-    const synced = connectedTiles(root).filter((t) => /Example only: not synced/.test(textOf(t)));
-    expect(synced).toHaveLength(connectors.filter((c) => c.st === "connected").length);
+    // CONNECTORS-DESIGN: the sample is said once, in one strip, not on every card.
+    const synced = connectedTiles(root).filter((t) => /Example only|Not synced/.test(textOf(t)));
+    expect(synced).toHaveLength(0);
+    const strips = root.querySelectorAll(".park-connectors-strip");
+    expect(strips).toHaveLength(1);
+    expect(textOf(strips[0] as Element)).toContain("Not synced");
     const addRegion = textOf(labelled(root, "Available") as HTMLElement);
     expect(addRegion).not.toMatch(/Synced|Connected just now|Healthy/);
   });

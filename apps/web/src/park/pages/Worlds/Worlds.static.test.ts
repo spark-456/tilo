@@ -126,9 +126,11 @@ describe("WEB_5_worlds_static: the registry gets one new line", () => {
       "skills",
       "ledger",
       "agenda",
+      "needs", // STUDIO-4: the Needs you page
       "team",
       "profile",
       "connectors",
+      "chat", // UI-STUDIO-2
       "library",
     ]);
     // another lane's page is its own one line in the same named-export form; the rest stay Placeholder

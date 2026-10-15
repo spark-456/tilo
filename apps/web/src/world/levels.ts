@@ -11,6 +11,9 @@ export interface LevelRow {
   readonly name: string;
   /** Buildings finished of the level's buildings, 0..100; a finished level is 100. */
   readonly percent: number;
+  /** True when `percent` rests on a recorded event (a building or level event, or the run finished); a started
+   * run with none has no honest number, so the screen shows none (HR-1). */
+  readonly measured: boolean;
   /** The summary of the latest event of this level, or null before one. */
   readonly line: string | null;
   /** The level the latest levelled event belongs to: where the run is at the replay point. */
@@ -24,12 +27,18 @@ export const buildingCount = (layout: Layout): number =>
     0,
   );
 
+/** A run that recorded world.completed but never a building, district or level event: its workstreams are not
+ * tracked one by one, so the run finishing is the only record, and it finished all of them (HR-1). */
+const finishedWithoutProgress = (state: WorldState, events: readonly Event[]): boolean =>
+  state.status === "completed" && !events.some((e) => /^(building|district|level)\./.test(e.type));
+
 /** The levels of a layout, top to bottom (the last level is the highest). */
 export function levelRows(
   layout: Layout,
   state: WorldState,
   events: readonly Event[],
 ): readonly LevelRow[] {
+  const runDone = finishedWithoutProgress(state, events);
   const lines = new Map<string, string>();
   let active: string | null = null;
   for (const e of events) {
@@ -41,21 +50,38 @@ export function levelRows(
     .map((level, i): LevelRow => {
       const buildings = level.districts.flatMap((d) => d.buildings);
       const done = buildings.filter((b) => state.buildings[b.id]?.status === "completed").length;
-      const percent = state.levels[level.id]?.completed
-        ? 100
-        : buildings.length === 0
-          ? 0
-          : Math.round((done / buildings.length) * 100);
+      const levelDone = state.levels[level.id]?.completed === true;
+      const percent =
+        levelDone || runDone
+          ? 100
+          : buildings.length === 0
+            ? 0
+            : Math.round((done / buildings.length) * 100);
       return {
         id: level.id,
         number: i + 1,
         name: level.name,
         percent,
+        measured:
+          levelDone || runDone || buildings.some((b) => state.buildings[b.id]?.status !== "hidden"),
         line: lines.get(level.id) ?? null,
         active: level.id === active,
       };
     })
     .reverse();
+}
+
+/** A building's state for the side panel: its own events win; a run that recorded world.completed has finished
+ * every workstream, and one that recorded world.planned has planned them (HR-1: the recorded run, not a default). */
+export function buildingStatus(
+  state: WorldState,
+  id: string,
+  events: readonly Event[],
+): WorldState["buildings"][string]["status"] {
+  const own = state.buildings[id]?.status ?? "hidden";
+  if (own !== "hidden") return own;
+  if (finishedWithoutProgress(state, events)) return "completed";
+  return events.some((e) => e.type === "world.planned") ? "planned" : own;
 }
 
 export type MarkKind = "decision" | "done" | "problem";

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Fredoka:wght@500;600;700&family=Figtree:wght@500;600;700;800&family=Geist:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--priInk);text-decoration:none}a:hover{color:var(--pri)}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="width:100%;min-height:100%;box-sizing:border-box;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:16px;line-height:1.5;padding:{{ pad }}">
+  <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:28px">
+    <h2 style="margin:0;font-family:var(--fH);font-weight:900;font-size:{{ hs }};line-height:1.1">Empty, loading and error</h2>
+    <p style="margin:0;font-size:16px;color:var(--ink2)">Every empty screen gets a happy helper and one clear next step. Loading shows the shape of what’s coming. Errors say what happened and what you can do.</p>
+  </div>
+  <div style="display:grid;grid-template-columns:{{ cols }};gap:24px">
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:13px;font-weight:800;color:var(--ink3)">Empty · Your worlds</div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh1);padding:32px 28px;min-height:360px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px">
+        <div style="height:150px;padding:0 16px;border-radius:24px;background:var(--cityBg);display:flex;align-items:flex-end;justify-content:center;filter:var(--cityFx)">{{ emptyArt }}</div>
+        <div style="font-family:var(--fH);font-weight:900;font-size:22px;line-height:1.25">Your town is ready for its first building</div>
+        <div style="font-size:15px;color:var(--ink2);max-width:300px">Describe a task and Tilo builds a little world to get it done.</div>
+        <span style="height:52px;padding:0 22px;border-radius:16px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;font-family:var(--fH);font-weight:900;font-size:17px">Start your first task</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:13px;font-weight:800;color:var(--ink3)">Empty · Needs you</div>
+      <div style="position:relative;background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh1);padding:32px 28px;min-height:360px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;overflow:hidden">
+        <div style="position:relative;width:150px;height:150px;border-radius:99px;background:var(--mintSoft);display:flex;align-items:flex-end;justify-content:center">
+          <span style="position:absolute;top:18px;left:22px;width:10px;height:10px;background:var(--amber);border-radius:2px;transform:rotate(45deg)"></span>
+          <span style="position:absolute;top:34px;right:20px;width:8px;height:8px;background:var(--sun);border-radius:99px"></span>
+          <span style="position:absolute;top:10px;right:46px;width:7px;height:7px;background:var(--mint);border-radius:2px;transform:rotate(20deg)"></span>
+          <span style="position:absolute;bottom:40px;left:14px;width:6px;height:6px;background:var(--pri);border-radius:99px"></span>
+          <span style="padding-bottom:18px">{{ happyAgent }}</span>
+        </div>
+        <div style="font-family:var(--fH);font-weight:900;font-size:22px;line-height:1.25">All clear. Nothing needs you.</div>
+        <div style="font-size:15px;color:var(--ink2);max-width:300px">Your helpers are getting on with it. We’ll let you know when one has a question.</div>
+        <span style="height:52px;padding:0 22px;border-radius:16px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:800;font-size:16px">Back to Home</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:13px;font-weight:800;color:var(--ink3)">Empty · No search results</div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh1);padding:32px 28px;min-height:360px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px">
+        <div style="width:150px;height:150px;border-radius:99px;background:var(--skySoft);display:flex;align-items:flex-end;justify-content:center"><span style="padding-bottom:18px">{{ lookAgent }}</span></div>
+        <div style="font-family:var(--fH);font-weight:900;font-size:22px;line-height:1.25">No skills match “invoce”</div>
+        <div style="font-size:15px;color:var(--ink2);max-width:300px">Did you mean <a href="#" style="font-weight:800">invoice</a>? Or show Tilo how you’d like it done.</div>
+        <span style="height:52px;padding:0 22px;border-radius:16px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;font-family:var(--fH);font-weight:900;font-size:17px">Teach Tilo this skill</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;grid-column:{{ span2 }}">
+      <div style="font-size:13px;font-weight:800;color:var(--ink3)">Loading · Home</div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh1);padding:28px;min-height:360px;box-sizing:border-box;display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="width:40px;height:40px;border-radius:99px;background:var(--priSoft);display:flex;align-items:flex-end;justify-content:center;overflow:hidden">{{ walkAgent }}</span>
+          <span style="font-size:15px;font-weight:700;color:var(--ink2)">Getting your worlds ready…</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="width:180px;height:14px;border-radius:99px;background:linear-gradient(90deg,var(--sunk) 0,var(--line) 50%,var(--sunk) 100%);background-size:800px 100%;animation:tiloShimmer 1.4s linear infinite"></div>
+          <div style="width:58%;height:36px;border-radius:12px;background:linear-gradient(90deg,var(--sunk) 0,var(--line) 50%,var(--sunk) 100%);background-size:800px 100%;animation:tiloShimmer 1.4s linear infinite"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:{{ skCols }};gap:16px">
+          <sc-for list="{{ sk }}" as="k" hint-placeholder-count="3">
+            <div style="border:1px solid var(--line);border-radius:20px;padding:8px;display:flex;flex-direction:column;gap:12px">
+              <div style="height:110px;border-radius:14px;background:linear-gradient(90deg,var(--sunk) 0,var(--line) 50%,var(--sunk) 100%);background-size:800px 100%;animation:tiloShimmer 1.4s linear infinite"></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:0 8px 8px">
+                <div style="flex:1;display:flex;flex-direction:column;gap:8px"><div style="width:80%;height:14px;border-radius:99px;background:var(--sunk)"></div><div style="width:50%;height:12px;border-radius:99px;background:var(--sunk)"></div></div>
+                <div style="width:40px;height:40px;border-radius:99px;border:5px solid var(--sunk);box-sizing:border-box"></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:13px;font-weight:800;color:var(--ink3)">Error · Something isn’t connected</div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh1);padding:28px;min-height:360px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;align-items:center;gap:14px">
+          <span style="width:52px;height:52px;border-radius:16px;background:var(--redSoft);color:var(--redInk);display:flex;align-items:center;justify-content:center;flex:none">{{ iSearch }}</span>
+          <span style="font-family:var(--fH);font-weight:900;font-size:21px;line-height:1.25">Web search isn’t connected yet</span>
+        </div>
+        <div style="font-size:15px;color:var(--ink2)">Try again, or continue without it. Without web search, Tilo uses what it already knows, which may be a little out of date.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <span style="height:48px;padding:0 20px;border-radius:14px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;font-weight:800;font-size:15px">Try again</span>
+          <span style="height:48px;padding:0 18px;border-radius:14px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:800;font-size:15px">Continue without it</span>
+        </div>
+        <a href="#" style="font-size:14px;font-weight:800">Connect web search →</a>
+        <div style="margin-top:auto;background:var(--redSoft);border-radius:16px;padding:10px 10px 10px 14px;display:flex;align-items:center;gap:10px">
+          <span style="width:8px;height:8px;border-radius:99px;background:var(--red);flex:none"></span>
+          <span style="flex:1;font-size:14px;font-weight:700;color:var(--redInk)">Couldn’t save your change. Check your connection.</span>
+          <span style="height:36px;padding:0 12px;border-radius:10px;background:var(--card);color:var(--ink);font-size:13px;font-weight:800;display:flex;align-items:center">Retry</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1000},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;,&quot;meadow&quot;,&quot;meadowDark&quot;,&quot;studio&quot;,&quot;studioDark&quot;,&quot;electric&quot;,&quot;electricDark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloR) this.t = setInterval(() => { if (window.TiloR && window.TiloCity) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const R = window.TiloR ? window.TiloR(React.createElement) : null;
+    const theme = this.props.theme ?? 'light', ph = (this.props.device ?? 'desktop') === 'phone';
+    return {
+      theme, pad: ph ? '32px 16px' : '48px', hs: ph ? '28px' : '36px',
+      cols: ph ? 'minmax(0,1fr)' : 'repeat(3,minmax(0,1fr))', span2: ph ? 'auto' : 'span 2', skCols: ph ? 'minmax(0,1fr)' : 'repeat(3,minmax(0,1fr))',
+      sk: ph ? [1] : [1, 2, 3],
+      emptyArt: R ? [R.bld('townhall', 'planned', 130), R.agent('builder', 'delighted', 64)] : null,
+      happyAgent: R ? R.agent('connector', 'delighted', 88) : null,
+      lookAgent: R ? R.agent('research', 'puzzled', 88) : null,
+      walkAgent: R ? R.agent('research', 'walking', 36) : null,
+      iSearch: R ? R.ic('search', 24) : null
+    };
+  }
+}
+</script>
+</body>
+</html>

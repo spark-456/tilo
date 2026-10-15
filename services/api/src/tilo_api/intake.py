@@ -41,11 +41,12 @@ from tilo_providers.config import ProviderConfigError
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
-from tilo_providers.router import Router
+from tilo_providers.router import Deadline, Router, RouterDeadlineError
 
 from tilo_api import deps, ephemeral, intake_requests, quick
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
+from tilo_api.intake_deadline import INTAKE_DEADLINE_DETAIL, load_intake_deadline
 from tilo_api.intake_uploads import FILE_SCREEN_UNAVAILABLE, RunUploads, UploadStorageError
 from tilo_api.tasks import create_task
 
@@ -154,6 +155,8 @@ async def _thinking(
     key: str | None,
 ) -> Any:
     text = request.text
+    limit = load_intake_deadline()
+    deadline = Deadline.after(limit.seconds, limit.first_attempt_share)  # NFR-03: ends inside the web's wait
     ids = intake_requests.identifiers(principal.user_id, key)
     if key is not None and not (chosen and chosen[0] == "quick"):
         await run_in_threadpool(tasks.load_path, {"task_id": ids[0]})
@@ -197,6 +200,7 @@ async def _thinking(
                 today=today(),
                 source_text=prepared.source_text,
                 parts=prepared.parts,
+                deadline=deadline,
             )
         except TaskRefused as refused:
             await _abort_uploads(store)
@@ -217,6 +221,8 @@ async def _thinking(
         except BriefExtractionError as exc:
             # A category only: the error text can quote the model's output.
             logger.warning("brief extraction failed: %s", type(exc.__cause__ or exc).__name__)
+            if isinstance(exc.__cause__, RouterDeadlineError):  # NFR-22: a plain, retryable answer, never a late 201
+                raise HTTPException(status_code=503, detail=INTAKE_DEADLINE_DETAIL) from exc
             deps.raise_if_model_unavailable(exc)
             raise HTTPException(status_code=502, detail="The Director could not draft a brief.") from exc
         try:  # a bad kinds file stops the task before anything is stored, like a bad refusal list

@@ -25,7 +25,12 @@ afterEach(cleanup);
 
 const DAY = "38 agents are at work across 4 worlds. ";
 const NIGHT_LINE = "Your city keeps working overnight. ";
-const k1Row = (el: HTMLElement) => controlWith(todayRegion(el), "K1 electric scooter");
+// UI-STUDIO-2: the K1 world is a card in the Sample worlds section.
+const k1Row = (el: HTMLElement) =>
+  controlWith(
+    el.querySelector('section[aria-label="Sample worlds"]') as HTMLElement,
+    "K1 electric scooter",
+  );
 
 describe("WEB_4_home_decide: the Needs-you pill and the caught-up state", () => {
   it("WEB_4_home_decide_one_approval_leaves_one_decision_in_the_singular", async () => {
@@ -95,31 +100,36 @@ describe("WEB_4_home_decide: the summary line", () => {
 describe("WEB_4_home_decide: the K1 row of Live now", () => {
   it("WEB_4_home_decide_k1_row_counts_the_waiting_decisions", async () => {
     const open = await mountHome();
-    expect(flat(textOf(k1Row(open.el)))).toBe(flat("K1 electric scooter 2 decisions waiting"));
+    expect(flat(textOf(k1Row(open.el)))).toBe(
+      flat("Needs you K1 electric scooter 2 decisions waiting 46%"),
+    );
     cleanup();
     const one = await mountHome({ dec: { depot: true } });
-    expect(flat(textOf(k1Row(one.el)))).toBe(flat("K1 electric scooter 1 decision waiting"));
+    expect(flat(textOf(k1Row(one.el)))).toBe(
+      flat("Needs you K1 electric scooter 1 decision waiting 46%"),
+    );
   });
 
   it("WEB_4_home_decide_k1_row_goes_back_to_running_when_nothing_is_waiting", async () => {
     const rig = await mountHome({ dec: { depot: true, mail: true } });
     const row = k1Row(rig.el);
-    expect(flat(textOf(row))).toBe(flat("K1 electric scooter Running · 46%"));
-    expect(progressOf(row)).toBe(46);
+    expect(flat(textOf(row))).toBe(flat("Working K1 electric scooter Running · 46% 46%"));
   });
 });
 
-describe("WEB_4_home_decide: the K1 map pin follows the decisions", () => {
-  const pins = [{ x: 760, y: 300 }];
-  const k1Pin = (el: HTMLElement) => pinFor(el, "K1 electric scooter");
-
+describe("STUDIO_2_home_decide: the Needs you card follows the decisions", () => {
+  const needsCard = (el: HTMLElement) => el.querySelector(".park-home-card--needs") as HTMLElement;
   it.each([
-    [{}, "2 decisions need you"],
-    [{ depot: true }, "1 decision needs you"],
-    [{ depot: true, mail: true }, "Running · 46%"],
-  ])("WEB_4_home_decide_pin_line_for_dec_%j", async (dec, line) => {
-    const rig = await mountHome({ dec, app: { pins } });
-    expect(flat(textOf(k1Pin(rig.el)))).toBe(flat(`K1 electric scooter ${line}`));
+    [{}, 2],
+    [{ depot: true }, 1],
+    [{ depot: true, mail: true }, 0],
+  ] as const)("STUDIO_2_home_decide_needs_card_for_dec_%j", async (dec, open) => {
+    const rig = await mountHome({ dec });
+    const card = needsCard(rig.el);
+    expect(card.querySelectorAll(".park-home-tray")).toHaveLength(open);
+    if (open > 0)
+      expect(textOf(card.querySelector(".park-home-count") as Element)).toBe(String(open));
+    else expect(textOf(card)).toContain("Nothing needs you right now.");
   });
 });
 

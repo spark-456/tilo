@@ -81,6 +81,7 @@ def test_PRD_6_4_shipped_config_loads(repo_root):
     assert set(config.roles) == {
         "director",
         "lead",
+        "lead_review",  # services/harness/src/tilo_harness/lead_review.py
         "specialist",
         "verifier",
         "writer",
@@ -92,6 +93,7 @@ def test_PRD_6_4_shipped_config_loads(repo_root):
         "assistant",  # PPL-11b, FR-PA-19: the assistant panel's fallback (services/api/tests/API_PPL_11b.md)
         "search",  # ADR-0029, PRD 12.2: every SearchProvider call (falls back to the same grounded profile)
         "meeting",  # FR-MTG-11: the meeting bot's agenda analysis
+        "meeting_analyst",  # services/api/src/tilo_api/meeting_analysis.py
         "meeting_fast",  # FR-MTG-11: the meeting bot's one-sentence direct answers
         "meeting_room",  # MROOM-A1, ADR-0028: the meeting room's quick replies (`meeting` is the bot's)
         "meeting_room_thinking",  # MROOM-A1: the room's thinking replies

@@ -3,12 +3,17 @@ export const THEMES = [
   {
     id: "metropolis",
     name: "Metropolis",
-    isDefault: true,
+    isDefault: false,
   },
   {
     id: "neutral",
     name: "Neutral",
     isDefault: false,
   },
+  {
+    id: "studio",
+    name: "Studio",
+    isDefault: true,
+  },
 ] as const;
-export const DEFAULT_THEME = "metropolis";
+export const DEFAULT_THEME = "studio";

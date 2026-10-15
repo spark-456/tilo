@@ -13,7 +13,7 @@ import { ALLOWLIST, scanSource } from "../../../../test-support/honestyScan";
 
 // The Park city's ambient scenery (shell and engines) is decoration, not work: its animation entries are
 // pinned by src/honesty/park-ambient.allowlist.test.ts. Every other entry stays pinned exactly here.
-const AMBIENT = /^src\/park\/(shell|engines)\//;
+const AMBIENT = /^src\/(park\/(shell|engines)|landing)\//; // LANDING-2: the landing's own chrome motion
 
 const HOME = __dirname;
 const PAGES = resolve(HOME, "..");
@@ -110,7 +110,9 @@ describe("WEB_4_static: honesty (HR-1..HR-7; the scan and its allowlist are unto
   it("WEB_4_static_the_composer_delay_goes_through_useSchedule", () => {
     const src = code(join(HOME, "HomePage.tsx"));
     expect(src).toMatch(/\buseSchedule\b/);
-    expect(src).toMatch(/\b900\b/);
+    // the 900 ms is homeData's DRAFT_MS, scheduled by the page (UI-STUDIO-2 dropped the viewport literal that matched)
+    expect(src).toMatch(/schedule\([\s\S]*?DRAFT_MS\)/);
+    expect(code(join(HOME, "homeData.ts"))).toMatch(/DRAFT_MS = 900\b/);
   });
 });
 

@@ -60,25 +60,30 @@ async function expand(root: ParentNode) {
 it("TEAM_WEB_integration_catalogue_remains_when_owner_opens_team_controls", async () => {
   const { api, fetch } = setup();
   const { container } = await renderPage(makeApp(), api);
-  expect(fetch.mock.calls.map(([url]) => String(url))).toEqual(["https://api.test/v1/connectors"]);
+  expect(fetch.mock.calls.map(([url]) => String(url))).toEqual([
+    "https://api.test/v1/connectors",
+    "https://api.test/v1/people",
+  ]);
   await expand(container);
   expect(fetch.mock.calls.map(([url]) => String(url))).toEqual([
     "https://api.test/v1/connectors",
+    "https://api.test/v1/people",
     "https://api.test/v1/team",
   ]);
   expect(container.textContent).toContain("Actual Mail");
-  expect(container.querySelector('select[aria-label="Access level for mail"]')).not.toBeNull();
+  expect(container.querySelector('fieldset[aria-label="Access level for mail"]')).not.toBeNull();
 });
 
 it("TEAM_WEB_integration_people_directory_survives_failed_team_controls_read", async () => {
   const { api, fetch } = setup(true);
   const { root } = await renderTeam(makeApp(), api);
-  expect(fetch.mock.calls.map(([url]) => String(url))).toEqual(["https://api.test/v1/people"]);
+  // SELF-SERVE-TEAMS: the "Your teams" panel reads the person's own teams (/v1/teams) beside the directory; the
+  // owner's team controls (/v1/team) are still read only when opened.
+  const urls = () =>
+    fetch.mock.calls.map(([url]) => String(url)).filter((u) => !u.endsWith("/v1/teams"));
+  expect(urls()).toEqual(["https://api.test/v1/people"]);
   await expand(root);
-  expect(fetch.mock.calls.map(([url]) => String(url))).toEqual([
-    "https://api.test/v1/people",
-    "https://api.test/v1/team",
-  ]);
+  expect(urls()).toEqual(["https://api.test/v1/people", "https://api.test/v1/team"]);
   expect(root.textContent).toContain("Actual owner");
   expect(root.textContent).toContain("Team controls are not set up on this install yet.");
   expect(root.querySelector('[data-testid="live-team"]')).not.toBeNull();

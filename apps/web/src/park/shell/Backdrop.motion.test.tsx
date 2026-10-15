@@ -116,6 +116,10 @@ describe("WEB-MOTION-1 the city holds still while the world loader is open (as t
   it("WEB-MOTION-1 opening a world on Home pauses the city, and it is not paused before", async () => {
     await mountApp();
     const backdrop = () => q(document.body, ".park-shell__backdrop");
+    // UI-STUDIO-2: the Studio Home has no city (the design's plain page), so the city is veiled and held there;
+    // the Metropolis theme keeps its city behind Home.
+    expect(backdrop().hasAttribute("data-paused"), "Studio Home: the city is veiled").toBe(true);
+    await act(async () => seen.app.setPref("theme", "metropolis"));
     expect(backdrop().hasAttribute("data-paused"), "Home, no loader: the city moves").toBe(false);
     await act(async () => seen.store.openWorld("k1"));
     expect(backdrop().hasAttribute("data-paused"), "the loader is open: the city holds").toBe(true);

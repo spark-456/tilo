@@ -14,6 +14,7 @@ import type {
   Dec,
   DecideAck,
   Decision,
+  DecisionCard,
   DecisionFacts,
   DecisionKey,
   Learn,
@@ -112,6 +113,7 @@ describe("WEB_1a_types: entity shapes follow the README data model", () => {
       approvedTitle: string;
       provide?: { cardId: string }; // additive (ADR-0035 L6d): a live card answered by the fields form
       facts?: DecisionFacts; // additive (WEB-9c), not in the prototype
+      card?: DecisionCard; // additive (STUDIO-4): a live card's served fields, for Needs you
     }>();
   });
 

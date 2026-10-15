@@ -13,6 +13,7 @@ export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppC
   skills: lazy(() => import("../pages/Skills/SkillsPage").then((m) => ({ default: m.SkillsPage }))),
   ledger: lazy(() => import("../pages/Ledger/LedgerPage").then((m) => ({ default: m.LedgerPage }))),
   agenda: lazy(() => import("../pages/Agenda/AgendaPage").then((m) => ({ default: m.AgendaPage }))),
+  needs: lazy(() => import("../pages/Needs/NeedsPage").then((m) => ({ default: m.NeedsPage }))),
   team: lazy(() => import("../pages/Team/TeamPage").then((m) => ({ default: m.TeamPage }))),
   profile: lazy(() =>
     import("../pages/Profile/ProfilePage").then((m) => ({ default: m.ProfilePage })),
@@ -20,6 +21,8 @@ export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppC
   connectors: lazy(() =>
     import("../pages/Connectors/ConnectorsPage").then((m) => ({ default: m.ConnectorsPage })),
   ),
+  // biome-ignore format: the registry keeps one line per page
+  chat: lazy(() => import("../pages/Chat/ChatPage").then((m) => ({ default: m.ChatPage }))),
   library: lazy(() =>
     import("../pages/Library/LibraryPage").then((m) => ({ default: m.LibraryPage })),
   ),

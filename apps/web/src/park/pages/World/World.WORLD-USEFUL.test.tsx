@@ -96,7 +96,7 @@ describe("WORLD_USEFUL runView: the progress line comes from recorded events onl
     const planned = PLAN.map((f) => f());
     expect(runView([...planned]).line).toBe("The plan is ready: 3 steps. Waiting to start.");
     const working = [...planned, START()];
-    expect(runView(working).line).toBe("Working.");
+    expect(runView(working).line).toBe("Starting: the team is getting ready.");
     const one = [...working, WORKING("U1", "The Specialist is mapping the route")()];
     expect(runView(one)).toMatchObject({
       phase: "working",
@@ -146,7 +146,9 @@ describe("WORLD_USEFUL runView: the progress line comes from recorded events onl
       ev("world.completed", "Done.", { credits_used: 4, deliverable_count: 1 }),
     ];
     expect(runView(done)).toMatchObject({ phase: "done", percent: 100, deliverable: true });
-    expect(runView(done).line).toBe("Done. All 3 steps finished, 1 deliverable ready below.");
+    expect(runView(done).line).toBe(
+      "Done. All 3 steps finished, 1 deliverable ready in the Result tab.",
+    );
   });
 });
 
@@ -193,7 +195,7 @@ describe("WORLD_USEFUL the World page of a live run", () => {
     expect(status()).toContain("Step 1 of 3: The Specialist is mapping the route.");
     const bar = rig.el.querySelector("progress.park-world-progress") as HTMLProgressElement;
     expect(bar.value).toBe(33);
-    expect(rig.el.querySelector(".park-world-chip")?.textContent).toContain("Running");
+    expect(rig.el.querySelector(".park-world-chip")?.textContent).toContain("Working");
     expect(rig.el.querySelector('[data-testid="run-result"]')).toBeNull();
 
     // 3. a recorded assumption shows as a chip
@@ -215,8 +217,10 @@ describe("WORLD_USEFUL the World page of a live run", () => {
       }),
       ev("world.completed", "Done.", { credits_used: 4, deliverable_count: 1 }),
     );
-    expect(status()).toContain("Done. All 3 steps finished, 1 deliverable ready below.");
-    expect(rig.el.querySelector(".park-world-chip")?.textContent).toContain("Ready");
+    expect(status()).toContain(
+      "Done. All 3 steps finished, 1 deliverable ready in the Result tab.",
+    );
+    expect(rig.el.querySelector(".park-world-chip")?.textContent).toContain("Done");
     const text = rig.el.querySelector('[data-testid="result-text"]') as HTMLElement;
     expect(text.querySelector("h3")?.textContent).toBe("Road trip");
     expect(textOf(text)).toContain("drive to Bangalore");
@@ -315,7 +319,7 @@ describe("WORLD_USEFUL the World page of a live run", () => {
     expect(textOf(failed)).toContain("Why: the route tool is not connected");
     expect(pageText(rig.el)).toContain("Stopped at step 1 of 3: the route tool is not connected.");
     expect(rig.el.querySelector(".park-world-chip")?.textContent).toContain("Stopped");
-    expect(rig.el.querySelector(".park-world-chip")?.textContent).not.toContain("Ready");
+    expect(rig.el.querySelector(".park-world-chip")?.textContent).not.toContain("Done");
     expect(rig.el.querySelector('[data-testid="run-result"]')).toBeNull();
     expect(hasControl(rig.el, "Open result")).toBe(false);
     expect(pageText(rig.el)).not.toContain("a unit failed");
@@ -365,7 +369,9 @@ describe("WORLD_USEFUL the World page of a live run", () => {
     );
     expect(status()).toContain("Waiting for you: 1 decision.");
     await emit(...(EVENTS_VILLAGE_BASIC.filter((e) => e.seq > 34) as unknown as RunEvent[]));
-    expect(status()).toContain("Done. All 2 steps finished, 1 deliverable ready below.");
+    expect(status()).toContain(
+      "Done. All 2 steps finished, 1 deliverable ready in the Result tab.",
+    );
     expect(rig.el.querySelector('[data-testid="result-text"]')).not.toBeNull();
   });
 });

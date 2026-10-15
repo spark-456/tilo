@@ -1,0 +1,188 @@
+/* UI-STUDIO-5 Team (design/studio-v2 "Tilo S Team", canvas section 09): values read from the artboard's inline styles.
+   Only under the Studio theme, so Team.css keeps the Park look. Colours are role tokens (light and dark). No
+   transition, animation or keyframes (HR-1..7). Every tap target is 44px or more. */
+[data-park][data-theme="studio"] [data-testid="park-page-team"] > .park-sheet {
+  max-width: var(--park-page-max, 1296px);
+  margin: 0 auto;
+  padding: 8px var(--park-page-pad, 8px) 64px;
+  gap: 28px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+[data-park][data-theme="studio"] .park-team-titles {
+  gap: 8px;
+}
+[data-park][data-theme="studio"] .park-team-h1 {
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: -2px;
+}
+[data-park][data-theme="studio"] .park-team-intro {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink2);
+}
+[data-park][data-theme="studio"] .park-team-count {
+  font-weight: 600;
+  color: var(--ink3);
+}
+
+/* ---- Cards: hairline, r24, the soft shadow ---- */
+[data-park][data-theme="studio"] .park-team-card,
+[data-park][data-theme="studio"] .park-team-side,
+[data-park][data-theme="studio"] .park-team-helper {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park][data-theme="studio"] .park-team-helper {
+  border-radius: 22px;
+}
+[data-park][data-theme="studio"] .park-team-h2,
+[data-park][data-theme="studio"] .park-team-sidetitle {
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+[data-park][data-theme="studio"] .park-team-sidetitle.park-team-sidetitle--sm,
+[data-park][data-theme="studio"] .park-team-alwaystitle {
+  font-weight: 600;
+}
+
+/* ---- The people table (Person, Role, Teams, Department, Active) ---- */
+[data-park][data-theme="studio"] .park-team-dirhead th {
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-team-directory .park-team-avatar {
+  background: var(--lilacSoft);
+  color: var(--lilacInk);
+  font-size: 14px;
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-team-name {
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-team-sub,
+[data-park][data-theme="studio"] .park-team-dirnote {
+  font-weight: 500;
+  color: var(--ink3);
+}
+[data-park][data-theme="studio"] .park-team-tag--you {
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+
+/* ---- Your teams (SELF-SERVE-TEAMS): the panel where the design's team list sits ---- */
+[data-park][data-theme="studio"] [data-testid="self-serve-teams"] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px;
+}
+[data-park][data-theme="studio"] [data-testid="self-serve-teams"] > p,
+[data-park][data-theme="studio"] [data-testid="self-serve-teams"] > output {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--ink2);
+}
+[data-park][data-theme="studio"] [data-testid="self-serve-teams"] .park-team-details {
+  align-self: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--sunk);
+}
+[data-park][data-theme="studio"] [data-testid="self-serve-teams"] .park-team-details p,
+[data-park][data-theme="studio"] [data-testid="self-serve-teams"] .park-team-details h3 {
+  flex: 1 1 100%;
+  margin: 0;
+}
+[data-park][data-theme="studio"] [data-testid="self-serve-teams"] .park-team-details ul {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park][data-theme="studio"] [data-testid="self-serve-teams"] .park-team-details li {
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 99px;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-team-field {
+  min-height: 44px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 12px;
+  background: var(--field);
+}
+[data-park][data-theme="studio"] .park-team-input {
+  min-height: 42px;
+  font-size: 15px;
+}
+
+/* ---- Side cards and the settings disclosure ---- */
+[data-park][data-theme="studio"] .park-team-always {
+  background: var(--sunk);
+}
+[data-park][data-theme="studio"] .park-team-sidenote {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--amberSoft);
+  color: var(--amberInk);
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-team-disclosure {
+  padding: 4px 22px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+}
+[data-park][data-theme="studio"] .park-team-disclosure[open] {
+  padding-bottom: 22px;
+}
+[data-park][data-theme="studio"] .park-team-summary:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---- Your helpers ---- */
+[data-park][data-theme="studio"] .park-team-helperstitle {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+}
+[data-park][data-theme="studio"] .park-team-helpername {
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-team-helperwhat,
+[data-park][data-theme="studio"] .park-team-helpersnote {
+  font-weight: 500;
+}
+
+/* ---- A phone: one column, the table scrolls inside its card ---- */
+@media (max-width: 560px) {
+  [data-park][data-theme="studio"] [data-testid="park-page-team"] > .park-sheet {
+    padding: 0 0 48px;
+    gap: 20px;
+  }
+  [data-park][data-theme="studio"] .park-team-h1 {
+    font-size: 36px;
+    letter-spacing: -1.2px;
+  }
+  [data-park][data-theme="studio"] [data-testid="self-serve-teams"],
+  [data-park][data-theme="studio"] .park-team-side {
+    padding: 18px 16px;
+  }
+}

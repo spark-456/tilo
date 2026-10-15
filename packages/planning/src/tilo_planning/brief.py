@@ -23,7 +23,7 @@ from tilo_providers.clock import real_today
 from tilo_providers.interfaces import Capability, GenerateRequest
 from tilo_providers.media import MediaPart
 from tilo_providers.prompts import load_prompt, neutralise_marker
-from tilo_providers.router import Router, RouterError, RouterResult
+from tilo_providers.router import Deadline, Router, RouterError, RouterResult
 
 from tilo_planning.due_dates import DEADLINE_HELP, parse_deadline
 from tilo_planning.gaps import (
@@ -304,6 +304,7 @@ def extract_brief(
     today: date | None = None,
     source_text: str = "",
     parts: list[MediaPart] | None = None,
+    deadline: Deadline | None = None,
 ) -> ExtractionResult:
     """PRD 16.3 item 1: the task text is passed only as delimited data, after the instructions. An out-of-policy
     category from the Director raises `TaskRefused` carrying the configured text (FR-INT-12), never a brief. Parts
@@ -319,7 +320,9 @@ def extract_brief(
         parts=parts,
     )
     try:
-        run = router.generate(DIRECTOR_ROLE, request, budget=budget, required_capability=Capability.JSON)
+        # NFR-03: only a caller that sets a limit passes one, so a router without the keyword is untouched
+        extra: dict[str, Any] = {} if deadline is None else {"deadline": deadline}
+        run = router.generate(DIRECTOR_ROLE, request, budget=budget, required_capability=Capability.JSON, **extra)
     except RouterError as error:
         raise BriefExtractionError(f"FR-INT-03: no schema-valid brief from the Director: {error}") from error
     if run.outcome != "ok" or run.response is None:

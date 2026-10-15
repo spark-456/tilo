@@ -1,25 +1,44 @@
 // The top nav (README "Shell > Nav"; reference `Tilo App.dc.html` header): a fixed glass bar with the logo,
-// six tabs (an amber badge on Worlds while decisions wait), the day and night toggle, the bell (an amber dot
+// seven tabs (an amber badge on Needs you while decisions wait, STUDIO-4), the day and night toggle, the bell (an amber dot
 // until the notifications are read) and the AM avatar (ringed in the hero colour on Profile and
 // Connectors). The 3px progress bar on its bottom edge follows the world loader and the page swap: it fades
 // with its opacity and fills with a scaleX (the stylesheet times both).
-import { type MouseEvent, useState } from "react";
+import { type CSSProperties, type MouseEvent, useState } from "react";
 import { PAGE_LABEL, type PageId } from "../app/AppCtx";
 import { parkPath } from "../app/router";
 import { Menu } from "../components";
 import { SampleChip } from "./SampleChip";
 import { icon } from "./kit";
 import type { Bar } from "./motion";
+import { fitTabs } from "./navFit";
 import { prefetchPage } from "./prefetch";
 
 const TABS: readonly (readonly [PageId, string])[] = [
   ["home", "Home"],
+  ["chat", "Chat"],
   ["worlds", "Worlds"],
   ["skills", "Skills"],
+  ["needs", "Needs you"],
   ["ledger", "Ledger"],
   ["agenda", "Agenda"],
   ["team", "Team"],
 ];
+
+/** The down chevron on the page menu and More buttons. */
+function Chevron() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+      <path
+        d="M2 4.5 L6 8.5 L10 4.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 /** A plain left click; anything else (new tab, new window, download) is left to the browser. */
 const plain = (e: MouseEvent): boolean =>
@@ -53,6 +72,8 @@ export interface TopNavProps {
   /** QA-DEMO-1 B2: a narrow screen. The six tabs do not fit beside the tools, so one button names the current page
    * and opens a menu of all of them. */
   compact?: boolean;
+  /** STUDIO-INT: the window width; the tabs that do not fit beside the tools move into a More menu (0 = all). */
+  vw?: number;
 }
 
 export function TopNav(p: TopNavProps) {
@@ -62,10 +83,26 @@ export function TopNav(p: TopNavProps) {
     p.go(page);
   };
   const [pagesOpen, setPagesOpen] = useState(false);
+  // STUDIO-INT: the More menu opens under its button; its left edge is read when it opens.
+  const [moreAt, setMoreAt] = useState<number | null>(null);
   const current = TABS.find(([id]) => p.page === id || (id === "worlds" && p.page === "world"));
   // The page's own name, also for Profile and Connectors, which have no tab.
   const shown = current ? current[1] : p.page ? PAGE_LABEL[p.page] : "Pages";
   const timeLabel = p.night ? "Switch to day" : "Switch to night";
+  const fit = fitTabs(TABS, p.compact ? 0 : (p.vw ?? 0), {
+    sample: p.sample || p.reserveSample,
+    badge: p.needsLeft > 0,
+  });
+  const moreOn = fit.more.find(([id]) => id === current?.[0]);
+  const moreWaiting = p.needsLeft > 0 && fit.more.some(([id]) => id === "needs");
+  const waitingWords = `${p.needsLeft} decision${p.needsLeft === 1 ? "" : "s"}`;
+  const items = (tabs: readonly (readonly [PageId, string])[]) =>
+    tabs.map(([id, label]) => {
+      const on = current?.[0] === id;
+      const waiting = id === "needs" && p.needsLeft > 0 ? waitingWords : "";
+      const hint = [on ? "Current page" : "", waiting].filter(Boolean).join(" · ");
+      return { id, label, ...(hint ? { hint } : {}), onSelect: () => p.go(id) };
+    });
   const ringed = p.menu === "acct" || p.page === "profile" || p.page === "connectors";
   return (
     <>
@@ -100,21 +137,12 @@ export function TopNav(p: TopNavProps) {
             >
               <span className="park-shell__pagelabel">{shown}</span>
               {p.needsLeft > 0 ? <span className="park-shell__pagedot" aria-hidden="true" /> : null}
-              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-                <path
-                  d="M2 4.5 L6 8.5 L10 4.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <Chevron />
             </button>
           </nav>
         ) : (
           <nav aria-label="Main" className="park-shell__tabs">
-            {TABS.map(([id, label]) => {
+            {fit.shown.map(([id, label]) => {
               const on = p.page === id || (id === "worlds" && p.page === "world");
               return (
                 <a
@@ -127,12 +155,28 @@ export function TopNav(p: TopNavProps) {
                   onFocus={() => prefetchPage(id)}
                 >
                   {label}
-                  {id === "worlds" && p.needsLeft > 0 ? (
+                  {id === "needs" && p.needsLeft > 0 ? (
                     <span className="park-shell__badge">{p.needsLeft}</span>
                   ) : null}
                 </a>
               );
             })}
+            {fit.more.length > 0 ? (
+              <button
+                type="button"
+                className={`park-shell__tab park-shell__more ${moreOn ? "park-shell__tab--on" : ""}`}
+                aria-haspopup="menu"
+                aria-expanded={moreAt !== null}
+                aria-label={`More pages${moreOn ? `, now on ${moreOn[1]}` : ""}${
+                  moreWaiting ? `, ${waitingWords} waiting` : ""
+                }`}
+                onClick={(e) => setMoreAt(e.currentTarget.getBoundingClientRect().left)}
+              >
+                {moreOn ? moreOn[1] : "More"}
+                {moreWaiting ? <span className="park-shell__pagedot" aria-hidden="true" /> : null}
+                <Chevron />
+              </button>
+            ) : null}
           </nav>
         )}
         <div className="park-shell__tools">
@@ -189,21 +233,20 @@ export function TopNav(p: TopNavProps) {
           className="park-shell__pagemenu"
           width={240}
           onClose={() => setPagesOpen(false)}
-          items={TABS.map(([id, label]) => {
-            const on = current?.[0] === id;
-            const waiting =
-              id === "worlds" && p.needsLeft > 0
-                ? `${p.needsLeft} decision${p.needsLeft === 1 ? "" : "s"}`
-                : "";
-            const hint = [on ? "Current page" : "", waiting].filter(Boolean).join(" · ");
-            return {
-              id,
-              label,
-              ...(hint ? { hint } : {}),
-              onSelect: () => p.go(id),
-            };
-          })}
+          items={items(TABS)}
         />
+      ) : null}
+      {!p.compact && moreAt !== null && fit.more.length > 0 ? (
+        // The menu is fixed; the variable carries the More button's left edge to it.
+        <div style={{ "--park-more-left": `${Math.round(moreAt)}px` } as CSSProperties}>
+          <Menu
+            label="More pages"
+            className="park-shell__pagemenu park-shell__moremenu"
+            width={240}
+            onClose={() => setMoreAt(null)}
+            items={items(fit.more)}
+          />
+        </div>
       ) : null}
       {/* Over the nav's bottom edge but not inside it: the nav's glass blur must not sit under a moving layer. */}
       <div

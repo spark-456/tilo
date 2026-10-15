@@ -39,9 +39,10 @@ from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
-from tilo_providers.router import Router
+from tilo_providers.router import Deadline, Router, RouterDeadlineError
 
 from tilo_api import deps, runs
+from tilo_api.intake_deadline import INTAKE_DEADLINE_DETAIL, load_intake_deadline
 from tilo_api.people_writes import _capped_body
 
 logger = logging.getLogger("tilo_api.tasks")
@@ -330,6 +331,7 @@ def _proposed(
 
 def _compute_approaches(task: deps.TaskRecord, model_router: Router, clock: Clock) -> Any:
     try:
+        limit = load_intake_deadline()
         result = propose_approaches(
             task.brief,
             router=model_router,
@@ -337,8 +339,11 @@ def _compute_approaches(task: deps.TaskRecord, model_router: Router, clock: Cloc
             seq=task.next_seq,
             gaps=task.gaps,
             today=clock(),
+            deadline=Deadline.after(limit.seconds, limit.first_attempt_share),
         )
     except ApproachProposalError as exc:
+        if isinstance(exc.__cause__, RouterDeadlineError):
+            raise HTTPException(status_code=503, detail=INTAKE_DEADLINE_DETAIL) from exc
         deps.raise_if_model_unavailable(exc)
         raise HTTPException(status_code=502, detail="The Director could not propose approaches.") from exc
     return result

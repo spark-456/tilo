@@ -42,14 +42,24 @@ const apiOf = (read: () => Promise<TeamView>, write?: (op: TeamOp) => Promise<Te
     getTeamLive,
   };
 };
-const level = (root: ParentNode, id: string) =>
-  root.querySelector<HTMLSelectElement>(`select[aria-label="Access level for ${id}"]`);
-const pick = async (sel: HTMLSelectElement | null, value: string) => {
+// UI-STUDIO-5: each app's level is a radio group (Always, Ask me, Read only, Never), not a select.
+const level = (root: ParentNode, id: string) => {
+  const set = root.querySelector<HTMLFieldSetElement>(
+    `fieldset[aria-label="Access level for ${id}"]`,
+  );
+  if (!set) return null;
+  return {
+    set,
+    value: set.querySelector<HTMLInputElement>("input:checked")?.value,
+    disabled: set.disabled,
+  };
+};
+const pick = async (sel: { set: HTMLFieldSetElement } | null, value: string) => {
   const { act } = await import("react");
   await act(async () => {
-    if (!sel) throw new Error("no select");
-    sel.value = value;
-    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    const radio = sel?.set.querySelector<HTMLInputElement>(`input[value="${value}"]`);
+    if (!radio) throw new Error("no radio");
+    radio.click();
   });
   await flush();
 };
@@ -109,7 +119,7 @@ describe("TEAM_WEB_connectors_live: tool levels from the server", () => {
     const { api } = apiOf(async () => Promise.reject(new TiloApiError("x", 503, true)));
     const m = await renderPage(makeApp(), api);
     expect(textOf(m.container)).toContain("Team controls are not set up on this install yet.");
-    expect(m.container.querySelector("select")).toBeNull();
+    expect(m.container.querySelector("fieldset")).toBeNull();
     expect(errors).not.toHaveBeenCalled();
     errors.mockRestore();
   });

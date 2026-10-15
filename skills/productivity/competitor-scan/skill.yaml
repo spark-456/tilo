@@ -1,0 +1,9 @@
+id: competitor-scan
+version: "1.0.0"
+domain: productivity
+author: "Tilo Skills Library"
+reviewer: "Tilo Product Review"
+tools_allowed: ["web_search","fetch_url"]
+inputs: {"type":"object","additionalProperties":false,"required":["company_or_product"],"properties":{"company_or_product":{"type":"string","description":"Company or product to scan."},"market":{"type":"string","description":"Target market or geography."},"known_competitors":{"type":"array","items":{"type":"string","description":"A competitor named by the user."}},"as_of_date":{"type":"string","description":"Date for the scan in YYYY-MM-DD format.","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}}}
+outputs: {"type":"object","additionalProperties":false,"required":["as_of_date","competitors","patterns","implications","uncertainties"],"properties":{"as_of_date":{"type":"string","description":""},"competitors":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","positioning","features","pricing_evidence","sources"],"properties":{"name":{"type":"string","description":""},"positioning":{"type":"string","description":""},"features":{"type":"array","items":{"type":"string","description":""}},"pricing_evidence":{"type":"string","description":""},"sources":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["title","archive_ref","url"],"properties":{"title":{"type":"string","description":"Source title."},"archive_ref":{"type":"string","description":"Raw archive reference for the source."},"url":{"type":"string","description":"Public source URL."}}}}}}},"patterns":{"type":"array","items":{"type":"string","description":""}},"implications":{"type":"array","items":{"type":"string","description":""}},"uncertainties":{"type":"array","items":{"type":"string","description":""}}}}
+description: "Scan competitors; est. max 23.4 credits/run (~$0.117)."

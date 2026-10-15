@@ -3,7 +3,14 @@
 import { runProgress } from "./runProgress";
 import type { RunEvent } from "./useRunEvents";
 
-export function RunProgressCard({ events }: { events: readonly RunEvent[] }) {
+export function RunProgressCard({
+  events,
+  steps = true,
+}: {
+  events: readonly RunEvent[];
+  /** STUDIO-3: false where the Story already lists the recorded steps beside the facts. */
+  steps?: boolean;
+}) {
   if (events.length === 0) {
     return (
       <section aria-label="Live run" className="park-world-section">
@@ -41,14 +48,16 @@ export function RunProgressCard({ events }: { events: readonly RunEvent[] }) {
           </div>
         ))}
       </div>
-      <ol className="park-world-teamlist" aria-label="Latest steps">
-        {p.steps.map((s) => (
-          <li key={s.seq}>
-            {s.at ? `${s.at} · ` : ""}
-            {s.text}
-          </li>
-        ))}
-      </ol>
+      {steps ? (
+        <ol className="park-world-teamlist" aria-label="Latest steps">
+          {p.steps.map((s) => (
+            <li key={s.seq}>
+              {s.at ? `${s.at} · ` : ""}
+              {s.text}
+            </li>
+          ))}
+        </ol>
+      ) : null}
     </section>
   );
 }
