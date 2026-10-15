@@ -25,6 +25,8 @@ export interface ConnectionRow {
   id: string;
   name: string;
   state: ConnectionState;
+  /** Granted OAuth scopes from the live connector view; absent when the view cannot say. */
+  scopes?: string[];
 }
 
 export type StartResult =
@@ -127,7 +129,11 @@ export function createConnectFlow(
         if (!row || typeof row.name !== "string") continue;
         const state =
           row.state === "connected" || row.state === "attention" ? row.state : "available";
-        out.push({ id, name: row.name, state });
+        const scopes =
+          Array.isArray(row.scopes) && row.scopes.every((s) => typeof s === "string")
+            ? { scopes: [...row.scopes] as string[] }
+            : {};
+        out.push({ id, name: row.name, state, ...scopes });
       }
       return out;
     },

@@ -48,7 +48,7 @@ export function useRead<T>(
 
 /** What a shared world's readers get (ADR-0040 decision 10), said plainly before a share is made. */
 export const CONSENT =
-  "Sharing makes this whole world visible to every member of the team you choose: its Story, Trace, runs and artifacts, past and future, except lines only you can see. Items added in this world from now on are visible to them too. They can read it. They cannot answer, approve, pause or share it.";
+  "Sharing makes this whole world visible to every member of the team you choose: its Story, Trace, runs and artifacts, past and future, except lines only you can see. Past and future outputs may include results based on mail, calendar and Drive reads. Items added in this world from now on are visible to them too. They can read it. They cannot answer, approve, pause or share it.";
 
 const MAX_TEAMS = 8;
 
