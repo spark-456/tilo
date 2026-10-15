@@ -84,6 +84,11 @@ def test_FR_INT_01_flow_api_source_names_no_model_id():
     assert hits == []
 
 
+def test_AGY_REDS_1_meeting_voice_meter_source_names_no_model_id():
+    src = pathlib.Path(__file__).resolve().parents[1] / "src" / "tilo_api" / "meeting_voice_meter.py"
+    assert not _MODEL_ID.search(src.read_text(encoding="utf-8"))
+
+
 def test_FR_INT_01_flow_submit_p50_under_4s(flow):
     samples = []
     for _ in range(5):
