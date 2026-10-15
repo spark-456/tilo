@@ -117,12 +117,8 @@ const BUNDLES: readonly [string, Decls][] = [
   [
     "hero tag",
     {
+      // left 20, top 20, height 36, padding 0 14 and a round end on desktop; a phone spans it across the top
       position: "absolute",
-      left: "20px",
-      top: "20px",
-      height: "36px",
-      padding: "0 14px",
-      "border-radius": "99px",
       background: "var(--card)",
       "box-shadow": "var(--sh)",
       gap: "8px",

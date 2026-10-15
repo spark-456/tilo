@@ -35,8 +35,8 @@ function linkProps(w: World, onOpen: CardProps["onOpen"]) {
 function Picture({ w, art }: { w: World; art: Art }) {
   const artOn = useAfterTask(); // a city's picture is the heavy part: drawn a task after the card (WEB-MOTION-2)
   if (w.tier === "City") return artOn ? <>{art.city(w)}</> : null;
-  if (w.tier === "Town") return <>{art.strip(w)}</>;
-  return <>{art.single(w)}</>;
+  if (w.tier === "Town") return <>{art.strip(w, 104)}</>;
+  return <>{art.single(w, 96)}</>;
 }
 
 function WorldCardView({ w, art, status, onOpen }: CardProps) {

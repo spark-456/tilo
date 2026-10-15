@@ -603,8 +603,12 @@
 }
 @media (max-width: 760px) {
   [data-park] .park-world-map {
-    height: 300px;
-    padding: 56px 8px 64px;
+    height: 400px;
+    padding: 108px 8px 96px;
+  }
+  [data-park] .park-world-map.park-world-map--art {
+    padding-top: 108px;
+    padding-bottom: 20px;
   }
   [data-park] .park-world-panel {
     max-height: none;
@@ -625,14 +629,24 @@
     min-height: 44px;
     padding: 0 8px;
   }
+  /* A phone: the tag across the top, the lenses under it, the legend at the bottom; the art keeps the middle. */
+  [data-park] .park-world-tag {
+    left: 12px;
+    right: 12px;
+    top: 12px;
+    height: auto;
+    min-height: 32px;
+    padding: 6px 12px;
+    border-radius: 16px;
+  }
   [data-park] .park-world-lenses {
-    top: auto;
+    top: 64px;
     right: auto;
     left: 12px;
-    bottom: 12px;
   }
   [data-park] .park-world-legend {
-    display: none;
+    left: 12px;
+    bottom: 12px;
   }
 }
 

@@ -437,6 +437,8 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const shown: WorldTab = tab ?? (view?.deliverable ? "result" : "story");
   const delivered = trackRun && view !== null && view.deliverable;
 
+  // A finished quick task's own Result card already carries Share to Slack: the row does not repeat it.
+  const slackInResult = !trackRun && !isCity && !isTown && w.st === "finished";
   const shareRow = (
     <div className="park-world-sharerow">
       <Button
@@ -447,17 +449,21 @@ export function WorldPage({ app }: { app: AppCtx }) {
       >
         Share
       </Button>
-      <Button
-        variant="secondary"
-        size="sm"
-        disabled={!slackState.connected}
-        aria-disabled={!slackState.connected ? "true" : undefined}
-        aria-describedby={!slackState.connected ? NO_SLACK_ID : undefined}
-        title={!slackState.connected ? slackState.disabledReason : "Share this world link to Slack"}
-        onClick={(e) => openSlackDialog(e.currentTarget)}
-      >
-        Share to Slack
-      </Button>
+      {slackInResult ? null : (
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={!slackState.connected}
+          aria-disabled={!slackState.connected ? "true" : undefined}
+          aria-describedby={!slackState.connected ? NO_SLACK_ID : undefined}
+          title={
+            !slackState.connected ? slackState.disabledReason : "Share this world link to Slack"
+          }
+          onClick={(e) => openSlackDialog(e.currentTarget)}
+        >
+          Share to Slack
+        </Button>
+      )}
       {loaded.live && worldClient && !w.sample ? (
         <ShareWithTeam client={worldClient} worldId={w.id} worldName={w.name} />
       ) : null}
