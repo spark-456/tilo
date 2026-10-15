@@ -32,6 +32,9 @@ from tilo_api.web_tools import FetchTool, RunArchiveBridge, SearchTool, fetch_se
 FILE_TEXT_CAP = 4000  # characters of one converted upload a run agent reads (the prompt's upstream item cap)
 MAX_FILE_BYTES = 2_000_000  # a stored text or Office upload past this is not read for a run agent
 FILE_TEXT_TOTAL = 6000  # all uploads together: the rest of the upstream room stays for earlier units' output
+# FR-AGT-03: a specialist whose plan pins no skill still gets the two read-only (T1) web tools. They are the registry's
+# own: recorded search and fetch in replay, live only when the router is live (never this map's decision).
+DEFAULT_TOOLS = {"specialist": ("web_search", "fetch_url")}
 
 
 class RunBudget:
@@ -174,6 +177,7 @@ class BoundRunRunner:
             models,
             clock=self.clock,
             tools=ToolRegistry([SearchTool(self.search, self.hosts), fetch]),
+            default_tools=DEFAULT_TOOLS,
             safety=self.safety,
             archive=self.archive,
             request_options={role: {"parts": parts} for role in models} if parts else {},
