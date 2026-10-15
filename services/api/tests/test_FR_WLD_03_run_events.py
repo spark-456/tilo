@@ -13,6 +13,7 @@ import pytest
 import yaml
 from _clint1_lib import registered_event_types
 from _clint2_lib import REPO_ROOT, assert_stream_valid, only, wait_for
+from tilo_api import deps
 
 RUN_TYPES = {
     "world.started", "agent.spawned", "agent.assigned", "agent.working", "agent.handoff", "agent.retired",
@@ -63,7 +64,9 @@ def test_CP2_no_event_of_a_run_carries_a_model_id(run_flow):
 
 
 @pytest.mark.parametrize("cap", [1, 7.5, 300])  # 300: the most one approval may grant (#139, BQ-99)
-def test_CP2_the_budget_is_never_exceeded(run_flow, cap):
+def test_CP2_the_budget_is_never_exceeded(run_flow, cap, monkeypatch):
+    # BQ-BUDGET-FLOOR-1 allows a zero floor: retain small-cap metering coverage independently of the default grant.
+    monkeypatch.setattr(deps, "min_run_grant", lambda: 0.0)
     run_flow.start()
     assert run_flow.approve(cap=cap).status_code == 200
     (started,) = wait_for(lambda: run_flow.events("world.started"), what="world.started")
