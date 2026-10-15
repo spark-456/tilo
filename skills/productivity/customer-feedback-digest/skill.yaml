@@ -1,0 +1,9 @@
+id: customer-feedback-digest
+version: "1.0.0"
+domain: productivity
+author: "Tilo Skills Library"
+reviewer: "Tilo Product Review"
+tools_allowed: ["list_files","read_file"]
+inputs: {"type":"object","additionalProperties":false,"required":["feedback_location"],"properties":{"feedback_location":{"type":"string","description":"User-selected Drive folder or file location."},"period":{"type":"string","description":"Optional date range or reporting period."},"product_area":{"type":"string","description":"Optional product area to focus on."},"theme_limit":{"type":"integer","description":"Maximum themes to report.","minimum":1,"maximum":12}}}
+outputs: {"type":"object","additionalProperties":false,"required":["summary","themes","positive_patterns","open_questions","sample_limits"],"properties":{"summary":{"type":"string","description":""},"themes":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["theme","frequency","severity","evidence","sources"],"properties":{"theme":{"type":"string","description":""},"frequency":{"type":"integer","minimum":0,"description":"Number of source records that support this theme."},"severity":{"type":"string","description":""},"evidence":{"type":"array","items":{"type":"string","description":""}},"sources":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["title","archive_ref","url"],"properties":{"title":{"type":"string","description":"Source title."},"archive_ref":{"type":"string","description":"Raw archive reference for the source."},"url":{"type":"string","description":"Public source URL."}}}}}}},"positive_patterns":{"type":"array","items":{"type":"string","description":""}},"open_questions":{"type":"array","items":{"type":"string","description":""}},"sample_limits":{"type":"array","items":{"type":"string","description":""}}}}
+description: "Digest customer feedback; est. max 12 credits/run (~$0.060)."

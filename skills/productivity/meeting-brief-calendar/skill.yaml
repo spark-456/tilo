@@ -1,0 +1,9 @@
+id: meeting-brief-calendar
+version: "1.0.0"
+domain: productivity
+author: "Tilo Skills Library"
+reviewer: "Tilo Product Review"
+tools_allowed: ["read_events"]
+inputs: {"type":"object","additionalProperties":false,"required":["event_id"],"properties":{"event_id":{"type":"string","description":"Identifier of the calendar event selected by the user."},"context":{"type":"string","description":"Optional background the user wants included."},"desired_outcome":{"type":"string","description":"Optional outcome for the meeting."}}}
+outputs: {"type":"object","additionalProperties":false,"required":["event_title","event_time","purpose","attendees","agenda","questions","decisions","missing_context"],"properties":{"event_title":{"type":"string","description":""},"event_time":{"type":"string","description":""},"purpose":{"type":"string","description":""},"attendees":{"type":"array","items":{"type":"string","description":""}},"agenda":{"type":"array","items":{"type":"string","description":""}},"questions":{"type":"array","items":{"type":"string","description":""}},"decisions":{"type":"array","items":{"type":"string","description":""}},"missing_context":{"type":"array","items":{"type":"string","description":""}}}}
+description: "Prepare a meeting brief from a calendar event; est. max 12 credits/run (~$0.060)."
