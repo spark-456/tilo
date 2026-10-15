@@ -2,6 +2,7 @@
 // Add-a-tool row. Built from the design's markup (Tilo App Connectors.dc.html). The design's spinner turns
 // and it is a still ring: connect and reconnect are page-local stand-ins with no call behind them, so it does not turn (HR-1).
 import type { Connector } from "../../api/types";
+import { BrandIcon } from "./BrandIcon";
 import { icon } from "./icons";
 import { LEVEL_LABEL, type Merged, bannerText, syncLine, usedLine } from "./view";
 
@@ -60,7 +61,7 @@ export function ConnectedTile({ c, onOpen }: { c: Merged; onOpen: () => void }) 
     >
       <span className="park-connectors-tile-head">
         <span className="park-connectors-mono" style={{ color: monoColor(c.col) }}>
-          {c.mono}
+          <BrandIcon id={c.id} mono={c.mono} />
         </span>
         <span className="park-connectors-tile-names">
           <span className="park-connectors-tile-name">{c.name}</span>
@@ -98,7 +99,7 @@ export function AvailableRow({
   return (
     <div className="park-connectors-avail">
       <span className="park-connectors-avail-mono" style={{ color: monoColor(c.col) }}>
-        {c.mono}
+        <BrandIcon id={c.id} mono={c.mono} />
       </span>
       <span className="park-connectors-avail-names">
         <span className="park-connectors-avail-name">{c.name}</span>

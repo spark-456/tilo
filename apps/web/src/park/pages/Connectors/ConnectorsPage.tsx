@@ -25,6 +25,7 @@ import { LiveConnectors } from "./LiveConnectors";
 import { useToolLevels } from "./LiveConnectorsWithLevels";
 import { ManagePanel } from "./ManagePanel";
 import { MeetingHostAccess } from "./MeetingHostAccess";
+import { groupConnectors } from "./connectorGroups";
 import { icon } from "./icons";
 import {
   CATEGORY_CHIPS,
@@ -274,11 +275,16 @@ export function ConnectorsPage({
           <span className="park-connectors-sectitle">Connected</span>
           <span className="park-connectors-count">{nOn}</span>
         </div>
-        <div className="park-connectors-grid">
-          {on.map((c) => (
-            <ConnectedTile key={c.id} c={c} onOpen={() => setOpen(c.id)} />
-          ))}
-        </div>
+        {groupConnectors(on).map(({ heading, connectors: members }) => (
+          <div className="park-connectors-category" key={heading}>
+            <h2>{heading}</h2>
+            <div className="park-connectors-grid">
+              {members.map((c) => (
+                <ConnectedTile key={c.id} c={c} onOpen={() => setOpen(c.id)} />
+              ))}
+            </div>
+          </div>
+        ))}
       </section>
 
       <section className="park-connectors-section" aria-label="Available">
@@ -288,11 +294,21 @@ export function ConnectorsPage({
             Sign in with the tool. Tilo never sees your password.
           </span>
         </div>
-        <div className="park-connectors-availgrid">
-          {avail.map((c) => (
-            <AvailableRow key={c.id} c={c} busy={false} onConnect={() => sample(c, "connected")} />
-          ))}
-        </div>
+        {groupConnectors(avail).map(({ heading, connectors: members }) => (
+          <div className="park-connectors-category" key={heading}>
+            <h2>{heading}</h2>
+            <div className="park-connectors-availgrid">
+              {members.map((c) => (
+                <AvailableRow
+                  key={c.id}
+                  c={c}
+                  busy={false}
+                  onConnect={() => sample(c, "connected")}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
       </section>
 
       {cur ? (
