@@ -128,3 +128,37 @@
     padding: 18px 16px;
   }
 }
+
+/* ---- Host a meeting with Tilo / Send Tilo (FR-MTG-09): fields in the Meetings card ---- */
+[data-park][data-theme="studio"] .park-agenda-hostform {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0;
+}
+[data-park][data-theme="studio"] .park-agenda-hostfield {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-agenda-hostfield input,
+[data-park][data-theme="studio"] .park-agenda-hostfield select {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+}
+[data-park][data-theme="studio"] .park-agenda-hostnotice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 14px;
+}
+[data-park][data-theme="studio"] .park-agenda-hostnotice input {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
