@@ -1,0 +1,89 @@
+/* LANDING-2 motion: the signed-out landing's scroll reveal and hover lift. Page chrome, not a world: nothing here shows
+   an agent, a run or a decision, and no agent picture moves (agents animate only from recorded events, HR-1). Opacity,
+   `translate` and `transform` only, so nothing shifts the layout (CLS). Reveal.tsx puts `landing-reveal` on an element
+   only when motion is welcome and the browser can tell what is in view; with reduced motion nothing is marked, and
+   the rules below are switched off again as a second guard. One honesty-scan allowlist entry covers this file
+   (test-support/honestyScan.ts, rule css-transition); it has no keyframes and no animation. */
+
+.landing-reveal {
+  opacity: 0;
+  translate: 0 18px;
+  transition: opacity 520ms ease calc(var(--i, 0) * 70ms), translate 520ms ease
+    calc(var(--i, 0) * 70ms), transform 180ms ease 0s;
+}
+.landing-reveal.is-in {
+  opacity: 1;
+  translate: 0 0;
+}
+
+/* a gentle lift on the cards a pointer can rest on (never on touch, never with reduced motion) */
+@media (hover: hover) {
+  .landing-card:hover,
+  .landing-skill:hover,
+  .landing-app:hover,
+  .landing-why__item:hover,
+  .landing-life__row:hover,
+  .landing-flow__row:hover,
+  .landing-step:hover,
+  .landing-speed:hover {
+    transform: translateY(-3px);
+  }
+  .landing-card,
+  .landing-skill,
+  .landing-app,
+  .landing-why__item,
+  .landing-life__row,
+  .landing-flow__row,
+  .landing-step,
+  .landing-speed {
+    transition: transform 180ms ease;
+  }
+  /* revealing elements keep their own, longer timing for opacity and translate */
+  .landing-reveal.landing-card,
+  .landing-reveal.landing-skill,
+  .landing-reveal.landing-app,
+  .landing-reveal.landing-why__item,
+  .landing-reveal.landing-life__row,
+  .landing-reveal.landing-flow__row,
+  .landing-reveal.landing-step,
+  .landing-reveal.landing-speed {
+    transition: opacity 520ms ease calc(var(--i, 0) * 70ms), translate 520ms ease
+      calc(var(--i, 0) * 70ms), transform 180ms ease 0s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-reveal,
+  .landing-reveal.is-in {
+    opacity: 1;
+    translate: none;
+    transition: none;
+  }
+  .landing-card,
+  .landing-skill,
+  .landing-app,
+  .landing-why__item,
+  .landing-life__row,
+  .landing-flow__row,
+  .landing-step,
+  .landing-speed {
+    transition: none;
+  }
+  .landing-card:hover,
+  .landing-skill:hover,
+  .landing-app:hover,
+  .landing-why__item:hover,
+  .landing-life__row:hover,
+  .landing-flow__row:hover,
+  .landing-step:hover,
+  .landing-speed:hover {
+    transform: none;
+  }
+}
+
+@media print {
+  .landing-reveal {
+    opacity: 1;
+    translate: none;
+  }
+}

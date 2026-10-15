@@ -57,7 +57,8 @@ describe(
     it("FR_WLD_09 the allowlist is small, every entry has a reason, and none is stale", () => {
       // The two choreographer-era clocks plus the Park city's ambient entries (WEB-MOTION-1: four, city layer only).
       // Updated for WEB-MOTION-2: cap 6 -> 7, the one css-transition entry for the shell's own chrome.
-      expect(ALLOWLIST.length).toBeLessThanOrEqual(7);
+      // LANDING-2: one more, the landing's css-transition (landing.motion.css).
+      expect(ALLOWLIST.length).toBeLessThanOrEqual(8);
       const hits = found();
       for (const a of ALLOWLIST) {
         expect(a.reason.length, `${a.file} needs a reason`).toBeGreaterThanOrEqual(30);

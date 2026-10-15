@@ -20,6 +20,7 @@ import {
 import { Reveal } from "./Reveal";
 import { cityArt, helperArt } from "./landingKit";
 import "./landing.sections.css";
+import "./landing.motion.css";
 import { RECORDED_RUN } from "./recordedRun";
 
 const RULES = [

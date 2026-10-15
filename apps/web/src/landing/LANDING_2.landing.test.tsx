@@ -284,3 +284,41 @@ describe("LANDING_2 the stylesheet", () => {
     expect(code).not.toMatch(/@keyframes|animation|transition/);
   });
 });
+
+describe("LANDING_2 the motion stylesheet", () => {
+  const motion = readFileSync(join(__dirname, "landing.motion.css"), "utf8");
+  const code = motion.replace(/\/\*[\s\S]*?\*\//g, "");
+  it("LANDING_2 motion: transitions only, on opacity, translate and transform, never a layout property", () => {
+    expect(code).not.toMatch(/@keyframes|animation/);
+    const props = [...code.matchAll(/transition:\s*([^;]+);/g)].flatMap((m) =>
+      (m[1] ?? "")
+        .split(/,(?![^(]*\))/)
+        .map((part) => part.trim().split(/\s+/)[0] ?? "")
+        .filter((p) => p !== "none"),
+    );
+    expect(props.length).toBeGreaterThan(0);
+    for (const p of props) expect(["opacity", "translate", "transform"]).toContain(p);
+    expect(code).not.toMatch(
+      /\b(?:width|height|top|left|right|bottom|margin|padding|box-shadow|filter)\s*:/,
+    );
+  });
+
+  it("LANDING_2 motion: reduced motion switches every transition off, and lifts need a pointer that can hover", () => {
+    expect(code).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
+    expect(code).toMatch(/@media \(hover: hover\)/);
+    const reduced = code.slice(code.indexOf("@media (prefers-reduced-motion: reduce)"));
+    expect(reduced).toMatch(/\.landing-reveal\.is-in\s*\{[^}]*opacity:\s*1/);
+    expect(reduced).toMatch(/transition:\s*none/);
+  });
+
+  it("LANDING_2 motion: the landing chunk loads it, and the allowlist entry says chrome, non-agent, recorded events", async () => {
+    const body = readFileSync(join(__dirname, "LandingBody.tsx"), "utf8");
+    expect(body).toContain('import "./landing.motion.css";');
+    const { ALLOWLIST } = await import("../../test-support/honestyScan");
+    const e = ALLOWLIST.find((a) => a.file === "src/landing/landing.motion.css");
+    expect(e?.rule).toBe("css-transition");
+    expect(e?.reason).toMatch(/non-agent/);
+    expect(e?.reason).toMatch(/recorded events/);
+    expect(ALLOWLIST.filter((a) => a.file.startsWith("src/landing/"))).toHaveLength(1);
+  });
+});

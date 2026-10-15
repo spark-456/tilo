@@ -76,6 +76,7 @@ describe("WEB_3b_static: honesty (HR-1..HR-7; the scan and its allowlist, WEB-MO
       "src/park/shell/park.shell.css:css-keyframes",
       "src/park/shell/park.shell.css:css-animation",
       "src/park/shell/park.shell.css:css-transition",
+      "src/landing/landing.motion.css:css-transition", // LANDING-2
     ]);
   });
 

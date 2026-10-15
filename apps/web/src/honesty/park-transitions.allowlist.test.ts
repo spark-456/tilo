@@ -38,7 +38,11 @@ describe("WEB-MOTION-2 honesty: UI-chrome motion widens the allowlist by one nar
     for (const k of KNOWN) expect(keys, `${k} was removed`).toContain(k);
     const added = keys.filter((k) => !KNOWN.has(k));
     expect(
-      added.filter((k) => k !== `${SHELL_CSS}:css-transition`),
+      added.filter(
+        (k) =>
+          k !== `${SHELL_CSS}:css-transition` &&
+          k !== "src/landing/landing.motion.css:css-transition", // LANDING-2, reviewed on its own
+      ),
       "a new exception beyond the shell stylesheet's css-transition: it needs its own review",
     ).toEqual([]);
     expect(new Set(keys).size, "an entry is listed twice").toBe(keys.length);
