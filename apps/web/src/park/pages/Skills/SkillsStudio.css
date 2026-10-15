@@ -30,6 +30,9 @@
 [data-park] .park-skills-page .park-skills-h1:focus {
   outline: none;
 }
+[data-park] .park-skills-page .park-skills-total {
+  white-space: nowrap;
+}
 [data-park] .park-skills-page .park-skills-intro {
   font-size: 18px;
   font-weight: 400;
@@ -666,10 +669,19 @@
   gap: 8px;
 }
 [data-park] .park-teach__art {
+  width: 100%;
   height: 140px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  overflow: hidden;
+}
+[data-park] .park-teach__art img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 [data-park] .park-teach__pill {
   display: flex;
@@ -1019,6 +1031,18 @@
     padding: 16px 16px 48px;
     gap: 20px;
   }
+  [data-park] .park-skills-page .park-skills-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  [data-park] .park-skills-page .park-skills-intro-col {
+    max-width: none;
+  }
+  /* The Help section's answers, thumbs and review buttons: phone targets are 44px (Skills.css keeps desktop). */
+  [data-park] .park-skills-page .park-skills-section button {
+    min-height: 44px;
+    min-width: 44px;
+  }
   [data-park] .park-skills-page .park-skills-h1 {
     font-size: 34px;
   }
@@ -1080,10 +1104,6 @@
   }
   [data-park] .park-teach__art {
     height: 96px;
-  }
-  [data-park] .park-teach__art svg {
-    max-height: 96px;
-    width: auto;
   }
   [data-park] .park-teach__pill {
     padding: 0 8px;

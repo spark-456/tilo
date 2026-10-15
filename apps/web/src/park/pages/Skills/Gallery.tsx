@@ -195,11 +195,7 @@ export function LearningNow({
                 <span className="park-skills-learning__titles">
                   <span className="park-skills-card2__name">{s.name}</span>
                   <span className="park-skills-card2__what">
-                    {s.from
-                      ? `Learning ${s.from}`
-                      : s.owner
-                        ? `Learning from ${s.owner}`
-                        : "Learning"}
+                    {s.from || s.owner ? `Learning from ${s.from || s.owner}` : "Learning"}
                   </span>
                 </span>
                 <span className="park-skill-chip park-skill-chip--lilac">Learning</span>
