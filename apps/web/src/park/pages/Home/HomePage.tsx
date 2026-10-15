@@ -1,6 +1,6 @@
-// The Home page (WEB-4): the greeting, the Today panel, the map pins and the composer, as drawn in
-// design_handoff_tilo_web_app/design/Tilo App Home.dc.html. It floats panels over the city the shell draws
-// behind it and has no landmark of its own. Data comes only through the Api (`useParkApi`); a page whose Api
+// The Home page (WEB-4; Studio layout UI-STUDIO-2, design/studio-v2 "Tilo S Home"): the greeting, one ask box with
+// the Quick answer / Make a world switch, Your worlds, Chat history and the side column (Needs you, spend). It has
+// no landmark of its own. Data comes only through the Api (`useParkApi`); a page whose Api
 // is not built shows "Home data is unavailable", never sample values. The composer's 900 ms goes through the
 // provider's `useSchedule`, so a test never waits and a pending draft is cancelled when the page goes.
 import { useEffect, useRef, useState } from "react";
@@ -21,12 +21,13 @@ import type { AppCtx } from "../../app/AppCtx";
 import { BUILD_SHA } from "../../app/buildStamp";
 import { useDemoSession, useParkApi, useParkStore, useSchedule } from "../../app/context";
 import { DEMO_START } from "../../app/store";
+import { takeDraft } from "../../chat/handoff";
 import { FirstRunOverview } from "../../sample/FirstRunOverview";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
 import "./Home.css";
 import { HomeSkeleton } from "./HomeSkeleton";
-import { Hero, KpiStrip, Pins, TodayPanel } from "./Panels";
+import { ChatHistory, Crew, Hero, KpiStrip, TodayPanel, WorldsSection } from "./Panels";
 import { readEffort, writeEffort } from "./effortStore";
 import {
   DRAFT_MS,
@@ -38,13 +39,11 @@ import {
   liveSummaryLine,
   needsWorld,
   nextEvents,
-  placedPins,
   spendOf,
   suggestedTask,
   summaryLine,
 } from "./homeData";
 import { textLimitMessage } from "./uploadRules";
-import { useComposerClearance } from "./useComposerClearance";
 
 interface Base {
   user: User;
@@ -72,7 +71,7 @@ export function HomePage({ app }: { app: AppCtx }) {
   const preview = useFirstRunPreview();
   // QA-DEMO-1: a demo session (the sample company) replays recorded data and starts no run.
   const demo = useDemoSession();
-  const { go, dec, added, night, vw, vh, pins, needsLeft } = app;
+  const { go, dec, added, night, vw, needsLeft } = app;
 
   const [base, setBase] = useState<Loaded<Base>>(null);
   const [worlds, setWorlds] = useState<Loaded<World[]>>(null);
@@ -331,6 +330,14 @@ export function HomePage({ app }: { app: AppCtx }) {
   useEffect(() => {
     if (email && !chosenNow.current) setEffort(readEffort(email));
   }, [email]);
+  // UI-STUDIO-2: "Make it a world" on the Chat page hands its question over, once, set to Make a world.
+  useEffect(() => {
+    const handed = takeDraft();
+    if (handed === null) return;
+    chosenNow.current = true;
+    setEffort("thinking");
+    setQuery(handed);
+  }, []);
   const [quick, setQuick] = useState<QuickView>(QUICK_IDLE);
   const asking = useRef(false);
   const alive = useRef(true);
@@ -360,7 +367,7 @@ export function HomePage({ app }: { app: AppCtx }) {
     if (length > QUICK_MAX_CHARS) {
       setQuick({
         state: "error",
-        message: `A Quick question can be up to ${QUICK_MAX_CHARS} characters; this one is ${length}. Shorten it, or switch to Thinking.`,
+        message: `A Quick question can be up to ${QUICK_MAX_CHARS} characters; this one is ${length}. Shorten it, or make it a world.`,
       });
       return;
     }
@@ -407,7 +414,14 @@ export function HomePage({ app }: { app: AppCtx }) {
 
   const root = useRef<HTMLDivElement>(null);
   const composerShown = !failed || (worldsLive && worlds !== "failed");
-  useComposerClearance(root, composerShown);
+  // The helper in the ask box shows the request state only: reading while a call is out, done once answered.
+  const mood =
+    quick.state === "asking" || (sending && phase === "drafting")
+      ? "reading"
+      : quick.state === "answered"
+        ? "done"
+        : "idle";
+  const stacked = vw > 0 && vw < 1180;
 
   return (
     <div
@@ -416,48 +430,18 @@ export function HomePage({ app }: { app: AppCtx }) {
       data-testid="park-page-home"
     >
       {ready ? (
-        <div
-          className={preview ? "park-home-preview-account" : undefined}
-          style={preview ? undefined : { display: "contents" }}
-        >
-          <Pins
-            pins={placedPins(pins, worlds, needs, night, vw || 1440, vh || 900, served)}
-            onOpen={open}
-          />
-          <div className="park-home-leftcol">
-            <Hero
-              dateLine={base.today.long.toUpperCase()}
-              greeting={`${greetingWord(new Date().getHours())}, ${base.user.first}.`}
-              summary={summary}
-              needs={needs}
-              needsKnown={!served || openServed !== null}
-              night={night}
-              worldName={waitingIn?.name ?? null}
-              onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
-            />
-            {!preview ? (
-              <KpiStrip
-                ledger={base.ledger}
-                dec={dec}
-                decisions={base.decisions}
-                fallbackWorld={waitingIn?.id}
-                onWorld={open}
-              />
-            ) : null}
-          </div>
-          <TodayPanel
-            served={served}
-            rows={liveRows(worlds, needs, served)}
-            sample={served ? worlds.find((w) => w.sample) : undefined}
-            events={base.agenda && base.agenda.days !== null ? nextEvents(base.agenda) : []}
-            spend={spendOf(base.ledger)}
+        <div className="park-home-top">
+          <Hero
+            dateLine={base.today.long.toUpperCase()}
+            greeting={`${greetingWord(new Date().getHours())}, ${base.user.first}.`}
+            summary={summary}
+            needs={needs}
+            needsKnown={!served || openServed !== null}
             night={night}
-            onWorld={open}
-            onWorlds={() => go("worlds")}
-            onAgenda={() => go("agenda")}
-            onLedger={() => go("ledger")}
-            stacked={vw > 0 && vw < 1180}
+            worldName={waitingIn?.name ?? null}
+            onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
           />
+          <Crew />
         </div>
       ) : null}
       {!ready && !failed ? <HomeSkeleton /> : null}
@@ -482,8 +466,8 @@ export function HomePage({ app }: { app: AppCtx }) {
         />
       ) : null}
       {failed && !preview ? (
-        <div className="park-home-leftcol">
-          <div className="park-home-hero park-home-glass">
+        <div className="park-home-top">
+          <div className="park-home-hero">
             <h1 className="park-home-h1">Home</h1>
             <p className="park-home-summary">Home data is unavailable</p>
           </div>
@@ -492,6 +476,7 @@ export function HomePage({ app }: { app: AppCtx }) {
       {composerShown ? (
         <ComposerPanel
           sending={sending}
+          mood={mood}
           sample={demo}
           compact={vw > 0 && vw <= 480}
           inputRef={composerInput}
@@ -504,7 +489,7 @@ export function HomePage({ app }: { app: AppCtx }) {
               : !worldsLive
                 ? "Uploads need setup; the owner has not finished it."
                 : effort === "quick"
-                  ? "Uploads work with Thinking tasks; a Quick ask makes no task."
+                  ? "Files go with Make a world; a quick answer reads no files."
                   : null,
           }}
           mode={mode}
@@ -550,6 +535,45 @@ export function HomePage({ app }: { app: AppCtx }) {
           onConfirm={confirmStart}
           onChange={changeBrief}
         />
+      ) : null}
+      {ready ? (
+        <div className="park-home-grid">
+          <div className="park-home-maincol">
+            <WorldsSection
+              served={served}
+              rows={liveRows(worlds, needs, served)}
+              sample={served ? worlds.find((w) => w.sample) : undefined}
+              night={night}
+              onWorld={open}
+              onWorlds={() => go("worlds")}
+            />
+            <ChatHistory onChat={() => go("chat")} />
+          </div>
+          <TodayPanel
+            served={served}
+            open={base.decisions.filter((d) => !dec[d.k])}
+            needs={served ? openServed : needs}
+            events={base.agenda && base.agenda.days !== null ? nextEvents(base.agenda) : []}
+            finished={worlds.find((w) => w.st === "finished" && !w.sample && !w.isNew)}
+            spend={spendOf(base.ledger)}
+            night={night}
+            onWorld={open}
+            onWorlds={() => go("worlds")}
+            onAgenda={() => go("agenda")}
+            onLedger={() => go("ledger")}
+            stacked={stacked}
+          >
+            {preview ? null : (
+              <KpiStrip
+                ledger={base.ledger}
+                dec={dec}
+                decisions={base.decisions}
+                fallbackWorld={waitingIn?.id}
+                onWorld={open}
+              />
+            )}
+          </TodayPanel>
+        </div>
       ) : null}
       <nav className="park-home-legal" aria-label="Legal">
         <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> ·{" "}

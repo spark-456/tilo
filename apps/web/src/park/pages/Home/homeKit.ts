@@ -18,11 +18,11 @@ export const icon = (name: string, size: number): ReactNode => kit().icon(name, 
 export const needsAgent = (size: number, night: boolean): ReactNode =>
   kit().agent({ role: "builder", expr: "needs" }, size, night) as ReactNode;
 
-/** A world's picture for the Live now tile: the town hall for a city, else the world's own art. */
-export function worldArt(world: ArtWorld & { tier: string }, night: boolean): ReactNode {
+/** A world's picture for its Home card: the town hall for a city, else the world's own art. */
+export function worldArt(world: ArtWorld & { tier: string }, night: boolean, size = 30): ReactNode {
   return (
     world.tier === "City"
-      ? kit().building("townhall", "active", "hall", 34, night)
-      : kit().art(world, 30, night)
+      ? kit().building("townhall", "active", "hall", Math.round(size * 1.13), night)
+      : kit().art(world, size, night)
   ) as ReactNode;
 }

@@ -39,6 +39,9 @@ const summaryOf = (el: HTMLElement): string | null => {
   const node = el.querySelector(".park-home-summary");
   return node ? textOf(node) : null;
 };
+// UI-STUDIO-2: the world cards are their own section, titled "Your worlds" live and "Sample worlds" on fixtures.
+const worldsText = (el: HTMLElement): string =>
+  textOf(el.querySelector(".park-home-grid .park-home-section") as Element);
 const heroOf = (el: HTMLElement): string => textOf(el.querySelector(".park-home-hero") as Element);
 
 describe("HOME_SUMMARY_LIVE: the summary is derived from served worlds and decisions", () => {
@@ -90,27 +93,27 @@ describe("HOME_SUMMARY_LIVE: the summary is derived from served worlds and decis
         getDecisions: async () => ({ data: [], source: "live" }),
       }),
     );
-    const today = textOf(todayRegion(rig.el));
-    expect(today).toContain("Served a");
-    expect(today).not.toMatch(/Running · 0%|\b0%/);
+    const worlds = worldsText(rig.el);
+    expect(worlds).toContain("Served a");
+    expect(worlds).not.toMatch(/Running · 0%|\b0%/);
   });
 
-  it("QA_13OCT_home_only_served_worlds_are_titled_live_now_and_the_fixture_panel_says_sample", async () => {
+  it("QA_13OCT_home_only_served_worlds_are_titled_your_worlds_and_the_fixture_panel_says_sample", async () => {
     const rig = await mountLiveHome(
       live({
         getWorlds: async () => servedWorlds(item("a", "started")),
         getDecisions: async () => ({ data: [], source: "live" }),
       }),
     );
-    const served = textOf(todayRegion(rig.el));
-    expect(served).toContain("Live now");
+    const served = worldsText(rig.el);
+    expect(served).toContain("Your worlds");
     expect(served).not.toContain("Sample worlds");
     cleanup();
     const { el } = await mountHome();
     await settle();
-    const sample = textOf(todayRegion(el));
+    const sample = worldsText(el);
     expect(sample).toContain("Sample worlds");
-    expect(sample).not.toContain("Live now"); // no recorded event stands behind "live" on sample data (HR-1)
+    expect(sample).not.toContain("Your worlds"); // no recorded event stands behind sample data (HR-1)
   });
 });
 

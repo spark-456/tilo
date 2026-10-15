@@ -1,0 +1,425 @@
+/* UI-STUDIO-2: the Chat page (design/studio-v2 "Tilo S Chat"). Values from the artboard's inline styles; colours are
+   role tokens (config/themes/studio.json), with a Park fallback where the Metropolis theme has no such role. No
+   transition, animation or keyframes: the helper's poses are still (HR-1, HR-2). */
+[data-park] .park-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--ink);
+}
+[data-park] .park-chat-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+[data-park] .park-chat-h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -1px;
+}
+[data-park] .park-chat-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  margin: 0 0 6px 6px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--heroSoft);
+  color: var(--heroInk);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+[data-park] .park-chat-head__gap {
+  flex: 1;
+}
+[data-park] .park-chat-cost {
+  margin: 0 6px 10px 0;
+  color: var(--ink3);
+  font-size: 12px;
+}
+[data-park] .park-chat-quiet {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+[data-park] .park-chat-quiet--lg {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+[data-park] .park-chat-quiet:hover {
+  background: var(--sunk);
+}
+[data-park] .park-chat-quiet:disabled {
+  color: var(--ink3);
+  cursor: not-allowed;
+}
+[data-park] .park-chat-soft {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--heroSoft);
+  color: var(--heroInk);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+[data-park] .park-chat-quiet:focus-visible,
+[data-park] .park-chat-soft:focus-visible,
+[data-park] .park-chat-send:focus-visible {
+  outline: 3px solid var(--focus, var(--ink));
+  outline-offset: 2px;
+}
+
+/* ---- Two columns: the scene and the conversation ---- */
+[data-park] .park-chat-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 24px;
+  height: calc(100vh - 220px);
+  min-height: 560px;
+}
+
+/* ---- The scene ---- */
+[data-park] .park-chat-scene {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+}
+[data-park] .park-chat-scene__art,
+[data-park] .park-chat-scene__front {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+[data-park][data-time="night"] .park-chat-scene__art,
+[data-park][data-time="night"] .park-chat-scene__front {
+  filter: brightness(0.58) saturate(0.8);
+}
+[data-park] .park-chat-scene__buddy {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+[data-park] .park-chat-scene__top {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+}
+[data-park] .park-chat-scene__top .park-seg {
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--sh, 0 1px 2px rgba(0, 0, 0, 0.12));
+}
+[data-park] .park-chat-speech {
+  position: absolute;
+  top: 96px;
+  right: 24px;
+  max-width: 300px;
+  padding: 14px 16px;
+  border-radius: 18px 18px 18px 4px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shPop, 0 12px 32px rgba(0, 0, 0, 0.2));
+  font-size: 15px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-chat-speech__label {
+  margin-bottom: 4px;
+  color: var(--ink3);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+}
+[data-park] .park-chat-status {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--sh, 0 1px 2px rgba(0, 0, 0, 0.12));
+  font-size: 14px;
+  font-weight: 500;
+}
+[data-park] .park-chat-status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--ink3);
+}
+[data-park] .park-chat-status[data-mood="reading"] .park-chat-status__dot,
+[data-park] .park-chat-status[data-mood="talking"] .park-chat-status__dot {
+  background: var(--lime, var(--hero));
+  box-shadow: 0 0 0 2px var(--limeEdge, var(--ink));
+}
+[data-park] .park-chat-status[data-mood="done"] .park-chat-status__dot {
+  background: var(--ok);
+}
+
+/* ---- The conversation ---- */
+[data-park] .park-chat-thread {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: var(--card);
+  box-shadow: var(--sh, none);
+}
+[data-park] .park-chat-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 28px;
+}
+[data-park] .park-chat-intro {
+  margin: auto 0;
+  text-align: center;
+}
+[data-park] .park-chat-intro__title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 700;
+}
+[data-park] .park-chat-intro__line {
+  margin: 0 auto;
+  max-width: 360px;
+  color: var(--ink2);
+  font-size: 15px;
+}
+[data-park] .park-chat-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+[data-park] .park-chat-you {
+  align-self: flex-end;
+  max-width: 78%;
+  padding: 11px 15px;
+  border-radius: 18px 18px 4px 18px;
+  background: var(--priFill, var(--hero));
+  color: var(--onPri, #ffffff);
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-chat-turn {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+[data-park] .park-chat-face {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--lime, var(--hero));
+}
+[data-park] .park-chat-face__visor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 18px;
+  height: 11px;
+  border-radius: 4px;
+  background: #ffffff;
+}
+[data-park] .park-chat-face__visor span {
+  width: 2px;
+  height: 3px;
+  border-radius: 2px;
+  background: #0b0b0c;
+}
+[data-park] .park-chat-turn__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+[data-park] .park-chat-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink3);
+  font-size: 11px;
+  letter-spacing: 0.3px;
+}
+[data-park] .park-chat-sample {
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--amberSoft);
+  color: var(--amberInk);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+[data-park] .park-chat-text {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-chat-text--note {
+  color: var(--ink2);
+}
+[data-park] .park-chat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ---- The ask box ---- */
+[data-park] .park-chat-compose {
+  flex: none;
+  padding: 12px 20px 18px;
+}
+[data-park] .park-chat-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--lineStrong, var(--line));
+  border-radius: 16px;
+  background: var(--card);
+}
+[data-park] .park-chat-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+[data-park] .park-chat-box .park-chat-input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+}
+[data-park] .park-chat-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: var(--sunk);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+[data-park] .park-chat-mode__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--lime, var(--hero));
+  box-shadow: 0 0 0 2px var(--limeEdge, var(--ink));
+}
+[data-park] .park-chat-send {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--priFill, var(--hero));
+  color: var(--onPri, #ffffff);
+  box-shadow: 0 3px 0 var(--priLip, transparent);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-park] .park-chat-send[aria-disabled="true"] {
+  cursor: progress;
+  opacity: 0.6;
+}
+[data-park] .park-chat-note {
+  margin: 8px 4px 0;
+  color: var(--redInk, var(--red));
+  font-size: 13px;
+}
+[data-park] .park-chat-foot {
+  margin: 0;
+  padding: 8px 4px 0;
+  color: var(--ink3);
+  font-size: 12px;
+}
+
+/* ---- A phone: the scene on top, the conversation under it ---- */
+@media (max-width: 840px) {
+  [data-park] .park-chat-grid {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    min-height: 0;
+  }
+  [data-park] .park-chat-scene {
+    height: 340px;
+  }
+  [data-park] .park-chat-speech {
+    top: 64px;
+    right: 12px;
+    max-width: 56%;
+    font-size: 14px;
+  }
+  [data-park] .park-chat-scene__buddy {
+    left: 32%;
+    transform: translateX(-50%) scale(0.7);
+    transform-origin: 50% 100%;
+  }
+  [data-park] .park-chat-thread {
+    min-height: 420px;
+  }
+  [data-park] .park-chat-log {
+    padding: 18px 16px;
+  }
+  [data-park] .park-chat-compose {
+    padding: 10px 12px 14px;
+  }
+  [data-park] .park-chat-mode {
+    display: none;
+  }
+  [data-park] .park-chat-scene__top .park-seg {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}

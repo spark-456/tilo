@@ -153,6 +153,7 @@ describe("WEB_CUTOVER_parkapp: navigation writes root paths", () => {
     const tabs = qa<HTMLAnchorElement>(q(m.container, "header nav"), "a");
     expect(tabs.map((a) => a.getAttribute("href"))).toEqual([
       "/",
+      "/chat",
       "/worlds",
       "/skills",
       "/ledger",

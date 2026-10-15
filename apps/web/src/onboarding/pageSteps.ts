@@ -2,6 +2,10 @@ import { PAGE_LABEL, type PageId } from "../park/app/AppCtx";
 import type { TourStep } from "./steps";
 
 const CONTENT: Record<PageId, [string, string]> = {
+  chat: [
+    "Ask a quick question",
+    "One helper answers right away and never acts for you. Bigger jobs become a world.",
+  ],
   more: ["Find another page", "Open the tools and recorded activity for this project."],
   home: [
     "Describe the work",

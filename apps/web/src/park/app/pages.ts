@@ -20,6 +20,8 @@ export const PAGES: Record<PageId, LazyExoticComponent<ComponentType<{ app: AppC
   connectors: lazy(() =>
     import("../pages/Connectors/ConnectorsPage").then((m) => ({ default: m.ConnectorsPage })),
   ),
+  // biome-ignore format: the registry keeps one line per page
+  chat: lazy(() => import("../pages/Chat/ChatPage").then((m) => ({ default: m.ChatPage }))),
   library: lazy(() =>
     import("../pages/Library/LibraryPage").then((m) => ({ default: m.LibraryPage })),
   ),

@@ -1,0 +1,255 @@
+/* UI-STUDIO-2: the Tilo bubble and its compact chat (design/studio-v2 "Tilo S Bubble"). Colours are role tokens;
+   no transition, animation or keyframes (the design's ring pulse, hover lift and blinking eyes are not built: they
+   would move with nothing behind them, HR-2). */
+[data-park] .park-bubble {
+  position: fixed;
+  z-index: 33;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 0;
+  border-radius: 99px;
+  background: var(--priFill, var(--hero));
+  box-shadow: var(--sh, 0 6px 18px rgba(0, 0, 0, 0.2)), 0 0 0 3px var(--card);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+[data-park][data-time="night"] .park-bubble {
+  background: var(--lime, var(--hero));
+}
+[data-park] .park-bubble:active {
+  cursor: grabbing;
+}
+[data-park] .park-bubble:focus-visible {
+  outline: 3px solid var(--focus, var(--ink));
+  outline-offset: 4px;
+}
+[data-park] .park-bubble__visor {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 36px;
+  height: 24px;
+  border-radius: 9px;
+  background: #ffffff;
+}
+[data-park] .park-bubble__visor span {
+  width: 5px;
+  height: 7px;
+  border-radius: 3px;
+  background: #0b0b0c;
+}
+[data-park] .park-bubble__visor .park-bubble__smile {
+  position: absolute;
+  left: 14px;
+  bottom: 4px;
+  width: 8px;
+  height: 3px;
+  border-radius: 0 0 4px 4px;
+}
+
+/* ---- The compact chat ---- */
+[data-park] .park-bubble__panel {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  z-index: 34;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shPop, 0 30px 80px -30px rgba(0, 0, 0, 0.4));
+  font-size: 14px;
+  line-height: 1.45;
+}
+[data-park] .park-bubble__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 14px 12px 12px;
+  border-bottom: 1px solid var(--line);
+}
+[data-park] .park-bubble__face {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--sunk);
+}
+[data-park] .park-bubble__who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+[data-park] .park-bubble__name {
+  font-size: 15px;
+  font-weight: 600;
+}
+[data-park] .park-bubble__sub {
+  color: var(--ink3);
+  font-size: 12.5px;
+}
+[data-park] .park-bubble__icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink2);
+  font-size: 16px;
+  cursor: pointer;
+}
+[data-park] .park-bubble__icon:hover,
+[data-park] .park-bubble__go button:hover {
+  background: var(--sunk);
+}
+[data-park] .park-bubble__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+[data-park] .park-bubble__where {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 99px;
+  background: var(--sunk);
+  color: var(--ink2);
+  font-size: 11px;
+}
+[data-park] .park-bubble__log {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+[data-park] .park-bubble__you {
+  align-self: flex-end;
+  max-width: 80%;
+  padding: 9px 13px;
+  border-radius: 16px 16px 4px 16px;
+  background: var(--priFill, var(--hero));
+  color: var(--onPri, #ffffff);
+  overflow-wrap: anywhere;
+}
+[data-park] .park-bubble__tilo {
+  align-self: flex-start;
+  max-width: 92%;
+  padding: 10px 13px;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--sunk);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-bubble__sample {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--amberInk);
+  font-size: 11px;
+  font-weight: 700;
+}
+[data-park] .park-bubble__go {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+[data-park] .park-bubble__go button {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-bubble__note {
+  margin: 0;
+  color: var(--redInk, var(--red));
+  font-size: 13px;
+}
+[data-park] .park-bubble__form {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 12px 12px;
+  padding: 0 6px;
+  min-height: 48px;
+  border: 1px solid var(--lineStrong, var(--line));
+  border-radius: 14px;
+}
+[data-park] .park-bubble__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+[data-park] .park-bubble__form .park-bubble__input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+}
+[data-park] .park-bubble__send {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--sunk);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-park] .park-bubble__send[aria-disabled="true"] {
+  cursor: progress;
+  color: var(--ink3);
+}
+[data-park] .park-bubble__icon:focus-visible,
+[data-park] .park-bubble__go button:focus-visible,
+[data-park] .park-bubble__send:focus-visible {
+  outline: 3px solid var(--focus, var(--ink));
+  outline-offset: 2px;
+}
+@media (max-width: 480px) {
+  [data-park] .park-bubble__icon,
+  [data-park] .park-bubble__send,
+  [data-park] .park-bubble__go button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

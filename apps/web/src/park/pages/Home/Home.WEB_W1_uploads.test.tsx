@@ -163,10 +163,12 @@ describe("WEB-W1 composer uploads", () => {
     const { api } = live();
     const rig = await mountLiveHome(api);
     await pickSize(rig, "Quick task");
-    const quick = [...rig.el.querySelectorAll("button")].find((b) => b.textContent === "Quick");
+    const quick = [...rig.el.querySelectorAll("button")].find(
+      (b) => b.textContent === "Quick answer",
+    );
     if (quick) clickEl(quick);
     await settle();
     expect(fileButton(rig.el).getAttribute("aria-disabled")).toBe("true");
-    expect(rig.el.textContent).toMatch(/Uploads work with Thinking tasks/);
+    expect(rig.el.textContent).toMatch(/Files go with Make a world/);
   });
 });

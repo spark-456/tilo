@@ -48,19 +48,20 @@ describe("JUDGE_FIRST_RUN_F6 loading", () => {
 });
 
 describe("JUDGE_FIRST_RUN_F7 composer options", () => {
-  it("folds Size of job and Depth behind Options, closed on the defaults, and says what they mean", async () => {
+  // UI-STUDIO-2: the depth is now the ask box's own Quick answer / Make a world switch (always shown); only the
+  // size of job stays folded behind Options.
+  it("folds Size of job behind Options, closed on the default, and says what it means", async () => {
     const { el } = await mountHome();
     const options = el.querySelector<HTMLDetailsElement>("details.park-home-options");
     expect(options).not.toBeNull();
     expect(options?.open).toBe(false);
     const summary = options?.querySelector("summary");
     expect(summary?.textContent).toContain("Options");
-    expect(summary?.textContent).toContain("Quick task · Thinking");
+    expect(summary?.textContent).toContain("Quick task");
     const body = options?.textContent ?? "";
     expect(body).toContain("Size of job: how big the work is");
-    expect(body).toContain("Depth: Quick answers straight away");
     expect(options?.querySelector('[aria-label="Size of job"]')).not.toBeNull();
-    expect(options?.querySelector('[aria-label="Depth"]')).not.toBeNull();
+    expect(el.querySelector('[aria-label="Quick answer or world"]')).not.toBeNull();
     // the hint a new person needs stays outside the fold
     expect(el.querySelector(".park-home-hint")?.textContent).toContain(
       "You see the plan and the cost",
@@ -77,6 +78,6 @@ describe("JUDGE_FIRST_RUN_F7 composer options", () => {
     await settle();
     const options = el.querySelector<HTMLDetailsElement>("details.park-home-options");
     expect(options?.open).toBe(true);
-    expect(options?.querySelector("summary")?.textContent).toContain("Routine · Thinking");
+    expect(options?.querySelector("summary")?.textContent).toContain("Routine");
   });
 });
