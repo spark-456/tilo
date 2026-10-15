@@ -83,6 +83,15 @@ def extract(filename: str, content: bytes, budget: Budget | None = None) -> str 
     return _ooxml_text(content, _PARTS[ext], budget or Budget())
 
 
+def stored_text(media_type: str, content: bytes) -> str | None:
+    """Text of an already stored converted upload, read from its stored bytes by media type (a run agent gets this,
+    never the file). None for a native type; ExtractionError when the bytes cannot be read safely."""
+    for ext, (kind, mime, _magic) in FILE_TYPES.items():
+        if kind == "converted" and mime == media_type:
+            return extract(f"file{ext}", content)
+    return None
+
+
 def _check_directory(content: bytes) -> None:
     """Refuse an oversized central directory from its end record, before zipfile parses it. zipfile
     walks the directory's byte size, not the entry count, so the size is what is bounded."""
