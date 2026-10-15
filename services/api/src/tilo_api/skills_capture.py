@@ -193,6 +193,26 @@ def _ask(router: Router, system: str, prompt: str, schema: dict[str, Any]) -> tu
     return doc, {"credits": credits, "trace": trace}
 
 
+def _fold(name: str) -> str:
+    return re.sub(r"[\s\-]+", "_", name.strip().lower())
+
+
+def _listed(registry: Any, doc: dict[str, Any]) -> list[StepIn]:
+    """The reply's steps whose pair config/connectors.yaml lists; no invented channel or action. A pair written as a
+    model writes it (`tool.action` in either field, other case, spaces for underscores) is read as the listed pair."""
+    kept = []
+    for s in doc["steps"]:
+        tool, action = _fold(s["tool"]), _fold(s["action"])
+        if "." in tool:  # `gmail.read_email` in the tool field
+            tool, _, joined = tool.partition(".")
+            action = action or joined
+        if action.startswith(tool + "."):  # `gmail.read_email` in the action field
+            action = action[len(tool) + 1 :]
+        if _declared(registry, tool, action) is not None:
+            kept.append(StepIn(text=s["text"], tool=tool, action=action, verb=s["verb"]))
+    return kept
+
+
 def _ready(flags: FlagStore) -> None:
     deps.refuse_if_replay_only(flags)
     try:
@@ -352,22 +372,25 @@ def version_route(
     _ready(flags)
     steps_block = "\n".join(f"{n}. {neutralise_marker(c['text'], 'STEPS')}" for n, c in enumerate(draft["captured"], 1))
     actions = "\n".join(
-        f"{tool}.{a['id']}: {a['description']}" for tool in registry.ids() for a in registry.get(tool)["actions"]
+        f'tool "{tool}", action "{a["id"]}": {a["description"]}'
+        for tool in registry.ids()
+        for a in registry.get(tool)["actions"]
     )
     system = load_prompt("skill_describe", "version_system.md", {"actions": actions})
     doc, used = _ask(
         model_router, system, load_prompt("skill_describe", "version_task.md", {"steps": steps_block}), _VERSION_SCHEMA
     )
+    kept = _listed(registry, doc)
+    if not kept:  # SKILL-TEACH-422: no listed pair at all; one more ask that says so, then the 422
+        retry = load_prompt("skill_describe", "version_retry.md", {"steps": steps_block})
+        doc, again = _ask(model_router, system, retry, _VERSION_SCHEMA)
+        kept = _listed(registry, doc)
+        used = {"credits": used["credits"] + again["credits"], "trace": again["trace"]}
 
     def save() -> dict[str, Any]:
         now, owner = _now(clock), principal.user_id
         writer = Writer(stores, deps.ORG_ID, owner, now, redact)
         try:
-            kept = [
-                StepIn(text=s["text"], tool=s["tool"], action=s["action"], verb=s["verb"])
-                for s in doc["steps"]
-                if _declared(registry, s["tool"], s["action"]) is not None  # no invented channel or action
-            ]
             if not kept:
                 raise _not_understood()
             plan = plan_steps(kept, writer.text, registry)
