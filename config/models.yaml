@@ -44,6 +44,8 @@ profiles:
     model: fake-safety
     context: 1000000
     caps: []
+  # RT-05 / BQ-MEMB-7: owner-approved Vertex text embeddings; dev/CI use models.dev.yaml's fake.
+  embed-google: { provider: google, model: gemini-embedding-001, context: 2048, caps: [] }
   # FR-INT-02: Model Armor. `model` is the Model Armor template id (not a model); the project is
   # GOOGLE_CLOUD_PROJECT and the location TILO_MODEL_ARMOR_LOCATION (default asia-southeast1).
   armor-default:
@@ -53,6 +55,7 @@ profiles:
     caps: []
 
 roles:
+  embed: { primary: embed-google, fallback: embed-google } # vectors from different profiles cannot be mixed
   # PL-02 / BQ-PL02-1: thinking tokens count against max_output_tokens, so a role that thinks states a cap that fits
   # thinking plus the JSON reply (16384 for high and medium). Not a model limit: the repo states none.
   # max_input_tokens (EFF-03): 100000, under the smallest context of any example profile (NIM: 128000)

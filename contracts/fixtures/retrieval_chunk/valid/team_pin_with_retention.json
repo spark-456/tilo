@@ -1,0 +1,21 @@
+{
+  "id": "ch_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+  "org_id": "org_example",
+  "owner": "u_alex",
+  "team_id": "tm_ops",
+  "world_id": null,
+  "source": {
+    "kind": "pin",
+    "id": "pb_launch_date",
+    "version": null
+  },
+  "label": "Launch date",
+  "position": 0,
+  "text": "Launch moved to 2 November.",
+  "text_sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+  "embed_profile": "embed-fake",
+  "dimensions": 768,
+  "screening": "clean",
+  "created_at": "2026-10-16T03:00:01.000Z",
+  "expires_at": "2027-10-16T00:00:00.000Z"
+}

@@ -123,11 +123,13 @@
  * meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
  * meeting_room.schema.json 1.0.0 sha256:13c682235d58ce69
  * meeting_voice_meter.schema.json 1.0.0 sha256:fa317e43b3e785b6
+ * memory_item.schema.json 1.0.0 sha256:d8c8bfb89ccd887f
  * mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
  * meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
  * metering.schema.json 1.0.0 sha256:91358a776e6c033a
  * minutes.schema.json 1.0.0 sha256:b8bbe5f69603a5a8
  * model_call_rpc.schema.json 1.0.0 sha256:3f585f8e5d092538
+ * morning_brief.schema.json 1.0.0 sha256:2247fea8efa065e2
  * org_model_key.schema.json 1.1.0 sha256:ba443cf35d658c90
  * outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
  * person.schema.json 1.1.0 sha256:2d974d326607d569
@@ -137,6 +139,7 @@
  * plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
  * policy.schema.json 1.0.0 sha256:307bca25f6efc07e
  * providers.schema.json 1.4.0 sha256:e39a636e4de90ab6
+ * retrieval_chunk.schema.json 1.0.0 sha256:823e0149d45b9297
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.1.0 sha256:9eeee7768b667afa
  * spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
@@ -1049,6 +1052,34 @@ export type MeetingVoiceMeterKey = string;
  */
 export type MeetingVoiceMeterTokenCount = number;
 /**
+ * Minted by tilo-api; never taken from a body.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MemoryItemMemoryItemId".
+ */
+export type MemoryItemMemoryItemId = string;
+/**
+ * The note: one line of 1 to 280 characters with no leading or trailing space, no control, format, line or paragraph separator character of the Basic Multilingual Plane, no variation selector after an ASCII character and no link (`://` or host/path). Astral format characters and variation selectors are the api's (MI-03). Data, never an instruction.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MemoryItemText".
+ */
+export type MemoryItemText = string;
+/**
+ * What the note is about: a preference (I prefer morning meetings), a fact (I work on the Q4 launch) or a person (my manager is Priya). A label for the list; it changes no use (MI-05).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MemoryItemKind".
+ */
+export type MemoryItemKind = "preference" | "fact" | "person";
+/**
+ * Provenance only: user when the person typed it on the list, tilo_suggested when they tapped a suggestion a Quick answer offered (MI-04). It never changes, an edit included, and it grants nothing.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MemoryItemSource".
+ */
+export type MemoryItemSource = "user" | "tilo_suggested";
+/**
  * An https URL of host, optional port and path, with no user info, query or fragment. The not-pattern rejects a final line break, which a Python validator's $ lets through.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -1093,6 +1124,63 @@ export type MinutesEvidence = UtteranceId[];
  */
 export type ModelCallRpc =
   ModelCallRpcGenerateRequest | ModelCallRpcGenerateAnswer | ModelCallRpcError;
+/**
+ * An IANA time zone name (Asia/Kolkata) or UTC, in the same shape as person.time_zone. The schema checks the shape; tilo-api also refuses a name the zone database does not know (USET-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsTimeZone".
+ */
+export type UserSettingsTimeZone = string;
+/**
+ * One line of 1 to 140 characters, cleaned by code (MO-06): no leading or trailing space, no control, format, line or paragraph separator character of the Basic Multilingual Plane, no variation selector after an ASCII character, no link (`://` or host/path). Astral format characters are code's (MO-06). Untrusted data, shown as plain text.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefTitle".
+ */
+export type MorningBriefTitle = string;
+/**
+ * The cited record's own id, copied by code: a Google Calendar event id, a Gmail message id, or a Tilo work item, pin or world id. Letters, digits, underscore and hyphen only, so never a URL, domain or address.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefSourceId".
+ */
+export type MorningBriefSourceId = string;
+/**
+ * A sender's display name, 1 to 80 characters, with the checks of `title` and no @: never an address (MO-06).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefName".
+ */
+export type MorningBriefName = string;
+/**
+ * A suggestion's text, 1 to 240 characters, with the checks of `title`.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefLine".
+ */
+export type MorningBriefLine = string;
+/**
+ * An item of this brief's meetings, mail_needing_reply or deadlines, by its source (MO-08).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefCite".
+ */
+export type MorningBriefCite =
+  MorningBriefMeetingSource | MorningBriefMailSource | MorningBriefDeadlineSource;
+/**
+ * A to-do's due words as the model read them (by Friday), 1 to 60 characters, with the checks of `title`. Code computes a date from it only when the person confirms the to-do (PE-15).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefDueText".
+ */
+export type MorningBriefDueText = string;
+/**
+ * A wall-clock time, HH:MM on a 24-hour clock, 00:00 to 23:59, in the zone of the object that holds it.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "UserSettingsClock".
+ */
+export type UserSettingsClock = string;
 /**
  * An organisation's own model key as tilo-api keeps and serves it (ADR-0041 decisions 2, 3 and 10, BK-01 to BK-08, BK-20; Proposed and inert until config/byok.yaml enabled is true): the stored reference orgs/{org}/model_keys/models, the audit entry orgs/{org}/byok_audit/{id}, and the bodies and answers of GET, PUT, PATCH and DELETE /v1/org/model-key; this root is any one of them. The key itself is in exactly one place on this surface: put_request.key, in transit, handed to the vault and dropped (BK-02). Every other object is closed and has no field for a key, a length, a hash, the last four characters, a secret name, a URL or a model id (BK-04); the org is never a field of a route body or answer (BK-08), it is the verified principal's. A body is JSON only. The rules that compare values or need the directory, the clock, the vault or config/byok.yaml are in byok.rules.md and are checked by the routes.
  *
@@ -1230,6 +1318,27 @@ export type ProvidersCapability =
   | "video"
   | "documents";
 /**
+ * ch_ and the first 32 hex digits of SHA-256 over org, source kind, source id, source version, position and embed_profile, so indexing the same version again writes the same ids.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "RetrievalChunkChunkId".
+ */
+export type RetrievalChunkChunkId = string;
+/**
+ * What the person sees for the source (a file or deliverable label, a meeting or pin title, or 'Your note'): one line of 1 to 120 characters with no control, format, line or paragraph separator character.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "RetrievalChunkLabel".
+ */
+export type RetrievalChunkLabel = string;
+/**
+ * The passage: 1 to 1200 characters, cleaned and secret-redacted by code before it is embedded or stored (RT-08). Line breaks and tabs stay; every other control character, format character and line or paragraph separator is gone. Untrusted data, never instructions.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "RetrievalChunkText".
+ */
+export type RetrievalChunkText = string;
+/**
  * Scenario id: a letter, then up to 31 letters, digits, hyphens or underscores. Equals the file name without .yaml (SN-01). The not-pattern rejects a final line break, which a Python validator's $ lets through.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -1301,13 +1410,6 @@ export type UserSettingsLine = string;
  */
 export type UserSettingsEmail = string;
 /**
- * An IANA time zone name (Asia/Kolkata) or UTC, in the same shape as person.time_zone. The schema checks the shape; tilo-api also refuses a name the zone database does not know (USET-03).
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "UserSettingsTimeZone".
- */
-export type UserSettingsTimeZone = string;
-/**
  * A BCP 47 language tag of the drafts Tilo writes for the person: language, an optional four-letter script and an optional two-letter region (en, en-GB, zh-Hans-CN). A display name such as English (UK) is the client's label, never stored.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -1319,13 +1421,6 @@ export type UserSettingsLanguage = string;
  * via the `definition` "UserSettingsWeekday".
  */
 export type UserSettingsWeekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
-/**
- * A wall-clock time, HH:MM on a 24-hour clock, 00:00 to 23:59, in the zone of the object that holds it.
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "UserSettingsClock".
- */
-export type UserSettingsClock = string;
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "WorldShareId".
@@ -5442,6 +5537,90 @@ export interface MeetingVoiceMeterError {
     | "key_used";
 }
 /**
+ * One note on a person's 'Tilo remembers' list (ADR-0049): a preference, a fact or a person, in at most 280 characters, that Tilo hands to that person's own Quick asks and intake as data. Stored and served by tilo-api for the verified principal only, keyed by org and owner; nobody else reads, lists or counts it (MI-01). Every stored item was saved by the person: typed on the list, or a suggestion they tapped (`source` tilo_suggested), so there is no unconfirmed state (MI-04). Delete is a hard delete (MI-02). A note authorises nothing (MI-07). $defs: `create` and `update` are the POST and PATCH bodies, `list` the GET answer, `suggestion` what a Quick answer may offer, `prompt_context` the data block handed to a prompt. Rules MI-01 to MI-10 are in memory_item.rules.md.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MemoryItem".
+ */
+export interface MemoryItem {
+  id: MemoryItemMemoryItemId;
+  org_id: OrgId;
+  owner: UserId;
+  text: MemoryItemText;
+  kind: MemoryItemKind;
+  source: MemoryItemSource;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+/**
+ * The body of POST /v1/memory. It names no id, owner, org or time: tilo-api mints the id and takes the owner and org from the verified principal (MI-01, MI-02).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MemoryItemCreate".
+ */
+export interface MemoryItemCreate {
+  text: MemoryItemText;
+  kind: MemoryItemKind;
+  source: MemoryItemSource;
+}
+/**
+ * The body of PATCH /v1/memory/{id}: a new text, a new kind, or both. `source` and every server-owned field are refused (MI-02).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MemoryItemUpdate".
+ */
+export interface MemoryItemUpdate {
+  text?: MemoryItemText;
+  kind?: MemoryItemKind;
+}
+/**
+ * The answer of GET /v1/memory: the principal's own items, newest `updated_at` first, ties by id, at most 100 (MI-02).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MemoryItemList".
+ */
+export interface MemoryItemList {
+  /**
+   * @maxItems 100
+   */
+  items: MemoryItem[];
+}
+/**
+ * What a Quick answer may offer to remember: at most one per answer, made by code from the person's own words in that question, never by a model (MI-04). Nothing is stored until the person taps it, which POSTs `create` with source tilo_suggested.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MemoryItemSuggestion".
+ */
+export interface MemoryItemSuggestion {
+  text: MemoryItemText;
+  kind: MemoryItemKind;
+}
+/**
+ * The data block tilo-api renders into the user turn (never the system prompt, EFF-04) of the person's own Quick ask and the Director's brief extraction for their own signed-in intake (MI-05): the person's local date and at most 20 of their notes, newest first. It carries no name, address, title or other settings text (USET-08). Fenced and labelled as data, never instructions.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MemoryItemPromptContext".
+ */
+export interface MemoryItemPromptContext {
+  v: "1.0";
+  today: CalendarDate;
+  /**
+   * @maxItems 20
+   */
+  items: MemoryItemContextItem[];
+}
+/**
+ * One note as a prompt sees it: its id (so the Director may cite it in brief.sources, kind memory, MI-05), kind and text.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MemoryItemContextItem".
+ */
+export interface MemoryItemContextItem {
+  id: MemoryItemMemoryItemId;
+  kind: MemoryItemKind;
+  text: MemoryItemText;
+}
+/**
  * An @mention of a team member on a team pinboard entry (FR-PB-04). It names a team because a personal entry cannot be tagged (PE-01, PE-06). The tagged person is a member of the team when tagged; they can always remove themselves, and the entry's `set_up_by` person can remove anyone (PE-06). A removed mention stays as a record; a new tag is a new mention.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -5720,6 +5899,192 @@ export interface ModelCallRpcError {
     | "rate_limited"
     | "quota"
     | "unreachable";
+}
+/**
+ * A person's morning brief for one local day, `local_date` in `time_zone` (ADR-0049): the content of one version of the `application/json` artifact `art_mbrief_<yyyymmdd>` in their own Desk world. Not the intake brief (`brief.schema.json`) and not a meeting's brief (ADR-0047). Owner-only (MO-01). Code copies every meeting, mail and deadline item from the person's own calendar read, mail search and plate (MO-05, MO-06); a model only picks which mail needs a reply and writes the `suggestions` and `todo_suggestions` text, each citing items code offered (MO-07, MO-08). Every section says whether it could be read (`status`), so an empty list is never a failed read (MO-12). No recipient, address, link or body: every text is one link-free line, and the brief sends, books and authorises nothing (MO-11). $defs `settings` is the GET and PUT answer of /v1/me/brief-settings and `settings_update` the PUT body. Rules MO-01 to MO-12 are in morning_brief.rules.md.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBrief".
+ */
+export interface MorningBrief {
+  v: "1.0";
+  owner: UserId;
+  local_date: CalendarDate;
+  time_zone: UserSettingsTimeZone;
+  generated_at: Timestamp;
+  /**
+   * schedule: the Scheduler tick's sweep made it at the person's brief time (MO-03); on_demand: the person asked for it now (MO-04).
+   */
+  trigger: "schedule" | "on_demand";
+  /**
+   * What happened to the one model call (MO-07): used (its reply passed the checks), skipped (nothing to read, or the allowance had no room), failed (error or timeout) or flagged (the safety provider flagged the reply). Anything but used leaves suggestions and todo_suggestions empty and the mail unsorted (schema).
+   */
+  model: "used" | "skipped" | "failed" | "flagged";
+  meetings: MorningBriefMeetingsSection;
+  mail_needing_reply: MorningBriefMailSection;
+  deadlines: MorningBriefDeadlinesSection;
+  /**
+   * @maxItems 5
+   */
+  suggestions: MorningBriefSuggestion[];
+  /**
+   * @maxItems 5
+   */
+  todo_suggestions: MorningBriefTodo[];
+}
+/**
+ * ok: the calendar was read (items may be empty: no meetings today). not_connected: no calendar grant. unavailable: the read failed. Only ok carries items.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefMeetingsSection".
+ */
+export interface MorningBriefMeetingsSection {
+  status: "ok" | "not_connected" | "unavailable";
+  /**
+   * @maxItems 20
+   */
+  items: MorningBriefMeeting[];
+}
+/**
+ * One event of the person's own primary calendar on local_date, copied by code from the calendar read (MO-05). An all-day event has dates (end exclusive); any other has UTC times. No description, location, link, organizer or guest.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefMeeting".
+ */
+export interface MorningBriefMeeting {
+  title: MorningBriefTitle;
+  start: Timestamp | CalendarDate;
+  end: Timestamp | CalendarDate;
+  all_day: boolean;
+  attendee_count: number;
+  source: MorningBriefMeetingSource;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefMeetingSource".
+ */
+export interface MorningBriefMeetingSource {
+  kind: "calendar_event";
+  id: MorningBriefSourceId;
+}
+/**
+ * ok: the model picked these from the mail read as needing a reply. unsorted: the mail was read but the model was not used, so these are the newest unread messages, shown as unread, not as needing a reply. not_connected: no mail grant. unavailable: the read failed. not_connected and unavailable carry no items.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefMailSection".
+ */
+export interface MorningBriefMailSection {
+  status: "ok" | "unsorted" | "not_connected" | "unavailable";
+  /**
+   * @maxItems 10
+   */
+  items: MorningBriefMail[];
+}
+/**
+ * One message of the person's own inbox, copied by code from the mail search (MO-05): the sender's display name (null when it has none), the subject (null when empty after cleaning) and the receipt time (null when unreadable). Never an address, a body, a snippet or an attachment.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefMail".
+ */
+export interface MorningBriefMail {
+  from_name: MorningBriefName | null;
+  subject: MorningBriefTitle | null;
+  received_at: Timestamp | null;
+  source: MorningBriefMailSource;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefMailSource".
+ */
+export interface MorningBriefMailSource {
+  kind: "mail";
+  id: MorningBriefSourceId;
+}
+/**
+ * ok: the plate was read (items may be empty). unavailable: it could not be read. Only ok carries items.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefDeadlinesSection".
+ */
+export interface MorningBriefDeadlinesSection {
+  status: "ok" | "unavailable";
+  /**
+   * @maxItems 20
+   */
+  items: MorningBriefDeadline[];
+}
+/**
+ * A row of the person's own plate with a due date on or before local_date plus 2 days (MO-05), copied by code: the record's title, its due date, whether it is past (`overdue`, due before local_date).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefDeadline".
+ */
+export interface MorningBriefDeadline {
+  title: MorningBriefTitle;
+  due: CalendarDate;
+  overdue: boolean;
+  source: MorningBriefDeadlineSource;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefDeadlineSource".
+ */
+export interface MorningBriefDeadlineSource {
+  kind: "work_item" | "pinboard_item" | "world";
+  id: MorningBriefSourceId;
+}
+/**
+ * A short line the model wrote about the day, citing one to five items of this brief (MO-07, MO-08). It opens or does nothing by itself.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefSuggestion".
+ */
+export interface MorningBriefSuggestion {
+  text: MorningBriefLine;
+  /**
+   * @minItems 1
+   * @maxItems 5
+   */
+  cites: [MorningBriefCite, ...MorningBriefCite[]];
+}
+/**
+ * A to-do the model proposed from one message the mail search read (a bill, a delivery, an appointment): its title and due words, and that message as code copied it. It becomes a work item only when the person confirms it (MO-11).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefTodo".
+ */
+export interface MorningBriefTodo {
+  title: MorningBriefTitle;
+  due_text: MorningBriefDueText | null;
+  mail: MorningBriefMail;
+}
+/**
+ * The answer of GET and PUT /v1/me/brief-settings for the verified principal (MO-02). With nothing stored, GET answers the defaults with updated_at null. email_rule_ready is read-only: true when the person has the standing rule that lets Tilo mail their own address (MO-10); without it the email copy sends nothing even when switched on.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefSettings".
+ */
+export interface MorningBriefSettings {
+  owner_id: UserId;
+  org_id: OrgId;
+  enabled: boolean;
+  time: UserSettingsClock;
+  time_zone: UserSettingsTimeZone;
+  email_copy: boolean;
+  email_rule_ready: boolean;
+  updated_at: Timestamp | null;
+}
+/**
+ * The body of PUT /v1/me/brief-settings: the whole setting. It names no owner, org, time of saving or email_rule_ready: those are the server's (MO-02).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MorningBriefSettingsUpdate".
+ */
+export interface MorningBriefSettingsUpdate {
+  enabled: boolean;
+  time: UserSettingsClock;
+  time_zone: UserSettingsTimeZone;
+  email_copy: boolean;
 }
 /**
  * orgs/{org}/model_keys/models (ADR-0041 decision 2, BK-04): the org's choices and stamps and the version of the vault secret, never a key character, length, hash or last four. rotated_at is null until a rotation; rev starts at 1 and is the compare-and-set counter of every write. The record is written by tilo-api's routes only and never by a model, a skill or a tool (BK-18).
@@ -6413,6 +6778,75 @@ export interface ProvidersPrice {
 export interface ProvidersUnitPrice {
   unit: "query" | "minute" | "character" | "image";
   per_1k: number | null;
+}
+/**
+ * One indexed passage of a record a person may read, for per-account grounding (ADR-0049): the document at orgs/{org}/chunks/{id} without its vector. The stored document also holds `embedding`, a Firestore vector of `dimensions` floats made by the `embed` role's `embed_profile`; JSON readers (erasure, export, tests) never see it. Written by code only, from records already stored and screened clean (RT-01, RT-08). `owner` is the person whose record it is; `team_id` is set only for a source a team may read under the existing rules (a team pin, or a deliverable of a world while a team share is in force), and team reads are re-checked at every query (RT-02, RT-03). A chunk lives no longer than its source (RT-07). $defs `prompt_block` is the data block a prompt receives and `grounding_ref` what an answer shows it looked at. Rules RT-01 to RT-10 are in retrieval_chunk.rules.md.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "RetrievalChunk".
+ */
+export interface RetrievalChunk {
+  id: RetrievalChunkChunkId;
+  org_id: OrgId;
+  owner: UserId;
+  team_id: TeamId | null;
+  world_id: WorldId | null;
+  source: RetrievalChunkSource;
+  label: RetrievalChunkLabel;
+  position: number;
+  text: RetrievalChunkText;
+  text_sha256: string;
+  embed_profile: ProvidersProfileId;
+  dimensions: number;
+  screening: "clean";
+  created_at: Timestamp;
+  expires_at: Timestamp | null;
+}
+/**
+ * The record the passage came from. deliverable and upload name an artifact version (ADR-0018); minutes name the meeting and the version of its minutes artifact; pin and memory_item name the record, whose current text is indexed (version null).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "RetrievalChunkSource".
+ */
+export interface RetrievalChunkSource {
+  kind: "deliverable" | "upload" | "minutes" | "pin" | "memory_item";
+  id: string;
+  version: number | null;
+}
+/**
+ * One retrieved passage as a prompt sees it.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "RetrievalChunkPromptChunk".
+ */
+export interface RetrievalChunkPromptChunk {
+  id: RetrievalChunkChunkId;
+  source: RetrievalChunkSource;
+  label: RetrievalChunkLabel;
+  text: RetrievalChunkText;
+}
+/**
+ * The data block tilo-api renders into the user turn (never the system prompt, EFF-04) of the person's own Quick ask and their own signed-in intake's Director brief extraction (RT-04): at most 5 passages that passed the query-time scope check, nearest first. Fenced and labelled as untrusted data.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "RetrievalChunkPromptBlock".
+ */
+export interface RetrievalChunkPromptBlock {
+  v: "1.0";
+  /**
+   * @maxItems 5
+   */
+  chunks: RetrievalChunkPromptChunk[];
+}
+/**
+ * What an answer shows it looked at, one per passage given to the model (RT-04): the source and its label, never the text. A Quick answer carries at most 5 as `grounded_on`.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "RetrievalChunkGroundingRef".
+ */
+export interface RetrievalChunkGroundingRef {
+  source: RetrievalChunkSource;
+  label: RetrievalChunkLabel;
 }
 /**
  * A scenario config, config/scenarios/<id>.yaml (PRD 4.3, 7.1 FR-INT-11, ADR-0014): the skill set, connectors, seed data, autonomy policy and world theme a scenario preloads, and nothing else. Data only: no code, prompt, model id, brief text or plan, so a scenario that needs any of those becomes a pillar requirement first, and no platform source names a scenario id. The same shape serves any scenario, a demo, a held-out bank case or a generated brief. theme is the world theme, the same slug as layout.schema.json theme (config/themes/, FR-WLD-15; only its shape is checked until that folder exists, BQ-202). Rules that need other files (the id equals the file name, connectors in config/connectors.yaml, seed files exist inside the repo, each autonomy level within its risk tier's max_level, T3 at L1 only) are SN-01 to SN-09 in contracts/scenario.rules.md, checked by the loader.

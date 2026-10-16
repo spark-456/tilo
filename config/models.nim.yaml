@@ -22,6 +22,7 @@
 example: true
 
 profiles:
+  embed-fake: { provider: fake, model: fake-embed, context: 1000000, caps: [] } # RT-05
   nim-gemma-4-31b:
     provider: openai_compat
     model: google/gemma-4-31b-it
@@ -38,6 +39,7 @@ profiles:
     caps: [json, tools]
 
 roles:
+  embed: { primary: embed-fake, fallback: embed-fake } # RT-05
   # The Director's `thinking: high` is only the default for a caller that sets no level (BQ-LE2E-10): planning calls
   # set low (brief) or medium (approaches, plan) themselves. Specialist is already cheapest first (EFF-02).
   director: { primary: nim-gemma-4-31b, fallback: nim-gemma-3-27b, thinking: high, max_input_tokens: 100000, max_output_tokens: 16384 }

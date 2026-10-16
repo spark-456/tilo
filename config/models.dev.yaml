@@ -9,6 +9,7 @@
 example: true
 
 profiles:
+  embed-fake: { provider: fake, model: fake-embed, context: 1000000, caps: [] } # RT-05
   director-dev:
     provider: fake
     model: fake-director
@@ -50,6 +51,7 @@ profiles:
     caps: [json]
 
 roles:
+  embed: { primary: embed-fake, fallback: embed-fake } # RT-05
   director: { primary: director-dev, fallback: director-dev }
   specialist: { primary: specialist-fake, fallback: specialist-fake, max_input_tokens: 16000, max_output_tokens: 2048 }
   safety: { primary: safety-fake, fallback: safety-fake } # screens use the primary only
