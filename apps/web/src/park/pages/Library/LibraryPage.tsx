@@ -8,6 +8,7 @@ import { HttpClient } from "../../../api/http";
 import { type Library, libraryApi } from "../../api/live/library";
 import type { AppCtx } from "../../app/AppCtx";
 import { Button, KpiTile, PageSheet } from "../../components";
+import { EmptyState, ErrorState, LoadingState, StateAction } from "../../../design/tilo-t";
 import "../../components/park.components.css";
 import "./Library.css";
 
@@ -91,28 +92,34 @@ export function LibraryView({
       </p>
     </div>
   );
-  if (state.status === "loading") return <Frame>{head}</Frame>;
+  if (state.status === "loading") {
+    return (
+      <Frame>
+        {head}
+        <LoadingState layout="list" caption="Loading Library" />
+      </Frame>
+    );
+  }
   if (state.status === "unavailable" || state.status === "error") {
     return (
       <Frame>
         {head}
-        <output className="park-library-card park-library-state">
-          <h2 className="park-library-cardtitle">
-            {state.status === "unavailable" ? "Not connected yet" : "The Library could not load"}
-          </h2>
-          <p className="park-library-note">
-            {state.status === "unavailable"
-              ? "Finished work shows here once you are signed in with a live workspace."
-              : "Nothing was changed. Try again in a moment."}
-          </p>
-          {state.status === "error" ? (
-            <div>
-              <Button variant="secondary" onClick={retry}>
+        {state.status === "unavailable" ? (
+          <EmptyState
+            title="Not connected yet"
+            body="Finished work shows here once you are signed in with a live workspace."
+          />
+        ) : (
+          <ErrorState
+            title="The Library could not load"
+            body="Nothing was changed. Try again in a moment."
+            action={
+              <StateAction onClick={retry} icon="refresh">
                 Try again
-              </Button>
-            </div>
-          ) : null}
-        </output>
+              </StateAction>
+            }
+          />
+        )}
       </Frame>
     );
   }
@@ -148,9 +155,12 @@ export function LibraryView({
           />
         </div>
         {library.items.length === 0 ? (
-          <p className="park-library-note" data-testid="library-empty">
-            Nothing delivered yet. Finished work is listed here as each one is delivered.
-          </p>
+          <div data-testid="library-empty">
+            <EmptyState
+              title="Nothing delivered yet"
+              body="Finished work is listed here as each one is delivered."
+            />
+          </div>
         ) : shown.length === 0 ? (
           <p className="park-library-note" data-testid="library-nomatch">
             No deliverable matches that search.
