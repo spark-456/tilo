@@ -10,7 +10,7 @@ export { STEP_LEDGER_PRICES };
 
 /** STUDIO-4 (design/studio-v2 "Tilo S Skills"), without the design's "Use one in a task" (no such action yet). */
 export const INTRO =
-  "Things your helpers already know how to do. Open one to see its steps, or teach Tilo something new.";
+  "Things Tilo knows how to do. They grow with you.";
 
 /** One captured step / one run step every 900 ms (README Skills 2). */
 /** Sample data: the four steps read from the sample description. */

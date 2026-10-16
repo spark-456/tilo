@@ -6,7 +6,7 @@
 
 /** STUDIO-4 (design/studio-v2 "Tilo S Skills"). */
 export const INTRO =
-  "Things your helpers already know how to do. Open one to see its steps, or teach Tilo something new.";
+  "Things Tilo knows how to do. They grow with you.";
 export const CARD_TITLE = "Teach Tilo something new";
 export const CARD_SUB =
   "Show it once. Tilo repeats it, you check the result, and it becomes a skill your agents can reuse.";

@@ -19,6 +19,7 @@ const AMBIENT = /^src\/(park\/(shell|engines)|landing|design\/tilo-t)\//; // LAN
 const DIR = __dirname;
 const PAGES = resolve(DIR, "..");
 const PARK = resolve(PAGES, "..");
+const TILO_T_DESIGN = resolve(PARK, "..", "design", "tilo-t");
 
 function walk(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -190,9 +191,18 @@ describe("WEB_8a_static: imports", () => {
           bad.push(`${rel(p)} imports another page: ${spec}`);
           continue;
         }
-        if (!target.startsWith(PARK)) bad.push(`${rel(p)} imports outside park/: ${spec}`);
+        const usesTiloTDesign =
+          target === TILO_T_DESIGN ||
+          target.startsWith(`${TILO_T_DESIGN}\\`) ||
+          target.startsWith(`${TILO_T_DESIGN}/`);
+        if (!target.startsWith(PARK) && !usesTiloTDesign)
+          bad.push(`${rel(p)} imports outside park/ and Tilo T foundation: ${spec}`);
       }
     }
     expect(bad).toEqual([]);
+  });
+
+  it("CX_T_SKILLS_foundation_icons_are_imported_from_the_shared_design_layer", () => {
+    expect(code(join(DIR, "Gallery.tsx"))).toMatch(/from "\.\.\/\.\.\.\/design\/tilo-t"/);
   });
 });

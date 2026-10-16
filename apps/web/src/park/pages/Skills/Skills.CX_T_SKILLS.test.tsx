@@ -8,6 +8,9 @@ afterEach(cleanup);
 describe("CX_T_SKILLS Skills board", () => {
   it("test_CX_T_SKILLS_keeps_how_to_guidance_and_existing_skill_library", async () => {
     const { el } = await mountSkills();
+    expect(q(el, ".park-skills-intro").textContent).toBe(
+      "Things Tilo knows how to do. They grow with you.",
+    );
     const how = q(el, 'section[aria-label="How skills work"]');
     expect(pageText(how)).toContain("Tilo picks the right skill");
     expect(pageText(how)).toContain("Show it how, one time");
