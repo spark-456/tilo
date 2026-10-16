@@ -294,6 +294,9 @@
     bottom: calc(92px + env(safe-area-inset-bottom, 0px));
     z-index: 34;
   }
+  [data-park][data-theme="studio"] .park-shell__phone-menu .park-menu__row {
+    height: 44px;
+  }
 }
 @media (max-width: 360px) {
   [data-park][data-theme="studio"] .park-shell__iconbtn,
