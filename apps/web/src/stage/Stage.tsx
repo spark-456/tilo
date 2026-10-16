@@ -5,7 +5,7 @@ import tokens from "../design/tokens";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { agentNames, rankName } from "../world/runSummary";
 import { select, useSelection } from "../world/selection";
-import { onFly, openAgent, registerProbe as probeOf, setHover } from "../world/spotlight";
+import { flyTo, onFly, openAgent, registerProbe as probeOf, setHover } from "../world/spotlight";
 import { ViewLink } from "../worldView/ViewLink";
 import * as cam from "./camera";
 
@@ -37,6 +37,7 @@ const KEYS: Record<string, (c: cam.CameraState) => cam.CameraState> = {
   "+": (c) => zoomAt(c, Z, 0, 0),
   "=": (c) => zoomAt(c, Z, 0, 0),
   "-": (c) => zoomAt(c, -Z, 0, 0),
+  Home: () => cam.INITIAL_CAMERA, // TILO-T-WORLD: Fit, the framed world
 };
 
 /**
@@ -77,7 +78,14 @@ export function Stage({
    * a labelled region instead: one main per page. */
   landmark?: boolean;
 }) {
-  const [, set, toggle] = useSelection(worldId ?? "");
+  const [selectedId, set, toggle] = useSelection(worldId ?? "");
+  // TILO-T-WORLD: Follow keeps the chosen agent centred as events move it; Zoom and Fit end it.
+  const [follow, setFollow] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `seq` (the last drawn event) is the trigger to re-centre.
+  useEffect(() => {
+    // triggeredBy: agent.moved (any recorded event that moves the followed agent): the camera glides to it.
+    if (follow && worldId && selectedId) flyTo(worldId, selectedId, 320);
+  }, [follow, seq, selectedId, worldId]);
   const outlineItems = useMemo(() => {
     if (!layout) return [];
     const names = agentNames(layout);

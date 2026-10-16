@@ -530,3 +530,41 @@
 [data-park] .park-world-livestage[data-run-status="paused"] .stage-frame canvas {
   filter: var(--cityFx, none);
 }
+
+/* Replay speeds */
+[data-park] .tw-play {
+  margin: 0;
+  position: absolute;
+  z-index: 5;
+  bottom: 8px;
+  left: 50%;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  transform: translateX(-50%);
+  border: 1px solid var(--line, #e6e6e2);
+  border-radius: 14px;
+  background: var(--card, #fff);
+  box-shadow: var(--sh2, none);
+}
+[data-park] .tw-play__b {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink2, #46464a);
+  font: inherit;
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  cursor: pointer;
+}
+[data-park] .tw-play__b[aria-pressed="true"] {
+  background: var(--pri, #0b0b0c);
+  color: var(--onPri, #fff);
+}

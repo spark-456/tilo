@@ -114,6 +114,7 @@ export function TabPanel({
   title,
   sub,
   aside,
+  className,
   children,
 }: {
   tab: WorldTab;
@@ -121,6 +122,8 @@ export function TabPanel({
   title: string;
   sub: string;
   aside?: string;
+  /** An extra class: the Result panel slides in on artifact.delivered (TILO-T-WORLD). */
+  className?: string;
   children: ReactNode;
 }) {
   return (
@@ -129,7 +132,7 @@ export function TabPanel({
       id={panelId(tab)}
       aria-labelledby={tabId(tab)}
       hidden={on !== tab}
-      className="park-world-panel"
+      className={cx("park-world-panel", className)}
       data-tab={tab}
     >
       <div className="park-world-panelhead">
