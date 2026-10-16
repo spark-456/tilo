@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 // UI-STUDIO-5 Agenda (design/studio-v2 "Tilo S Agenda"): the live Agenda lays today's calendar, the plate, the
-// meetings and parked work on the left and Tilo's brief and suggestions on the right. Only what GET /v1/plate sends
-// is shown; the brief and the suggestions have no read yet, so they say so and offer no action.
+// meetings and parked work from the live plate. Sections without data are hidden.
 import { afterEach, expect, it } from "vitest";
 import { cleanup, renderAgenda } from "../../../../test-support/park/agendaHarness";
 import { createLiveApi } from "../../api/liveApi";
@@ -44,30 +43,22 @@ const mount = () =>
     }),
   });
 
-it("STUDIO_5 agenda live: today and the plate on the left, brief and suggestions on the right", async () => {
+it("STUDIO_5 agenda live: today and the recorded plate", async () => {
   const { container } = await mount();
   expect(container.textContent).toContain(
     "Tilo prepares a brief before each meeting and takes notes in the ones you invite it to.",
   );
   const main = container.querySelector(".park-agenda-studiomain");
-  const side = container.querySelector(".park-agenda-studioside");
   expect(main?.querySelector('[aria-label="Today\'s calendar"]')?.textContent).toContain(
     "Supplier call",
   );
   expect(main?.querySelector('[aria-label="Your plate"]')?.textContent).toContain("Send the quote");
-  expect(side?.querySelector('[aria-label="Event details"]')?.textContent).toContain(
-    "Tilo’s brief",
-  );
-  expect(side?.querySelector('[aria-label="Available times"]')?.textContent).toContain(
-    "Tilo suggests",
-  );
+  expect(container.querySelector(".park-agenda-studioside")).toBeNull();
 });
 
 it("STUDIO_5 agenda live: no invented brief, suggestion or button without a read behind it", async () => {
   const { container } = await mount();
-  const side = container.querySelector(".park-agenda-studioside");
-  for (const card of side?.querySelectorAll("section") ?? [])
-    expect(card.textContent).toContain("Not available yet");
+  expect(container.textContent).not.toContain("Not available yet");
   expect(container.querySelector("button")).toBeNull();
   expect(container.textContent).not.toMatch(/Voltway|Add to calendar|Dismiss|Open the full brief/);
 });

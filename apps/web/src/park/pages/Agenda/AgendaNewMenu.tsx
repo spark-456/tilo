@@ -5,10 +5,12 @@ export function AgendaNewMenu({
   createPin,
   onPinCreated,
   canHost,
+  onSchedule,
 }: {
   createPin: ((title: string, idempotencyKey: string) => Promise<void>) | null;
   onPinCreated: () => void;
   canHost: boolean;
+  onSchedule: () => void;
 }) {
   const [pinOpen, setPinOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -40,9 +42,9 @@ export function AgendaNewMenu({
       <details ref={details}>
         <summary>+ New</summary>
         <div className="park-agenda-new__menu" role="menu" aria-label="New item">
-          <span role="menuitem" tabIndex={-1} aria-label="Calendar item" aria-disabled="true">
-            Calendar item <small>Not available here yet</small>
-          </span>
+          <button type="button" role="menuitem" onClick={() => { details.current && (details.current.open = false); onSchedule(); }}>
+            Schedule meeting <small>Choose a time and invite people</small>
+          </button>
           {createPin ? (
             <button
               type="button"
@@ -61,7 +63,7 @@ export function AgendaNewMenu({
           )}
           {canHost ? (
             <a role="menuitem" href="#agenda-meetings">
-              Meeting with Tilo <small>Use the meeting host form</small>
+              Meeting with Tilo <small>Meet now with Tilo</small>
             </a>
           ) : (
             <span role="menuitem" tabIndex={-1} aria-label="Meeting with Tilo" aria-disabled="true">
