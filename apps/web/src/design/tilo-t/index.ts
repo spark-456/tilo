@@ -9,5 +9,6 @@ export {
   type LoadingLayout,
 } from "./States";
 export { DoodleGutter } from "./DoodleGutter";
+export { PoolLoader, type PoolLoaderEvent, type PoolLoaderProps } from "./PoolLoader";
 export { EASING, EASING_VAR, REDUCED_FADE_MS, prefersReducedMotion, type EasingName } from "./motion";
 export { useInView, useLoopPaused, usePauseWhenHidden } from "./loops";
