@@ -12,7 +12,7 @@ import { subscribeDensity } from "../display/density";
 import { MAX_DURATION_MS, createChoreographer } from "./choreographer";
 import { type Frame, type FrameAgent, type FrameSay, frameOf } from "./frame";
 import { createMobileQuality } from "./mobileQuality";
-import { type WorldState, applyEvent, createInitialState } from "./reducer";
+import { type WorldState, applyEvent, createInitialState, standingAt } from "./reducer";
 import {
   type WorldLayer,
   createLayer,
@@ -285,7 +285,7 @@ function createLive(
     apply(event, receivedAtMs) {
       if (stopped || event.seq <= state.seq) return; // duplicate or out of order: ignored
       const wasPaused = paused;
-      const before = state.agents;
+      const before = state;
       state = applyEvent(state, event, layout);
       paused = state.status === "paused";
       onStatus(state.status);
@@ -310,8 +310,11 @@ function createLive(
           continue;
         }
         // This event relocates its actor, and, for a meeting room (WORLD-LIVE), every agent it called or sent back.
-        if (event.actor !== a.id && before[a.id]?.location === state.agents[a.id]?.location)
-          continue;
+        // TILO-T-WORLD: where it stands (its post once its handoff is old), not only where its last event sent it.
+        const was = before.agents[a.id];
+        const stood = was && standingAt(before, was);
+        const stands = standingAt(state, state.agents[a.id] as never);
+        if (event.actor !== a.id && stood === stands) continue;
         // HR-3: every location change for an already-visible actor goes through that actor's
         // choreographer queue in seq order (chained by finish time), never straight into
         // agentPos, so a later event can never race an earlier walk still in flight.
@@ -321,7 +324,12 @@ function createLive(
           actor: a.id,
           seq: event.seq,
           receivedAtMs,
-          durationMs: WALKS.has(event.type) ? Math.min(MOVE_DURATION_MS, MAX_DURATION_MS) : 0,
+          // A settle (a finished agent going to its post once the talk window has passed) is a walk too: the event
+          // that closed the window is its recorded cause (TILO-T-WORLD).
+          durationMs:
+            WALKS.has(event.type) || (event.actor !== a.id && stood !== stands)
+              ? Math.min(MOVE_DURATION_MS, MAX_DURATION_MS)
+              : 0,
         });
       }
       if (event.type === "meeting.adjourned") roomSay.clear(); // the room is over: its bubbles go with it

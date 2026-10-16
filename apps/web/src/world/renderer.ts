@@ -190,7 +190,7 @@ type Zone = { x0: number; x1: number; y0: number; y1: number };
 const TAG_GAP = 4;
 /** A tag slides at most this far to clear the figures; further and it would sit over another
  * building, so it stays where it was. */
-const SLIDE_MAX = 40;
+const SLIDE_MAX = 90;
 /** What a resting figure covers in front of a building (Friendly's size, the larger): half its width
  * either side of its feet, its height up (the same 30 units the rank tag sits above). */
 const FIGURE_HALF_W = 18;
