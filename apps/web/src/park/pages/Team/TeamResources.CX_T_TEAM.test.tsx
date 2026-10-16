@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 import { act, createElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { type Root, createRoot } from "react-dom/client";
 import { afterEach, expect, it } from "vitest";
 import { cleanup, makeApp, renderTeam } from "../../../../test-support/park/teamHarness";
-import { createLiveApi } from "../../api/liveApi";
 import type { TeamView } from "../../api/live/teamLive";
+import { createLiveApi } from "../../api/liveApi";
 import { TeamResources } from "./TeamResources";
 
 let resourceRoot: Root | null = null;

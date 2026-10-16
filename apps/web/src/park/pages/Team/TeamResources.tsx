@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { API_URL, appCheckToken, authToken } from "../../../api/ClientProvider";
 import { HttpClient } from "../../../api/http";
 import { EmptyState, ErrorState, LoadingState } from "../../../design/tilo-t";
+import { type PeopleList, peopleListsApi } from "../../api/live/peopleLists";
 import type { World } from "../../api/types";
-import { peopleListsApi, type PeopleList } from "../../api/live/peopleLists";
 
 type Pins = PeopleList | "loading" | "failed" | "unavailable";
 
@@ -36,7 +36,9 @@ export function TeamResources({
           if (active) setPins("failed");
         });
     }
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [read]);
   const shared = worlds.filter((world) => world.access === "team");
   const teamPins =
@@ -58,7 +60,10 @@ export function TeamResources({
             ))}
           </ul>
         ) : (
-          <EmptyState title="No shared worlds yet" body="Worlds shared with your team will show up here." />
+          <EmptyState
+            title="No shared worlds yet"
+            body="Worlds shared with your team will show up here."
+          />
         )}
       </section>
       <section className="park-team-card" aria-label="Team pins">
@@ -68,7 +73,10 @@ export function TeamResources({
         ) : pins === "failed" ? (
           <ErrorState title="Team pins are unavailable" body="Try again later." />
         ) : pins === "unavailable" ? (
-          <EmptyState title="Team pins aren’t connected" body="Pinboards are not set up on this install." />
+          <EmptyState
+            title="Team pins aren’t connected"
+            body="Pinboards are not set up on this install."
+          />
         ) : teamPins.length ? (
           <ul>
             {teamPins.map((pin) => (
@@ -76,7 +84,10 @@ export function TeamResources({
             ))}
           </ul>
         ) : (
-          <EmptyState title="No team pins yet" body="Pins shared with your team will show up here." />
+          <EmptyState
+            title="No team pins yet"
+            body="Pins shared with your team will show up here."
+          />
         )}
       </section>
     </div>
