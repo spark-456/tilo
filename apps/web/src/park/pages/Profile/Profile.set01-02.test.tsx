@@ -144,9 +144,11 @@ describe("FR_SET_01_profile_saved_per_person", () => {
     });
     const a = await renderProfile(makeApp(), flaky);
     expect(a.root.querySelectorAll("input")).toHaveLength(0);
-    expect(alertText(a.root)).toBe("Tilo had a problem on its side.");
+    expect(text(a.root.querySelector('[role="alert"] h2'))).toBe("Tilo had a problem on its side.");
     await clickAndSettle(buttonNamed(a.root, "Try again"));
-    expect(alertText(a.root)).toBe("Sign in to see and save your settings.");
+    expect(text(a.root.querySelector('[role="alert"] h2'))).toBe(
+      "Sign in to see and save your settings.",
+    );
     await clickAndSettle(buttonNamed(a.root, "Try again"));
     expect(named(a.root, "Full name")).toBe("Alex Morgan");
   });

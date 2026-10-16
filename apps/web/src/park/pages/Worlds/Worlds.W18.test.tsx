@@ -44,15 +44,14 @@ it("UI-10 W18 loading reserves card grid and replaces skeleton after data arrive
       }),
   );
   const { c } = await renderWorlds({ api });
-  const loading = c.querySelector('[role="status"][aria-label="Loading worlds"]');
+  const loading = c.querySelector('[role="status"][data-testid="tt-loading"]');
   expect(loading).not.toBeNull();
   expect(loading?.textContent).toContain("Loading worlds");
-  expect(loading?.querySelector(".park-worlds-grid")).not.toBeNull();
-  expect(loading?.querySelectorAll('[aria-hidden="true"] .park-worlds-card')).toHaveLength(3);
+  expect(loading?.querySelectorAll(".tt-sk--card")).toHaveLength(6);
   expect(loading?.querySelector("a,button")).toBeNull();
   resolve(result);
   await flush();
-  expect(c.querySelector('[aria-label="Loading worlds"]')).toBeNull();
+  expect(c.querySelector('[data-testid="tt-loading"]')).toBeNull();
   expect(cardIds(c, GRID).slice(0, 2)).toEqual(["k1", "hires"]);
 });
 
@@ -60,7 +59,7 @@ it("UI-10 W18 loading skeleton clears on failure", async () => {
   const api = worldsApi();
   api.getWorlds = vi.fn(() => Promise.reject(new Error("offline")));
   const { c } = await renderWorlds({ api });
-  expect(c.querySelector('[aria-label="Loading worlds"]')).toBeNull();
+  expect(c.querySelector('[data-testid="tt-loading"]')).toBeNull();
   expect(c.textContent).toContain("Worlds data is unavailable");
 });
 

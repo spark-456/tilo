@@ -8,6 +8,7 @@
 import type { UserSettings, UserSettingsUpdate } from "@tilo/contracts";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { morningBriefApi } from "../../api/live/morningBrief";
+import { ErrorState, LoadingState, StateAction } from "../../../design/tilo-t";
 import type { ProfileSession, ProfileSettings, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useDemoSession, useParkApi, useWorldClient } from "../../app/context";
@@ -159,21 +160,17 @@ function SettingsState({ remote, retry }: { remote: Remote; retry: () => void })
       style={{ blockSize: 176, overflow: "auto" }}
     >
       {failed ? (
-        <p role="alert" className="park-profile-alert">
-          {remote.text}
-        </p>
+        <ErrorState
+          title={remote.text}
+          action={
+            <StateAction onClick={retry} icon="refresh">
+              Try again
+            </StateAction>
+          }
+        />
       ) : (
-        <output className="park-profile-note">Loading your settings…</output>
+        <LoadingState layout="list" caption="Loading your settings" />
       )}
-      <button
-        type="button"
-        className="park-profile-small"
-        onClick={retry}
-        disabled={!failed}
-        style={{ visibility: failed ? "visible" : "hidden" }}
-      >
-        Try again
-      </button>
     </div>
   );
 }

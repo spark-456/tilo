@@ -2,6 +2,7 @@
 // (STUDIO-3, "Tilo S Worlds.dc.html"). The town's counts are the list's own; its picture is the shell's city,
 // drawn still (no motion on this page).
 import type { ReactNode } from "react";
+import { EmptyState, LoadingState } from "../../../design/tilo-t";
 import { backdropScene } from "../../shell/scene";
 import { type TownCounts, plural } from "./model";
 
@@ -17,17 +18,7 @@ export function CardSkeleton() {
 }
 
 export function LoadingWorlds() {
-  return (
-    // biome-ignore lint/a11y/useSemanticElements: loading status contains a block card grid, not a form output
-    <div role="status" aria-label="Loading worlds" className="park-worlds-section">
-      <span className="park-worlds-section__title">Loading worlds…</span>
-      <div aria-hidden="true" className="park-worlds-grid">
-        {[0, 1, 2].map((n) => (
-          <CardSkeleton key={n} />
-        ))}
-      </div>
-    </div>
-  );
+  return <LoadingState layout="grid" caption="Loading worlds" />;
 }
 
 export function Section({ count, children }: { count: number; children: ReactNode }) {
@@ -83,10 +74,5 @@ export function TownHero({
 }
 
 export function EmptyBox({ title, body }: { title: string; body?: string }) {
-  return (
-    <div className="park-worlds-empty">
-      <div className="park-worlds-empty__title">{title}</div>
-      {body ? <div className="park-worlds-empty__body">{body}</div> : null}
-    </div>
-  );
+  return <EmptyState title={title} body={body ?? ""} />;
 }

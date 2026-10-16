@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EmptyState } from "../../../design/tilo-t";
 import type { Decision, Ledger } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { Button, SegmentedControl } from "../../components";
@@ -118,11 +119,13 @@ export function Activity({
         </div>
       ))}
       {groups.length === 0 ? (
-        <div className="park-ledger-empty">
-          {L.recordedRuns !== undefined
-            ? "No recorded approvals in this view."
-            : "Nothing here this month."}
-        </div>
+        <EmptyState
+          title={
+            L.recordedRuns !== undefined
+              ? "No recorded approvals in this view."
+              : "Nothing here this month."
+          }
+        />
       ) : null}
     </section>
   );

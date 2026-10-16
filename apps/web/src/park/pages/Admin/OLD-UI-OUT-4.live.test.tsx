@@ -21,6 +21,7 @@ it("OLD-UI-OUT-4 live account without a run never requests sample data", async (
   );
   await act(async () => undefined);
   expect(m.container.textContent).toContain("No run yet.");
+  expect(m.container.querySelector('[data-testid="tt-empty"]')).not.toBeNull();
   expect(subscribeEvents).not.toHaveBeenCalled();
   expect(getLayout).not.toHaveBeenCalled();
   expect(getDelivery).not.toHaveBeenCalled();

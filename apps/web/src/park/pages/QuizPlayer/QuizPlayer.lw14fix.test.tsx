@@ -41,6 +41,32 @@ const source = (artifact: Record<string, unknown>): unknown =>
   withQuestion({ source: { artifact } });
 
 describe("LW_14_fix the player accepts exactly what the schema accepts", () => {
+  it("TILO_T_STATES_HR1_quiz_unavailable_and_invalid_screens_use_shared_states", () => {
+    const invalid = mount(
+      <ParkProvider>
+        <QuizPlayerPage worldId="w1" artifactId="art_bad" spec={withQuestion({ topic: "9-x" })} />
+      </ParkProvider>,
+    );
+    expect(invalid.container.querySelector('[data-testid="tt-error"]')?.getAttribute("role")).toBe(
+      "alert",
+    );
+    expect(invalid.container.querySelector("h1")?.textContent).toBe(
+      "Quiz specification is invalid",
+    );
+    expect(invalid.container.querySelector("h1")?.getAttribute("tabindex")).toBe("-1");
+
+    const unavailable = mount(
+      <ParkProvider api={createLiveApi()}>
+        <QuizPlayerPage worldId="w1" artifactId="art_any" />
+      </ParkProvider>,
+    );
+    expect(unavailable.container.querySelector('[data-testid="tt-empty"]')).not.toBeNull();
+    expect(unavailable.container.querySelector("h1")?.textContent).toBe(
+      "This quiz is not available yet",
+    );
+    expect(unavailable.container.querySelector("h1")?.getAttribute("tabindex")).toBe("-1");
+  });
+
   it("LW_14_fix the schema itself is loaded and the sample quiz is valid under both", () => {
     expect(schema).toBeDefined();
     expect(schema?.(QUIZ_FIXTURE_SPEC)).toBe(true);
