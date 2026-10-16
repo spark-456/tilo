@@ -122,6 +122,10 @@
 .tt-dots span:nth-child(3){animation-delay:.4s}
 /* Loops stop while the tab is hidden or the section is off-screen (usePauseWhenHidden, useInView, useLoopPaused). */
 .tt-paused,.tt-paused *{animation-play-state:paused!important}
+/* triggeredBy: Start click in HomePage, world.started and world.planned in PendingWorldRoute. */
+[data-park] .park-home-plan--starting{animation:tRunCard 1.8s var(--tt-ease-standard) both}
+[data-park] .park-pending-world__pool{animation:tPoolOpen .5s var(--tt-ease-leap) both}
+[data-park] .park-world-enter{animation:tRise .3s var(--tt-ease-standard) both}
 
 /* ---- Reduced motion (tilo-t.css, last rule, 1:1): every walk, rise and flight becomes a fade of 200 to 300 ms and
    loops stop. Buddy and the loops below also fall back to their static pose. ---- */
@@ -129,3 +133,9 @@
 .tt-bd,.tt-bd *,.tt-shim,.tt-dots span{animation:none!important}}
 /* The person's own 'still' choice (Profile > Appearance) is the same list. */
 [data-motion="still"] .tt-bd,[data-motion="still"] .tt-bd *,[data-motion="still"] .tt-shim,[data-motion="still"] .tt-dots span{animation:none!important}
+@media (prefers-reduced-motion:reduce){
+[data-park] .park-home-plan--starting{animation:none!important;opacity:0;transition:opacity .2s!important}
+[data-park] .park-pending-world__pool,[data-park] .park-world-enter{animation:tFade .2s ease-out both!important}
+}
+[data-motion="still"] .park-home-plan--starting{animation:none!important;opacity:0;transition:opacity .2s!important}
+[data-motion="still"] .park-pending-world__pool,[data-motion="still"] .park-world-enter{animation:tFade .2s ease-out both!important}

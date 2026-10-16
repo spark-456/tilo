@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Buddy, ErrorState, LoadingState, useLoopPaused } from "../../design/tilo-t";
 
 /** An approval reply proves this id exists; it does not prove that planning has finished. */
 const pending = new Set<string>();
@@ -17,7 +18,7 @@ interface EventFeed {
   ): () => void;
 }
 
-/** Holds the new world's route until its real event feed says that a plan or run exists. */
+/** The server's start response gives an id; only streamed events advance the visual story. */
 export function PendingWorldRoute({
   worldId,
   client,
@@ -27,30 +28,55 @@ export function PendingWorldRoute({
   readonly client: EventFeed | null;
   readonly children: ReactNode;
 }) {
-  const [waiting, setWaiting] = useState(() => pendingWorld(worldId));
+  const [phase, setPhase] = useState<"waiting" | "started" | "planned">(() =>
+    pendingWorld(worldId) ? "waiting" : "planned",
+  );
   const [error, setError] = useState(false);
+  const loopRef = useRef<HTMLDivElement>(null);
+  const paused = useLoopPaused(loopRef);
+  const planned = phase === "planned";
+  const failed = error || client === null;
   useEffect(() => {
-    if (!waiting || client === null) return undefined;
+    if (planned || client === null) return undefined;
     return client.subscribeEvents(
       worldId,
       (event) => {
-        if (event.type !== "world.planned" && event.type !== "world.started") return;
-        pending.delete(worldId);
-        setWaiting(false);
+        if (event.type === "world.started") {
+          // triggeredBy: world.started. The pool appears only after this recorded event.
+          setPhase((current) => current === "planned" ? current : "started");
+        }
+        if (event.type === "world.planned") {
+          // triggeredBy: world.planned. Enter the actual World only after its plan is recorded.
+          pending.delete(worldId);
+          setPhase("planned");
+        }
       },
       () => setError(true),
     );
-  }, [client, waiting, worldId]);
+  }, [client, planned, worldId]);
 
-  if (!waiting) return <>{children}</>;
+  if (planned) return <div className="park-world-enter">{children}</div>;
   return (
-    <section className="park-pending-world" data-testid="pending-world" aria-live="polite">
-      <h1 tabIndex={-1}>Tilo is planning your world</h1>
-      <p>
-        {error
-          ? "World updates are unavailable right now. You can return to your worlds and try again."
-          : "Your world will open when its plan or start is recorded."}
-      </p>
+    <section className="park-pending-world" data-testid="pending-world">
+      <h1 tabIndex={-1}>{failed ? "We can't open this world yet" : "Tilo is planning your world"}</h1>
+      {failed ? (
+        <ErrorState
+          title="World updates are unavailable"
+          body="You can return to your worlds and try again."
+        />
+      ) : (
+        <div ref={loopRef} className={paused}>
+          {phase === "started" ? (
+            <div className="park-pending-world__pool" aria-hidden="true">
+              <Buddy mood="swim" size={96} />
+            </div>
+          ) : null}
+          <LoadingState
+            layout="world"
+            caption={phase === "started" ? "world.started · Waiting for world.planned" : "Waiting for world.started"}
+          />
+        </div>
+      )}
       <a href="/worlds">Your worlds</a>
     </section>
   );

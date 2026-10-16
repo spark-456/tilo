@@ -507,6 +507,15 @@
   background: var(--card);
   box-shadow: var(--sh);
 }
+[data-park] .park-home-plan--starting {
+  transform-origin: center bottom;
+}
+[data-park] .park-home-start-status {
+  margin: 0;
+  color: var(--ink2);
+  font-weight: 700;
+  text-align: center;
+}
 [data-park] .park-home-plan__main {
   min-width: 0;
   display: flex;

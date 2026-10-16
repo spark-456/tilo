@@ -10,6 +10,8 @@ export interface RunCardProps {
   readonly plan: RunPlan;
   /** A call is out (Start, or a changed line being priced again): every control waits. */
   readonly busy: boolean;
+  /** True only after the person pressed Start; repricing a changed line must stay still. */
+  readonly starting?: boolean;
   /** The plain reason the last step stopped, with Start as the retry. */
   readonly error: string | null;
   /** Start, with the weekly cadence when the person switched "Repeat weekly" on (FR-AGT-14). */
@@ -20,7 +22,7 @@ export interface RunCardProps {
 
 const credits = (n: number): string => `${Number.isInteger(n) ? n : n.toFixed(1)}`;
 
-export function RunCard({ plan, busy, error, onStart, onCancel, onEdit }: RunCardProps) {
+export function RunCard({ plan, busy, starting = false, error, onStart, onCancel, onEdit }: RunCardProps) {
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const repeat = useRepeatWeekly(busy);
@@ -30,7 +32,8 @@ export function RunCard({ plan, busy, error, onStart, onCancel, onEdit }: RunCar
       : `${credits(plan.credits.min)}–${credits(plan.credits.max)} credits`;
   const usd = plan.usd === null ? "" : ` (about US$${plan.usd.toFixed(2)} at most)`;
   return (
-    <div className="park-home-plan" data-testid="run-card">
+    <>
+    <div className={starting ? "park-home-plan park-home-plan--starting" : "park-home-plan"} data-testid="run-card">
       <div className="park-home-plan__main">
         <div className="park-home-plan__head">
           <span className="park-home-tier">READY</span>
@@ -127,5 +130,7 @@ export function RunCard({ plan, busy, error, onStart, onCancel, onEdit }: RunCar
         </button>
       </div>
     </div>
+    {starting ? <p className="park-home-start-status" role="status">Starting your world…</p> : null}
+    </>
   );
 }

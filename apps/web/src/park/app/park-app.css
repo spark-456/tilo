@@ -55,3 +55,12 @@
 [data-park] .park-pending-world p {
   color: var(--ink2);
 }
+[data-park] .park-pending-world__pool {
+  display: grid;
+  place-items: center;
+  width: min(100%, 280px);
+  min-height: 125px;
+  margin: 0 auto 1rem;
+  border-bottom: 6px solid var(--bpLine);
+  background: linear-gradient(180deg, transparent 65%, var(--bp) 65%);
+}
