@@ -161,6 +161,11 @@ export function SkillDrawer({
                   <li key={`${i + 1}-${s}`} className="park-skill-drawer__step">
                     <span className="park-skill-drawer__n">{i + 1}</span>
                     <span>{s}</span>
+                    {skill.details?.steps[i] ? (
+                      <span className="park-skill-chip">
+                        {skill.details.steps[i].tool} · {skill.details.steps[i].action}
+                      </span>
+                    ) : null}
                     {skill.fix?.asks[i] ? (
                       <span className="park-skill-chip park-skill-chip--amber">Asks you first</span>
                     ) : null}
@@ -168,6 +173,27 @@ export function SkillDrawer({
                 ))}
               </ol>
             </section>
+          ) : null}
+          {skill.details?.inputs.length ? (
+            <section className="park-skill-drawer__sec" aria-label="Inputs for this skill">
+              <h3 className="park-skill-drawer__h3">What you provide</h3>
+              <ul>
+                {skill.details.inputs.map((input) => (
+                  <li key={input.name}>
+                    {input.label}
+                    {input.required ? " (required)" : " (optional)"}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          {skill.details?.hosts.length ? (
+            <p className="park-skill-drawer__p">Approved sites: {skill.details.hosts.join(", ")}</p>
+          ) : null}
+          {skill.details?.estimatedCredits != null ? (
+            <p className="park-skill-drawer__p">
+              Estimated cost: {skill.details.estimatedCredits} credits per run
+            </p>
           ) : null}
           {fix}
           {skill.builtin ? null : (

@@ -32,6 +32,9 @@ export interface SkillRow {
   paused: boolean;
   plan: Step[];
   question: Question | null;
+  inputs?: SkillInput[];
+  hosts?: string[];
+  estimates?: { credits_per_run?: number } | null;
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
@@ -93,6 +96,26 @@ export function skillFromRow(r: SkillRow): Skill {
     tools: toolsOf(r.plan),
     used: [],
     steps: r.plan.map((s) => s.text),
+    details: {
+      steps: r.plan.map((s) => ({ tool: s.tool, action: s.action })),
+      inputs: Array.isArray(r.inputs)
+        ? r.inputs.filter(
+            (i) =>
+              isObject(i) &&
+              isText(i.name) &&
+              isText(i.label) &&
+              ["text", "file", "date", "person", "url", "number"].includes(i.kind) &&
+              typeof i.required === "boolean",
+          )
+        : [],
+      hosts: Array.isArray(r.hosts) ? r.hosts.filter(isText) : [],
+      estimatedCredits:
+        typeof r.estimates?.credits_per_run === "number" &&
+        Number.isFinite(r.estimates.credits_per_run) &&
+        r.estimates.credits_per_run >= 0
+          ? r.estimates.credits_per_run
+          : null,
+    },
     ...(Number.isInteger(r.version) && (r.version ?? 0) > 0
       ? {
           fix: {
