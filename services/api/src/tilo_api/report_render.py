@@ -5,6 +5,7 @@ import json
 import os
 import threading
 from collections.abc import Callable
+from datetime import UTC, date, datetime
 from typing import Literal, cast
 
 from starlette.concurrency import run_in_threadpool
@@ -31,22 +32,26 @@ def _render(spec: DeliverableSpec, fmt: str) -> bytes:
     return {"pdf": render_pdf, "docx": render_docx, "pptx": render_pptx, "xlsx": render_xlsx}[fmt](spec)
 
 
-def _plan(reply: str, fmt: str, template: bytes | None) -> tuple[Callable[[], bytes], str]:
+def _plan(reply: str, fmt: str, template: bytes | None, report_date: date) -> tuple[Callable[[], bytes], str]:
     """The validated reply as the work to do and the text the file says (for the redactor)."""
     if fmt == "xlsx" and template is not None:  # DOCS-OUT A4: the reply is cells for the person's own workbook
         fills = parse_fill(reply)
         return (lambda: fill_workbook(template, fills)), json.dumps({"cells": [f.model_dump() for f in fills]})
     # A workbook is made in process and has its own cell cap, so it takes the full spec, not the door's 1200 cells.
-    spec = (DeliverableSpec if fmt == "xlsx" else RequestDeliverableSpec).model_validate(parse_spec(reply).model_dump())
+    spec = (DeliverableSpec if fmt == "xlsx" else RequestDeliverableSpec).model_validate(
+        parse_spec(reply, report_date=report_date).model_dump()
+    )
     return (lambda: _render(spec, fmt)), spec.model_dump_json()
 
 
-async def render_report(reply: str, *, fmt: str = "pdf", template: bytes | None = None) -> RenderedPdf | RenderedOffice:
+async def render_report(
+    reply: str, *, fmt: str = "pdf", template: bytes | None = None, report_date: date | None = None
+) -> RenderedPdf | RenderedOffice:
     """The writer's reply as the file for `fmt`; with an uploaded workbook as `template` it is the cells to fill."""
     if fmt not in ("pdf", "pptx", "docx", "xlsx"):
         raise DeliverableRefused("render_failed")
     try:
-        build, spec_text = _plan(reply, fmt, template)
+        build, spec_text = _plan(reply, fmt, template, report_date or datetime.now(UTC).date())
     except Exception:
         raise DeliverableRefused("invalid_spec") from None
     if not _SLOTS.acquire(blocking=False):

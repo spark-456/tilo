@@ -191,6 +191,7 @@ class ToolUnitRunner:
             progress=context.progress,
         )
         holds_effects = not loop.tainted and any(self._tools.is_side_effect(tool) for tool in allowed.values())
+        today = self._today()
         base = load_prompt(
             role,
             prompt_name(unit, context),  # LW-10: a deliver unit for a file writes a spec (or, for a template, cells)
@@ -202,7 +203,7 @@ class ToolUnitRunner:
                 **request_variables(
                     context.brief,
                     context.intake_answers,
-                    today=self._today(),
+                    today=today,
                     decision=getattr(context, "decision", None),  # FR-HIL-10: the unit's own answer, as data
                 ),
             },
@@ -238,7 +239,7 @@ class ToolUnitRunner:
                         (
                             await self._report_renderer(response.text)
                             if self._report_renderer is not None
-                            else await asyncio.to_thread(render_output, response.text)
+                            else await asyncio.to_thread(render_output, response.text, report_date=today)
                         )
                         if wants_rendered(unit, context.brief)
                         else await asyncio.to_thread(quiz_output, response.text, self._quiz_sources)

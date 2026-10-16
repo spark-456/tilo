@@ -11,7 +11,7 @@ Keep to every limit. If a limit cannot be met, say so in one plain paragraph ins
 The object has exactly these keys and no others:
 - title: the report title (text, not empty).
 - subtitle: optional text.
-- date: an ISO date, YYYY-MM-DD, such as the date stated in the request or the latest date in the sources.
+- date: today's code-supplied ISO date, YYYY-MM-DD. The renderer stamps it from the clock even if this field differs.
 - tables: a list of tables, each {"id": "t1", "columns": ["Name", "Value"], "rows": [["A", 1], ["B", 2.5]]}. Ids are unique. Every row has one cell per column; a cell is text or a number, never null. At most 500 rows.
 - charts: a list of charts, each {"id": "c1", "kind": "bar" or "line" or "pie", "table_id": "t1", "x": "Name", "y": "Value", "title": "Chart title"}. A chart reads its data from the table it names: x and every y are columns of that table, y is a column name or a list of them (a pie takes one), and the y cells are numbers. At most 200 points.
 - sections: a list of at most 60 sections, each {"heading": "Heading", "blocks": [...]}. A block is one of {"type": "paragraph", "text": "..."}, {"type": "bullets", "bullets": ["...", "..."]}, {"type": "table", "table_id": "t1"} or {"type": "chart", "chart_id": "c1"}. A table or chart shows only where a block places it, and the id must exist.
@@ -21,6 +21,8 @@ The same object makes every file format, so write it the same way whichever the 
 Write every figure and claim from the data in the blocks below, and say where a source is missing instead of inventing one. Text is printed as plain text: do not write markup, HTML or code in it.
 
 $skills
+
+Today's date (from code): $today
 
 <<<REQUEST
 Goal: $goal
