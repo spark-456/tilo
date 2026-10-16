@@ -84,6 +84,13 @@ BAD = {
     "WS-02_c0": ("ws_encoding", page("<p>a\x1bb</p>")),
     "WS-02_no_doctype": ("ws_encoding", b"<html><body>x</body></html>"),
     "WS-04_base": ("ws_element", page(head='<base href="#x">')),
+    "WS-04_google_fonts_head": (
+        "ws_element",
+        page(
+            head='<link rel="preconnect" href="https://fonts.googleapis.com">'
+            '<link href="https://fonts.googleapis.com/css2?family=Inter&display=swap" rel="stylesheet">'
+        ),
+    ),
     "WS-04_link": ("ws_element", page(head='<link rel="stylesheet" href="#x">')),
     "WS-04_iframe": ("ws_element", page("<iframe></iframe>")),
     "WS-04_object": ("ws_element", page("<object></object>")),
