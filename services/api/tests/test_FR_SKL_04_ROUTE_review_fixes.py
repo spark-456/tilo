@@ -90,3 +90,67 @@ def test_FR_SKL_04_ROUTE_a_skill_name_cannot_close_the_fenced_block_of_the_tie_b
     assert len(sent) == 1
     assert sent[0].count("SKILLS>>>") == 1 and sent[0].count("<<<SKILLS") == 1  # only the template's own fence
     assert json.dumps(sent[0]).count("<<<TASK") == 1
+
+
+def test_FR_SKL_04_ROUTE_quick_finds_the_skill_inside_the_hold_and_prices_it_into_the_ask(quick_rig, monkeypatch):
+    import _costfast1_lib  # noqa: PLC0415
+    from tilo_api import quick  # noqa: PLC0415
+
+    timeline = []
+    embedder = Embedder({"competitor scan": vec(i1=1.0), "zq-rivals": vec(i1=1.0)})
+
+    def embed(self, request):
+        timeline.append("embed")
+        return embedder.embed(request)
+
+    commit = quick._Spend.commit
+
+    def committed(self, credits):
+        timeline.append("commit")
+        return commit(self, credits)
+
+    monkeypatch.setattr(_costfast1_lib.QuickProvider, "embed", embed)
+    monkeypatch.setattr(quick._Spend, "commit", committed)
+    body = quick_rig.ask("What is the capital of France? zq-rivals").json()
+    assert body["skill"]["id"] == "competitor-scan"
+    assert (
+        timeline and timeline[-1] == "commit" and set(timeline[:-1]) == {"embed"}
+    )  # every embedding before the commit
+    assert body["cost"]["credits"] > quick_rig.credits_for(400, 80)  # the answer's own price plus the embeddings'
+
+
+def test_FR_SKL_04_ROUTE_a_capped_caller_sends_no_embedding_and_a_call_is_priced_out_of_the_budget(repo_root):
+    provider = Embedder({**TOPICS, "zq-scan": vec(i1=1.0, i5=0.3)})
+    for left in (0.0, 1e-12):
+        ctx = context(repo_root, provider)
+        ctx.budget = left
+        assert ctx.best_for("zq-scan") is None and ctx.failed is True
+        assert provider.embedded == []  # refused before anything was sent
+    ctx = context(repo_root, provider)
+    ctx.budget = 5.0
+    assert ctx.best_for("zq-scan")["id"] == "competitor-scan" and ctx.failed is False
+    assert 0 < ctx.budget < 5.0  # the query and the descriptions were paid for from the ask's budget
+
+
+def test_FR_SKL_04_ROUTE_a_failed_match_is_not_remembered_as_no_match(clear_flow):
+    from tilo_api import tasks  # noqa: PLC0415
+
+    class Skills:
+        def __init__(self):
+            self.calls, self.failed, self.answer = 0, True, None
+
+        def best_for(self, text):
+            self.calls += 1
+            return self.answer
+
+    stub = Skills()
+    tasks._MATCHED.clear()
+    task_id = clear_flow.new_task()["task_id"]
+    task = clear_flow.store.tasks[task_id]
+    for _ in range(2):
+        tasks._matched(clear_flow.store, clear_flow.writer, task_id, task, stub)
+    assert stub.calls == 2  # a refusal or a transient failure is asked again
+    stub.failed = False
+    for _ in range(2):
+        tasks._matched(clear_flow.store, clear_flow.writer, task_id, task, stub)
+    assert stub.calls == 3  # a real "nothing fits" is remembered for this brief

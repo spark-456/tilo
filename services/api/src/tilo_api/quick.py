@@ -16,6 +16,7 @@ import threading
 import unicodedata
 import uuid
 import weakref
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -167,7 +168,14 @@ def _call(
 
 
 def _ask(
-    rules: QuickRules, router: Router, question: str, tally: _Tally, *, vet: bool, skills: str = ""
+    rules: QuickRules,
+    router: Router,
+    question: str,
+    tally: _Tally,
+    *,
+    vet: bool,
+    skills: str = "",
+    fit: Callable[[_Tally], dict[str, Any] | None] | None = None,
 ) -> dict[str, Any]:
     """The classifier call (when `vet`: the rules left this text to the model) and then the answer call."""
     data = neutralise_marker(question, "QUESTION")
@@ -185,6 +193,7 @@ def _ask(
         verdict = parse_verdict(reply)
         if verdict is None or verdict.kind == "work":  # no verdict is the offer `unclear`; a model never answers it
             return {"offer": verdict.reason if verdict else "unclear", "calls": calls}
+    found = fit(tally) if fit is not None else None  # SKILL-ROUTE: priced out of this ask's budget, before the answer
     request = GenerateRequest(
         system=load_prompt("assistant", "quick_answer_system.md"),
         prompt=load_prompt("assistant", "quick_answer_task.md", {"question": data, "skills": skills}),
@@ -192,7 +201,7 @@ def _ask(
         max_output_tokens=rules.answer_max_output_tokens,
     )
     reply, made = _call(router, rules, request, tally)
-    return {"text": _plain(reply)[: rules.answer_max_chars], "calls": calls + made}
+    return {"text": _plain(reply)[: rules.answer_max_chars], "calls": calls + made, "skill": found}
 
 
 def _plain(reply: str) -> str:
@@ -243,10 +252,15 @@ def respond(
         raise QuickRefusal(503, "not_configured") from None
     verdict = classify(rules, text, max_chars=max_chars, has_files=has_files, scenario=scenario is not None)
 
-    def tag(body: dict[str, Any]) -> dict[str, Any]:
-        """SKILL-ROUTE: the skill that fits, for a "Run with skill" chip; absent when none does (inside the hold)."""
-        found = None if skills is None else skills.match(question)
-        return body if found is None else {**body, "skill": found}
+    def fit(tally: _Tally) -> dict[str, Any] | None:
+        """SKILL-ROUTE: the skill that fits, for a "Run with skill" chip, found INSIDE this ask's hold: its embedding is
+        priced out of the ask's budget (`tally.left`) before the hold is committed, and a spent budget sends none."""
+        if skills is None:
+            return None
+        skills.budget = tally.left
+        found = skills.best_for(question)
+        tally.left = min(tally.left, skills.budget)
+        return found
 
     if verdict.kind == "work":
         return _offer(verdict.reason)  # decided by rules: no model, no cost, nothing stored; so no skill is looked for
@@ -275,6 +289,7 @@ def respond(
                 tally,
                 vet=verdict.kind == "model",
                 skills="" if skills is None else skills.block(),
+                fit=fit,
             )
         except BaseException:
             held.commit(tally.spent) if tally.spent > 0 else held.release()  # billed stays charged
@@ -283,9 +298,10 @@ def respond(
         held.commit(tally.spent)
         record(tally)
         if "offer" in done:
-            return tag(_offer(done["offer"]))
+            return _offer(done["offer"])
         cost = {"model_calls": done["calls"], "credits": float(tally.spent), "saved_credits": 0.0}
-        return tag({"mode": "quick", "outcome": "answered", "text": done["text"], "cost": cost})
+        answer = {"mode": "quick", "outcome": "answered", "text": done["text"], "cost": cost}
+        return answer if done.get("skill") is None else {**answer, "skill": done["skill"]}
 
     if key is None:
         return make()
