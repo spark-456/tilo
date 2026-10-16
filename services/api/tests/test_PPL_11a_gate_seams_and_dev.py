@@ -102,6 +102,7 @@ def test_PPL_11a_SEC_15_the_people_routes_exist_and_none_of_them_is_public(peopl
                 ("GET", "/healthz/deps"),
                 ("GET", "/access"),
                 ("POST", "/access/declaration"),
+                ("GET", "/preview/website"),  # ADR-0050 (WS-10): the owner's yes, 16 Oct; the fixed preview shell
                 # FR-AGT-14b: the Scheduler tick checks its own OIDC caller; the owner approved this one route (6 Oct).
                 ("POST", "/internal/schedules/tick"),
                 # ADR-0042 (BQ-M2-5): the meeting bot's two meter routes, inert until TILO_VOICE_METER=1.

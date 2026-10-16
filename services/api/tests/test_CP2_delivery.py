@@ -23,7 +23,8 @@ def test_CP2_delivery_returns_the_tilo_client_delivery_result(run_flow):
     assert body["world_id"] == run_flow.world_id
     delivered = run_flow.events("artifact.delivered")
     completed = run_flow.events("world.completed")[0]["data"]
-    assert [set(a) for a in body["artifacts"]] == [ARTIFACT_KEYS] * len(delivered)
+    extra = {"media_type", "content_sha256"}  # WEB-2 (WS-11): the version record's type and hash, when recorded
+    assert [set(a) - extra for a in body["artifacts"]] == [ARTIFACT_KEYS] * len(delivered)
     assert [(a["id"], a["version"], a["kind"]) for a in body["artifacts"]] == [
         (e["data"]["artifact"]["artifact_id"], e["data"]["artifact"]["version"], e["data"]["format"]) for e in delivered
     ]

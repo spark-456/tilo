@@ -441,6 +441,7 @@ def test_SEC_15_SIGNIN_the_gate_has_the_same_public_routes_as_before():
         ("GET", "/healthz/deps"),  # Supervisor SEC15-HEALTH: leak-free alias of the public configuration inventory.
         ("GET", "/access"),
         ("POST", "/access/declaration"),
+        ("GET", "/preview/website"),  # ADR-0050 (WS-10): the owner's yes, 16 Oct; the fixed preview shell
         ("POST", "/internal/schedules/tick"),
         # ADR-0042: default-off meter routes check their own OIDC token, audience, caller and nonce.
         ("POST", "/internal/meeting-voice/reserve"),
