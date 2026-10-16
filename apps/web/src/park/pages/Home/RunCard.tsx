@@ -1,12 +1,13 @@
 // SIMPLE-RUN-1: the one confirm card of the one-step start. It is the composer's plan card with the server's own
 // words in it: the goal, what Tilo assumed in place of asking (each line can be changed), the price and one Start
 // button. The person's click is the budget approval. Presentation only: the calls are HomePage's.
-import type { PlanMakeChoice } from "@tilo/contracts";
 import { useEffect, useState } from "react";
 import type { Cadence, RunPlan } from "../../api/oneStep";
 import { AppLink } from "../../shared/AppLink";
 import { BudgetBar } from "./BudgetBar";
 import { useRepeatWeekly } from "./RepeatWeekly";
+
+type PlanMakeChoice = RunPlan["makeChoices"][number];
 
 export interface RunCardProps {
   readonly plan: RunPlan;

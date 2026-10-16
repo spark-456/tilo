@@ -523,8 +523,9 @@
   border: 2px dashed var(--bpInk);
   border-radius: inherit;
   background-color: var(--bp);
-  background-image: linear-gradient(var(--bpLine) 1px, transparent 1px),
-    linear-gradient(90deg, var(--bpLine) 1px, transparent 1px);
+  --bp-grid-v: linear-gradient(var(--bpLine) 1px, transparent 1px);
+  --bp-grid-h: linear-gradient(90deg, var(--bpLine) 1px, transparent 1px);
+  background-image: var(--bp-grid-v), var(--bp-grid-h);
   background-size: 16px 16px;
   color: var(--bpInk);
   font-family: var(--mono);
