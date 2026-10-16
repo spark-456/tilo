@@ -234,6 +234,7 @@ export function displayApiError(error: unknown): string {
     not_hostable: "This meeting cannot be hosted.",
     not_joinable: "This meeting cannot be joined right now.",
     not_publishable: "This skill is not ready to publish.",
+    not_ready: "This is not ready yet. Ask Tilo to make it, or try again in a moment.",
     not_text: "Only text can be used here.",
     not_understood: "Tilo could not understand this request. Check it and try again.",
     outbox_unavailable: "Pending deliveries are unavailable right now.",
