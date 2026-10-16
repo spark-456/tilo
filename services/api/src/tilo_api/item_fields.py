@@ -143,6 +143,22 @@ def shown_document(raw: bytes, recipients: object) -> dict[str, Any] | None:
     if kind == "file" and isinstance(parsed.get("origin"), dict) and parsed["origin"].get("kind") == "render":
         out["origin"] = {"kind": "render"}
     guests = parsed.get("attendees")
+    reminders = parsed.get("reminders")
+    if kind == "calendar_event" and reminders is not None:
+        if (
+            not isinstance(reminders, list)
+            or len(reminders) > 5
+            or any(
+                not isinstance(row, dict)
+                or set(row) != {"method", "minutes"}
+                or row["method"] not in ("popup", "email")
+                or type(row["minutes"]) is not int
+                or not 0 <= row["minutes"] <= 40320
+                for row in reminders
+            )
+        ):
+            return None
+        out["reminders"] = reminders
     if kind == "calendar_event" and guests is not None:
         if not (
             isinstance(guests, list) and len(guests) <= 50 and all(isinstance(g, str) and len(g) <= 254 for g in guests)

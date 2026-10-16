@@ -1006,7 +1006,10 @@ class Run:
                 log_caught(exc, __name__, locals())
                 raise _GateFailed("the item to send is not in the run's store") from exc
             origin = {"kind": stored["origin"]["kind"]}
+            reminder = action == "create_event" and unit.get("unit_type") in ("reminder", "reminder_email")
             try:
+                if reminder:
+                    fields = item_documents.reminder_fields(fields, email=unit["unit_type"] == "reminder_email")
                 while isinstance(
                     built := item_documents.build_document(
                         action,
@@ -1018,7 +1021,10 @@ class Run:
                     ),
                     item_documents.Needs,
                 ):
-                    fields |= await self._ask_fields(unit, worker, action, built.fields)
+                    missing = tuple(name for name in built.fields if name != "end") if reminder else built.fields
+                    fields |= await self._ask_fields(unit, worker, action, missing)
+                    if reminder:
+                        fields = item_documents.reminder_fields(fields, email=unit["unit_type"] == "reminder_email")
             except item_documents.DocumentRefused as exc:
                 raise _GateFailed(exc.reason) from None
             parent = {"artifact_id": body["artifact_id"], "version": self.recorded_version(body["artifact_id"])}
@@ -1105,6 +1111,8 @@ class Run:
         asked = fields if isinstance(fields, Mapping) else {}
         try:
             got = item_documents.check_fields(action, {k: v for k, v in asked.items() if k != "recipient"})
+            if "event_id" in asked and action == "update_event":
+                got["event_id"] = side_effect_fields.check_event_id(asked["event_id"])
             if "recipient" in asked:
                 got["recipient"] = side_effect_fields.check_recipient(action, asked["recipient"])
         except item_documents.DocumentRefused as exc:

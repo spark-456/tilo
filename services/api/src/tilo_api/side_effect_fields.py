@@ -31,6 +31,7 @@ _ADDRESS = re.compile(
     r"@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}"
 )
 _DOCUMENT_FIELDS = frozenset({"subject", "name", "title", "start", "end", "time_zone", "mime_type"})
+_EVENT_ID = re.compile(r"[A-Za-z0-9_-]{1,1024}\Z")
 
 
 class Missing(Exception):
@@ -156,6 +157,12 @@ def check_recipient(action: str, text: Any) -> str:
     return ", ".join(parse_addresses(text, cap=rule.cap, max_length=_max_length()))
 
 
+def check_event_id(value: Any) -> str:
+    if not isinstance(value, str) or not _EVENT_ID.fullmatch(value):
+        raise DocumentRefused("the event id must be a plain Google Calendar id")
+    return value
+
+
 def make_resolver(
     rules: Mapping[str, Rule] | None = None,
 ) -> Callable[..., dict[str, Any]]:
@@ -192,7 +199,13 @@ def make_resolver(
                 except DocumentRefused:
                     continue  # not usable as this field: the person is asked instead
         fields |= {k: v for k, v in supplied.items() if k != RECIPIENT and k in _DOCUMENT_FIELDS}
-        return {"destination": None, "recipients": recipients, "known_recipients": [], "fields": fields}
+        destination = None
+        if action_type == "update_event":
+            try:
+                destination = check_event_id(supplied.get("event_id"))
+            except DocumentRefused as exc:
+                raise Missing(("event_id",), exc.reason) from None
+        return {"destination": destination, "recipients": recipients, "known_recipients": [], "fields": fields}
 
     resolve.takes_answers = True  # type: ignore[attr-defined]  # the run passes the person's answers only to this one
     return resolve

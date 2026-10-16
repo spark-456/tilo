@@ -21,6 +21,14 @@ const plate = {
       group: "today",
     },
     {
+      ref: { kind: "calendar_entry", id: "reminder-1" },
+      title: "Pay bill",
+      at: "2026-10-15T09:00:00Z",
+      due: null,
+      from: null,
+      group: "today",
+    },
+    {
       ref: { kind: "pin", id: "p1" },
       title: "Send the quote",
       at: null,
@@ -61,6 +69,13 @@ it("STUDIO_5 agenda live: today and the plate on the left, brief and suggestions
   expect(side?.querySelector('[aria-label="Available times"]')?.textContent).toContain(
     "Tilo suggests",
   );
+});
+
+it("WORKSPACE_TOOLS_WT08 Agenda shows a reminder only after the synced calendar row arrives", async () => {
+  const { container } = await mount();
+  const today = container.querySelector('[aria-label="Today\'s calendar"]');
+  expect(today?.textContent).toContain("Pay bill");
+  expect(today?.querySelector('time[datetime="2026-10-15T09:00:00Z"]')).not.toBeNull();
 });
 
 it("STUDIO_5 agenda live: no invented brief, suggestion or button without a read behind it", async () => {

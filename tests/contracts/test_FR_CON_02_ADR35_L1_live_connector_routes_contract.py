@@ -248,7 +248,7 @@ def test_FR_CON_02_ADR35_L1_google_calendar_declares_create_event_T1_and_create_
     }
     assert decl["capabilities"] == ["read", "write", "send"]
     rows = {a["id"]: a for a in decl["actions"]}
-    assert list(rows) == ["read_events", "create_event", "create_event_with_guests"]
+    assert list(rows) == ["read_events", "create_event", "update_event", "create_event_with_guests"]
     assert (rows["create_event"]["capability"], rows["create_event"]["risk_tier"]) == ("write", "T1")
     assert (rows["create_event"]["gate_type"], rows["create_event"]["irreversible"]) == ("approval", False)
     guests = rows["create_event_with_guests"]
@@ -263,3 +263,15 @@ def test_FR_CON_02_ADR35_L1_the_tier_table_lists_both_calendar_writes_and_a_pers
     table = _yaml("config", "autonomy.yaml")
     assert table["actions"]["create_event"] == "T1" and table["actions"]["create_event_with_guests"] == "T3"
     assert table["max_level"]["T3"] == "L1", "T3 runs at L1 only: a person decides"
+
+
+def test_WORKSPACE_TOOLS_WT08_calendar_update_is_t2_approved_and_reversible():
+    rows = {a["id"]: a for a in _declared("google_calendar")["actions"]}
+    update = rows["update_event"]
+    assert (update["capability"], update["risk_tier"], update["gate_type"], update["irreversible"]) == (
+        "write",
+        "T2",
+        "approval",
+        False,
+    )
+    assert _yaml("config", "autonomy.yaml")["actions"]["update_event"] == "T2"

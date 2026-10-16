@@ -16,15 +16,15 @@ import re
 import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 KIND_OF = {  # action type -> the kind of document its connector parses
     "create_draft": "email", "send_email": "email", "save_file": "file", "save_as_google_file": "file",
-    "create_event": "calendar_event", "create_event_with_guests": "calendar_event",
+    "create_event": "calendar_event", "create_event_with_guests": "calendar_event", "update_event": "calendar_event",
 }  # fmt: skip
 NO_RECIPIENT_ACTIONS = frozenset(
-    {"save_file", "save_as_google_file", "create_event"}
+    {"save_file", "save_as_google_file", "create_event", "update_event"}
 )  # they reach no one but the owner
 ORDER = ("email", "file", "calendar_event")  # a stable index per kind (an artifact key)
 MAX_DOCUMENT = 32_768  # decoded bytes of one item: the execute contract's content_b64 maxLength (43692) is its base64
@@ -81,13 +81,13 @@ def _moment(field: str, value: Any) -> str:
     return text
 
 
-def check_fields(action: str, fields: Mapping[str, Any]) -> dict[str, str]:
+def check_fields(action: str, fields: Mapping[str, Any]) -> dict[str, Any]:
     """The declared fields that belong to this action's document, each validated; DocumentRefused on a bad one.
     An absent or blank required field is simply not in the result (`build_document` then says what is needed)."""
     kind, out = KIND_OF.get(action), {}
     if kind is None:
         raise DocumentRefused("this action has no document to build")
-    if action == "create_event" and (fields.get("attendees") or fields.get("guests")):
+    if action in ("create_event", "update_event") and (fields.get("attendees") or fields.get("guests")):
         raise DocumentRefused(NO_GUESTS)
     for name in (*_REQUIRED[kind], *({"email": _HEADERS, "file": ("mime_type",)}.get(kind, ()))):
         value = fields.get(name)
@@ -115,6 +115,38 @@ def check_fields(action: str, fields: Mapping[str, Any]) -> dict[str, str]:
                 raise DocumentRefused("the name has a slash")
         else:
             out[name] = _plain(name, value, limit=998 if name in _HEADERS else MAX_TEXT)
+    if kind == "calendar_event" and "reminders" in fields:
+        reminders = fields["reminders"]
+        if (
+            not isinstance(reminders, list)
+            or len(reminders) > 5
+            or any(
+                not isinstance(row, dict)
+                or set(row) != {"method", "minutes"}
+                or row["method"] not in ("popup", "email")
+                or type(row["minutes"]) is not int
+                or not 0 <= row["minutes"] <= 40320
+                for row in reminders
+            )
+        ):
+            raise DocumentRefused("reminders need at most five popup or email entries from 0 to 40320 minutes")
+        out["reminders"] = [{"method": row["method"], "minutes": row["minutes"]} for row in reminders]
+    return out
+
+
+def reminder_fields(fields: Mapping[str, Any], *, email: bool = False) -> dict[str, Any]:
+    """A Director reminder unit is an ordinary own-calendar create, 15 minutes at the supplied start."""
+    out = dict(fields)
+    out["reminders"] = [{"method": "popup", "minutes": 0}]
+    if email:
+        out["reminders"].append({"method": "email", "minutes": 0})
+    if start := out.get("start"):
+        try:
+            moment = datetime.fromisoformat(_moment("start", start).replace("Z", "+00:00"))
+            end = (moment + timedelta(minutes=15)).isoformat()
+        except OverflowError:
+            raise DocumentRefused("the reminder time is out of range") from None
+        out["end"] = end.replace("+00:00", "Z") if start.endswith("Z") else end
     return out
 
 
@@ -139,6 +171,8 @@ def build_document(
     ):  # connectors would take the subject from the thread
         raise DocumentRefused("a reply must name the message it answers, so the subject sent is the one approved")
     document: dict[str, Any] = {"kind": kind, **{name: declared[name] for name in _REQUIRED[kind]}}
+    if kind == "calendar_event" and "reminders" in declared:
+        document["reminders"] = declared["reminders"]
     if kind == "email":
         try:
             document["body_text"] = bytes(body).decode("utf-8")

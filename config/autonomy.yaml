@@ -59,6 +59,7 @@ actions:
   build_handoff: T3
   create_meeting_event: T3
   create_event: T1
+  update_event: T2
   create_event_with_guests: T3
   org_model_key_change: T3
 modifiers:

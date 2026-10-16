@@ -84,6 +84,38 @@ def test_ADR35_L6b_FR_CON_02_a_missing_or_blank_field_is_needs_never_taken_from_
     )  # the body's first line is "# Quarterly note": it never becomes the subject
 
 
+def test_WORKSPACE_TOOLS_WT08_calendar_reminders_are_pinned_and_bounded():
+    reminders = [{"method": "popup", "minutes": 0}, {"method": "email", "minutes": 40320}]
+    assert parsed("create_event", make("create_event", {**EVENT, "reminders": reminders}))["reminders"] == reminders
+    assert parsed("update_event", make("update_event", {**EVENT, "reminders": reminders}))["reminders"] == reminders
+    for bad in (
+        [{"method": "sms", "minutes": 1}],
+        [{"method": "popup", "minutes": True}],
+        [{"method": "popup", "minutes": -1}],
+        [{"method": "popup", "minutes": 40321}],
+        [{"method": "popup", "minutes": 0}] * 6,
+    ):
+        with pytest.raises(DocumentRefused, match="reminder"):
+            make("create_event", {**EVENT, "reminders": bad})
+
+
+def test_WORKSPACE_TOOLS_WT08_remind_me_is_a_fifteen_minute_own_event_with_popup_zero():
+    from tilo_api.item_documents import reminder_fields
+
+    fields = reminder_fields({"title": "Pay bill", "start": "2026-10-12T09:00:00Z", "time_zone": "Asia/Kolkata"})
+    assert fields == {
+        "title": "Pay bill",
+        "start": "2026-10-12T09:00:00Z",
+        "end": "2026-10-12T09:15:00Z",
+        "time_zone": "Asia/Kolkata",
+        "reminders": [{"method": "popup", "minutes": 0}],
+    }
+    assert reminder_fields(fields, email=True)["reminders"] == [
+        {"method": "popup", "minutes": 0},
+        {"method": "email", "minutes": 0},
+    ]
+
+
 def test_ADR35_L6b_FR_CON_02_the_same_inputs_make_the_same_bytes_and_hash():
     first, second = make("send_email", EMAIL), make("create_draft", dict(reversed(EMAIL.items())))
     assert first == second and hashlib.sha256(first).hexdigest() == hashlib.sha256(second).hexdigest()

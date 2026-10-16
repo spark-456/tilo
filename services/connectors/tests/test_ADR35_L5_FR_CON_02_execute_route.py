@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 from _gapi_lib import DRIVE_ALL, GMAIL_ALL, FakeGoogleApis, b64url_decode, parse_raw
 from _live_lib import no_external_network as no_external_network  # noqa: F401 - autouse guard
-from _meeting_host_lib import CALENDAR_EVENTS_OWNED, EVENTS_URL, OWNER, FakeHostCalendar
+from _meeting_host_lib import CALENDAR_EVENTS_OWNED, EVENTS_URL, OWNER, FakeApiResponse, FakeHostCalendar
 from test_ADR32_T3_host_routes import AUD, CALLER, HARNESS, Rig
 from tilo_connectors.adapters import GMAIL_API, side_effect_marker
 from tilo_connectors.host_routes import AUDIENCE_VAR, CALLER_VAR, MAX_BODY_BYTES
@@ -301,6 +301,99 @@ def test_ADR35_L5_FR_CON_02_create_event_is_events_insert_on_the_own_primary_cal
         "end": {"dateTime": END, "timeZone": ZONE}, "guestsCanInviteOthers": False, "guestsCanModify": False,
     }  # fmt: skip
     assert rig.cal.invitations() == [] and rig.apis.requests == []
+
+
+def test_WORKSPACE_TOOLS_WT08_create_event_sends_only_pinned_reminders() -> None:
+    rig, (entry, body) = Rig5(), the_event(reminders=[{"method": "popup", "minutes": 0}])
+    sent_ok(rig.run(body), entry)
+    assert rig.cal.posts()[0].json["reminders"] == {
+        "useDefault": False,
+        "overrides": [{"method": "popup", "minutes": 0}],
+    }
+
+
+@pytest.mark.parametrize(
+    "reminders",
+    [
+        [{"method": "sms", "minutes": 0}],
+        [{"method": "popup", "minutes": True}],
+        [{"method": "popup", "minutes": 0}] * 6,
+    ],
+)
+def test_WORKSPACE_TOOLS_WT08_bad_reminders_refused_before_google(reminders: list[dict]) -> None:
+    rig = Rig5()
+    assert rig.run(the_event(reminders=reminders)[1])["outcome"] == "refused"
+    assert rig.google.reached() == 0
+
+
+def update_request(destination: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    entry, body = the_event(reminders=[{"method": "popup", "minutes": 5}])
+    entry.update(
+        action_type="update_event",
+        destination=destination,
+        risk_tier="T2",
+        idempotency_key="r_followups_1:U4:update_event:1",
+    )
+    body["evidence"]["reserved_by"]["data"].update(action_type="update_event", risk_tier="T2")
+    return entry, body
+
+
+def test_WORKSPACE_TOOLS_WT08_update_event_reads_own_guestless_event_then_patches_once(monkeypatch) -> None:
+    rig = Rig5()
+    original = rig.cal.request
+    patches = []
+
+    def request(method, url, **kw):
+        if method == "PATCH":
+            patches.append((url, kw))
+            return FakeApiResponse(200, {"id": url.rsplit("/", 1)[-1]})
+        if method == "GET":
+            return FakeApiResponse(
+                200,
+                {
+                    "id": url.rsplit("/", 1)[-1],
+                    "status": "confirmed",
+                    "organizer": {"self": True},
+                    "attendees": [{"self": True}],
+                },
+            )
+        return original(method, url, **kw)
+
+    monkeypatch.setattr(rig.cal, "request", request)
+    entry, body = update_request("own-event-1")
+    assert sent_ok(rig.run(body), entry) == "own-event-1"
+    assert len(patches) == 1
+    url, kw = patches[0]
+    assert url == f"{EVENTS_URL}/own-event-1"
+    assert kw["params"]["sendUpdates"] == "none"
+    assert kw["json"] == {
+        "summary": TITLE,
+        "start": {"dateTime": START, "timeZone": ZONE},
+        "end": {"dateTime": END, "timeZone": ZONE},
+        "reminders": {"useDefault": False, "overrides": [{"method": "popup", "minutes": 5}]},
+        "extendedProperties": {"private": {"tilo_update": side_effect_marker(entry)}},
+    }
+
+
+@pytest.mark.parametrize(
+    "event",
+    [
+        {"status": "confirmed", "organizer": {"self": False}, "attendees": []},
+        {"status": "cancelled", "organizer": {"self": True}, "attendees": []},
+        {"status": "tentative", "organizer": {"self": True}, "attendees": [{"email": GUEST}]},
+    ],
+)
+def test_WORKSPACE_TOOLS_WT08_update_event_refuses_foreign_cancelled_or_guest_event(monkeypatch, event) -> None:
+    rig = Rig5()
+    calls = []
+
+    def request(method, url, **kw):
+        calls.append(method)
+        return FakeApiResponse(200, {"id": "own-event-1", **event})
+
+    monkeypatch.setattr(rig.cal, "request", request)
+    assert rig.run(update_request("own-event-1")[1])["outcome"] == "refused"
+    assert calls == ["GET"]
 
 
 @pytest.mark.parametrize("more", [{"attendees": [GUEST]}, {"guests": [GUEST]}, {"attendees": "x"}])

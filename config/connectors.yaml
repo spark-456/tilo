@@ -76,6 +76,7 @@
   actions:
     - {id: read_events, capability: read, description: "Read the events on your own calendar to show them in Tilo.", risk_tier: T1, gate_type: none, irreversible: false}
     - {id: create_event, capability: write, description: "Add an event with no guests to your own Google Calendar.", risk_tier: T1, gate_type: approval, irreversible: false}
+    - {id: update_event, capability: write, description: "Change an event you organised on your own Google Calendar when it has no other attendees.", risk_tier: T2, gate_type: approval, irreversible: false}
     - {id: create_event_with_guests, capability: send, description: "Add an event to your own Google Calendar and invite guests; Google emails them.", risk_tier: T3, gate_type: approval, irreversible: true}
   limits: {per_minute: 60, batch_size: 2500}
   data_class: {returns: [personal, business], redact: []}

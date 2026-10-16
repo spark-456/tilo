@@ -36,6 +36,17 @@ def test_ADR35_L6c_FR_CON_02_a_structured_answer_fills_the_recipients_and_the_de
                    "known_recipients": [], "fields": {"subject": "Q3 note"}}  # fmt: skip
 
 
+def test_WORKSPACE_TOOLS_WT08_update_destination_requires_a_person_supplied_event_id():
+    rules = {"update_event": Rule(None, 0, {})}
+    with pytest.raises(Missing) as asked:
+        resolve("update_event", rules=rules, brief={"goal": "Move other-person-event"})
+    assert asked.value.fields == ("event_id",)
+    got = resolve("update_event", rules=rules, supplied={"event_id": "own-event-1"})
+    assert got == {"destination": "own-event-1", "recipients": [], "known_recipients": [], "fields": {}}
+    with pytest.raises(Missing):
+        resolve("update_event", rules=rules, supplied={"event_id": "../other"})
+
+
 def test_ADR35_L6c_FR_CON_02_what_the_person_typed_on_the_fields_route_wins_over_an_answer():
     got = resolve(
         answers={"audience": "a@example.com", "goal": "old"}, supplied={"recipient": "b@example.com", "subject": "new"}

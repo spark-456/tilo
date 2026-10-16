@@ -38,12 +38,12 @@ class Live:
     """A run of one unit that drafts and then sends by the live stub over the real connectors route."""
 
     def __init__(self, repo_root, *, actions=("create_draft", "send_email"), fields=None, destination=None,
-                 connector="gmail", recipients=(NEW_RECIPIENT,)):  # fmt: skip
+                 connector="gmail", recipients=(NEW_RECIPIENT,), unit_type=None):  # fmt: skip
         self.rf = rf = build_run_flow(repo_root, covered=True)
         self.google = FakeGoogle()
         self.connectors = InProcessConnectors5(self.google, clock=events.now)
         self.fields, self.destination, self.actions = fields or {}, destination, actions
-        self.connector, self.recipients = connector, list(recipients)
+        self.connector, self.recipients, self.unit_type = connector, list(recipients), unit_type
         rf.registry = (
             ConnectorRegistry({"gmail": load_json("contracts", "fixtures", "connector", "valid", "gmail.json")})
             if connector == "gmail" else deps.get_connector_registry()
@@ -60,6 +60,8 @@ class Live:
     def compile_plan(self, *, brief, approach, budget_cap, context=None):
         plan = base_plan(approach["id"], budget_cap)
         plan["units"][3] |= {"connectors": [self.connector], "actions": list(self.actions)}
+        if self.unit_type:
+            plan["units"][3]["unit_type"] = self.unit_type
         tiers = {"create_draft": "T1", "send_email": "T3", "create_event": "T1", "save_file": "T1"}
         plan["gates"] = [
             {"id": f"G{n}", "action_type": a, "risk_tier": tiers[a], "guards": ["U4"], "policy_ref": None}
@@ -280,6 +282,29 @@ def test_ADR35_L6b_FR_CON_02_an_event_needs_no_recipient_and_lands_on_the_own_ca
     wait_for(lambda: lv.rf.events("world.completed"), what="world.completed")
     (made,) = lv.google.events.values()
     assert made["summary"] == "Review" and "attendees" not in made
+
+
+def test_WORKSPACE_TOOLS_WT08_reminder_unit_pins_15_minute_popup_before_approval(live):
+    lv = live(
+        connector="google_calendar",
+        actions=("create_event",),
+        fields={"title": "Pay bill", "start": "2026-10-12T09:00:00Z", "time_zone": "Asia/Kolkata"},
+        destination="primary",
+        recipients=(),
+        unit_type="reminder",
+    )
+    lv.start()
+    card = lv.gate_card("create_event")
+    document = json.loads(lv.read(card["gate"]["action"]["item"]))
+    assert document == {
+        "kind": "calendar_event",
+        "title": "Pay bill",
+        "start": "2026-10-12T09:00:00Z",
+        "end": "2026-10-12T09:15:00Z",
+        "time_zone": "Asia/Kolkata",
+        "reminders": [{"method": "popup", "minutes": 0}],
+    }
+    assert lv.google.reached() == 0 and lv.rf.outbox_store.all_entries() == []
 
 
 def test_ADR35_L6b_FR_CON_02_guests_on_create_event_fail_the_step_with_a_reason_before_any_card(live):

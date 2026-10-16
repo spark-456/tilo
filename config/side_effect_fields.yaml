@@ -16,10 +16,12 @@ labels:
   start: {label: "Starts", hint: "Date and time like 2026-10-12T09:00:00Z.", max_length: 40}
   end: {label: "Ends", hint: "Date and time like 2026-10-12T09:30:00Z.", max_length: 40}
   time_zone: {label: "Time zone", hint: "A time zone name like Asia/Kolkata.", max_length: 64}
+  event_id: {label: "Event ID", hint: "The id of an event on your Google Calendar with no other attendees.", max_length: 1000}
 actions:
   create_draft: {recipient: {answer: audience, max: 10}, fields: {}}
   send_email: {recipient: {answer: audience, max: 10}, fields: {}}
   create_event_with_guests: {recipient: {answer: audience, max: 10}, fields: {}}
   create_event: {fields: {}}
+  update_event: {fields: {}}
   save_file: {fields: {}}
   save_as_google_file: {fields: {}}

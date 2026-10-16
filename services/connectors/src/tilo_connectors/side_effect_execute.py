@@ -9,7 +9,8 @@ log line (a failure logs its exception type).
 
 Item documents (BQ-ADR35L5-1): the decoded bytes of the entry's item and of each attachment are UTF-8 JSON with a
 `kind`: `email` {subject, body_text, in_reply_to?, references?}, `file` {name, mime_type, content_b64, origin?},
-`calendar_event` {title, start, end, time_zone, attendees?}. The adapters read them through `_Documents`.
+`calendar_event` {title, start, end, time_zone, attendees?, reminders?}. The adapters read them through `_Documents`;
+calendar_write validates the bounded reminder overrides before any Google request (WT-08).
 """
 
 from __future__ import annotations
