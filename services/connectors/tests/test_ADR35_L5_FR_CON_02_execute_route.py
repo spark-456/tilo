@@ -366,6 +366,8 @@ def test_WORKSPACE_TOOLS_WT08_update_event_reads_own_guestless_event_then_patche
     url, kw = patches[0]
     assert url == f"{EVENTS_URL}/own-event-1"
     assert kw["params"]["sendUpdates"] == "none"
+    get = rig.cal.gets()[0]
+    assert get.params["fields"] == "id,status,organizer(self),attendees(self),extendedProperties(private)"
     assert kw["json"] == {
         "summary": TITLE,
         "start": {"dateTime": START, "timeZone": ZONE},
