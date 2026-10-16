@@ -11,6 +11,8 @@ import "../tokens/park.opaque.css";
 import "../tokens/themes.css";
 import "../studio/fonts";
 import "../studio/studio.css";
+import { DoodleGutter } from "../../design/tilo-t/DoodleGutter";
+import "../../design/tilo-t/styles"; // TILO-T-FOUNDATION: tokens, Geist, keyframes, easing, reduced-motion
 import { themeFor } from "../tokens/themes";
 import { PAGE_LABEL } from "./AppCtx";
 import { NotFound } from "./NotFound";
@@ -116,6 +118,7 @@ function Shell({ routed }: { routed?: RoutedView | undefined }) {
         data-motion={app.motion}
         data-theme={themeFor(app.prefs.theme)}
       >
+        {themeFor(app.prefs.theme) === "studio" ? <DoodleGutter /> : null}
         <AppShell>
           <Suspense fallback={null}>
             {routed ? (
