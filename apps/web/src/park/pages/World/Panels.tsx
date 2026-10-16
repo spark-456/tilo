@@ -1,17 +1,26 @@
 // STUDIO-3 (design/studio-v2 "Tilo S World.dc.html"): the three tabs beside the city. Story is what the team did, in
 // plain words from the recorded events; Steps is the plan in order; Result is the delivered output. A tab with
 // nothing recorded says so; nothing here moves or is filled in.
-import { type KeyboardEvent, type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { cx } from "../../components/cx";
 import { type RunStep, clockOf, runSteps, storyOf } from "./runSteps";
 import type { RunEvent } from "./useRunEvents";
 
-export type WorldTab = "story" | "steps" | "result";
+export type WorldTab = "story" | "steps" | "result" | "chat";
 const TABS: readonly (readonly [WorldTab, string])[] = [
   ["story", "Story"],
   ["steps", "Steps"],
   ["result", "Result"],
 ];
+/** TILO-T-WORLD: a real run with a stage also has its Chat (the agents talking), after the three. */
+const CHAT: readonly [WorldTab, string] = ["chat", "Chat"];
 export const tabId = (t: WorldTab): string => `park-world-tab-${t}`;
 export const panelId = (t: WorldTab): string => `park-world-panel-${t}`;
 
@@ -20,24 +29,27 @@ export function WorldTabs({
   on,
   onPick,
   counts,
+  chat = false,
 }: {
   on: WorldTab;
   onPick: (t: WorldTab) => void;
   counts: Partial<Record<WorldTab, string>>;
+  chat?: boolean;
 }) {
+  const tabs = chat ? [...TABS, CHAT] : TABS;
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   const move = (e: KeyboardEvent<HTMLButtonElement>, at: number) => {
     const to =
       e.key === "ArrowRight"
-        ? (at + 1) % TABS.length
+        ? (at + 1) % tabs.length
         : e.key === "ArrowLeft"
-          ? (at + TABS.length - 1) % TABS.length
+          ? (at + tabs.length - 1) % tabs.length
           : e.key === "Home"
             ? 0
             : e.key === "End"
-              ? TABS.length - 1
+              ? tabs.length - 1
               : -1;
-    const next = TABS[to];
+    const next = tabs[to];
     if (!next) return;
     e.preventDefault();
     onPick(next[0]);
@@ -45,7 +57,7 @@ export function WorldTabs({
   };
   return (
     <div role="tablist" aria-label="World views" className="park-world-tabs">
-      {TABS.map(([t, label], i) => (
+      {tabs.map(([t, label], i) => (
         <button
           key={t}
           ref={(el) => {
@@ -109,6 +121,8 @@ export function TabPanel({
   title,
   sub,
   aside,
+  slideWhen,
+  slide,
   children,
 }: {
   tab: WorldTab;
@@ -116,15 +130,25 @@ export function TabPanel({
   title: string;
   sub: string;
   aside?: string;
+  /** TILO-T-WORLD: a panel that slides in (class `slide`) when this turns true while the page is open, and only then:
+   * triggeredBy artifact.delivered for the Result panel. True from the start just shows. */
+  slideWhen?: boolean;
+  slide?: string;
   children: ReactNode;
 }) {
+  const was = useRef(slideWhen);
+  const [slid, setSlid] = useState(false);
+  useEffect(() => {
+    if (slideWhen && !was.current) setSlid(true);
+    was.current = slideWhen;
+  }, [slideWhen]);
   return (
     <div
       role="tabpanel"
       id={panelId(tab)}
       aria-labelledby={tabId(tab)}
       hidden={on !== tab}
-      className="park-world-panel"
+      className={cx("park-world-panel", slid && slide)}
       data-tab={tab}
     >
       <div className="park-world-panelhead">

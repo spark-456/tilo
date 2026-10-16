@@ -9,7 +9,8 @@ import { hash } from "./art/color";
 import { type Bridge, type GateLook, LEVEL_RISE, type Link, MARGIN, type Rect } from "./art/ground";
 import { P } from "./art/iso";
 import { styleOf } from "./art/style";
-import type { WorldState } from "./reducer";
+import { districtLabel } from "./labels";
+import { type WorldState, standingAt } from "./reducer";
 import { agentNames } from "./runSummary";
 
 const NAMES = new WeakMap<Layout, Map<string, string>>();
@@ -124,23 +125,29 @@ const centreOf = (r: Rect, lift: number): { cx: number; cy: number } => {
   return { cx, cy };
 };
 
-/** Where an agent stands at a building, district or level: on the ground in front of a building,
- * on the plot's front lane, on the plate's front edge. `slot` (its place in the layout's roster)
- * fans out agents that share a spot, and never changes, so nobody shifts when another arrives. */
+/** Where an agent stands at a building, district or level: on the ground in front of a building, on the plot's front
+ * lane, on the plate's front edge. `slot` (its place in the layout's roster) fans out agents that share a spot by the
+ * golden ratio, so any number of them spread across the frontage in a fixed pattern that never changes when another
+ * arrives (TILO-T-WORLD: nobody huddles, nobody shifts). */
 function standAt(r: Rect, kind: "building" | "district" | "level", lift: number, slot: number) {
+  const across = (slot * 0.618034) % 1; // 0..1 along the frontage
+  const row = slot % 2; // two lanes deep
   const [sx, sy] =
     kind === "building"
-      ? [r.x + r.w * 0.3, r.y + r.d + 0.5]
-      : [r.x + r.w / 2, r.y + r.d - (kind === "district" ? 0.6 : 0.5)];
-  const [x, y] = P(sx + ((slot % 4) - 1.5) * 0.4, sy + Math.floor(slot / 4) * 0.4, lift);
+      ? [r.x + r.w * (0.1 + 0.8 * across), r.y + r.d + 0.5 + row * 0.45]
+      : [
+          r.x + r.w * (0.1 + 0.8 * across),
+          r.y + r.d - (kind === "district" ? 0.6 : 0.5) - row * 0.35,
+        ];
+  const [x, y] = P(sx, sy, lift);
   return { cx: x, cy: y };
 }
 
-/** The ground in front of a building where agents rest (the first row of `standAt`'s four slots),
+/** The ground in front of a building where agents rest (the whole frontage `standAt` fans over),
  * in world px: feet only, so a caller pads it by a figure's size. From the layout alone, so a
  * building's tag can keep clear of it whoever is standing there (nothing here moves). */
 export function standZone(r: Rect, lift: number) {
-  const feet = [0, 1, 2, 3].map((slot) => standAt(r, "building", lift, slot));
+  const feet = [0, 1, 2, 3, 4, 5, 6, 7, 8].map((slot) => standAt(r, "building", lift, slot));
   const xs = feet.map((f) => f.cx);
   const ys = feet.map((f) => f.cy);
   return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
@@ -159,7 +166,7 @@ export function frameOf(layout: Layout, state: WorldState): Frame {
   for (const level of layout.semantic.levels) {
     for (const district of level.districts) {
       districtLevel.set(district.id, level.id);
-      names.set(district.id, district.name);
+      names.set(district.id, districtLabel(district));
       leads.set(district.lead, district.id);
       for (const building of district.buildings) {
         buildingLevel.set(building.id, level.id);
@@ -270,7 +277,8 @@ export function frameOf(layout: Layout, state: WorldState): Frame {
     spots.set(l.id, { r: l.plate, kind: "level", lift: liftOf(l.id), level: l.index });
   const rank = new Map(layout.semantic.agents.map((a, i) => [a.id, { rank: a.rank, slot: i }]));
   const agents: FrameAgent[] = Object.values(state.agents).flatMap((agent) => {
-    const spot = agent.spawned && agent.location ? spots.get(agent.location) : undefined;
+    const stands = standingAt(state, agent);
+    const spot = agent.spawned && stands ? spots.get(stands) : undefined;
     const meta = rank.get(agent.id);
     if (!spot || !meta) return [];
     const ledDistrict = leads.get(agent.id);
@@ -287,7 +295,7 @@ export function frameOf(layout: Layout, state: WorldState): Frame {
         level: spot.level,
         working: agent.working,
         say: agent.say
-          ? { text: agent.say.text, to: namesOf(layout).get(agent.say.to) ?? agent.say.to }
+          ? { text: agent.say.text, to: namesOf(layout).get(agent.say.to) ?? "You" }
           : null,
       },
     ];

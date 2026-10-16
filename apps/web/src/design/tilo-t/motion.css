@@ -163,3 +163,24 @@
 /* The person's own 'still' choice (Profile > Appearance) is the same list. */
 [data-motion="still"] .tt-bd,[data-motion="still"] .tt-bd *,[data-motion="still"] .tt-shim,[data-motion="still"] .tt-dots span{animation:none!important}
 [data-motion="still"] .tt-pool__stage,[data-motion="still"] .tt-pool__stage *{animation:none!important}
+
+/* TILO-T-WORLD: the World page's own classes over the design's keyframes (spec: Tilo T Motion.dc.html). Each names the
+   recorded event that starts it; none runs on a timer of its own. Reduced motion: the global rule above turns them off,
+   so the element simply appears. */
+/* triggeredBy: agent.handoff / question.routed / meeting.asked / meeting.replied: a chat message or bubble pops in, 240 ms */
+.tw-pop{animation:tPop .24s var(--tt-ease-standard) both}
+/* triggeredBy: a hover over an agent (display state): the stats card fades in */
+.tw-fade{animation:tFade .16s var(--tt-ease-standard) both}
+/* triggeredBy: artifact.delivered: the Result panel slides in from the right, 420 ms */
+.tw-slide-r{animation:tSlideR .42s var(--tt-ease-standard) both}
+/* triggeredBy: artifact.delivered on a phone: the sheet rises, 420 ms */
+.tw-slide-up{animation:tSlideUp .42s var(--tt-ease-standard) both}
+@media (prefers-reduced-motion:reduce){.tw-pop,.tw-fade,.tw-slide-r,.tw-slide-up{animation:none!important}}
+
+/* triggeredBy: artifact.delivered: the parcel arcs from the Meeting Hall to the Delivery Dock along its offset-path, 1.6 s, walk easing */
+.tw-parcel{animation:tParcel 1.6s var(--tt-ease-walk) both}
+/* triggeredBy: world.completed: confetti bursts once (the pieces carry --cx/--cy), 1.8 s */
+.tw-confetti i{animation:tConfetti 1.8s var(--tt-ease-standard) both}
+/* triggeredBy: world.completed: the city goes from muted to full colour, 800 ms */
+.tw-light canvas{animation:tLight .8s var(--tt-ease-standard) both}
+@media (prefers-reduced-motion:reduce){.tw-parcel,.tw-confetti i,.tw-light canvas{animation:none!important}}
