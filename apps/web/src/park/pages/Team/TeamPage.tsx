@@ -27,6 +27,7 @@ import { LiveBody, LiveInvite, StatusLine } from "./LiveTeam";
 import { Members } from "./Members";
 import { MatrixCard, RulesCard } from "./Rules";
 import { SelfServeTeams } from "./SelfServeTeams";
+import { TeamResources } from "./TeamResources";
 import { Helpers, WhoCanSayYes } from "./Studio";
 import "./Team.css";
 import "./Team.studio.css";
@@ -109,6 +110,7 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
   const [controlsOnly, setControlsOnly] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
   const [liveTeam, setLiveTeam] = useState<Team | null>(null);
+  const [teamWorlds, setTeamWorlds] = useState<World[]>([]);
   const [people, setPeople] = useState<Member[] | null>(null);
   const [email, setEmail] = useState("");
   const [mine, setMine] = useState<{ you: string | null; teams: MyTeamName[] }>({
@@ -130,6 +132,8 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
         if (!live) return;
         if (t.source === "live") {
           setLiveTeam(t.data);
+          const worlds = await api.getWorlds(dec, added).catch(() => null);
+          if (live && worlds?.source === "live") setTeamWorlds(worlds.data);
           return;
         }
         const [pol, l, s, w] = await Promise.all([
@@ -242,6 +246,7 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
             </div>
             <WhoCanSayYes />
           </div>
+          <TeamResources worlds={teamWorlds} />
           <details
             className="park-team-disclosure"
             onToggle={(e) => setControlsOpen(e.currentTarget.open)}
