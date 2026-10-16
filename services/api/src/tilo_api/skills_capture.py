@@ -18,7 +18,7 @@ import logging
 import re
 import unicodedata
 from collections.abc import Callable
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import Field
@@ -275,7 +275,7 @@ def capture_route(
     text = _description(body.text, redact)
     if _flagged(safety, text):
         raise _not_understood()
-    blocks, doc_texts, parts = "", [], []
+    blocks, doc_texts, parts = "", cast(list[str], []), cast(list[MediaPart], [])
     if body.documents:
         scope = Scope(deps.ORG_ID, _guarded(lambda: _desk(we, deps.ORG_ID, principal.user_id)), principal.user_id)
         refs = [r.model_dump() for r in body.documents]
