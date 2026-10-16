@@ -1,0 +1,141 @@
+/* CX_T_SKILLS: Skills board styling on the shared Tilo T foundation tokens. */
+[data-park] .park-skills-page {
+  max-width: 1200px;
+  padding-top: 36px;
+  gap: 20px;
+  font-family: var(--fB, inherit);
+}
+[data-park] .park-skills-page .park-skills-h1 {
+  font-size: clamp(34px, 4vw, 44px);
+  letter-spacing: -1.4px;
+}
+[data-park] .park-skills-page .park-btn--primary {
+  background: var(--pri);
+  color: var(--onPri);
+}
+[data-park] .park-skills-page .park-skills-intro {
+  font-size: 15px;
+  color: var(--ink2);
+}
+[data-park] .park-skills-how {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+}
+[data-park] .park-skills-how__item {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px;
+}
+[data-park] .park-skills-how__art {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--sunk);
+  color: var(--ink);
+}
+[data-park] .park-skills-how__copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  line-height: 1.4;
+}
+[data-park] .park-skills-how__copy strong {
+  font-size: 15px;
+  line-height: 1.25;
+}
+[data-park] .park-skills-how__copy > span:last-child {
+  color: var(--ink2);
+  font-size: 13px;
+}
+[data-park] .park-skills-how__eyebrow {
+  color: var(--ink3);
+  font-family: var(--mono, monospace);
+  font-size: 10px;
+  letter-spacing: 0.3px;
+}
+[data-park] .park-skills-banner {
+  border-radius: 20px;
+  box-shadow: none;
+  padding: 16px 20px;
+  gap: 18px;
+}
+[data-park] .park-skills-banner__art {
+  width: 84px;
+  height: 84px;
+  border-radius: 18px;
+  background: var(--sunk);
+}
+[data-park] .park-skills-banner__h2 {
+  font-size: 20px;
+  letter-spacing: -0.4px;
+}
+[data-park] .park-skills-banner__ways {
+  margin-top: 0;
+  gap: 6px;
+}
+[data-park] .park-skills-banner__way {
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+[data-park] .park-skills-banner__n {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  color: var(--ink);
+  background: var(--sunk);
+}
+[data-park] .park-skills-banner__sub {
+  font-size: 11px;
+}
+[data-park] .park-skills-page .park-skills-filter--on {
+  border-color: var(--pri);
+  background: var(--pri);
+  color: var(--onPri);
+}
+[data-park] .park-skills-card2,
+[data-park] .park-teach__card {
+  border-radius: 20px;
+  box-shadow: none;
+}
+[data-park] .park-skill-drawer {
+  border-radius: 24px 0 0 24px;
+  box-shadow: none;
+}
+[data-park] .park-skills-card2__art {
+  border-radius: 14px;
+  background: var(--sunk);
+}
+@media (max-width: 760px) {
+  [data-park] .park-skills-how {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+  [data-park] .park-skills-how__item {
+    padding: 4px;
+  }
+  [data-park] .park-skills-banner {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  [data-park] .park-skills-banner > button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  [data-park] .park-skills-banner__ways {
+    grid-template-columns: 1fr;
+  }
+}

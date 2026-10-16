@@ -15,11 +15,12 @@ import { FirstRunPanels } from "../../sample/FirstRunPanels";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { ApiReadState } from "../../shared/ApiReadState";
 import { FixSkill } from "./FixSkill";
-import { LearningNow, SkillGrid, TeachBanner } from "./Gallery";
+import { HowSkillsWork, LearningNow, SkillGrid, TeachBanner } from "./Gallery";
 import { HelpSection } from "./HelpSection";
 import { SkillDrawer } from "./SkillDrawer";
 import "./Skills.css";
 import "./SkillsStudio.css";
+import "./SkillsTilo.css";
 import { TeachWizard } from "./TeachWizard";
 import { ToolAccess } from "./ToolAccess";
 import { type SkillFixEntry, applySkillFix } from "./skillConfig";
@@ -288,6 +289,7 @@ function Ready({
           </span>
         ))}
       </div>
+      <HowSkillsWork />
       <TeachBanner night={app.night} onStart={() => startTeach()} />
       <SkillGrid skills={skills} paused={paused} night={app.night} onOpen={setOpen} />
       <LearningNow

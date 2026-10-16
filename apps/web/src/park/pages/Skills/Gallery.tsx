@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { Skill } from "../../api/types";
 import { Button } from "../../components";
 import { cx } from "../../components/cx";
+import { Icon } from "../../../design/tilo-t";
 import { statusOf } from "./SkillDrawer";
 import { WIZARD_STEPS } from "./TeachWizard";
 import { SkillIcon } from "./skillIcon";
@@ -24,6 +25,46 @@ const WAYS = [
   "What goes in, what comes out",
   "Choose where Tilo asks first",
 ] as const;
+
+const HOW_SKILLS_WORK = [
+  {
+    n: "01 · AUTOMATIC",
+    title: "Tilo picks the right skill",
+    body: "Describe the work. Tilo matches it to a skill and shows which one it used.",
+    icon: "sparkle",
+  },
+  {
+    n: "02 · TEACH ONCE",
+    title: "Show it how, one time",
+    body: "Describe the steps and save them as a skill you can reuse.",
+    icon: "wand",
+  },
+  {
+    n: "03 · GROWS WITH YOU",
+    title: "Ratings make it better",
+    body: "Rate a run and Tilo can improve the steps. Changes are versioned.",
+    icon: "star",
+  },
+] as const;
+
+export function HowSkillsWork() {
+  return (
+    <section aria-label="How skills work" className="park-skills-how">
+      {HOW_SKILLS_WORK.map((item) => (
+        <article className="park-skills-how__item" key={item.n}>
+          <span className="park-skills-how__art" aria-hidden="true">
+            <Icon name={item.icon} size={30} />
+          </span>
+          <span className="park-skills-how__copy">
+            <span className="park-skills-how__eyebrow">{item.n}</span>
+            <strong>{item.title}</strong>
+            <span>{item.body}</span>
+          </span>
+        </article>
+      ))}
+    </section>
+  );
+}
 
 export function TeachBanner({ night, onStart }: { night: boolean; onStart: () => void }) {
   return (
