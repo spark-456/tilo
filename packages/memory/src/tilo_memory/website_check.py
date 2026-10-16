@@ -56,7 +56,6 @@ _FRAGMENT = re.compile(r"#[A-Za-z0-9_-]*")
 _RAW_BAD = re.compile(r"://|javascript:|vbscript:|data:text/html|<base|http-equiv|@import", re.IGNORECASE)  # WS-08
 _CSS_ESCAPE = re.compile(r"\\(?:([0-9a-fA-F]{1,6})[ \t\n\r\f]?|(\r\n|[\n\r\f])|(.))", re.DOTALL)
 _CSS_BAD = re.compile(r"@import|expression\s*+\(|behavior|-moz-binding", re.IGNORECASE)  # WS-06
-_CSS_COMMENT = re.compile(r"/\*.*?(?:\*/|\Z)", re.DOTALL)
 _CSS_TOKEN = re.compile(  # strings, the functions that load a URL, and parentheses: one pass, no backtracking
     r"\"(?P<d>[^\"\\\n]*+)\"|'(?P<s>[^'\\\n]*+)'|(?P<quote>[\"'])"
     r"|(?<![a-z0-9_])(?P<fn>url|src|image-set|image|cross-fade)\s*+\(|(?P<open>\()|(?P<close>\))",
@@ -135,12 +134,46 @@ def _unescape_css(css: str) -> str:
     return _CSS_ESCAPE.sub(repl, css)
 
 
+def _strip_css_comments(css: str) -> str:
+    """Remove CSS comments outside strings before escapes are decoded; preserve newlines and escaped delimiters."""
+    out: list[str] = []
+    quote: str | None = None
+    i = 0
+    while i < len(css):
+        char = css[i]
+        if char == "\\" and i + 1 < len(css):
+            out.extend((char, css[i + 1]))
+            i += 2
+            continue
+        if quote:
+            out.append(char)
+            if char == quote:
+                quote = None
+            i += 1
+            continue
+        if char in ("'", '"'):
+            quote = char
+            out.append(char)
+            i += 1
+            continue
+        if css.startswith("/*", i):
+            end = css.find("*/", i + 2)
+            end = len(css) if end < 0 else end + 2
+            out.extend("\n" if c == "\n" else " " for c in css[i:end])
+            i = end
+            continue
+        out.append(char)
+        i += 1
+    return "".join(out)
+
+
 def css_problem(css: str, *, fragments: bool = False) -> int | None:
-    """Index of the first WS-06 violation in CSS text (after escapes), or None. One linear pass: comments are blanked
-    first (newlines kept), then strings and the URL-loading functions are walked with a stack, so nested or unclosed
-    `url(`, `image-set(` and `src(` cost O(n) in all. An unterminated quote is refused. `fragments` also accepts a
-    same-document `url(#id)` (SVG paint attributes only)."""
-    css = _CSS_COMMENT.sub(lambda m: re.sub(r"[^\n]", " ", m.group()), css)
+    """Index of the first WS-06 violation in CSS text (after escapes), or None. Strings and URL-loading functions are
+    walked with a stack, so nested or unclosed `url(`, `image-set(` and `src(` cost O(n) in all. Comments are removed
+    only outside strings and before CSS escapes are decoded, so a string delimiter or escaped slash cannot hide a URL.
+    An unterminated quote is refused. `fragments` also accepts a same-document `url(#id)` (SVG paint attributes
+    only)."""
+    css = _strip_css_comments(css)
     css = _unescape_css(css)
     bad = _CSS_BAD.search(css)
     if bad:
