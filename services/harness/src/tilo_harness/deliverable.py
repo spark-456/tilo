@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from datetime import UTC, date, datetime
 from typing import Any
 
 from tilo_providers.diagnostics import log_caught
@@ -94,9 +95,11 @@ def _json_object(reply: Any) -> Any:
         raise DeliverableRefused("not_json") from None
 
 
-def parse_spec(reply: Any) -> DeliverableSpec:
+def parse_spec(reply: Any, *, report_date: date | None = None) -> DeliverableSpec:
     """The reply as a validated DeliverableSpec, or DeliverableRefused."""
     data = _json_object(reply)
+    if report_date is not None and isinstance(data, dict):
+        data["date"] = report_date.isoformat()  # HR-1: model-written or missing dates are not a fact.
     try:
         return DeliverableSpec.model_validate(data)
     except Exception as caught_error:  # noqa: BLE001 - pydantic's message echoes the input
@@ -127,9 +130,9 @@ def prompt_name(unit: Mapping[str, Any], context: Any) -> str:
     return "unit_xlsx_fill.md" if render_format(unit, brief) == "xlsx" and has_template else "unit_pdf.md"
 
 
-def render_output(reply: Any) -> RenderedPdf:
+def render_output(reply: Any, *, report_date: date | None = None) -> RenderedPdf:
     """The reply as the PDF `keep` stores with origin `render`, or DeliverableRefused (no partial PDF)."""
-    spec = parse_spec(reply)
+    spec = parse_spec(reply, report_date=report_date or datetime.now(UTC).date())
     try:
         pdf = render_pdf(spec)
     except Exception as caught_error:  # noqa: BLE001 - the error text may echo the spec

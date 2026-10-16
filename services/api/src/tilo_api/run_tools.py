@@ -7,10 +7,11 @@ import dataclasses
 import json
 import threading
 from collections.abc import Callable, Mapping
-from datetime import date
+from datetime import UTC, date, datetime
 from functools import partial
 from pathlib import Path
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 from tilo_archive import RunArchive
 from tilo_harness.deliverable import render_format
@@ -38,6 +39,17 @@ FILE_TEXT_TOTAL = 6000  # all uploads together: the rest of the upstream room st
 # FR-AGT-03: a specialist whose plan pins no skill still gets the two read-only (T1) web tools. They are the registry's
 # own: recorded search and fetch in replay, live only when the router is live (never this map's decision).
 DEFAULT_TOOLS = {"specialist": ("web_search", "fetch_url")}
+
+
+def report_day(owner: str, org: str, people: Callable[[], Any], now: datetime) -> date:
+    """The owner's local date at this instant; absent or invalid profile time zones use UTC."""
+    try:
+        stores = people()
+        stored = stores.persons.get(org, owner) if stores is not None else None
+        zone = ZoneInfo(stored.record["time_zone"]) if stored is not None else UTC
+    except Exception:  # a missing profile or unavailable people store uses UTC without failing the deliverable
+        zone = UTC
+    return now.astimezone(zone).date()
 
 
 def brief_texts(run: Any) -> list[str]:
@@ -197,6 +209,11 @@ class BoundRunRunner:
             )
         fmt = render_format(unit, context.brief)  # DOCS-OUT A4: an uploaded workbook is filled, not replaced
         template, context = attach_template(fmt, owner.seams.artifacts, owner.scope, stream, owner.run_id, context)
+        day = (
+            report_day(owner.owner, owner.org_id, owner.seams.people or (lambda: None), datetime.now(UTC))
+            if fmt and template is None
+            else self.clock()
+        )
         models = {role: BoundModel(model, self.budget) for role, model in self.providers.items()}
         fetch = FetchTool(owner, self.service, self.hosts, unit, context, self.sources)
         tools: list[Any] = [SearchTool(self.search, self.hosts), fetch]
@@ -211,7 +228,7 @@ class BoundRunRunner:
                 defaults, on_call = self.default_tools(), reads.on_call
         runner = DefaultUnitRunner(
             models,
-            clock=self.clock,
+            clock=lambda: day,
             tools=ToolRegistry(tools),
             default_tools=defaults,
             on_tool_call=on_call,
@@ -223,7 +240,7 @@ class BoundRunRunner:
             credit_cap=self.budget.left,
             limits=self.limits,
             tool_credit_cap=self.limits.credit_share * owner.cap,  # the rest is for the writer and the verifier
-            report_renderer=partial(render_report, fmt=fmt or "pdf", template=template),
+            report_renderer=partial(render_report, fmt=fmt or "pdf", template=template, report_date=day),
         )
         return await runner.run(unit, context)
 
