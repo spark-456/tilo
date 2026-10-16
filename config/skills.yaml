@@ -21,6 +21,15 @@ triggers:
 # proposes outside this list, or that config/connectors.yaml does not declare, is dropped to "Tilo can't do this yet"
 # (the declared-only rule is code, never the model). browse_web stays unusable until config/connectors.yaml declares it
 # (ticket B1c); render outputs arrive with their own ticket. No model id belongs here.
+# SKILL-ROUTE (FR-SKL-04, EFF-04): which skill fits a task. A task is embedded with the `embed` role and compared (cosine)
+# with the description of each skill the person may use. min_score is the least score that counts as a match; when the
+# top two are within tie_margin one cheap assistant call picks between them. dimensions is the embedding size. The
+# numbers are a starting point to tune against real embeddings (BQ-SKILLROUTE-1). No model id belongs here.
+route:
+  min_score: 0.75
+  tie_margin: 0.02
+  dimensions: 256
+
 capture:
   # S2 (ADR-0051, TS-03): limits for a recording or file. The web recorder reads max_recording_seconds; the server
   # stores at most max_file_bytes (ADR-0034) and reads at most max_read_bytes (the providers' 10 MiB inline part).

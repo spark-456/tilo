@@ -165,6 +165,9 @@ class TaskRecord:
     gaps: tuple[Gap, ...] = ()  # FR-INT-15: the parts Tilo cannot do, set once at intake; answers and edits keep them
     lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
     approaches_work: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+    skill: dict[str, Any] | None = (
+        None  # SKILL-ROUTE: the skill the task matched (or was tagged with), pinned at the run
+    )
 
 
 @dataclass
