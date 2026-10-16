@@ -82,6 +82,7 @@ BODY_ROUTES = {
     "delete meeting": "/v1/meetings/mt_q4_plan/delete",
     "meeting world": "/v1/meetings/mt_q4_plan/world",
     "meeting brief": "/v1/meetings/mt_q4_plan/brief",
+    "make morning brief": "/v1/me/brief",
     "host meeting": "/v1/meetings/mt_q4_plan/host",
     "attend meeting": "/v1/meetings/mt_q4_plan/attend",
     "create pin": "/v1/pinboards",
@@ -210,7 +211,7 @@ def test_PPL_11c_s4_BQ_PPL11C_1_meeting_patch_oversize_body_is_a_413(people_rig,
 
 
 # `/v1/me/settings` (ADR-0039) has its own 16 KiB cap and a route-level `write_limit` (user_settings.py)
-SETTINGS_PUT_ROUTES = {"settings": "/v1/me/settings"}
+SETTINGS_PUT_ROUTES = {"settings": "/v1/me/settings", "brief settings": "/v1/me/brief-settings"}
 SETTINGS_MAX_BODY_BYTES = 16384
 
 ORG_MODEL_KEY_WRITE_ROUTES = {"org model key": "/v1/org/model-key"}
