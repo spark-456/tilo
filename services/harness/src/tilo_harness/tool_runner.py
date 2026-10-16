@@ -193,7 +193,10 @@ class ToolUnitRunner:
             private=any(item.private for item in context.upstream),
             progress=context.progress,
         )
-        website = wants_website(unit, context.brief)  # WEB-1: the final writer's reply is one HTML file
+        wanted = wants_website(unit, context.brief)  # WEB-1: the final writer's reply is one HTML file
+        # WT-04, SEC-05: a page can run script, so a run that rests on the person's private data or on outside
+        # content never makes one; it answers in Markdown with a plain note
+        website = wanted and not (loop.private or loop.tainted)
         holds_effects = not loop.tainted and any(self._tools.is_side_effect(tool) for tool in allowed.values())
         base = load_prompt(
             role,
@@ -215,7 +218,7 @@ class ToolUnitRunner:
         )
         quiz = wants_quiz(unit, context.brief, source_available=self._quiz_available)
         rendered = wants_rendered(unit, context.brief)
-        fmt = render_format(unit, context.brief) or (WEBSITE_FORMAT if website else None)
+        fmt = render_format(unit, context.brief) or (WEBSITE_FORMAT if wanted else None)
         if quiz:
             base += (
                 "\nReturn only a quiz AppSpec JSON object (v=1.0, kind=quiz, title, theme, timer, questions). "
@@ -236,6 +239,12 @@ class ToolUnitRunner:
             if not (response.tool_calls and live):
                 if not response.text or not response.text.strip():
                     return self._finish(UnitOutcome(False, f"No result for {unit['title']}."), loop, "no_text")
+
+                if wanted and (loop.private or loop.tainted):  # also when this unit's own tool calls tainted it
+                    note = f"Tilo could not build the {fmt} file, so here is the result as text."
+                    text = UnitOutput(media_type="text/markdown", content=degraded(response.text))
+                    outcome = UnitOutcome(True, note, outputs=(text,), provenance_ids=_refs(loop))
+                    return self._finish(outcome, loop, "done")
 
                 async def final_output(text: str) -> UnitOutput:
                     if website:

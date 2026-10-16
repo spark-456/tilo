@@ -14,8 +14,10 @@ import html
 import re
 from dataclasses import dataclass
 from html.parser import HTMLParser
+from typing import Any
 
 MAX_BYTES = 524_288  # WS-02, AR-10
+MAX_CSS_DEPTH = 64
 MAX_TAGS = 30_000  # a real page is far below; bounds html.parser's worst case
 CODES = ("ws_size", "ws_encoding", "ws_element", "ws_url", "ws_css", "ws_script", "ws_raw")
 
@@ -53,9 +55,19 @@ _DATA_URL = re.compile(
 _FRAGMENT = re.compile(r"#[A-Za-z0-9_-]*")
 _RAW_BAD = re.compile(r"://|javascript:|vbscript:|data:text/html|<base|http-equiv|@import", re.IGNORECASE)  # WS-08
 _CSS_ESCAPE = re.compile(r"\\(?:([0-9a-fA-F]{1,6})[ \t\n\r\f]?|(\r\n|[\n\r\f])|(.))", re.DOTALL)
-_CSS_BAD = re.compile(r"@import|expression\s*\(|behavior|-moz-binding", re.IGNORECASE)  # WS-06
-_CSS_FUNC = re.compile(r"(?<![a-z0-9_])(url|src|image-set|image|cross-fade)\s*\(", re.IGNORECASE)
-_CSS_STRING = re.compile(r"\"([^\"\\]*)\"|'([^'\\]*)'")
+_CSS_BAD = re.compile(r"@import|expression\s*+\(|behavior|-moz-binding", re.IGNORECASE)  # WS-06
+_CSS_COMMENT = re.compile(r"/\*.*?(?:\*/|\Z)", re.DOTALL)
+_CSS_TOKEN = re.compile(  # strings, the functions that load a URL, and parentheses: one pass, no backtracking
+    r"\"(?P<d>[^\"\\\n]*+)\"|'(?P<s>[^'\\\n]*+)'|(?P<quote>[\"'])"
+    r"|(?<![a-z0-9_])(?P<fn>url|src|image-set|image|cross-fade)\s*+\(|(?P<open>\()|(?P<close>\))",
+    re.IGNORECASE,
+)
+_PRESENTATION = frozenset(  # SVG presentation attributes that take a paint, a reference or a cursor (WS-06)
+    "fill stroke mask clip-path marker marker-start marker-mid marker-end filter cursor".split()
+)
+_SMIL = frozenset({"set", "animate", "animatetransform", "animatemotion"})
+_SMIL_VALUES = ("to", "from", "by", "values")
+_SMIL_HREF = frozenset({"href", "xlink:href"})
 _JS_ESCAPE = re.compile(r"\\u\{([0-9a-fA-F]{1,6})\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})")
 _NAMES = (  # WS-07: refused as a word anywhere in script text and handlers, strings and comments included
     "fetch XMLHttpRequest WebSocket WebTransport EventSource sendBeacon RTCPeerConnection Worker SharedWorker "
@@ -66,12 +78,14 @@ _WORD = r"(?<![\w$])(?:{})(?![\w$])"
 _JS_RULES = (
     re.compile(r"://"),
     re.compile(_WORD.format("|".join(_NAMES))),
-    re.compile(r"[.'\"`]\s*constructor(?![\w$])"),
+    re.compile(r"[.'\"`]\s*+constructor(?![\w$])"),
     re.compile(rf"(?<![\w$.])(?:{_GLOBALS})(?![\w$])"),
-    re.compile(rf"(?<![\w$])(?:window|self|globalThis|document)\s*\??\.\s*(?:{_GLOBALS})(?![\w$])"),
-    re.compile(r"(?<![\w$])document\s*\??\.\s*(?:domain|cookie|write|writeln)(?![\w$])"),
-    re.compile(r"(?<![\w$])(?:window|self|globalThis|document)\s*(?:\?\.)?\s*\["),
-    re.compile(r"(?<![\w$])(?:setTimeout|setInterval)\s*\(\s*['\"`]"),
+    re.compile(rf"(?<![\w$])(?:window|self|globalThis|document)\s*+\??\.\s*+(?:{_GLOBALS})(?![\w$])"),
+    re.compile(r"(?<![\w$])document\s*+\??\.\s*+(?:domain|cookie|write|writeln)(?![\w$])"),
+    re.compile(r"(?<![\w$])(?:window|self|globalThis|document)\s*+(?:\?\.\s*+)?\["),
+    re.compile(r"(?<![\w$])(?:setTimeout|setInterval)\s*+\(\s*+['\"`]"),
+    re.compile(r"<!--|<script", re.IGNORECASE),  # script double escape: html.parser ends at the first </script>
+    re.compile(r"(?<![\w$])(?:webkit|moz|ms)?rtc", re.IGNORECASE),  # RTCPeerConnection, webkitRTCPeerConnection, ...
 )
 _C0 = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 _DOCTYPE = re.compile(r"[ \t\n\r\f]*<!doctype html>", re.IGNORECASE)
@@ -83,8 +97,11 @@ def _line(text: str, index: int) -> int:
     return text.count("\n", 0, index) + 1
 
 
+_URL_STRIP = "".join(chr(i) for i in range(33))
+
+
 def _clean_url(value: str) -> str:
-    return re.sub(r"[\t\n\r]", "", value).strip("".join(chr(i) for i in range(33)))
+    return re.sub(r"[\t\n\r]", "", value).strip(_URL_STRIP)
 
 
 def _url_ok(value: str) -> bool:
@@ -118,30 +135,56 @@ def _unescape_css(css: str) -> str:
     return _CSS_ESCAPE.sub(repl, css)
 
 
-def _css_body(css: str, start: int) -> str:
-    depth, i = 1, start
-    while i < len(css) and depth:
-        depth += {"(": 1, ")": -1}.get(css[i], 0)
-        i += 1
-    return css[start : i - 1] if depth == 0 else css[start:]
-
-
-def css_problem(css: str) -> int | None:
-    """Index of the first WS-06 violation in CSS text (after escapes), or None."""
+def css_problem(css: str, *, fragments: bool = False) -> int | None:
+    """Index of the first WS-06 violation in CSS text (after escapes), or None. One linear pass: comments are blanked
+    first (newlines kept), then strings and the URL-loading functions are walked with a stack, so nested or unclosed
+    `url(`, `image-set(` and `src(` cost O(n) in all. An unterminated quote is refused. `fragments` also accepts a
+    same-document `url(#id)` (SVG paint attributes only)."""
+    css = _CSS_COMMENT.sub(lambda m: re.sub(r"[^\n]", " ", m.group()), css)
     css = _unescape_css(css)
     bad = _CSS_BAD.search(css)
     if bad:
         return bad.start()
-    for m in _CSS_FUNC.finditer(css):
-        body = _css_body(css, m.end()).strip()
-        if m.group(1).lower() == "url" and body[:1] not in "\"'":
-            args = [body]  # an unquoted url(...) argument
-        else:
-            args = [a or b for a, b in _CSS_STRING.findall(body)]
-            if not args and m.group(1).lower() != "url" and body[:1] not in "\"'":
-                args = [""]  # image-set(), src() or image() with no string at all
-        if any(_DATA_URL.match(_clean_url(a)) is None for a in args):
+    stack: list[list[Any]] = []  # [function name or None, position after "(", direct strings, nested functions]
+
+    def data(value: str) -> bool:
+        url = _clean_url(value)
+        return _DATA_URL.match(url) is not None or (fragments and _FRAGMENT.fullmatch(url) is not None)
+
+    for m in _CSS_TOKEN.finditer(css):
+        kind = m.lastgroup
+        if kind == "quote":
             return m.start()
+        if len(stack) > MAX_CSS_DEPTH:  # no real stylesheet nests this deep; bounds memory
+            return m.start()
+        if kind in ("d", "s"):
+            if stack:
+                stack[-1][2].append(m.group(kind))
+        elif kind == "fn":
+            if stack:
+                stack[-1][3] += 1
+            stack.append([m.group("fn").lower(), m.end(), [], 0])
+        elif kind == "open":
+            stack.append([None, m.end(), [], 0])
+        elif stack:  # close
+            name, after, strings, nested = stack.pop()
+            if name is None:
+                continue
+            if name == "url":
+                at = after
+                while at < len(css) and css[at] in " \t\n\r\f":
+                    at += 1
+                quoted = css[at : at + 1] in ("'", '"')
+                if quoted:
+                    ok = bool(strings) and all(map(data, strings))
+                else:  # an unquoted argument: only its start is read, no slice
+                    ok = _DATA_URL.match(css, at) is not None or (fragments and _FRAGMENT.match(css, at) is not None)
+            else:
+                ok = all(map(data, strings)) and bool(strings or nested)
+            if not ok:
+                return m.start()
+    if any(entry[0] for entry in stack):  # an unclosed url( or image-set(
+        return len(css)
     return None
 
 
@@ -160,6 +203,7 @@ class _Scan(HTMLParser):
     def __init__(self, text: str) -> None:
         super().__init__(convert_charrefs=False)
         self.text = text
+        self.starts = [0] + [m.end() for m in re.finditer(r"\n", text)]  # offsets of line starts
         self.tags = 0
         self.raw: str | None = None  # "script" or "style" while inside it
         self.rc: str | None = None  # "title" or "textarea" while inside it
@@ -203,6 +247,16 @@ class _Scan(HTMLParser):
                     raise self._refuse("ws_url")
             elif name == "style" and css_problem(value) is not None:
                 raise self._refuse("ws_css")
+            elif name in _PRESENTATION and css_problem(value, fragments=True) is not None:
+                raise self._refuse("ws_css")  # fill="url(a.png)", mask, filter, cursor ...: same rule as CSS
+            elif tag in _SMIL and name in _SMIL_VALUES and css_problem(value, fragments=True) is not None:
+                raise self._refuse("ws_css")  # <set attributeName="fill" to="url(a.png)">
+            elif tag in _SMIL and name == "attributename" and value.strip().lower() in _SMIL_HREF:
+                raise self._refuse("ws_element")  # an animation that rewrites a link target
+            elif tag == "input" and name == "type" and value.strip().lower() == "password":
+                raise self._refuse("ws_element")  # Tilo never handles passwords
+            elif name == "autocomplete" and {"current-password", "new-password"} & set(value.lower().split()):
+                raise self._refuse("ws_element")
             elif name.startswith("on") and js_problem(value) is not None:
                 raise self._refuse("ws_script")
         if tag in ("script", "style"):
@@ -258,10 +312,7 @@ class _Scan(HTMLParser):
 
     def _index(self) -> int:
         line, col = self.getpos()
-        index = 0
-        for _ in range(line - 1):
-            index = self.text.index("\n", index) + 1
-        return index + col
+        return self.starts[line - 1] + col
 
 
 def check_website(data: bytes) -> WebsiteCheck:
@@ -291,7 +342,11 @@ def check_website(data: bytes) -> WebsiteCheck:
         return WebsiteCheck(False, "ws_element", scan.getpos()[0])
     if scan.raw is not None:  # ended inside <script> or <style>
         return WebsiteCheck(False, "ws_element", scan.start_line)
-    for view in (text, html.unescape(text)):  # WS-08, and again with character references decoded
+    try:
+        decoded = html.unescape(text)
+    except ValueError:  # a character reference of thousands of digits: not a page to keep
+        return WebsiteCheck(False, "ws_raw", 1)
+    for view in (text, decoded):  # WS-08, and again with character references decoded
         found = _RAW_BAD.search(view)
         if found:
             return WebsiteCheck(False, "ws_raw", _line(view, found.start()))
