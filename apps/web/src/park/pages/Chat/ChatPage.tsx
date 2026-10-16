@@ -68,7 +68,6 @@ function Answer({
     const meta = [
       "TILO",
       turn.seconds > 0 ? `ANSWERED IN ${turn.seconds}S` : "ANSWERED",
-      ...(cost ? [cost.toUpperCase()] : []),
     ].join(" · ");
     return (
       <div className="park-chat-turn">
@@ -79,6 +78,7 @@ function Answer({
             {turn.sample ? <span className="park-chat-sample">Sample answer</span> : null}
           </div>
           <div className="park-chat-result-card">
+            {cost ? <span className="park-chat-meta">{cost}</span> : null}
             <p className="park-chat-text">{turn.text}</p>
             <div className="park-chat-actions">
               {onCopy ? (
