@@ -265,10 +265,16 @@ def test_SEC_15_SIGNIN_hosting_csp_adds_exactly_the_sign_in_origins_and_nothing_
     off_origin = {
         name: {s for s in csp.get(name, []) if "://" in s} for name in ("script-src", "connect-src", "frame-src")
     }
-    assert off_origin["script-src"] <= APPCHECK_ORIGINS | SIGN_IN_SCRIPT, off_origin["script-src"]
+    picker_script = {"https://accounts.google.com/gsi/client"}  # WT-07: GIS token client
+    picker_frames = {"https://docs.google.com", "https://accounts.google.com"}  # WT-07: Picker and chooser
+    assert picker_script <= off_origin["script-src"]
+    assert picker_frames <= off_origin["frame-src"]
+    assert off_origin["script-src"] <= APPCHECK_ORIGINS | SIGN_IN_SCRIPT | picker_script, off_origin["script-src"]
     api = {"https://tilo-api-4qhkpsn5ga-as.a.run.app"}  # WEB-TO-API: the one tilo-dev API origin
     assert off_origin["connect-src"] <= APPCHECK_ORIGINS | SIGN_IN_CONNECT | api, off_origin["connect-src"]
-    assert off_origin["frame-src"] <= APPCHECK_ORIGINS | SIGN_IN_FRAME | OPTIONAL_FRAME, off_origin["frame-src"]
+    assert off_origin["frame-src"] <= APPCHECK_ORIGINS | SIGN_IN_FRAME | OPTIONAL_FRAME | picker_frames, off_origin[
+        "frame-src"
+    ]
     # no other directive grows an off-origin source (img, font, style, worker, form-action, base-uri, object-src)
     for name, sources in csp.items():
         if name in ("script-src", "connect-src", "frame-src"):

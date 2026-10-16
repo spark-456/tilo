@@ -61,9 +61,12 @@ OFF_ORIGIN_ALLOWED = {
         "https://www.google.com/recaptcha/",
         "https://www.gstatic.com/recaptcha/",
         "https://apis.google.com",
+        "https://accounts.google.com/gsi/client",  # WT-07: browser GIS token client only
     ],
     "frame-src": [
         "https://www.google.com/recaptcha/",
+        "https://docs.google.com",  # WT-07: Google Picker's file dialog iframe
+        "https://accounts.google.com",  # WT-07: GIS account chooser iframe
         "https://essential-wares-510320-f0.firebaseapp.com/__/auth/",
     ],
     "connect-src": [

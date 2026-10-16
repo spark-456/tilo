@@ -9,6 +9,7 @@ import {
   type ConnectionRow,
   GOOGLE_PERSON_CONNECTORS,
 } from "../../../api/connect";
+import { openDrivePicker, pickerConfig } from "./DrivePicker";
 
 const MONO: Record<string, string> = { gmail: "G", google_drive: "D", google_calendar: "C" };
 const STATE_TEXT = {
@@ -33,6 +34,8 @@ export function GoogleAccess({ flow }: { flow: ConnectFlow }) {
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [pickerBusy, setPickerBusy] = useState(false);
+  const picker = pickerConfig(import.meta.env);
 
   const load = useCallback(() => {
     flow.list().then(
@@ -69,6 +72,23 @@ export function GoogleAccess({ flow }: { flow: ConnectFlow }) {
       );
       if (result !== "failed") load();
     });
+  };
+
+  const chooseDriveFiles = () => {
+    if (!picker) return;
+    setPickerBusy(true);
+    setNote(null);
+    openDrivePicker(picker).then(
+      (result) => {
+        setPickerBusy(false);
+        if (result === "picked")
+          setNote("Drive files selected. Tilo can read them from your connected Google account.");
+      },
+      () => {
+        setPickerBusy(false);
+        setNote("Drive Picker could not open. Please try again.");
+      },
+    );
   };
 
   const shown = rows ?? [];
@@ -111,6 +131,26 @@ export function GoogleAccess({ flow }: { flow: ConnectFlow }) {
                   {busy === id ? "Signing in" : "Connect"}
                 </button>
               )}
+              {id === "google_drive" && row.state === "connected" ? (
+                <div className="park-connectors-drive-picker">
+                  {picker ? (
+                    <button
+                      type="button"
+                      className="park-connectors-connect"
+                      disabled={busy !== null || pickerBusy}
+                      onClick={chooseDriveFiles}
+                    >
+                      {pickerBusy ? "Choosing Drive files" : "Choose Drive files"}
+                    </button>
+                  ) : (
+                    <span>Drive Picker is not set up on this install.</span>
+                  )}
+                  <small>
+                    Use the Google account you connected. Only files you choose are available to
+                    Tilo.
+                  </small>
+                </div>
+              ) : null}
             </div>
           );
         })}

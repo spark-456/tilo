@@ -7,7 +7,10 @@ import { flush, makeApp, renderPage } from "../../../../test-support/park/connec
 import type { ConnectFlow, ConnectionRow } from "../../../api/connect";
 import { GoogleAccess } from "./GoogleAccess";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 
 const ROWS: ConnectionRow[] = [
   { id: "gmail", name: "Gmail", state: "available" },
@@ -32,6 +35,29 @@ const byText = (c: HTMLElement, t: string) =>
   buttons(c).find((b) => b.textContent === t) as HTMLButtonElement;
 
 describe("ADR35_L4_FR_CON_02_google_access", () => {
+  it("WORKSPACE_TOOLS_WT_07_connected_Drive_has_an_honest_not_set_up_fallback", async () => {
+    const rows: ConnectionRow[] = [
+      { id: "google_drive", name: "Google Drive", state: "connected" },
+    ];
+    const m = mount(<GoogleAccess flow={flowOf({ list: vi.fn(async () => rows) })} />);
+    await flush();
+    expect(m.container.textContent).toContain("Drive Picker is not set up");
+    expect(byText(m.container, "Choose Drive files")).toBeUndefined();
+  });
+
+  it("WORKSPACE_TOOLS_WT_07_configured_connected_Drive_offers_a_file_picker", async () => {
+    vi.stubEnv("VITE_GOOGLE_PICKER_CLIENT_ID", "client.apps.googleusercontent.com");
+    vi.stubEnv("VITE_GOOGLE_PICKER_API_KEY", "public-browser-key");
+    vi.stubEnv("VITE_GOOGLE_PICKER_PROJECT_NUMBER", "123456789");
+    const rows: ConnectionRow[] = [
+      { id: "google_drive", name: "Google Drive", state: "connected" },
+    ];
+    const m = mount(<GoogleAccess flow={flowOf({ list: vi.fn(async () => rows) })} />);
+    await flush();
+    expect(byText(m.container, "Choose Drive files")).toBeDefined();
+    expect(m.container.textContent).toContain("Use the Google account you connected");
+  });
+
   it("ADR35_L4_FR_CON_02_connect_asks_for_read_then_opens_the_link", async () => {
     const flow = flowOf();
     const m = mount(<GoogleAccess flow={flow} />);
