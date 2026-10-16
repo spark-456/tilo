@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, mount } from "../../test-support/park/componentsHarness";
+import { cleanup, click, mount } from "../../test-support/park/componentsHarness";
 import { SignInScreen } from "../auth/SignInScreen";
 import { RECORDED_RUN } from "./recordedRun";
 
@@ -37,4 +37,9 @@ it("CX-T-LANDING keeps the Studio story and adds honest T agenda and task ideas"
   expect(replay?.textContent).toContain(RECORDED_RUN.facts.planned);
   expect(replay?.textContent).toContain(RECORDED_RUN.facts.done);
   expect(replay?.textContent).toContain("Recorded example");
+  const pause = replay?.querySelector("button");
+  expect(pause?.textContent).toBe("Pause example");
+  await act(async () => click(pause as Element));
+  expect(replay?.classList.contains("tt-paused")).toBe(true);
+  expect(pause?.textContent).toBe("Play example");
 });

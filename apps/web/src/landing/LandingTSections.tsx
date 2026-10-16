@@ -48,6 +48,7 @@ const IDEAS = [
 export function TaskIdeasSection() {
   const replayRef = useRef<HTMLElement>(null);
   const paused = useLoopPaused(replayRef);
+  const [manuallyPaused, setManuallyPaused] = useState(false);
   const [painted, setPainted] = useState(false);
   useEffect(() => {
     // The first paint shows the complete record; its labelled replay starts only afterward.
@@ -69,10 +70,15 @@ export function TaskIdeasSection() {
       </ul>
       <aside
         ref={replayRef}
-        className={`landing-t-ideas__replay tt-landing-replay ${paused} ${painted ? "is-painted" : ""}`}
+        className={`landing-t-ideas__replay tt-landing-replay ${paused} ${manuallyPaused ? "tt-paused" : ""} ${painted ? "is-painted" : ""}`}
         aria-label="Recorded example events"
       >
-        <strong>Recorded example</strong>
+        <div className="landing-t-ideas__replay-head">
+          <strong>Recorded example</strong>
+          <button type="button" onClick={() => setManuallyPaused((value) => !value)}>
+            {manuallyPaused ? "Play example" : "Pause example"}
+          </button>
+        </div>
         <div className="landing-t-ideas__events">
           {/* triggeredBy: recorded village-basic events; this is a labelled replay, never live progress. */}
           {planned && <span className="tt-landing-replay__a">{planned}</span>}

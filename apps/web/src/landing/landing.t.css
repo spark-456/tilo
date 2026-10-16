@@ -107,11 +107,27 @@
   border-radius: 24px;
   background: var(--sunk);
 }
-.landing-t-ideas__replay > strong {
+.landing-t-ideas__replay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.landing-t-ideas__replay-head strong {
   color: var(--ink2);
   font-size: 12px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+.landing-t-ideas__replay-head button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
 }
 .landing-t-ideas__events {
   display: grid;
