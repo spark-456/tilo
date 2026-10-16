@@ -59,6 +59,8 @@ export interface QuickChat {
   readonly note: string | null;
   /** Sends `text`; returns false when it was not sent (busy, empty or too long). */
   ask(text: string): boolean;
+  /** Starts a fresh local session when no request is in flight. */
+  clear(): void;
 }
 
 export function useQuickChat(now: () => number = Date.now): QuickChat {
@@ -136,5 +138,13 @@ export function useQuickChat(now: () => number = Date.now): QuickChat {
     mood: moodOf(last, talkingId),
     note,
     ask,
+    clear: () => {
+      if (busyRef.current) return;
+      cancelTalk.current?.();
+      cancelTalk.current = null;
+      setTalkingId(null);
+      setNote(null);
+      setTurns([]);
+    },
   };
 }

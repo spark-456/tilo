@@ -152,6 +152,25 @@ describe("STUDIO_2 Chat: the helper's mood follows the real request", () => {
 });
 
 describe("STUDIO_2 Chat: honest data", () => {
+  it("CX_T_CHAT lists only current-session questions and New chat clears them", async () => {
+    const api = quickApi(async () => ({
+      data: { kind: "answered", text: "A real answer.", cost: null },
+      source: "live",
+    }));
+    const { el } = await mountChat(api);
+    const history = q(el, 'nav[aria-label="Chat history"]');
+    expect(textOf(history)).toContain("Current chat");
+    expect(textOf(history)).not.toContain("Yesterday");
+    expect(qa(history, "a")).toHaveLength(0);
+    await send(el, "First live question");
+    await send(el, "Second live question");
+    expect(qa(history, "a").map(textOf)).toEqual(["First live question", "Second live question"]);
+    expect(textOf(q(el, '[role="log"]'))).toContain("A real answer.");
+    act(() => q<HTMLButtonElement>(history, "button").click());
+    expect(qa(history, "a")).toHaveLength(0);
+    expect(textOf(q(el, '[role="log"]'))).toContain("Past chats are not kept");
+  });
+
   it("STUDIO_2 chat on the fixture Api the answer is labelled a sample and shows no cost", async () => {
     const { el } = await mountChat(fakeApi());
     await send(el, "Anything");
