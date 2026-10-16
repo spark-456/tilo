@@ -146,7 +146,7 @@ class SkillContext:
     read_taught: Callable[[], list[dict[str, Any]]]
     router: Router | None
 
-    def catalog(self) -> list[dict[str, Any]]:
+    def catalog(self, limit: int | None = CATALOG_MAX) -> list[dict[str, Any]]:
         """The library skills and, if the stores can be read, the caller's taught ones. Advisory: a store that cannot
         be read leaves those out; it never fails the request that asked."""
         try:
@@ -158,14 +158,13 @@ class SkillContext:
             entries += taught_entries(self.read_taught(), self.user)
         except Exception as exc:  # noqa: BLE001
             logger.warning("taught skills not read: %s", type(exc).__name__)
-        return entries[:CATALOG_MAX]
+        return entries[:limit]
 
     def match(self, text: str, *, tagged: str | None = None) -> dict[str, Any] | None:
         """The one skill that fits `text`, or None. `tagged` (an id the person named) wins when they may use it."""
-        entries = self.catalog()
         if tagged is not None:
-            found = next((e for e in entries if e["id"] == tagged), None)
-            return None if found is None else _data(found, 1.0, "tagged")
+            return self.resolve_tag(None, tagged)
+        entries = self.catalog()
         if not entries or self.router is None or not text.strip():
             return None
         try:
@@ -173,6 +172,13 @@ class SkillContext:
         except Exception as exc:  # noqa: BLE001
             logger.warning("skill match failed: %s", type(exc).__name__)
             return None
+
+    def resolve_tag(self, kind: str | None, ref_id: str) -> dict[str, Any] | None:
+        """A skill the person tagged, as the caller may use it now (MN-02): `kind` is the ref's (`skill` is a library
+        skill, `taught_skill` a taught one). Anything else, or a skill not in their view, is None: one answer."""
+        wanted = {"skill": "library", "taught_skill": "taught"}.get(kind or "")
+        found = next((e for e in self.catalog(None) if e["id"] == ref_id and wanted in (None, e["kind"])), None)
+        return None if found is None else _data(found, 1.0, "tagged")
 
     def block(self) -> str:
         """The catalog as fenced data for a prompt: one line per skill, name and purpose only."""

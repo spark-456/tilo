@@ -122,6 +122,7 @@ def create_task(
     extraction: ExtractionResult,
     scenario: str | None = None,
     kinds: Sequence[DeliverableKind] | None = None,
+    skill: dict[str, Any] | None = None,
 ) -> tuple[str, deps.TaskRecord]:
     """FR-INT-03/04: the task from its intake and the Director's brief (extracted first, so a failed extraction
     stores nothing), then the questions, decided in code."""
@@ -135,6 +136,7 @@ def create_task(
     intake_events = [intake.event, *(e for f in intake.files for e in f.events)]
     task = deps.TaskRecord(owner, intake.world_id, intake.run_id, draft, draft, [], len(intake_events) + 1)
     task.scenario, task.gaps = scenario, extraction.gaps
+    task.skill = skill  # SKILL-TAG: a tagged skill (source `tagged`) is never replaced by the matcher
     asked = generate_questions(
         draft,
         extraction.ambiguous_fields,
