@@ -1,0 +1,30 @@
+{
+  "connections": [
+    {
+      "connector": "gmail",
+      "state": "connected",
+      "requested_scopes": ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.compose", "https://www.googleapis.com/auth/gmail.send"],
+      "granted_scopes": ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.compose", "https://www.googleapis.com/auth/gmail.send"],
+      "missing_scopes": []
+    },
+    {
+      "connector": "google_calendar",
+      "state": "connected",
+      "requested_scopes": ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/calendar.events.owned"],
+      "granted_scopes": ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/calendar.events.owned"],
+      "missing_scopes": []
+    },
+    {
+      "connector": "google_drive",
+      "state": "connected",
+      "requested_scopes": ["https://www.googleapis.com/auth/drive.file"],
+      "granted_scopes": ["https://www.googleapis.com/auth/drive.file"],
+      "missing_scopes": []
+    }
+  ],
+  "parts": [
+    {"type": "connection.established", "connector": "gmail", "user_id": "u_priya"},
+    {"type": "connection.established", "connector": "google_calendar", "user_id": "u_priya"},
+    {"type": "connection.established", "connector": "google_drive", "user_id": "u_priya"}
+  ]
+}

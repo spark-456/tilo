@@ -1,0 +1,8 @@
+{
+  "connections": [
+    {"connector": "gmail", "state": "connected", "requested_scopes": ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"], "granted_scopes": ["https://www.googleapis.com/auth/gmail.readonly"], "missing_scopes": ["https://www.googleapis.com/auth/gmail.send"]},
+    {"connector": "google_calendar", "state": "connected", "requested_scopes": ["https://www.googleapis.com/auth/calendar.readonly"], "granted_scopes": ["https://www.googleapis.com/auth/calendar.readonly"], "missing_scopes": []},
+    {"connector": "google_drive", "state": "connected", "requested_scopes": ["https://www.googleapis.com/auth/drive.file"], "granted_scopes": ["https://www.googleapis.com/auth/drive.file"], "missing_scopes": []}
+  ],
+  "parts": []
+}

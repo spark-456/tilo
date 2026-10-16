@@ -1,0 +1,8 @@
+{
+  "connections": [
+    {"connector": "gmail", "state": "connected", "requested_scopes": [], "granted_scopes": [], "missing_scopes": []},
+    {"connector": "gmail", "state": "connected", "requested_scopes": [], "granted_scopes": [], "missing_scopes": []},
+    {"connector": "google_drive", "state": "connected", "requested_scopes": [], "granted_scopes": [], "missing_scopes": []}
+  ],
+  "parts": []
+}

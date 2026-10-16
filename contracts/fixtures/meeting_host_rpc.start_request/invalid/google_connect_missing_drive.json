@@ -1,0 +1,4 @@
+{
+  "user_id": "u_priya",
+  "connectors": ["gmail", "google_calendar"]
+}
