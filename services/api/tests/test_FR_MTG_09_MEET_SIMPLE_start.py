@@ -119,3 +119,36 @@ def test_FR_MTG_09_MEET_SIMPLE_a_picked_person_resolves_only_to_a_teammate(hr):
     assert made.status_code == 201, made.text[:300]
     users = [a["user"] for a in made.json()["attendees"]]
     assert users[0] == PRIYA and users[1] is None and users[2] == OWNER
+    # an existing person of the org who is not the owner's teammate never resolves
+    for other in (MEERA,):
+        got = hr.rig.client.post(
+            "/v1/meetings",
+            json={**body, "attendees": [{"name": "n", "person": other}]},
+            headers={"Idempotency-Key": f"k-{other}"},
+        )
+        assert got.status_code == 201, got.text[:300]
+        assert [a["user"] for a in got.json()["attendees"]] == [None], other
+
+
+def test_FR_MTG_09_MEET_SIMPLE_a_pause_after_the_card_writes_no_approval(hr, monkeypatch):
+    from tilo_api.cards import CardStore  # noqa: PLC0415
+
+    real = CardStore.is_open
+
+    def is_open_then_pause(self, world_id, card_id):
+        found = real(self, world_id, card_id)
+        if found:
+            hr.store.worlds[world_id].paused = True  # the owner pauses the world right after the card is raised
+        return found
+
+    monkeypatch.setattr(CardStore, "is_open", is_open_then_pause)
+    response = start(hr)
+    assert response.status_code == 409 and response.json()["detail"] == "world_paused"
+    assert hr.events("approval.resolved") == [] and hr.entries() == [] and hr.calendar.requests == []
+
+
+def test_FR_MTG_09_MEET_SIMPLE_the_answer_uses_the_session_channel(hr):
+    hr.rig.channel = "mobile_web"
+    assert start(hr).status_code == 200
+    (resolved,) = hr.events("approval.resolved")
+    assert resolved["data"]["channel"] == "mobile_web"

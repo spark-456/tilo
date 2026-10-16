@@ -443,7 +443,10 @@ def start_meeting(
         if card_id is None:
             _check_alive(run, deadline)
             time.sleep(_POLL_S)
-    answered = run.cards.answer(world_id, card_id, option="approve", channel="web", principal=me)
+    world = seams.store.worlds.get(world_id)
+    if world is None or world.paused:  # pause all is final (BQ-90): a pause after the card writes no approval
+        raise Refusal(409, "world_paused")
+    answered = run.cards.answer(world_id, card_id, option="approve", channel=principal.channel, principal=me)
     if answered.outcome != "answered":
         raise Refusal(409, "not_approved")
     while True:

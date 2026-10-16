@@ -12,6 +12,7 @@ import {
   type HostForm,
   type HostableRow,
   LENGTHS,
+  MAY_HAVE_GONE_OUT,
   MEET_NOW_NOTICE,
   type MeetTab,
   NOTICE_TEXT,
@@ -21,6 +22,7 @@ import {
   hostFormError,
   later,
   openMeetTab,
+  refusedBeforeSend,
 } from "../../shared/hostMeetingRules";
 
 type Flow =
@@ -32,6 +34,8 @@ type Flow =
   | { phase: "failed"; text: string }
   | { phase: "scheduled"; names: string[] };
 
+const SENT_NO_LINK =
+  "Your invitation was sent, but Tilo could not open the call. Open it from your calendar or the meeting below.";
 const JOIN_FAILED = "Tilo could not join the meeting.";
 const WRAP_UP =
   'In the Meet chat, type "Tilo leave". Tilo leaves and your minutes can be made below.';
@@ -94,11 +98,13 @@ export function HostMeeting({
     setLink(null);
     setFlow({ phase: "starting" });
     let id: string | null = null;
-    let sent = false;
+    let started = false; // from the moment `start` is called, an invitation may exist
+    let sent = false; // `start` answered: the invitation went out
     try {
       const { you } = await api.people();
       id = await api.createNow(now(), crypto.randomUUID());
       await api.world(id);
+      started = true;
       await api.start(id, [you]);
       sent = true;
       const j = await api.join(id);
@@ -106,8 +112,16 @@ export function HostMeeting({
       else setLink(j.url);
     } catch (e) {
       tab?.close();
-      if (id !== null && !sent) await api.remove(id).catch(() => undefined);
-      setFlow({ phase: "failed", text: displayApiError(e) });
+      if (sent) {
+        setFlow({ phase: "failed", text: SENT_NO_LINK }); // the meeting stands; Open the call is on its row
+        onChanged?.();
+      } else if (!started || refusedBeforeSend(e)) {
+        if (id !== null) await api.remove(id).catch(() => undefined); // nothing was sent: no half-made meeting
+        setFlow({ phase: "failed", text: displayApiError(e) });
+      } else {
+        setFlow({ phase: "failed", text: MAY_HAVE_GONE_OUT }); // kept, never repeated by itself
+        onChanged?.();
+      }
       return;
     }
     await attend(id);
@@ -119,8 +133,14 @@ export function HostMeeting({
       await api.world(id);
       await api.start(id, [you, ...picked.map((p) => p.id)]);
     } catch (e) {
-      await api.remove(id).catch(() => undefined);
-      throw e;
+      if (refusedBeforeSend(e)) {
+        await api.remove(id).catch(() => undefined);
+        throw e;
+      }
+      setDialog(false); // the outcome is unknown: no second Confirm, no second set of invitations
+      setFlow({ phase: "failed", text: MAY_HAVE_GONE_OUT });
+      onChanged?.();
+      return;
     }
     setDialog(false);
     setFlow({ phase: "scheduled", names: picked.map((p) => p.name) });

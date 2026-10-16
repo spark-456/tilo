@@ -1,6 +1,8 @@
 // FR-MTG-01, FR-MTG-09, FR-MTG-10: the hosted-meeting form rules and the attend window. Kept outside `api/` (which may
 // hold no clock, Park's static rule WEB_1a) and outside the Agenda page files (no Date or timers, WEB_9).
 
+import { TiloApiError } from "../../api/http";
+
 /** The notice version the API stamps (`deps.NOTICE_VERSION`); a stale one is a 422. */
 export const NOTICE_VERSION = "1.0.0";
 /** The disclosed-notetaker notice, from the addendum's rule 2 (PPL: AI notetaker, 30-day transcript, who sees it,
@@ -118,3 +120,15 @@ export function attendOffered(row: HostableRow, nowMs: number): boolean {
   const e = row.end ? new Date(row.end).getTime() : s + 60 * 60_000;
   return nowMs >= s - EARLY_MS && nowMs <= e;
 }
+
+/** True only for an answer that proves nothing went out: the API refused the start (403, 404, 409, 422, or 503
+ * `not_configured`) before any invitation was made. Anything else (a lost answer, a 5xx, a timeout, 502
+ * `invitation_failed`, 504 `invitation_pending`) may have been sent, so nothing is taken back or repeated. */
+export function refusedBeforeSend(e: unknown): boolean {
+  if (!(e instanceof TiloApiError) || e.status === null) return false;
+  if ([403, 404, 409, 422].includes(e.status)) return true;
+  return e.status === 503 && (e.code === "not_configured" || e.refusal === "not_configured");
+}
+
+export const MAY_HAVE_GONE_OUT =
+  "The invitation may have gone out. Check your calendar before trying again. Tilo has not repeated it, and the meeting is kept below.";

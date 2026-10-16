@@ -455,3 +455,102 @@ describe("FR_MTG_09_UI the Agenda's Meetings list", () => {
     expect(m.container.textContent).toContain("The meeting ended and Tilo left.");
   });
 });
+
+describe("MEET_SIMPLE an unknown outcome is never called nothing-sent", () => {
+  const failStart = (http: ReturnType<typeof rig>["http"], error: unknown) => {
+    const base = http.postJson.getMockImplementation() as Post;
+    http.postJson.mockImplementation(async (path: string) => {
+      if (path.endsWith("/start")) throw error;
+      return base(path);
+    });
+  };
+  const unsure: [string, TiloApiError][] = [
+    ["504 invitation_pending", new TiloApiError("x", 504, false, true, "invitation_pending")],
+    ["502 invitation_failed", new TiloApiError("x", 502, false, true, "invitation_failed")],
+    ["a lost answer", new TiloApiError("x", null, true, true)],
+    ["a plain 500", new TiloApiError("x", 500, true, true)],
+    ["503 try_again", new TiloApiError("x", 503, true, true, "try_again")],
+  ];
+  it.each(unsure)(
+    "MEET_SIMPLE_k_meet_now_after_%s_keeps_the_meeting_and_does_not_repeat",
+    async (_n, error) => {
+      const { api, http } = rig();
+      failStart(http, error);
+      const m = mount(<HostMeeting api={api} hostState={hostState("connected")} now={() => NOW} />);
+      await flush();
+      await press(m.container, "Meet with Tilo now");
+      await flush();
+      const text = m.container.querySelector('[role="alert"]')?.textContent ?? "";
+      expect(text).toContain("may have gone out");
+      expect(text).toContain("Check your calendar");
+      expect(text).not.toContain("Nothing was sent");
+      expect(paths(http)).not.toContain("/v1/meetings/mt_new/delete");
+      expect(paths(http).filter((p) => p.endsWith("/start"))).toHaveLength(1);
+      expect(paths(http).some((p) => p.endsWith("/attend"))).toBe(false);
+    },
+  );
+  it.each(unsure)(
+    "MEET_SIMPLE_l_schedule_after_%s_closes_the_dialog_keeps_the_meeting",
+    async (_n, error) => {
+      const { api, http } = rig();
+      const m = mount(<HostMeeting api={api} hostState={hostState("connected")} now={() => NOW} />);
+      await flush();
+      await press(m.container, "Schedule with others");
+      await flush();
+      failStart(http, error);
+      const form = m.container.querySelector("form") as HTMLElement;
+      set(form.querySelector('input[name="title"]') as Element, "Q4 plan");
+      set(form.querySelector('input[name="start"]') as Element, "2026-10-17T18:00");
+      await act(async () =>
+        click(form.querySelector(":scope > label.park-agenda-hostnotice input") as Element),
+      );
+      await press(m.container, "Confirm and send invitations");
+      await flush();
+      expect(m.container.querySelector("form")).toBeNull(); // no second Confirm to send a second set
+      expect(m.container.textContent).toContain("may have gone out");
+      expect(m.container.textContent).not.toContain("Nothing was sent");
+      expect(paths(http)).not.toContain("/v1/meetings/mt_new/delete");
+      expect(paths(http).filter((p) => p.endsWith("/start"))).toHaveLength(1);
+    },
+  );
+  it.each([403, 404, 409, 422])(
+    "MEET_SIMPLE_m_a_%s_refusal_is_nothing_sent_and_takes_the_meeting_back",
+    async (status) => {
+      const { api, http } = rig();
+      failStart(http, new TiloApiError("x", status, false, true));
+      const m = mount(<HostMeeting api={api} hostState={hostState("connected")} now={() => NOW} />);
+      await flush();
+      await press(m.container, "Meet with Tilo now");
+      await flush();
+      expect(m.container.querySelector('[role="alert"]')?.textContent).not.toContain(
+        "may have gone out",
+      );
+      expect(paths(http)).toContain("/v1/meetings/mt_new/delete");
+    },
+  );
+  it("MEET_SIMPLE_n_503_not_configured_is_a_refusal_and_after_a_sent_start_nothing_is_taken_back", async () => {
+    const a = rig();
+    failStart(a.http, new TiloApiError("x", 503, false, true, "not_configured"));
+    const m = mount(<HostMeeting api={a.api} hostState={hostState("connected")} now={() => NOW} />);
+    await flush();
+    await press(m.container, "Meet with Tilo now");
+    await flush();
+    expect(paths(a.http)).toContain("/v1/meetings/mt_new/delete");
+    cleanup();
+    const b = rig();
+    b.http.getJson.mockImplementation(async (path: string) => {
+      if (path === "/v1/people") return PEOPLE;
+      throw new TiloApiError("x", 409, false, false, "not_joinable");
+    });
+    const m2 = mount(
+      <HostMeeting api={b.api} hostState={hostState("connected")} now={() => NOW} />,
+    );
+    await flush();
+    await press(m2.container, "Meet with Tilo now");
+    await flush();
+    expect(m2.container.querySelector('[role="alert"]')?.textContent).toContain(
+      "invitation was sent",
+    );
+    expect(paths(b.http)).not.toContain("/v1/meetings/mt_new/delete");
+  });
+});
