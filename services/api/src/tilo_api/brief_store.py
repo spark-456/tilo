@@ -135,13 +135,14 @@ class MemoryBriefStore:
     def erase(self, org: str, user: str) -> None:
         with self._lock:
             self._settings.pop((org, user), None)
-            for table in (self._claims, self._counts):
-                for key in [k for k in table if k[0] == org and k[1] == user]:
-                    table.pop(key, None)
-            for key in [k for k in self._mail if k[0] == org and user in self._mail[k]]:
-                self._mail[key].pop(user, None)
-                if not self._mail[key]:
-                    self._mail.pop(key, None)
+            for claim_key in [k for k in self._claims if k[0] == org and k[1] == user]:
+                self._claims.pop(claim_key, None)
+            for count_key in [k for k in self._counts if k[0] == org and k[1] == user]:
+                self._counts.pop(count_key, None)
+            for mail_key in [k for k in self._mail if k[0] == org and user in self._mail[k]]:
+                self._mail[mail_key].pop(user, None)
+                if not self._mail[mail_key]:
+                    self._mail.pop(mail_key, None)
 
 
 class FirestoreBriefStore:
@@ -220,7 +221,7 @@ class FirestoreBriefStore:
         self._doc(org, "brief_settings", user).delete()
         claims = self._client.collection(f"orgs/{org}/brief_claims")
         for snap in claims.stream():
-            if snap.id.startswith(f"{user}_"):
+            if re.fullmatch(rf"{re.escape(user)}_{_DATE.pattern}_[a-z][a-z0-9_]*", snap.id):
                 snap.reference.delete()
         from google.cloud.firestore import DELETE_FIELD  # noqa: PLC0415
 

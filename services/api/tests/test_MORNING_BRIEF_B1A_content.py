@@ -352,9 +352,13 @@ def test_MORNING_BRIEF_B1A_MO09_old_email_copies_are_purged_by_stored_creation_d
             self.deleted = []
 
         def artifact_ids(self, scope, prefix):
+            if prefix == "art_mbrief_":
+                return ["art_mbrief_20261001"]
             return ["art_morning_brief_old", "art_morning_brief_recent"] if prefix == "art_morning_brief_" else []
 
         def versions(self, scope, aid):
+            if aid == "art_mbrief_20261001":
+                raise ArtifactNotFound("purged by another worker")
             return [old if aid.endswith("old") else recent]
 
         def retention(self):

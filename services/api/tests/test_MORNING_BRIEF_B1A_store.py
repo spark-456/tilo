@@ -102,6 +102,7 @@ def test_MORNING_BRIEF_B1A_MO09_firestore_erasure_removes_claims_and_mail_owners
     data = {
         f"orgs/{ORG}/brief_settings/{ME}": SETTING,
         f"orgs/{ORG}/brief_claims/{ME}_2026-10-16_schedule": {"at": "2026-10-16"},
+        f"orgs/{ORG}/brief_claims/{ME}_other_2026-10-16_schedule": {"at": "2026-10-16"},
         f"orgs/{ORG}/brief_claims/{YOU}_2026-10-16_schedule": {"at": "2026-10-16"},
         f"orgs/{ORG}/brief_mail/m1": {"owners": {ME: "2026-10-16", YOU: "2026-10-16"}},
         f"orgs/{ORG}/brief_mail/m2": {"owners": {ME: "2026-10-16"}},
@@ -145,6 +146,7 @@ def test_MORNING_BRIEF_B1A_MO09_firestore_erasure_removes_claims_and_mail_owners
     FirestoreBriefStore(Client()).erase(ORG, ME)
     assert f"orgs/{ORG}/brief_settings/{ME}" not in data
     assert f"orgs/{ORG}/brief_claims/{ME}_2026-10-16_schedule" not in data
+    assert f"orgs/{ORG}/brief_claims/{ME}_other_2026-10-16_schedule" in data
     assert f"orgs/{ORG}/brief_claims/{YOU}_2026-10-16_schedule" in data
     assert data[f"orgs/{ORG}/brief_mail/m1"]["owners"] == {YOU: "2026-10-16"}
     assert f"orgs/{ORG}/brief_mail/m2" not in data and f"orgs/{ORG}/brief_mail/m3" in data
