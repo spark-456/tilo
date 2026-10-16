@@ -285,13 +285,13 @@ export function HomePage({ app }: { app: AppCtx }) {
       if (!r.capped) setQuick({ state: "error", message: r.message, retry: prepare });
     });
   };
-  const startRun = (repeat: Cadence | null) => {
+  const startRun = (repeat: Cadence | null, makeChoices = run?.makeChoices ?? []) => {
     if (run === null || runBusy) return;
     // triggeredBy: the person's Start click; the card folds only for an actual start request.
     setRunStarting(true);
     setRunBusy(true);
     setRunError(null);
-    store.startRun(run, repeat).then((r) => {
+    store.startRun({ ...run, makeChoices }, repeat).then((r) => {
       if (!alive.current) return;
       setRunBusy(false);
       if (!r.ok) {

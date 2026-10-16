@@ -3,6 +3,7 @@
 // default; on, it shows weekday, time and the browser time zone prefilled (Monday 09:00) and Start hands the
 // cadence over; an invalid time stops Start; off again posts nothing. The schedule call itself is the one-step
 // start's (oneStep.OLD-UI-OUT.test.ts).
+import type { PlanMakeChoice } from "@tilo/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, mount, q } from "../../../../test-support/park/componentsHarness";
 import { clickEl, settle, typeInto } from "../../../../test-support/park/homeHarness";
@@ -21,13 +22,36 @@ const PLAN: RunPlan = {
   cap: 20,
   usd: 1,
   time: "2–5 min",
+  makeChoices: [],
 };
 
-function card(over: { busy?: boolean; error?: string | null } = {}) {
+const MAKER_CHOICE: PlanMakeChoice = {
+  deliverable: 0,
+  selected: "native",
+  options: [
+    { make_with: "native", label: "Tilo", status: "ready", suggested: false, note: null },
+    {
+      make_with: "connector:lovable",
+      label: "Lovable",
+      status: "ready",
+      suggested: true,
+      note: "For a large site",
+    },
+    {
+      make_with: "connector:canva",
+      label: "Canva",
+      status: "needs_setup",
+      suggested: false,
+      note: "Connect Canva first",
+    },
+  ],
+};
+
+function card(over: { busy?: boolean; error?: string | null; plan?: RunPlan } = {}) {
   const onStart = vi.fn();
   const m = mount(
     <RunCard
-      plan={PLAN}
+      plan={over.plan ?? PLAN}
       busy={over.busy ?? false}
       error={over.error ?? null}
       onStart={onStart}
@@ -46,7 +70,7 @@ describe("FR-AGT-14 confirm card: Repeat weekly", () => {
     expect(toggle(el).checked).toBe(false);
     expect(el.querySelector('[data-testid="repeat-weekday"]')).toBeNull();
     clickEl(startButton(el));
-    expect(onStart).toHaveBeenCalledWith(null);
+    expect(onStart).toHaveBeenCalledWith(null, []);
   });
 
   it("switched on shows Monday 09:00 and the browser's zone, and Start hands over exactly that cadence", async () => {
@@ -58,7 +82,7 @@ describe("FR-AGT-14 confirm card: Repeat weekly", () => {
     const tz = q(el, '[data-testid="repeat-tz"]').textContent ?? "";
     expect(tz.length).toBeGreaterThan(0);
     clickEl(startButton(el));
-    expect(onStart).toHaveBeenCalledWith({ weekday: 0, hour: 9, minute: 0, tz });
+    expect(onStart).toHaveBeenCalledWith({ weekday: 0, hour: 9, minute: 0, tz }, []);
   });
 
   it("an invalid time stops Start and says what to enter; switching off again hands over nothing", async () => {
@@ -73,7 +97,7 @@ describe("FR-AGT-14 confirm card: Repeat weekly", () => {
     await settle();
     expect(startButton(el).disabled).toBe(false);
     clickEl(startButton(el));
-    expect(onStart).toHaveBeenCalledWith(null);
+    expect(onStart).toHaveBeenCalledWith(null, []);
   });
 
   it("shows the budget line with the cap Start approves and a labelled meter", () => {
@@ -82,5 +106,52 @@ describe("FR-AGT-14 confirm card: Repeat weekly", () => {
     expect(q(el, '[data-testid="budget-meter"]').getAttribute("aria-label")).toContain(
       "your cap is 20",
     );
+  });
+
+  it("WEBSITE_MK_08 shows every maker in order, suggests Lovable, and disables setup-only picks", () => {
+    const m = mount(
+      <RunCard
+        plan={{ ...PLAN, makeChoices: [MAKER_CHOICE] }}
+        busy={false}
+        error={null}
+        onStart={() => undefined}
+        onCancel={() => undefined}
+        onEdit={() => undefined}
+      />,
+    );
+    const section = m.container.querySelector('[aria-label="Where to make it"]');
+    const text = section?.textContent ?? "";
+    expect(section).not.toBeNull();
+    expect(text.indexOf("Tilo")).toBeLessThan(text.indexOf("Lovable"));
+    expect(text).toContain("Suggested");
+    expect(text).toContain("For a large site");
+    expect(text).toContain("Connect Canva first");
+    expect(section?.querySelector<HTMLInputElement>('input[value="native"]')?.checked).toBe(true);
+    expect(
+      section?.querySelector<HTMLInputElement>('input[value="connector:canva"]')?.disabled,
+    ).toBe(true);
+    expect(section?.querySelector('a[href="/connectors"]')).not.toBeNull();
+    m.unmount();
+  });
+
+  it("WEBSITE_MK_05 changing maker hands the selected choice to Start; unlisted markdown has no chooser", () => {
+    const onStart = vi.fn();
+    const m = mount(
+      <RunCard
+        plan={{ ...PLAN, makeChoices: [MAKER_CHOICE] }}
+        busy={false}
+        error={null}
+        onStart={onStart}
+        onCancel={() => undefined}
+        onEdit={() => undefined}
+      />,
+    );
+    const el = m.container;
+    clickEl(q<HTMLInputElement>(el, 'input[value="connector:lovable"]'));
+    clickEl(startButton(el));
+    expect(onStart.mock.calls[0]?.[1]?.[0]?.selected).toBe("connector:lovable");
+    m.unmount();
+    const noChoice = card({ plan: { ...PLAN, goal: "Write a markdown note" } });
+    expect(noChoice.el.querySelector('[aria-label="Where to make it"]')).toBeNull();
   });
 });
