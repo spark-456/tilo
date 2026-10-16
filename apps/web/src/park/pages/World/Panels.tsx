@@ -1,7 +1,14 @@
 // STUDIO-3 (design/studio-v2 "Tilo S World.dc.html"): the three tabs beside the city. Story is what the team did, in
 // plain words from the recorded events; Steps is the plan in order; Result is the delivered output. A tab with
 // nothing recorded says so; nothing here moves or is filled in.
-import { type KeyboardEvent, type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { cx } from "../../components/cx";
 import { type RunStep, clockOf, runSteps, storyOf } from "./runSteps";
 import type { RunEvent } from "./useRunEvents";
@@ -114,7 +121,8 @@ export function TabPanel({
   title,
   sub,
   aside,
-  className,
+  slideWhen,
+  slide,
   children,
 }: {
   tab: WorldTab;
@@ -122,17 +130,25 @@ export function TabPanel({
   title: string;
   sub: string;
   aside?: string;
-  /** An extra class: the Result panel slides in on artifact.delivered (TILO-T-WORLD). */
-  className?: string;
+  /** TILO-T-WORLD: a panel that slides in (class `slide`) when this turns true while the page is open, and only then:
+   * triggeredBy artifact.delivered for the Result panel. True from the start just shows. */
+  slideWhen?: boolean;
+  slide?: string;
   children: ReactNode;
 }) {
+  const was = useRef(slideWhen);
+  const [slid, setSlid] = useState(false);
+  useEffect(() => {
+    if (slideWhen && !was.current) setSlid(true);
+    was.current = slideWhen;
+  }, [slideWhen]);
   return (
     <div
       role="tabpanel"
       id={panelId(tab)}
       aria-labelledby={tabId(tab)}
       hidden={on !== tab}
-      className={cx("park-world-panel", className)}
+      className={cx("park-world-panel", slid && slide)}
       data-tab={tab}
     >
       <div className="park-world-panelhead">

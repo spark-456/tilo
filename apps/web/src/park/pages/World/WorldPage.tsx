@@ -471,14 +471,6 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const toastLine = latestLine(trackRun ? runEvents : null, w.activity);
   const shown: WorldTab = tab ?? (view?.deliverable ? "result" : "story");
   const delivered = trackRun && view !== null && view.deliverable;
-  // triggeredBy: artifact.delivered, seen arriving while this page is open: the Result panel slides in (tSlideR, or the
-  // sheet rises on a phone, tSlideUp). A result that was already delivered when the page opened just shows.
-  const wasDelivered = useRef(delivered);
-  const [slid, setSlid] = useState(false);
-  useEffect(() => {
-    if (delivered && !wasDelivered.current) setSlid(true);
-    wasDelivered.current = delivered;
-  }, [delivered]);
   // TILO-T-WORLD: the agents' conversations are a tab of a real run once it has recorded events.
   const chatOn = trackRun && hasStage && !w.sample;
 
@@ -885,7 +877,8 @@ export function WorldPage({ app }: { app: AppCtx }) {
             on={shown}
             title="Result"
             sub="What this world delivered"
-            {...(slid ? { className: wide ? "tw-slide-r" : "tw-slide-up" } : {})}
+            slideWhen={delivered}
+            slide={wide ? "tw-slide-r" : "tw-slide-up"}
           >
             {delivered ? (
               <RunResult api={api} worldId={w.id} events={runEvents} shared={result} />
