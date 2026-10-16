@@ -1,8 +1,8 @@
 # ADR-0050: The website deliverable (one sandboxed HTML file) and where each deliverable is made
 
-- Status: **Proposed** (16 Oct 2026), for acceptance. The owner's direction and their yes to this contract change
-  reached the architect relayed by the supervisor; both are quoted verbatim below. A relayed message is not
-  recorded here as the owner's own acceptance: the supervisor (or the owner) flips this line to Accepted.
+- Status: **Accepted** (16 Oct 2026). The owner wrote in the supervisor chat, verbatim: "This is my YES to the
+  website output (ADR + contract change to allow a self-contained HTML deliverable, sandboxed preview, no network,
+  security review)"; the direction is quoted verbatim below.
 - Deciders: owner (scope and approval), supervisor (acceptance), architect (design), security reviewer (WEB-1,
   WEB-2, WEB-3, WEB-5)
 - Requirements: FR-AGT-16 (deliverables Tilo builds), FR-CON-16, FR-CON-17, FR-CON-19, FR-CON-20, FR-CON-22,
