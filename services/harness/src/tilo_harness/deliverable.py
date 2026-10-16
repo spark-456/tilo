@@ -32,6 +32,7 @@ _REASONS = {
     "not_json": "the reply is not one JSON object",
     "invalid_spec": "the reply is not a valid report specification",
     "source_invalid": "a cited source could not be verified",
+    "website_invalid": "the website file did not pass the safety checks",
     "render_failed": "the report could not be laid out",
 }
 
@@ -39,9 +40,10 @@ _REASONS = {
 class DeliverableRefused(Exception):
     """The reply cannot become a PDF. `code` is one of a fixed few; `str()` is a plain sentence without the reply."""
 
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, detail: str = "") -> None:
         super().__init__(_REASONS[code])
         self.code = code
+        self.detail = detail  # a fixed checker code and a line number (WEB-1), never reply text
 
 
 def wants_pdf(unit: Mapping[str, Any], brief: Mapping[str, Any] | None) -> bool:

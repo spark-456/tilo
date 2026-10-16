@@ -885,12 +885,16 @@ class Run:
         nothing and says so (deliverable_count 0)."""
         seen = {e["data"]["artifact"]["artifact_id"] for e in self.store.events.get(self.world_id, [])
                 if e["type"] == "artifact.delivered"}  # fmt: skip
+        sites = {e["data"]["artifact"]["artifact_id"] for e in self.store.events.get(self.world_id, [])
+                 if e["type"] == "artifact.created" and e["data"].get("media_type") == "text/html"}  # fmt: skip
         for source in (unit["id"], *unit["depends_on"]):
             for producer, item, made in self.produced.get(source, []):
                 if item["artifact_id"] in seen:
                     continue
                 seen.add(item["artifact_id"])
                 data = {"artifact": item, "format": "in_app", "outbox_id": None}
+                if item["artifact_id"] in sites:  # WEB-1, WS-14: a native website says where it was made
+                    data = {"artifact": item, "format": "website", "outbox_id": None, "make_with": "native"}
                 self._deliver(producer, worker, item, data, made, here=self._building(unit))
 
     async def _send(self, entry: dict, evidence: dict[str, Any]) -> dict:

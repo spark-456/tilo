@@ -27,9 +27,14 @@ import jsonschema
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
+from tilo_memory.website_check import MAX_BYTES as MAX_HTML
+from tilo_memory.website_check import check_website
+
 _CONTRACTS = pathlib.Path(__file__).resolve().parents[4] / "contracts"
 _SCHEMA_ID = "https://contracts.tilo.example/artifact.schema.json"
 TEXT_TYPES = frozenset({"text/markdown", "text/csv", "application/json"})
+HTML = "text/html"  # a writer unit's website only (AR-10); text for the redactor and the screener (AR-07)
+_TEXTUAL = TEXT_TYPES | {HTML}
 FILE_TYPES = frozenset(
     {
         "application/pdf",
@@ -611,8 +616,10 @@ class ArtifactStore:
             self._plan(scope, None, None, len(content))  # AR-04 world cap, before any hashing
         if self._hash(content) != rec["content_sha256"]:
             raise _refuse("AR-01", "the bytes do not match the record's hash")
-        if rec["media_type"] in TEXT_TYPES and self._clean(content) is not None:
+        if rec["media_type"] in _TEXTUAL and self._clean(content) is not None:
             raise _refuse("AR-07", "the text holds what the secret redactor removes; nothing stored")
+        if rec["media_type"] == HTML:
+            self._check_html(content)
         if held is None and rec["screening"] == "clean" and rec["origin"]["kind"] != "restore":
             rec["screening"], rec["screened_at"] = self._screen(content, rec["media_type"])  # never the claim
         with self._lock:
@@ -657,13 +664,14 @@ class ArtifactStore:
             raise _refuse("AR-02", "a restore copies an earlier version")
         kind = "upload" if origin["kind"] == "restore" else origin["kind"]  # a restore has no unit, agent or key
         self._check_new(
-            NewVersion(
+            restore=origin["kind"] == "restore",
+            new=NewVersion(
                 media_type=rec["media_type"],
                 content=content,
                 run_id=rec["run_id"],
                 origin=Origin(kind=kind, unit=origin["unit"], agent=origin["agent"]),
                 idempotency_key=rec["idempotency_key"],
-            )
+            ),
         )
         if rec["size_bytes"] != len(content):
             raise _refuse("AR-01", "the size does not match the bytes")
@@ -747,16 +755,18 @@ class ArtifactStore:
         }
         return self._append(scope, parent, data, fields)
 
-    def _check_new(self, new: NewVersion) -> dict[str, Any] | None:
+    def _check_new(self, new: NewVersion, *, restore: bool = False) -> dict[str, Any] | None:
         """Shape, kinds and caps: everything that can be refused without hashing. Returns the normalised parent."""
         origin, media = new.origin, new.media_type
         if new.screening_hint is not None and (type(new.screening_hint) is not str or new.screening_hint != "flagged"):
             raise _refuse("AR-07", "a screening hint can only be 'flagged'; the store alone says clean")
         if not isinstance(origin, Origin) or origin.kind not in ("unit", "render", "upload", "fetch"):
             raise _refuse("AR-02", "origin must be unit, render, upload or fetch (restore has its own call)")
-        if type(media) is not str or media not in TEXT_TYPES | FILE_TYPES:
+        if type(media) is not str or media not in _TEXTUAL | FILE_TYPES:
             raise _refuse("AR-04", "media type is not one of the nine")
-        if origin.kind == "unit" and media not in TEXT_TYPES:
+        if media == HTML and origin.kind != "unit" and not restore:
+            raise _refuse("AR-10", "HTML is only ever a writer unit's website (never an upload, fetch or render)")
+        if origin.kind == "unit" and media not in _TEXTUAL:
             raise _refuse("AR-04", "a unit's output is text or JSON, never a file")
         if origin.kind == "render" and media not in FILE_TYPES:
             raise _refuse("AR-04", "render makes only files")
@@ -783,7 +793,7 @@ class ArtifactStore:
             raise _refuse("AR-05", "an upload has no idempotency key")
         if not isinstance(new.content, bytes) or len(new.content) < 1:
             raise _refuse("AR-04", "content must be at least 1 byte")
-        if len(new.content) > (MAX_TEXT if media in TEXT_TYPES else MAX_FILE):
+        if len(new.content) > (MAX_HTML if media == HTML else MAX_TEXT if media in TEXT_TYPES else MAX_FILE):
             raise _refuse("AR-04", "content is over the size cap for its kind")
         if origin.kind == "fetch":
             if media not in FILE_TYPES or len(new.sources) != 1 or self._file_sniffer is None:
@@ -807,10 +817,18 @@ class ArtifactStore:
 
     def _prepare(self, new: NewVersion) -> tuple[bytes, bool]:
         """The bytes to store and whether the redactor changed them (text and JSON only; files are not read)."""
-        if new.media_type not in TEXT_TYPES:
+        if new.media_type not in _TEXTUAL:
             return new.content, False
         cleaned = self._clean(new.content)
-        return (new.content, False) if cleaned is None else (cleaned.encode("utf-8"), True)
+        data, redacted = (new.content, False) if cleaned is None else (cleaned.encode("utf-8"), True)
+        if new.media_type == HTML:
+            self._check_html(data)  # AR-10: the exact bytes kept, after the redactor, before any hash
+        return data, redacted
+
+    def _check_html(self, data: bytes) -> None:
+        result = check_website(data)
+        if not result.ok:
+            raise _refuse("AR-10", f"the website did not pass the static checks ({result.code}, line {result.line})")
 
     def _clean(self, content: bytes) -> str | None:
         """What the redactor makes of text or JSON bytes, or None when it changes nothing."""
@@ -836,7 +854,7 @@ class ArtifactStore:
             convert = getattr(self, "_upload_text", None)
             if media_type.startswith("application/vnd.openxmlformats-officedocument.") and convert is not None:
                 verdict = self._screener.check(convert(data, media_type))
-            elif media_type in TEXT_TYPES:
+            elif media_type in _TEXTUAL:
                 verdict = self._screener.check(data.decode("utf-8"))
             else:
                 verdict = self._screener.check("", content=data, mime_type=media_type)

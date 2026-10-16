@@ -47,7 +47,7 @@ from tilo_providers.clock import Clock, real_today
 from tilo_providers.diagnostics import log_caught
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
 from tilo_providers.media import MediaPart, check_parts
-from tilo_providers.prompts import load_prompt
+from tilo_providers.prompts import load_prompt, neutralise_marker
 
 from tilo_harness.deliverable import DeliverableRefused, prompt_name, render_format, render_output, wants_rendered
 from tilo_harness.outputs import UnitOutput
@@ -66,6 +66,7 @@ from tilo_harness.tools import (
 )
 from tilo_harness.unit_prompt import UpstreamItem, data_line, inputs_text, request_variables
 from tilo_harness.untrusted import neutralise
+from tilo_harness.website import REPAIR_REPLY_CHARS, WEBSITE_FORMAT, degraded, wants_website, website_output
 
 if TYPE_CHECKING:
     from tilo_harness.executor import UnitContext, UnitOutcome
@@ -192,10 +193,13 @@ class ToolUnitRunner:
             private=any(item.private for item in context.upstream),
             progress=context.progress,
         )
+        website = wants_website(unit, context.brief)  # WEB-1: the final writer's reply is one HTML file
         holds_effects = not loop.tainted and any(self._tools.is_side_effect(tool) for tool in allowed.values())
         base = load_prompt(
             role,
-            prompt_name(unit, context),  # LW-10: a deliver unit for a file writes a spec (or, for a template, cells)
+            "unit_website.md"
+            if website
+            else prompt_name(unit, context),  # LW-10, WEB-1: a deliver unit for a file writes a spec, cells or a page
             {
                 "title": data_line(unit["title"], 120),
                 "unit_type": data_line(unit["unit_type"], 80),
@@ -211,7 +215,7 @@ class ToolUnitRunner:
         )
         quiz = wants_quiz(unit, context.brief, source_available=self._quiz_available)
         rendered = wants_rendered(unit, context.brief)
-        fmt = render_format(unit, context.brief)
+        fmt = render_format(unit, context.brief) or (WEBSITE_FORMAT if website else None)
         if quiz:
             base += (
                 "\nReturn only a quiz AppSpec JSON object (v=1.0, kind=quiz, title, theme, timer, questions). "
@@ -234,6 +238,8 @@ class ToolUnitRunner:
                     return self._finish(UnitOutcome(False, f"No result for {unit['title']}."), loop, "no_text")
 
                 async def final_output(text: str) -> UnitOutput:
+                    if website:
+                        return await asyncio.to_thread(website_output, text)
                     if rendered:
                         if fmt != "pdf" and self._report_renderer is None:
                             raise DeliverableRefused("render_failed")
@@ -246,6 +252,9 @@ class ToolUnitRunner:
                         return await asyncio.to_thread(quiz_output, text, self._quiz_sources)
                     return UnitOutput(media_type="text/markdown", content=text.encode("utf-8"))
 
+                def as_text(text: str) -> bytes:  # the useful reply as Markdown; a failed page only as a code block
+                    return degraded(text) if website else text.encode("utf-8")
+
                 summary = f"Finished {unit['title']}."
                 try:
                     output = await final_output(response.text)
@@ -254,7 +263,7 @@ class ToolUnitRunner:
                         return self._refused_delivery(refused, loop)
                     repair = None
                     if (
-                        refused.code in {"not_json", "invalid_spec"}
+                        refused.code in {"not_json", "invalid_spec", "website_invalid"}
                         and loop.step < self._max_steps
                         and loop.credits < self._credit_cap
                     ):
@@ -273,6 +282,14 @@ class ToolUnitRunner:
                             json_mode=True,
                             max_output_tokens=4096,
                         )
+                        if website:  # WEB-1: same role, no tools; the checker's code and line and the reply as data
+                            shown = neutralise_marker(response.text[:REPAIR_REPLY_CHARS], "BAD_REPLY")
+                            variables = {"violations": refused.detail, "reply": shown}
+                            repair_request = GenerateRequest(
+                                prompt=base + load_prompt(role, "unit_website_repair.md", variables),
+                                system=request.system,
+                                parts=request.parts,
+                            )
                         try:
                             repair = await asyncio.to_thread(provider.generate, repair_request)
                             if self._meter is not None:
@@ -285,9 +302,9 @@ class ToolUnitRunner:
                         except DeliverableRefused as second:
                             if second.code in {"too_large", "source_invalid"}:
                                 return self._refused_delivery(second, loop)
-                            output = UnitOutput(media_type="text/markdown", content=response.text.encode("utf-8"))
+                            output = UnitOutput(media_type="text/markdown", content=as_text(response.text))
                     else:
-                        output = UnitOutput(media_type="text/markdown", content=response.text.encode("utf-8"))
+                        output = UnitOutput(media_type="text/markdown", content=as_text(response.text))
                     if output.media_type == "text/markdown":
                         summary = f"Tilo could not build the {fmt or 'app'} file, so here is the result as text."
                 outcome = UnitOutcome(True, summary, outputs=(output,), provenance_ids=_refs(loop))

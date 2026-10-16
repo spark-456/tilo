@@ -37,4 +37,4 @@ email-body result is reused when fresh and a fit check and the Verifier accept i
   `GRACE` (else `ArtifactBusy`); `retention()` is `gcs_artifacts`. Firestore/GCS backends: ticket T8.
 
 ## Requirement IDs
-FR-MEM-01, FR-MEM-02, FR-MEM-03, FR-MEM-06, FR-MEM-09, FR-MEM-12; FR-MEM-10 `import_version` (a bundle's version under the importer's Scope: ids and bytes kept, `sources` dropped, a `clean` claim screened again).
+FR-MEM-01, FR-MEM-02, FR-MEM-03, FR-MEM-06, FR-MEM-09, FR-MEM-12; WEB-1 `website_check.check_website` (WS-02..08, stdlib; AR-10: the store runs it on every `text/html` version, unit origin only, after the redactor, before hashing); FR-MEM-10 `import_version` (a bundle's version under the importer's Scope: ids and bytes kept, `sources` dropped, a `clean` claim screened again).
