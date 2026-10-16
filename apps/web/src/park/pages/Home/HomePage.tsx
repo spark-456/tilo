@@ -25,6 +25,7 @@ import { DEMO_START } from "../../app/store";
 import { takeDraft } from "../../chat/handoff";
 import { FirstRunOverview } from "../../sample/FirstRunOverview";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
+import { HomeAssistant, type HomeContextChip } from "./HomeAssistant";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
 import "./Home.css";
 import { HomeSkeleton } from "./HomeSkeleton";
@@ -36,7 +37,7 @@ import {
   MODES,
   QUICK_MAX_CHARS,
   greetingWord,
-  liveRows,
+  recentRows,
   liveSummaryLine,
   needsWorld,
   nextEvents,
@@ -51,6 +52,7 @@ interface Base {
   today: Today;
   /** Null when the Api serves no calendar (live today): the Today panel then lists no events. */
   agenda: AgendaData | null;
+  agendaServed: boolean;
   ledger: Ledger;
   /** What the "Waiting on you" tile says and opens; none when the Api serves no decisions. */
   decisions: Decision[];
@@ -104,6 +106,7 @@ export function HomePage({ app }: { app: AppCtx }) {
             user: data(user),
             today: data(today),
             agenda: agenda && data(agenda),
+            agendaServed: agenda?.source === "live",
             ledger: data(ledger),
             decisions: decided.list,
             decisionsServed: decided.served,
@@ -413,6 +416,48 @@ export function HomePage({ app }: { app: AppCtx }) {
         openServed,
       )
     : summaryLine(needs, night);
+  const assistantContexts: HomeContextChip[] = [];
+  if (ready) {
+    const prefix = worldsLive ? "" : "Sample data: ";
+    const recentWorlds = worlds.filter((w) => !w.isNew && !w.sample).slice(0, 5);
+    if (recentWorlds.length > 0) {
+      assistantContexts.push({
+        id: "worlds",
+        label: "Recent worlds",
+        prompt: "Summarize my recent worlds",
+        detail: `${prefix}${recentWorlds.map((w) => `${w.name} (${w.st})`).join("; ")}`,
+      });
+    }
+    if (base.agenda) {
+      const rows =
+        base.agenda.days !== null
+          ? base.agenda.events
+              .filter((e) => e.d === base.agenda?.today)
+              .slice(0, 6)
+              .map((e) => `${e.t} at ${e.s}`)
+          : base.agenda.plate.rows
+              .slice(0, 6)
+              .map((e) => e.title)
+              .filter((title): title is string => title !== null);
+      if (rows.length > 0) {
+        assistantContexts.push({
+          id: "agenda",
+          label: "Today’s agenda",
+          prompt: "Today’s agenda: summarize it",
+          detail: `${base.agendaServed ? "" : "Sample data: "}${rows.join("; ")}`,
+        });
+      }
+    }
+    const openDecisions = base.decisions.filter((d) => !dec[d.k]);
+    if (openDecisions.length > 0) {
+      assistantContexts.push({
+        id: "needs",
+        label: "Needs you",
+        prompt: "What needs my attention?",
+        detail: `${base.decisionsServed ? "" : "Sample data: "}${openDecisions.map((d) => d.title).join("; ")}`,
+      });
+    }
+  }
 
   const root = useRef<HTMLDivElement>(null);
   const composerShown = !failed || (worldsLive && worlds !== "failed");
@@ -447,6 +492,7 @@ export function HomePage({ app }: { app: AppCtx }) {
         </div>
       ) : null}
       {!ready && !failed ? <HomeSkeleton /> : null}
+      {ready ? <HomeAssistant contexts={assistantContexts} /> : null}
       {base &&
       base !== "failed" &&
       base.agenda &&
@@ -543,7 +589,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           <div className="park-home-maincol">
             <WorldsSection
               served={served}
-              rows={liveRows(worlds, needs, served)}
+              rows={recentRows(worlds, needs, served)}
               sample={served ? worlds.find((w) => w.sample) : undefined}
               night={night}
               onWorld={open}

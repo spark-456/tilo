@@ -219,6 +219,29 @@ export function liveRows(worlds: readonly World[], needs: number, served = false
     });
 }
 
+/** The newest served worlds for Home, in the Api's order and with their actual terminal or active state. */
+export function recentRows(worlds: readonly World[], needs: number, served = false): LiveRow[] {
+  return worlds.filter((world) => !world.sample).slice(0, 5).map((world) => ({
+    world,
+    needs: world.st === "needs",
+    sub:
+      world.st === "needs"
+        ? needs > 0
+          ? decisionsWaiting(needs)
+          : "Needs you"
+        : world.st === "running"
+          ? world.isNew
+            ? "Starting now"
+            : served && world.prog === undefined
+              ? "Running"
+              : `Running · ${world.prog ?? 0}%`
+          : world.st === "finished"
+            ? "Done"
+            : world.when ?? "Scheduled",
+    prog: world.prog ?? 0,
+  }));
+}
+
 export type CalTone = AgendaEvent["cal"];
 
 export interface NextEvent {

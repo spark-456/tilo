@@ -98,7 +98,7 @@ describe("HOME_SUMMARY_LIVE: the summary is derived from served worlds and decis
     expect(worlds).not.toMatch(/Running · 0%|\b0%/);
   });
 
-  it("QA_13OCT_home_only_served_worlds_are_titled_your_worlds_and_the_fixture_panel_says_sample", async () => {
+  it("CX_T_HOME_served_worlds_are_recent_and_the_fixture_panel_stays_sample", async () => {
     const rig = await mountLiveHome(
       live({
         getWorlds: async () => servedWorlds(item("a", "started")),
@@ -106,7 +106,7 @@ describe("HOME_SUMMARY_LIVE: the summary is derived from served worlds and decis
       }),
     );
     const served = worldsText(rig.el);
-    expect(served).toContain("Your worlds");
+    expect(served).toContain("Recent worlds");
     expect(served).not.toContain("Sample worlds");
     cleanup();
     const { el } = await mountHome();

@@ -122,12 +122,12 @@ describe("WEB_4_home_render: the greeting panel", () => {
 });
 
 describe("WEB_4_home_render: Today panel", () => {
-  it("STUDIO_2_home_render_sample_worlds_lists_three_cards_with_their_lines_and_progress", async () => {
+  it("CX_T_HOME_sample_worlds_keeps_active_progress_and_shows_a_recent_done_world", async () => {
     const { el } = await mountHome();
     const worlds = worldsRegion(el);
     expect(textOf(worlds)).toContain("Sample worlds"); // fixture cards: never titled "Your worlds" (HR-1)
     let last = -1;
-    for (const w of LIVE_OPEN.slice(0, 3)) {
+    for (const w of LIVE_OPEN.slice(0, 2)) {
       const card = controlWith(worlds, w.name);
       expect(textOf(card), w.name).toContain(w.sub);
       expect(ringOf(card), `${w.name} progress`).toBe(w.prog);
@@ -136,19 +136,17 @@ describe("WEB_4_home_render: Today panel", () => {
       expect(at, `${w.name} keeps the reference order`).toBeGreaterThan(last);
       last = at;
     }
-    for (const w of LIVE_OPEN.slice(3)) expect(textOf(worlds)).not.toContain(w.name);
+    const done = controlWith(worlds, "Q3 audit prep");
+    expect(textOf(done)).toContain("Done");
+    expect(ringOf(done)).toBeNull();
   });
 
-  it("WEB_4_home_render_live_now_leaves_out_finished_and_scheduled_worlds", async () => {
+  it("CX_T_HOME_recent_worlds_labels_done_work_without_showing_scheduled_work", async () => {
     const { el } = await mountHome();
     const text = textOf(worldsRegion(el));
-    for (const gone of [
-      "Q3 audit prep",
-      "Invoice match",
-      "Inbox triage",
-      "Pricing check",
-      "Northline reply",
-    ]) {
+    expect(text).toContain("Q3 audit prep");
+    expect(text).toContain("Done");
+    for (const gone of ["Invoice match", "Inbox triage", "Pricing check", "Northline reply"]) {
       expect(text, gone).not.toContain(gone);
     }
   });
