@@ -1,7 +1,6 @@
 // RUN-INDICATOR css: the run bar's rules in park.shell.css, read as text. Pinned here: it floats at the bottom
 // (fixed, safe-area aware), is only as big as its pill (so it blocks no click outside itself), never sits over
-// the nav, shifts no layout, and adds no animation or transition of its own (the moving ring is the loader's
-// existing `park-shell__ring` class; the honesty allowlists and their tests are untouched).
+// the nav, shifts no layout, and adds no animation or transition of its own (the saved Thinking Tilo moves).
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -51,16 +50,9 @@ describe("RUN_INDICATOR css: no motion of its own", () => {
     }
   });
 
-  it("RUN_INDICATOR_css_no_new_keyframes_the_ring_is_the_loaders_existing_tiloSpin", () => {
+  it("CX_THINKING_TILO_css_no_rotating_ring_keyframes_remain", () => {
     const names = [...stripComments(css).matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]);
-    expect(names.sort()).toEqual([
-      "mvXY",
-      "tiloFade",
-      "tiloSlide",
-      "tiloSpin",
-      "waddle",
-      "walkFrame",
-    ]);
+    expect(names.sort()).toEqual(["mvXY", "tiloFade", "tiloSlide", "waddle", "walkFrame"]);
   });
 
   it("RUN_INDICATOR_css_the_bar_uses_tokens_for_colour", () => {

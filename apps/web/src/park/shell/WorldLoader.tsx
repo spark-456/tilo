@@ -1,6 +1,6 @@
 // The world loader (README "Interactions and motion": Open a world; reference `Tilo App.dc.html` wlOn): a
 // scrim with a 400px card (the world's art, "OPENING CITY", name, meta, three steps and a 4px bar). The steps
-// tick from a ring to a green check as the store's loader advances (the ring spins with tiloSpin); the page
+// tick from Thinking Tilo to a green check as the store's loader advances; the page
 // swaps in at step 3 and the card fades out over 280 ms on the next tick (`leaving`: the stylesheet fades the
 // scrim, the browser's animationend calls `onGone`). The bar jumps to its width.
 import type { ReactNode } from "react";
@@ -8,6 +8,7 @@ import { worlds } from "../api/fixtures/worlds";
 import type { Dec, TierName, World } from "../api/types";
 import type { WorldLaunch } from "../app/store";
 import { ArtTile, ModalScrim } from "../components";
+import { ThinkingTilo } from "../shared/ThinkingTilo";
 import { icon, parkKit } from "./kit";
 
 const STEPS: Record<TierName, (agents: number) => [string, string, string]> = {
@@ -29,10 +30,10 @@ function art(world: World, night: boolean): ReactNode {
   return drawn as ReactNode;
 }
 
-/** The step marker: a check when done, a ring on the current step, nothing after it. */
+/** The step marker: a check when done, Thinking Tilo on the current step, nothing after it. */
 function mark(i: number, step: number): ReactNode {
   if (i < step) return icon("check", 12);
-  if (i === step) return <span className="park-shell__ring" />;
+  if (i === step) return <ThinkingTilo size={20} decorative />;
   return null;
 }
 

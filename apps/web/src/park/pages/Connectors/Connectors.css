@@ -354,21 +354,6 @@
   cursor: default;
 }
 
-/* ---- Still spinner (the design's ring, without the turn) ---- */
-[data-park] .park-connectors-spin {
-  width: 14px;
-  height: 14px;
-  box-sizing: border-box;
-  border-radius: 99px;
-  border: 2.5px solid var(--track);
-  border-top-color: var(--hero);
-  display: block;
-  flex: none;
-}
-[data-park] .park-connectors-spin--red {
-  border: 2.5px solid rgba(255, 255, 255, 0.4);
-  border-top-color: var(--inv);
-}
 
 /* ---- Not connected yet ---- */
 [data-park] .park-connectors-empty {

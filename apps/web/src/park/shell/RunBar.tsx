@@ -1,7 +1,7 @@
 // The run bar (RUN-INDICATOR; PRD 9.4 HR-1, HR-2): a small pill fixed at the bottom of the Park app that says
 // Tilo is working. It draws only from the worlds the Api serves, the same recorded state the Worlds page shows:
-//   - a world in state `running` (a recorded start, not yet completed, failed or paused): a ring and a label;
-//   - a world in state `needs` (a recorded open card, the run is held): the static label, no ring;
+//   - a world in state `running` (a recorded start, not yet completed, failed or paused): Thinking Tilo and a label;
+//   - a world in state `needs` (a recorded open card, the run is held): the static label;
 //   - anything else, a failed read, or no worlds: nothing is drawn.
 // The state is read on mount, when the page changes, when a decision or a started world changes, and, while a live
 // run is showing, again every POLL_MS through the injected scheduler (so the end of a run takes the bar away; no
@@ -13,6 +13,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import type { World } from "../api/types";
 import { useParkApi, useParkStore, useSchedule } from "../app/context";
 import { useParkRoute } from "../app/router";
+import { ThinkingTilo } from "../shared/ThinkingTilo";
 import { useMotionOff } from "./motion";
 import { runBarOf } from "./runStatus";
 
@@ -83,7 +84,7 @@ export function RunBar() {
       data-source={read.live ? "live" : "fixture"}
     >
       {moving ? (
-        <span className="park-shell__ring" aria-hidden="true" />
+        <ThinkingTilo size={20} decorative />
       ) : (
         <span
           className={`park-shell__runbar-dot ${bar.kind === "held" ? "park-shell__runbar-dot--held" : ""}`}
