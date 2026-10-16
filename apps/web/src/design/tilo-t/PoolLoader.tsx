@@ -3,7 +3,7 @@ import { Buddy } from "./Buddy";
 import { useLoopPaused } from "./loops";
 import "./PoolLoader.css";
 
-type PoolPhase = "leap" | "swim" | "sink" | "done";
+type PoolPhase = "leap" | "swim" | "sink";
 export type PoolLoaderEvent = { readonly type: string };
 export type PoolLoaderProps = {
   children: ReactNode;
@@ -15,6 +15,16 @@ export type PoolLoaderProps = {
 const SITE_DELAY_MS = 300;
 const LEAP_MS = 2600;
 const SINK_MS = 2000;
+const SITE_COPY = {
+  leap: ["Loading Tilo", "Fetching your workspace"],
+  swim: ["Still loading", "The request is still loading"],
+  sink: ["Ready", "The request finished"],
+} as const;
+const TASK_COPY = {
+  leap: ["Starting your world", "world.started"],
+  swim: ["The Director is still planning", "Waiting for world.planned"],
+  sink: ["Your plan is ready", "world.planned"],
+} as const;
 const DROPS = Array.from({ length: 12 }, (_, i) => {
   const angle = Math.PI * (1.05 + (i / 11) * 0.9);
   const radius = 70 + ((i * 29) % 60);
@@ -80,41 +90,16 @@ export function PoolLoader(props: PoolLoaderProps) {
   useEffect(() => {
     if (!visible || phase !== "sink") return;
     const timer = window.setTimeout(() => {
-      setPhase("done");
       setVisible(false);
     }, SINK_MS);
     return () => window.clearTimeout(timer);
   }, [phase, visible]);
 
   const busy = active;
-  const subtitle =
-    phase === "leap"
-      ? isTask
-        ? "world.started"
-        : "Fetching your workspace"
-      : phase === "swim"
-        ? isTask
-          ? "Waiting for world.planned"
-          : "The request is still loading"
-        : isTask
-          ? failed
-            ? "world.failed"
-            : "world.planned"
-          : "The request finished";
-  const title =
-    phase === "leap"
-      ? isTask
-        ? "Starting your world"
-        : "Loading Tilo"
-      : phase === "swim"
-        ? isTask
-          ? "The Director is still planning"
-          : "Still loading"
-        : isTask && failed
-          ? "The world stopped"
-          : isTask
-            ? "Your plan is ready"
-            : "Ready";
+  const [title, subtitle] =
+    isTask && phase === "sink" && failed
+      ? ["The world stopped", "world.failed"]
+      : (isTask ? TASK_COPY : SITE_COPY)[phase];
   const surfaceStyle = (index: number): CSSProperties =>
     ({
       "--dx": DROPS[index]?.dx,
@@ -144,7 +129,6 @@ export function PoolLoader(props: PoolLoaderProps) {
             aria-busy={busy}
           >
             <div className={`tt-pool__water${phase === "sink" ? " tt-pool__water--closing" : ""}`}>
-              <div className="tt-pool__water-inner" />
               {phase !== "sink" ? (
                 <>
                   <span className="tt-pool__ring tt-pool__ring--one" />
@@ -159,7 +143,6 @@ export function PoolLoader(props: PoolLoaderProps) {
                 <div className="tt-pool__buddy tt-pool__buddy--leap tt-pool__leap">
                   <Buddy size={120} mood="happy" />
                 </div>
-                <div className="tt-pool__water-front" />
                 <div className="tt-pool__drops" aria-hidden="true">
                   {DROPS.map((drop, i) => (
                     <span

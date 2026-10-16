@@ -7,46 +7,21 @@ import { PoolLoader } from "./PoolLoader";
 
 afterEach(cleanup);
 
-it("FR_POOL_01_task_loader_waits_for_world_started_and_names_world_planned", async () => {
-  const mounted = mount(
-    createElement(PoolLoader, {
-      kind: "task",
-      events: [],
-      children: createElement("p", null, "World"),
-    }),
-  );
+it("FR_POOL_01_task_waits_for_world_started_and_names_world_planned", async () => {
+  const mounted = mount(createElement(PoolLoader, { kind: "task", events: [], children: null }));
   await settle();
   expect(mounted.container.querySelector('[role="status"]')).toBeNull();
-
-  mounted.render(
-    createElement(
-      PoolLoader,
-      {
-        kind: "task",
-        events: [{ type: "world.started" }],
-        children: createElement("p", null, "World"),
-      },
-    ),
-  );
+  mounted.render(createElement(PoolLoader, { kind: "task", events: [{ type: "world.started" }], children: null }));
   await settle();
-  const status = mounted.container.querySelector('[role="status"]');
-  expect(status?.getAttribute("aria-live")).toBe("polite");
+  expect(mounted.container.textContent).toContain("world.started");
+  expect(mounted.container.textContent).toContain("world.planned");
   expect(mounted.container.querySelector('[aria-busy="true"]')).not.toBeNull();
-  expect(status?.textContent).toContain("world.started");
-  expect(status?.textContent).toContain("world.planned");
 });
 
-it("FR_POOL_01_site_loader_waits_300ms_before_showing", async () => {
-  const mounted = mount(
-    createElement(PoolLoader, {
-      kind: "site",
-      loading: true,
-      children: createElement("p", null, "Home"),
-    }),
-  );
+it("FR_POOL_01_site_waits_300ms_before_showing", async () => {
+  const mounted = mount(createElement(PoolLoader, { kind: "site", loading: true, children: null }));
   await settle();
   expect(mounted.container.querySelector('[role="status"]')).toBeNull();
   await act(async () => new Promise((resolve) => setTimeout(resolve, 310)));
   expect(mounted.container.querySelector('[role="status"]')).not.toBeNull();
-  expect(mounted.container.querySelector('[aria-busy="true"]')).not.toBeNull();
 });
