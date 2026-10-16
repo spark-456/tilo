@@ -10,6 +10,7 @@ answer closes intake with 503 before anything is stored or sent to a model.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -304,8 +305,8 @@ async def _thinking(
         logger.warning("intake persistence failed: %s", type(exc).__name__)
         detail = "Upload storage is unavailable; retry." if request.files else "store_unavailable"
         raise HTTPException(status_code=503, detail=detail) from exc
-    if grounding.enabled():  # RT-01: each clean, readable upload becomes the owner's own passages; best effort
-        await run_in_threadpool(_remember_uploads, http, principal.user_id, result)
+    if grounding.enabled():  # RT-01: each clean, readable upload becomes the owner's own passages, after the answer
+        _in_background(_remember_uploads_later(http, principal.user_id, result))
     body = asdict(result)  # per-file text and events stay server-side
     body["files"] = [{k: v for k, v in f.items() if k not in ("text", "events")} for f in body["files"]]
     questions = [
@@ -320,6 +321,25 @@ async def _thinking(
         "scenario": scenario,
         "gaps": [g.as_dict() for g in task.gaps],
     }
+
+
+_BACKGROUND: set[asyncio.Task[None]] = set()
+_REMEMBER_UPLOADS_S = (
+    60.0  # indexing is best effort and never delays an answer; past this it is left for the next change
+)
+
+
+def _in_background(work: Any) -> None:
+    task = asyncio.ensure_future(work)
+    _BACKGROUND.add(task)  # a reference, so the task is not collected before it finishes
+    task.add_done_callback(_BACKGROUND.discard)
+
+
+async def _remember_uploads_later(http: Request, uid: str, result: Any) -> None:
+    try:
+        await asyncio.wait_for(run_in_threadpool(_remember_uploads, http, uid, result), _REMEMBER_UPLOADS_S)
+    except Exception as exc:  # TimeoutError included: the answer has already gone
+        logger.warning("grounding uploads not indexed (%s)", type(exc).__name__)
 
 
 def _remember_uploads(http: Request, uid: str, result: Any) -> None:

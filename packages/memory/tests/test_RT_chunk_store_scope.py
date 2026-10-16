@@ -130,3 +130,22 @@ def test_FR_MEM_09_RT_07_erasure_removes_every_chunk_of_the_user_and_verify_agre
     assert report.complete and report.removed["firestore_chunks"] == 1
     assert verify_erasure(registry, ALICE).ok
     assert len(store.search(ORG, BOB, SAME)) == 1
+
+
+def test_FR_MEM_09_RT_07_the_chunk_collection_is_a_required_erasure_store():
+    from tilo_memory.erasure import IncompleteRegistry
+
+    assert "firestore_chunks" in REQUIRED_STORES
+
+    class Empty:
+        def records(self):
+            return []
+
+        def delete(self, record_id):
+            raise AssertionError("nothing to delete")
+
+    registry = {name: Empty() for name in REQUIRED_STORES if name != "firestore_chunks"}
+    with pytest.raises(IncompleteRegistry, match="firestore_chunks"):
+        erase_user(registry, ErasureRequest(ALICE, NOW), now=NOW)  # refused before any delete
+    with pytest.raises(IncompleteRegistry):
+        verify_erasure(registry, ALICE)

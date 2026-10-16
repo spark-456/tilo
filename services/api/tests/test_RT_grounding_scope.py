@@ -19,11 +19,11 @@ def rig():
 
 def test_RT_03_a_team_deliverable_reaches_a_member_only_while_the_share_is_in_force(rig):
     rig.deliver(PLAN)
-    assert rig.grounding.index_deliverables(WORLD) == 1
+    assert rig.grounding.index_deliverables(WORLD, rig.delivered) == 1
     assert [h.text for h in rig.search(ASHA, "launch plan")] == [PLAN]  # the owner reads her own
     assert rig.search(BEN, "launch plan") == []  # no share: a teammate has nothing
     rig.grant()
-    rig.grounding.index_deliverables(WORLD)  # the next run end re-scopes the chunk to the team
+    rig.grounding.index_deliverables(WORLD, rig.delivered)  # the next run end re-scopes the chunk to the team
     assert [h.text for h in rig.search(BEN, "launch plan")] == [PLAN]
     assert rig.search(CARA, "launch plan") == []  # another team never
     stored = rig.people.world_shares.list(ORG)[0]
@@ -39,7 +39,7 @@ def test_RT_03_a_team_deliverable_reaches_a_member_only_while_the_share_is_in_fo
 def test_RT_03_a_removed_member_is_refused_at_once(rig):
     rig.deliver(PLAN)
     rig.grant()
-    rig.grounding.index_deliverables(WORLD)
+    rig.grounding.index_deliverables(WORLD, rig.delivered)
     assert len(rig.search(BEN, "launch plan")) == 1
     ben = rig.people.persons.get(ORG, BEN)
     rig.people.persons.replace({**ben.record, "memberships": []}, expected_version=ben.version)
@@ -66,14 +66,14 @@ def test_RT_07_a_removed_pin_and_a_deleted_world_take_their_chunks_with_them(rig
     rig.grounding.index_pin(rig.people.pins.get(ORG, "pb_launch").record)
     assert list(rig.backend.scan(ORG)) == []
     rig.deliver(PLAN)
-    rig.grounding.index_deliverables(WORLD)
+    rig.grounding.index_deliverables(WORLD, rig.delivered)
     del rig.store.worlds[WORLD]
     assert rig.search(ASHA, "launch plan") == [] and rig.grounding.sweep() == 1
 
 
 def test_RT_01_only_clean_run_outputs_are_indexed_not_uploads_or_flagged_pins(rig):
     rig.deliver("an uploaded transcript like text", origin="upload")
-    rig.grounding.index_deliverables(WORLD)
+    rig.grounding.index_deliverables(WORLD, rig.delivered)
     pin = team_pin(team=None) | {"flagged": True}
     rig.people.pins.create(pin)
     rig.grounding.index_pin(pin)
@@ -83,7 +83,7 @@ def test_RT_01_only_clean_run_outputs_are_indexed_not_uploads_or_flagged_pins(ri
 def test_RT_03_another_orgs_person_is_never_a_caller(rig):
     rig.people.persons.create(person("u_zed", org="org_elsewhere"))
     rig.deliver(PLAN)
-    rig.grounding.index_deliverables(WORLD)
+    rig.grounding.index_deliverables(WORLD, rig.delivered)
     rig.grant(by=ASHA)
     assert rig.grounding.store.search(ORG, ASHA, "launch")[0].source["id"].startswith("art_")
     from tilo_memory.chunks import ChunkError
@@ -91,3 +91,10 @@ def test_RT_03_another_orgs_person_is_never_a_caller(rig):
     with pytest.raises(ChunkError):
         rig.grounding.store.search(ORG, "u_zed", "launch")  # not a person of this org
     assert share()["team"] == LAUNCH
+
+
+def test_RT_01_only_delivered_outputs_are_indexed_not_a_units_intermediates(rig):
+    rig.deliver("a draft the unit made on the way", deliver=False)
+    kept = rig.deliver(PLAN)
+    assert rig.grounding.index_deliverables(WORLD, {kept.artifact_id}) == 1
+    assert [d["source"]["id"] for d in rig.backend.scan(ORG)] == [kept.artifact_id]

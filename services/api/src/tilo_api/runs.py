@@ -708,16 +708,28 @@ class Run:
         credits = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))  # the meter (HR-1)
         data = {"credits_used": credits, "deliverable_count": len(self.delivered)}
         cause = self.delivered[-1] if self.delivered else None
-        self._remember_deliverables()  # before world.completed: nothing is written to a finished world
+        await self._remember_deliverables()  # before world.completed: nothing is written to a finished world
         self.put("world.completed", self.director, self.world_id, "The work is done.", data, cause=cause)
 
-    def _remember_deliverables(self) -> None:
+    async def _remember_deliverables(self) -> None:
         """RT-01 / RT-09: the run's clean outputs become the owner's own passages (never a team's unless the world is
         shared with one); one `memory.saved` says how many. Off unless TILO_RETRIEVAL=1; failures never end the run."""
         if self.seams.grounding is None:
             return
+        delivered = {
+            e["data"]["artifact"]["artifact_id"]
+            for e in self.store.events.get(self.world_id, [])
+            if e["type"] == "artifact.delivered"
+        }  # only what the run delivered, never a unit's intermediates
+
+        open_grounding = self.seams.grounding
+
+        def index() -> int:
+            opened = open_grounding()
+            return 0 if opened is None else int(opened.index_deliverables(self.world_id, delivered))
+
         try:
-            if (opened := self.seams.grounding()) is not None and (held := opened.index_deliverables(self.world_id)):
+            if held := await asyncio.to_thread(index):  # embedding calls never block the event loop
                 item = {"layer": "artifact_memory", "item_count": held}
                 self.put("memory.saved", self.director, self.world_id, "Saved to your account memory.", item, vis=[])
         except Exception as exc:

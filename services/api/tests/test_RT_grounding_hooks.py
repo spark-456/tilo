@@ -163,26 +163,95 @@ def test_RT_05_RT_06_the_embedder_goes_through_the_router_and_a_metered_router_c
 
 
 def test_RT_09_run_end_writes_one_memory_saved_and_a_failing_grounding_never_ends_the_run():
+    import asyncio
     from types import SimpleNamespace
 
     from tilo_api.runs import Run
 
     written: list[tuple] = []
-    run = SimpleNamespace(director="A_dir", world_id="w_x", run_id="r_x", put=lambda *a, **kw: written.append((a, kw)))
-    run.seams = SimpleNamespace(grounding=lambda: SimpleNamespace(index_deliverables=lambda world: 3))
-    Run._remember_deliverables(run)
+    seen: list[set] = []
+    delivered = {"type": "artifact.delivered", "data": {"artifact": {"artifact_id": "art_out", "version": 1}}}
+    run = SimpleNamespace(
+        director="A_dir", world_id="w_x", run_id="r_x", put=lambda *a, **kw: written.append((a, kw)),
+        store=SimpleNamespace(events={"w_x": [delivered, {"type": "artifact.created", "data": {}}]}),
+    )  # fmt: skip
+
+    def index(count):
+        return lambda world, ids: (seen.append(set(ids)), count)[1]
+
+    run.seams = SimpleNamespace(grounding=lambda: SimpleNamespace(index_deliverables=index(3)))
+    asyncio.run(Run._remember_deliverables(run))
     ((args, kwargs),) = written
     assert args[0] == "memory.saved" and args[4] == {"layer": "artifact_memory", "item_count": 3}
-    assert kwargs["vis"] == []  # the owner's alone (HR-1: recorded, never widened)
+    assert kwargs["vis"] == [] and seen == [{"art_out"}]  # owner's alone; only what was delivered
     written.clear()
-    run.seams = SimpleNamespace(grounding=lambda: SimpleNamespace(index_deliverables=lambda world: 0))
-    Run._remember_deliverables(run)
+    run.seams = SimpleNamespace(grounding=lambda: SimpleNamespace(index_deliverables=index(0)))
+    asyncio.run(Run._remember_deliverables(run))
     run.seams = SimpleNamespace(grounding=None)
-    Run._remember_deliverables(run)
+    asyncio.run(Run._remember_deliverables(run))
     assert written == []
     run.seams = SimpleNamespace(grounding=lambda: (_ for _ in ()).throw(RuntimeError("x")))
-    Run._remember_deliverables(run)  # a failure is logged by type, the run goes on to world.completed
+    asyncio.run(Run._remember_deliverables(run))  # a failure is logged by type, the run goes on to world.completed
     assert written == []
+
+
+def test_RT_07_deleting_a_meeting_deletes_its_minutes_passages(people_rig, monkeypatch):
+    import copy
+
+    from _mtg09b_lib import block_network
+    from _ppl11a_lib import OWNER
+    from _ppl11c_lib import meeting_rig, transcript_case
+    from tilo_api.deps import WorldRecord
+    from tilo_api.meeting_minutes import publish_minutes
+    from tilo_api.people_writes import Writer, confirm_minutes
+
+    block_network(monkeypatch)
+    rig = meeting_rig(people_rig)
+    before = rig.stored("meetings", "mt_q4_plan")
+    ended = {**before, "status": "ended", "minutes": None, "minutes_confirmed_by": None, "delete_minutes_after": None}
+    rig.real.meetings.replace(ended, expected_version=1)
+    rig.event_store.worlds[ended["world_id"]] = WorldRecord(OWNER, {}, run_id="r_meeting_q4_plan_1")
+    rig._ids = ["art_publication_minutes"]
+    doc = copy.deepcopy(transcript_case("owner_reads_quotes")["minutes"])
+    for row in doc["action_items"]:
+        row["work_item_id"] = None
+    writer = Writer(rig.stores, rig.org, OWNER, rig.clock, rig.redactor)
+    publish_minutes(writer, rig.event_store, rig.artifacts, "mt_q4_plan", doc, events=rig.events)
+    confirm_minutes(Writer(rig.stores, rig.org, OWNER, rig.clock, rig.redactor), "mt_q4_plan")
+    opened, _ = _wire(rig, monkeypatch)
+    opened.index_minutes("mt_q4_plan")
+    assert list(opened.store._backend.scan(rig.org))
+    rig.as_user(OWNER)
+    assert rig.post("/v1/meetings/mt_q4_plan/delete", {}).status_code == 200
+    assert list(opened.store._backend.scan(rig.org)) == []  # the tombstone is written, the passages are gone
+
+
+def test_RT_10_deployed_without_a_firestore_chunk_store_grounding_is_off(monkeypatch):
+    monkeypatch.setenv("TILO_RETRIEVAL", "1")
+    monkeypatch.delenv("TILO_CHUNKS_STORE", raising=False)
+    monkeypatch.setattr(grounding, "enforced", lambda: True)
+    with pytest.raises(RuntimeError, match="TILO_CHUNKS_STORE"):
+        grounding._backend()  # open_grounding turns this into None: no process-wide dict on Cloud Run
+    monkeypatch.setattr(grounding, "enforced", lambda: False)
+    assert grounding._backend() is grounding._MEMORY  # local dev and replay keep the in-memory store
+
+
+def test_RT_10_an_opener_that_cannot_look_at_its_request_returns_none_not_an_error(monkeypatch):
+    monkeypatch.setenv("TILO_RETRIEVAL", "1")
+    assert grounding.opener(object())() is None  # no app, no demo lookup: refused inside the try
+
+
+def test_RT_06_indexing_uploads_never_delays_the_answer_and_a_slow_index_is_dropped(monkeypatch):
+    import asyncio
+    import time
+
+    from tilo_api import intake
+
+    monkeypatch.setattr(intake, "_REMEMBER_UPLOADS_S", 0.05)
+    monkeypatch.setattr(intake, "_remember_uploads", lambda *a: time.sleep(0.3))
+    started = time.monotonic()
+    asyncio.run(intake._remember_uploads_later(object(), "u_x", object()))  # times out quietly, never raises
+    assert time.monotonic() - started < 0.25
 
 
 def test_RT_07_the_daily_sweep_runs_once_a_day_and_only_when_retrieval_is_on(monkeypatch):
@@ -200,3 +269,25 @@ def test_RT_07_the_daily_sweep_runs_once_a_day_and_only_when_retrieval_is_on(mon
     grounding.sweep_daily(object(), "2026-10-16T23:00:00.000Z")  # the same day
     grounding.sweep_daily(object(), "2026-10-17T00:01:00.000Z")
     assert swept == [1, 1]
+
+
+def test_RT_06_one_embedding_is_priced_by_its_tokens_not_by_the_whole_unit_reserve():
+    from pathlib import Path
+
+    from tilo_api import spend_units
+    from tilo_providers.config import load_providers_config
+    from tilo_providers.interfaces import EmbedRequest
+    from tilo_providers.router import Router
+
+    root = Path(__file__).resolve().parents[3]
+    config = load_providers_config(root / "config/models.yaml", root / "config/prices.yaml")  # the live price sheet
+    run = Router(
+        load_providers_config(root / "config/models.dev.yaml", root / "config/prices.yaml"), fixtures_dir=root
+    ).embed("embed", EmbedRequest(texts=["x" * 1200] * 4, task="document", dimensions=64))
+    (attempt,) = run.attempts
+    assert (attempt.tokens_in, attempt.tokens_out) == (1600, 0)  # 4800 bytes, over-counted at three bytes a token
+    meter = spend_units.SpendMeter.__new__(spend_units.SpendMeter)
+    meter._config, meter.unit_minor = config, 1000
+    attempt.profile_id = config.roles["embed"].primary  # priced as the live Google embedding model
+    minor = meter.router_minor(run.attempts)
+    assert minor is not None and minor <= 10  # at most 0.1 INR (100 minor = 1 INR), not the 10 INR unit reserve

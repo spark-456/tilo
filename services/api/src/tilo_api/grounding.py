@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from typing import Any
 
 from tilo_memory.artifacts import ArtifactError, Scope
@@ -22,6 +22,7 @@ from tilo_providers.interfaces import EmbedRequest, EmbedResponse
 from tilo_providers.memory_config import load_memory_config
 
 from tilo_api import deps, events
+from tilo_api.access import enforced
 
 logger = logging.getLogger("tilo_api.grounding")
 _TEXT_TYPES = ("text/", "application/json")
@@ -37,6 +38,8 @@ def _backend() -> ChunkBackend:
     the process-wide in-memory store. A client that cannot be opened raises: the caller's hook logs it and skips."""
     project = os.environ.get("TILO_FIRESTORE_PROJECT") or ""
     if os.environ.get("TILO_CHUNKS_STORE") != "firestore" or not project:
+        if enforced():  # deployed: a per-process dict would lose chunks on every instance change, so grounding is off
+            raise RuntimeError("chunks need TILO_CHUNKS_STORE=firestore when deployed")
         return _MEMORY
     from tilo_api import prod  # noqa: PLC0415
 
@@ -195,8 +198,9 @@ class Grounding:
 
         self._safely("minutes", work)
 
-    def index_deliverables(self, world_id: str) -> int:
-        """Run end (RT-09): the latest clean text version of each of the owner's run outputs. Returns passages held."""
+    def index_deliverables(self, world_id: str, delivered: Collection[str]) -> int:
+        """Run end (RT-09): the latest clean text version of each output the run delivered (`artifact.delivered`, not
+        the intermediates of its units). Returns passages held."""
         held = [0]
 
         def work() -> None:
@@ -205,7 +209,7 @@ class Grounding:
                 return
             scope = Scope(self._org, world_id, world.owner)
             team = self._share_team(world_id, world.owner)
-            for art_id in self._artifacts.artifact_ids(scope):
+            for art_id in sorted(set(self._artifacts.artifact_ids(scope)) & set(delivered)):
                 latest = self._artifacts.versions(scope, art_id)[-1]
                 doc = latest.doc
                 text = _text_of(doc, lambda: self._artifacts.read(scope, latest.ref))
@@ -313,9 +317,11 @@ def opener(
         return request.app.dependency_overrides.get(getter, getter)(*args, **kwargs)
 
     def open_() -> Grounding | None:
-        if not enabled() or deps._demo(request) is not None:
+        if not enabled():
             return None
         try:
+            if deps._demo(request) is not None:
+                return None
             switches = seam(deps.get_switches, request, deps.get_flag_store())
             use = mode if mode is not None else seam(deps.get_work_mode, request, switches)
             use_router = router if router is not None else seam(deps.get_router, use, request, switches, meter=meter)
@@ -345,16 +351,26 @@ def sweep_daily(request: Any, stamp: str) -> None:
     _swept_day = stamp[:10]
 
 
+def forget_for(request: Any, kind: str, source_id: str) -> None:
+    """A source was deleted: drop its chunks. Replay mode, so a spent cap or switch never keeps a deleted source's
+    passages; deleting embeds nothing."""
+    if enabled() and (grounding := opener(request, mode="replay")()) is not None:
+        grounding.forget(kind, source_id)
+
+
 def after_pin(request: Any, pin_id: str) -> None:
     """Called once a pin write has committed: index the pin as it now is, or drop its chunks when it was removed."""
-    if not enabled() or (grounding := opener(request)()) is None:
+    if not enabled() or (current := opener(request, mode="replay")()) is None:
         return
     try:
-        stored = grounding._people.pins.get(deps.ORG_ID, pin_id)
+        stored = current._people.pins.get(deps.ORG_ID, pin_id)
     except Exception as exc:
         logger.warning("grounding pin not read (%s)", type(exc).__name__)
         return
-    grounding.forget("pin", pin_id) if stored is None else grounding.index_pin(stored.record)
+    if stored is None or stored.record["status"] == "removed":
+        current.forget("pin", pin_id)
+    elif (indexing := opener(request)()) is not None:  # the embedding needs this request's own mode and meter
+        indexing.index_pin(stored.record)
 
 
 def after_minutes(request: Any, meeting_id: str) -> None:

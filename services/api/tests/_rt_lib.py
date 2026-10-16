@@ -64,14 +64,23 @@ class GroundingRig(Rig):
     def __init__(self) -> None:
         super().__init__()
         self.puts = 0
+        self.delivered: set[str] = set()
         self.artifacts, self.embedder, self.backend = artifacts(), WordEmbedder(), MemoryChunkBackend()
         rules = ApiSourceRules(self.people, self.store, self.artifacts)
         chunks = ChunkStore(self.backend, self.embedder, rules, config=ChunkConfig())
         self.grounding = Grounding(chunks, ORG, self.people, self.store, self.artifacts)
 
-    def deliver(self, text: str, *, origin: str = "unit", world: str = WORLD, owner: str = ASHA) -> Any:
+    def deliver(
+        self, text: str, *, origin: str = "unit", world: str = WORLD, owner: str = ASHA, deliver: bool = True
+    ) -> Any:
         unit = origin == "unit"
         self.puts += 1
+        made = self._put(text, unit, origin, world, owner)
+        if deliver:
+            self.delivered.add(made.artifact_id)  # the run said `artifact.delivered` for it
+        return made
+
+    def _put(self, text: str, unit: bool, origin: str, world: str, owner: str) -> Any:
         return self.artifacts.put(
             Scope(ORG, world, owner),
             NewVersion(
