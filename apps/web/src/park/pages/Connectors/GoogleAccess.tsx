@@ -12,23 +12,24 @@ import {
 import { BrandIcon } from "./BrandIcon";
 
 const MONO: Record<string, string> = { gmail: "G", google_drive: "D", google_calendar: "C" };
+// A scope is named by its last part; the connection row carries the full Google scope URL.
 const READ = {
   gmail: {
     label: "Read mail",
     capabilities: ["read", "search"],
-    scope: "https://www.googleapis.com/auth/gmail.readonly",
+    scope: "gmail.readonly",
     copy: "Agents may search and read your mail.",
   },
   google_drive: {
     label: "Read Drive",
     capabilities: ["read", "list"],
-    scope: "https://www.googleapis.com/auth/drive.file",
+    scope: "drive.file",
     copy: "Agents may list and read files you pick for Tilo and files Tilo saves.",
   },
   google_calendar: {
     label: "Read calendar",
     capabilities: ["read"],
-    scope: "https://www.googleapis.com/auth/calendar.readonly",
+    scope: "calendar.readonly",
     copy: "Agents may read your calendar events.",
   },
 } as const;
@@ -111,7 +112,7 @@ export function GoogleAccess({ flow }: { flow: ConnectFlow }) {
           if (!row) return null;
           const on = row.state !== "available";
           const read = READ[id];
-          const granted = row.scopes?.includes(read.scope);
+          const granted = row.scopes?.some((s) => s.endsWith(`/auth/${read.scope}`));
           return (
             <div className="park-connectors-avail" key={id}>
               <span className="park-connectors-avail-mono">
