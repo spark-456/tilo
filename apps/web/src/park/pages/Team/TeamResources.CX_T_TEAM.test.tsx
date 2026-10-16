@@ -2,61 +2,19 @@
 import { act, createElement } from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { afterEach, expect, it } from "vitest";
-import { cleanup, makeApp, renderTeam } from "../../../../test-support/park/teamHarness";
-import type { TeamView } from "../../api/live/teamLive";
-import { createLiveApi } from "../../api/liveApi";
 import { TeamResources } from "./TeamResources";
 
 let resourceRoot: Root | null = null;
 afterEach(() => {
-  resourceRoot?.unmount();
+  if (resourceRoot) act(() => resourceRoot?.unmount());
   resourceRoot = null;
-  cleanup();
+});
+const emptyPinboards = async () => ({
+  data: { rows: [], truncated: false },
+  source: "live" as const,
 });
 
-it("FR_TEAM_01_team_resources_show_real_shared_worlds_and_pins_with_honest_empty_states", async () => {
-  const view: TeamView = {
-    version: 4,
-    me: { id: "u1", role: "Owner" },
-    members: [{ id: "u1", role: "Owner", limit_minor: null }],
-    switches: [],
-    tools: [],
-    capabilities: [],
-    invites: [],
-  };
-  const api = {
-    ...createLiveApi(),
-    getTeamLive: async () => ({ data: view, source: "live" as const }),
-    getWorlds: async () => ({
-      data: [
-        {
-          id: "w_shared",
-          name: "Q3 deck",
-          short: "Q3 deck",
-          tier: "Village",
-          tool: "",
-          st: "running",
-          agents: 0,
-          spend: "",
-          spendV: 0,
-          nextL: "",
-          nextV: "",
-          owner: "",
-          started: "",
-          access: "team",
-        },
-      ],
-      source: "live" as const,
-    }),
-  };
-  const { root } = await renderTeam(makeApp(), api as never);
-  expect(root.textContent).toContain("Shared worlds");
-  expect(root.textContent).toContain("Q3 deck");
-  expect(root.textContent).toContain("Team pins");
-  expect(root.textContent).toContain("Team pins aren’t connected");
-});
-
-it("FR_TEAM_01_team_resources_show_server_returned_team_pins_only", async () => {
+it("FR_TEAM_01_team_resources_show_shared_worlds_and_server_returned_team_pins_only", async () => {
   const host = document.createElement("div");
   document.body.append(host);
   resourceRoot = createRoot(host);
@@ -94,9 +52,52 @@ it("FR_TEAM_01_team_resources_show_server_returned_team_pins_only", async () => 
   });
   await act(async () => {
     resourceRoot?.render(
-      createElement(TeamResources, { worlds: [], worldsState: "ready", readPinboards }),
+      createElement(TeamResources, {
+        worlds: [
+          {
+            id: "w_shared",
+            name: "Q3 deck",
+            short: "Q3 deck",
+            tier: "Village",
+            tool: "",
+            st: "running",
+            agents: 0,
+            spend: "",
+            spendV: 0,
+            nextL: "",
+            nextV: "",
+            owner: "",
+            started: "",
+            access: "team",
+          },
+        ],
+        worldsState: "ready",
+        readPinboards,
+      }),
     );
+    await Promise.resolve();
+    await Promise.resolve();
   });
+  expect(host.textContent).toContain("Q3 deck");
   expect(host.textContent).toContain("Launch notes");
   expect(host.textContent).not.toContain("Private note");
+});
+
+it("FR_TEAM_01_team_resources_use_shared_empty_states_when_lists_are_empty", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  resourceRoot = createRoot(host);
+  await act(async () => {
+    resourceRoot?.render(
+      createElement(TeamResources, {
+        worlds: [],
+        worldsState: "ready",
+        readPinboards: emptyPinboards,
+      }),
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  expect(host.textContent).toContain("No shared worlds yet");
+  expect(host.textContent).toContain("No team pins yet");
 });
