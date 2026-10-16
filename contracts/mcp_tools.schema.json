@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/mcp_tools.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "McpTools",
   "description": "Tilo's MCP server tools (ADR-0031, Proposed). The root is one `tools/call` request as the server accepts it: a tool `name` and its `arguments`, bound to that tool's input shape; anything else is refused before any store is read. Each tool's result (`structuredContent`) is its `*_out` entry. Read tools need the grant scope `tilo.read`; `answer_card` and `start_run` need `tilo.write`, which the person turns on per client. No tool ever answers a gate, consent or meeting card: only `needs_you` questions can be answered here (`card_row.answerable_here`). Results carry ids, titles, labels and Tilo-written lines only; artifact text only from `read_artifact`, only for a clean text version of the owner's. Rules MC-01 to MC-12 in `mcp_tools.rules.md`.",
   "type": "object",
@@ -170,7 +170,7 @@
       }
     },
     "read_artifact_out": {
-      "description": "`text` is the version's bytes as UTF-8 for `text/markdown`, `text/csv` and `application/json` up to 262,144 bytes, else null with `withheld` saying why (MC-07).",
+      "description": "`text` is the version's bytes as UTF-8 for `text/markdown`, `text/csv` and `application/json` up to 262,144 bytes, else null with `withheld` saying why (MC-07). Since 1.1.0 (ADR-0050) the schema holds the type half: text is null for any other type, a website's HTML included.",
       "type": "object",
       "additionalProperties": false,
       "required": ["artifact", "content_sha256", "text", "withheld"],
@@ -182,7 +182,16 @@
       },
       "if": { "properties": { "text": { "type": "null" } }, "required": ["text"] },
       "then": { "properties": { "withheld": { "$ref": "#/$defs/withheld_reason" } } },
-      "else": { "properties": { "withheld": { "type": "null" } } }
+      "else": {
+        "properties": {
+          "withheld": { "type": "null" },
+          "artifact": {
+            "properties": {
+              "media_type": { "enum": ["text/markdown", "text/csv", "application/json"] }
+            }
+          }
+        }
+      }
     },
     "withheld_reason": { "type": "string", "enum": ["not_text", "too_large"] },
     "card_option": {

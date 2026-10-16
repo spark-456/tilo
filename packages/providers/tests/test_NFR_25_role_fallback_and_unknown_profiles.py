@@ -79,6 +79,7 @@ def test_PRD_6_4_shipped_config_loads(repo_root):
     config = load_providers_config(repo_root / "config" / "models.yaml", repo_root / "config" / "prices.yaml")
 
     assert set(config.roles) == {
+        "embed",  # RT-05: offline until the owner chooses and prices the live embedding model
         "director",
         "lead",
         "lead_review",  # services/harness/src/tilo_harness/lead_review.py

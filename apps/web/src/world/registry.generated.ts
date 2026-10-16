@@ -10,6 +10,7 @@ export const KNOWN_EVENT_TYPES: readonly string[] = [
   "plan.questions_asked",
   "plan.approaches_proposed",
   "plan.revised",
+  "plan.maker_chosen",
   "budget.requested",
   "budget.granted",
   "level.created",

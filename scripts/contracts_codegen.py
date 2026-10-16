@@ -59,6 +59,7 @@ CONFIG_SHAPES = {
     "config/scenarios/*.yaml": "scenario",
     "config/spend_caps.yaml": "spend_caps",
     "config/byok.yaml": "byok",
+    "config/makers.yaml": "makers",
 }
 # Contract roots whose generated name is not the PascalCase file name.
 ROOT_NAMES = {
@@ -68,6 +69,7 @@ ROOT_NAMES = {
     "artifact": "ArtifactVersion",
     "spend_caps": "SpendCapsConfig",  # tilo_api.spend.SpendCaps is the loaded six-field value
     "byok": "ByokConfig",  # config/byok.yaml (ADR-0041); the loader's own dataclass is tilo_providers.byok.ByokConfig
+    "makers": "MakersConfig",  # config/makers.yaml (ADR-0050)
 }
 # Fixture folders with their own layout, checked by contracts_events.
 EVENT_FIXTURES = {"events", "streams"}

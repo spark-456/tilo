@@ -9,7 +9,7 @@ the smallest seam that keeps that true while the client starts sending tokens, a
 
 - `tilo_api.appcheck` (new module) holds a pure-ASGI middleware, registered on `tilo_api.app` beside `AccessGate`.
   It reads the `X-Firebase-AppCheck` header of every request except the exempt routes below.
-- `deps.get_app_check_verifier()` (new, like `deps.get_access_store`): returns an object with
+- `deps.get_app_check_verifier()` returns an object with
   `verify(token: str) -> Mapping`, which raises for a token it refuses. Tests override it; the default must never
   break a call (no verifier, a verifier that raises, a network that is down: all the same as "not verified").
 - Enforcement is a config flag `TILO_APPCHECK_ENFORCE`, read on every request: exactly `"1"` turns it on (the

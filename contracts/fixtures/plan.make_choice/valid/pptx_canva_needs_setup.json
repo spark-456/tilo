@@ -1,0 +1,20 @@
+{
+  "deliverable": 1,
+  "options": [
+    {
+      "make_with": "native",
+      "label": "Tilo",
+      "status": "ready",
+      "suggested": false,
+      "note": null
+    },
+    {
+      "make_with": "connector:canva",
+      "label": "Canva",
+      "status": "needs_setup",
+      "suggested": false,
+      "note": "Needs the workspace owner's Canva app before Tilo can use Canva."
+    }
+  ],
+  "selected": "native"
+}

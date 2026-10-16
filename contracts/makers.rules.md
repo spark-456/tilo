@@ -1,0 +1,19 @@
+# Where a deliverable is made (ADR-0050)
+
+The owner's decision of 16 Oct 2026: Lovable for a large site, Tilo itself for a smaller one, and the person can
+pick native, a connector or an MCP tool, with Canva offered beside Tilo for decks and PDFs, "that we aren't ruining
+options for the user". The contract holds `make_with` (common 1.8.0), the start plan's `make_choice` and
+`make_option` (plan 1.2.0), `plan.maker_chosen` (registry 1.6.0) and `make_with` on `artifact.delivered` (1.1.0).
+The configuration is `config/makers.yaml` (`makers.schema.json`). The rules below are code in tilo-api and the
+planner (WEB-4 to WEB-6). Rule ids are stable.
+
+| Rule | Rule | Checked by | Source |
+| --- | --- | --- | --- |
+| MK-01 | **Options.** For each deliverable whose format `config/makers.yaml` lists, the approaches reply carries one `make_choice`: native first (label Tilo), then each partner in config order. A format not listed gets no choice, is made natively and gets no `plan.maker_chosen`. | api | owner, 16 Oct |
+| MK-02 | **Status.** Native is always `ready`. A `connector:` partner is `ready` when `config/connectors.yaml` declares it and it needs no sign-in (`auth: none`, as Lovable's link route) or the owner has a live connection to it; otherwise `needs_setup`. A connector declared only in `config/canva.yaml` (not yet in `config/connectors.yaml`) is `needs_setup` with the note that the workspace owner must register the Canva app. An `mcp:` partner is `ready` only when `config/mcp.yaml` allowlists that server and tool and the owner connected the server. Status is read again at Start. | api | FR-CON-19, FR-CON-12 |
+| MK-03 | **Large site.** A website deliverable is large when its brief text names more than `large_site.max_native_pages` pages or one of `large_site.needs` (the matching rule is in `makers.schema.json`). Only the brief text the person saw and could edit is read; no model judges size, so the same brief always gives the same answer. | api | owner, 16 Oct |
+| MK-04 | **Suggestion.** For a large website the first `ready` partner is `suggested: true`, with a `note` saying which need or page count made it so. Nothing else is ever suggested: not native, not a `needs_setup` partner, not a partner for a small site or for another format (schema for native and needs_setup). At most one option per deliverable is suggested. | api (schema in part) | owner, 16 Oct |
+| MK-05 | **Selection before Start.** `make_choice.selected` is the suggested option when `preselect_suggested` is true and one is suggested, otherwise native. A `needs_setup` option is never selected. The start plan shows every option (MK-08) and the person can change the selection before pressing Start. | api; web | one-step start |
+| MK-06 | **The person's pick.** Start carries the person's selection per deliverable. tilo-api accepts only an option it offered for that deliverable and that is still `ready`, refuses anything else with a plain reason (422) and starts nothing, and writes one `plan.maker_chosen` per deliverable with a choice (actor the person, in brief order) in the same save as the budget grant. The plan is compiled from that pick. | api | HR-1 |
+| MK-07 | **A pick authorises nothing.** Choosing a partner only changes which unit makes the deliverable. Lovable's `build_handoff` and Canva's `create_design` stay T3: card, outbox entry, approving `approval.resolved` and `data.transfer` out, with only the accepted requirements and granted data (FR-CON-16, FR-CON-20). Native website means a writer unit writes one HTML file under `website.rules.md`. | policy engine; planner | 10.4, FR-CON-16 |
+| MK-08 | **Never hidden.** Every option `config/makers.yaml` lists for the format is shown, ready or needing setup; a partner that is not set up says what is missing and links to where it is set up. No option is ever chosen without the person seeing it on the start plan. | web | owner, 16 Oct |

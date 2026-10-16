@@ -37,10 +37,10 @@ describe("ADR35_L4_FR_CON_02_google_access", () => {
     const m = mount(<GoogleAccess flow={flow} />);
     await flush();
     const first = buttons(m.container)[0] as HTMLButtonElement;
-    expect(first.textContent).toBe("Connect");
+    expect(first.textContent).toBe("Read mail");
     click(first);
     await flush();
-    expect(flow.start).toHaveBeenCalledWith("gmail", ["read"]);
+    expect(flow.start).toHaveBeenCalledWith("gmail", ["read", "search"]);
     expect(flow.open).toHaveBeenCalledWith(LINK);
   });
 

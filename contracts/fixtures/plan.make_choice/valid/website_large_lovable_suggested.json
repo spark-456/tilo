@@ -1,0 +1,20 @@
+{
+  "deliverable": 0,
+  "options": [
+    {
+      "make_with": "native",
+      "label": "Tilo",
+      "status": "ready",
+      "suggested": false,
+      "note": null
+    },
+    {
+      "make_with": "connector:lovable",
+      "label": "Lovable",
+      "status": "ready",
+      "suggested": true,
+      "note": "This site needs sign-in, which one page made in Tilo cannot do."
+    }
+  ],
+  "selected": "connector:lovable"
+}

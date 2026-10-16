@@ -1,4 +1,4 @@
-"""PROD-WIRE slice 3 helpers (one Firestore client per process, the Firestore access store). Kept out of conftest.py
+"""PROD-WIRE slice 3 helpers (one Firestore client per process). Kept out of conftest.py
 under a package-unique name, as `_pw1b_lib.py` is.
 
 Pinned interface (every test of slice 3), all in the new module `tilo_api.prod`:
@@ -12,10 +12,7 @@ Pinned interface (every test of slice 3), all in the new module `tilo_api.prod`:
   `google.cloud.firestore.Client(project=project)`; tests replace it), single-flight under a lock; a builder that
   raises is not cached and surfaces as `FirestoreUnavailable` (a `store_door.ApiStoreUnavailable`, no exception text).
   `reset()` forgets every cached client.
-- `FirestoreAccessStore(client, org_id="org_tilo")`: `orgs/{org}/access/{uid}` with the field `declaration`;
-  `get`, `declare` (see `tilo_api.access.AccessStore`).
 - `durable_store.deployed()` and `deps.get_people_stores()` both obtain their client from `prod.firestore_client`;
-  `deps.get_access_store()` builds a `FirestoreAccessStore` on it when `TILO_API_STORE=firestore` and the door opens.
 
 `Pw3` is the per-test rig: a cold process, no ambient config, and the real `google.cloud.firestore.Client` replaced by
 a spy, so no test can reach a real client. A test calls `pw3.use(builder)` to import `tilo_api.prod` (a missing module

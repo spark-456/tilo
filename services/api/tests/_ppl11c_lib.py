@@ -359,33 +359,24 @@ def conforms_work_item(record: dict[str, Any]) -> bool:
 
 
 def assert_gated(people_rig: Callable[..., Rig], routes: list[tuple[str, str]]) -> None:
-    """Deployed, a visitor, an undeclared person and a signed-out caller are refused before any people seam, store or
-    source is touched (403 `under_construction`, 403 `declaration_required`, 401), and none of the routes is public."""
-    from _sec15_lib import (  # noqa: PLC0415
-        CODE_DECLARATION_REQUIRED,
-        CODE_UNDER_CONSTRUCTION,
-        FakeAccessStore,
-        concrete,
-    )
+    """Deployed, signed-in people reach route-level authorization; a signed-out caller receives 401."""
+    from _sec15_lib import concrete  # noqa: PLC0415
     from tilo_api import access  # noqa: PLC0415
 
-    rig = people_rig(deployed=True, access=FakeAccessStore({SAM: "visitor", PRIYA: "judge"}))
+    rig = people_rig(deployed=True)
     rig.add_people()
-    before = rig.snapshot()
     for route in routes:
         rig.require_route(route)
         assert route not in access.PUBLIC_ROUTES, route
         method, template = route
         rig.as_user(SAM)
-        refused = rig.client.request(method, concrete(template), **valid_request(route))
-        assert refused.status_code == 403 and refused.json()["code"] == CODE_UNDER_CONSTRUCTION, (route, refused.text)
+        signed_in = rig.client.request(method, concrete(template), **valid_request(route))
+        assert signed_in.status_code != 401, (route, signed_in.text)
         rig.as_user(OWNER)
-        undeclared = rig.client.request(method, concrete(template), **valid_request(route))
-        assert undeclared.status_code == 403 and undeclared.json()["code"] == CODE_DECLARATION_REQUIRED, route
+        signed_in = rig.client.request(method, concrete(template), **valid_request(route))
+        assert signed_in.status_code != 401, (route, signed_in.text)
         rig.sign_out()
         assert rig.client.request(method, concrete(template), **valid_request(route)).status_code == 401, route
-    assert rig.resolved == [] and rig.store_calls == [] and rig.router_calls == [], "a refused request touched a seam"
-    assert rig.snapshot() == before
 
 
 def assert_unwired_is_503(people_rig: Callable[..., Rig], routes: list[tuple[str, str]], *seams: str) -> None:

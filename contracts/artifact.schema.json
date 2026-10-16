@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/artifact.schema.json",
-  "x-version": "1.1.0",
+  "x-version": "1.2.0",
   "title": "ArtifactVersion",
-  "description": "One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-09 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser.",
+  "description": "One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-10 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser. 1.2.0 (ADR-0050) lets a writer unit store one self-contained HTML file for a website deliverable, at most 524,288 bytes; an upload never stores HTML (AR-10).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -95,9 +95,9 @@
       "required": ["origin"]
     },
     "then": {
-      "description": "A model writes only text and JSON, never a file (ADR-0018 1).",
+      "description": "A model writes only text and JSON, never a file (ADR-0018 1); since 1.2.0 also one self-contained HTML file for a website, after the static checks (ADR-0050, AR-10).",
       "properties": {
-        "media_type": { "enum": ["text/markdown", "text/csv", "application/json"] },
+        "media_type": { "enum": ["text/markdown", "text/csv", "application/json", "text/html"] },
         "idempotency_key": { "not": { "pattern": ":f[0-9]$" } }
       }
     },
@@ -139,18 +139,31 @@
       },
       "required": ["origin"]
     },
-    "then": { "properties": { "sources": { "maxItems": 0 } } }
+    "then": {
+      "description": "An upload has no archive sources and is never HTML (AR-10): a website is only ever a writer unit's output.",
+      "properties": {
+        "sources": { "maxItems": 0 },
+        "media_type": { "not": { "const": "text/html" } }
+      }
+    }
   },
   "dependentSchemas": {
     "media_type": {
-      "description": "Text and JSON are at most 2,000,000 bytes (BQ-257). Keyed by a required field, so it always applies; the root keeps one if/then/else.",
+      "description": "Text and JSON are at most 2,000,000 bytes (BQ-257) and a website's HTML at most 524,288 (ADR-0050, AR-10). Keyed by a required field, so it always applies; the root keeps one if/then/else.",
       "if": {
         "properties": {
           "media_type": { "enum": ["text/markdown", "text/csv", "application/json"] }
         },
         "required": ["media_type"]
       },
-      "then": { "properties": { "size_bytes": { "maximum": 2000000 } } }
+      "then": { "properties": { "size_bytes": { "maximum": 2000000 } } },
+      "else": {
+        "if": {
+          "properties": { "media_type": { "const": "text/html" } },
+          "required": ["media_type"]
+        },
+        "then": { "properties": { "size_bytes": { "maximum": 524288 } } }
+      }
     },
     "screening": {
       "description": "clean and flagged carry the verdict's time; unscreened has none (AR-07).",

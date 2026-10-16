@@ -75,14 +75,14 @@ describe("WEB_12_profile_render: the frame (header and tabs)", () => {
     expect(connectors.disabled).toBe(false);
   });
 
-  it("WEB_12_profile_nav_has_five_tabs_with_icons_and_the_first_is_current", async () => {
+  it("test_MO_02_profile_nav_includes_morning_brief_and_the_first_is_current", async () => {
     const { root } = await renderProfile(makeApp());
     const nav = settingsNav(root);
     expect(nav.tagName).toBe("NAV");
     const tabs = [...nav.querySelectorAll("button")];
     expect(tabs.map(text)).toEqual(TABS.map((t) => t.label));
     for (const t of tabs) expect(t.querySelector("svg"), `${text(t)}: icon`).not.toBeNull();
-    // UI-STUDIO-5: seven tabs in the Studio settings order; only the first is current.
+    // MO-02 adds the brief setting after the Studio settings order; only the first is current.
     expect(tabs.map((t) => t.getAttribute("aria-current"))).toEqual(
       TABS.map((_, i) => (i === 0 ? "page" : null)),
     );

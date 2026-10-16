@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/events/data/artifact.delivered.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "ArtifactDeliveredData",
-  "description": "data of artifact.delivered (PRD 9.5): a deliverable reached the Delivery Dock. This event is the notice, not the side effect, so it carries no authz. A format that leaves Tilo (email, or google_docs, google_sheets or google_slides through the Drive connector, PRD 12.4) went through the outbox: outbox_id names the entry that sent it, and the event's cause is that entry's data.transfer out, which carries the authorisation (EV-14, HR-7). A format kept in Tilo (a file to download, or in_app) has outbox_id null.",
+  "description": "data of artifact.delivered (PRD 9.5): a deliverable reached the Delivery Dock. This event is the notice, not the side effect, so it carries no authz. A format that leaves Tilo (email, or google_docs, google_sheets or google_slides through the Drive connector, PRD 12.4) went through the outbox: outbox_id names the entry that sent it, and the event's cause is that entry's data.transfer out, which carries the authorisation (EV-14, HR-7). A format kept in Tilo (a file to download, or in_app) has outbox_id null. 1.1.0 (ADR-0050): make_with says where the deliverable was made, and a website always carries it. A deliverable a partner made (make_with not native: a Lovable build link, a Canva export) left Tilo through that partner's T3 outbox entry, so outbox_id names it and the cause is its data.transfer out (EV-14); a native one kept in Tilo has outbox_id null.",
   "type": "object",
   "additionalProperties": false,
   "required": ["artifact", "format", "outbox_id"],
@@ -12,7 +12,8 @@
     "format": { "$ref": "../../common.schema.json#/$defs/deliverable_format" },
     "outbox_id": {
       "anyOf": [{ "$ref": "../../common.schema.json#/$defs/ulid" }, { "type": "null" }]
-    }
+    },
+    "make_with": { "$ref": "../../common.schema.json#/$defs/make_with" }
   },
   "if": {
     "properties": {
@@ -21,5 +22,19 @@
     "required": ["format"]
   },
   "then": { "properties": { "outbox_id": { "$ref": "../../common.schema.json#/$defs/ulid" } } },
-  "else": { "properties": { "outbox_id": { "type": "null" } } }
+  "else": {
+    "if": {
+      "properties": { "make_with": { "not": { "const": "native" } } },
+      "required": ["make_with"]
+    },
+    "then": { "properties": { "outbox_id": { "$ref": "../../common.schema.json#/$defs/ulid" } } },
+    "else": { "properties": { "outbox_id": { "type": "null" } } }
+  },
+  "dependentSchemas": {
+    "format": {
+      "description": "A website always says where it was made (ADR-0050). Keyed by a required field, so it always applies; the root keeps one if/then/else.",
+      "if": { "properties": { "format": { "const": "website" } }, "required": ["format"] },
+      "then": { "required": ["make_with"] }
+    }
+  }
 }

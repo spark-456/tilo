@@ -1,0 +1,10 @@
+# RT-05 / ADR-0049: passage-index caps. Retrieval remains off until TILO_RETRIEVAL=1.
+vector:
+  dimensions: 768
+  k: 5
+  max_distance: null
+  chunk_chars: 1200
+  per_source: 200
+  per_person: 2000
+embed:
+  batch_max: 64

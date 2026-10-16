@@ -3,13 +3,13 @@
 # `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
 # agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
 # appspec.schema.json 1.0.0 sha256:e3638e1ae19f9b9b
-# artifact.schema.json 1.1.0 sha256:ce5a30aeae826180
+# artifact.schema.json 1.2.0 sha256:e840ce55967af231
 # attention.schema.json 1.0.0 sha256:f35cff84728304af
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
 # byok.schema.json 1.0.0 sha256:683d5d2b4fc8b0fe
 # calendar_entry.schema.json 1.1.0 sha256:291531543be88320
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
-# common.schema.json 1.7.0 sha256:71b116e3caa126a8
+# common.schema.json 1.8.0 sha256:519aa76cc4543df9
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -38,8 +38,8 @@
 # events/data/app.tested.schema.json 1.0.0 sha256:7cc150abdade1ee3
 # events/data/approval.requested.schema.json 1.0.0 sha256:fa01c18f73338a6d
 # events/data/approval.resolved.schema.json 1.0.0 sha256:3c56d4ad96d63941
-# events/data/artifact.created.schema.json 1.1.0 sha256:e796f958760d0464
-# events/data/artifact.delivered.schema.json 1.0.0 sha256:a0e7a46e56965c1d
+# events/data/artifact.created.schema.json 1.2.0 sha256:0df200011b9cfb66
+# events/data/artifact.delivered.schema.json 1.1.0 sha256:65d00e00c4f3261d
 # events/data/artifact.reviewed.schema.json 1.0.0 sha256:fee51f5f590c73c4
 # events/data/artifact.rolled_back.schema.json 1.0.0 sha256:4c4dac77a4b5c873
 # events/data/artifact.versioned.schema.json 1.0.0 sha256:b6ceac1481d2595b
@@ -87,6 +87,7 @@
 # events/data/pinboard.item_added.schema.json 1.0.0 sha256:f36dccb547318b08
 # events/data/pinboard.item_changed.schema.json 1.0.0 sha256:2db181d1a51c6c84
 # events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
+# events/data/plan.maker_chosen.schema.json 1.0.0 sha256:587d15f93e9054ca
 # events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
 # events/data/plan.revised.schema.json 1.0.0 sha256:55005a10fa84656a
 # events/data/policy.applied.schema.json 1.0.0 sha256:3ca104f308b12dce
@@ -114,28 +115,32 @@
 # events/registry.schema.json 1.2.0 sha256:5a2b8514c1e7e2b1
 # handoff.schema.json 1.0.0 sha256:7ed882f92b634672
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
+# makers.schema.json 1.0.0 sha256:311892161a9ac570
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
-# mcp_tools.schema.json 1.0.0 sha256:46a498402c9b1e4e
+# mcp_tools.schema.json 1.1.0 sha256:f2a2e81377dc3337
 # meeting.schema.json 1.3.0 sha256:2042ae5ef2dc73c2
 # meeting_brief.schema.json 1.0.0 sha256:1f6442fa4f0c3e86
 # meeting_host_rpc.schema.json 1.4.0 sha256:38bb31a808bfe7f0
 # meeting_join.schema.json 1.0.0 sha256:ea1e8f0945773573
 # meeting_room.schema.json 1.0.0 sha256:13c682235d58ce69
 # meeting_voice_meter.schema.json 1.0.0 sha256:fa317e43b3e785b6
+# memory_item.schema.json 1.0.0 sha256:d8c8bfb89ccd887f
 # mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
 # meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
 # metering.schema.json 1.0.0 sha256:91358a776e6c033a
 # minutes.schema.json 1.0.0 sha256:b8bbe5f69603a5a8
 # model_call_rpc.schema.json 1.0.0 sha256:3f585f8e5d092538
+# morning_brief.schema.json 1.0.0 sha256:2247fea8efa065e2
 # org_model_key.schema.json 1.1.0 sha256:ba443cf35d658c90
 # outbox.schema.json 1.0.0 sha256:0b9b172f230a6347
 # person.schema.json 1.1.0 sha256:2d974d326607d569
 # pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
 # pinboard_item.schema.json 1.1.0 sha256:edf4c50a588211ee
-# plan.schema.json 1.1.0 sha256:f0722cc94a84e2d1
+# plan.schema.json 1.2.0 sha256:56b88d2b8bac8f09
 # plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
 # policy.schema.json 1.0.0 sha256:307bca25f6efc07e
 # providers.schema.json 1.4.0 sha256:e39a636e4de90ab6
+# retrieval_chunk.schema.json 1.0.0 sha256:823e0149d45b9297
 # scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
 # skill.schema.json 1.1.0 sha256:9eeee7768b667afa
 # spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
@@ -146,7 +151,7 @@
 # user_settings.schema.json 1.0.0 sha256:dfc439371ba69131
 # work_item.schema.json 1.1.0 sha256:9ee739ef8bdb7579
 # world_share.schema.json 1.0.0 sha256:89d31e9968dc95cc
-# events/registry.yaml 1.5.0 sha256:ffb369c84ae3eff7
+# events/registry.yaml 1.6.0 sha256:73d1110f8751fe0b
 
 from __future__ import annotations
 
@@ -576,15 +581,15 @@ Data class (PRD 12.1): personal, business or public.
 """
 
 
-type DeliverableFormat = Literal["pdf", "pptx", "docx", "xlsx", "csv", "markdown", "google_slides", "google_docs", "google_sheets", "email", "in_app", "app"]
+type DeliverableFormat = Literal["pdf", "pptx", "docx", "xlsx", "csv", "markdown", "google_slides", "google_docs", "google_sheets", "email", "in_app", "app", "website"]
 """
-Deliverable format (PRD 12.4), plus email for replies, in_app for answers shown in Tilo and, since 1.6.0 (ADR-0029), app: an AppSpec (appspec.schema.json) that fixed web code renders (FR-AGT-16).
+Deliverable format (PRD 12.4), plus email for replies, in_app for answers shown in Tilo, since 1.6.0 (ADR-0029) app: an AppSpec (appspec.schema.json) that fixed web code renders (FR-AGT-16), and since 1.8.0 (ADR-0050) website: a site made natively as one self-contained HTML file by a writer unit (website.rules.md) or by a build partner the person picked (make_with, makers.rules.md).
 """
 
 
-type MediaType = Literal["text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/png", "image/jpeg", "video/webm", "video/mp4"]
+type MediaType = Literal["text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/png", "image/jpeg", "video/webm", "video/mp4", "text/html"]
 """
-Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG, and since 1.7.0 (ADR-0034) WebM and MP4 video, which only a taught-skill capture upload stores (a screen recording or an uploaded example; never rendered or fetched). Code picks it, never a model: from the role and the pinned skill for a unit or render output, and from the file's own leading bytes for an upload (whose extension must agree) or a fetch (ADR-0029), never from a file name, a URL or a Content-Type header alone. Closed: no HTML or SVG.
+Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG, and since 1.7.0 (ADR-0034) WebM and MP4 video, which only a taught-skill capture upload stores (a screen recording or an uploaded example; never rendered or fetched). Code picks it, never a model: from the role and the pinned skill for a unit or render output, and from the file's own leading bytes for an upload (whose extension must agree) or a fetch (ADR-0029), never from a file name, a URL or a Content-Type header alone. Since 1.8.0 (ADR-0050) text/html is allowed for one case only: a writer unit's website, one self-contained HTML file of at most 524,288 bytes that passed the static checks (website.rules.md WS-01 to WS-09), never an upload, a fetch or a render (artifact.rules.md AR-10). Closed: no SVG file and no other HTML.
 """
 
 
@@ -662,6 +667,17 @@ class RecordRef(BaseModel):
     )
     kind: Literal["work_item", "calendar_entry", "meeting", "pinboard_item", "mention", "card", "world", "event", "mail"]
     id: Annotated[str, Field(pattern="^[A-Za-z0-9_]{1,64}$")]
+
+
+type MakeWith = Annotated[
+    str,
+    Field(
+        pattern="^(native|connector:[a-z][a-z0-9_]{1,31}|mcp:[a-z][a-z0-9_]{1,31}:[A-Za-z0-9_.-]{1,64})$"
+    ),
+]
+"""
+Where a deliverable is made (1.8.0, ADR-0050): native (Tilo's own units), connector:<connector id> (a build partner such as lovable or canva) or mcp:<server id>:<tool name> (a tool of an allowlisted MCP server, config/mcp.yaml). The person picks it on the start plan from the options code offers (makers.rules.md); a model never picks it, and picking a partner authorises nothing: the partner's action stays T3 behind its own card. Not to be confused with maker, a record's provenance.
+"""
 
 
 type ConnectorCapability = Literal["read", "list", "search", "write", "send", "share", "delete"]
@@ -1449,6 +1465,31 @@ class PlanApproachesProposedData(BaseModel):
     approach_count: Annotated[int, Field(ge=2, le=3)]
 
 
+class PlanMakerChosenData(BaseModel):
+    """
+    data of plan.maker_chosen (ADR-0050, MK-06): at Start, where the person chose to make one deliverable whose format offers a choice in config/makers.yaml; one event per such deliverable, in brief order, in the same save as the budget grant. The actor is the person and the target the world. A choice authorises nothing: a partner's action stays T3 behind its own card (MK-07). suggested is the option code suggested (MK-04), or null when it suggested none, so the Trace shows whether the person followed it.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    deliverable: Annotated[int, Field(ge=0, le=9)]
+    """
+    0-based position of the deliverable in the brief (a brief has at most 10).
+    """
+    title: Annotated[str, Field(max_length=120, min_length=1)]
+    """
+    The deliverable's title in the brief.
+    """
+    format: DeliverableFormat
+    make_with: MakeWith
+    label: Annotated[str, Field(max_length=40, min_length=1)]
+    """
+    The chosen option's display name as the start plan showed it, e.g. Tilo, Lovable or Canva.
+    """
+    suggested: MakeWith | None
+
+
 class PlanQuestionsAskedData(BaseModel):
     """
     data of plan.questions_asked (PRD 9.5). At most three ranked clarifying questions (FR-INT-04); each is a card.
@@ -1854,6 +1895,23 @@ class LayoutGateGeometry(BaseModel):
     )
     id: GateId
     cell: LayoutPoint
+
+
+class MakersConfigPartner(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    make_with: MakeWith
+    action: ActionType
+    """
+    The action that makes the deliverable there: the connector's T3, gated action (build_handoff, create_design) or the MCP tool's action type. Picking the partner authorises nothing; this action keeps its own card (MK-07).
+    """
+
+
+type MakersConfigNeed = Annotated[str, Field(pattern="^[a-z0-9]+([ -][a-z0-9]+){0,3}$")]
+"""
+Lower-case words separated by one space or hyphen.
+"""
 
 
 class ManifestSkillVersion(BaseModel):
@@ -2818,6 +2876,87 @@ class MeetingVoiceMeterError(BaseModel):
     error: Literal["unauthenticated", "forbidden", "invalid_request", "not_configured", "not_attending", "no_hold", "key_used"]
 
 
+type MemoryItemMemoryItemId = Annotated[str, Field(pattern="^mem_[0-9A-Za-z_]{1,48}$")]
+"""
+Minted by tilo-api; never taken from a body.
+"""
+
+
+type MemoryItemText = Annotated[
+    str,
+    Field(
+        max_length=280,
+        min_length=1,
+        pattern="^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+    ),
+]
+"""
+The note: one line of 1 to 280 characters with no leading or trailing space, no control, format, line or paragraph separator character of the Basic Multilingual Plane, no variation selector after an ASCII character and no link (`://` or host/path). Astral format characters and variation selectors are the api's (MI-03). Data, never an instruction.
+"""
+
+
+type MemoryItemKind = Literal["preference", "fact", "person"]
+"""
+What the note is about: a preference (I prefer morning meetings), a fact (I work on the Q4 launch) or a person (my manager is Priya). A label for the list; it changes no use (MI-05).
+"""
+
+
+type MemoryItemSource = Literal["user", "tilo_suggested"]
+"""
+Provenance only: user when the person typed it on the list, tilo_suggested when they tapped a suggestion a Quick answer offered (MI-04). It never changes, an edit included, and it grants nothing.
+"""
+
+
+class MemoryItemCreate(BaseModel):
+    """
+    The body of POST /v1/memory. It names no id, owner, org or time: tilo-api mints the id and takes the owner and org from the verified principal (MI-01, MI-02).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    text: MemoryItemText
+    kind: MemoryItemKind
+    source: MemoryItemSource
+
+
+class MemoryItemUpdate(BaseModel):
+    """
+    The body of PATCH /v1/memory/{id}: a new text, a new kind, or both. `source` and every server-owned field are refused (MI-02).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    text: MemoryItemText | None = None
+    kind: MemoryItemKind | None = None
+
+
+class MemoryItemSuggestion(BaseModel):
+    """
+    What a Quick answer may offer to remember: at most one per answer, made by code from the person's own words in that question, never by a model (MI-04). Nothing is stored until the person taps it, which POSTs `create` with source tilo_suggested.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    text: MemoryItemText
+    kind: MemoryItemKind
+
+
+class MemoryItemContextItem(BaseModel):
+    """
+    One note as a prompt sees it: its id (so the Director may cite it in brief.sources, kind memory, MI-05), kind and text.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: MemoryItemMemoryItemId
+    kind: MemoryItemKind
+    text: MemoryItemText
+
+
 class MentionRemoval(BaseModel):
     """
     Who removed the tag and when: the tagged person or the entry's setter (PE-06).
@@ -3020,6 +3159,199 @@ class ModelCallRpcError(BaseModel):
         extra="forbid",
     )
     error: Literal["unauthenticated", "forbidden", "invalid_request", "not_configured", "no_key", "unverified", "invalid_key", "rate_limited", "quota", "unreachable"]
+
+
+type MorningBriefTitle = Annotated[
+    str,
+    Field(
+        max_length=140,
+        min_length=1,
+        pattern="^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+    ),
+]
+"""
+One line of 1 to 140 characters, cleaned by code (MO-06): no leading or trailing space, no control, format, line or paragraph separator character of the Basic Multilingual Plane, no variation selector after an ASCII character, no link (`://` or host/path). Astral format characters are code's (MO-06). Untrusted data, shown as plain text.
+"""
+
+
+type MorningBriefName = Annotated[
+    str,
+    Field(
+        max_length=80,
+        min_length=1,
+        pattern="^[^@\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+    ),
+]
+"""
+A sender's display name, 1 to 80 characters, with the checks of `title` and no @: never an address (MO-06).
+"""
+
+
+type MorningBriefLine = Annotated[
+    str,
+    Field(
+        max_length=240,
+        min_length=1,
+        pattern="^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+    ),
+]
+"""
+A suggestion's text, 1 to 240 characters, with the checks of `title`.
+"""
+
+
+type MorningBriefDueText = Annotated[
+    str,
+    Field(
+        max_length=60,
+        min_length=1,
+        pattern="^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+    ),
+]
+"""
+A to-do's due words as the model read them (by Friday), 1 to 60 characters, with the checks of `title`. Code computes a date from it only when the person confirms the to-do (PE-15).
+"""
+
+
+type MorningBriefSourceId = Annotated[str, Field(pattern="^[A-Za-z0-9_-]{1,128}$")]
+"""
+The cited record's own id, copied by code: a Google Calendar event id, a Gmail message id, or a Tilo work item, pin or world id. Letters, digits, underscore and hyphen only, so never a URL, domain or address.
+"""
+
+
+class MorningBriefMeetingSource(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["calendar_event"]
+    id: MorningBriefSourceId
+
+
+class MorningBriefMailSource(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["mail"]
+    id: MorningBriefSourceId
+
+
+class MorningBriefDeadlineSource(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["work_item", "pinboard_item", "world"]
+    id: MorningBriefSourceId
+
+
+type MorningBriefCite = MorningBriefMeetingSource | MorningBriefMailSource | MorningBriefDeadlineSource
+"""
+An item of this brief's meetings, mail_needing_reply or deadlines, by its source (MO-08).
+"""
+
+
+class MorningBriefMeeting(BaseModel):
+    """
+    One event of the person's own primary calendar on local_date, copied by code from the calendar read (MO-05). An all-day event has dates (end exclusive); any other has UTC times. No description, location, link, organizer or guest.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: MorningBriefTitle
+    start: Timestamp | CalendarDate
+    end: Timestamp | CalendarDate
+    all_day: bool
+    attendee_count: Annotated[int, Field(ge=0, le=500)]
+    source: MorningBriefMeetingSource
+
+
+class MorningBriefMail(BaseModel):
+    """
+    One message of the person's own inbox, copied by code from the mail search (MO-05): the sender's display name (null when it has none), the subject (null when empty after cleaning) and the receipt time (null when unreadable). Never an address, a body, a snippet or an attachment.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    from_name: MorningBriefName | None
+    subject: MorningBriefTitle | None
+    received_at: Timestamp | None
+    source: MorningBriefMailSource
+
+
+class MorningBriefDeadline(BaseModel):
+    """
+    A row of the person's own plate with a due date on or before local_date plus 2 days (MO-05), copied by code: the record's title, its due date, whether it is past (`overdue`, due before local_date).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: MorningBriefTitle
+    due: CalendarDate
+    overdue: bool
+    source: MorningBriefDeadlineSource
+
+
+class MorningBriefSuggestion(BaseModel):
+    """
+    A short line the model wrote about the day, citing one to five items of this brief (MO-07, MO-08). It opens or does nothing by itself.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    text: MorningBriefLine
+    cites: Annotated[list[MorningBriefCite], Field(max_length=5, min_length=1)]
+
+
+class MorningBriefTodo(BaseModel):
+    """
+    A to-do the model proposed from one message the mail search read (a bill, a delivery, an appointment): its title and due words, and that message as code copied it. It becomes a work item only when the person confirms it (MO-11).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: MorningBriefTitle
+    due_text: MorningBriefDueText | None
+    mail: MorningBriefMail
+
+
+class MorningBriefMeetingsSection(BaseModel):
+    """
+    ok: the calendar was read (items may be empty: no meetings today). not_connected: no calendar grant. unavailable: the read failed. Only ok carries items.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    status: Literal["ok", "not_connected", "unavailable"]
+    items: Annotated[list[MorningBriefMeeting], Field(max_length=20)]
+
+
+class MorningBriefMailSection(BaseModel):
+    """
+    ok: the model picked these from the mail read as needing a reply. unsorted: the mail was read but the model was not used, so these are the newest unread messages, shown as unread, not as needing a reply. not_connected: no mail grant. unavailable: the read failed. not_connected and unavailable carry no items.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    status: Literal["ok", "unsorted", "not_connected", "unavailable"]
+    items: Annotated[list[MorningBriefMail], Field(max_length=10)]
+
+
+class MorningBriefDeadlinesSection(BaseModel):
+    """
+    ok: the plate was read (items may be empty). unavailable: it could not be read. Only ok carries items.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    status: Literal["ok", "unavailable"]
+    items: Annotated[list[MorningBriefDeadline], Field(max_length=20)]
 
 
 type OrgModelKeySlot = Literal["models"]
@@ -3339,6 +3671,30 @@ class PinboardItemHistoryEntry(BaseModel):
 type PlanApproachId = Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,31}$")]
 
 
+type PlanMakeNote = Annotated[str, Field(max_length=200, min_length=1)]
+"""
+One plain sentence Tilo wrote from the rule that applied (MK-02, MK-04).
+"""
+
+
+class PlanMakeOption(BaseModel):
+    """
+    One place a deliverable can be made (MK-02 to MK-04). A partner that is not set up is shown with status needs_setup, never hidden, never suggested and never selected. note is one plain sentence: why the option is suggested, or what must be set up first; null otherwise.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    make_with: MakeWith
+    label: Annotated[str, Field(max_length=40, min_length=1)]
+    """
+    Display name: Tilo for native, else the connector's or MCP server's name.
+    """
+    status: Literal["ready", "needs_setup"]
+    suggested: bool
+    note: PlanMakeNote | None
+
+
 type Risk = Annotated[str, Field(max_length=200, min_length=1)]
 
 
@@ -3606,6 +3962,89 @@ class ProvidersUnitPrice(BaseModel):
     )
     unit: Literal["query", "minute", "character", "image"]
     per_1k: Annotated[float | None, Field(ge=0.0)]
+
+
+type RetrievalChunkChunkId = Annotated[str, Field(pattern="^ch_[0-9a-f]{32}$")]
+"""
+ch_ and the first 32 hex digits of SHA-256 over org, source kind, source id, source version, position and embed_profile, so indexing the same version again writes the same ids.
+"""
+
+
+class RetrievalChunkSource(BaseModel):
+    """
+    The record the passage came from. deliverable and upload name an artifact version (ADR-0018); minutes name the meeting and the version of its minutes artifact; pin and memory_item name the record, whose current text is indexed (version null).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["deliverable", "upload", "minutes", "pin", "memory_item"]
+    id: Annotated[str, Field(pattern="^(art|mt|pb|mem)_[0-9A-Za-z_]{1,48}$")]
+    version: Version | None
+
+
+type RetrievalChunkLabel = Annotated[
+    str,
+    Field(
+        max_length=120,
+        min_length=1,
+        pattern="^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF\\uFFF9-\\uFFFB]+$",
+    ),
+]
+"""
+What the person sees for the source (a file or deliverable label, a meeting or pin title, or 'Your note'): one line of 1 to 120 characters with no control, format, line or paragraph separator character.
+"""
+
+
+type RetrievalChunkText = Annotated[
+    str,
+    Field(
+        max_length=1200,
+        min_length=1,
+        pattern="^[^\\u0000-\\u0008\\u000B-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF\\uFFF9-\\uFFFB]+$",
+    ),
+]
+"""
+The passage: 1 to 1200 characters, cleaned and secret-redacted by code before it is embedded or stored (RT-08). Line breaks and tabs stay; every other control character, format character and line or paragraph separator is gone. Untrusted data, never instructions.
+"""
+
+
+class RetrievalChunkPromptChunk(BaseModel):
+    """
+    One retrieved passage as a prompt sees it.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: RetrievalChunkChunkId
+    source: RetrievalChunkSource
+    label: RetrievalChunkLabel
+    text: RetrievalChunkText
+
+
+class RetrievalChunkPromptBlock(BaseModel):
+    """
+    The data block tilo-api renders into the user turn (never the system prompt, EFF-04) of the person's own Quick ask and their own signed-in intake's Director brief extraction (RT-04): at most 5 passages that passed the query-time scope check, nearest first. Fenced and labelled as untrusted data.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    chunks: Annotated[list[RetrievalChunkPromptChunk], Field(max_length=5)]
+
+
+class RetrievalChunkGroundingRef(BaseModel):
+    """
+    What an answer shows it looked at, one per passage given to the model (RT-04): the source and its label, never the text. A Quick answer carries at most 5 as `grounded_on`.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    source: RetrievalChunkSource
+    label: RetrievalChunkLabel
 
 
 type ScenarioId = Annotated[str, Field(pattern="^[A-Za-z][A-Za-z0-9_-]{0,31}$")]
@@ -4717,7 +5156,7 @@ class ApprovalRequestedDataApproverAssignment(BaseModel):
 
 class ArtifactCreatedData(BaseModel):
     """
-    data of artifact.created (PRD 9.5): version 1 of a new artifact (EV-15). A version that went through the artifact store (ADR-0018) carries content_sha256, media_type and size_bytes copied from its stored record (artifact.schema.json), all three or none; the event is written only after the store committed it. Events from before the store, and the intake and channels producers, carry none (1.0.0 shape).
+    data of artifact.created (PRD 9.5): version 1 of a new artifact (EV-15). A version that went through the artifact store (ADR-0018) carries content_sha256, media_type and size_bytes copied from its stored record (artifact.schema.json), all three or none; the event is written only after the store committed it. Events from before the store, and the intake and channels producers, carry none (1.0.0 shape). 1.2.0 (ADR-0050): a website's HTML (text/html) is at most 524,288 bytes, as in the record (AR-10).
     """
 
     model_config = ConfigDict(
@@ -4739,7 +5178,7 @@ class ArtifactCreatedData(BaseModel):
 
 class ArtifactDeliveredData(BaseModel):
     """
-    data of artifact.delivered (PRD 9.5): a deliverable reached the Delivery Dock. This event is the notice, not the side effect, so it carries no authz. A format that leaves Tilo (email, or google_docs, google_sheets or google_slides through the Drive connector, PRD 12.4) went through the outbox: outbox_id names the entry that sent it, and the event's cause is that entry's data.transfer out, which carries the authorisation (EV-14, HR-7). A format kept in Tilo (a file to download, or in_app) has outbox_id null.
+    data of artifact.delivered (PRD 9.5): a deliverable reached the Delivery Dock. This event is the notice, not the side effect, so it carries no authz. A format that leaves Tilo (email, or google_docs, google_sheets or google_slides through the Drive connector, PRD 12.4) went through the outbox: outbox_id names the entry that sent it, and the event's cause is that entry's data.transfer out, which carries the authorisation (EV-14, HR-7). A format kept in Tilo (a file to download, or in_app) has outbox_id null. 1.1.0 (ADR-0050): make_with says where the deliverable was made, and a website always carries it. A deliverable a partner made (make_with not native: a Lovable build link, a Canva export) left Tilo through that partner's T3 outbox entry, so outbox_id names it and the cause is its data.transfer out (EV-14); a native one kept in Tilo has outbox_id null.
     """
 
     model_config = ConfigDict(
@@ -4748,6 +5187,7 @@ class ArtifactDeliveredData(BaseModel):
     artifact: ArtifactRef
     format: DeliverableFormat
     outbox_id: Ulid | None
+    make_with: MakeWith | None = None
 
 
 class ArtifactReviewedData(BaseModel):
@@ -5141,6 +5581,34 @@ class LayoutGeometry(BaseModel):
     gates: list[LayoutGateGeometry]
 
 
+class MakersConfigFormatOptions(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    partners: Annotated[list[MakersConfigPartner], Field(max_length=5, min_length=1)]
+    """
+    The partner options after native, in display order.
+    """
+
+
+class MakersConfigLargeSite(BaseModel):
+    """
+    MK-03: a website deliverable is large when its brief text names more than max_native_pages pages or one of the needs. The brief text is the goal, the deliverable's title and each constraint, lower-cased with whitespace collapsed; a need matches as whole words; a page count is a number (digits, or a word from one to twenty) directly before page or pages, a space or hyphen between.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    max_native_pages: Annotated[int, Field(ge=1, le=20)]
+    """
+    The most pages one self-contained HTML file is asked to hold (in-page sections or tabs).
+    """
+    needs: Annotated[list[MakersConfigNeed], Field(max_length=60)]
+    """
+    Lower-case phrases of one to four words naming a need a single file with no network cannot meet (sign-in, a database, payments).
+    """
+
+
 class ManifestProducer(BaseModel):
     """
     Who produced the version: the agent and its role, the pinned skill version (null without a skill), and the model role and profile from config/models.yaml (null when no model was called), never a model id.
@@ -5170,7 +5638,7 @@ class McpTools(BaseModel):
 
 class McpToolsReadArtifactOut(BaseModel):
     """
-    `text` is the version's bytes as UTF-8 for `text/markdown`, `text/csv` and `application/json` up to 262,144 bytes, else null with `withheld` saying why (MC-07).
+    `text` is the version's bytes as UTF-8 for `text/markdown`, `text/csv` and `application/json` up to 262,144 bytes, else null with `withheld` saying why (MC-07). Since 1.1.0 (ADR-0050) the schema holds the type half: text is null for any other type, a website's HTML included.
     """
 
     model_config = ConfigDict(
@@ -5409,6 +5877,48 @@ What the meeting bot posts to tilo-api to meter its Gemini Live voice on the SEC
 """
 
 
+class MemoryItem(BaseModel):
+    """
+    One note on a person's 'Tilo remembers' list (ADR-0049): a preference, a fact or a person, in at most 280 characters, that Tilo hands to that person's own Quick asks and intake as data. Stored and served by tilo-api for the verified principal only, keyed by org and owner; nobody else reads, lists or counts it (MI-01). Every stored item was saved by the person: typed on the list, or a suggestion they tapped (`source` tilo_suggested), so there is no unconfirmed state (MI-04). Delete is a hard delete (MI-02). A note authorises nothing (MI-07). $defs: `create` and `update` are the POST and PATCH bodies, `list` the GET answer, `suggestion` what a Quick answer may offer, `prompt_context` the data block handed to a prompt. Rules MI-01 to MI-10 are in memory_item.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: MemoryItemMemoryItemId
+    org_id: OrgId
+    owner: UserId
+    text: MemoryItemText
+    kind: MemoryItemKind
+    source: MemoryItemSource
+    created_at: Timestamp
+    updated_at: Timestamp
+
+
+class MemoryItemList(BaseModel):
+    """
+    The answer of GET /v1/memory: the principal's own items, newest `updated_at` first, ties by id, at most 100 (MI-02).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    items: Annotated[list[MemoryItem], Field(max_length=100)]
+
+
+class MemoryItemPromptContext(BaseModel):
+    """
+    The data block tilo-api renders into the user turn (never the system prompt, EFF-04) of the person's own Quick ask and the Director's brief extraction for their own signed-in intake (MI-05): the person's local date and at most 20 of their notes, newest first. It carries no name, address, title or other settings text (USET-08). Fenced and labelled as data, never instructions.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    today: CalendarDate
+    items: Annotated[list[MemoryItemContextItem], Field(max_length=20)]
+
+
 class Mention(BaseModel):
     """
     An @mention of a team member on a team pinboard entry (FR-PB-04). It names a team because a personal entry cannot be tagged (PE-01, PE-06). The tagged person is a member of the team when tagged; they can always remove themselves, and the entry's `set_up_by` person can remove anyone (PE-06). A removed mention stays as a record; a new tag is a new mention.
@@ -5517,6 +6027,66 @@ class ModelCallRpcGenerateAnswer(BaseModel):
     usage: ModelCallRpcUsage | None = None
 
 
+class MorningBrief(BaseModel):
+    """
+    A person's morning brief for one local day, `local_date` in `time_zone` (ADR-0049): the content of one version of the `application/json` artifact `art_mbrief_<yyyymmdd>` in their own Desk world. Not the intake brief (`brief.schema.json`) and not a meeting's brief (ADR-0047). Owner-only (MO-01). Code copies every meeting, mail and deadline item from the person's own calendar read, mail search and plate (MO-05, MO-06); a model only picks which mail needs a reply and writes the `suggestions` and `todo_suggestions` text, each citing items code offered (MO-07, MO-08). Every section says whether it could be read (`status`), so an empty list is never a failed read (MO-12). No recipient, address, link or body: every text is one link-free line, and the brief sends, books and authorises nothing (MO-11). $defs `settings` is the GET and PUT answer of /v1/me/brief-settings and `settings_update` the PUT body. Rules MO-01 to MO-12 are in morning_brief.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    owner: UserId
+    local_date: CalendarDate
+    time_zone: UserSettingsTimeZone
+    generated_at: Timestamp
+    trigger: Literal["schedule", "on_demand"]
+    """
+    schedule: the Scheduler tick's sweep made it at the person's brief time (MO-03); on_demand: the person asked for it now (MO-04).
+    """
+    model: Literal["used", "skipped", "failed", "flagged"]
+    """
+    What happened to the one model call (MO-07): used (its reply passed the checks), skipped (nothing to read, or the allowance had no room), failed (error or timeout) or flagged (the safety provider flagged the reply). Anything but used leaves suggestions and todo_suggestions empty and the mail unsorted (schema).
+    """
+    meetings: MorningBriefMeetingsSection
+    mail_needing_reply: MorningBriefMailSection
+    deadlines: MorningBriefDeadlinesSection
+    suggestions: Annotated[list[MorningBriefSuggestion], Field(max_length=5)]
+    todo_suggestions: Annotated[list[MorningBriefTodo], Field(max_length=5)]
+
+
+class MorningBriefSettings(BaseModel):
+    """
+    The answer of GET and PUT /v1/me/brief-settings for the verified principal (MO-02). With nothing stored, GET answers the defaults with updated_at null. email_rule_ready is read-only: true when the person has the standing rule that lets Tilo mail their own address (MO-10); without it the email copy sends nothing even when switched on.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    owner_id: UserId
+    org_id: OrgId
+    enabled: bool
+    time: UserSettingsClock
+    time_zone: UserSettingsTimeZone
+    email_copy: bool
+    email_rule_ready: bool
+    updated_at: Timestamp | None
+
+
+class MorningBriefSettingsUpdate(BaseModel):
+    """
+    The body of PUT /v1/me/brief-settings: the whole setting. It names no owner, org, time of saving or email_rule_ready: those are the server's (MO-02).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    enabled: bool
+    time: UserSettingsClock
+    time_zone: UserSettingsTimeZone
+    email_copy: bool
+
+
 class OrgModelKeyError(BaseModel):
     """
     The body of every refusal on these routes (BK-02): a fixed word in detail and, on the coded refusals, the same word in code, and nothing else, never a value, the input, the provider's text or an exception's. owner_only (403: not the org owner, a demo or non-full session), reauth_required (401, BK-06), confirm_required (422), key_refused (422: the key or the body is not accepted), invalid_body (422), rate_limited (429, with Retry-After, 5 acts an hour, BK-08), not_configured (503: byok.yaml missing or enabled false, or a seam is not wired) and unavailable (503: connectors, the vault or a store). Sign-in, size and media-type refusals use the platform's shared bodies.
@@ -5622,6 +6192,25 @@ class PinboardItemPlacement(BaseModel):
     board: PinboardItemPlaceId
     column: PinboardItemPlaceId
     order: Annotated[int, Field(ge=0, le=9999)]
+
+
+class PlanMakeChoice(BaseModel):
+    """
+    Where one deliverable can be made (ADR-0050, MK-01): sent with the approaches for every deliverable whose format config/makers.yaml lists, native first, then each partner in config order. Code builds it, never a model. The selected option is the one whose make_with the start plan holds; a deliverable with no choice is made natively.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    deliverable: Annotated[int, Field(ge=0, le=9)]
+    """
+    0-based position of the deliverable in the brief.
+    """
+    options: Annotated[list[PlanMakeOption], Field(max_length=6, min_length=2)]
+    selected: MakeWith
+    """
+    The option selected before Start (MK-05): native, or the suggested ready option when config/makers.yaml preselect_suggested is true. Never an option that needs setup (MK-05, checked by code).
+    """
 
 
 class PlanApproach(BaseModel):
@@ -5758,6 +6347,31 @@ class ProvidersPrice(BaseModel):
     cached_input: Annotated[float | None, Field(ge=0.0)] = None
     unit_price: ProvidersUnitPrice | None = None
     valid_until: CalendarDate | None = None
+
+
+class RetrievalChunk(BaseModel):
+    """
+    One indexed passage of a record a person may read, for per-account grounding (ADR-0049): the document at orgs/{org}/chunks/{id} without its vector. The stored document also holds `embedding`, a Firestore vector of `dimensions` floats made by the `embed` role's `embed_profile`; JSON readers (erasure, export, tests) never see it. Written by code only, from records already stored and screened clean (RT-01, RT-08). `owner` is the person whose record it is; `team_id` is set only for a source a team may read under the existing rules (a team pin, or a deliverable of a world while a team share is in force), and team reads are re-checked at every query (RT-02, RT-03). A chunk lives no longer than its source (RT-07). $defs `prompt_block` is the data block a prompt receives and `grounding_ref` what an answer shows it looked at. Rules RT-01 to RT-10 are in retrieval_chunk.rules.md.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: RetrievalChunkChunkId
+    org_id: OrgId
+    owner: UserId
+    team_id: TeamId | None
+    world_id: WorldId | None
+    source: RetrievalChunkSource
+    label: RetrievalChunkLabel
+    position: Annotated[int, Field(ge=0, le=999)]
+    text: RetrievalChunkText
+    text_sha256: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+    embed_profile: ProvidersProfileId
+    dimensions: Annotated[int, Field(ge=64, le=2048)]
+    screening: Literal["clean"]
+    created_at: Timestamp
+    expires_at: Timestamp | None
 
 
 class Scenario(BaseModel):
@@ -6044,7 +6658,7 @@ class AppSpecSource(BaseModel):
 
 class ArtifactVersion(BaseModel):
     """
-    One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-09 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser.
+    One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-10 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser. 1.2.0 (ADR-0050) lets a writer unit store one self-contained HTML file for a website deliverable, at most 524,288 bytes; an upload never stores HTML (AR-10).
     """
 
     model_config = ConfigDict(
@@ -6229,6 +6843,7 @@ class Common(BaseModel):
     opaque_ref: OpaqueRef | None = None
     maker: Maker | None = None
     record_ref: RecordRef | None = None
+    make_with: MakeWith | None = None
 
 
 class Decision(BaseModel):
@@ -6411,6 +7026,26 @@ class LayoutDistrict(BaseModel):
     icon: IconName
     lead: AgentId
     buildings: Annotated[list[LayoutBuilding], Field(max_length=5, min_length=1)]
+
+
+class MakersConfig(BaseModel):
+    """
+    config/makers.yaml (ADR-0050; FR-CON-16, FR-CON-17, FR-CON-19): where each deliverable can be made. For a format listed in formats the start plan offers native (made in Tilo: always first, never listed here) and then each partner in order; a format not listed is made natively with no choice shown. Code applies MK-01 to MK-08 (makers.rules.md); a model never picks. Every key is required and no other key is allowed. The loader also checks what the schema cannot: a connector partner is declared in config/connectors.yaml or config/canva.yaml with that action as T3 and gated, and an mcp partner is a tool of config/mcp.yaml's allowlist with that action type; it refuses the whole file otherwise.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    formats: dict[DeliverableFormat, MakersConfigFormatOptions]
+    """
+    The formats that offer a choice, keyed by deliverable format, each with at least one partner (MK-01).
+    """
+    large_site: MakersConfigLargeSite
+    preselect_suggested: bool
+    """
+    MK-05: true selects a suggested ready partner before Start (the person can switch back to native); false always selects native first.
+    """
 
 
 class Manifest(BaseModel):
@@ -6762,7 +7397,7 @@ class PinboardItem(BaseModel):
 
 class Plan(BaseModel):
     """
-    PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md.
+    PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md. 1.2.0 (ADR-0050) adds make_choice and make_option: where each deliverable can be made, as the start plan shows it (makers.rules.md); the Plan root is unchanged.
     """
 
     model_config = ConfigDict(
@@ -7251,6 +7886,7 @@ type RegisteredEventType = Literal[
     "plan.questions_asked",
     "plan.approaches_proposed",
     "plan.revised",
+    "plan.maker_chosen",
     "budget.requested",
     "budget.granted",
     "level.created",
@@ -7350,6 +7986,7 @@ EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
     "plan.questions_asked",
     "plan.approaches_proposed",
     "plan.revised",
+    "plan.maker_chosen",
     "budget.requested",
     "budget.granted",
     "level.created",
@@ -7460,6 +8097,7 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
     "plan.questions_asked": PlanQuestionsAskedData,
     "plan.approaches_proposed": PlanApproachesProposedData,
     "plan.revised": PlanRevisedData,
+    "plan.maker_chosen": PlanMakerChosenData,
     "budget.requested": BudgetRequestedData,
     "budget.granted": BudgetGrantedData,
     "level.created": LevelCreatedData,
@@ -7549,7 +8187,7 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
 }
 
 EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
-    {'version': '1.5.0',
+    {'version': '1.6.0',
      'unknown_types': 'trace_only',
      'types': {'world.requested': {'family': 'world',
                                    'verb': 'requested',
@@ -7686,6 +8324,23 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                 'trace_row': 'proposal={data.proposal_id} run={data.run}',
                                 'data_schema': 'events/data/plan.revised.schema.json',
                                 'fixture': 'fixtures/events/valid/plan.revised.json'},
+               'plan.maker_chosen': {'family': 'plan',
+                                     'verb': 'maker_chosen',
+                                     'priority': 'should',
+                                     'pillar': 'P1',
+                                     'default_severity': 'info',
+                                     'side_effect': False,
+                                     'world_effect': 'A signpost at the Town Hall names who makes the '
+                                                     'deliverable: Tilo or the partner the person '
+                                                     'picked.',
+                                     'hud_effect': 'none',
+                                     'story_template': '{actor} picked {data.label} to make a '
+                                                       '{data.format} deliverable.',
+                                     'trace_row': 'deliverable={data.deliverable} '
+                                                  'make_with={data.make_with} '
+                                                  'suggested={data.suggested}',
+                                     'data_schema': 'events/data/plan.maker_chosen.schema.json',
+                                     'fixture': 'fixtures/events/valid/plan.maker_chosen.json'},
                'budget.requested': {'family': 'budget',
                                     'verb': 'requested',
                                     'priority': 'must',

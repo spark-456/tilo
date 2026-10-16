@@ -1,0 +1,31 @@
+.tt-pool-host{position:relative;min-height:100%}
+.tt-pool-page{position:relative;min-height:inherit}
+.tt-pool-page--covered{filter:blur(8px) saturate(.85);transform:scale(1.015)}
+.tt-pool-page--sink{filter:none;transform:none}
+.tt-pool-overlay{position:fixed;z-index:1000;inset:0;display:grid;place-items:center;overflow:hidden;pointer-events:auto;color:var(--ink,#0b0b0c)}
+.tt-pool-scrim{position:absolute;inset:0;background:var(--bg,#fff);opacity:.35}
+.tt-pool__stage{position:relative;width:380px;height:280px;transform:scale(1.25)}
+.tt-pool__water{position:absolute;top:38px;left:0;width:380px;height:130px;box-sizing:border-box;border:1px solid var(--line2,#d5d5d0);border-radius:50%;background:var(--card,#fff);transform-origin:center}
+.tt-pool__water::before,.tt-pool__water::after{content:"";position:absolute;border-radius:50%;background:radial-gradient(ellipse at 50% 35%,#c9e8f1 0%,#9fcfe0 45%,#6fb2cb 100%)}
+.tt-pool__water::before{inset:9px;box-shadow:inset 0 12px 0 rgb(11 11 12 / 10%)}
+.tt-pool__water::after{top:33px;left:9px;width:362px;height:112px;z-index:3;clip-path:inset(50% 0 0 0)}
+.tt-pool__ring,.tt-pool__swim-ring,.tt-pool__sink-ripple{position:absolute;border:2px solid rgb(255 255 255 / 75%);border-radius:50%;box-sizing:border-box}
+.tt-pool__ring--one{inset:30px 60px}.tt-pool__ring--two{inset:20px 40px}.tt-pool__ring--three{inset:10px 20px}
+.tt-pool__buddy{position:absolute;z-index:2}
+.tt-pool__buddy--leap{top:-16px;left:139px;width:102px;height:120px;transform-origin:50% 100%}
+.tt-pool__shadow{position:absolute;z-index:1;top:83px;left:120px;width:140px;height:40px;border-radius:50%;background:#0b0b0c;opacity:0}
+.tt-pool__drops{position:absolute;z-index:4;top:103px;left:190px;width:0;height:0}
+.tt-pool__drop{position:absolute;border:1.5px solid #0b0b0c;border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;box-sizing:border-box;opacity:0}
+.tt-pool__splash{position:absolute;top:-46px;left:-150px;width:300px;height:92px;border:3px solid #fff;border-radius:50%;opacity:0}
+.tt-pool__swimmer{position:absolute;z-index:2;top:75px;left:calc(50% - 33px);width:66px;height:52px;offset-path:ellipse(122px 32px at 50% 50%)}
+.tt-pool__swimmer-clip{position:absolute;top:0;left:4px;width:58px;height:44px;overflow:hidden}
+.tt-pool__swim-ring{bottom:2px;left:-6px;width:78px;height:16px;border-width:2.5px}
+.tt-pool__buddy--sink{top:17px;left:150px;width:80px;height:74px;overflow:hidden}
+.tt-pool__sink-ripple{top:108px;left:134px;width:112px;height:20px;border-width:2.5px}
+.tt-pool__bubble{position:absolute;top:124px;width:8px;height:8px;border:2px solid #fff;border-radius:50%;box-sizing:border-box;opacity:0}
+.tt-pool__caption{position:absolute;top:190px;left:-10px;width:400px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+.tt-pool__caption strong{font-size:18px;letter-spacing:-.3px}
+.tt-pool__caption span{color:var(--ink2,#46464a);font-family:var(--mono,monospace);font-size:12px}
+@media(max-width:560px){.tt-pool__stage{transform:scale(.8)}}
+@media(prefers-reduced-motion:reduce){.tt-pool-page--covered{filter:none;transform:none;opacity:.72}}
+[data-motion="still"] .tt-pool-page--covered{filter:none;transform:none}
