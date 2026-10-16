@@ -6,18 +6,23 @@ import { peopleListsApi, type PeopleList } from "../../api/live/peopleLists";
 
 type Pins = PeopleList | "loading" | "failed" | "unavailable";
 
-export function TeamResources({ worlds }: { worlds: World[] }) {
+type PinboardReader = ReturnType<typeof peopleListsApi>["getPinboards"];
+
+export function TeamResources({
+  worlds,
+  readPinboards,
+}: { worlds: World[]; readPinboards?: PinboardReader }) {
   const http = useMemo(
     () => (API_URL?.trim() ? new HttpClient({ baseUrl: API_URL, appCheckToken, authToken }) : null),
     [],
   );
   const client = useMemo(() => (http ? peopleListsApi(http) : null), [http]);
-  const [pins, setPins] = useState<Pins>(client ? "loading" : "unavailable");
+  const read = readPinboards ?? client?.getPinboards;
+  const [pins, setPins] = useState<Pins>(read ? "loading" : "unavailable");
   useEffect(() => {
     let active = true;
-    if (client) {
-      void client
-        .getPinboards()
+    if (read) {
+      void read()
         .then((result) => {
           if (active) setPins(result.data);
         })
@@ -26,7 +31,7 @@ export function TeamResources({ worlds }: { worlds: World[] }) {
         });
     }
     return () => { active = false; };
-  }, [client]);
+  }, [read]);
   const shared = worlds.filter((world) => world.access === "team");
   const teamPins =
     pins && typeof pins === "object"
