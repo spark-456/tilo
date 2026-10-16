@@ -354,7 +354,6 @@
   cursor: default;
 }
 
-
 /* ---- Not connected yet ---- */
 [data-park] .park-connectors-empty {
   display: flex;
