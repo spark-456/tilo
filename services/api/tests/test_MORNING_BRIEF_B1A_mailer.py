@@ -61,6 +61,12 @@ def test_MORNING_BRIEF_B1A_MO10_a_malformed_kind_is_refused(people_rig, monkeypa
     assert env.gmail.sent == []
 
 
+def test_MORNING_BRIEF_B1A_MO09_email_copy_artifact_uses_its_requested_retention_id(people_rig, monkeypatch):
+    env = _env(people_rig, monkeypatch)
+    assert _mailer(env).deliver_text(PRIYA, TEXT, now=IN_WINDOW, kind="morning_brief") is True
+    assert any("/artifacts/art_morning_brief_" in path for path in env.meta.paths(""))
+
+
 def _quiet(env, *, start: str, end: str) -> None:
     """The person's saved quiet hours (Asia/Kolkata): the copy must wait while they are on."""
     document = defaults(PRIYA) | {"version": 1, "updated_at": "2026-10-01T00:00:00.000Z"}

@@ -128,7 +128,8 @@ class DeskArtifacts:
             "application/json", raw, self._run_id, Origin(kind="unit", unit=unit, agent="A_digest"),
             idempotency_key=key,
         )  # fmt: skip
-        return {"artifact_id": (put := self._artifacts.put(self._scope, new)).artifact_id, "version": put.version}
+        artifacts = self._artifacts.with_new_id(lambda: artifact_id) if kind == "morning_brief" else self._artifacts
+        return {"artifact_id": (put := artifacts.put(self._scope, new)).artifact_id, "version": put.version}
 
     def get(self, artifact_id: str, version: int) -> Mapping[str, Any]:
         import json  # noqa: PLC0415

@@ -470,12 +470,21 @@ class ArtifactStore:
             pass
 
     def artifact_ids(self, scope: Scope, prefix: str = "art_") -> list[str]:
-        """The ids of the owner's artifacts in this Scope's world that start with `prefix`, sorted (the records of the
-        Scope's own owner only; a retention pass such as the morning brief's lists its own artifacts with this)."""
+        """The ids named by version-record paths in this Scope's world that start with `prefix`, sorted."""
         _check_scope(scope)
-        docs = self._docs(f"orgs/{scope.org_id}/worlds/{scope.world_id}/artifacts/")
-        found = {d["artifact"]["artifact_id"] for d in docs if d["owner"] == scope.owner}
-        return sorted(i for i in found if i.startswith(prefix))
+        latest: dict[str, tuple[int, str]] = {}
+        for path in self._meta.paths(f"orgs/{scope.org_id}/worlds/{scope.world_id}/artifacts/"):
+            match = _RECORD_PATH.fullmatch(path)
+            if match and match[1] == scope.org_id and match[2] == scope.world_id and match[3].startswith(prefix):
+                version = int(match[4])
+                if match[3] not in latest or version > latest[match[3]][0]:
+                    latest[match[3]] = (version, path)
+        found = []
+        for aid, (_, path) in latest.items():
+            doc = self._meta.get(path)
+            if doc is not None and doc["owner"] == scope.owner:
+                found.append(aid)
+        return sorted(found)
 
     def versions(self, scope: Scope, artifact_id: str) -> list[StoredVersion]:
         _check_scope(scope)
