@@ -178,6 +178,7 @@ def test_PL_05_CL_INT_5_the_dev_fake_never_conforms_for_a_real_role(tmp_path, mo
 
     (tmp_path / "director-dev.json").write_text(json.dumps({"result": "pass"}), encoding="utf-8")
     (tmp_path / "safety-fake.json").write_text(json.dumps({"result": "pass"}), encoding="utf-8")
+    (tmp_path / "embed-fake.json").write_text(json.dumps({"result": "pass"}), encoding="utf-8")  # RT-05 embed role
     monkeypatch.setenv("TILO_REQUIRE_CONFORMANCE", "1")
     with pytest.raises(ProviderConfigError, match="never conforms"):  # a passing file for it does not count
         load_providers_config(DEV_MODELS, ROOT / "config" / "prices.yaml", conformance_dir=tmp_path)

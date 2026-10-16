@@ -5,7 +5,7 @@ import re
 from tilo_providers.prompts import DEFAULT_PROMPTS_ROOT
 
 SYSTEM_PROMPTS = {
-    "assistant": ("quick_answer_system.md", "quick_classify_system.md", "route_system.md"),
+    "assistant": ("morning_brief_system.md", "quick_answer_system.md", "quick_classify_system.md", "route_system.md"),
     "autopilot": ("draft_system.md", "followup_system.md", "triage_system.md"),
     "autorater": ("plan_fit.md",),
     "director": ("approaches_system.md", "brief_system.md", "plan_system.md", "revision_system.md"),
