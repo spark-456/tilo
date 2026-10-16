@@ -1,0 +1,13 @@
+{
+  "session": "bs_01JB7A0000000000000000BRW1",
+  "step": 4,
+  "action": {
+    "kind": "click",
+    "at": {
+      "x": 700,
+      "y": 640
+    }
+  },
+  "digest": "abababababababababababababababababababababababababababababababab",
+  "outbox_id": null
+}

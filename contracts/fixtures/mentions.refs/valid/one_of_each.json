@@ -1,0 +1,39 @@
+[
+  {
+    "kind": "skill",
+    "id": "web-research"
+  },
+  {
+    "kind": "taught_skill",
+    "id": "tsk_01JB6Z0000000000000000INV"
+  },
+  {
+    "kind": "file",
+    "id": "art_triage_list",
+    "version": 2
+  },
+  {
+    "kind": "drive_file",
+    "id": "1AbCdEfGhIjKlMnOpQrStUvWxYz012345"
+  },
+  {
+    "kind": "drive_folder",
+    "id": "0BxFolderExample_abcdefgh"
+  },
+  {
+    "kind": "world",
+    "id": "w_example"
+  },
+  {
+    "kind": "person",
+    "id": "u_priya"
+  },
+  {
+    "kind": "connector",
+    "id": "gmail"
+  },
+  {
+    "kind": "tool",
+    "id": "browse_web"
+  }
+]
