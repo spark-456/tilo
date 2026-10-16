@@ -176,6 +176,10 @@ class SkillContext:
             logger.warning("skill match failed: %s", type(exc).__name__)
             return None
 
+    def best_for(self, text: str) -> dict[str, Any] | None:
+        """The skill that fits `text` (a plain match, no tag)."""
+        return self.match(text)
+
     def block(self) -> str:
         """The catalog as fenced data for a prompt: one line per skill, name and purpose only."""
         lines = [f"{e['name']}: {e['purpose']}" for e in self.catalog()]

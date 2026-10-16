@@ -501,7 +501,7 @@ def _matched(
     if key in _MATCHED:  # one match per brief: a repeat GET costs no embedding
         found = _MATCHED[key]
     else:
-        found = skills.match(goal)
+        found = skills.best_for(goal)
         _MATCHED[key] = found
         while len(_MATCHED) > _MATCHED_MAX:
             _MATCHED.popitem(last=False)

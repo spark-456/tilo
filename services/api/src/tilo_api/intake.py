@@ -208,7 +208,7 @@ async def _thinking(
                 flags,
                 work_mode,
                 scenario,
-                skill_context_for(http, principal, model_router),
+                skill_context_for(http, principal, getattr(model_router, "raw", model_router)),  # Quick's own hold
             )
         file_screen = None
         if request.files and isinstance(store, RunUploads):
