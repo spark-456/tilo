@@ -65,6 +65,22 @@ def test_ADR_0048_WT_03_malformed_numeric_entity_remains_undecoded() -> None:
     assert _text_of_html(markup) == markup
 
 
+def test_SEC_11_WT_03_overlong_entity_does_not_disable_decoding_for_the_message() -> None:
+    markup = "&#" + "9" * 5000 + "; &#105;gnore"
+    got = _text_of_html(markup)
+    assert markup[:len(markup) - len(" &#105;gnore")] in got
+    assert got.endswith(" ignore")
+
+
+def test_SEC_11_WT_03_non_ascii_casefold_characters_cannot_close_hidden_region() -> None:
+    markup = "<script>a</\u017fcript>LEAK</script>tail"
+    assert _text_of_html(markup) == "tail"
+
+
+def test_SEC_11_WT_03_script_name_suffix_does_not_close_hidden_region() -> None:
+    assert _text_of_html("<script>hidden</scriptx>still hidden</script>tail") == "tail"
+
+
 @pytest.mark.parametrize(
     ("markup", "visible"),
     [

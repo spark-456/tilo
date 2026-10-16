@@ -41,7 +41,8 @@ SUMMARY_FIELDS = "id,threadId,snippet,labelIds,payload/headers"
 _GMAIL_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
 _HTML_SCAN = 400_000  # characters of an HTML part looked at
 _HIDDEN_TAGS = frozenset({"script", "style", "head", "title"})
-_HIDDEN_END = {name: re.compile(r"</" + name + r"(?=[\s/>])", re.I) for name in _HIDDEN_TAGS}
+_HIDDEN_END = {name: re.compile(r"</" + name + r"(?=[\s/>])", re.I | re.A) for name in _HIDDEN_TAGS}
+_HTML_ENTITY = re.compile(r"&(?:#[xX][0-9A-Fa-f]+;?|#\d+;?|[A-Za-z][A-Za-z0-9]+;?)")
 _BREAK_TAGS = frozenset({"br", "p", "div", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "blockquote"})
 _TOPIC = re.compile(r"projects/[a-z][a-z0-9.:-]{4,62}/topics/[A-Za-z][\w.~+%-]{2,254}")  # Pub/Sub resource names
 
@@ -305,10 +306,14 @@ def _text_of_html(markup: str) -> str:
                 break
             i = close + 1
     text = "".join(out)
-    try:
-        text = html.unescape(text)
-    except ValueError:
-        pass  # an overlong numeric entity stays undecoded
+    def decode_entity(match: re.Match[str]) -> str:
+        entity = match.group(0)
+        try:
+            return html.unescape(entity)
+        except ValueError:
+            return entity  # keep an overlong numeric entity without affecting its neighbors
+
+    text = _HTML_ENTITY.sub(decode_entity, text)
     return re.sub(r"\n\s*\n+", "\n\n", text).strip()
 
 
