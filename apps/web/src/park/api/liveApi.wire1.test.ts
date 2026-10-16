@@ -163,6 +163,7 @@ describe("WIRE_1_live_api: every other method is still NotBuilt", () => {
           "getLearn",
           "saveSkill",
           "captureSkill",
+          "captureFile",
           "proposeVersion",
           "setPref",
           "getUserSettings",

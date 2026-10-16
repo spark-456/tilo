@@ -973,6 +973,15 @@
   color: var(--ink);
   font-size: 16px;
 }
+[data-park] .park-teach__droptext input[type="file"] {
+  max-width: 100%;
+  margin-top: 8px;
+}
+[data-park] .park-teach__drop output,
+[data-park] .park-teach__drop [role="alert"] {
+  flex: 1 1 100%;
+  font-size: 14px;
+}
 [data-park] .park-teach__name {
   display: flex;
   align-items: center;
