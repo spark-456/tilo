@@ -86,6 +86,24 @@ def test_WEB_1_WS_05_a_reply_with_an_external_script_is_refused_then_repaired() 
     assert "ws_element" in provider.requests[1].prompt and "cdn.example" in provider.requests[1].prompt  # as data
 
 
+GOOGLE_FONTS = PAGE.replace(
+    "<title>Zones</title>",
+    '<link rel="preconnect" href="https://fonts.googleapis.com">'
+    '<link href="https://fonts.googleapis.com/css2?family=Inter&display=swap" rel="stylesheet"><title>Zones</title>',
+)
+
+
+def test_WEB_1_WS_04_the_google_fonts_head_is_repaired_with_a_system_font_stack_not_degraded() -> None:
+    assert GOOGLE_FONTS != PAGE
+    result, provider = run(GOOGLE_FONTS, PAGE)
+    assert result.outcome.outputs[0].media_type == "text/html" and result.outcome.outputs[0].content == PAGE.encode()
+    repair = provider.requests[1].prompt
+    assert "ws_element, line 1" in repair and "fonts.googleapis.com" in repair  # the bad reply, as data
+    assert "delete every <link> tag" in repair and "system font stack" in repair
+    first = provider.requests[0].prompt
+    assert "No external fonts, scripts, styles or images" in first and "system font stacks" in first
+
+
 def test_WEB_1_WS_05_a_page_that_stays_bad_degrades_to_markdown_never_to_html() -> None:
     result, provider = run(EXTERNAL, EXTERNAL)
     out = result.outcome.outputs[0]
