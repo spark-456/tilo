@@ -50,6 +50,7 @@ from tilo_api.assistant.metering import SpendLedger
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
 from tilo_api.intake_deadline import INTAKE_DEADLINE_DETAIL, load_intake_deadline
 from tilo_api.intake_uploads import FILE_SCREEN_UNAVAILABLE, RunUploads, UploadStorageError
+from tilo_api.skills_route import SkillContext, skill_context_for
 from tilo_api.tasks import create_task
 
 router = APIRouter()
@@ -198,7 +199,16 @@ async def _thinking(
         await run_in_threadpool(screen_task_text, request, safety=safety)
         if chosen and chosen[0] == "quick":  # COST-FAST-1: the rules answer, offer Thinking, or call the cheap role
             return await _quick(
-                http, request, principal.user_id, safety, model_router, allowance, flags, work_mode, scenario
+                http,
+                request,
+                principal.user_id,
+                safety,
+                model_router,
+                allowance,
+                flags,
+                work_mode,
+                scenario,
+                skill_context_for(http, principal, model_router),
             )
         file_screen = None
         if request.files and isinstance(store, RunUploads):
@@ -340,6 +350,7 @@ async def _quick(
     flags: FlagStore,
     work_mode: deps.Mode,
     scenario: str | None,
+    skills: SkillContext,
 ) -> JSONResponse:
     """COST-FAST-1: nothing is created or stored; the body is the answer or the offer to switch to Thinking. Quick holds
     its own SEC-16 unit around the whole ask, so it gets the Router unmetered (`raw`): one hold, not one per call."""
@@ -349,6 +360,7 @@ async def _quick(
             safety=safety, router=getattr(model_router, "raw", model_router), allowance=allowance, switches=flags,
             mode=work_mode,
             caps=deps.caps_for(http), key=http.headers.get("idempotency-key"), ledger=deps.ledger_writer_for(http),
+            skills=skills,
         )  # fmt: skip
     except quick.QuickRefusal as refusal:
         return JSONResponse(status_code=refusal.status, content={"error": refusal.message})

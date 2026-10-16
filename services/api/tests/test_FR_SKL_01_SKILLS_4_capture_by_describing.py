@@ -107,7 +107,7 @@ def test_FR_SKL_01_SKILLS_4_the_role_is_one_constant_and_the_call_goes_through_t
     from tilo_api import skills_capture  # noqa: PLC0415
 
     skills4.made(CLEAR)
-    assert isinstance(skills_capture.CAPTURE_ROLE, str) and skills_capture.CAPTURE_ROLE == "specialist"
+    assert isinstance(skills_capture.CAPTURE_ROLE, str) and skills_capture.CAPTURE_ROLE == "skill_capture"
     assert skills4.events()[0]["trace"]["model_role"] == skills_capture.CAPTURE_ROLE
     assert len(skills4.model.calls) == 1  # one model call for the capture; the version is a second call later
 

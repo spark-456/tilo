@@ -39,6 +39,17 @@ _SKILL_ID = re.compile(r"tsk_[0-9A-Za-z_]{1,48}")
 _DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _MUST_ASK_VERBS = frozenset({"send", "post", "pay", "delete", "share", "book"})
 _NEEDS_RATING_MAX = 50  # newest first; the person rates a few, not a backlog
+WRITER = (
+    "writer",
+    "compose",
+)  # ADR-0051 S1: a text-only step (summarise, write up) names no connector; code owns this pair
+_WRITER_ACTION: dict[str, Any] = {
+    "id": "compose",
+    "capability": "write",
+    "risk_tier": "T1",
+    "gate_type": "none",
+    "irreversible": False,
+}
 Verb = Literal["read", "draft", "write", "send", "post", "pay", "delete", "share", "book"]
 
 
@@ -96,6 +107,13 @@ class CapturedIn(_Closed):
     text: Text
 
 
+class InputIn(_Closed):  # TS-19: a named slot the run form fills
+    name: Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,31}$")]
+    label: Annotated[str, Field(min_length=1, max_length=80, pattern=r"^[^\r\n]+$")]
+    kind: Literal["text", "file", "date", "person", "url", "number"]
+    required: StrictBool
+
+
 class ScopeIn(_Closed):
     kind: Literal["just_me", "team"]
     team: Annotated[str, Field(max_length=64)] | None
@@ -134,13 +152,18 @@ class SkillIn(_Closed):
     plan_steps: Annotated[list[StepIn], Field(min_length=1, max_length=20)]
     captured_steps: Annotated[list[CapturedIn], Field(max_length=20)] = Field(default_factory=list)
     clarifying_question: QuestionIn | None = None
+    inputs: Annotated[list[InputIn], Field(max_length=8)] = Field(default_factory=list)
+    hosts: Annotated[list[Annotated[str, Field(max_length=253)]], Field(max_length=10)] | None = None  # TS-18
 
 
 # --- the record -------------------------------------------------------------------------------------------------
 
 
 def _declared(registry: Any, tool: str, action: str) -> dict[str, Any] | None:
-    """The connector's own entry for the action in config/connectors.yaml (TS-06); None when it lists none."""
+    """The connector's own entry for the action in config/connectors.yaml (TS-06); None when it lists none. The one
+    exception is the writer pair (`WRITER`): text-only work, no connector, T1, no gate."""
+    if (tool, action) == WRITER:
+        return dict(_WRITER_ACTION)
     if tool not in registry:
         return None
     return next((a for a in registry.get(tool)["actions"] if a.get("id") == action), None)
@@ -154,6 +177,8 @@ def plan_steps(steps: list[StepIn], text: Callable[[str], str], registry: Any) -
         if declared is None:
             raise Refusal(422, "unknown_action")
         must_ask = step.verb in _MUST_ASK_VERBS or declared.get("risk_tier") != "T1"  # TS-04: unlisted tier is T3
+        if (step.tool, step.action) == WRITER and step.verb not in ("read", "draft", "write"):
+            raise Refusal(422, "unknown_action")  # a writer step only works on text: it cannot send, pay or post
         if must_ask and step.ask_first is False:
             raise Refusal(422, "ask_first_required")
         plan.append(
@@ -215,6 +240,10 @@ def build_record(
         "created_at": w.now,
         "updated_at": w.now,
     }
+    if body.inputs:
+        record["inputs"] = [i.model_dump() for i in body.inputs]
+    if body.hosts is not None:
+        record["hosts"] = list(body.hosts)
     if not conforms("taught_skill.schema.json", record):
         raise Refusal(422, "invalid_record")
     return record

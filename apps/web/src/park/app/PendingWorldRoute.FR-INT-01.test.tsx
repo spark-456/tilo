@@ -48,7 +48,7 @@ it("test_FR_INT_01_run_opens_world_existing_bookmarks_without_a_pending_state", 
   expect(client.subscribeEvents).not.toHaveBeenCalled();
 });
 
-it("test_FR_INT_01_run_opens_world_on_a_recorded_start_without_a_plan", async () => {
+it("test_FR_INT_01_run_shows_recorded_start_then_opens_world_on_recorded_plan", async () => {
   let receive: ((event: { type: string }) => void) | undefined;
   const client = {
     subscribeEvents: vi.fn((_id: string, onEvent: (event: { type: string }) => void) => {
@@ -63,5 +63,8 @@ it("test_FR_INT_01_run_opens_world_on_a_recorded_start_without_a_plan", async ()
     </PendingWorldRoute>,
   );
   await act(async () => receive?.({ type: "world.started" }));
+  expect(rig.container.textContent).toContain("world.started");
+  expect(rig.container.textContent).not.toContain("World loaded");
+  await act(async () => receive?.({ type: "world.planned" }));
   expect(rig.container.textContent).toContain("World loaded");
 });
