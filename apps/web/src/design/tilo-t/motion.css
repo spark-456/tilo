@@ -122,6 +122,12 @@
 .tt-dots span:nth-child(3){animation-delay:.4s}
 /* Loops stop while the tab is hidden or the section is off-screen (usePauseWhenHidden, useInView, useLoopPaused). */
 .tt-paused,.tt-paused *{animation-play-state:paused!important}
+/* CX-T-LANDING: the labelled village-basic fixture replay starts after first paint and pauses off-screen. */
+.tt-landing-replay.is-painted .tt-landing-replay__a{animation:tLoopA 9s ease-in-out infinite}
+.tt-landing-replay.is-painted .tt-landing-replay__b{animation:tLoopB 9s ease-in-out infinite}
+.tt-landing-replay.is-painted .tt-landing-replay__c{animation:tLoopC 9s ease-in-out infinite}
+.tt-landing-replay.is-painted .tt-landing-replay__d{animation:tLoopD 9s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.tt-landing-replay.is-painted span{animation:none!important;opacity:1!important;transform:none!important}}
 
 /* Pool loader: one request/event starts the splash; the phase machine only completes its visual sequence. */
 .tt-pool-page{transition:filter .8s var(--tt-ease-standard),transform .8s var(--tt-ease-standard)}
