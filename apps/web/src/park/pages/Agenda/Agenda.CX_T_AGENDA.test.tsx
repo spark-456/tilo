@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, click, mount, q } from "../../../../test-support/park/componentsHarness";
+import { byText, cleanup, click, mount, q } from "../../../../test-support/park/componentsHarness";
 import { settle, typeInto } from "../../../../test-support/park/skillsHarness";
 import { AgendaNewMenu } from "./AgendaNewMenu";
 
@@ -16,12 +16,15 @@ it("CX_T_AGENDA_new_menu_creates_a_pin_only_after_the_api_records_it", async () 
       }),
   );
   const changed = vi.fn();
+  const onSchedule = vi.fn();
   const { container } = mount(
-    <AgendaNewMenu createPin={createPin} onPinCreated={changed} canHost />,
+    <AgendaNewMenu createPin={createPin} onPinCreated={changed} canHost onSchedule={onSchedule} />,
   );
   click(q(container, "summary"));
-  expect(q(container, '[aria-label="Calendar item"]').getAttribute("aria-disabled")).toBe("true");
-  click(q(container, 'button[role="menuitem"]'));
+  click(byText(container, "button", "Schedule meetingChoose a time and invite people"));
+  expect(onSchedule).toHaveBeenCalledOnce();
+  click(q(container, "summary"));
+  click(byText(container, "button", "PinA note for you"));
   typeInto(q<HTMLInputElement>(container, 'input[name="pin-title"]'), "Call Lin back");
   click(q(container, 'button[type="submit"]'));
   expect(createPin).toHaveBeenCalledWith("Call Lin back", expect.any(String));
@@ -42,7 +45,9 @@ it("CX_T_AGENDA_new_menu_keeps_unavailable_actions_disabled", () => {
   );
   click(q(container, "summary"));
   expect(q(container, '[aria-label="Pin"]').getAttribute("aria-disabled")).toBe("true");
-  expect(container.querySelector("button")).toBeNull();
+  expect(
+    byText(container, "button", "Schedule meetingChoose a time and invite people"),
+  ).not.toBeNull();
   expect(q(container, '[aria-label="Meeting with Tilo"]').getAttribute("aria-disabled")).toBe(
     "true",
   );
@@ -55,10 +60,11 @@ it("CX_T_AGENDA_pin_error_does_not_claim_the_write_failed_or_refresh_the_list", 
       createPin={vi.fn(async () => Promise.reject(new Error("response lost")))}
       onPinCreated={changed}
       canHost
+      onSchedule={() => undefined}
     />,
   );
   click(q(container, "summary"));
-  click(q(container, 'button[role="menuitem"]'));
+  click(byText(container, "button", "PinA note for you"));
   typeInto(q<HTMLInputElement>(container, 'input[name="pin-title"]'), "Call Lin back");
   click(q(container, 'button[type="submit"]'));
   await settle();

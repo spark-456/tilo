@@ -310,7 +310,7 @@ function Plate({ A }: { A: LiveAgenda }) {
           </section>
         </aside>
       </div>
-      {schedule && host ? (
+      {schedule ? (
         <ScheduleWithOthersDialog
           api={host}
           start={schedule.start}
