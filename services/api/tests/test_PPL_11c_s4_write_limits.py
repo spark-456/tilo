@@ -82,6 +82,7 @@ BODY_ROUTES = {
     "delete meeting": "/v1/meetings/mt_q4_plan/delete",
     "meeting world": "/v1/meetings/mt_q4_plan/world",
     "meeting brief": "/v1/meetings/mt_q4_plan/brief",
+    "make morning brief": "/v1/me/brief",
     "host meeting": "/v1/meetings/mt_q4_plan/host",
     "attend meeting": "/v1/meetings/mt_q4_plan/attend",
     "create pin": "/v1/pinboards",
@@ -210,7 +211,7 @@ def test_PPL_11c_s4_BQ_PPL11C_1_meeting_patch_oversize_body_is_a_413(people_rig,
 
 
 # `/v1/me/settings` (ADR-0039) has its own 16 KiB cap and a route-level `write_limit` (user_settings.py)
-SETTINGS_PUT_ROUTES = {"settings": "/v1/me/settings"}
+SETTINGS_PUT_ROUTES = {"settings": "/v1/me/settings", "brief settings": "/v1/me/brief-settings"}
 SETTINGS_MAX_BODY_BYTES = 16384
 
 ORG_MODEL_KEY_WRITE_ROUTES = {"org model key": "/v1/org/model-key"}
@@ -714,15 +715,13 @@ def test_PPL_11c_s4_BQ_PPL11C_12_meeting_world_and_delete_read_the_actor_by_id_a
 # --- no-store on every answer ---------------------------------------------------------------------------------------
 
 
-def test_PPL_11c_s4_PE_22_every_answer_is_no_store_the_gates_403_and_a_validation_422_included(people_rig):
-    from _sec15_lib import FakeAccessStore  # noqa: PLC0415
-
-    rig = people_rig(deployed=True, access=FakeAccessStore({SAM: "visitor", PRIYA: "judge"}))
+def test_PPL_11c_s4_PE_22_every_answer_is_no_store_the_gates_401_and_a_validation_422_included(people_rig):
+    rig = people_rig(deployed=True)
     rig.add_people()
     rig.as_user(SAM)
-    answers = {"gate 403 (visitor)": rig.get("/v1/plate")}
+    answers = {"visitor": rig.get("/v1/plate")}  # OPEN-ACCESS: a signed-in visitor reaches the route
     rig.as_user(OWNER)
-    answers["gate 403 (undeclared)"] = rig.post("/v1/work-items", WORK_ITEM_BODY)
+    answers["undeclared"] = rig.post("/v1/work-items", WORK_ITEM_BODY)
     rig.sign_out()
     answers["401"] = rig.get("/v1/plate")
     rig.as_user(PRIYA)
@@ -738,7 +737,7 @@ def test_PPL_11c_s4_PE_22_every_answer_is_no_store_the_gates_403_and_a_validatio
     answers["201"] = rig.post("/v1/work-items", WORK_ITEM_BODY)
     for label, response in answers.items():
         assert response.headers.get("cache-control") == "no-store", (label, response.status_code)
-    assert [answers[k].status_code for k in ("gate 403 (visitor)", "413", "422 (bad query)")] == [403, 413, 422]
+    assert [answers[k].status_code for k in ("401", "413", "422 (bad query)")] == [401, 413, 422]
 
 
 def test_PPL_11c_s4_PE_22_every_people_route_of_this_ticket_answers_no_store_whatever_the_status(people_rig):

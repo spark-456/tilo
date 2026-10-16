@@ -24,6 +24,7 @@
 example: true
 
 profiles:
+  embed-fake: { provider: fake, model: fake-embed, context: 1000000, caps: [] } # RT-05
   flash-38:
     provider: openai_compat
     model: gemini-3.8-flash
@@ -47,6 +48,7 @@ profiles:
     caps: [json, tools]
 
 roles:
+  embed: { primary: embed-fake, fallback: embed-fake } # RT-05
   # The Director's `thinking: high` is only the default for a caller that sets no level (BQ-LE2E-10): planning calls
   # set low (brief) or medium (approaches, plan) themselves.
   director: { primary: flash-38, fallback: flash-37, thinking: high, max_input_tokens: 100000, max_output_tokens: 16384 }

@@ -25,7 +25,15 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from tilo_providers.diagnostics import log_caught
-from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
+from tilo_providers.interfaces import (
+    Capability,
+    EmbedRequest,
+    EmbedResponse,
+    GenerateRequest,
+    GenerateResponse,
+    ModelProvider,
+    PriceQuote,
+)
 
 # Backstop scrub for anything written to a recording, whatever provider
 # produced it: an "Authorization: ..." header rendered as text, or a bare
@@ -76,7 +84,8 @@ def embed_recording_key(role: str, profile_id: str, request: Any) -> str:
     not a `GenerateRequest`, so it is normalised directly instead of through
     `model_dump()`. Kept a separate function (rather than overloading
     `recording_key`) so existing `generate()` keys never shift."""
-    normalised = json.dumps({"role": role, "profile": profile_id, "embed_request": request}, sort_keys=True)
+    value = request.model_dump() if isinstance(request, EmbedRequest) else request
+    normalised = json.dumps({"role": role, "profile": profile_id, "embed_request": value}, sort_keys=True)
     return hashlib.sha256(normalised.encode("utf-8")).hexdigest()[:16]
 
 
@@ -179,7 +188,7 @@ class RecordReplayProvider(ModelProvider):
             key = recording_key(self._role, self._profile_id, request)
             self._write_recording(self._path(key), key, _join_chunks(chunks, self._profile_id))
 
-    def embed(self, request: Any) -> Any:
+    def embed(self, request: EmbedRequest) -> EmbedResponse:
         # Same record/replay/redact shape as generate() -- see the module
         # docstring and CLAUDE.md's router note (ticket P0-06 review fix):
         # this must never let a bare exception escape past the router, which
@@ -195,7 +204,8 @@ class RecordReplayProvider(ModelProvider):
 
         if path.is_file():
             recorded = json.loads(path.read_text(encoding="utf-8"))
-            return recorded["embedding"]
+            embedding = recorded["embedding"]
+            return EmbedResponse.model_validate(embedding) if isinstance(request, EmbedRequest) else embedding
 
         raise ReplayMissError(
             f"EFF-01: no recording for role={self._role!r} profile={self._profile_id!r} key={key!r} "
@@ -242,7 +252,12 @@ class RecordReplayProvider(ModelProvider):
 
     def _write_embed_recording(self, path: Path, key: str, embedding: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"role": self._role, "profile": self._profile_id, "key": key, "embedding": embedding}
+        payload = {
+            "role": self._role,
+            "profile": self._profile_id,
+            "key": key,
+            "embedding": embedding.model_dump() if isinstance(embedding, EmbedResponse) else embedding,
+        }
         # PRD 16.1 rule 4: same redact-before-serialise rule as `_write_recording` -- an embedding vector
         # is numeric, but a provider may echo request metadata (e.g. a model name) back as a string.
         redacted = redact_strings(payload, self._live_provider)

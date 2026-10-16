@@ -21,7 +21,6 @@ import pytest
 from _clint1_lib import seam
 from _ppl11a_lib import OWNER, PRIYA, fixture_case
 from _ppl11c_lib import confirmed_item, holds_artifact, proposed_launch_note
-from _sec15_lib import FakeAccessStore
 from _sec16_lib import make_caps, make_ledger, spend
 
 STATES = ("open", "capped", "tripped")
@@ -80,7 +79,7 @@ def meeting_world(people_rig, monkeypatch):
     from tilo_api import deps  # noqa: PLC0415
 
     def make(state: str):
-        rig = people_rig(deployed=True, access=FakeAccessStore({OWNER: "judge", PRIYA: "judge"}))
+        rig = people_rig(deployed=True)
         rig.seed_quote_case(fixture_case("transcript", "valid", "owner_reads_quotes"))
         rig.add("work_items", confirmed_item())
         rig.add("work_items", proposed_launch_note())
@@ -172,7 +171,7 @@ def test_SEC_16_GOLIVE_935_B1_a_quiz_apps_view_is_never_refused_for_a_cap_or_the
     from test_LW_complete_quiz_owner import WORLD, make_case  # noqa: PLC0415
     from tilo_api import deps, run_stores  # noqa: PLC0415
 
-    rig = people_rig(deployed=True, access=FakeAccessStore({OWNER: "judge"}))
+    rig = people_rig(deployed=True)
     case_app, world_state, writer, quiz, _source, _spec = make_case()
     artifacts = case_app.dependency_overrides[deps.get_artifact_store]()
     try:

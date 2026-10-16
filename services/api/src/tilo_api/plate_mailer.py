@@ -34,12 +34,18 @@ from tilo_memory.artifacts import ArtifactStore, NewVersion, Origin, Scope
 from tilo_policy.schemas import conforms
 
 from tilo_api import deps, events, item_documents
+from tilo_api.user_settings import StoredPreferences, settings_store_of
 
 logger = logging.getLogger("tilo_api.plate_mailer")
 
 CONNECTOR = "gmail"
 _UNSENT = ("queued", "scheduled", "sending")
-_KIND_INDEX = {"digest": 0, "plate_digest": 1, "plate_reminder": 2}  # the key's last digit of one artifact
+_KIND_INDEX = {
+    "digest": 0,
+    "plate_digest": 1,
+    "plate_reminder": 2,
+    "morning_brief": 3,
+}  # the key's last digit of one artifact
 
 
 class NotConfigured(Exception):
@@ -235,16 +241,62 @@ class DeskPlateMailer:
             return False
 
     def _deliver(self, user_id: str, plate: dict[str, Any], now: str) -> bool:
+        built = self._build(user_id, now)
+        if built is None:
+            return False
+        sender, outbox, desk, _ = built
+        entry = PlateDigestService(builder=self._builder, sender=sender).deliver_if_non_empty(
+            user_id=user_id, plate=plate, kind="digest", now=now
+        )
+        if entry is None:
+            return False
+        outbox.dispatch_due()
+        return self._settle(outbox, desk, entry["id"])
+
+    def rule_ready(self, user_id: str, now: str) -> bool:
+        """MO-10 `email_rule_ready`: the person has a standing rule this mail may run under, and an address."""
+        address = self._address(user_id)
+        return address is not None and bool(
+            StorePolicies(self._store, self._table, owner=user_id, address=address, now=now).eligible()
+        )
+
+    def deliver_text(self, user_id: str, text: str, *, now: str, kind: str = "morning_brief") -> bool:
+        """Mails `text` to the person's own address once per UTC day and `kind` (the digest key), under the same
+        standing rule, quiet hours and outbox path as the plate; True when it went out (MO-10)."""
+        try:
+            built = self._build(user_id, now, quiet=True)
+            cleared = None if built is None else built[0].ready(user_id, now=now)
+            if built is None or cleared is None:
+                return False
+            sender, outbox, desk, address = built
+            entry = sender.enqueue_text(
+                user_id=user_id, owner_addr=address, window_end=now, rendered_text=text, kind=kind,
+                subject="Your morning brief",
+            )  # fmt: skip
+            if entry is None:
+                return False
+            outbox.dispatch_due()
+            return self._settle(outbox, desk, entry["id"])
+        except Exception as exc:  # the type only (no title, address or link)
+            logger.warning("mail not sent (%s)", type(exc).__name__)
+            return False
+
+    def _build(
+        self, user_id: str, now: str, *, quiet: bool = False
+    ) -> tuple[DigestService, Outbox, DeskEvents, str] | None:
+        """The sender for one person's own mail, or None when nothing may be built: no address, no standing rule, or a
+        Desk world that is not theirs, unreadable or paused. With `quiet` the sender holds the mail during the person's
+        own saved quiet hours (the morning brief's copy; the plate digest keeps its window)."""
         address = self._address(user_id)
         if address is None:
-            return False
+            return None
         policies = StorePolicies(self._store, self._table, owner=user_id, address=address, now=now)
         if not policies.eligible():  # nothing is built, stored or sent for a person with no such standing rule
-            return False
+            return None
         world_id = self._desks.desk_world(deps.ORG_ID, user_id)
         record = self._store.load_world(world_id)
         if record is None or record.owner != user_id or self._desks.desk_owner(world_id) != user_id or record.paused:
-            return False
+            return None
         scope = Scope(org_id=deps.ORG_ID, world_id=world_id, owner=user_id)
         desk = DeskEvents(self._writer, world_id)
         bound = self._gmail.bound(lambda ref: bytes(self._artifacts.read(scope, ref)), lambda part: None, user_id)
@@ -257,19 +309,14 @@ class DeskPlateMailer:
             self._outbox_store, {CONNECTOR: bound}, emit=desk.transfer, clock=lambda: now, world_id=world_id,
             halted=halted, alert=desk.alert, retry=RetryPolicy(),
         )  # fmt: skip
+        preferences = StoredPreferences(settings_store_of(self._people), deps.ORG_ID) if quiet else None
         sender = DigestService(
             builder=self._builder.daily_builder(), outbox=_EvidenceOutbox(outbox, bound), policy=policies,
             artifacts=DeskArtifacts(self._artifacts, scope, record.run_id), emit=desk.applied,
             mailbox=lambda uid: self._address(uid) if uid == user_id else None, world_id=world_id,
-            world_owner=user_id, run_id=record.run_id,
+            world_owner=user_id, run_id=record.run_id, preferences=preferences,
         )  # fmt: skip
-        entry = PlateDigestService(builder=self._builder, sender=sender).deliver_if_non_empty(
-            user_id=user_id, plate=plate, kind="digest", now=now
-        )
-        if entry is None:
-            return False
-        outbox.dispatch_due()
-        return self._settle(outbox, desk, entry["id"])
+        return sender, outbox, desk, address
 
     def _settle(self, outbox: Outbox, desk: DeskEvents, outbox_id: str) -> bool:
         """True when it went out. Unsent after this call's one dispatch: abandoned (it never goes out later with no

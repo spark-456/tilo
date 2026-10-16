@@ -7,9 +7,10 @@
 // app.setPref and read back from the AppCtx. Navigation is app.go only.
 import type { UserSettings, UserSettingsUpdate } from "@tilo/contracts";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { morningBriefApi } from "../../api/live/morningBrief";
 import type { ProfileSession, ProfileSettings, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { useDemoSession, useParkApi } from "../../app/context";
+import { useDemoSession, useParkApi, useWorldClient } from "../../app/context";
 import { useFollowed } from "../../app/followed";
 import { PageSheet, StatusChip, Switch } from "../../components";
 import { SampleBadge } from "../../sample/SampleBadge";
@@ -18,6 +19,7 @@ import { ModelKeyControl } from "./ModelKey";
 import "./Profile.css";
 import { AppearanceControls } from "./AppearanceControls";
 import { BetaPlan } from "./BetaPlan";
+import { BriefSettingsPanel } from "./BriefSettingsPanel";
 import { AskBefore, SpendingLimits } from "./Limits";
 import "./Profile.studio.css";
 import { PushControl } from "./PushControl";
@@ -45,6 +47,7 @@ const TABS = [
   { id: "limits", label: "Spending and limits", icon: ICONS.limits },
   { id: "ask", label: "Ask before", icon: ICONS.ask },
   { id: "notifications", label: "Notifications", icon: ICONS.notifications },
+  { id: "brief", label: "Morning brief", icon: ICONS.notifications },
   { id: "security", label: "Security", icon: ICONS.security },
   { id: "billing", label: "Plan and billing", icon: ICONS.billing },
 ] as const;
@@ -229,6 +232,8 @@ function SaveFoot(props: {
 export function ProfilePage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const demo = useDemoSession();
+  const briefClient = useWorldClient();
+  const briefApi = useMemo(() => briefClient && morningBriefApi(briefClient), [briefClient]);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<"missing" | "failed" | null>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
@@ -570,6 +575,15 @@ export function ProfilePage({ app }: { app: AppCtx }) {
             ) : null}
 
             {tab === "ask" ? <AskBefore /> : null}
+            {tab === "brief" ? (
+              briefApi && !demo ? (
+                <BriefSettingsPanel api={briefApi} />
+              ) : (
+                <section aria-label="Morning brief settings" className="park-profile-card">
+                  Sign in to change brief settings.
+                </section>
+              )
+            ) : null}
 
             {tab === "security" ? (
               <section aria-label="Security" className="park-profile-card park-profile-card--list">

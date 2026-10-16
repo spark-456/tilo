@@ -14,8 +14,6 @@ export type ModelKeyProblem =
   | "sign_in" // 401: no sign-in
   | "reauth" // 401 `reauth_required`: the sign-in is older than 10 minutes (BK-06)
   | "owner_only" // 403: not the org owner, or a session with no directory record (BK-05)
-  | "under_construction" // SEC-15: account access has not been granted
-  | "declaration_required" // SEC-15: sign-up declaration is missing
   | "key_refused" // 422 `key_refused`
   | "confirm" // 422 `confirm_required`: the consent version moved
   | "invalid" // 422 `invalid_body`
@@ -97,7 +95,7 @@ export function problemOf(error: unknown): ModelKeyProblem {
   if (error.status === 503) return word === "not_configured" ? "not_configured" : "unavailable";
   if (error.status === 401) return word === "reauth_required" ? "reauth" : "sign_in";
   if (error.status === 403) {
-    return word === "under_construction" || word === "declaration_required" ? word : "owner_only";
+    return "owner_only";
   }
   if (error.status === 429) return "rate_limited";
   if (error.status === 422) {

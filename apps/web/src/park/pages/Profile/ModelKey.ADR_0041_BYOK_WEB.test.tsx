@@ -92,23 +92,6 @@ describe("ADR-0041 BQ-BYOK-WEB-1 states", () => {
     }
   });
 
-  it("ADR_0041_R34_3_SEC_15_gate_refusals_have_gate_copy_without_owner_claims_or_writes", async () => {
-    for (const [code, copy] of [
-      ["under_construction", "Access to Tilo is not available for this account yet."],
-      ["declaration_required", "Complete the sign-up question before using Tilo."],
-    ]) {
-      const { flow, calls } = fake({ get: [refuse(403, code ?? null)] });
-      const m = mount(<ModelKeyControl flow={flow} demo={false} />);
-      await settle();
-      expect(text(m.container)).toContain(copy);
-      expect(text(m.container)).not.toContain("Only this organisation's owner");
-      expect(text(m.container)).not.toContain(KEY);
-      expect(m.container.querySelector("form, input, button")).toBeNull();
-      expect(calls).toEqual([{ method: "GET", path: "/v1/org/model-key" }]);
-      cleanup();
-    }
-  });
-
   it("BYOK_WEB_ADR_0041_off_in_this_build_is_a_calm_line_with_a_disabled_form_and_no_write", async () => {
     const { flow, calls } = fake({ get: [refuse(503, "not_configured", true)] });
     const m = mount(<ModelKeyControl flow={flow} demo={false} />);

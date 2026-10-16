@@ -41,6 +41,7 @@ SUMMARY_FIELDS = "id,threadId,snippet,labelIds,payload/headers"
 _GMAIL_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
 _HTML_SCAN = 400_000  # characters of an HTML part looked at
 _HIDDEN_TAGS = frozenset({"script", "style", "head", "title"})
+_HIDDEN_END = {name: re.compile(r"</" + name + r"(?=[\s/>])", re.I) for name in _HIDDEN_TAGS}
 _BREAK_TAGS = frozenset({"br", "p", "div", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "blockquote"})
 _TOPIC = re.compile(r"projects/[a-z][a-z0-9.:-]{4,62}/topics/[A-Za-z][\w.~+%-]{2,254}")  # Pub/Sub resource names
 
@@ -266,7 +267,6 @@ def _text_of_html(markup: str) -> str:
     hostile input): comments, scripts, styles, head and title are dropped, block tags become line breaks, entities are
     decoded. Every step moves forward or stops, so the cost is linear in the (capped) input."""
     doc = markup[:_HTML_SCAN]
-    low = doc.lower()
     out: list[str] = []
     i = 0
     while i < len(doc):
@@ -299,12 +299,17 @@ def _text_of_html(markup: str) -> str:
         if name in _BREAK_TAGS:
             out.append("\n")
         if name in _HIDDEN_TAGS and doc[j + 1] != "/":  # drop everything up to its end tag
-            end = low.find("</" + name, i)
-            close = doc.find(">", end) if end != -1 else -1
+            end = _HIDDEN_END[name].search(doc, i)
+            close = doc.find(">", end.end()) if end is not None else -1
             if close == -1:
                 break
             i = close + 1
-    return re.sub(r"\n\s*\n+", "\n\n", html.unescape("".join(out))).strip()
+    text = "".join(out)
+    try:
+        text = html.unescape(text)
+    except ValueError:
+        pass  # an overlong numeric entity stays undecoded
+    return re.sub(r"\n\s*\n+", "\n\n", text).strip()
 
 
 def _line(value: str, cap: int) -> str:

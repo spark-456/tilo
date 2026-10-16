@@ -1398,6 +1398,50 @@
 }
 
 /* POLISH-1: the 390px placeholder ("e.g. Summarise this week's feedback") was cut at "fe"; 16px with no tracking fits. */
+[data-park] .park-home-brief {
+  display: grid;
+  gap: 12px;
+}
+[data-park] .park-home-brief__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+[data-park] .park-home-brief__head p {
+  margin: 4px 0 0;
+}
+[data-park] .park-home-brief section {
+  border-top: 1px solid currentColor;
+  padding-top: 10px;
+}
+[data-park] .park-home-brief h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+[data-park] .park-home-brief ul {
+  margin: 0;
+  padding-left: 20px;
+}
+[data-park] .park-home-brief li {
+  margin: 5px 0;
+}
+[data-park] .park-home-brief button {
+  min-height: 36px;
+  cursor: pointer;
+}
+[data-park] .park-home-brief__cites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: .8rem;
+  opacity: 0.78;
+}
+@media (max-width: 600px) {
+  [data-park] .park-home-brief__head {
+    flex-direction: column;
+  }
+}
 @media (max-width: 430px) {
   [data-park] .park-home-panel .park-home-input {
     font-size: 16px;

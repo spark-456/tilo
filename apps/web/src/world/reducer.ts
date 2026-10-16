@@ -22,6 +22,22 @@ export interface AgentState {
   readonly say: { readonly text: string; readonly to: string } | null;
   /** Where the agent stood before a meeting room called it to the hall; it walks back on meeting.adjourned. */
   readonly back: string | null;
+  /** TILO-T-WORLD: the building the agent works at: the one its latest agent.working named, else the first
+   * building an agent.moved sent it to (a Lead's or the Director's post). Null until an event says so. */
+  readonly post: string | null;
+  /** TILO-T-WORLD: the seq of the agent's own agent.handoff while it is its latest event; it talks with the receiver
+   * for TALK_WINDOW events, then stands at its post (`standingAt`). Null otherwise. */
+  readonly doneAt: number | null;
+}
+
+/** How many later events a handing-over agent stays beside its receiver (the design's talkWin: 2). */
+export const TALK_WINDOW = 2;
+
+/** Where an agent stands, from the record alone (TILO-T-WORLD): a room's hall while it is in one, its post once its
+ * handoff is older than the talk window, else the place its last event put it. */
+export function standingAt(state: WorldState, agent: AgentState): string | null {
+  if (agent.back !== null || agent.doneAt === null || agent.post === null) return agent.location;
+  return state.seq - agent.doneAt > TALK_WINDOW ? agent.post : agent.location;
 }
 
 export interface BuildingState {
@@ -82,7 +98,16 @@ export function createInitialState(layout: Layout): WorldState {
   }
   const agents: Record<string, AgentState> = {};
   for (const id of ids(layout.semantic.agents)) {
-    agents[id] = { id, spawned: false, location: null, working: false, say: null, back: null };
+    agents[id] = {
+      id,
+      spawned: false,
+      location: null,
+      working: false,
+      say: null,
+      back: null,
+      post: null,
+      doneAt: null,
+    };
   }
   const gates: Record<string, GateState> = {};
   for (const gate of layout.semantic.gates) gates[gate.id] = "closed";
@@ -114,6 +139,8 @@ const BUILDING_STATUS_BY_VERB: Readonly<Record<string, BuildingStatus>> = {
 };
 
 const NOTE_MAX = 140;
+/** agent.* verbs whose event is the agent saying something (its bubble shows the real line): TILO-T-WORLD adds help. */
+const SAYS: ReadonlySet<string> = new Set(["handoff", "assigned", "help_requested"]);
 
 /** An agent.handoff's note: the envelope's own summary, else the event's line, cut to one short line. */
 function noteOf(event: Event): { text: string; to: string } | null {
@@ -133,6 +160,17 @@ function gateAfter(event: Event, verb: string): GateState | null {
   if (verb !== "resolved" || (by !== "person" && by !== "team_lead")) return null;
   const option = (event.data as Record<string, unknown> | null)?.option;
   return option === "approve" ? "open" : option === "edit" || option === "hold" ? "closed" : null;
+}
+
+/** The agent's post after one of its own events: where it works (agent.working) wins; else its first building. */
+function postAfter(
+  agent: AgentState,
+  verb: string,
+  target: string | null,
+  building: boolean,
+): string | null {
+  if (!building || target === null) return agent.post;
+  return verb === "working" ? target : (agent.post ?? target);
 }
 
 /** Applies one known event's world effect. `state` is a fresh object already carrying the
@@ -221,10 +259,27 @@ function applyKnown(state: WorldState, event: Event): WorldState {
       const next: AgentState = {
         ...agent,
         working: verb === "working",
-        say: verb === "handoff" || verb === "assigned" ? noteOf(event) : null,
+        say: SAYS.has(verb) ? noteOf(event) : null,
         location: isLocation ? event.target : agent.location,
+        post: postAfter(
+          agent,
+          verb,
+          isLocation ? event.target : null,
+          event.target in state.buildings,
+        ),
+        doneAt: verb === "handoff" ? event.seq : null,
       };
       return { ...state, agents: { ...state.agents, [agent.id]: next } };
+    }
+    case "question": {
+      // TILO-T-WORLD: an agent routing a question to a person says it: its bubble is the event's own line, to "You".
+      const asker = state.agents[event.actor];
+      if (verb !== "routed" || !asker) return state;
+      const say = noteOf(event);
+      return {
+        ...state,
+        agents: { ...state.agents, [asker.id]: { ...asker, working: false, say, doneAt: null } },
+      };
     }
     case "meeting": {
       // WORLD-LIVE: a person's room (meeting.convened .. meeting.adjourned). Its agents gather in the layout's Meeting
@@ -243,7 +298,7 @@ function applyKnown(state: WorldState, event: Event): WorldState {
           const agent = agents[id] as AgentState;
           agents[id] = {
             ...agent,
-            back: agent.back ?? agent.location,
+            back: agent.back ?? standingAt(state, agent),
             location: state.hall,
             working: false,
             say: null,

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/common.schema.json",
-  "x-version": "1.7.0",
+  "x-version": "1.8.0",
   "title": "Common",
   "description": "Definitions shared by every Tilo contract. The root is a sampler with one optional property per definition so that fixtures and generated types cover each one; no service sends a Common document.",
   "type": "object",
@@ -57,7 +57,8 @@
     "utterance_id": { "$ref": "#/$defs/utterance_id" },
     "opaque_ref": { "$ref": "#/$defs/opaque_ref" },
     "maker": { "$ref": "#/$defs/maker" },
-    "record_ref": { "$ref": "#/$defs/record_ref" }
+    "record_ref": { "$ref": "#/$defs/record_ref" },
+    "make_with": { "$ref": "#/$defs/make_with" }
   },
   "$defs": {
     "ulid": {
@@ -220,7 +221,7 @@
       "enum": ["personal", "business", "public"]
     },
     "deliverable_format": {
-      "description": "Deliverable format (PRD 12.4), plus email for replies, in_app for answers shown in Tilo and, since 1.6.0 (ADR-0029), app: an AppSpec (appspec.schema.json) that fixed web code renders (FR-AGT-16).",
+      "description": "Deliverable format (PRD 12.4), plus email for replies, in_app for answers shown in Tilo, since 1.6.0 (ADR-0029) app: an AppSpec (appspec.schema.json) that fixed web code renders (FR-AGT-16), and since 1.8.0 (ADR-0050) website: a site made natively as one self-contained HTML file by a writer unit (website.rules.md) or by a build partner the person picked (make_with, makers.rules.md).",
       "type": "string",
       "enum": [
         "pdf",
@@ -234,11 +235,12 @@
         "google_sheets",
         "email",
         "in_app",
-        "app"
+        "app",
+        "website"
       ]
     },
     "media_type": {
-      "description": "Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG, and since 1.7.0 (ADR-0034) WebM and MP4 video, which only a taught-skill capture upload stores (a screen recording or an uploaded example; never rendered or fetched). Code picks it, never a model: from the role and the pinned skill for a unit or render output, and from the file's own leading bytes for an upload (whose extension must agree) or a fetch (ADR-0029), never from a file name, a URL or a Content-Type header alone. Closed: no HTML or SVG.",
+      "description": "Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG, and since 1.7.0 (ADR-0034) WebM and MP4 video, which only a taught-skill capture upload stores (a screen recording or an uploaded example; never rendered or fetched). Code picks it, never a model: from the role and the pinned skill for a unit or render output, and from the file's own leading bytes for an upload (whose extension must agree) or a fetch (ADR-0029), never from a file name, a URL or a Content-Type header alone. Since 1.8.0 (ADR-0050) text/html is allowed for one case only: a writer unit's website, one self-contained HTML file of at most 524,288 bytes that passed the static checks (website.rules.md WS-01 to WS-09), never an upload, a fetch or a render (artifact.rules.md AR-10). Closed: no SVG file and no other HTML.",
       "type": "string",
       "enum": [
         "text/markdown",
@@ -251,7 +253,8 @@
         "image/png",
         "image/jpeg",
         "video/webm",
-        "video/mp4"
+        "video/mp4",
+        "text/html"
       ]
     },
     "credit_range": {
@@ -326,6 +329,12 @@
         },
         "id": { "type": "string", "pattern": "^[A-Za-z0-9_]{1,64}$" }
       }
+    },
+    "make_with": {
+      "description": "Where a deliverable is made (1.8.0, ADR-0050): native (Tilo's own units), connector:<connector id> (a build partner such as lovable or canva) or mcp:<server id>:<tool name> (a tool of an allowlisted MCP server, config/mcp.yaml). The person picks it on the start plan from the options code offers (makers.rules.md); a model never picks it, and picking a partner authorises nothing: the partner's action stays T3 behind its own card. Not to be confused with maker, a record's provenance.",
+      "type": "string",
+      "pattern": "^(native|connector:[a-z][a-z0-9_]{1,31}|mcp:[a-z][a-z0-9_]{1,31}:[A-Za-z0-9_.-]{1,64})$",
+      "not": { "pattern": "\n" }
     }
   }
 }

@@ -14,8 +14,8 @@ from _sec15_lib import VISITOR
 from _sec16_lib import JUDGE_A
 from _signin_lib import NOW, PROJECT, Fetch, _key, _token
 from fastapi.testclient import TestClient
-from tilo_api import access, deps, firebase_auth
 from tilo_api import app as tilo_app
+from tilo_api import deps, firebase_auth
 
 GOOGLE_SUB = "uid" + "A1" * 10
 ANON_SUB = "anon" + "Q7" * 12
@@ -88,10 +88,7 @@ class Counting:
 def test_SEC_15_SIGNIN_followup_a_gated_request_verifies_its_token_once(signer, monkeypatch):
     monkeypatch.setenv("K_SERVICE", "tilo-api")
     counting = Counting(verifier(signer))
-    store = access.InMemoryAccessStore()
-    store.declare(firebase_auth.user_id_for(GOOGLE_SUB), "judge")
     tilo_app.dependency_overrides[deps.get_firebase_verifier] = lambda: counting
-    tilo_app.dependency_overrides[deps.get_access_store] = lambda: store
     tilo_app.dependency_overrides[deps.get_store] = lambda: deps.Store()
     headers = {"Authorization": f"Bearer {_token(signer)}"}
     with TestClient(tilo_app, raise_server_exceptions=False) as client:
@@ -106,7 +103,6 @@ def test_SEC_15_SIGNIN_followup_a_public_route_still_verifies_for_itself(signer,
     monkeypatch.setenv("K_SERVICE", "tilo-api")
     counting = Counting(verifier(signer))
     tilo_app.dependency_overrides[deps.get_firebase_verifier] = lambda: counting
-    tilo_app.dependency_overrides[deps.get_access_store] = lambda: access.InMemoryAccessStore()
     with TestClient(tilo_app, raise_server_exceptions=False) as client:
         assert client.get("/access", headers={"Authorization": f"Bearer {_token(signer)}"}).status_code == 200
     assert counting.calls == 1
@@ -116,7 +112,6 @@ def test_SEC_15_SIGNIN_followup_a_request_cannot_supply_the_cached_principal(sig
     """The reuse is scope state the gate sets; nothing a client sends (header, query, cookie) can stand in for it."""
     monkeypatch.setenv("K_SERVICE", "tilo-api")
     tilo_app.dependency_overrides[deps.get_firebase_verifier] = lambda: verifier(signer)
-    tilo_app.dependency_overrides[deps.get_access_store] = lambda: access.InMemoryAccessStore()
     with TestClient(tilo_app, raise_server_exceptions=False) as client:
         headers = {"principal": "u_victim", "X-Principal": "u_victim", "state": "x"}
         assert client.get("/worlds?principal=u_victim", headers=headers).status_code == 401

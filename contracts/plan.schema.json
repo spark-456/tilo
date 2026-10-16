@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/plan.schema.json",
-  "x-version": "1.1.0",
+  "x-version": "1.2.0",
   "title": "Plan",
-  "description": "PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md.",
+  "description": "PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md. 1.2.0 (ADR-0050) adds make_choice and make_option: where each deliverable can be made, as the start plan shows it (makers.rules.md); the Plan root is unchanged.",
   "type": "object",
   "additionalProperties": false,
   "required": ["approaches", "chosen_approach", "units", "gates", "budget_cap"],
@@ -37,6 +37,74 @@
   },
   "$defs": {
     "approach_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$" },
+    "make_choice": {
+      "description": "Where one deliverable can be made (ADR-0050, MK-01): sent with the approaches for every deliverable whose format config/makers.yaml lists, native first, then each partner in config order. Code builds it, never a model. The selected option is the one whose make_with the start plan holds; a deliverable with no choice is made natively.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deliverable", "options", "selected"],
+      "properties": {
+        "deliverable": {
+          "description": "0-based position of the deliverable in the brief.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 6,
+          "items": { "$ref": "#/$defs/make_option" }
+        },
+        "selected": {
+          "description": "The option selected before Start (MK-05): native, or the suggested ready option when config/makers.yaml preselect_suggested is true. Never an option that needs setup (MK-05, checked by code).",
+          "$ref": "common.schema.json#/$defs/make_with"
+        }
+      }
+    },
+    "make_note": {
+      "description": "One plain sentence Tilo wrote from the rule that applied (MK-02, MK-04).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "make_option": {
+      "description": "One place a deliverable can be made (MK-02 to MK-04). A partner that is not set up is shown with status needs_setup, never hidden, never suggested and never selected. note is one plain sentence: why the option is suggested, or what must be set up first; null otherwise.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["make_with", "label", "status", "suggested", "note"],
+      "properties": {
+        "make_with": { "$ref": "common.schema.json#/$defs/make_with" },
+        "label": {
+          "description": "Display name: Tilo for native, else the connector's or MCP server's name.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "status": { "type": "string", "enum": ["ready", "needs_setup"] },
+        "suggested": { "type": "boolean" },
+        "note": { "anyOf": [{ "$ref": "#/$defs/make_note" }, { "type": "null" }] }
+      },
+      "if": { "properties": { "suggested": { "const": true } }, "required": ["suggested"] },
+      "then": {
+        "description": "A suggestion is a ready partner with its reason (MK-04): native is the default, never a suggestion.",
+        "properties": {
+          "make_with": { "not": { "const": "native" } },
+          "status": { "const": "ready" },
+          "note": { "type": "string" }
+        }
+      },
+      "else": {
+        "if": { "properties": { "status": { "const": "needs_setup" } }, "required": ["status"] },
+        "then": {
+          "description": "What must be set up first; native never needs setup.",
+          "properties": {
+            "make_with": { "not": { "const": "native" } },
+            "note": { "type": "string" }
+          }
+        },
+        "else": { "properties": { "note": { "type": "null" } } }
+      }
+    },
     "approach": {
       "type": "object",
       "additionalProperties": false,

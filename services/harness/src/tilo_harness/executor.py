@@ -395,6 +395,7 @@ class _Run:
         self.handoff_at = handoff_at  # config.context.handoff_at: a handoff is valid from this share (FR-AGT-09)
         self.used = {*roster.workers.values(), *([verifier.agent_id] if verifier is not None else [])}  # not spare
         self.held: set[str] = set()
+        self.peer_envelopes: dict[str, dict[str, Any]] = {}
         self.handoffs: dict[str, str] = {}  # unit -> the agent.handoff event that carried its artifacts
         self.brief, self.intake_answers = brief, tuple((str(q), str(a)) for q, a in intake_answers)
         self.results: dict[str, UpstreamItem] = {}  # unit -> what it made, for the units that depend on it
@@ -594,6 +595,24 @@ class _Run:
                 "agent.working", worker, site, "The agent is working.", {"unit": unit_id}, cause=cause, **at
             )
             upstream = tuple(self.results[dep] for dep in unit["depends_on"] if dep in self.results)
+            for item in upstream:
+                if item.unit_id not in self.peer_envelopes:
+                    continue
+                if not (
+                    unit["unit_type"].startswith("design_")
+                    or self.unit_types.get(item.unit_id, "").startswith("design_")
+                ):
+                    continue
+                peer = self.peer_envelopes[item.unit_id] | {"to": worker}
+                cause = self.emit(
+                    "agent.handoff",
+                    peer["from"],
+                    worker,
+                    "The agent handed its work to the next agent.",
+                    {"envelope": peer},
+                    cause=cause,
+                    **at,
+                )
             first = UnitContext(
                 worker,
                 loaded,
@@ -624,6 +643,11 @@ class _Run:
             if self.before_handoff is not None and not await self.before_handoff(unit, worker, announced):
                 outcome = UnitOutcome(success=False, summary="The unit's step before its handoff did not finish.")
                 envelope = None
+        stored: UpstreamItem | None = None
+        if envelope is not None and unit["unit_type"].startswith("design_"):
+            stored = await asyncio.to_thread(_upstream_item, unit, outcome, made, self.store)
+            if stored.text:
+                envelope["summary"] = stored.text[:1000]
         if envelope is not None:
             summary = (
                 "The agent handed its result to the Lead."  # FR-AGT-08: the agent's own words ride only in the envelope
@@ -639,12 +663,17 @@ class _Run:
                     reason="a step's result could not be handed to the Lead",
                 )
             else:
+                self.peer_envelopes[unit_id] = envelope
                 self.handoffs[unit_id] = cause
                 self.finish(unit, lead, cause)
         self.emit("agent.retired", lead, worker, "The agent finished and left.", {}, cause=cause, **at)
         if outcome.success is True:
             # the store read is synchronous: keep it off the event loop
-            self.results[unit_id] = await asyncio.to_thread(_upstream_item, unit, outcome, made, self.store)
+            self.results[unit_id] = (
+                stored
+                if stored is not None
+                else await asyncio.to_thread(_upstream_item, unit, outcome, made, self.store)
+            )
         return outcome
 
     def progress_for(
