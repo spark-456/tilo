@@ -507,6 +507,39 @@
   background: var(--card);
   box-shadow: var(--sh);
 }
+[data-park] .park-home-plan--starting {
+  position: relative;
+  overflow: hidden;
+  transform-origin: center bottom;
+}
+[data-park] .park-home-run-blueprint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  border: 2px dashed var(--bpInk);
+  border-radius: inherit;
+  background-color: var(--bp);
+  background-image: linear-gradient(var(--bpLine) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bpLine) 1px, transparent 1px);
+  background-size: 16px 16px;
+  color: var(--bpInk);
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+[data-park] .park-home-start-status {
+  margin: 0;
+  color: var(--ink2);
+  font-weight: 700;
+  text-align: center;
+}
 [data-park] .park-home-plan__main {
   min-width: 0;
   display: flex;

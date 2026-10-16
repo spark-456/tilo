@@ -166,12 +166,14 @@ export function HomePage({ app }: { app: AppCtx }) {
   // SIMPLE-RUN-1: the one confirm card (live only): the priced plan, a call in flight on it, and why the last step stopped.
   const [run, setRun] = useState<RunPlan | null>(null);
   const [runBusy, setRunBusy] = useState(false);
+  const [runStarting, setRunStarting] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
   const toIdle = () => {
     cancelDraft();
     settle("idle");
     setRun(null);
     setRunError(null);
+    setRunStarting(false);
   };
   const draft = () => {
     if (phaseNow.current !== "idle") return;
@@ -282,12 +284,15 @@ export function HomePage({ app }: { app: AppCtx }) {
   };
   const startRun = (repeat: Cadence | null) => {
     if (run === null || runBusy) return;
+    // triggeredBy: the person's Start click; the card folds only for an actual start request.
+    setRunStarting(true);
     setRunBusy(true);
     setRunError(null);
     store.startRun(run, repeat).then((r) => {
       if (!alive.current) return;
       setRunBusy(false);
       if (!r.ok) {
+        setRunStarting(false);
         if (!r.capped) setRunError(r.message);
         return;
       }
@@ -298,7 +303,7 @@ export function HomePage({ app }: { app: AppCtx }) {
         store.toast(
           `The run has started, but it was not set to repeat weekly. ${r.value.repeatRefused}`,
         );
-      markPendingWorld(r.value.worldId);
+      markPendingWorld(r.value.worldId, run.goal);
       go("world", { id: r.value.worldId });
     });
   };
@@ -534,6 +539,7 @@ export function HomePage({ app }: { app: AppCtx }) {
               : {
                   plan: run,
                   busy: runBusy,
+                  starting: runStarting,
                   error: runError,
                   onStart: startRun,
                   onCancel: toIdle,

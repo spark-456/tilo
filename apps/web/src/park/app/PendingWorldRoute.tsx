@@ -1,23 +1,33 @@
 import { type ReactNode, useEffect, useState } from "react";
+import { ErrorState, LoadingState, PoolLoader, type PoolLoaderEvent } from "../../design/tilo-t";
 
 /** An approval reply proves this id exists; it does not prove that planning has finished. */
 const pending = new Set<string>();
+const pendingGoals = new Map<string, string>();
 
-export function markPendingWorld(worldId: string): void {
-  if (worldId) pending.add(worldId);
+export function markPendingWorld(worldId: string, goal?: string): void {
+  if (!worldId) return;
+  pending.add(worldId);
+  if (goal) pendingGoals.set(worldId, goal);
 }
 
 export const pendingWorld = (worldId: string): boolean => pending.has(worldId);
+const pendingWorldGoal = (worldId: string): string | undefined => pendingGoals.get(worldId);
+
+function clearPendingWorld(worldId: string): void {
+  pending.delete(worldId);
+  pendingGoals.delete(worldId);
+}
 
 interface EventFeed {
   subscribeEvents(
     worldId: string,
-    onEvent: (event: { readonly type: string }) => void,
+    onEvent: (event: { readonly type: string; readonly ts?: string }) => void,
     onError?: (error: { readonly message: string }) => void,
   ): () => void;
 }
 
-/** Holds the new world's route until its real event feed says that a plan or run exists. */
+/** The server's start response gives an id; only streamed events advance the visual story. */
 export function PendingWorldRoute({
   worldId,
   client,
@@ -27,31 +37,91 @@ export function PendingWorldRoute({
   readonly client: EventFeed | null;
   readonly children: ReactNode;
 }) {
-  const [waiting, setWaiting] = useState(() => pendingWorld(worldId));
+  const [phase, setPhase] = useState<"waiting" | "started" | "planned">(() =>
+    pendingWorld(worldId) ? "waiting" : "planned",
+  );
+  const [events, setEvents] = useState<PoolLoaderEvent[]>([]);
+  const goal = pendingWorldGoal(worldId);
   const [error, setError] = useState(false);
+  const [worldFailed, setWorldFailed] = useState(false);
+  const planned = phase === "planned";
+  const failed = error || worldFailed || client === null;
   useEffect(() => {
-    if (!waiting || client === null) return undefined;
+    if (planned || client === null) return undefined;
     return client.subscribeEvents(
       worldId,
       (event) => {
-        if (event.type !== "world.planned" && event.type !== "world.started") return;
-        pending.delete(worldId);
-        setWaiting(false);
+        if (
+          event.type === "world.started" ||
+          event.type === "world.planned" ||
+          event.type === "world.failed"
+        ) {
+          setEvents((current) => {
+            if (current.some((recorded) => recorded.type === event.type)) return current;
+            const recorded = event.ts ? { type: event.type, ts: event.ts } : { type: event.type };
+            return [...current, recorded];
+          });
+        }
+        if (event.type === "world.started") {
+          // triggeredBy: world.started. The pool appears only after this recorded event.
+          setPhase((current) => (current === "planned" ? current : "started"));
+        }
+        if (event.type === "world.planned") {
+          // triggeredBy: world.planned. Enter the actual World only after its plan is recorded.
+          clearPendingWorld(worldId);
+          setPhase("planned");
+        }
+        if (event.type === "world.failed") {
+          clearPendingWorld(worldId);
+          setWorldFailed(true);
+        }
       },
       () => setError(true),
     );
-  }, [client, waiting, worldId]);
+  }, [client, planned, worldId]);
 
-  if (!waiting) return <>{children}</>;
   return (
-    <section className="park-pending-world" data-testid="pending-world" aria-live="polite">
-      <h1 tabIndex={-1}>Tilo is planning your world</h1>
-      <p>
-        {error
-          ? "World updates are unavailable right now. You can return to your worlds and try again."
-          : "Your world will open when its plan or start is recorded."}
-      </p>
-      <a href="/worlds">Your worlds</a>
-    </section>
+    <PoolLoader kind="task" events={events}>
+      {planned ? (
+        <div className="park-world-enter">{children}</div>
+      ) : (
+        <section className="park-pending-world" data-testid="pending-world">
+          <h1 tabIndex={-1}>
+            {worldFailed
+              ? "This world stopped"
+              : failed
+                ? "We can't open this world yet"
+                : "Tilo is planning your world"}
+          </h1>
+          {failed ? (
+            <ErrorState
+              title={worldFailed ? "This world stopped" : "World updates are unavailable"}
+              body={
+                worldFailed
+                  ? "Return to your worlds to see what happened."
+                  : "You can return to your worlds and try again."
+              }
+            />
+          ) : (
+            <div>
+              {phase === "waiting" && goal ? (
+                <div className="park-pending-world__blueprint" data-testid="run-blueprint">
+                  BLUEPRINT · {goal}
+                </div>
+              ) : null}
+              <LoadingState
+                layout="world"
+                caption={
+                  phase === "started"
+                    ? "world.started · Waiting for world.planned"
+                    : "Waiting for world.started"
+                }
+              />
+            </div>
+          )}
+          <a href="/worlds">Your worlds</a>
+        </section>
+      )}
+    </PoolLoader>
   );
 }
