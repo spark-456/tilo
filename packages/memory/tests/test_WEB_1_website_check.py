@@ -68,6 +68,10 @@ def test_WEB_1_WS_03_a_live_multi_timezone_clock_passes() -> None:
         "<script>class A { constructor() { this.x = 1 } } el.style.top = '1px'; a?.open;</script>",
         "<style>@font-face{font-family:f;src:url(data:font/woff2;base64,AAAA)}</style>",
         "<script>const important = 1; /* important is not the keyword */</script>",
+        "<script>let startClock = 1, chartCanvas = 2, shortcut = 3;</script>",  # "rtc" inside a word is fine
+        '<svg><rect fill="url(#g)" stroke="red" mask="url(#m)"/><linearGradient id="g"/></svg>',
+        "<style>/* don't panic */ p{content:\"it's\"; font-family:'A B'}</style>",
+        '<input type=text autocomplete=off><input type="email" autocomplete="email">',
     ],
 )
 def test_WEB_1_WS_05_WS_07_allowed_forms_pass(body: str) -> None:
@@ -149,6 +153,33 @@ BAD = {
     "WS-07_handler": ("ws_script", page('<p onclick="fetch(1)">x</p>')),
     "WS-07_handler_entity": ("ws_script", page('<p onclick="&#102;etch(1)">x</p>')),
     "WS-07_unicode_escape": ("ws_script", page("<script>\\u0066etch(1)</script>")),
+    "WS-07_script_double_escape_comment": ("ws_script", page("<script>var a = '<!--'; </script>")),
+    "WS-07_script_double_escape_tag": ("ws_script", page("<script>var a = '<SCRIPT>'; </script>")),
+    "WS-07_rtc_vendor": ("ws_script", page("<script>new webkitRTCPeerConnection()</script>")),
+    "WS-07_rtc_datachannel": ("ws_script", page("<script>var c = RTCDataChannel</script>")),
+    "WS-07_rtc_lowercase": ("ws_script", page("<script>var c = rtcpeer</script>")),
+    "WS-06_unclosed_quote_in_url": ("ws_css", page(head='<style>p{background:url("data:image/png;base64,AA)}</style>')),
+    "WS-06_unclosed_quote_in_image_set": ("ws_css", page(head="<style>p{background:image-set('a.png 1x)}</style>")),
+    "WS-06_unclosed_quote_in_style_attr": ("ws_css", page("<p style='background:url(\"a'>x</p>")),
+    "WS-06_svg_fill_url": ("ws_css", page('<svg><rect fill="url(a.png)"/></svg>')),
+    "WS-06_svg_mask_url": ("ws_css", page('<svg><rect mask="url(b.svg#m)"/></svg>')),
+    "WS-06_svg_filter_url": ("ws_css", page('<svg><rect filter="url(&quot;c.svg#f&quot;)"/></svg>')),
+    "WS-06_svg_cursor_url": ("ws_css", page('<svg><rect cursor="url(d.cur), auto"/></svg>')),
+    "WS-04_smil_set_href": ("ws_element", page('<svg><a><set attributeName="href" to="#x"/></a></svg>')),
+    "WS-04_smil_animate_xlink": (
+        "ws_element",
+        page('<svg><a><animate attributeName=" XLink:Href " to="#x"/></a></svg>'),
+    ),
+    "WS-04_smil_animate_transform_href": (
+        "ws_element",
+        page('<svg><a><animateTransform attributeName="href"/></a></svg>'),
+    ),
+    "WS-06_smil_to_url": ("ws_css", page('<svg><rect><set attributeName="fill" to="url(e.png)"/></rect></svg>')),
+    "WS-04_password_input": ("ws_element", page("<input type=password>")),
+    "WS-04_password_input_case_space": ("ws_element", page('<INPUT TYPE=" PassWord ">')),
+    "WS-04_autocomplete_current_password": ("ws_element", page('<input autocomplete="username current-password">')),
+    "WS-04_autocomplete_new_password": ("ws_element", page("<input autocomplete=NEW-PASSWORD>")),
+    "WS-03_giant_character_reference": ("ws_raw", page("<p>&#" + "1" * 5000 + ";</p>")),
     "WS-08_scheme_in_text": ("ws_raw", page("<p>see https://example.com</p>")),
     "WS-08_scheme_entity": ("ws_raw", page("<p>see x&#58;//example.com</p>")),
     "WS-08_javascript_in_text": ("ws_raw", page("<p>javascript:alert(1)</p>")),
@@ -201,3 +232,41 @@ def test_WEB_1_WS_03_a_tag_flood_is_refused_quickly_not_quadratically() -> None:
     result = check(b"<!doctype html>" + b"<a " * 150_000)
     assert result.ok is False
     assert time.monotonic() - started < 5
+
+
+def hostile(opening: str, unit: str, closing: str) -> bytes:
+    """A page of exactly the 512 KB cap: `opening`, `unit` repeated to fill, `closing`. The checker holds the GIL for
+    the whole call, so every rule must be linear."""
+    head, tail = "<!doctype html><html><body>", "</body></html>"
+    room = MAX_BYTES - len(head) - len(tail) - len(opening) - len(closing)
+    return (head + opening + (unit * (room // len(unit) + 1))[:room] + closing + tail).encode()
+
+
+HOSTILE = {
+    "spaces_after_window": ("<script>window", " ", "</script>"),
+    "windows_and_spaces": ("<script>", "window  ", "</script>"),
+    "dots_and_spaces": ("<script>", ".  ", "</script>"),
+    "deep_url": ("<style>", "url(", "</style>"),
+    "deep_image_set": ("<style>", "image-set(", "</style>"),
+    "deep_src_spaces": ("<style>", "src(  ", "</style>"),
+    "unclosed_quotes": ("<style>", 'url("a', "</style>"),
+    "many_style_strings": ("<style>a{content:", '"x" ', "}</style>"),
+    "many_comments": ("", "<!-- c -->\n", ""),
+    "many_comments_one_line": ("", "<!-- c -->", ""),
+    "many_long_lines_comments": ("", "<!--" + "x" * 30 + "-->\n", ""),
+    "paren_flood": ("<style>", "(", "</style>"),
+    "many_expression_words": ("<style>", "expression ", "</style>"),
+    "many_css_comments": ("<style>", "/* c */\n", "</style>"),
+    "many_style_attrs": ("", '<i style="a:url(\'">', ""),
+}
+
+
+@pytest.mark.parametrize("name", sorted(HOSTILE))
+def test_WEB_1_WS_03_a_hostile_512_kb_page_is_judged_in_under_two_seconds(name: str) -> None:
+    import time
+
+    data = hostile(*HOSTILE[name])
+    started = time.monotonic()
+    result = check_website(data)
+    assert time.monotonic() - started < 2, (name, result)
+    assert isinstance(result.ok, bool)

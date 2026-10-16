@@ -52,7 +52,7 @@ def degraded(reply: str) -> bytes:
         return reply.encode("utf-8")
     code = reply[:100_000]
     fence = "`" * max(3, _longest_ticks(code) + 1)
-    note = "The page below did not pass Tilo's safety checks, so it is shown as text, not as a website."
+    note = "Tilo did not make this page into a website, so it is shown as text and never run."
     return f"{note}\n\n{fence}html\n{code}\n{fence}\n".encode()
 
 

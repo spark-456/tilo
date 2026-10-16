@@ -38,8 +38,9 @@ branch | packages/providers/src/tilo_providers/vertex_smoke.py | classify | maps
 branch | services/connectors/src/tilo_connectors/handoff.py | _fence | picks a Markdown fence longer than any backtick run in granted text, so an excerpt cannot close its own fence; no word of the text is read
 branch | services/connectors/src/tilo_connectors/handoff.py | record | compares the stored prompt's hash and ids with the prepared ones (BH-07); the prompt text is never read
 branch | services/connectors/src/tilo_connectors/grants.py | _excerpt | cuts a granted text to the requested part and checks its hash and size (DG-04); compares task text with the owner's own request and the file, never with a literal
+branch | services/api/src/tilo_api/intake.py | safe_app_brief | format guard for ADR-0029 quiz briefs: an app (quiz) deliverable survives only when the task text states a quiz intent and a screened native source is attached; otherwise it becomes Markdown. It reads the task's words to refuse a format, never to choose a scenario
 branch | packages/memory/src/tilo_memory/website_check.py | check_website | static WS-02..WS-08 checks of a website file's own bytes against fixed rules (WEB-1); a task's words are never read
-branch | packages/memory/src/tilo_memory/website_check.py | css_problem | WS-06: scans a website's own CSS for forbidden functions and non-data URLs; a task's words are never read
+branch | packages/memory/src/tilo_memory/website_check.py | __init__ | indexes the line starts of a website file the checker is about to scan (WEB-1); a task's words are never read
 branch | packages/memory/src/tilo_memory/website_check.py | js_problem | WS-07: scans a website's own script for forbidden names; a task's words are never read
 branch | services/harness/src/tilo_harness/run_bundle.py | _stamp | validates that a bundle time string is a fixed-format timestamp; not task content
 branch | services/harness/src/tilo_harness/run_bundle.py | export_run | compares recorded artifact fields and the run's archive records with the event stream (FR-MEM-10); a task's words are never read

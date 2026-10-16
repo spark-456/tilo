@@ -14,6 +14,7 @@ from tilo_harness.deliverable import DeliverableRefused
 from tilo_harness.executor import UnitContext
 from tilo_harness.outputs import OutputRefused, UnitOutput, WebsiteHtml, keep
 from tilo_harness.tool_runner import ToolUnitRunner
+from tilo_harness.unit_prompt import UpstreamItem
 from tilo_harness.website import website_output
 from tilo_providers.fake import FakeModelProvider
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse
@@ -109,7 +110,7 @@ def test_WEB_1_WS_05_a_page_that_stays_bad_degrades_to_markdown_never_to_html() 
     out = result.outcome.outputs[0]
     assert result.outcome.success and len(provider.requests) == 2
     assert type(out) is UnitOutput and out.media_type == "text/markdown"
-    assert out.content.startswith(b"The page below did not pass Tilo's safety checks") and b"````" not in out.content
+    assert out.content.startswith(b"Tilo did not make this page into a website") and b"````" not in out.content
     assert "could not build the website file, so here is the result as text" in result.outcome.summary
 
 
@@ -155,6 +156,24 @@ def test_WEB_1_WS_01_only_a_native_website_deliver_unit_may_make_html(unit: dict
     runner = ToolUnitRunner({unit["role"]: provider})
     result = asyncio.run(runner.run_unit(unit, UnitContext("A_s0", (), brief=brief)))
     assert result.outcome.outputs[0].media_type == "text/markdown"
+
+
+@pytest.mark.parametrize("tainted, private", [(False, True), (True, False), (True, True)])
+def test_WEB_1_WT_04_a_run_that_read_private_or_outside_data_never_makes_an_html_page(
+    tainted: bool, private: bool
+) -> None:
+    item = UpstreamItem(
+        "U0", "Research", "Notes from the person's mail.", screening="clean", tainted=tainted, private=private
+    )
+    provider = Script(PAGE)
+    runner = ToolUnitRunner({"writer": provider})
+    result = asyncio.run(runner.run_unit(UNIT, UnitContext("A_s0", (), brief=BRIEF, upstream=(item,))))
+    out = result.outcome.outputs[0]
+    assert result.outcome.success and out.media_type == "text/markdown" and type(out) is UnitOutput
+    assert out.content.startswith(b"Tilo did not make this page into a website") and PAGE.encode() in out.content
+    assert "<!doctype html>" not in provider.requests[0].prompt.split("<<<REQUEST")[0]
+    assert "could not build the website file, so here is the result as text" in result.outcome.summary
+    assert len(provider.requests) == 1
 
 
 def test_WEB_1_WS_01_a_native_website_with_make_with_native_takes_the_html_path() -> None:
