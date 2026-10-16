@@ -21,6 +21,7 @@ from tilo_api import durable_store as _durable_store
 from tilo_api import meeting_host_routes as _meeting_host_routes
 from tilo_api import meeting_minutes_flag as _meeting_minutes_flag
 from tilo_api import meeting_voice_meter as _meeting_voice_meter
+from tilo_api import memory_routes as _memory_routes
 from tilo_api import nudge_sweep as _nudge_sweep
 from tilo_api import owner_minutes_routes as _owner_minutes_routes
 from tilo_api import people as _people
@@ -180,6 +181,7 @@ app.include_router(_schedules.router)
 app.include_router(_meeting_voice_meter.router)  # ADR-0042: public to the gate, inert until TILO_VOICE_METER=1
 app.include_router(_nudge_sweep.router)  # FR-PA-15b: GET /v1/nudges, POST /v1/nudges/{id}/snooze
 app.include_router(_team_router)
+app.include_router(_memory_routes.router)
 app.include_router(_user_settings_router)  # FR-SET-01/02: GET and PUT /v1/me/settings
 
 
