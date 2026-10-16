@@ -23,7 +23,8 @@ from _live_lib import no_external_network as no_external_network  # noqa: F401 -
 from _meeting_host_lib import CALENDAR_EVENTS_OWNED, EVENTS_URL, OWNER, FakeApiResponse, FakeHostCalendar
 from test_ADR32_T3_host_routes import AUD, CALLER, HARNESS, Rig
 from tilo_connectors.adapters import GMAIL_API, side_effect_marker
-from tilo_connectors.adapters.calendar_write import _EVENT_ID
+from tilo_connectors.adapters.calendar_write import _EVENT_ID, CalendarWriteAdapter
+from tilo_connectors.errors import SideEffectRefused
 from tilo_connectors.host_routes import AUDIENCE_VAR, CALLER_VAR, MAX_BODY_BYTES
 from tilo_connectors.side_effects import scan_for_side_effect_calls
 
@@ -383,16 +384,18 @@ def test_WORKSPACE_TOOLS_WT08_update_event_id_regex_rejects_non_google_ids(desti
     assert _EVENT_ID.fullmatch(destination) is None
 
 
-@pytest.mark.parametrize(
-    "changes", [{"recipients": [GUEST]}, {"attachments": [{"artifact_id": "art_attachment_01", "version": 1}]}]
-)
-def test_WORKSPACE_TOOLS_WT08_update_event_refuses_recipients_and_attachments_before_google(changes) -> None:
+def test_WORKSPACE_TOOLS_WT08_update_event_refuses_recipients_before_google() -> None:
     rig = Rig5()
     entry, body = update_request("own-event-1")
-    entry.update(changes)
-    body["entry"].update(changes)
+    entry["recipients"] = body["entry"]["recipients"] = [GUEST]
     assert rig.run(body)["outcome"] == "refused"
     assert rig.google.reached() == 0
+
+
+def test_WORKSPACE_TOOLS_WT08_update_event_refuses_attachments_before_adapter_dependencies() -> None:
+    adapter = object.__new__(CalendarWriteAdapter)
+    with pytest.raises(SideEffectRefused, match="guests"):
+        adapter._update({"destination": "own-event-1", "attachments": [{"artifact_id": "art_attachment_01"}]})
 
 
 def test_WORKSPACE_TOOLS_WT08_update_event_requires_attendee_subfield_and_fails_closed(monkeypatch) -> None:
