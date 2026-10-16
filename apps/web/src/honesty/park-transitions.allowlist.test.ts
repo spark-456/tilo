@@ -41,7 +41,8 @@ describe("WEB-MOTION-2 honesty: UI-chrome motion widens the allowlist by one nar
       added.filter(
         (k) =>
           k !== `${SHELL_CSS}:css-transition` &&
-          k !== "src/landing/landing.motion.css:css-transition", // LANDING-2, reviewed on its own
+          k !== "src/landing/landing.motion.css:css-transition" && // LANDING-2, reviewed on its own
+          !k.startsWith("src/design/tilo-t/motion.css:"), // TILO-T-FOUNDATION, reviewed on its own
       ),
       "a new exception beyond the shell stylesheet's css-transition: it needs its own review",
     ).toEqual([]);
