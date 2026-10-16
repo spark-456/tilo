@@ -26,6 +26,8 @@ it("FR_POOL_01_task_waits_for_world_started_and_names_world_planned", async () =
 
 it("CX_T_RUN_batched_started_and_planned_events_keep_the_loader_for_slow_runs", async () => {
   vi.useFakeTimers();
+  // the run ended a moment ago (a world opened later shows at once: NO_REPLAY)
+  vi.setSystemTime(new Date("2026-10-16T10:00:01.000Z"));
   const mounted = mount(createElement(PoolLoader, { kind: "task", events: [], children: null }));
   await settle();
   mounted.render(createElement(PoolLoader, {

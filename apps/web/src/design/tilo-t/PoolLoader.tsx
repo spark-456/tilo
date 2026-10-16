@@ -15,6 +15,7 @@ export type PoolLoaderProps = {
 const MIN_LOAD_MS = 300;
 const LEAP_MS = 2600;
 const SINK_MS = 2000;
+const RECENT_END_MS = 10_000;
 const SITE_COPY = {
   leap: ["Loading Tilo", "Fetching your workspace"],
   swim: ["Still loading", "The request is still loading"],
@@ -67,19 +68,26 @@ export function PoolLoader(props: PoolLoaderProps) {
   activeRef.current = active;
   const [visible, setVisible] = useState(false);
   const [phase, setPhase] = useState<PoolPhase>("leap");
+  // One play per mount: without it the buffered replay below re-opened the overlay every time it closed.
+  const playedRef = useRef(false);
 
   useEffect(() => {
     if (isTask) {
-      if (!started || visible) return;
+      if (!started || visible || playedRef.current) return;
       if (!active) {
-        // Buffered world.started plus a terminal event plays only when their real event times exceed the 300 ms gate.
+        // Buffered world.started plus a terminal event plays only when their real event times exceed the 300 ms gate,
+        // and only for a run that ended just now; a world opened after it ended shows at once.
         if (!Number.isFinite(recordedDuration) || recordedDuration < MIN_LOAD_MS) return;
+        const endedAt = terminalEvent?.ts ? Date.parse(terminalEvent.ts) : Number.NaN;
+        if (!Number.isFinite(endedAt) || Date.now() - endedAt > RECENT_END_MS) return;
+        playedRef.current = true;
         setPhase("leap");
         setVisible(true);
         return;
       }
       // triggeredBy: world.started (recorded event); short runs cancel this 300 ms reveal.
       const timer = window.setTimeout(() => {
+        playedRef.current = true;
         setPhase("leap");
         setVisible(true);
       }, MIN_LOAD_MS);
@@ -92,7 +100,7 @@ export function PoolLoader(props: PoolLoaderProps) {
       setVisible(true);
     }, MIN_LOAD_MS);
     return () => window.clearTimeout(timer);
-  }, [active, isTask, recordedDuration, started, visible]);
+  }, [active, isTask, recordedDuration, started, terminalEvent, visible]);
 
   useEffect(() => {
     if (!visible || phase !== "leap") return;
@@ -162,6 +170,7 @@ export function PoolLoader(props: PoolLoaderProps) {
                 <div className="tt-pool__buddy tt-pool__buddy--leap tt-pool__leap">
                   <Buddy size={120} mood="happy" />
                 </div>
+                <span className="tt-pool__lip" aria-hidden="true" />
                 <div className="tt-pool__drops" aria-hidden="true">
                   {DROPS.map((drop, i) => (
                     <span
