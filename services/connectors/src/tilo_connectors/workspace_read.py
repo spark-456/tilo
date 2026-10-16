@@ -36,13 +36,28 @@ class _NoArtifacts:  # a read saves nothing
         raise AdapterError("a read has no artifacts")
 
 
+class _Open:
+    """The broker as a read sees it: a person whose disconnect has begun gets no token (as `execute`'s)."""
+
+    def __init__(self, broker: Any, stopped: Callable[[str], bool]) -> None:
+        self._broker, self._stopped = broker, stopped
+
+    def access_token_for_adapter(self, user_id: str, connector: str, **kw: Any) -> str:
+        if self._stopped(user_id):
+            raise NotConnected("the grant is being disconnected")
+        return str(self._broker.access_token_for_adapter(user_id, connector, **kw))
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._broker, name)
+
+
 def invalid_window(request: Mapping[str, Any]) -> bool:
     """WT-02: a `read_events` window that does not end after it starts, or spans over 31 days (or has no offset)."""
     if request["tool"] != "read_events":
         return False
     try:
         window(request["args"]["start"], request["args"]["end"])
-    except ValueError:
+    except (ValueError, OverflowError):
         return True
     return False
 
@@ -56,9 +71,11 @@ def read(
     clock: Callable[[], str],
     emit: Callable[[dict[str, Any]], None],
     parts: Any,
+    stopped: Callable[[str], bool] = lambda user_id: False,
 ) -> dict[str, Any]:
     """The `read_answer` for one request. The caller has captured `parts` (`emit` feeds them) and checked the window."""
     user, tool, args = body["user_id"], body["tool"], body["args"]
+    broker = _Open(broker, stopped)
     connector = TOOLS[tool]
     scopes = declaration["scopes"][next(a["capability"] for a in declaration["actions"] if a["id"] == tool)]
 

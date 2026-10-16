@@ -425,7 +425,7 @@ def remove_meeting(
     if m["status"] != "deleted":
         if m.get("world_id") is not None:  # no world, no artifact: nothing is stored outside a world
             scope = Scope(m["org_id"], m["world_id"], m["owner"])
-            for ref in (m["transcript"], m["minutes"]):
+            for ref in (m["transcript"], m["minutes"], m.get("brief")):  # the brief goes with them (MB-09)
                 if ref is not None:
                     _purge(artifacts, scope, ref["artifact_id"])
             _purge_hosted(artifacts, scope, meeting_id)
@@ -446,7 +446,8 @@ def remove_meeting(
 
 def _purge_hosted(artifacts: ArtifactStore, scope: Scope, meeting_id: str) -> None:
     """FR-MTG-09: the host draft (title, time, invitee addresses) and the receipt of this meeting, found in its world by
-    their own `kind` and `meeting_id`; nothing else in the world is touched."""
+    their own `kind` and `meeting_id`; and (MB-09) every brief version of this meeting, found by its shape and
+    `meeting_id` whether or not the meeting pins it. Nothing else in the world is touched."""
     prefix = f"orgs/{scope.org_id}/worlds/{scope.world_id}/artifacts/"
     for record in artifacts.retention().records():
         if not record.record_id.startswith(prefix) or record.user_id != scope.owner:
@@ -454,8 +455,10 @@ def _purge_hosted(artifacts: ArtifactStore, scope: Scope, meeting_id: str) -> No
         art, _, version = record.record_id[len(prefix) :].partition("/versions/")
         try:
             doc = json.loads(artifacts.read(scope, {"artifact_id": art, "version": int(version)}))
-            hosted = doc["kind"] in ("meeting_event", "meeting_event_receipt") and doc["meeting_id"] == meeting_id
-        except Exception:  # not JSON, not a host document, or unreadable: not ours to purge
+            hosted = doc.get("kind") in ("meeting_event", "meeting_event_receipt") and doc["meeting_id"] == meeting_id
+            # ADR-0047 MB-09: a meeting brief, pinned or not, found by its own shape and its meeting id
+            hosted = hosted or (doc.get("v") == "1.0" and "agenda_points" in doc and doc["meeting_id"] == meeting_id)
+        except Exception:  # not JSON, not a host or brief document, or unreadable: not ours to purge
             continue
         if hosted:
             artifacts.retention().delete(record.record_id)

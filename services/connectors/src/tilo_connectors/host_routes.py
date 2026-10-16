@@ -368,6 +368,7 @@ class HostRuntime:
             return read(
                 body, declaration=_registry().get(WORKSPACE_TOOLS[body["tool"]]), broker=broker, transport=transport,
                 clock=self._clock, emit=self._emit, parts=parts,
+                stopped=self._stopped,
             )  # fmt: skip
 
     def send(self, body: Mapping[str, Any]) -> dict[str, Any]:

@@ -21,11 +21,13 @@ from tilo_people.stores import PeopleStores
 from tilo_api import deps, people_items
 from tilo_api.meeting_bot import attend_meeting
 from tilo_api.meeting_bot_rpc import MeetingBotRpc, get_meeting_bot_client
+from tilo_api.meeting_brief import read_brief
 from tilo_api.meeting_draft_cleanup import get_meeting_draft_cleanup
 from tilo_api.meeting_host import HostSeams, get_host_seams, host_meeting
 from tilo_api.meeting_host_rpc import MeetingHostRpc
 from tilo_api.meeting_join import owner_join
 from tilo_api.meeting_voice_claims import AttendClaims, get_attend_claims
+from tilo_api.owner_minutes_caller import OwnerMinutesCaller, get_owner_minutes_caller
 from tilo_api.people_events import WorkEvents, get_work_events
 from tilo_api.people_limits import idempotent, write_limit
 from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, list_meetings, read_minutes, set_world
@@ -71,7 +73,7 @@ class _PeopleRoute(APIRoute):
     (SEC-10: `write_limit`, before the body is read)."""
 
     def __init__(self, path: str, endpoint: Callable[..., Any], *, dependencies: Any = None, **kwargs: Any) -> None:
-        if "POST" in kwargs.get("methods", ()):
+        if {"POST", "PATCH"} & set(kwargs.get("methods", ())):
             dependencies = [*(dependencies or []), Depends(write_limit)]
         super().__init__(path, endpoint, dependencies=dependencies, **kwargs)
 
@@ -224,6 +226,7 @@ def get_meeting_route(
 
 
 @router.post("/v1/meetings/{meeting_id}/edit")
+@router.patch("/v1/meetings/{meeting_id}")
 def edit_meeting_route(
     meeting_id: str,
     body: Annotated[MeetingEditIn, Depends(json_body(MeetingEditIn))],
@@ -232,7 +235,8 @@ def edit_meeting_route(
     redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> dict[str, Any]:
-    """The owner edits title, series, schedule, agenda and attendees, nothing else (PE-07, PE-19)."""
+    """The owner edits title, series, schedule, agenda and attendees, and the two switches `brief_requested` and
+    `auto_report` (PE-07, PE-19, MB-10), nothing else. `PATCH` is the same edit."""
     if _MEETING_ID.fullmatch(meeting_id) is None:
         raise _not_found()
     return _answer(lambda: edit_meeting(_writer(principal, stores, clock, redact), meeting_id, body))
@@ -251,6 +255,40 @@ def meeting_minutes_route(
     if _MEETING_ID.fullmatch(meeting_id) is None:
         raise _not_found()
     return _answer(lambda: read_minutes(_writer(principal, stores, clock), artifacts, redact, meeting_id))
+
+
+@router.get("/v1/meetings/{meeting_id}/brief")
+def meeting_brief_route(
+    meeting_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """The owner reads the pinned meeting brief; it never makes one (MB-02). No brief yet is 404 `not_ready`."""
+    if _MEETING_ID.fullmatch(meeting_id) is None:
+        raise _not_found()
+    return _answer(lambda: read_brief(_writer(principal, stores, clock), artifacts, redact, meeting_id))
+
+
+@router.post("/v1/meetings/{meeting_id}/brief")
+def make_meeting_brief_route(
+    meeting_id: str,
+    _: Annotated[Empty, Depends(json_body(Empty))],
+    caller: Annotated[OwnerMinutesCaller, Depends(get_owner_minutes_caller)],
+    worlds: Annotated[deps.MeetingWorlds, Depends(deps.get_meeting_worlds)],
+) -> dict[str, Any]:
+    """The owner asks for a brief now: one metered model call, stored and pinned (MB-03). A model error is 503
+    `try_again` with nothing stored; a spent allowance is 429 `allowance_capped`."""
+    if _MEETING_ID.fullmatch(meeting_id) is None:
+        raise _not_found()
+    try:
+        return caller.brief(meeting_id, worlds)
+    except (HTTPException, deps.ReplayOnly):
+        raise
+    except Exception:
+        raise _unreadable() from None
 
 
 @router.post("/v1/meetings/{meeting_id}/world")

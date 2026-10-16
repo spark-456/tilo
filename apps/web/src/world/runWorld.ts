@@ -10,7 +10,7 @@ import type { Event, Layout } from "@tilo/contracts";
 import type { Container } from "pixi.js";
 import { subscribeDensity } from "../display/density";
 import { MAX_DURATION_MS, createChoreographer } from "./choreographer";
-import { type Frame, frameOf } from "./frame";
+import { type Frame, type FrameAgent, type FrameSay, frameOf } from "./frame";
 import { createMobileQuality } from "./mobileQuality";
 import { type WorldState, applyEvent, createInitialState } from "./reducer";
 import {
@@ -26,6 +26,16 @@ import { getSelection, subscribeSelection } from "./selection";
 import { createWorldStore } from "./store";
 
 const MOVE_DURATION_MS = 600; // a plausible walk; HR-3 caps it at MAX_DURATION_MS regardless
+/** How long a handoff note's speech bubble is held, so it can be read before the speaker's next event (WORLD-LIVE). */
+const SAY_DURATION_MS = MAX_DURATION_MS;
+/** Events whose relocation is a walk; every other relocation is a plain placement (no motion). */
+const WALKS: ReadonlySet<string> = new Set([
+  "agent.moved",
+  "meeting.convened",
+  "meeting.adjourned",
+]);
+/** The longest meeting-room turn drawn in a bubble; the Meeting Hall panel keeps all of it. */
+const SAY_MAX = 160;
 const LEAD_IN_MS = 1000; // hold at seq 0 after load before the first event (see startPlayback)
 
 type Trace = ReadonlyArray<{ seq: number; type: string }>;
@@ -41,6 +51,14 @@ interface WorldOptions {
   readonly onTrace: (trace: Trace) => void;
   /** The reducer's run status after each applied event (FR-WLD-07: the veil follows "paused"). */
   readonly onStatus?: (status: Frame["status"]) => void;
+  /** True while events the run already held are folded in: nothing is spoken for a past moment (WORLD-LIVE). */
+  readonly catchingUp?: () => boolean;
+  /** The words of a meeting-room turn (they are not in the event), or null; called when the turn is recorded. */
+  readonly words?: (
+    roomId: string,
+    turn: number,
+    kind: "asked" | "replied",
+  ) => Promise<string | null>;
 }
 
 export interface RunWorldOptions extends WorldOptions {
@@ -80,7 +98,14 @@ function staticView(layer: WorldLayer, o: WorldOptions, events: readonly Event[]
   return {
     show(seq: number) {
       const state = store.stateAt(seq);
-      frame = frameOf(o.layout, state);
+      // WORLD-LIVE: at a recorded moment only the agent that spoke in its last event has a bubble (a note is an
+      // event's, never a lasting state of the world), so a scrub does not pile every earlier note on the stage.
+      const spoke = events.find((e) => e.seq === state.seq)?.actor;
+      const whole = frameOf(o.layout, state);
+      frame = {
+        ...whole,
+        agents: whole.agents.map((a) => (a.id === spoke ? a : { ...a, say: null })),
+      };
       renderStatic(layer, frame);
       places = new Map(frame.agents.map((a) => [a.id, { x: a.cx, y: a.cy }]));
       renderAgents(layer, frame, places);
@@ -120,8 +145,17 @@ function createLive(
   // Professional density has no decorative motion: a walk is drawn as a jump, as under reduced motion.
   const calm = () => reducedMotion() || layer.density() === "professional";
   const choreo = createChoreographer({ reducedMotion: calm });
+  // WORLD-LIVE: a handoff note is held for a readable time by a queue of its own (a bubble is not a walk, so reduced
+  // motion does not cut it), one hold per speaker, in seq order, each starting no earlier than its event was received.
+  const talk = createChoreographer({ reducedMotion: false });
+  // A room's bubbles stay while the room is open (it is a conversation, not a moment); meeting.adjourned ends them.
+  const roomSay = new Map<string, FrameSay>();
+  const spoken = new Map<
+    string,
+    Array<{ seq: number; say: NonNullable<FrameAgent["say"]>; armed: boolean }>
+  >();
   const agentPos = new Map<string, Vec>(); // settled: where each actor's last completed move left it
-  const pendingTo = new Map<number, Vec>(); // by seq: where a queued move lands once it finishes
+  const pendingTo = new Map<string, Vec>(); // by "actor:seq": where a queued move lands once it finishes
   const queued = new Map<string, number>(); // moves enqueued per actor
   const completedCount = new Map<string, number>();
   const walkFrom = new Map<string, { seq: number; from: Vec }>(); // the in-flight move's start
@@ -145,7 +179,7 @@ function createLive(
       const done = choreo.completed(id);
       if (done.length > (completedCount.get(id) ?? 0)) {
         completedCount.set(id, done.length);
-        const to = pendingTo.get(done[done.length - 1] as number);
+        const to = pendingTo.get(`${id}:${done[done.length - 1]}`);
         if (to) agentPos.set(id, to);
       }
       if (done.length < (queued.get(id) ?? 0)) busy = true;
@@ -153,7 +187,7 @@ function createLive(
     const display = new Map(agentPos);
     for (const id of agentIds) {
       const act = choreo.active(id);
-      const to = act && pendingTo.get(act.seq);
+      const to = act && pendingTo.get(`${id}:${act.seq}`);
       const settled = agentPos.get(id);
       if (!act || !to || !settled) continue;
       let walk = walkFrom.get(id);
@@ -169,7 +203,35 @@ function createLive(
       });
     }
     lastDisplay = display;
-    renderAgents(layer, lastFrame, display);
+    // WORLD-LIVE: a note is spoken, and a tool is shown, only once the agent has arrived (its recorded walks are done).
+    const arrived = (id: string) => choreo.completed(id).length >= (queued.get(id) ?? 0);
+    for (const [id, list] of spoken) {
+      for (const hold of list) {
+        if (hold.armed || !arrived(id)) continue;
+        hold.armed = true;
+        talk.enqueue({ actor: id, seq: hold.seq, receivedAtMs: now, durationMs: SAY_DURATION_MS });
+      }
+    }
+    talk.advance(now);
+    const speaking = new Map<string, FrameAgent["say"]>();
+    for (const [id, list] of spoken) {
+      const done = new Set(talk.completed(id));
+      const left = list.filter((hold) => !done.has(hold.seq));
+      spoken.set(id, left);
+      const act = talk.active(id);
+      const current = act ? left.find((hold) => hold.seq === act.seq) : undefined;
+      if (current) speaking.set(id, current.say);
+      if (left.length > 0) busy = true; // a note still waiting for its turn or being read keeps the frames coming
+    }
+    const shown: Frame = {
+      ...lastFrame,
+      agents: lastFrame.agents.map((a) => ({
+        ...a,
+        working: a.working && arrived(a.id),
+        say: speaking.get(a.id) ?? (arrived(a.id) ? (roomSay.get(a.id) ?? null) : null),
+      })),
+    };
+    renderAgents(layer, shown, display);
     renderSelection(layer, lastFrame, display, selected());
     requestRender();
     return busy;
@@ -223,6 +285,7 @@ function createLive(
     apply(event, receivedAtMs) {
       if (stopped || event.seq <= state.seq) return; // duplicate or out of order: ignored
       const wasPaused = paused;
+      const before = state.agents;
       state = applyEvent(state, event, layout);
       paused = state.status === "paused";
       onStatus(state.status);
@@ -246,19 +309,50 @@ function createLive(
           agentPos.set(a.id, { x: a.cx, y: a.cy }); // first reveal: appear instantly, no walk
           continue;
         }
-        if (event.actor !== a.id) continue; // this event doesn't relocate this actor
+        // This event relocates its actor, and, for a meeting room (WORLD-LIVE), every agent it called or sent back.
+        if (event.actor !== a.id && before[a.id]?.location === state.agents[a.id]?.location)
+          continue;
         // HR-3: every location change for an already-visible actor goes through that actor's
         // choreographer queue in seq order (chained by finish time), never straight into
         // agentPos, so a later event can never race an earlier walk still in flight.
-        pendingTo.set(event.seq, { x: a.cx, y: a.cy });
+        pendingTo.set(`${a.id}:${event.seq}`, { x: a.cx, y: a.cy });
         queued.set(a.id, (queued.get(a.id) ?? 0) + 1);
         choreo.enqueue({
           actor: a.id,
           seq: event.seq,
           receivedAtMs,
-          durationMs:
-            event.type === "agent.moved" ? Math.min(MOVE_DURATION_MS, MAX_DURATION_MS) : 0,
+          durationMs: WALKS.has(event.type) ? Math.min(MOVE_DURATION_MS, MAX_DURATION_MS) : 0,
         });
+      }
+      if (event.type === "meeting.adjourned") roomSay.clear(); // the room is over: its bubbles go with it
+      const asked = event.type === "meeting.asked";
+      if ((asked || event.type === "meeting.replied") && o.words && !o.catchingUp?.()) {
+        // The words of a room turn are not in the event (MR-12); they are read from the room when it is recorded.
+        const d = (event.data ?? {}) as { room_id?: unknown; turn?: unknown; to?: unknown };
+        const who = asked ? d.to : event.actor;
+        if (
+          typeof d.room_id === "string" &&
+          typeof d.turn === "number" &&
+          typeof who === "string"
+        ) {
+          o.words(d.room_id, d.turn, asked ? "asked" : "replied").then(
+            (text) => {
+              if (!text || stopped || scrubbed) return;
+              const cut = text.length > SAY_MAX ? `${text.slice(0, SAY_MAX - 1).trimEnd()}…` : text;
+              roomSay.set(who, { text: cut, to: "", head: asked ? "You asked" : "Replied to you" });
+              if (!paused) drawAgents(performance.now());
+            },
+            () => undefined, // no words, no bubble: nothing is made up
+          );
+        }
+      }
+      const say =
+        (event.type === "agent.handoff" || event.type === "agent.assigned") && !o.catchingUp?.()
+          ? frame.agents.find((a) => a.id === event.actor)?.say
+          : null;
+      if (say) {
+        const list = spoken.get(event.actor) ?? [];
+        spoken.set(event.actor, [...list, { seq: event.seq, say, armed: false }]);
       }
       if (drawAgents(receivedAtMs) && !raf) raf = requestAnimationFrame(tickAnim);
       onSeq(state.seq);
@@ -339,6 +433,7 @@ export function runClientWorld(opts: ClientWorldOptions): () => void {
     {
       ...opts,
       reducedMotion: () => catchingUp || opts.reducedMotion(),
+      catchingUp: () => catchingUp,
       onTrace: opts.onTrace ?? (() => undefined),
     },
     { events: () => seen, canScrub: (s) => runEnded(s.status) },

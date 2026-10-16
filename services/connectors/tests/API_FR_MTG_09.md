@@ -162,7 +162,7 @@ sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("ascii")`.
 `not_invited`, `n` is `len(recipients)`):
 `f'Creates "{title}" on the Tilo meeting host\'s Google Calendar, {when} ({time_zone}), with a new Google Meet
 link. Google emails an invitation from the meeting host account to the {n} people listed, you included.
-{skipped}Guests cannot add people or see each other\'s addresses. An invitation cannot be unsent.'` with
+{skipped}Guests cannot add people or see each other\'s addresses. Tilo notetaker joins at the start time and posts a recording notice. An invitation cannot be unsent.'` with
 `skipped = f"{k} attendee{'s' if k != 1 else ''} without a Tilo account {'are' if k != 1 else 'is'} not
 invited. "` when `k > 0`, else `""`.
 

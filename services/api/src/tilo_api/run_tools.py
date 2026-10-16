@@ -29,6 +29,7 @@ from tilo_api.quiz_apps import source_loader
 from tilo_api.report_render import render_report
 from tilo_api.web_tools import FetchTool, RunArchiveBridge, SearchTool, fetch_service, typed_hosts
 from tilo_api.workspace_tools import READS_OF, WorkspaceAccess, WorkspaceUnit
+from tilo_api.xlsx_template import attach_template
 
 FILE_TEXT_CAP = 4000  # characters of one converted upload a run agent reads (the prompt's upstream item cap)
 MAX_FILE_BYTES = 2_000_000  # a stored text or Office upload past this is not read for a run agent
@@ -192,6 +193,8 @@ class BoundRunRunner:
                     ),
                 ),
             )
+        fmt = render_format(unit, context.brief)  # DOCS-OUT A4: an uploaded workbook is filled, not replaced
+        template, context = attach_template(fmt, owner.seams.artifacts, owner.scope, stream, owner.run_id, context)
         models = {role: BoundModel(model, self.budget) for role, model in self.providers.items()}
         fetch = FetchTool(owner, self.service, self.hosts, unit, context, self.sources)
         tools: list[Any] = [SearchTool(self.search, self.hosts), fetch]
@@ -216,7 +219,7 @@ class BoundRunRunner:
             quiz_sources=source_loader(owner.seams.artifacts, owner.scope, owner.store.events[owner.world_id]),
             meter=lambda role, _request, _reply: models[role].take_charge(),
             credit_cap=self.budget.left,
-            report_renderer=partial(render_report, fmt=render_format(unit, context.brief) or "pdf"),
+            report_renderer=partial(render_report, fmt=fmt or "pdf", template=template),
         )
         return await runner.run(unit, context)
 

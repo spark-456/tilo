@@ -53,6 +53,9 @@ class GenerateResponse(BaseModel):  # one generate() result, or one stream() chu
     # PL-02 usage tokens: {"input_tokens", "output_tokens", "total_tokens"}, plus "cached_tokens" (a part of
     # input_tokens) only when the provider reported a cached count; left out means unknown (EFF-04, ADR-0022).
     usage: dict[str, int] | None = None
+    # GOOGLE-MAX: each run of Gemini code execution, `{language, code, outcome, output}` (strings, capped), in order;
+    # None when the request ran no code. The caller shows what was computed; it never has to trust prose about it.
+    code_runs: list[dict[str, str]] | None = None
 
 
 def cached_tokens_or_none(value: Any, input_tokens: Any) -> int | None:

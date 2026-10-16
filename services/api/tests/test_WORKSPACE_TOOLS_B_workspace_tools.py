@@ -204,10 +204,10 @@ def test_WORKSPACE_TOOLS_B_WT03_a_pdf_goes_as_a_native_part_not_as_text(monkeypa
     assert "pdf_b64" not in body and body["name"] == "Lease.pdf"
 
 
-def test_WORKSPACE_TOOLS_B_WT03_a_pdf_the_media_layer_refuses_is_a_fixed_note() -> None:
+def test_WORKSPACE_TOOLS_B_WT03_a_pdf_the_media_layer_refuses_is_a_fixed_note_and_still_owes_its_event() -> None:
     _, unit, tools = make(FakeRpc(answer("ok_read_file_pdf")))  # the fixture's bytes are a header only: no pages
     assert tools["read_file"].run(ARGS["read_file"]).content == NOT_READABLE
-    assert unit._pending == {} or not any(unit._pending.values())
+    assert any(unit._pending.values())  # the read happened, so its event is owed (WT-05)
 
 
 def test_WORKSPACE_TOOLS_B_WT03_connection_parts_of_the_call_reach_the_runs_sink_once_and_only_for_the_owner() -> None:

@@ -156,7 +156,10 @@ def _offset_instant(value: Any) -> datetime:
     moment = datetime.fromisoformat(value) if isinstance(value, str) and len(value) <= _MAX_INSTANT else None
     if moment is None or moment.utcoffset() is None:
         raise ValueError("not an RFC 3339 instant with an offset")
-    return moment.astimezone(UTC)
+    try:
+        return moment.astimezone(UTC)
+    except OverflowError:  # year 9999 with an offset: out of range, so not a window
+        raise ValueError("an instant out of range") from None
 
 
 def _item(event: CalendarEvent) -> dict[str, Any]:

@@ -25,6 +25,13 @@ export function readResult(api: Api, world: string, artifact?: string): Promise<
   return reader ? reader(world, artifact) : Promise.reject(new Error("Result unavailable"));
 }
 
+const OFFICE = "application/vnd.openxmlformats-officedocument.";
+const OFFICE_EXTENSIONS: Readonly<Record<string, string>> = {
+  [`${OFFICE}wordprocessingml.document`]: ".docx",
+  [`${OFFICE}presentationml.presentation`]: ".pptx",
+  [`${OFFICE}spreadsheetml.sheet`]: ".xlsx",
+};
+
 /** Saves a result already read; the file name follows its type. */
 export function saveResult(blob: Blob, world: string): void {
   const url = URL.createObjectURL(blob);
@@ -32,15 +39,18 @@ export function saveResult(blob: Blob, world: string): void {
     const link = document.createElement("a");
     link.href = url;
     const extension =
-      blob.type === "application/pdf"
+      OFFICE_EXTENSIONS[blob.type] ??
+      (blob.type === "application/pdf"
         ? ".pdf"
         : blob.type === "application/json"
           ? ".json"
           : blob.type === "text/markdown"
             ? ".md"
-            : blob.type.startsWith("text/")
-              ? ".txt"
-              : "";
+            : blob.type === "text/csv"
+              ? ".csv"
+              : blob.type.startsWith("text/")
+                ? ".txt"
+                : "");
     link.download = `tilo-result-${world}${extension}`;
     document.body.append(link);
     try {

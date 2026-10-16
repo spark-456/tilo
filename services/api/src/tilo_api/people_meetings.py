@@ -26,8 +26,8 @@ _WORLD = re.compile(r"w_[0-9A-Za-z_]{1,48}")
 
 
 class MeetingEditIn(BaseModel):
-    """The five editable fields, at least one. The defaults are never read: only a field the caller sent counts, so
-    `series` and `scheduled` can be cleared with null and nothing else can."""
+    """The five editable fields and the two switches (MB-10), at least one. The defaults are never read: only a field
+    the caller sent counts, so `series` and `scheduled` can be cleared with null and nothing else can."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
     title: Text = ""
@@ -35,6 +35,8 @@ class MeetingEditIn(BaseModel):
     scheduled: WindowIn | None = None
     agenda: Annotated[list[AgendaIn], Field(max_length=20)] = []
     attendees: Annotated[list[AttendeeIn], Field(max_length=50)] = []
+    brief_requested: bool = False  # the owner's two switches (MB-10): strict booleans, a sent field only, never null
+    auto_report: bool = False
 
     @model_validator(mode="after")
     def _names_one(self) -> MeetingEditIn:
@@ -96,6 +98,9 @@ def edit_meeting(w: Writer, meeting_id: str, body: MeetingEditIn) -> dict[str, A
     if "attendees" in sent:
         known = {a["name"]: a["user"] for a in reversed(m["attendees"])}
         after["attendees"] = meeting_attendees(w, body.attendees, known)
+    for switch in ("brief_requested", "auto_report"):
+        if switch in sent:
+            after[switch] = getattr(body, switch)
     if not conforms("meeting.schema.json", after):
         raise Refusal(422, "invalid_record")
     request = AccessRequest(w.actor, "edit", "meeting", m, w.now)

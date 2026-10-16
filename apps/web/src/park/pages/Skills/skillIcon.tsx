@@ -9,7 +9,7 @@ import {
   Shapes,
   Table2,
   UsersRound,
-} from "lucide-react";
+} from "../../shared/icons";
 import type { Skill } from "../../api/types";
 
 export type SkillIconKind =

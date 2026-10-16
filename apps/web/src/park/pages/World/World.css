@@ -1598,3 +1598,82 @@
   color: var(--heroInk);
   text-decoration: underline;
 }
+
+/* WORLD-LIVE: a real run's map is the live stage, filling the card; the tag, lenses and toast sit over it. */
+[data-park] .park-world-map--live {
+  padding: 0;
+  align-items: stretch;
+  justify-content: stretch;
+}
+[data-park] .park-world-livestage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+[data-park] .park-world-livestage .stage-frame {
+  flex: 1;
+  min-width: 0;
+}
+[data-park] .park-world-livenote {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 20px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 14px;
+}
+[data-park] .park-world-livenote p {
+  margin: 0;
+}
+/* WORLD-LIVE: the labelled delivery spot under the map, and the Result panel's wider dialog. */
+[data-park] .park-world-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--card);
+  color: var(--ink);
+}
+[data-park] .park-world-dockhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+[data-park] .park-world-docktitle {
+  font-size: 14px;
+  font-weight: 800;
+}
+[data-park] .park-world-dockstate {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-world-dockbody {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+[data-park] .park-world-docksummary {
+  flex: 1 1 260px;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+[data-park] .park-world-resultdialog {
+  max-width: 640px;
+  max-height: calc(100vh - 32px);
+}
+[data-park] .park-world-resultpanel-text {
+  max-height: 46vh;
+  overflow: auto;
+}

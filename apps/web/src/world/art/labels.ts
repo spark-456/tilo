@@ -38,3 +38,48 @@ export const islandTag = (name: string) =>
 // Dark text on the neutral policy fill: white on it would be under 4.5:1.
 export const policyTag = () =>
   makePill("Policy", { fill: tokens.color.policy, ink: PALETTE.ink, lip: true });
+
+/** WORLD-LIVE: a speech bubble whose tail tip is at (0, 0) and which grows upward: the receiver's name in bold,
+ * then the real note, wrapped at 170 px. Dark text on the white pill fill (same pair as the building tags). */
+export function makeBubble(to: string, note: string): Container {
+  const head = new Text({
+    text: to,
+    resolution: RES,
+    style: { fontFamily: tokens.font.ui, fontSize: 12, fontWeight: "700", fill: PALETTE.ink },
+  });
+  const body = new Text({
+    text: note,
+    resolution: RES,
+    style: {
+      fontFamily: tokens.font.ui,
+      fontSize: 12,
+      fontWeight: "400",
+      fill: PALETTE.ink,
+      wordWrap: true,
+      wordWrapWidth: 170,
+    },
+  });
+  const [padX, padY, tail] = [8, 6, 7];
+  head.position.set(padX, padY);
+  body.position.set(padX, padY + head.height + 1);
+  const w = Math.max(head.width, body.width) + 2 * padX;
+  const h = padY * 2 + head.height + 1 + body.height;
+  const bg = new Graphics();
+  bg.roundRect(-w / 2, -h - tail, w, h, 8).fill({ color: PALETTE.white });
+  bg.roundRect(-w / 2, -h - tail, w, h, 8).stroke({ width: 1.5, color: PALETTE.pillLine });
+  bg.poly([-5, -tail - 0.75, 5, -tail - 0.75, 0, 0]).fill({ color: PALETTE.white });
+  bg.poly([-5, -tail, 0, 0, 5, -tail]).stroke({ width: 1.5, color: PALETTE.pillLine });
+  head.position.set(-w / 2 + padX, -h - tail + padY);
+  body.position.set(-w / 2 + padX, -h - tail + padY + head.height + 1);
+  const c = new Container();
+  c.addChild(bg, head, body);
+  return c;
+}
+
+/** WORLD-LIVE: the tool icon over a working agent, centred on (0, 0): a ringed disc with a spanner shape, so the
+ * state is a shape and not a colour. Static: it is there because agent.working was recorded, and it does not move. */
+export function drawTool(g: Graphics): void {
+  g.circle(0, 0, 10).fill({ color: PALETTE.white }).stroke({ width: 1.5, color: PALETTE.ink });
+  g.moveTo(-4.5, 4.5).lineTo(2, -2).stroke({ width: 2.6, color: PALETTE.ink, cap: "round" });
+  g.circle(3.6, -3.6, 3.2).stroke({ width: 2, color: PALETTE.ink });
+}

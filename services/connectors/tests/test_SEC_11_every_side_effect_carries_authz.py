@@ -78,7 +78,10 @@ def _declared() -> dict[str, tuple[str, dict]]:
     registry = load_registry(REPO_ROOT / "config" / "connectors.yaml")
     found: dict[str, tuple[str, dict]] = {}
     for connector_id in registry.ids():
-        for action in registry.get(connector_id)["actions"]:
+        declaration = registry.get(connector_id)
+        for action in declaration["actions"]:
+            if declaration["auth"] == "oauth2" and not declaration["scopes"].get(action["capability"]):
+                continue  # FR-UX-18 setup catalogue (Slack, Notion, ...): no scope and no adapter, nothing to execute
             if action["gate_type"] != "none" or action["capability"] not in READ_ONLY_CAPABILITIES:
                 found[action["id"]] = (connector_id, action)
     return found
@@ -174,7 +177,14 @@ def test_SEC_11_the_discovered_side_effect_set_is_consistent_between_config_and_
     for action, (connector, declared) in DECLARED.items():
         assert declared["risk_tier"] == RISK.actions[action], f"{connector}/{action}: config and risk table disagree"
     assert gated <= set(ACTION_TYPES), "a gated connector action is missing from the risk table"
-    assert set(ACTION_TYPES) - set(DECLARED) == {"post_status_update", "share_file", "delete_file", PUSH_ACTION}, (
+    # org_model_key_change (ADR-0041 BK-07) is tilo-api's own T3 route: no connector, no adapter
+    assert set(ACTION_TYPES) - set(DECLARED) == {
+        "post_status_update",
+        "share_file",
+        "delete_file",
+        "org_model_key_change",
+        PUSH_ACTION,
+    }, (
         "an action type changed between 'no connector declares it' and 'a connector declares it': it now needs an "
         "adapter that runs only from the outbox, and the SEC-11 cases below already cover it by name"
     )

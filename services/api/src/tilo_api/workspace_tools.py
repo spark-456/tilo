@@ -21,7 +21,7 @@ import os
 import time
 from collections import defaultdict
 from collections.abc import Callable, Mapping
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +37,7 @@ from tilo_api.meeting_host_rpc import MeetingHostRpc
 logger = logging.getLogger("tilo_api.workspace_tools")
 _SCHEMA = Path(__file__).resolve().parents[4] / "contracts" / "meeting_host_rpc.schema.json"
 MAX_WINDOW = timedelta(days=31)
+_CHAIN_MAX = 25  # person records read to judge one share
 CONNECTOR_OF = {
     "search_email": "gmail", "read_email": "gmail", "read_events": "google_calendar",
     "list_files": "google_drive", "read_file": "google_drive",
@@ -93,11 +94,33 @@ def window_ok(start: str, end: str) -> bool:
     """WT-02: an RFC 3339 window with offsets, ending after it starts, of at most 31 days."""
     try:
         first, last = datetime.fromisoformat(start), datetime.fromisoformat(end)
+        first.astimezone(UTC), last.astimezone(UTC)  # OverflowError for year 9999 with an offset, as connectors refuses
         return (
             first.utcoffset() is not None and last.utcoffset() is not None and timedelta(0) < last - first <= MAX_WINDOW
         )
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return False
+
+
+def _chain(persons: Any, owner: str, teams: set[Any]) -> list[Any] | None:
+    """The owner's person record and, transitively, those of whoever assigned them to one of `teams` (the only records
+    PE-31's membership check reads), at most `_CHAIN_MAX` of them; None when more are needed."""
+    todo, seen, found = [owner], set[str](), []
+    while todo:
+        uid = todo.pop()
+        if uid in seen:
+            continue
+        if len(seen) >= _CHAIN_MAX:
+            return None
+        seen.add(uid)
+        stored = persons.get(deps.ORG_ID, uid)
+        if stored is None:
+            continue
+        found.append(stored.record)
+        for m in stored.record.get("memberships") or []:
+            if isinstance(m, Mapping) and m.get("team") in teams and isinstance(m.get("assigned_by"), Mapping):
+                todo.append(str(m["assigned_by"].get("by")))
+    return found
 
 
 def team_share_in_force(
@@ -112,12 +135,14 @@ def team_share_in_force(
     that with no people store configured at all no share can exist, so none is in force."""
     try:
         people = (stores or deps.get_people_stores)()
-        directory = Directory.of(s.record for s in people.persons.list(deps.ORG_ID))
-        now = clock()
-        return any(
-            in_force(s.record, owner, directory, now)
-            for s in people.world_shares.list(deps.ORG_ID, "world_id", world_id)
-        )
+        shares = people.world_shares.list(deps.ORG_ID, "world_id", world_id)
+        if not shares:
+            return False
+        teams = {s.record.get("team") for s in shares}
+        records = _chain(people.persons, owner, teams)  # the owner and who assigned them to those teams, not the org
+        if records is None:
+            return True  # a chain longer than the bound: cannot be told, so shared
+        return any(in_force(s.record, owner, Directory.of(records), clock()) for s in shares)
     except HTTPException:
         return configured()
     except Exception as exc:  # noqa: BLE001 - the type only
@@ -202,6 +227,8 @@ class WorkspaceUnit:
         if answer.outcome != "ok" or answer.result is None or answer.connected_at is None:
             return ToolResult(note(connector, answer.outcome))
         result = answer.result.model_dump(mode="json")
+        latency = max(0, int((time.monotonic() - started) * 1000))
+        self._pending[args_hash(tool, args)].append((tool, owner, answer.connected_at, latency))  # it happened (WT-05)
         parts: tuple[MediaPart, ...] = ()
         if tool == "read_file" and result["pdf_b64"] is not None:
             try:
@@ -210,8 +237,6 @@ class WorkspaceUnit:
                 logger.warning("a Drive PDF was not readable (%s)", type(exc).__name__)
                 return ToolResult(NOT_READABLE)
             result["pdf"] = "attached as a document"
-        latency = max(0, int((time.monotonic() - started) * 1000))
-        self._pending[args_hash(tool, args)].append((tool, owner, answer.connected_at, latency))
         return ToolResult(json.dumps(result, ensure_ascii=False, separators=(",", ":")), parts=parts)
 
     def _deliver(self, parts: list[Any], user_id: str) -> None:

@@ -16,6 +16,12 @@ export interface AgentState {
   readonly spawned: boolean;
   /** Last building/district/level id the agent was placed at, or null. */
   readonly location: string | null;
+  /** True from agent.working until the agent's next event: the tool icon over it (WORLD-LIVE). */
+  readonly working: boolean;
+  /** The short note of the agent's latest agent.handoff and who got it, until its next event (WORLD-LIVE). */
+  readonly say: { readonly text: string; readonly to: string } | null;
+  /** Where the agent stood before a meeting room called it to the hall; it walks back on meeting.adjourned. */
+  readonly back: string | null;
 }
 
 export interface BuildingState {
@@ -51,6 +57,10 @@ export interface WorldState {
   readonly buildings: Readonly<Record<string, BuildingState>>;
   readonly agents: Readonly<Record<string, AgentState>>;
   readonly gates: Readonly<Record<string, GateState>>;
+  /** The layout's Meeting Hall building, where a convened room gathers (WORLD-LIVE), or null. */
+  readonly hall: string | null;
+  /** Open meeting rooms: room id -> who sits in it, until meeting.adjourned (WORLD-LIVE). */
+  readonly rooms: Readonly<Record<string, readonly string[]>>;
 }
 
 function ids<T extends { id: string }>(items: readonly T[]): string[] {
@@ -72,11 +82,27 @@ export function createInitialState(layout: Layout): WorldState {
   }
   const agents: Record<string, AgentState> = {};
   for (const id of ids(layout.semantic.agents)) {
-    agents[id] = { id, spawned: false, location: null };
+    agents[id] = { id, spawned: false, location: null, working: false, say: null, back: null };
   }
   const gates: Record<string, GateState> = {};
   for (const gate of layout.semantic.gates) gates[gate.id] = "closed";
-  return { seq: 0, trace: [], status: "idle", levels, districts, buildings, agents, gates };
+  const hall =
+    layout.semantic.levels
+      .flatMap((l) => l.districts)
+      .flatMap((d) => d.buildings)
+      .find((b) => b.common_type === "meeting_hall")?.id ?? null;
+  return {
+    seq: 0,
+    trace: [],
+    status: "idle",
+    levels,
+    districts,
+    buildings,
+    agents,
+    gates,
+    hall,
+    rooms: {},
+  };
 }
 
 const BUILDING_STATUS_BY_VERB: Readonly<Record<string, BuildingStatus>> = {
@@ -86,6 +112,19 @@ const BUILDING_STATUS_BY_VERB: Readonly<Record<string, BuildingStatus>> = {
   completed: "completed",
   archived: "archived",
 };
+
+const NOTE_MAX = 140;
+
+/** An agent.handoff's note: the envelope's own summary, else the event's line, cut to one short line. */
+function noteOf(event: Event): { text: string; to: string } | null {
+  const envelope = (event.data as Record<string, unknown> | null)?.envelope as
+    | { summary?: unknown }
+    | undefined;
+  const own = typeof envelope?.summary === "string" ? envelope.summary : "";
+  const raw = own.trim() ? own : event.summary;
+  const text = raw.replace(/\s+/g, " ").trim().slice(0, NOTE_MAX);
+  return text ? { text, to: event.target } : null;
+}
 
 function gateAfter(event: Event, verb: string): GateState | null {
   if (verb === "requested") return "waiting";
@@ -150,9 +189,23 @@ function applyKnown(state: WorldState, event: Event): WorldState {
         const spawnedId = event.target;
         const agent = state.agents[spawnedId];
         if (!agent) return state;
+        // WORLD-LIVE: whoever spawns an agent that already stands somewhere brings it out there.
+        const at = state.agents[event.actor]?.location ?? null;
         return {
           ...state,
-          agents: { ...state.agents, [spawnedId]: { ...agent, spawned: true } },
+          agents: {
+            ...state.agents,
+            [spawnedId]: { ...agent, spawned: true, location: agent.location ?? at },
+          },
+        };
+      }
+      if (verb === "retired") {
+        // The Lead retires a worker: the worker (the target) puts its tool and its note away.
+        const gone = state.agents[event.target];
+        if (!gone) return state;
+        return {
+          ...state,
+          agents: { ...state.agents, [gone.id]: { ...gone, working: false, say: null } },
         };
       }
       // Any other agent.* event: if `actor` is a known agent and `target` resolves to a
@@ -164,11 +217,52 @@ function applyKnown(state: WorldState, event: Event): WorldState {
         event.target in state.buildings ||
         event.target in state.districts ||
         event.target in state.levels;
-      if (!isLocation) return state;
-      return {
-        ...state,
-        agents: { ...state.agents, [agent.id]: { ...agent, location: event.target } },
+      // The actor's own next event ends its last note and tool (WORLD-LIVE: both exist only because an event said so).
+      const next: AgentState = {
+        ...agent,
+        working: verb === "working",
+        say: verb === "handoff" || verb === "assigned" ? noteOf(event) : null,
+        location: isLocation ? event.target : agent.location,
       };
+      return { ...state, agents: { ...state.agents, [agent.id]: next } };
+    }
+    case "meeting": {
+      // WORLD-LIVE: a person's room (meeting.convened .. meeting.adjourned). Its agents gather in the layout's Meeting
+      // Hall and go back to where they stood when it closes; with no hall in the layout nobody moves (nothing guessed).
+      const data = (event.data ?? {}) as { room_id?: unknown; lead?: unknown; agents?: unknown };
+      const room = typeof data.room_id === "string" ? data.room_id : null;
+      if (room === null) return state;
+      if (verb === "convened") {
+        if (state.hall === null || room in state.rooms) return state;
+        const named = [data.lead, ...(Array.isArray(data.agents) ? data.agents : [])];
+        const members = named.filter(
+          (id): id is string => typeof id === "string" && id in state.agents,
+        );
+        const agents = { ...state.agents };
+        for (const id of members) {
+          const agent = agents[id] as AgentState;
+          agents[id] = {
+            ...agent,
+            back: agent.back ?? agent.location,
+            location: state.hall,
+            working: false,
+            say: null,
+          };
+        }
+        return { ...state, agents, rooms: { ...state.rooms, [room]: members } };
+      }
+      if (verb === "adjourned") {
+        const members = state.rooms[room];
+        if (!members) return state;
+        const agents = { ...state.agents };
+        for (const id of members) {
+          const agent = agents[id] as AgentState;
+          agents[id] = { ...agent, location: agent.back ?? agent.location, back: null, say: null };
+        }
+        const { [room]: _closed, ...rest } = state.rooms;
+        return { ...state, agents, rooms: rest };
+      }
+      return state;
     }
     case "approval":
     case "policy": {

@@ -15,7 +15,6 @@ from collections.abc import Iterable, Iterator, Mapping
 from datetime import UTC
 from email.header import decode_header, make_header
 from email.message import EmailMessage
-from html.parser import HTMLParser
 from typing import Any
 
 from .._time import format_ts
@@ -259,32 +258,53 @@ class GmailAdapter(GoogleAdapter):
             msg["References"] = " ".join(_MSG_ID.findall(headers.get("references", ""))[-20:] + last_id)  # bounded
 
 
-class _Strip(HTMLParser):
-    """HTML to text with the standard library only: scripts and styles dropped, block ends become line breaks."""
-
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=True)
-        self.out: list[str] = []
-        self._skip = 0
-
-    def handle_starttag(self, tag: str, attrs: Any) -> None:
-        self._skip += tag in _HIDDEN_TAGS
-        self.out.append("\n" if tag in _BREAK_TAGS else "")
-
-    def handle_endtag(self, tag: str) -> None:
-        self._skip = max(0, self._skip - (tag in _HIDDEN_TAGS))
-        self.out.append("\n" if tag in _BREAK_TAGS else "")
-
-    def handle_data(self, data: str) -> None:
-        if not self._skip:
-            self.out.append(data)
+_TAG = re.compile(r"</?([A-Za-z][A-Za-z0-9]{0,15})")
 
 
 def _text_of_html(markup: str) -> str:
-    parser = _Strip()
-    parser.feed(markup[:_HTML_SCAN])
-    parser.close()
-    return re.sub(r"\n\s*\n+", "\n\n", "".join(parser.out)).strip()
+    """HTML to text in one linear pass of `str.find` (not `HTMLParser`, whose tag and comment scanning backtracks on
+    hostile input): comments, scripts, styles, head and title are dropped, block tags become line breaks, entities are
+    decoded. Every step moves forward or stops, so the cost is linear in the (capped) input."""
+    doc = markup[:_HTML_SCAN]
+    low = doc.lower()
+    out: list[str] = []
+    i = 0
+    while i < len(doc):
+        j = doc.find("<", i)
+        if j == -1:
+            out.append(doc[i:])
+            break
+        out.append(doc[i:j])
+        if doc.startswith("<!--", j):
+            k = doc.find("-->", j + 4)
+            if k == -1:
+                break
+            i = k + 3
+            continue
+        tag = _TAG.match(doc, j)
+        if tag is None:
+            if doc.startswith(("<!", "<?", "</"), j):  # a doctype, an instruction or a stray end tag
+                k = doc.find(">", j)
+                if k == -1:
+                    break
+                i = k + 1
+            else:  # a lone "<" is doc
+                out.append("<")
+                i = j + 1
+            continue
+        k = doc.find(">", tag.end())
+        if k == -1:
+            break
+        name, i = tag.group(1).lower(), k + 1
+        if name in _BREAK_TAGS:
+            out.append("\n")
+        if name in _HIDDEN_TAGS and doc[j + 1] != "/":  # drop everything up to its end tag
+            end = low.find("</" + name, i)
+            close = doc.find(">", end) if end != -1 else -1
+            if close == -1:
+                break
+            i = close + 1
+    return re.sub(r"\n\s*\n+", "\n\n", html.unescape("".join(out))).strip()
 
 
 def _line(value: str, cap: int) -> str:

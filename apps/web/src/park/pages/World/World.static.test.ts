@@ -256,6 +256,8 @@ describe("WEB_6_static: imports", () => {
           bad.push(`${rel(p)} imports another page: ${spec}`);
           continue;
         }
+        // WORLD-LIVE: the one lazy chunk that draws a real run with the live stage (see park.static.test.ts).
+        if (target.replaceAll("\\", "/").endsWith("/src/worldView/LiveStageEmbed")) continue;
         if (!target.startsWith(PARK)) bad.push(`${rel(p)} imports outside park/: ${spec}`);
       }
     }

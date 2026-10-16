@@ -18,11 +18,14 @@ from typing import Any
 from tilo_providers.diagnostics import log_caught
 from tilo_render.pdf import render_pdf
 from tilo_render.spec import DeliverableSpec
+from tilo_render.xlsx import MAX_FILL_CELLS, FillCell
 
 from tilo_harness.outputs import MAX_PDF, RenderedPdf
 
 MAX_REPLY = 500_000  # characters of the writer's reply (the spec's own limits keep a real report far below this)
 PDF_FORMAT = "pdf"
+TEMPLATE_ID = "xlsx_template"  # the upstream item that carries an uploaded workbook's layout (DOCS-OUT A4)
+RENDERED_FORMATS = ("pdf", "pptx", "docx", "xlsx")  # DOCS-OUT: the formats the final writer's spec becomes
 _REASONS = {
     "too_large": "the reply is too long",
     "not_json": "the reply is not one JSON object",
@@ -58,9 +61,7 @@ def render_format(unit: Mapping[str, Any], brief: Mapping[str, Any] | None) -> s
     first = items[0] if isinstance(items, list) and items else None
     fmt = first.get("format") if isinstance(first, Mapping) else None
     return (
-        fmt
-        if unit.get("role") == "writer" and unit.get("unit_type") == "deliver" and fmt in ("pdf", "pptx", "docx")
-        else None
+        fmt if unit.get("role") == "writer" and unit.get("unit_type") == "deliver" and fmt in RENDERED_FORMATS else None
     )
 
 
@@ -79,23 +80,51 @@ def _constant(_name: str) -> Any:
     raise ValueError("NaN and Infinity are not JSON")
 
 
-def parse_spec(reply: Any) -> DeliverableSpec:
-    """The reply as a validated DeliverableSpec, or DeliverableRefused."""
+def _json_object(reply: Any) -> Any:
+    """The reply as one parsed JSON object, or DeliverableRefused (too_large, not_json)."""
     if not isinstance(reply, str) or len(reply) > MAX_REPLY:
         raise DeliverableRefused("too_large")
     text = reply.strip()
     if not (text.startswith("{") and text.endswith("}")):  # a fence or any text around the object is refused
         raise DeliverableRefused("not_json")
     try:
-        data = json.loads(text, object_pairs_hook=_object, parse_constant=_constant)
+        return json.loads(text, object_pairs_hook=_object, parse_constant=_constant)
     except (ValueError, RecursionError) as caught_error:  # includes JSONDecodeError and the int-digits limit
         log_caught(caught_error, __name__, locals())
         raise DeliverableRefused("not_json") from None
+
+
+def parse_spec(reply: Any) -> DeliverableSpec:
+    """The reply as a validated DeliverableSpec, or DeliverableRefused."""
+    data = _json_object(reply)
     try:
         return DeliverableSpec.model_validate(data)
     except Exception as caught_error:  # noqa: BLE001 - pydantic's message echoes the input
         log_caught(caught_error, __name__, locals())
         raise DeliverableRefused("invalid_spec") from None
+
+
+def parse_fill(reply: Any) -> tuple[FillCell, ...]:
+    """DOCS-OUT A4: a template fill reply, exactly `{"cells": [{sheet, cell, value}, ...]}`, or DeliverableRefused."""
+    data = _json_object(reply)
+    try:
+        if not isinstance(data, dict) or set(data) != {"cells"} or not isinstance(data["cells"], list):
+            raise ValueError("not a fill")
+        if not 0 < len(data["cells"]) <= MAX_FILL_CELLS:
+            raise ValueError("bad count")
+        return tuple(FillCell.model_validate(item) for item in data["cells"])
+    except Exception as caught_error:  # noqa: BLE001 - pydantic's message echoes the input
+        log_caught(caught_error, __name__, locals())
+        raise DeliverableRefused("invalid_spec") from None
+
+
+def prompt_name(unit: Mapping[str, Any], context: Any) -> str:
+    """The writer prompt for a unit: a deliver unit writes a spec, or cells for a template the person uploaded."""
+    brief = context.brief
+    if not wants_rendered(unit, brief):
+        return "unit.md"
+    has_template = any(item.unit_id == TEMPLATE_ID for item in context.upstream)
+    return "unit_xlsx_fill.md" if render_format(unit, brief) == "xlsx" and has_template else "unit_pdf.md"
 
 
 def render_output(reply: Any) -> RenderedPdf:
