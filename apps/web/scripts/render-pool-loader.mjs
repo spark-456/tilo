@@ -36,9 +36,9 @@ try {
     const dy = Math.round(Math.sin(angle) * radius * 1.2 - 30);
     return `<span class="tt-pool__drop" style="--dx:${dx}px;--dy:${dy}px;--tt-drop-delay:${2.236 + (i % 4) * 0.03}s;left:${50 + (i % 3) * 2}%;top:50%;width:${i % 3 ? 10 : 14}px;height:${i % 3 ? 13 : 18}px;background:${i % 4 ? "#9fcfe0" : "#fff"}"></span>`;
   }).join("");
-  const water = `<div class="tt-pool__water"><span class="tt-pool__ring tt-pool__ring--one"></span><span class="tt-pool__ring tt-pool__ring--two"></span><span class="tt-pool__ring tt-pool__ring--three"></span></div>`;
+  const water = `<div class="tt-pool__water"></div>`;
   const leap = `${water}<span class="tt-pool__shadow"></span><div class="tt-pool__buddy tt-pool__buddy--leap tt-pool__leap">${happy}</div><span class="tt-pool__lip" aria-hidden="true"></span><div class="tt-pool__drops">${drops}<span class="tt-pool__splash"></span></div>`;
-  const sink = `<div class="tt-pool__water tt-pool__water--closing"></div><div class="tt-pool__buddy tt-pool__buddy--sink tt-pool__sink-buddy">${swim}</div><span class="tt-pool__sink-ripple"></span>`;
+  const sink = `${water}<span class="tt-pool__lip" aria-hidden="true"></span><div class="tt-pool__buddy tt-pool__buddy--sink tt-pool__sink-buddy">${swim}</div><span class="tt-pool__sink-ripple"></span>`;
   browser = await chromium.launch({ headless: true, channel: "chrome" });
   const page = await browser.newPage({
     viewport: { width: 380, height: 280 },
@@ -56,7 +56,9 @@ try {
       (ms) => {
         for (const animation of document.getAnimations()) {
           animation.pause();
-          animation.currentTime = ms;
+          animation.currentTime = animation.effect?.target?.matches?.(".tt-pool__water, .tt-pool__lip")
+            ? 500
+            : ms;
         }
       },
       (i < 26 ? i : i - 26) * 100,
@@ -65,7 +67,7 @@ try {
       path: join(frames, `${String(i).padStart(3, "0")}.png`),
       omitBackground: true,
     });
-    if (i === 7) await page.screenshot({ path: join(frames, "still.png"), omitBackground: true });
+    if (i === 30) await page.screenshot({ path: join(frames, "still.png"), omitBackground: true });
   }
   const source = join(frames, "%03d.png");
   const target = join(frames, "pool.webp");

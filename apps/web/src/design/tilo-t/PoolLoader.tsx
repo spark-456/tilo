@@ -15,8 +15,8 @@ const LEAP_MS = 2600;
 const SINK_MS = 2000;
 const RECENT_END_MS = 10_000;
 const LOOP_MS = LEAP_MS + SINK_MS;
-const ASSET = "/loader/pool-c1bfe0ad6d7a.webp";
-const STILL = "/loader/pool-77eb84806e83.png";
+const ASSET = "/loader/pool-46a6cd3d6b84.webp";
+const STILL = "/loader/pool-9182ba9a51a9.png";
 const SITE_COPY = {
   leap: ["Loading Tilo", "Fetching your workspace"],
   swim: ["Still loading", "The request is still loading"],
