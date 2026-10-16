@@ -6,6 +6,19 @@ import { HttpClient, TiloApiError, displayApiError } from "./http";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 
+it("test_MI_01_memory_error_sentences_are_pinned_and_human_readable", () => {
+  const expected = {
+    memory_full: "Your memory is full. Remove a note before adding another.",
+    safety_unavailable: "Tilo cannot check this note right now. Try again in a moment.",
+    event_unavailable: "We could not record this note, so it was not saved. Try again.",
+  };
+  for (const [code, sentence] of Object.entries(expected)) {
+    expect(displayApiError(new TiloApiError("private server text", 503, false, false, code))).toBe(
+      sentence,
+    );
+  }
+});
+
 // Contract-fixed refusals propagated through connector/model-key RPCs or returned in
 // page data. Keep the wire words and their contract together; never change contracts
 // to make this coverage check pass. The enum assertion also catches new fixed codes.

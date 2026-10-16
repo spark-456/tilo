@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 import unicodedata
 from typing import Annotated, Any
@@ -14,6 +13,7 @@ from tilo_providers.interfaces import SafetyProvider
 
 from tilo_api import deps, ephemeral, events
 from tilo_api.memory_store import FirestoreMemoryStore, InMemoryMemoryStore, MemoryFull
+from tilo_api.people_limits import write_limit
 
 router = APIRouter()
 _ID = re.compile(r"mem_[0-9A-Za-z_]{1,48}\Z")
@@ -24,7 +24,7 @@ _NOT_FOUND = HTTPException(status_code=404, detail="not_found")
 def get_memory_store(request: Request) -> Any:
     if (demo := ephemeral.for_request(request)) is not None:
         return demo._once("memory", InMemoryMemoryStore)
-    if "K_SERVICE" not in os.environ and "CLOUD_RUN_JOB" not in os.environ:
+    if not deps.enforced():
         return _DEV_STORE
     stores = deps.get_people_stores(request)
     client = getattr(stores.work_items, "_client", None)
@@ -96,6 +96,16 @@ def _safe_text(value: Any, safety: SafetyProvider, redactor: Any) -> str:
 
 
 async def _body(request: Request, schema: str, safety: SafetyProvider, redactor: Any) -> dict[str, Any]:
+    declared_length = request.headers.get("content-length")
+    if declared_length is not None:
+        try:
+            parsed_length = int(declared_length)
+        except ValueError as exc:
+            raise HTTPException(400, "invalid_content_length") from exc
+        if parsed_length < 0:
+            raise HTTPException(400, "invalid_content_length")
+        if parsed_length > 4096:
+            raise HTTPException(413, "body_too_large")
     chunks: list[bytes] = []
     size = 0
     async for chunk in request.stream():
@@ -108,7 +118,7 @@ async def _body(request: Request, schema: str, safety: SafetyProvider, redactor:
         import json
 
         body = json.loads(raw)
-    except (ValueError, UnicodeDecodeError) as exc:
+    except (ValueError, UnicodeDecodeError, RecursionError) as exc:
         raise HTTPException(422, "body") from exc
     if not isinstance(body, dict):
         raise HTTPException(422, "body")
@@ -141,7 +151,7 @@ def list_memory(principal: Principal, store: Store) -> dict[str, Any]:
     return {"items": _call(lambda: store.list(deps.ORG_ID, principal.user_id))}
 
 
-@router.post("/v1/memory")
+@router.post("/v1/memory", dependencies=[Depends(write_limit)])
 async def create_memory(
     request: Request,
     principal: Principal,
@@ -164,7 +174,7 @@ async def create_memory(
     return JSONResponse(status_code=201 if created else 200, content=item)
 
 
-@router.patch("/v1/memory/{item_id}")
+@router.patch("/v1/memory/{item_id}", dependencies=[Depends(write_limit)])
 async def change_memory(
     item_id: str,
     request: Request,

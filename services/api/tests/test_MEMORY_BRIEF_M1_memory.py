@@ -182,3 +182,47 @@ def test_MI_01_demo_uses_session_memory_even_when_deployed(monkeypatch):
     first = memory_routes.get_memory_store(object())
     assert first is memory_routes.get_memory_store(object())
     assert isinstance(first, InMemoryMemoryStore)
+
+
+def test_MI_01_deep_json_body_is_a_422_not_a_server_error():
+    import asyncio
+
+    from fastapi import HTTPException
+    from starlette.requests import Request
+    from tilo_api.memory_routes import _body
+
+    raw = b"[" * 4000
+
+    async def run():
+        sent = False
+
+        async def receive():
+            nonlocal sent
+            if sent:
+                return {"type": "http.request", "body": b"", "more_body": False}
+            sent = True
+            return {"type": "http.request", "body": raw, "more_body": False}
+
+        request = Request({"type": "http", "method": "POST", "path": "/v1/memory", "headers": []}, receive)
+
+        class Safety:
+            def check(self, text):
+                return {"flagged": False}
+
+        try:
+            await _body(request, "create", Safety(), lambda text: text)
+        except HTTPException as exc:
+            return exc.status_code
+        return 200
+
+    assert asyncio.run(run()) == 422
+
+
+def test_MI_01_memory_store_uses_the_enforced_policy_helper(monkeypatch):
+    from tilo_api import deps, memory_routes
+
+    monkeypatch.setenv("K_SERVICE", "set")
+    monkeypatch.setattr(memory_routes.ephemeral, "for_request", lambda request: None)
+    monkeypatch.setattr(deps, "enforced", lambda: False)
+    monkeypatch.setattr(deps, "get_people_stores", lambda request: pytest.fail("unexpected durable store"))
+    assert memory_routes.get_memory_store(object()) is memory_routes._DEV_STORE
