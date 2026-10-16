@@ -28,9 +28,14 @@ it("CX_PAGES_ENRICH_TEAM_only_shows_columns_with_recorded_values", () => {
   );
   expect([...m.container.querySelectorAll("th")].map((th) => th.textContent)).toEqual(["Person"]);
   expect(m.container.textContent).not.toContain("Not available");
+  expect(m.container.textContent).not.toContain("u_a");
+  expect(m.container.textContent).toContain("Your card");
+  expect(m.container.textContent).toContain("Shared worlds");
 });
 
 it("CX_PAGES_ENRICH_TEAM_empty_directory_guides_an_invite", () => {
   const m = mount(<LiveMembers team={{ ...team, people: [] }} />);
-  expect(m.container.textContent).toContain("invite people by email");
+  expect(m.container.querySelector("thead")).not.toBeNull();
+  expect(m.container.textContent).toContain("Invite a teammate");
+  expect(m.container.textContent).toContain("Shared worlds");
 });
