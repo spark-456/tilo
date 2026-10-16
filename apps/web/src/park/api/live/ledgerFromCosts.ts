@@ -13,10 +13,10 @@ export interface CostGroupRow {
 
 /** The part of the `cost_report` this mapper reads. */
 export interface CostReport {
-  totals: { usd: number };
+  totals: { usd: number; credits?: number };
   by_profile: readonly CostGroupRow[];
   by_task_type: readonly CostGroupRow[];
-  tasks?: readonly { run_id: string; usd: number; completed: boolean }[];
+  tasks?: readonly { run_id: string; usd: number; credits?: number; completed: boolean }[];
   approval_waits?: readonly { action_type: string; seconds: number }[];
   activity?: readonly {
     world_id: string;
@@ -28,12 +28,35 @@ export interface CostReport {
   }[];
 }
 
-const UNLABELLED = "Unlabelled";
-
-const rowsOf = (
-  groups: readonly CostGroupRow[],
-  label: "profile" | "task_type",
-): [string, number][] => groups.map((g) => [g[label] ?? UNLABELLED, g.usd]);
+/** The report has task types, not model roles; only known types get a named cost line. */
+const workLabel = (type: string | null | undefined): string => {
+  switch (type) {
+    case "research":
+    case "search":
+    case "web_search":
+      return "Web search";
+    case "safety":
+    case "policy":
+    case "guard":
+      return "Safety checks";
+    case "draft":
+    case "summarise":
+    case "summary":
+    case "plan":
+    case "quick_answer":
+      return "Planning and writing";
+    default:
+      return "Other work";
+  }
+};
+const workRows = (groups: readonly CostGroupRow[]): [string, number][] => {
+  const amounts = new Map<string, number>();
+  for (const group of groups) {
+    const name = workLabel(group.task_type);
+    amounts.set(name, (amounts.get(name) ?? 0) + group.usd);
+  }
+  return [...amounts];
+};
 
 export function ledgerFromCosts(report: CostReport): Ledger {
   const waits = report.approval_waits ?? [];
@@ -54,31 +77,32 @@ export function ledgerFromCosts(report: CostReport): Ledger {
       k: pending ? "waiting" : e.type === "approval.requested" ? "request" : "answer",
       ...(pending ? { dec: key } : {}),
       what: e.summary,
-      sub: e.run_id,
+      sub: "",
       amt: "",
       detail: [
         ["Event", e.type],
         ["Recorded at", e.ts],
-        ["Run", e.run_id],
       ] as [string, string][],
     };
   });
   return {
     budget: 0,
     spent: report.totals.usd,
+    ...(typeof report.totals.credits === "number" ? { totalCredits: report.totals.credits } : {}),
     forecast: 0,
     daily: [],
     by: {
       world: { head: "", rows: [] },
-      tool: { head: "", rows: rowsOf(report.by_profile, "profile") },
-      role: { head: "", rows: rowsOf(report.by_task_type, "task_type") },
+      tool: { head: "", rows: [] },
+      role: { head: "Recorded work", rows: workRows(report.by_task_type) },
     },
     tx: [],
     runs: [],
-    recordedRuns: (report.tasks ?? []).map(({ run_id, usd, completed }) => ({
+    recordedRuns: (report.tasks ?? []).map(({ run_id, usd, completed, credits }) => ({
       id: run_id,
       usd,
       completed,
+      ...(typeof credits === "number" ? { credits } : {}),
     })),
     waits: {
       buckets: waits.length

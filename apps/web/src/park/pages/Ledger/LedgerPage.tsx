@@ -184,24 +184,16 @@ function PersonalLedgerPage({ app }: LedgerPageProps) {
         </div>
       ) : null}
 
-      {part(3) && (L.runs.length > 0 || hasWaits(L) || L.recordedRuns !== undefined) ? (
+      {part(3) && (L.runs.length > 0 || hasWaits(L) || !!L.recordedRuns?.length) ? (
         <div className="park-ledger-pair">
           {L.runs.length > 0 ? <CostPerRun L={L} go={app.go} /> : null}
-          {L.recordedRuns !== undefined ? <RecordedRuns L={L} /> : null}
+          {L.recordedRuns?.length ? <RecordedRuns L={L} /> : null}
           {hasWaits(L) ? <ApprovalWaits L={L} app={app} /> : null}
-          {L.recordedRuns !== undefined && !hasWaits(L) ? (
-            <p className="park-ledger-sub">No completed approval waits recorded yet.</p>
-          ) : null}
         </div>
       ) : null}
 
       {part(4) && (L.memory.length > 0 || L.hours.length > 0) ? <GaveBack L={L} /> : null}
-      {part(4) && L.recordedRuns !== undefined && !L.memory.length && !L.hours.length ? (
-        <p className="park-ledger-sub">
-          Memory savings by week and hours handed back are not available yet.
-        </p>
-      ) : null}
-      {part(5) && (L.activity.length > 0 || L.recordedRuns !== undefined) ? (
+      {part(5) && L.activity.length > 0 ? (
         <Activity L={L} decisions={state.decisions} app={app} />
       ) : null}
     </Frame>
