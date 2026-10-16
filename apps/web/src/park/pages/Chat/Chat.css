@@ -110,23 +110,27 @@
   left: 50%;
   transform: translateX(-50%);
 }
-[data-park] .park-chat-scene__top {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  right: 16px;
+[data-park] .park-chat-scene-controls {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
 }
-[data-park] .park-chat-scene__top .park-seg {
+[data-park] .park-chat-scene-controls .park-seg {
+  width: 100%;
   border-radius: 12px;
   background: var(--card);
   box-shadow: var(--sh, 0 1px 2px rgba(0, 0, 0, 0.12));
 }
+[data-park] .park-chat-scene-controls .park-seg__item {
+  flex: 1;
+  min-width: 0;
+  padding-inline: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
 [data-park] .park-chat-status {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 16px;
+  position: relative;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -186,6 +190,16 @@
   max-width: 360px;
   color: var(--ink2);
   font-size: 15px;
+}
+[data-park] .park-chat-intro__prompts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+[data-park] .park-chat-intro__prompt {
+  cursor: pointer;
 }
 [data-park] .park-chat-pair {
   display: flex;
@@ -372,9 +386,8 @@
   [data-park] .park-chat-mode {
     display: none;
   }
-  [data-park] .park-chat-scene__top .park-seg {
+  [data-park] .park-chat-scene-controls .park-seg {
     max-width: 100%;
-    overflow-x: auto;
   }
 }
 [data-park] .park-chat-grid {
