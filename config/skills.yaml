@@ -16,3 +16,23 @@ trust:
 # TS-07: an event trigger's type must be on this list (and registered); the runner's daily cap is a later slice.
 triggers:
   event_types: [meeting.minuted, work_item.created, world.completed]
+
+# FR-SKL-02, TS-20 (ADR-0051 decision A): the tools a taught step may use, connector -> actions. A step the model
+# proposes outside this list, or that config/connectors.yaml does not declare, is dropped to "Tilo can't do this yet"
+# (the declared-only rule is code, never the model). browse_web stays unusable until config/connectors.yaml declares it
+# (ticket B1c); render outputs arrive with their own ticket. No model id belongs here.
+capture:
+  tools:
+    gmail: [read_email, search_email, create_draft, send_email]
+    google_drive: [read_file, list_files, save_file, save_as_google_file]
+    google_calendar: [read_events, create_event, create_event_with_guests]
+    web: [web_search, fetch_url, browse_web]
+    slack: [read_slack]
+    notion: [read_notion]
+    github: [read_github]
+    xero: [read_xero]
+    hubspot: [read_hubspot]
+    stripe: [read_stripe]
+    microsoft365: [read_microsoft365]
+    jira: [read_jira]
+    bamboohr: [read_bamboohr]

@@ -48,12 +48,14 @@ profiles:
     provider: fake
     model: fake-specialist
     context: 1000000
-    caps: [json]
+    caps: [json, vision, video, documents]
+    media_tokens: { image: 1120, pdf_page: 1120, audio_per_second: 25, video_per_second: 258 }
 
 roles:
   embed: { primary: embed-fake, fallback: embed-fake } # RT-05
   director: { primary: director-dev, fallback: director-dev }
   specialist: { primary: specialist-fake, fallback: specialist-fake, max_input_tokens: 16000, max_output_tokens: 2048 }
+  skill_capture: { primary: specialist-fake, fallback: specialist-fake, max_output_tokens: 2048 } # ADR-0051 S1; no input cap: a recording is read as media (S2)
   safety: { primary: safety-fake, fallback: safety-fake } # screens use the primary only
   eval_judge: { primary: eval-fake, fallback: eval-fake } # judged with the primary only: one judge per run
   search: { primary: search-fake, fallback: search-fake, max_input_tokens: 8000, max_output_tokens: 4096, reserve_units: 5 }

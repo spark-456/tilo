@@ -84,6 +84,7 @@ def test_PRD_6_4_shipped_config_loads(repo_root):
         "lead",
         "lead_review",  # services/harness/src/tilo_harness/lead_review.py
         "specialist",
+        "skill_capture",  # ADR-0051 S1 / ADR-0034 decision 3: describe, upload and record (TS-20)
         "verifier",
         "writer",
         "narrator",

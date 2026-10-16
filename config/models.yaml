@@ -70,6 +70,11 @@ roles:
   # Router sends 1024 (BQ-63) and the model's own thinking uses all of it, so a role that writes a document or a research
   # note states a cap that fits thinking plus the text, and thinks little.
   specialist: { primary: lite-31, fallback: flash-37, thinking: low, max_output_tokens: 8192 } # EFF-02: cheapest first
+  # ADR-0034 decision 3 / ADR-0051 decision A (TS-20): the one understanding step for describe, upload and record. It
+  # reads typed words, documents and (S2) a recording as delimited data, so both profiles declare json, vision, video and
+  # documents; lite-31 carries an audio_input price, flash-37 does not (a recording with sound is read only by a profile
+  # that has one). max_output_tokens fits thinking plus the JSON reply. The user picks the final models and prices.
+  skill_capture: { primary: lite-31, fallback: flash-37, thinking: low, max_output_tokens: 8192 }
   verifier: { primary: flash-38, fallback: flash-37, thinking: high, max_input_tokens: 100000, max_output_tokens: 16384 }
   writer: { primary: flash-38, fallback: flash-37, thinking: low, max_output_tokens: 16384 }
   narrator: { primary: lite-31, fallback: flash-37, max_output_tokens: 4096 } # fallback added for NFR-25 (BQ-18)
