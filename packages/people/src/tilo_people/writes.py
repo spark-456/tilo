@@ -56,7 +56,10 @@ _MAY: dict[tuple[str, str], frozenset[str]] = {
     ("pinboard_item", "confirm"): frozenset({"status", "confirmed_by", "history", "updated_at"}),
     ("calendar_entry", "edit"): frozenset({"title", "start", "end", "all_day", "share", "state", "updated_at"}),
     ("calendar_entry", "confirm"): frozenset({"state", "confirmed_by", "updated_at"}),
-    ("meeting", "edit"): frozenset({"title", "series", "scheduled", "agenda", "attendees"}),
+    # ADR-0047 MB-10: the owner's two switches ride the same edit; `brief` is tilo-api's alone and is never in a request
+    ("meeting", "edit"): frozenset(
+        {"title", "series", "scheduled", "agenda", "attendees", "brief_requested", "auto_report"}
+    ),
     ("meeting", "confirm"): frozenset({"minutes_confirmed_by"}),
     ("mention", "untag"): frozenset({"removed"}),
     ("person", "assign_membership"): frozenset({"memberships"}),

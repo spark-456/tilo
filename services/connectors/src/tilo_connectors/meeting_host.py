@@ -121,6 +121,7 @@ def _exact(title: str, when: str, zone: str, recipients: int, not_invited: int) 
         f'Creates "{title}" on the Tilo meeting host\'s Google Calendar, {when} ({zone}), with a new Google Meet '
         f"link. Google emails an invitation from the meeting host account to the {recipients} people listed, "
         f"you included. {skipped}Guests cannot add people or see each other's addresses. "
+        "Tilo notetaker joins at the start time and posts a recording notice. "
         "An invitation cannot be unsent."
     )
 
