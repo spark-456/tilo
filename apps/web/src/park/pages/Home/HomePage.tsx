@@ -280,11 +280,11 @@ export function HomePage({ app }: { app: AppCtx }) {
       if (!r.capped) setQuick({ state: "error", message: r.message, retry: prepare });
     });
   };
-  const startRun = (repeat: Cadence | null) => {
+  const startRun = (repeat: Cadence | null, makeChoices = run?.makeChoices ?? []) => {
     if (run === null || runBusy) return;
     setRunBusy(true);
     setRunError(null);
-    store.startRun(run, repeat).then((r) => {
+    store.startRun({ ...run, makeChoices }, repeat).then((r) => {
       if (!alive.current) return;
       setRunBusy(false);
       if (!r.ok) {

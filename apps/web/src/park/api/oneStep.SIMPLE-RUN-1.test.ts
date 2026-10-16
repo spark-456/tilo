@@ -1,6 +1,7 @@
 // SIMPLE-RUN-1 acceptance: the one-step start over a fake tilo-api. One POST /intake, every Director question
 // skipped in ONE answers call (a field named twice is sent once: the API refuses a repeat with 422), one GET
 // approaches, and Start is the approval of the recommended approach's own maximum. Every refusal is in plain words.
+import type { PlanMakeChoice } from "@tilo/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { BRIEF_SUPPLIER_COMPARISON } from "../../api/fixtures/brief";
 import { TiloApiError } from "../../api/http";
@@ -153,6 +154,46 @@ describe("SIMPLE-RUN-1 one-step start over the live Api", () => {
     const approve = calls.at(-1);
     expect(`${approve?.method} ${approve?.path}`).toBe("POST /tasks/t_1/approve");
     expect(approve?.body).toEqual({ approach_id: "a_balanced", budget_cap: 60 });
+  });
+
+  it("WEBSITE_MK_06 start sends the selected maker for each offered deliverable", async () => {
+    const offered: PlanMakeChoice[] = [
+      {
+        deliverable: 0,
+        selected: "native",
+        options: [
+          { make_with: "native", label: "Tilo", status: "ready", suggested: false, note: null },
+          {
+            make_with: "connector:lovable",
+            label: "Lovable",
+            status: "ready",
+            suggested: true,
+            note: "A large site",
+          },
+        ],
+      },
+    ];
+    const { one, calls } = server({
+      "GET /tasks/t_1/approaches": () =>
+        json({
+          task_id: "t_1",
+          approaches: [APPROACH],
+          recommended: "a_balanced",
+          credit_usd: 0.05,
+          make_choices: offered,
+        }),
+    });
+    const plan = await one.prepare("Plan the offsite", []);
+    expect(plan.makeChoices).toEqual(offered);
+    await one.start({
+      ...plan,
+      makeChoices: plan.makeChoices.map((choice) => ({ ...choice, selected: "connector:lovable" })),
+    });
+    expect(calls.at(-1)?.body).toEqual({
+      approach_id: "a_balanced",
+      budget_cap: 60,
+      make_with: [{ deliverable: 0, make_with: "connector:lovable" }],
+    });
   });
 
   it("SIMPLE-RUN-1 cap: a price above the API's ceiling is asked at the ceiling", async () => {

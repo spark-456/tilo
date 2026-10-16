@@ -1,8 +1,10 @@
+import type { PlanMakeChoice } from "@tilo/contracts";
 // SIMPLE-RUN-1: the one confirm card of the one-step start. It is the composer's plan card with the server's own
 // words in it: the goal, what Tilo assumed in place of asking (each line can be changed), the price and one Start
 // button. The person's click is the budget approval. Presentation only: the calls are HomePage's.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Cadence, RunPlan } from "../../api/oneStep";
+import { AppLink } from "../../shared/AppLink";
 import { BudgetBar } from "./BudgetBar";
 import { useRepeatWeekly } from "./RepeatWeekly";
 
@@ -13,7 +15,7 @@ export interface RunCardProps {
   /** The plain reason the last step stopped, with Start as the retry. */
   readonly error: string | null;
   /** Start, with the weekly cadence when the person switched "Repeat weekly" on (FR-AGT-14). */
-  readonly onStart: (repeat: Cadence | null) => void;
+  readonly onStart: (repeat: Cadence | null, makeChoices: readonly PlanMakeChoice[]) => void;
   readonly onCancel: () => void;
   readonly onEdit: (field: string, answer: string) => void;
 }
@@ -23,6 +25,8 @@ const credits = (n: number): string => `${Number.isInteger(n) ? n : n.toFixed(1)
 export function RunCard({ plan, busy, error, onStart, onCancel, onEdit }: RunCardProps) {
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+  const [makeChoices, setMakeChoices] = useState<readonly PlanMakeChoice[]>(plan.makeChoices);
+  useEffect(() => setMakeChoices(plan.makeChoices), [plan.makeChoices]);
   const repeat = useRepeatWeekly(busy);
   const price =
     plan.credits.min === plan.credits.max
@@ -99,6 +103,45 @@ export function RunCard({ plan, busy, error, onStart, onCancel, onEdit }: RunCar
             ))}
           </ol>
         ) : null}
+        {makeChoices.length ? (
+          <section className="park-home-makers" aria-label="Where to make it">
+            {makeChoices.map((choice) => (
+              <fieldset key={choice.deliverable} className="park-home-maker">
+                <legend>{`Deliverable ${choice.deliverable + 1}`}</legend>
+                {choice.options.map((option) => (
+                  <div key={option.make_with} className="park-home-maker__option">
+                    <label>
+                      <input
+                        type="radio"
+                        name={`maker-${choice.deliverable}`}
+                        value={option.make_with}
+                        checked={choice.selected === option.make_with}
+                        disabled={busy || option.status !== "ready"}
+                        onChange={() =>
+                          setMakeChoices((current) =>
+                            current.map((item) =>
+                              item.deliverable === choice.deliverable
+                                ? { ...item, selected: option.make_with }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                      <span>
+                        {option.label}
+                        {option.suggested ? " · Suggested" : ""}
+                      </span>
+                    </label>
+                    {option.note ? <small>{option.note}</small> : null}
+                    {option.status === "needs_setup" ? (
+                      <AppLink to="/connectors">Connections</AppLink>
+                    ) : null}
+                  </div>
+                ))}
+              </fieldset>
+            ))}
+          </section>
+        ) : null}
         {repeat.control}
         {busy ? (
           // biome-ignore lint/a11y/useSemanticElements: a status line, not a form result
@@ -118,7 +161,7 @@ export function RunCard({ plan, busy, error, onStart, onCancel, onEdit }: RunCar
           className="park-home-confirm"
           disabled={busy || repeat.invalid}
           aria-busy={busy ? true : undefined}
-          onClick={() => onStart(repeat.cadence)}
+          onClick={() => onStart(repeat.cadence, makeChoices)}
         >
           {error ? "Try again" : "Start"}
         </button>
