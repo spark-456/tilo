@@ -1,0 +1,18 @@
+{
+  "v": "1.0",
+  "formats": {
+    "website": {
+      "partners": [
+        {
+          "make_with": "mcp:notes_hub:create_site",
+          "action": "create_site"
+        }
+      ]
+    }
+  },
+  "large_site": {
+    "max_native_pages": 1,
+    "needs": []
+  },
+  "preselect_suggested": false
+}

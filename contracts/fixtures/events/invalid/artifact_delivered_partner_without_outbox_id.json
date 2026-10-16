@@ -1,0 +1,42 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ00000000000000WEB04",
+  "seq": 61,
+  "ts": "2026-10-16T09:30:05.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "artifact.delivered",
+  "actor": "A_l1",
+  "target": "art_store_link",
+  "level": "L1",
+  "district": "D1",
+  "item": {
+    "kind": "parcel",
+    "artifact_id": "art_store_link",
+    "label": "Store build link"
+  },
+  "severity": "info",
+  "credits": 0,
+  "summary": "The Lovable build link is ready.",
+  "cause": "01JB5VQ00000000000000WEB05",
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "artifact": {
+      "artifact_id": "art_store_link",
+      "version": 1
+    },
+    "format": "website",
+    "outbox_id": null,
+    "make_with": "connector:lovable"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}
