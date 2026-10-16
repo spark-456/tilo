@@ -6,6 +6,7 @@
 // (NFR-01). No invented numbers, quotes or logos: the examples are lines of the recorded run, the skills are the ones
 // in the repository's skills/ folder, and the safety lines are what the policy engine and budgets do (PRD 9.4, 16).
 import type { ReactNode } from "react";
+import "../design/tilo-t/styles";
 import {
   AudiencesSection,
   ConnectorsSection,
