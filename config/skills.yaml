@@ -22,6 +22,12 @@ triggers:
 # (the declared-only rule is code, never the model). browse_web stays unusable until config/connectors.yaml declares it
 # (ticket B1c); render outputs arrive with their own ticket. No model id belongs here.
 capture:
+  # S2 (ADR-0051, TS-03): limits for a recording or file. The web recorder reads max_recording_seconds; the server
+  # stores at most max_file_bytes (ADR-0034) and reads at most max_read_bytes (the providers' 10 MiB inline part).
+  max_steps: 20
+  max_recording_seconds: 300
+  max_file_bytes: 50000000
+  max_read_bytes: 10485760
   tools:
     gmail: [read_email, search_email, create_draft, send_email]
     google_drive: [read_file, list_files, save_file, save_as_google_file]

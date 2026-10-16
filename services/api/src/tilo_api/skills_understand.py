@@ -31,7 +31,7 @@ logger = logging.getLogger("tilo_api.skills_understand")
 _NO_TOOL_VERBS = frozenset({"read", "draft", "write"})  # what a step with no tool can do: it only works on text
 _READABLE_TYPES = frozenset({"text/markdown", "text/csv", "application/json"})
 _MEDIA_TYPES = frozenset({"application/pdf", "image/png", "image/jpeg"})
-_DOC_CHARS = 8000
+DOC_CHARS = 8000
 MAX_DOCUMENTS = 3
 _SELF = re.compile(
     r"\b(?:to|email|e-mail|mail|send)\s+me\b|\bmyself\b|\bmy\s+(?:own\s+)?(?:e-?mail|inbox|address)\b", re.I
@@ -198,7 +198,7 @@ def read_documents(
             raise HTTPException(status_code=404, detail="not_found")
         media = head.record["media_type"]
         if media in _READABLE_TYPES:
-            text = redact(data.decode("utf-8", "replace")[:_DOC_CHARS])
+            text = redact(data.decode("utf-8", "replace")[:DOC_CHARS])
             texts.append(text)
             blocks.append(f"<<<DOCUMENT {number}\n{neutralise_marker(text, 'DOCUMENT')}\nDOCUMENT>>>")
         elif media in _MEDIA_TYPES:

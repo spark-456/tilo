@@ -63,6 +63,7 @@ from tilo_api.sharing import WorldView
 from tilo_api.sharing import build_router as _build_sharing_router
 from tilo_api.skills_capture import router as _skills_capture_router
 from tilo_api.skills_feedback import router as _skills_feedback_router
+from tilo_api.skills_media import router as _skills_media_router
 from tilo_api.skills_routes import router as _skills_router
 from tilo_api.tasks import router as _tasks_router
 from tilo_api.team_items import router as _team_items_router
@@ -172,6 +173,7 @@ app.include_router(_people_list_router)
 app.include_router(_people_teams_router)
 app.include_router(_skills_router)
 app.include_router(_skills_capture_router)
+app.include_router(_skills_media_router)
 app.include_router(_skills_feedback_router)
 app.include_router(_effort_router)
 app.include_router(_feedback_router)
