@@ -10,7 +10,8 @@ Pinned interface:
     fails the order is score then id. A tagged skill the caller may use always wins and no model is called.
   * `GET /tasks/{id}/approaches` also answers `skill` (the match or null) and keeps it on the task; the run pins a
     matched LIBRARY skill on its working units, and `skill.loaded` names the skill and version in its summary.
-  * Quick: an answer or a switch offer carries `skill` when one fits (absent otherwise); the answer prompt gets the
+  * Quick: an answer carries `skill` when one fits (absent otherwise; a rules-decided offer costs nothing, so none);
+    the answer prompt gets the
     caller's catalog as fenced data. No paid call anywhere.
 """
 
@@ -224,8 +225,10 @@ def test_FR_SKL_04_ROUTE_quick_answers_carry_the_skill_and_the_catalog_as_fenced
     prompt = quick_rig.provider_requests[-1].prompt
     assert "<<<SKILLS" in prompt and "competitor scan:" in prompt and "SKILLS>>>" in prompt
     assert "skill" not in quick_rig.ask("What is the capital of France?").json()  # nothing fits: the key is absent
+    quick_rig.reset()
     offer = quick_rig.ask("Please send an email to my whole team zq-rivals").json()
-    assert offer["outcome"] == "switch_to_thinking" and offer["skill"]["id"] == "competitor-scan"
+    assert offer["outcome"] == "switch_to_thinking" and "skill" not in offer  # a rules-decided offer costs nothing
+    assert quick_rig.provider_requests == []
 
 
 def test_FR_SKL_04_ROUTE_pinning_adds_a_matched_library_skill_to_working_units_only():

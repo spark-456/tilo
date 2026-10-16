@@ -14,7 +14,7 @@ Pinned interface:
     reads the file as one media part (or a text file as a delimited document). `too_long_to_read` and
     `audio_not_supported` are 422 with no model call; any ref the owner cannot read is the one 404. Every
     `skill.captured` event and every captured step carries the pinned artifact. A record is video only.
-  * config/skills.yaml `capture` holds max_steps 20, max_recording_seconds 300, max_file_bytes 50000000 and
+  * config/skills.yaml `capture` holds max_steps 20, max_recording_seconds 300, max_file_bytes 30000000 and
     max_read_bytes 10485760.
 """
 
@@ -60,7 +60,7 @@ def _limits(monkeypatch, **changes):
     monkeypatch.setattr(skills_media, "load_capture_limits", lambda: skills_media.CaptureLimits(**{**_BASE, **changes}))
 
 
-_BASE = {"max_steps": 20, "max_recording_seconds": 300, "max_file_bytes": 50_000_000, "max_read_bytes": 10_485_760}
+_BASE = {"max_steps": 20, "max_recording_seconds": 300, "max_file_bytes": 30_000_000, "max_read_bytes": 10_485_760}
 
 
 def test_FR_SKL_01_S2_the_shipped_capture_limits_are_config(repo_root):
@@ -85,7 +85,7 @@ def test_FR_SKL_01_S2_the_type_comes_from_the_bytes_and_the_file_is_stored_in_th
     body = response.json()
     assert body["media_type"] == media and body["size_bytes"] == len(data) and body["readable"] is True
     assert body["reason"] is None and body["artifact"] == {"artifact_id": "art_cap01", "version": 1}
-    assert body["limits"] == {"max_recording_seconds": 300, "max_steps": 20}
+    assert body["limits"] == {"max_recording_seconds": 300, "max_steps": 20, "max_file_bytes": 30_000_000}
     from tilo_memory.artifacts import Scope  # noqa: PLC0415
 
     stored = skills4.rig.artifacts.head(Scope(ORG, PRIYA_DESK, PRIYA), body["artifact"])
@@ -267,3 +267,95 @@ def test_FR_SKL_01_S2_the_media_route_is_closed_to_replay_only(skills4):
     skills4.rig.app.dependency_overrides[skills4.rig.deps.get_flag_store] = lambda: flags
     response = _upload(skills4, WEBM)
     assert response.status_code == 503 and skills4.rig.meta.paths("") == []
+
+
+class _Stub:
+    """A request whose body is a stream that records whether it was read (the helper under the upload route)."""
+
+    def __init__(self, headers, chunks):
+        self.headers, self.chunks, self.read = headers, chunks, 0
+
+    async def stream(self):
+        for chunk in self.chunks:
+            self.read += len(chunk)
+            yield chunk
+
+
+def _run(coro):
+    import asyncio  # noqa: PLC0415
+
+    return asyncio.run(coro)
+
+
+def test_FR_SKL_01_S2_a_declared_length_over_the_cap_is_refused_before_one_byte_is_read():
+    from tilo_api.people_writes import Refusal, capped_bytes  # noqa: PLC0415
+
+    stub = _Stub({"content-length": "5000"}, [b"x" * 10])
+    with pytest.raises(Refusal) as caught:
+        _run(capped_bytes(stub, 1000, too_large="file_too_large", length_required=True))
+    assert (caught.value.status_code, caught.value.detail, stub.read) == (413, "file_too_large", 0)
+
+
+def test_FR_SKL_01_S2_a_missing_length_is_411_and_a_bad_one_400_before_any_read():
+    from tilo_api.people_writes import Refusal, capped_bytes  # noqa: PLC0415
+
+    for headers, status, detail in (
+        ({}, 411, "length_required"),
+        ({"content-length": "12x"}, 400, "invalid_content_length"),
+    ):
+        stub = _Stub(headers, [b"x"])
+        with pytest.raises(Refusal) as caught:
+            _run(capped_bytes(stub, 1000, length_required=True))
+        assert (caught.value.status_code, caught.value.detail, stub.read) == (status, detail, 0)
+
+
+def test_FR_SKL_01_S2_the_bytes_are_counted_as_they_stream_whatever_the_framing_says():
+    from tilo_api.people_writes import Refusal, capped_bytes  # noqa: PLC0415
+
+    stub = _Stub({"content-length": "10"}, [b"x" * 600, b"x" * 600, b"x" * 600])  # claims 10, sends more
+    with pytest.raises(Refusal) as caught:
+        _run(capped_bytes(stub, 1000, too_large="file_too_large"))
+    assert caught.value.status_code == 413 and stub.read == 1200  # cut at the chunk that passed the cap
+    assert _run(capped_bytes(_Stub({}, [b"ab", b"cd"]), 1000)) == b"abcd"
+
+
+def test_FR_SKL_01_S2_an_upload_with_no_length_is_411_and_stores_nothing(skills4):
+    skills4.rig.as_user(PRIYA)
+
+    def chunks():
+        yield WEBM
+
+    response = skills4.rig.client.post(
+        MEDIA, content=chunks(), headers={"content-type": "multipart/form-data; boundary=b"}
+    )
+    assert response.status_code == 411 and response.json() == {"detail": "length_required"}
+    assert skills4.rig.meta.paths("") == []
+
+
+def test_FR_SKL_01_S2_a_desk_world_that_is_full_is_storage_full_not_an_unsupported_type(skills4, monkeypatch):
+    from tilo_memory import artifacts  # noqa: PLC0415
+
+    monkeypatch.setattr(artifacts, "MAX_WORLD", 10)
+    response = _upload(skills4, WEBM)
+    assert response.status_code == 413 and response.json() == {"detail": "storage_full"}
+    assert skills4.rig.meta.paths("") == []
+
+
+def test_FR_SKL_01_S2_only_a_file_the_person_uploaded_can_be_the_example(skills4):
+    from tilo_memory.artifacts import NewVersion, Origin, Scope  # noqa: PLC0415
+
+    skills4.rig._ids = ["art_made01"]
+    made = skills4.rig.artifacts.put(
+        Scope(ORG, PRIYA_DESK, PRIYA),
+        NewVersion(
+            "text/markdown",
+            TEXT,
+            "r_unit01",
+            Origin(kind="unit", unit="U1", agent="A_w1"),
+            idempotency_key="r_unit01:U1:1:0",
+        ),
+    )
+    skills4.rig.as_user(PRIYA)
+    response = skills4.rig.post(CAPTURE, {"method": "upload", "artifact": made.ref})
+    assert response.status_code == 404 and response.json() == {"detail": "not_found"}  # a made item is not an upload
+    assert skills4.model.calls == []

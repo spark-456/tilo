@@ -191,9 +191,9 @@ class SpendMeter:
 
 
 class MeteredRouter:
-    """The Router's `generate` and `search`, each one unit. Nothing else of the Router is reachable through it (no
-    `embed`, no `stream`): a call that is not metered cannot be made. `raw` is the unmetered Router, for the two
-    paths that hold their own unit (Quick and the Meeting Hall)."""
+    """The Router's `generate`, `search` and, as `metered_embed`, `embed`, each one unit. Nothing else of the Router is
+    reachable through it (no `embed` or `stream` by those names): a call that is not metered cannot be made. `raw`
+    is the unmetered Router, for the two paths that hold their own unit (Quick and the Meeting Hall)."""
 
     def __init__(self, raw: Any, meter: SpendMeter) -> None:
         self.raw, self._meter = raw, meter
@@ -216,6 +216,11 @@ class MeteredRouter:
 
     def search(self, *args: Any, **kwargs: Any) -> Any:
         return self._metered(self.raw.search, *args, **kwargs)
+
+    def metered_embed(self, *args: Any, **kwargs: Any) -> Any:
+        """RT-06: grounding's embeddings are units too. Not named `embed` on purpose: the pinned rule above (no
+        `embed`, no `stream` through the meter) stays true, and this is the one embedding path that is metered."""
+        return self._metered(self.raw.embed, *args, **kwargs)
 
 
 class MeteredSafety(SafetyProvider):
