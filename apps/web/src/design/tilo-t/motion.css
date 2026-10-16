@@ -87,7 +87,7 @@
 @keyframes tLeapShadow{0%,10%{transform:scale(.4);opacity:0}48%,56%{transform:scale(1.8);opacity:.28}84%{transform:scale(.6);opacity:.2}90%,100%{opacity:0}}
 @keyframes tDrop{0%{transform:translate(0,0) scale(.4);opacity:0}8%{opacity:1}55%{transform:translate(var(--dx),var(--dy)) scale(1)}100%{transform:translate(calc(var(--dx) * 1.35),calc(var(--dy) * -.1 + 40px)) scale(.4);opacity:0}}
 @keyframes tRipple{0%{transform:scale(.15);opacity:.95}100%{transform:scale(1);opacity:0}}
-@keyframes tSwim{from{offset-distance:0%}to{offset-distance:100%}}
+@keyframes tSwim{0%{transform:translateX(-90px) scaleX(1)}49%{transform:translateX(90px) scaleX(1)}50%{transform:translateX(90px) scaleX(-1)}99%{transform:translateX(-90px) scaleX(-1)}100%{transform:translateX(-90px) scaleX(1)}}
 @keyframes tSink{0%{transform:translateY(0)}25%{transform:translateY(-14px)}100%{transform:translateY(130px)}}
 @keyframes tBubble{0%{transform:translateY(0) scale(.4);opacity:0}20%{opacity:1}100%{transform:translateY(-70px) scale(1);opacity:0}}
 @keyframes tCaption{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:none}}
@@ -134,8 +134,7 @@
 [data-park] .park-world-enter{animation:tRise .3s var(--tt-ease-standard) both}
 
 /* Pool loader: one request/event starts the splash; the phase machine only completes its visual sequence. */
-.tt-pool-page{transition:filter .8s var(--tt-ease-standard),transform .8s var(--tt-ease-standard)}
-.tt-pool-page--sink{transition-delay:1.1s}
+.tt-pool-page{transition:opacity .25s var(--tt-ease-standard)}
 .tt-pool__water{animation:tPoolOpen .5s var(--tt-ease-standard) both}
 .tt-pool__water--closing{animation:tPoolClose .7s cubic-bezier(.5,0,.75,0) 1.15s both}
 .tt-pool__leap{animation:tLeap 2.6s var(--tt-ease-leap) both}
@@ -151,7 +150,7 @@
 .tt-pool__sink-ripple{animation:tRipple 1.2s ease-out .9s both}
 .tt-pool__bubble{animation:tBubble 1.2s ease-out var(--tt-bubble-delay) both}
 .tt-pool__caption{animation:tCaption .4s ease-out both}
-.tt-pool__overlay{animation:tCaption .25s ease-out both}
+.tt-pool-overlay{animation:tCaption .25s ease-out both}
 @keyframes ttPoolFade{from{opacity:0}to{opacity:1}}
 
 /* ---- Reduced motion (tilo-t.css, last rule, 1:1): every walk, rise and flight becomes a fade of 200 to 300 ms and
@@ -160,7 +159,7 @@
 .tt-bd,.tt-bd *,.tt-shim,.tt-dots span{animation:none!important}}
 @media (prefers-reduced-motion:reduce){
 .tt-pool__stage *,.tt-pool__stage{animation:none!important}
-.tt-pool__overlay{animation:ttPoolFade .25s ease-out both!important}
+.tt-pool-overlay{animation:ttPoolFade .25s ease-out both!important}
 .tt-pool-page,.tt-pool-page--covered,.tt-pool-page--sink{transition:opacity .25s!important;filter:none;transform:none}
 .tt-pool-page--covered{opacity:.72}
 }

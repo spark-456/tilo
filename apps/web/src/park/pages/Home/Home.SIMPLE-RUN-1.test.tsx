@@ -2,6 +2,7 @@
 // SIMPLE-RUN-1 acceptance: Home mounted over the REAL live Api (fake fetch for tilo-api). Start on a task makes the
 // intake, skips every question and lands on ONE confirm card; the person's click on its Start approves the cap and
 // opens the run's world. Nothing sends the person to the old Understanding or Approaches screens.
+import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, q } from "../../../../test-support/park/componentsHarness";
 import { MODES } from "../../../../test-support/park/homeCopy";
@@ -158,6 +159,18 @@ describe("SIMPLE-RUN-1 Home starts a run in one step", () => {
     approve.resolve(json({ world_id: "w_1" }));
     await settle();
     expect(posts.filter((p) => p.endsWith("/approve"))).toHaveLength(1);
+  });
+
+  it("CX_POOL_2_waiting_for_start_uses_the_shared_pool_after_300ms", async () => {
+    const approve = gate<Response>();
+    const { api } = serverWith({ "POST /tasks/t_1/approve": () => approve.promise });
+    const rig = await mountLiveHome(api);
+    await start(rig, "Plan the offsite");
+    clickEl(cardStart(rig));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(rig.el.querySelector(".tt-pool-overlay [role='status']")).not.toBeNull();
+    approve.resolve(json({ world_id: "w_1" }));
+    await settle();
   });
 
   it("SIMPLE-RUN-1 Home: a refusal at approve says why on the card and Try again approves again", async () => {

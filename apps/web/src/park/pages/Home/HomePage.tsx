@@ -27,6 +27,7 @@ import { DEMO_START } from "../../app/store";
 import { takeDraft } from "../../chat/handoff";
 import { FirstRunOverview } from "../../sample/FirstRunOverview";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
+import { PoolLoader } from "../../shared/poolLoader";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
 import "./Home.css";
 import { HomeSkeleton } from "./HomeSkeleton";
@@ -436,165 +437,167 @@ export function HomePage({ app }: { app: AppCtx }) {
   const stacked = vw > 0 && vw < 1180;
 
   return (
-    <div
-      ref={root}
-      className={`park-home-root${preview ? " park-home-root--preview" : ""}`}
-      data-testid="park-page-home"
-    >
-      {ready ? (
-        <div className="park-home-top">
-          <Hero
-            dateLine={base.today.long.toUpperCase()}
-            greeting={`${greetingWord(new Date().getHours())}, ${base.user.first}.`}
-            summary={summary}
-            needs={needs}
-            needsKnown={!served || openServed !== null}
-            night={night}
-            worldName={waitingIn?.name ?? null}
-            onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
-          />
-          <Crew />
-        </div>
-      ) : null}
-      {!ready && !failed ? <HomeSkeleton /> : null}
-      {base &&
-      base !== "failed" &&
-      base.agenda &&
-      "setupRequired" in base.agenda &&
-      base.agenda.setupRequired ? (
-        <output>{ORGANISATION_SETUP}</output>
-      ) : null}
-      {preview ? (
-        <FirstRunOverview
-          page="home"
-          app={app}
-          onPickTask={(prompt) => {
-            if (busy()) return;
-            setQuery(prompt);
-            setQuick(QUICK_IDLE);
-            toIdle();
-            composerInput.current?.focus();
-          }}
-        />
-      ) : null}
-      {failed && !preview ? (
-        <div className="park-home-top">
-          <div className="park-home-hero">
-            <h1 className="park-home-h1">Home</h1>
-            <p className="park-home-summary">Home data is unavailable</p>
+    <PoolLoader kind="site" loading={sending || runBusy || quick.state === "asking"}>
+      <div
+        ref={root}
+        className={`park-home-root${preview ? " park-home-root--preview" : ""}`}
+        data-testid="park-page-home"
+      >
+        {ready ? (
+          <div className="park-home-top">
+            <Hero
+              dateLine={base.today.long.toUpperCase()}
+              greeting={`${greetingWord(new Date().getHours())}, ${base.user.first}.`}
+              summary={summary}
+              needs={needs}
+              needsKnown={!served || openServed !== null}
+              night={night}
+              worldName={waitingIn?.name ?? null}
+              onReview={() => (waitingIn ? open(waitingIn.id) : go("worlds"))}
+            />
+            <Crew />
           </div>
-        </div>
-      ) : null}
-      {briefApi && !demo ? <MorningBriefCard api={briefApi} /> : null}
-      {composerShown ? (
-        <ComposerPanel
-          sending={sending}
-          mood={mood}
-          sample={demo}
-          compact={vw > 0 && vw <= 480}
-          inputRef={composerInput}
-          maxLength={INTAKE_MAX_CHARS}
-          staging={{
-            files,
-            onChange: setFiles,
-            disabledReason: demo
-              ? "Uploads are off in the demo; sign in to attach files."
-              : !worldsLive
-                ? "Uploads need setup; the owner has not finished it."
-                : effort === "quick"
-                  ? "Files go with Make a world; a quick answer reads no files."
-                  : null,
-          }}
-          mode={mode}
-          modes={MODES}
-          query={query}
-          shown={query.trim() || mode.example}
-          phase={phase}
-          effort={effort}
-          onEffort={chooseEffort}
-          quick={quick}
-          onSwitch={switchToThinking}
-          onQuery={(value) => {
-            if (busy()) return;
-            setQuery(value);
-            setQuick(QUICK_IDLE);
-            toIdle();
-          }}
-          onMode={(key) => {
-            if (busy()) return;
-            setModeKey(key as TierKey);
-            setQuick(QUICK_IDLE);
-            toIdle();
-          }}
-          onChip={(label) => {
-            if (busy()) return;
-            setQuery(suggestedTask(label));
-            setQuick(QUICK_IDLE);
-            toIdle();
-          }}
-          onDraft={effort === "quick" ? ask : oneStepLive() ? prepare : draft}
-          run={
-            run === null
-              ? undefined
-              : {
-                  plan: run,
-                  busy: runBusy,
-                  starting: runStarting,
-                  error: runError,
-                  onStart: startRun,
-                  onCancel: toIdle,
-                  onEdit: reviseRun,
-                }
-          }
-          onConfirm={confirmStart}
-          onChange={changeBrief}
-        />
-      ) : null}
-      {ready ? (
-        <div className="park-home-grid">
-          <div className="park-home-maincol">
-            <WorldsSection
+        ) : null}
+        {!ready && !failed ? <HomeSkeleton /> : null}
+        {base &&
+        base !== "failed" &&
+        base.agenda &&
+        "setupRequired" in base.agenda &&
+        base.agenda.setupRequired ? (
+          <output>{ORGANISATION_SETUP}</output>
+        ) : null}
+        {preview ? (
+          <FirstRunOverview
+            page="home"
+            app={app}
+            onPickTask={(prompt) => {
+              if (busy()) return;
+              setQuery(prompt);
+              setQuick(QUICK_IDLE);
+              toIdle();
+              composerInput.current?.focus();
+            }}
+          />
+        ) : null}
+        {failed && !preview ? (
+          <div className="park-home-top">
+            <div className="park-home-hero">
+              <h1 className="park-home-h1">Home</h1>
+              <p className="park-home-summary">Home data is unavailable</p>
+            </div>
+          </div>
+        ) : null}
+        {briefApi && !demo ? <MorningBriefCard api={briefApi} /> : null}
+        {composerShown ? (
+          <ComposerPanel
+            sending={sending}
+            mood={mood}
+            sample={demo}
+            compact={vw > 0 && vw <= 480}
+            inputRef={composerInput}
+            maxLength={INTAKE_MAX_CHARS}
+            staging={{
+              files,
+              onChange: setFiles,
+              disabledReason: demo
+                ? "Uploads are off in the demo; sign in to attach files."
+                : !worldsLive
+                  ? "Uploads need setup; the owner has not finished it."
+                  : effort === "quick"
+                    ? "Files go with Make a world; a quick answer reads no files."
+                    : null,
+            }}
+            mode={mode}
+            modes={MODES}
+            query={query}
+            shown={query.trim() || mode.example}
+            phase={phase}
+            effort={effort}
+            onEffort={chooseEffort}
+            quick={quick}
+            onSwitch={switchToThinking}
+            onQuery={(value) => {
+              if (busy()) return;
+              setQuery(value);
+              setQuick(QUICK_IDLE);
+              toIdle();
+            }}
+            onMode={(key) => {
+              if (busy()) return;
+              setModeKey(key as TierKey);
+              setQuick(QUICK_IDLE);
+              toIdle();
+            }}
+            onChip={(label) => {
+              if (busy()) return;
+              setQuery(suggestedTask(label));
+              setQuick(QUICK_IDLE);
+              toIdle();
+            }}
+            onDraft={effort === "quick" ? ask : oneStepLive() ? prepare : draft}
+            run={
+              run === null
+                ? undefined
+                : {
+                    plan: run,
+                    busy: runBusy,
+                    starting: runStarting,
+                    error: runError,
+                    onStart: startRun,
+                    onCancel: toIdle,
+                    onEdit: reviseRun,
+                  }
+            }
+            onConfirm={confirmStart}
+            onChange={changeBrief}
+          />
+        ) : null}
+        {ready ? (
+          <div className="park-home-grid">
+            <div className="park-home-maincol">
+              <WorldsSection
+                served={served}
+                rows={liveRows(worlds, needs, served)}
+                sample={served ? worlds.find((w) => w.sample) : undefined}
+                night={night}
+                onWorld={open}
+                onWorlds={() => go("worlds")}
+              />
+              <ChatHistory onChat={() => go("chat")} />
+            </div>
+            <TodayPanel
               served={served}
-              rows={liveRows(worlds, needs, served)}
-              sample={served ? worlds.find((w) => w.sample) : undefined}
+              open={base.decisions.filter((d) => !dec[d.k])}
+              needs={served ? openServed : needs}
+              events={base.agenda && base.agenda.days !== null ? nextEvents(base.agenda) : []}
+              finished={worlds.find((w) => w.st === "finished" && !w.sample && !w.isNew)}
+              spend={spendOf(base.ledger)}
               night={night}
               onWorld={open}
               onWorlds={() => go("worlds")}
-            />
-            <ChatHistory onChat={() => go("chat")} />
+              onAgenda={() => go("agenda")}
+              onLedger={() => go("ledger")}
+              stacked={stacked}
+            >
+              {preview ? null : (
+                <KpiStrip
+                  ledger={base.ledger}
+                  dec={dec}
+                  decisions={base.decisions}
+                  fallbackWorld={waitingIn?.id}
+                  onWorld={open}
+                />
+              )}
+            </TodayPanel>
           </div>
-          <TodayPanel
-            served={served}
-            open={base.decisions.filter((d) => !dec[d.k])}
-            needs={served ? openServed : needs}
-            events={base.agenda && base.agenda.days !== null ? nextEvents(base.agenda) : []}
-            finished={worlds.find((w) => w.st === "finished" && !w.sample && !w.isNew)}
-            spend={spendOf(base.ledger)}
-            night={night}
-            onWorld={open}
-            onWorlds={() => go("worlds")}
-            onAgenda={() => go("agenda")}
-            onLedger={() => go("ledger")}
-            stacked={stacked}
-          >
-            {preview ? null : (
-              <KpiStrip
-                ledger={base.ledger}
-                dec={dec}
-                decisions={base.decisions}
-                fallbackWorld={waitingIn?.id}
-                onWorld={open}
-              />
-            )}
-          </TodayPanel>
-        </div>
-      ) : null}
-      <nav className="park-home-legal" aria-label="Legal">
-        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> ·{" "}
-        <span className="park-home-build" title="The commit this page was built from">
-          Build {BUILD_SHA}
-        </span>
-      </nav>
-    </div>
+        ) : null}
+        <nav className="park-home-legal" aria-label="Legal">
+          <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> ·{" "}
+          <span className="park-home-build" title="The commit this page was built from">
+            Build {BUILD_SHA}
+          </span>
+        </nav>
+      </div>
+    </PoolLoader>
   );
 }

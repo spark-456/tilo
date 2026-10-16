@@ -1,7 +1,7 @@
 .tt-pool-host{position:relative;min-height:100%}
 .tt-pool-page{position:relative;min-height:inherit}
-.tt-pool-page--covered{filter:blur(8px) saturate(.85);transform:scale(1.015)}
-.tt-pool-page--sink{filter:none;transform:none}
+.tt-pool-page--covered{opacity:.72}
+.tt-pool-page--sink{opacity:1}
 .tt-pool-overlay{position:fixed;z-index:1000;inset:0;display:grid;place-items:center;overflow:hidden;pointer-events:auto;color:var(--ink,#0b0b0c)}
 .tt-pool-scrim{position:absolute;inset:0;background:var(--bg,#fff);opacity:.35}
 .tt-pool__stage{position:relative;width:380px;height:280px;transform:scale(1.25)}
@@ -17,7 +17,7 @@
 .tt-pool__drops{position:absolute;z-index:4;top:103px;left:190px;width:0;height:0}
 .tt-pool__drop{position:absolute;border:1.5px solid #0b0b0c;border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;box-sizing:border-box;opacity:0}
 .tt-pool__splash{position:absolute;top:-46px;left:-150px;width:300px;height:92px;border:3px solid #fff;border-radius:50%;opacity:0}
-.tt-pool__swimmer{position:absolute;z-index:2;top:75px;left:calc(50% - 33px);width:66px;height:52px;offset-path:ellipse(122px 32px at 50% 50%)}
+.tt-pool__swimmer{position:absolute;z-index:2;top:75px;left:calc(50% - 33px);width:66px;height:52px}
 .tt-pool__swimmer-clip{position:absolute;top:0;left:4px;width:58px;height:44px;overflow:hidden}
 .tt-pool__swim-ring{bottom:2px;left:-6px;width:78px;height:16px;border-width:2.5px}
 .tt-pool__buddy--sink{top:17px;left:150px;width:80px;height:74px;overflow:hidden}
@@ -27,5 +27,3 @@
 .tt-pool__caption strong{font-size:18px;letter-spacing:-.3px}
 .tt-pool__caption span{color:var(--ink2,#46464a);font-family:var(--mono,monospace);font-size:12px}
 @media(max-width:560px){.tt-pool__stage{transform:scale(.8)}}
-@media(prefers-reduced-motion:reduce){.tt-pool-page--covered{filter:none;transform:none;opacity:.72}}
-[data-motion="still"] .tt-pool-page--covered{filter:none;transform:none}

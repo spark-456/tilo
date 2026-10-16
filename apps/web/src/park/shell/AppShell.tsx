@@ -60,7 +60,10 @@ function signOut(store: { toast: (message: string) => void; closeMenu: () => voi
 /** The bar along the nav's bottom edge while a world opens: 18% then 26 more per step, full at step 3. */
 const loaderBar = (step: number): number => (step >= 3 ? 100 : 18 + step * 26);
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  pageLoading = false,
+}: { children: ReactNode; pageLoading?: boolean }) {
   const app = useApp();
   const store = useParkStore();
   const api = useParkApi();
@@ -219,7 +222,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       });
   };
   return (
-    <PoolLoader kind="site" loading={!ready}>
+    <PoolLoader kind="site" loading={!ready || pageLoading}>
       <CityBackdrop
         scene={scene}
         vw={app.vw}

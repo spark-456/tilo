@@ -74,6 +74,14 @@ function FocusHeading({ routeKey }: { routeKey: string }) {
   return <span ref={mark} hidden />;
 }
 
+function PagePending({ onPending }: { onPending: (pending: boolean) => void }) {
+  useEffect(() => {
+    onPending(true);
+    return () => onPending(false);
+  }, [onPending]);
+  return null;
+}
+
 /** A view the Root frames in this shell that is no Park page of its own (OLD-UI-OUT-2: a world's lenses, the
  * Needs-you page): its content, its tab title and a key that moves focus to its heading when it changes. */
 export interface RoutedView {
@@ -88,6 +96,7 @@ function Shell({ routed }: { routed?: RoutedView | undefined }) {
   const route = useParkRoute();
   const quizRoute = useQuizAppRoute();
   const [named, setNamed] = useState<string | null>(null);
+  const [pageLoading, setPageLoading] = useState(false);
   const title =
     named ??
     (routed ? routed.title : route ? PAGE_LABEL[route.page] : quizRoute ? "Quiz" : "Not found");
@@ -119,8 +128,8 @@ function Shell({ routed }: { routed?: RoutedView | undefined }) {
         data-theme={themeFor(app.prefs.theme)}
       >
         {themeFor(app.prefs.theme) === "studio" ? <DoodleGutter /> : null}
-        <AppShell>
-          <Suspense fallback={null}>
+        <AppShell pageLoading={pageLoading}>
+          <Suspense fallback={<PagePending onPending={setPageLoading} />}>
             {routed ? (
               routed.content
             ) : Page && route?.page === "world" ? (

@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { act, createElement } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, mount } from "../../../test-support/park/componentsHarness";
@@ -77,4 +79,24 @@ it("FR_POOL_01_site_finishing_before_300ms_never_shows_overlay", async () => {
   await settle();
   await act(async () => vi.advanceTimersByTimeAsync(1000));
   expect(mounted.container.querySelector('[role="status"]')).toBeNull();
+});
+
+it("CX_POOL_2_finished_page_load_sinks_without_covering_the_ready_page_for_seconds", async () => {
+  vi.useFakeTimers();
+  const mounted = mount(createElement(PoolLoader, { kind: "site", loading: true, children: null }));
+  await settle();
+  await act(async () => vi.advanceTimersByTimeAsync(301));
+  mounted.render(createElement(PoolLoader, { kind: "site", loading: false, children: null }));
+  await settle();
+  expect(mounted.container.querySelector("[data-phase=sink]")).not.toBeNull();
+  await act(async () => vi.advanceTimersByTimeAsync(251));
+  expect(mounted.container.querySelector(".tt-pool-overlay")).toBeNull();
+});
+
+it("CX_POOL_2_pool_motion_avoids_page_repaints_and_animates_the_real_overlay", () => {
+  const css = readFileSync(join(__dirname, "PoolLoader.css"), "utf8");
+  const motion = readFileSync(join(__dirname, "motion.css"), "utf8");
+  expect(css).not.toMatch(/\bfilter:|\boffset-path:/);
+  expect(motion.match(/@keyframes tSwim\{[^}]*\}/)?.[0]).not.toContain("offset-distance");
+  expect(motion).toMatch(/\.tt-pool-overlay\{animation:/);
 });

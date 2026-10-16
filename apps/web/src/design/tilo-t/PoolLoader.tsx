@@ -101,18 +101,18 @@ export function PoolLoader(props: PoolLoaderProps) {
   }, [visible, phase]);
 
   useEffect(() => {
-    if (!visible || phase !== "swim" || active) return;
+    if (!visible || phase === "sink" || active || (isTask && phase !== "swim")) return;
     // triggeredBy: world.planned/world.failed, or the site request finishing
     setPhase("sink");
-  }, [active, phase, visible]);
+  }, [active, isTask, phase, visible]);
 
   useEffect(() => {
     if (!visible || phase !== "sink") return;
     const timer = window.setTimeout(() => {
       setVisible(false);
-    }, SINK_MS);
+    }, isTask ? SINK_MS : 250);
     return () => window.clearTimeout(timer);
-  }, [phase, visible]);
+  }, [isTask, phase, visible]);
 
   const busy = active;
   const [title, subtitle] =

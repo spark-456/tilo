@@ -7,7 +7,7 @@
 //   so a fixture Api shows "Sample data" with no page asking for data.
 // The WEB-3a ParkApp tests (ParkApp.test.tsx, ParkApp.app.test.tsx) stay as they are; the tests here add the
 // shell's expectations only. They mock the scene engine for speed (see shellEngine.ts).
-import { act } from "react";
+import { act, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fakeApi } from "../../../test-support/park/appHarness";
 import { cleanup, click, mount, q, qa } from "../../../test-support/park/componentsHarness";
@@ -46,6 +46,24 @@ const waitDone = async () => {
 };
 
 describe("WEB_3b_shell: the pieces and where they sit", () => {
+  it("CX_POOL_2_slow_page_chunk_uses_the_existing_shell_pool", async () => {
+    let begin = () => undefined;
+    function PageWait() {
+      const [pageLoading, setPageLoading] = useState(false);
+      begin = () => setPageLoading(true);
+      return (
+        <AppShell pageLoading={pageLoading}>
+          <p>Page content</p>
+        </AppShell>
+      );
+    }
+    const { m } = mountShell(<PageWait />);
+    await settle();
+    await act(async () => begin());
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(m.container.querySelector(".tt-pool-overlay [role='status']")).not.toBeNull();
+  });
+
   it("WEB_3b_shell_the_nav_the_backdrop_and_one_main_that_holds_the_page", async () => {
     const { m } = await mountApp({ path: "/park/ledger" });
     expect(qa(m.container, "header nav[aria-label]")).toHaveLength(1);
