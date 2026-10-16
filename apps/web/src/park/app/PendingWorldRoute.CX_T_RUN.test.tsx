@@ -4,7 +4,10 @@ import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, mount } from "../../../test-support/park/componentsHarness";
 import { PendingWorldRoute, markPendingWorld, pendingWorld } from "./PendingWorldRoute";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 it("CX_T_RUN_starts_the_storyboard_only_from_recorded_world_events", async () => {
   let receive: ((event: { type: string }) => void) | undefined;
@@ -88,6 +91,7 @@ it("CX_T_RUN_pending_blueprint_stays_until_the_recorded_world_started_event", as
 });
 
 it("CX_T_RUN_pool_stays_mounted_while_the_recorded_plan_reveals_the_world", async () => {
+  vi.useFakeTimers();
   let receive: ((event: { type: string; ts?: string }) => void) | undefined;
   const client = {
     subscribeEvents: vi.fn((_id: string, onEvent: (event: { type: string; ts?: string }) => void) => {
@@ -104,6 +108,8 @@ it("CX_T_RUN_pool_stays_mounted_while_the_recorded_plan_reveals_the_world", asyn
   await act(async () => receive?.({ type: "world.started", ts: "2026-10-16T10:00:00.000Z" }));
   const host = rig.container.querySelector("[data-testid='tt-pool-host']");
   expect(host).not.toBeNull();
+  expect(host?.querySelector("[data-phase]")).toBeNull();
+  await act(async () => vi.advanceTimersByTimeAsync(300));
   expect(host?.querySelector("[data-phase='leap']")).not.toBeNull();
   await act(async () => receive?.({ type: "world.planned", ts: "2026-10-16T10:00:00.400Z" }));
   expect(rig.container.querySelector("[data-testid='tt-pool-host']")).toBe(host);
