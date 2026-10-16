@@ -1,7 +1,5 @@
-"""LW-10 (ADR-0029): a Writer's deliver unit for a PDF emits DeliverableSpec JSON; `render_pdf` runs in-process and the
-bytes are stored with origin `render`. No model call is added (a scripted fake model), no paid call, no network.
-
-Not done here: the `app` half (AppSpec and `app.spec`) waits for the contracts in PR #684.
+"""LW-10 (ADR-0029): a Writer's valid DeliverableSpec renders in process and stores a PDF with origin `render`.
+Malformed replies get one scripted fake repair, then useful text when a file still cannot be built. No paid call.
 """
 
 from __future__ import annotations
@@ -144,14 +142,24 @@ def test_HR_1_FR_INT_missing_model_date_is_stamped_by_code() -> None:
     assert outcome.success and json.loads(outcome.outputs[0].spec_text)["date"] == "2026-10-16"
 
 
-@pytest.mark.parametrize("reply", list(BAD.values()), ids=list(BAD))
-def test_LW_10_a_reply_that_is_not_one_valid_spec_fails_the_unit_and_stores_nothing(reply: str, tmp_path: Path) -> None:
+@pytest.mark.parametrize(("case", "reply"), list(BAD.items()), ids=list(BAD))
+def test_LW_10_a_reply_that_is_not_one_valid_spec_gets_one_repair_then_safe_text(
+    case: str, reply: str, tmp_path: Path
+) -> None:
     outcome, provider = run_runner(reply)
-    assert not outcome.success and outcome.outputs == () and len(provider.requests) == 1
+    if case in {"oversize", "blank"}:
+        assert not outcome.success and outcome.outputs == () and len(provider.requests) == 1
+    else:
+        assert outcome.success and outcome.outputs[0].media_type == "text/markdown"
+        assert outcome.outputs[0].content == reply.encode("utf-8")
+        assert len(provider.requests) == 2
+        assert provider.requests[1].json_mode and provider.requests[1].tools is None
     assert "evil.test" not in outcome.summary and "Sales" not in outcome.summary  # a plain, fixed reason
     ran = run_units(tmp_path, {"U1": None}, runner=AsDeliver(reply), with_archive=True)
-    assert not ran.result.outcomes["U1"].success
-    assert ran.of("artifact.created") == [] and ran.rig.meta.paths() == [] and ran.rig.blobs._blobs == {}
+    assert ran.result.outcomes["U1"].success is (case not in {"oversize", "blank"})
+    assert len(ran.of("artifact.created")) == (0 if case in {"oversize", "blank"} else 1)
+    if case in {"oversize", "blank"}:
+        assert ran.rig.meta.paths() == [] and ran.rig.blobs._blobs == {}
 
 
 def test_LW_10_script_like_text_inside_a_valid_spec_is_printed_never_run() -> None:

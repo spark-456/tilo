@@ -52,6 +52,8 @@ async def render_report(
         raise DeliverableRefused("render_failed")
     try:
         build, spec_text = _plan(reply, fmt, template, report_date or datetime.now(UTC).date())
+    except DeliverableRefused:
+        raise  # too_large remains a hard refusal; do not relabel it as a repairable specification
     except Exception:
         raise DeliverableRefused("invalid_spec") from None
     if not _SLOTS.acquire(blocking=False):
