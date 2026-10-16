@@ -251,7 +251,10 @@ class Run:
         self.store, self.seams, self.cap, self.approach = store, seams, cap, copy.deepcopy(approach)
         self.org_id = deps.ORG_ID  # the run's artifact Scope is (org_id, world_id, owner); never a request's
         self.scope: Scope | None = None  # set when the run starts
-        self.world_id, self.run_id, self.owner, self.brief = task.world_id, task.run_id, task.owner, task.brief
+        self.world_id, self.run_id, self.owner = task.world_id, task.run_id, task.owner
+        self.brief = copy.deepcopy(task.brief)
+        for pick in task.maker_picks:
+            self.brief["deliverables"][pick["deliverable"]]["make_with"] = pick["make_with"]
         self.intake_answers = (
             tuple(  # (the Director's question, the person's answer) for the units' prompts (UNIT-PROMPT)
                 (q.text, str(task.answers[q.field]))
