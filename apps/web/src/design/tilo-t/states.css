@@ -1,0 +1,47 @@
+/* Shared Tilo T states (empty, loading, error). Layout and colour only; the shimmer and dots motion are .tt-shim and .tt-dots in motion.css. */
+.tt-st{position:relative;width:100%;color:var(--ink);font-family:var(--fB)}
+.tt-st--empty,.tt-st--error{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:56px 20px}
+.tt-st__stage{position:relative;width:260px;height:180px;display:flex;align-items:flex-end;justify-content:center}
+.tt-st__plot{position:absolute;left:50%;bottom:6px;width:180px;height:180px;margin-left:-90px;transform:translateY(50%) scaleY(.5) rotate(45deg);border:2px dashed var(--line2);border-radius:16px}
+.tt-st__buddy{position:relative}
+.tt-st__stage .tt-st__buddy{bottom:22px}
+.tt-st__alert{position:absolute;right:-14px;top:6px;width:34px;height:34px;border-radius:99px;background:var(--redSoft);color:var(--redInk);display:flex;align-items:center;justify-content:center}
+.tt-st__title{margin:8px 0 0;font-weight:700;font-size:28px;letter-spacing:-.8px;line-height:1.15;text-wrap:balance;max-width:520px}
+.tt-st__body{margin:0;font-size:16px;color:var(--ink2);max-width:460px;text-wrap:pretty}
+.tt-st__actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;padding-top:6px}
+.tt-st__btn{height:48px;min-width:44px;padding:0 20px;border-radius:14px;border:0;background:var(--pri);color:var(--onPri);display:inline-flex;align-items:center;gap:8px;font:700 15px var(--fB);cursor:pointer}
+.tt-st__btn--quiet{padding:0 18px;border:1px solid var(--line2);background:transparent;color:var(--ink);font-weight:600}
+.tt-st__btn:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.tt-st__code{font-family:var(--mono);font-size:12px;color:var(--ink3)}
+/* loading */
+.tt-st--loading{display:flex;flex-direction:column;gap:16px}
+.tt-st__pill{position:absolute;left:50%;top:-6px;transform:translateX(-50%);z-index:2;height:48px;padding:0 16px 0 8px;border-radius:99px;background:var(--card);border:1px solid var(--line);box-shadow:var(--sh2);display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;white-space:nowrap}
+.tt-st__dots{display:flex;gap:3px}
+.tt-st__dots span{width:5px;height:5px;border-radius:9px;background:var(--ink3)}
+.tt-st__grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;padding-top:56px}
+.tt-st__col{display:flex;flex-direction:column;gap:10px;padding-top:56px}
+.tt-st__split{display:flex;flex-wrap:wrap;gap:16px;padding-top:56px}
+.tt-st__side{flex:1 1 320px;max-width:420px;display:flex;flex-direction:column;gap:10px}
+.tt-st__side--wide{flex:1 1 300px;max-width:none}
+.tt-st__cal{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;padding-top:56px}
+.tt-st__chat{display:flex;flex-direction:column;gap:14px;padding-top:64px;max-width:760px;width:100%;margin:0 auto}
+/* skeleton cells: a dashed blueprint plot with a sheen (tShim moves the sheen) */
+.tt-sk{box-sizing:border-box;border:1px dashed var(--bpLine);background-color:var(--bp);background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%);background-size:700px 100%;background-repeat:no-repeat}
+.tt-sk--grid{background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%),linear-gradient(var(--bpLine) 1px,transparent 1px),linear-gradient(90deg,var(--bpLine) 1px,transparent 1px);background-size:700px 100%,20px 20px,20px 20px;background-repeat:no-repeat,repeat,repeat}
+.tt-sk--card{height:200px;border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:10px;justify-content:flex-end}
+.tt-sk--row{height:76px;border-radius:18px;padding:0 18px;display:flex;align-items:center;gap:14px}
+.tt-sk--item{height:84px;border-radius:18px}
+.tt-sk--tall{height:96px}
+.tt-sk--main{flex:2 1 420px;min-height:460px;border-radius:24px;padding:28px;display:flex;flex-direction:column;gap:14px}
+.tt-sk--cal{height:440px;border-radius:16px;padding:10px;display:flex;flex-direction:column;gap:8px;background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%),linear-gradient(var(--bpLine) 1px,transparent 1px);background-size:700px 100%,100% 44px;background-repeat:no-repeat,repeat}
+.tt-sk--plan{position:relative;flex:3 1 480px;height:600px;border-radius:24px;overflow:hidden;background-image:linear-gradient(var(--bpLine) 1px,transparent 1px),linear-gradient(90deg,var(--bpLine) 1px,transparent 1px);background-size:24px 24px;background-repeat:repeat}
+.tt-sk__bar{display:block;border-radius:9px;background:var(--bpLine)}
+.tt-sk__ico{width:44px;height:44px;border-radius:14px;background:var(--bpLine);flex:none}
+.tt-sk__lines{flex:1;display:flex;flex-direction:column;gap:8px}
+.tt-sk__block{height:140px;border-radius:16px;background:var(--bpLine);opacity:.45;margin-top:8px}
+.tt-sk__ev{border-radius:10px;background:var(--bpLine)}
+.tt-sk__iso{position:absolute;left:50%;top:50%;transform:scaleY(.58) rotate(45deg);border:2px dashed var(--bpInk)}
+.tt-sk__iso--a{width:380px;height:380px;margin:-190px 0 0 -190px;border-radius:18px;opacity:.5}
+.tt-sk__iso--b{width:200px;height:200px;margin:-100px 0 0 -100px;border-radius:12px;opacity:.35}
+.tt-sk__sheen{position:absolute;inset:0;background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%);background-size:700px 100%;background-repeat:no-repeat}
+@media (max-width:560px){.tt-st__title{font-size:24px}.tt-sk--plan{height:360px}.tt-sk--cal{height:300px}}
