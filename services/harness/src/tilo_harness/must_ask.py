@@ -217,7 +217,17 @@ class MustAsk:
             return _canned("repeated_failure", _FAILED, proceed=0, count=failures)
         uncovered = self._uncovered(unit)
         if uncovered:
-            return _canned("sensitive_step", _SENSITIVE, proceed=1, actions=_clip(", ".join(uncovered), 60))
+            if uncovered == ["build_handoff"]:
+                return Ask(
+                    "sensitive_step",
+                    "Hand this to Lovable to build?",
+                    tuple(_SENSITIVE[1]),
+                    _SENSITIVE[2],
+                    _SENSITIVE[3],
+                    1,
+                )
+            labels = ["Lovable" if action == "build_handoff" else action.replace("_", " ") for action in uncovered]
+            return _canned("sensitive_step", _SENSITIVE, proceed=1, actions=_clip(", ".join(labels), 60))
         try:
             reply = await asyncio.to_thread(self._providers[unit["role"]].generate, self._request(unit))
             asked = _parse(reply.text)
