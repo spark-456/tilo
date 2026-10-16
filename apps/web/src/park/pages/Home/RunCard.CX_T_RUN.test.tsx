@@ -23,3 +23,14 @@ it("CX_T_RUN_card_folds_only_for_a_real_Start_click_not_other_busy_work", () => 
   expect(started.container.querySelector("[data-testid='run-card']")?.className).toContain("starting");
   expect(started.container.textContent).toContain("Starting your world");
 });
+
+it("CX_T_RUN_start_state_shows_a_blueprint_cue_only_after_Start", () => {
+  const render = (starting: boolean) => mount(
+    <RunCard plan={plan} busy starting={starting} error={null} onStart={() => undefined} onCancel={() => undefined} onEdit={() => undefined} />,
+  );
+  const idle = render(false);
+  expect(idle.container.querySelector("[data-testid='run-blueprint']")).toBeNull();
+  idle.unmount();
+  const started = render(true);
+  expect(started.container.querySelector("[data-testid='run-blueprint']")?.textContent).toContain(plan.goal);
+});

@@ -123,7 +123,8 @@
 /* Loops stop while the tab is hidden or the section is off-screen (usePauseWhenHidden, useInView, useLoopPaused). */
 .tt-paused,.tt-paused *{animation-play-state:paused!important}
 /* triggeredBy: Start click in HomePage, world.started and world.planned in PendingWorldRoute. */
-[data-park] .park-home-plan--starting{animation:tRunCard 1.8s var(--tt-ease-standard) both}
+[data-park] .park-home-plan--starting{animation:tRunCard 6s cubic-bezier(.6,0,.2,1) both}
+[data-park] .park-home-plan--starting .park-home-run-blueprint{animation:tRunBp 6s ease-in-out both}
 [data-park] .park-pending-world__pool{animation:tPoolOpen .5s var(--tt-ease-leap) both}
 [data-park] .park-world-enter{animation:tRise .3s var(--tt-ease-standard) both}
 

@@ -34,6 +34,11 @@ export function RunCard({ plan, busy, starting = false, error, onStart, onCancel
   return (
     <>
     <div className={starting ? "park-home-plan park-home-plan--starting" : "park-home-plan"} data-testid="run-card">
+      {starting ? (
+        <span className="park-home-run-blueprint" data-testid="run-blueprint" aria-hidden="true">
+          BLUEPRINT · {plan.goal}
+        </span>
+      ) : null}
       <div className="park-home-plan__main">
         <div className="park-home-plan__head">
           <span className="park-home-tier">READY</span>
