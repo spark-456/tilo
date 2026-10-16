@@ -559,9 +559,9 @@
   .park-connectors-connect {
   flex: 1 1 100%;
   min-height: 44px;
-  background: var(--priFill);
+  background: var(--pri);
   color: var(--onPri);
-  border-color: var(--priFill);
+  border-color: var(--pri);
 }
 [data-park][data-theme="studio"]
   .park-connectors-section[aria-label="Your Google account"]
