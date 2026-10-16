@@ -188,6 +188,20 @@ BAD = {
 }
 
 
+@pytest.mark.parametrize(
+    "html",
+    [
+        page(head='<style>p{content:"/*";background:url(//h/x)}q{content:"*/"}</style>'),
+        page(head=r"<style>p{background:\/* ;background:url(//h/x)}</style>"),
+        page('<p style=\'content:"/*";background:url(//h/x);content:"*/"\'>x</p>'),
+        page('<p style="background:\\/* ;background:url(//h/x)">x</p>'),
+    ],
+)
+def test_CX_WEB_1_css_comment_tokens_cannot_hide_external_urls(html: bytes) -> None:
+    result = check_website(html)
+    assert (result.ok, result.code) == (False, "ws_css")
+
+
 @pytest.mark.parametrize("name", sorted(BAD))
 def test_WEB_1_WS_09_one_bad_page_per_rule_is_refused_with_its_code(name: str) -> None:
     code, data = BAD[name]

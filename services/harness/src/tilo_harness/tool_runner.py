@@ -195,7 +195,7 @@ class ToolUnitRunner:
         )
         wanted = wants_website(unit, context.brief)  # WEB-1: the final writer's reply is one HTML file
         # WT-04: a page can run script, so a run that rests on the person's private data never makes one; it
-        # answers in Markdown with a plain note. Outside (tainted) content alone may (owner, 16 Oct 2026).
+        # answers in Markdown with a plain note. Outside (tainted) content alone may (supervisor default, 16 Oct 2026).
         website = wanted and not loop.private
         holds_effects = not loop.tainted and any(self._tools.is_side_effect(tool) for tool in allowed.values())
         base = load_prompt(
