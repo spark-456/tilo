@@ -33,6 +33,7 @@ class ToolLimits:
     credit_share: float  # of the run's credit cap, spent by one unit before its tools are withheld
     progress_default: str
     progress: Mapping[str, str] = field(default_factory=dict)
+    design_credit_share: float = 0.3
 
     def line(self, tool: str) -> str:
         """The plain sentence a running call of `tool` is recorded with."""
@@ -72,6 +73,9 @@ def load_tool_limits(path: Path | None = None) -> ToolLimits:
     ):
         raise ToolLimitsError("tool_loop.yaml: calls_per_tool must map tool names to counts from 1 to 50")
     progress = doc.get("progress")
+    design_share = doc.get("design", {}).get("credit_share", 0.3)
+    if type(design_share) not in (int, float) or not 0 < design_share < 1:
+        raise ToolLimitsError("tool_loop.yaml: design.credit_share must be above zero and below one")
     if not isinstance(progress, dict) or not isinstance(progress.get("tools"), dict):
         raise ToolLimitsError("tool_loop.yaml: progress needs default and tools")
     return ToolLimits(
@@ -84,4 +88,5 @@ def load_tool_limits(path: Path | None = None) -> ToolLimits:
         credit_share=float(share),
         progress_default=_line(progress.get("default"), "progress.default"),
         progress={str(k): _line(v, f"progress.tools.{k}") for k, v in progress["tools"].items()},
+        design_credit_share=float(design_share),
     )

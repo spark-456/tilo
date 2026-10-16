@@ -8,6 +8,8 @@ import { createRoomClient, readRoom } from "../park/api/live/meetingHall";
 import { Stage } from "../stage/Stage";
 import { useRunStatus } from "../world/runLog";
 import { type RoomWords, useClientWorld } from "../world/useClientWorld";
+import { AgentLayer } from "./live/AgentLayer";
+import { Conversations } from "./live/Conversations";
 
 export default function LiveStageEmbed({ worldId }: { worldId: string }) {
   const client = useClient();
@@ -25,7 +27,11 @@ export default function LiveStageEmbed({ worldId }: { worldId: string }) {
   const world = useClientWorld(client, worldId, words);
   const status = useRunStatus(client, worldId);
   return (
-    <div className="park-world-livestage" data-testid="live-stage">
+    <div
+      className={`park-world-livestage${status === "completed" ? " tw-light" : ""}`}
+      data-testid="live-stage"
+      data-run-status={status}
+    >
       <Stage
         key={worldId}
         landmark={false}
@@ -36,6 +42,7 @@ export default function LiveStageEmbed({ worldId }: { worldId: string }) {
         worldId={world.worldId}
         paused={status === "paused"}
       />
+      <AgentLayer worldId={worldId} rooms={rooms} />
       {world.note ? (
         <div
           className="park-world-livenote"
@@ -52,4 +59,10 @@ export default function LiveStageEmbed({ worldId }: { worldId: string }) {
       ) : null}
     </div>
   );
+}
+
+/** TILO-T-WORLD: the agents' chat for the World page's Chat tab; it lives in this chunk so the page imports one module. */
+export function LiveChat({ worldId }: { worldId: string }) {
+  const rooms = useMemo(createRoomClient, []);
+  return <Conversations worldId={worldId} rooms={rooms} />;
 }

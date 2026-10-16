@@ -1,5 +1,14 @@
 # SEC-15: deployed access, visitor or judge (what the acceptance tests pin)
 
+> **Superseded by OPEN-ACCESS (owner's order, 16 Oct 2026: "Everyone must be able to access through their mail, lets remove
+> the entire judge and non judge blockers").** The gate below no longer reads a declaration. Every verified sign-in passes
+> (no sign-in is still 401), is treated as the former judge (`access.OPEN_DECLARATION`: live models only where
+> `TILO_JUDGE_LIVE=1`, per-uid rate limit and spend cap apply), and the codes `declaration_required`, `under_construction`
+> and `declaration_locked` are never returned. `GET /access` answers `{"declaration": "judge", "allowed": true, "models": ...}`
+> for everyone and `POST /access/declaration` accepts the old body and stores nothing. The tests are
+> `test_SEC_15_open_access.py` and `test_SEC_16_open_access_allowance.py`. The rest of this file is history.
+
+
 Source: `docs/prd-supplement-2026-10-05.md` section 4, SEC-15 (Must, user, 5 Oct): "Deployed access: sign-up asks
 'visitor or Google AI Builder Cup judge?'. Visitors see 'still under construction, not open to the public' and get
 no access; judges get live models (never forced to replay). Enforced server-side from the stored declaration."

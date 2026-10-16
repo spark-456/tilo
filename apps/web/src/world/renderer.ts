@@ -190,7 +190,7 @@ type Zone = { x0: number; x1: number; y0: number; y1: number };
 const TAG_GAP = 4;
 /** A tag slides at most this far to clear the figures; further and it would sit over another
  * building, so it stays where it was. */
-const SLIDE_MAX = 40;
+const SLIDE_MAX = 90;
 /** What a resting figure covers in front of a building (Friendly's size, the larger): half its width
  * either side of its feet, its height up (the same 30 units the rank tag sits above). */
 const FIGURE_HALF_W = 18;
@@ -538,8 +538,16 @@ export function renderSelection(
   frame: Frame,
   positions: ReadonlyMap<string, { x: number; y: number }>,
   id: string | null,
+  lit: readonly string[] = [],
 ) {
   const g = layer.ring.clear();
+  // TILO-T-WORLD: an agent the pointer is over, or a clicked message names, lights up (a soft disc and a ring).
+  for (const agent of lit) {
+    const at = frame.agents.some((a) => a.id === agent) ? positions.get(agent) : undefined;
+    if (!at) continue;
+    g.ellipse(at.x, at.y - 2, 26, 15).fill({ color: tokens.color.brand.primary, alpha: 0.22 });
+    g.ellipse(at.x, at.y - 2, 26, 15).stroke({ width: 2, color: tokens.color.brand.primary });
+  }
   if (id === null) return;
   const at = frame.agents.some((a) => a.id === id) ? positions.get(id) : undefined;
   if (at) {

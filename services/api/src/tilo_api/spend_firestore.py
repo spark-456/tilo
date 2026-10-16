@@ -127,7 +127,10 @@ class FirestoreSpendLedger:
             tx.set(self._ref(f"hold:{rid}"), {**terms, "status": "held", "actual_minor": None, "expires_at": expires})
             return Reservation(id=rid, uid=uid, run_id=run_id, org_id=org_id, amount_minor=amount)
 
-        return self._run(txn)  # type: ignore[no-any-return]
+        result = self._run(txn)
+        if isinstance(result, Refused) and result.reason == "global_hard":
+            logger.warning("daily deployment spend cap reached; live models switched to replay_only")
+        return result  # type: ignore[no-any-return]
 
     def _sweep_uid(self, uid: str, at: datetime) -> None:
         last = self._swept.get(uid)
@@ -169,9 +172,12 @@ class FirestoreSpendLedger:
         the first did; the other close is a `KeyError`, like a hold that never existed."""
         rid = _part(reservation.id, "reservation id")
         want = "released" if actual is None else "settled"
+        newly_tripped = False
 
         @firestore.transactional  # type: ignore[misc]
         def txn(tx: Any) -> Settled | None:
+            nonlocal newly_tripped
+            newly_tripped = False
             hold = self._ref(f"hold:{rid}").get(transaction=tx)
             stored = hold.to_dict() if hold.exists else None
             if not isinstance(stored, dict) or stored.get("uid") != reservation.uid:
@@ -194,9 +200,13 @@ class FirestoreSpendLedger:
             if actual is not None and totals[-1][0] + actual >= self._caps.global_day_hard_minor:
                 if not self._switch_on(switch):  # the day reached its hard cap: new live work stops (NFR-24)
                     self._write_switch(tx, True, "the daily hard cap was reached")
+                    newly_tripped = True
             return None if actual is None else Settled(overrun=actual > amount)
 
-        return self._run(txn)  # type: ignore[no-any-return]
+        result = self._run(txn)
+        if newly_tripped:
+            logger.warning("daily deployment spend cap reached; live models switched to replay_only")
+        return result  # type: ignore[no-any-return]
 
     def settle(self, reservation: Reservation, actual_minor: int) -> Settled:
         actual = _int(actual_minor, "actual_minor", 0)  # a bad actual leaves the hold in place

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import pathlib
 import re
-import threading
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -80,33 +79,12 @@ def non_public(app: Any) -> list[tuple[str, str]]:
     return [r for r in route_table(app) if r not in PINNED_PUBLIC_ROUTES | PINNED_PUBLIC_LINK_ROUTES]
 
 
-class FakeAccessStore:
-    """The two methods of the pinned store protocol: `get(user_id)` and `declare(user_id, declaration)` (first
-    write wins, atomic, returns what is stored). `reads` and `writes` record every call."""
-
-    def __init__(self, declarations: dict[str, str] | None = None) -> None:
-        self.data: dict[str, str] = dict(declarations or {})
-        self.reads: list[str] = []
-        self.writes: list[tuple[str, str]] = []
-        self._lock = threading.Lock()
-
-    def get(self, user_id: str) -> str | None:
-        self.reads.append(user_id)
-        return self.data.get(user_id)
-
-    def declare(self, user_id: str, declaration: str) -> str:
-        self.writes.append((user_id, declaration))
-        with self._lock:
-            return self.data.setdefault(user_id, declaration)
-
-
 @dataclass
 class Sec15:
     """The real app, deployed-style, with every injected seam. `as_user` switches the signed-in principal."""
 
     client: TestClient
     store: Any  # deps.Store
-    access: FakeAccessStore
     safety: Any
     flags: Any
     router_modes: list[str] = field(default_factory=list)
@@ -166,11 +144,10 @@ def build(monkeypatch: Any, *, declarations: dict[str, str] | None = None, deplo
     writer = make_writer(store)
     safety = make_spy_safety()
     flags = InMemoryFlagStore()
-    access = FakeAccessStore(declarations)
     provider = RoleScriptedProvider(brief_reply([]), APPROACHES_REPLY)
     scripted = build_router(REPO_ROOT, provider)
 
-    h = Sec15(client=None, store=store, access=access, safety=safety, flags=flags)  # type: ignore[arg-type]
+    h = Sec15(client=None, store=store, safety=safety, flags=flags)  # type: ignore[arg-type]
 
     def current_principal() -> Any:
         if not h.signed_in:
@@ -187,7 +164,6 @@ def build(monkeypatch: Any, *, declarations: dict[str, str] | None = None, deplo
     app.dependency_overrides[deps.get_flag_store] = lambda: flags
     app.dependency_overrides[intake_module.get_safety] = lambda: safety
     app.dependency_overrides[deps.get_safety] = lambda: safety
-    app.dependency_overrides[seam(deps, "get_access_store")] = lambda: access
     # SEC-16: live needs a wired ledger (a fresh one) and each test gets its own limiter; _sec16_lib.py replaces both
     from tilo_api.spend import InMemorySpendLedger, RateLimiter, load_spend_caps  # noqa: PLC0415
 

@@ -25,6 +25,7 @@ from tilo_providers.prompts import load_prompt
 from tilo_providers.router import Router, RouterError, RouterResult
 
 from tilo_planning.brief import DIRECTOR_ROLE
+from tilo_planning.deliverable_teams import with_design_team
 from tilo_planning.plangraph import SCHEMA_RULE, Violation, _floor_tier, validate_plan
 
 PLAN_THINKING = "medium"  # drafting units needs some thought; the model's default (dynamic, high) is billed as output
@@ -247,7 +248,7 @@ def compile_plan(
         except pydantic.ValidationError as error:
             found = [f"schema: {_pointer(e['loc'])} does not match the units schema" for e in error.errors()[:20]]
         else:
-            units = _with_deliver(units, brief)
+            units = with_design_team(_with_deliver(units, brief), brief)
             plan = {
                 "approaches": approaches, "chosen_approach": approach["id"], "units": units,
                 "gates": _gates(units, inputs), "budget_cap": budget_cap,

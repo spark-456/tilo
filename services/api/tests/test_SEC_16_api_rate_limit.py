@@ -132,27 +132,29 @@ def test_SEC_16_public_routes_are_not_counted_so_sign_up_and_the_label_always_wo
     assert h.limiter.checked == []
 
 
-def test_SEC_16_a_visitor_an_undeclared_person_and_nobody_never_reach_the_limiter_or_the_ledger(sec16_factory):
+def test_SEC_16_every_signed_in_person_is_counted_and_nobody_signed_out_reaches_the_limiter(sec16_factory):
+    """OPEN-ACCESS (16 Oct 2026): a visitor or an undeclared person is a person like any other, so the per-uid limit
+    applies to them; a request with no sign-in is a 401 before the limiter."""
     h = sec16_factory(declarations=declared(), rate_limit_requests=1, rate_limit_window_s=60)
 
     h.as_user(VISITOR)
-    assert [h.intake().status_code for _ in range(3)] == [403, 403, 403]  # never 429: SEC-15 answers first
+    assert [h.intake().status_code for _ in range(3)] == [201, 429, 429]
     h.as_user(NEWCOMER)
-    assert [h.intake().status_code for _ in range(3)] == [403, 403, 403]
+    assert [h.intake().status_code for _ in range(3)] == [201, 429, 429]
+    checked = list(h.limiter.checked)
     h.sign_out()
     assert [h.intake().status_code for _ in range(3)] == [401, 401, 401]
 
-    assert h.limiter.checked == [], "SEC-15's gate comes first: only a judge is ever counted"
-    assert h.ledger.calls == [], "and only a judge ever reaches the ledger"
+    assert h.limiter.checked == checked, "a request with nobody signed in is never counted"
 
 
-def test_SEC_16_a_visitors_access_check_never_reads_the_ledger(sec16_factory):
-    h = sec16_factory(declarations=declared())
+def test_SEC_16_the_access_check_of_a_person_who_never_declared_spends_nothing_when_not_live(sec16_factory):
+    h = sec16_factory(declarations=declared(), judge_live=False)
     h.as_user(VISITOR)
 
-    assert h.me().json() == {"declaration": "visitor", "allowed": False, "models": None}
+    assert h.me().json() == {"declaration": "judge", "allowed": True, "models": "replay"}
 
-    assert h.ledger.calls == []
+    assert [c for c in h.ledger.calls if c[0] != "replay_only"] == [], "only the kill-switch flag is read"
 
 
 def test_SEC_16_not_deployed_nothing_is_counted_and_nothing_is_limited(sec16_factory):

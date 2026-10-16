@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/memory_item.schema.json",
+  "x-version": "1.0.0",
+  "title": "MemoryItem",
+  "description": "One note on a person's 'Tilo remembers' list (ADR-0049): a preference, a fact or a person, in at most 280 characters, that Tilo hands to that person's own Quick asks and intake as data. Stored and served by tilo-api for the verified principal only, keyed by org and owner; nobody else reads, lists or counts it (MI-01). Every stored item was saved by the person: typed on the list, or a suggestion they tapped (`source` tilo_suggested), so there is no unconfirmed state (MI-04). Delete is a hard delete (MI-02). A note authorises nothing (MI-07). $defs: `create` and `update` are the POST and PATCH bodies, `list` the GET answer, `suggestion` what a Quick answer may offer, `prompt_context` the data block handed to a prompt. Rules MI-01 to MI-10 are in memory_item.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "org_id", "owner", "text", "kind", "source", "created_at", "updated_at"],
+  "properties": {
+    "id": { "$ref": "#/$defs/memory_item_id" },
+    "org_id": { "$ref": "common.schema.json#/$defs/org_id" },
+    "owner": { "$ref": "common.schema.json#/$defs/user_id" },
+    "text": { "$ref": "#/$defs/text" },
+    "kind": { "$ref": "#/$defs/kind" },
+    "source": { "$ref": "#/$defs/source" },
+    "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "updated_at": { "$ref": "common.schema.json#/$defs/timestamp" }
+  },
+  "$defs": {
+    "memory_item_id": {
+      "description": "Minted by tilo-api; never taken from a body.",
+      "type": "string",
+      "pattern": "^mem_[0-9A-Za-z_]{1,48}$",
+      "not": { "pattern": "\\n" }
+    },
+    "text": {
+      "description": "The note: one line of 1 to 280 characters with no leading or trailing space, no control, format, line or paragraph separator character of the Basic Multilingual Plane, no variation selector after an ASCII character and no link (`://` or host/path). Astral format characters and variation selectors are the api's (MI-03). Data, never an instruction.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 280,
+      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+      "not": {
+        "anyOf": [
+          { "pattern": "[\\n\\r]" },
+          { "pattern": "^\\s|\\s$" },
+          { "pattern": ":[/\\\\]{2}" },
+          { "pattern": "[A-Za-z0-9-]+\\.(?![jJ][sS][/:])[A-Za-z]{2,63}(?::[0-9]{1,5})?/[^\\s/]" },
+          {
+            "pattern": "(?:^|[\\u0000-\\u0022\\u0024-\\u0029\\u002B-\\u002F\\u003A-\\u007F])[\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0F]|[#*0-9][\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0D]"
+          }
+        ]
+      }
+    },
+    "kind": {
+      "description": "What the note is about: a preference (I prefer morning meetings), a fact (I work on the Q4 launch) or a person (my manager is Priya). A label for the list; it changes no use (MI-05).",
+      "type": "string",
+      "enum": ["preference", "fact", "person"]
+    },
+    "source": {
+      "description": "Provenance only: user when the person typed it on the list, tilo_suggested when they tapped a suggestion a Quick answer offered (MI-04). It never changes, an edit included, and it grants nothing.",
+      "type": "string",
+      "enum": ["user", "tilo_suggested"]
+    },
+    "create": {
+      "description": "The body of POST /v1/memory. It names no id, owner, org or time: tilo-api mints the id and takes the owner and org from the verified principal (MI-01, MI-02).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "kind", "source"],
+      "properties": {
+        "text": { "$ref": "#/$defs/text" },
+        "kind": { "$ref": "#/$defs/kind" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "update": {
+      "description": "The body of PATCH /v1/memory/{id}: a new text, a new kind, or both. `source` and every server-owned field are refused (MI-02).",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "text": { "$ref": "#/$defs/text" },
+        "kind": { "$ref": "#/$defs/kind" }
+      }
+    },
+    "list": {
+      "description": "The answer of GET /v1/memory: the principal's own items, newest `updated_at` first, ties by id, at most 100 (MI-02).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "$ref": "#" }
+        }
+      }
+    },
+    "suggestion": {
+      "description": "What a Quick answer may offer to remember: at most one per answer, made by code from the person's own words in that question, never by a model (MI-04). Nothing is stored until the person taps it, which POSTs `create` with source tilo_suggested.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "kind"],
+      "properties": {
+        "text": { "$ref": "#/$defs/text" },
+        "kind": { "$ref": "#/$defs/kind" }
+      }
+    },
+    "prompt_context": {
+      "description": "The data block tilo-api renders into the user turn (never the system prompt, EFF-04) of the person's own Quick ask and the Director's brief extraction for their own signed-in intake (MI-05): the person's local date and at most 20 of their notes, newest first. It carries no name, address, title or other settings text (USET-08). Fenced and labelled as data, never instructions.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "today", "items"],
+      "properties": {
+        "v": { "const": "1.0" },
+        "today": { "$ref": "common.schema.json#/$defs/calendar_date" },
+        "items": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/context_item" }
+        }
+      }
+    },
+    "context_item": {
+      "description": "One note as a prompt sees it: its id (so the Director may cite it in brief.sources, kind memory, MI-05), kind and text.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/memory_item_id" },
+        "kind": { "$ref": "#/$defs/kind" },
+        "text": { "$ref": "#/$defs/text" }
+      }
+    }
+  }
+}

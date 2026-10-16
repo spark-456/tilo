@@ -1,5 +1,6 @@
 """PPTX deck renderer with native data-bound charts (FR-CON-09; PRD 6.6, 12.4, 12.6)."""
 
+import base64
 import io
 import json
 from pathlib import Path
@@ -21,8 +22,10 @@ from tilo_render.spec import (
     ChartKind,
     DeliverableSpec,
     ParagraphBlock,
+    SlideBlock,
     Table,
     TableBlock,
+    slide_chunks,
 )
 from tilo_render.text import PROVENANCE_HEADING, provenance_lines, sanitize_text, wrap_long_token
 from tilo_render.text import find_repo_root as _find_repo_root
@@ -60,6 +63,7 @@ def _slide(
     slide.background.fill.fore_color.rgb = bg
     if heading and h_col:
         tb = slide.shapes.add_textbox(Inches(1.0), Inches(0.8), Inches(11.3), Inches(1.0))
+        tb.text_frame.word_wrap = True
         p = tb.text_frame.paragraphs[0]
         p.text, p.font.size, p.font.bold, p.font.color.rgb = sanitize_text(heading), Pt(h_pt), True, h_col
     return slide
@@ -175,6 +179,39 @@ def _add_chart_slide(
         chart.chart_title.text_frame.paragraphs[0].font.color.rgb = col["slide_header"]
 
 
+def _add_design(prs: Any, block: SlideBlock, col: dict[str, RGBColor], typ: dict[str, float]) -> None:
+    left, right = slide_chunks(block.left), slide_chunks(block.right)
+    for index in range(max(len(left), len(right))):
+        slide = _slide(
+            prs,
+            col["slide_background"],
+            "\n".join(_chunk_text(block.title, 45)),
+            col["slide_header"],
+            min(16, typ["slide_title_size_pt"]),
+        )
+        slide.notes_slide.notes_text_frame.text = sanitize_text(block.notes)
+        for column, chunks in enumerate((left, right)):
+            text = chunks[index] if index < len(chunks) else ""
+            x, width = (1.0, 5.3) if column == 0 else (7.0, 5.3)
+            y, height = 2.2, 4.2
+            size = typ["body_size_pt"]
+            if block.layout == "stat" and column == 0 and len(text) <= 10 and "\n" not in text:
+                size = 44
+            if block.layout == "image" and column == 1:
+                continue
+            tf = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(width), Inches(height)).text_frame
+            tf.word_wrap = True
+            for number, line in enumerate(text.split("\n")):
+                para = tf.paragraphs[0] if number == 0 else tf.add_paragraph()
+                para.text, para.font.size, para.font.color.rgb = sanitize_text(line), Pt(size), col["slide_text"]
+            if block.layout == "image" and block.image_base64:
+                picture = slide.shapes.add_picture(
+                    io.BytesIO(base64.b64decode(block.image_base64)), Inches(7), Inches(2.2)
+                )
+                scale = min(Inches(5.3) / picture.width, Inches(4.2) / picture.height)
+                picture.width, picture.height = int(picture.width * scale), int(picture.height * scale)
+
+
 def render_pptx(
     spec: DeliverableSpec,
     *,
@@ -210,7 +247,9 @@ def render_pptx(
     for sec in spec.sections:
         _slide(prs, colors["section_background"], sec.heading, colors["section_title"], typo["section_title_size_pt"])
         for b in sec.blocks:
-            if isinstance(b, ParagraphBlock):
+            if isinstance(b, SlideBlock):
+                _add_design(prs, b, colors, typo)
+            elif isinstance(b, ParagraphBlock):
                 for chunk in _chunk_text(b.text, max_chars=chars_per_slide):
                     _add_para_slide(prs, sec.heading, chunk, colors, typo)
             elif isinstance(b, BulletsBlock):

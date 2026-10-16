@@ -80,9 +80,11 @@ const HEADINGS = [
   "Run it with your team.",
   "Signed in and working in one step.",
   "Everything in play, at a glance.",
+  "Your week, and the bits worth keeping.",
   "Your tools, on your terms.",
   "Built for companies. Just as handy for one person.",
   "Agents you can actually watch, and trust.",
+  "A good place to start.",
   "Your little city is waiting.",
 ];
 

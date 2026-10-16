@@ -357,6 +357,8 @@ def test_FR_AGT_14_deployed_the_tick_reaches_its_own_check_while_every_other_new
     ok = sched.tick()
     assert (ok.status_code, ok.json()) == (200, {"fired": 0})
     no_task = SimpleNamespace(task_id="t_none", approach_id="quick")
-    for call in (sched.listing, lambda: sched.create(no_task), lambda: sched.get("sched_a")):
+    # SEC-15 open access: the access store and its 503 are gone, so a signed-in caller reaches the schedule routes.
+    assert sched.listing().status_code == 200
+    for call in (lambda: sched.create(no_task), lambda: sched.get("sched_a")):
         response = call()
-        assert response.status_code in (401, 403, 503), response.status_code  # the gate's refusal, never a route answer
+        assert response.status_code not in (401, 403, 503), response.status_code  # the route's own answer, no gate

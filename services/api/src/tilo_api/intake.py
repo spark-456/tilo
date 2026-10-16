@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import asdict
+import re
+from dataclasses import asdict, replace
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
@@ -40,6 +41,7 @@ from tilo_providers.clock import Clock
 from tilo_providers.config import ProviderConfigError
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
+from tilo_providers.media import MediaPart
 from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Deadline, Router, RouterDeadlineError
 
@@ -51,6 +53,29 @@ from tilo_api.intake_uploads import FILE_SCREEN_UNAVAILABLE, RunUploads, UploadS
 from tilo_api.tasks import create_task
 
 router = APIRouter()
+
+_QUIZ_INTENT = re.compile(
+    r"\b(?:quiz|interactive\s+(?:test|exam|assessment)|practice\s+test|mock\s+test|self[- ]?test)\b", re.I
+)
+_QUIZ_SOURCES = {"application/pdf", "image/png", "image/jpeg"}
+
+
+def safe_app_brief(brief: dict[str, Any], task_text: str, parts: list[MediaPart]) -> dict[str, Any]:
+    """An AppSpec is possible only for an explicit quiz with a screened native source."""
+    if _QUIZ_INTENT.search(task_text) and any(part.mime_type in _QUIZ_SOURCES for part in parts):
+        return brief
+    deliverables = brief.get("deliverables")
+    if not isinstance(deliverables, list):
+        return brief
+    return {
+        **brief,
+        "deliverables": [
+            {**item, "format": "markdown"} if isinstance(item, dict) and item.get("format") == "app" else item
+            for item in deliverables
+        ],
+    }
+
+
 logger = logging.getLogger("tilo_api.intake")
 
 _store = InMemoryArtifactStore()
@@ -202,6 +227,7 @@ async def _thinking(
                 parts=prepared.parts,
                 deadline=deadline,
             )
+            extraction = replace(extraction, brief=safe_app_brief(extraction.brief, text, prepared.parts))
         except TaskRefused as refused:
             await _abort_uploads(store)
             # FR-INT-12: configured text only (reason, nearest task, category); nothing stored, no further call.

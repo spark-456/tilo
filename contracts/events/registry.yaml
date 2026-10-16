@@ -19,7 +19,7 @@
 # (PRD 10.4 Audit, HR-7). Such an event carries authz (EV-03) from one of authz_by (EV-04), and
 # event.schema.json lists the same types (contracts-check fails if the lists drift).
 
-version: 1.5.0
+version: 1.6.0
 unknown_types: trace_only
 types:
   world.requested:
@@ -152,6 +152,19 @@ types:
     trace_row: "proposal={data.proposal_id} run={data.run}"
     data_schema: events/data/plan.revised.schema.json
     fixture: fixtures/events/valid/plan.revised.json
+  plan.maker_chosen:
+    family: plan
+    verb: maker_chosen
+    priority: should
+    pillar: P1
+    default_severity: info
+    side_effect: false
+    world_effect: "A signpost at the Town Hall names who makes the deliverable: Tilo or the partner the person picked."
+    hud_effect: "none"
+    story_template: "{actor} picked {data.label} to make a {data.format} deliverable."
+    trace_row: "deliverable={data.deliverable} make_with={data.make_with} suggested={data.suggested}"
+    data_schema: events/data/plan.maker_chosen.schema.json
+    fixture: fixtures/events/valid/plan.maker_chosen.json
   budget.requested:
     family: budget
     verb: requested

@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/events/data/artifact.created.schema.json",
-  "x-version": "1.1.0",
+  "x-version": "1.2.0",
   "title": "ArtifactCreatedData",
-  "description": "data of artifact.created (PRD 9.5): version 1 of a new artifact (EV-15). A version that went through the artifact store (ADR-0018) carries content_sha256, media_type and size_bytes copied from its stored record (artifact.schema.json), all three or none; the event is written only after the store committed it. Events from before the store, and the intake and channels producers, carry none (1.0.0 shape).",
+  "description": "data of artifact.created (PRD 9.5): version 1 of a new artifact (EV-15). A version that went through the artifact store (ADR-0018) carries content_sha256, media_type and size_bytes copied from its stored record (artifact.schema.json), all three or none; the event is written only after the store committed it. Events from before the store, and the intake and channels producers, carry none (1.0.0 shape). 1.2.0 (ADR-0050): a website's HTML (text/html) is at most 524,288 bytes, as in the record (AR-10).",
   "type": "object",
   "additionalProperties": false,
   "required": ["artifact"],
@@ -33,5 +33,9 @@
     "properties": { "media_type": { "enum": ["text/markdown", "text/csv", "application/json"] } },
     "required": ["media_type"]
   },
-  "then": { "properties": { "size_bytes": { "maximum": 2000000 } } }
+  "then": { "properties": { "size_bytes": { "maximum": 2000000 } } },
+  "else": {
+    "if": { "properties": { "media_type": { "const": "text/html" } }, "required": ["media_type"] },
+    "then": { "properties": { "size_bytes": { "maximum": 524288 } } }
+  }
 }

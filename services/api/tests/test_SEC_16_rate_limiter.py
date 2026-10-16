@@ -71,6 +71,39 @@ def test_SEC_16_each_uid_has_its_own_window():
     assert rl.check("u_b").allowed is False
 
 
+def test_SEC_16_idle_uid_buckets_expire_and_active_uid_remains_limited():
+    clock = FakeClock(0.0)
+    rl = limiter(1, 5, clock)
+    rl.IDLE_TTL_S = 5
+    assert rl.check("idle").allowed
+    assert rl.check("active").allowed
+    clock.advance(4)
+    assert rl.check("active").allowed is False
+    clock.advance(2)
+    assert rl.check("fresh").allowed
+    assert "idle" not in rl._hits
+    assert "active" in rl._hits
+
+
+def test_SEC_16_uid_bucket_count_is_bounded():
+    rl = limiter(1, 5)
+    rl.MAX_UIDS = 5
+    for i in range(5):
+        assert rl.check(f"uid-{i}").allowed
+    assert len(rl._hits) <= rl.MAX_UIDS
+    assert rl.check("uid-5").allowed is False
+    assert rl.check("uid-0").allowed is False, "capacity pressure must not erase an active uid's window"
+
+
+def test_SEC_16_idle_ttl_never_shortens_a_longer_rate_window():
+    clock = FakeClock(0.0)
+    rl = limiter(1, 3_600, clock)
+    assert rl.check("uid").allowed
+    clock.advance(1_801)
+    assert rl.check("uid").allowed is False
+    assert "uid" in rl._hits
+
+
 def test_SEC_16_a_uid_is_a_uid_only_whatever_it_looks_like():
     """The key is exactly the string given: no case folding, trimming or prefix matching that two different
     people's ids could collide through (and no way for one to share a bucket with a victim)."""

@@ -30,6 +30,8 @@ export const TABS = [
   },
   { id: "ask", label: "Ask before", section: "Ask before", h2: ["Ask me before Tilo…"] },
   { id: "notifications", label: "Notifications", section: "Notifications", h2: ["Notifications"] },
+  // MO-02 adds the person's morning brief setting to Settings.
+  { id: "brief", label: "Morning brief", section: "Morning brief settings", h2: [] },
   { id: "security", label: "Security", section: "Security", h2: ["Security"] },
   { id: "billing", label: "Plan and billing", section: "Plan and billing", h2: ["Invoices"] },
 ] as const;
@@ -198,6 +200,7 @@ const header: readonly string[] = [
 
 /** Every visible string of the page frame plus one tab, once each (the page's own text, options included). */
 export const STRINGS: Record<TabId, readonly string[]> = {
+  brief: [...header, "Sign in to change brief settings."],
   profile: [
     ...header,
     PROFILE_COPY.sub,
@@ -263,6 +266,7 @@ export const STRINGS: Record<TabId, readonly string[]> = {
 
 /** Every aria-label on the page for a tab (a multiset, sorted); the nav is always "Settings". */
 export const ARIA_LABELS: Record<TabId, readonly string[]> = {
+  brief: ["Settings", "Morning brief settings"],
   profile: ["Settings", "Profile"],
   notifications: [
     "Settings",

@@ -329,7 +329,7 @@ Hard requirements from the security review for the routes the infra points at:
 
 ## 11. Sign-in with Google (Firebase Authentication): the console checklist (SEC-15)
 
-Terraform cannot do these. They turn on app sign-in (Google, and anonymous demo sessions for visitors and judges), which
+Terraform cannot do these. They turn on app sign-in (Google, and anonymous demo sessions), which
 `tilo-api` checks on every request and the web app asks for before it shows anything (BQ-SIGNIN-1..7 in
 `docs/open-questions.md`). Tilo never handles passwords (PRD 16.1). Do them in this order, for project
 `essential-wares-510320-f0`:

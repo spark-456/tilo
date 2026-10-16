@@ -104,18 +104,20 @@ def test_SEC_16_firestore_ledger_release_returns_the_hold_and_a_bad_actual_chang
     assert ledger.spent_minor(JUDGE_A) == 0
 
 
-def test_SEC_16_firestore_ledger_the_global_day_trips_the_durable_switch_once():
+def test_SEC_16_firestore_ledger_the_global_day_trips_and_logs_the_durable_switch_once(caplog):
     ledger = make(global_day_hard_minor=300)
     spend_once(ledger, JUDGE_A, 300)
     assert ledger.replay_only() is True, "settling the day to its hard cap flips the switch"
+    assert "daily deployment spend cap reached" in caplog.text
     assert reserve(ledger, JUDGE_B, 1).reason == "replay_only"
     assert ledger.trip_replay_only("again") is False
 
 
-def test_SEC_16_firestore_ledger_a_reserve_over_the_global_day_trips_the_switch():
+def test_SEC_16_firestore_ledger_a_reserve_over_the_global_day_logs_the_switch(caplog):
     ledger = make(global_day_hard_minor=300)
     assert reserve(ledger, minor=400).reason == "global_hard"
     assert ledger.replay_only() is True
+    assert "daily deployment spend cap reached" in caplog.text
 
 
 def test_SEC_16_firestore_ledger_only_a_named_human_reset_clears_the_switch():

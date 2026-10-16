@@ -28,7 +28,15 @@ from tilo_providers.errors import (
     SafetyError,
 )
 from tilo_providers.factory import build_provider
-from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, SearchProvider
+from tilo_providers.interfaces import (
+    Capability,
+    EmbedRequest,
+    EmbedResponse,
+    GenerateRequest,
+    GenerateResponse,
+    ModelProvider,
+    SearchProvider,
+)
 from tilo_providers.media import capabilities_needed, check_parts, estimate_tokens, provider_takes
 from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.replay import is_live_mode
@@ -125,7 +133,7 @@ class RouterResult:
     attempts: list[RouterAttempt] = field(default_factory=list)
     outcome: Literal["ok", "safety_blocked"] = "ok"
     response: GenerateResponse | None = None
-    embedding: Any = None  # embed()'s result (the adapter's raw {"vectors": [...]} shape), attempts alongside it
+    embedding: EmbedResponse | Any = None  # RT-05 typed result; legacy raw requests retain their old shape
     search_result: Any = None  # search()'s `SearchResult`, attempts alongside it (LW-05)
     chunks: Iterator[GenerateResponse] = field(default_factory=lambda: iter(()))
     last_error: Exception | None = field(default=None, repr=False)
@@ -241,7 +249,13 @@ def _embed_inputs(request: Any) -> list[str]:
     """The texts an embed request carries, in the same shape the adapters themselves read (PL-02: `{"input":
     [...]}` or the raw list/string) -- used only to price the call (BQ-61); the request goes to the adapter
     unchanged."""
-    raw = request["input"] if isinstance(request, dict) else request
+    raw = (
+        request.texts
+        if isinstance(request, EmbedRequest)
+        else request["input"]
+        if isinstance(request, dict)
+        else request
+    )
     return [raw] if isinstance(raw, str) else list(raw)
 
 

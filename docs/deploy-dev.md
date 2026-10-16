@@ -508,7 +508,7 @@ more (K = 1).
    ```
 
    Check A: `404` with `{"detail":"Not Found"}`: the image has the routes and they are off. A `403` from the access
-   gate (`under_construction` or `declaration_required`) means the api image predates T2: deploy it first.
+   gate (a 401 or 403 where the routes should answer 404) means the api image predates T2: deploy it first.
 4. Set the three `tilo-api` settings in one call (the command is in `meet-bot/docs/CLOUD_RUN.md`; one revision, so the
    pins and the switch arrive together). Repeat the curl. Check B: `401` `{"error":"unauthenticated"}` is healthy (routes
    on, pins valid, no token). `503` `not_configured`: an unset or malformed pin, or the caller equals the tick's or

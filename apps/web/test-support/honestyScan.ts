@@ -185,19 +185,19 @@ export const ALLOWLIST: readonly AllowEntry[] = [
     file: "src/design/tilo-t/motion.css",
     rule: "css-keyframes",
     reason:
-      "Tilo T design keyframes ported 1:1 (tsBob, tsBlink, tMarch, tRise, tParcel, tConfetti, the run-start and pool-loader storyboards and the rest). A keyframe only plays when a component applies its class: a work animation names its trigger event (recorded events, HR-1); ambient decoration is Buddy's idle loops and the loading shimmer. Transform, opacity and filter only.",
+      "Tilo T design keyframes ported 1:1 (tsBob, tsBlink, tMarch, tRise, tParcel, tConfetti, the run-start and pool-loader storyboards and the rest), plus ttPoolFade (reduced-motion fade). The pool lap reuses tSwim on its elliptical offset-path. A keyframe only plays when a component applies its class: work animation names its recorded trigger event, and the pool animation names the pending site request or world.started/world.planned event. Ambient decoration is Buddy idle loops and loading shimmer. Transform, opacity and filter only.",
   },
   {
     file: "src/design/tilo-t/motion.css",
     rule: "css-animation",
     reason:
-      "Class rules that start the Tilo T keyframes: Buddy's moods and ambient idle loops, the loading shimmer and dots (loading chrome, non-agent), and the animation-play-state pause for a hidden tab or off-screen section. Reduced motion and the still choice turn them off (static pose). Screen tickets start every other animation from a recorded event (HR-1).",
+      "Class rules that start the Tilo T keyframes: Buddy moods, ambient idle loops, loading shimmer and dots, plus PoolLoader's leap/swim/sink sequence from a site request pending over 300 ms or the recorded world.started event (ending at world.planned/world.failed). Animation-play-state pauses loops in a hidden tab or off-screen section. Reduced motion and the still choice stop the pool motion (leaving its fade) and Buddy loops. Work motion names its real event (HR-1).",
   },
   {
     file: "src/design/tilo-t/motion.css",
     rule: "css-transition",
     reason:
-      "Only the global reduced-motion fallback from tilo-t.css: every walk, rise and flight becomes an opacity fade of 200 ms and loops stop (opacity only, never a layout property). It adds no motion for anyone who has not asked for less; it starts nothing, and agents still animate only from recorded events (HR-1).",
+      "The global reduced-motion fallback from tilo-t.css makes walks, rises and flights opacity fades and stops loops; PoolLoader's page blur/scale transition starts only from a site request pending over 300 ms or world.started, then delays clearing at sink. Reduced motion changes it to an opacity fade only. No layout property animates; work movement remains event-driven (HR-1).",
   },
 ];
 

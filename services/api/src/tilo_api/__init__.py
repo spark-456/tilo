@@ -92,7 +92,7 @@ PRODUCTION_ORIGINS = _cors.PRODUCTION_ORIGINS
 
 app = FastAPI(title="tilo-api", lifespan=_lifespan, **_DOCS)
 app.add_middleware(_LogRunId)  # NFR-26: innermost, so the world is looked up only for a request the gate admitted
-app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route needs a stored judge declaration
+app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route needs a verified signed-in person
 app.add_middleware(_AppCheckGate)  # SEC-10: App Check token, logged only until the owner sets TILO_APPCHECK_ENFORCE=1
 app.add_middleware(_NoStore)  # added after the gate, so it is outside it: the gate's 403 on `/v1/` is no-store too
 app.add_middleware(_RateLimitGate, fastapi_app=app)  # SEC-10: before AccessGate

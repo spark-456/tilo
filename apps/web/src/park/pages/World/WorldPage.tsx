@@ -90,6 +90,9 @@ import {
 // WORLD-LIVE: a real run is drawn by the live stage (the same one as /world/:id/stage), a chunk of its own; a browser
 // with no WebGL2 keeps the recorded text map and the Story, which is what "no WebGL2" has always meant here.
 const LiveStageEmbed = lazy(() => import("../../../worldView/LiveStageEmbed"));
+const LiveChat = lazy(() =>
+  import("../../../worldView/LiveStageEmbed").then((m) => ({ default: m.LiveChat })),
+);
 const canDrawStage = (): boolean => {
   try {
     return document.createElement("canvas").getContext("webgl2") !== null;
@@ -468,6 +471,8 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const toastLine = latestLine(trackRun ? runEvents : null, w.activity);
   const shown: WorldTab = tab ?? (view?.deliverable ? "result" : "story");
   const delivered = trackRun && view !== null && view.deliverable;
+  // TILO-T-WORLD: the agents' conversations are a tab of a real run once it has recorded events.
+  const chatOn = trackRun && hasStage && !w.sample;
 
   // A finished quick task's own Result card already carries Share to Slack: the row does not repeat it.
   const slackInResult = !trackRun && !isCity && !isTown && w.st === "finished";
@@ -687,6 +692,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
           on={shown}
           onPick={setTab}
           counts={steps ? { steps: `${steps.done}/${steps.of}` } : {}}
+          chat={chatOn}
         />
         {view ? <AssumedChips assumptions={view.assumptions} /> : null}
       </div>
@@ -833,6 +839,15 @@ export function WorldPage({ app }: { app: AppCtx }) {
               </>
             ) : null}
           </TabPanel>
+          {chatOn ? (
+            <TabPanel tab="chat" on={shown} title="Chat" sub="How your agents talk to each other">
+              {shown === "chat" ? (
+                <Suspense fallback={null}>
+                  <LiveChat worldId={w.id} />
+                </Suspense>
+              ) : null}
+            </TabPanel>
+          ) : null}
           <TabPanel
             tab="steps"
             on={shown}
@@ -857,7 +872,14 @@ export function WorldPage({ app }: { app: AppCtx }) {
               />
             ) : null}
           </TabPanel>
-          <TabPanel tab="result" on={shown} title="Result" sub="What this world delivered">
+          <TabPanel
+            tab="result"
+            on={shown}
+            title="Result"
+            sub="What this world delivered"
+            slideWhen={delivered}
+            slide={wide ? "tw-slide-r" : "tw-slide-up"}
+          >
             {delivered ? (
               <RunResult api={api} worldId={w.id} events={runEvents} shared={result} />
             ) : null}
