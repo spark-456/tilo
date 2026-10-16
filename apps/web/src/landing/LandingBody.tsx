@@ -17,10 +17,12 @@ import {
   WhySection,
 } from "./LandingSections";
 import LandingStage, { RecordedStory } from "./LandingStage";
+import { TaskIdeasSection, WeekPreviewSection } from "./LandingTSections";
 import { Reveal } from "./Reveal";
 import { cityArt, helperArt } from "./landingKit";
 import "./landing.sections.css";
 import "./landing.motion.css";
+import "./landing.t.css";
 import { RECORDED_RUN } from "./recordedRun";
 
 const RULES = [
@@ -232,9 +234,11 @@ export default function LandingBody({
       <TeamsSection />
       <OnboardingSection />
       <ContextSection />
+      <WeekPreviewSection />
       <ConnectorsSection />
       <AudiencesSection />
       <WhySection />
+      <TaskIdeasSection />
 
       <Reveal
         as="section"
