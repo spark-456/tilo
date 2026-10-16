@@ -40,6 +40,8 @@ FILE_TYPES = frozenset(
         "image/jpeg",
     }
 )
+# ADR-0034 decision 3 / TS-03 (common 1.7.0): a capture recording. Only an upload stores one; it is never screened.
+CAPTURE_TYPES = frozenset({"video/webm", "video/mp4"})
 MAX_TEXT, MAX_FILE, MAX_WORLD = 2_000_000, 50_000_000, 200_000_000  # BQ-257
 STAGES = ("created", "reviewed", "sent", "exported")
 _DIGEST_KEYS = frozenset({"content_sha256", "fingerprint"})  # hex digests are not shown to the redactor (MF-06)
@@ -770,8 +772,10 @@ class ArtifactStore:
             raise _refuse("AR-07", "a screening hint can only be 'flagged'; the store alone says clean")
         if not isinstance(origin, Origin) or origin.kind not in ("unit", "render", "upload", "fetch"):
             raise _refuse("AR-02", "origin must be unit, render, upload or fetch (restore has its own call)")
-        if type(media) is not str or media not in TEXT_TYPES | FILE_TYPES:
-            raise _refuse("AR-04", "media type is not one of the nine")
+        if type(media) is not str or media not in TEXT_TYPES | FILE_TYPES | (
+            CAPTURE_TYPES if origin.kind == "upload" else frozenset()
+        ):
+            raise _refuse("AR-04", "media type is not one of the nine (or a capture video from an upload)")
         if origin.kind == "unit" and media not in TEXT_TYPES:
             raise _refuse("AR-04", "a unit's output is text or JSON, never a file")
         if origin.kind == "render" and media not in FILE_TYPES:
@@ -846,7 +850,7 @@ class ArtifactStore:
 
     def _screen(self, data: bytes, media_type: str) -> tuple[str, str | None]:
         """`clean`/`flagged` only from a verdict on exactly these bytes; anything else is `unscreened` (AR-07)."""
-        if self._screener is None:
+        if self._screener is None or media_type in CAPTURE_TYPES:  # a video cannot be screened (ADR-0034)
             return "unscreened", None
         try:
             convert = getattr(self, "_upload_text", None)

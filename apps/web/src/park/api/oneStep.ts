@@ -2,11 +2,12 @@
 // (the brief records each skip as "Assumed: ...", FR-INT-04), asks for the approaches and shows ONE confirm card
 // with the recommended approach. The person's click on Start is the budget approval (the same `approve` call the
 // old S-03 made), and the run's own world opens. Nothing here is a model call; every step is a tilo-api route.
-import type { PlanApproach } from "@tilo/contracts";
+import type { PlanApproach, PlanMakeChoice } from "@tilo/contracts";
 import type { IntakeResult } from "../../api/client";
 import type { HttpClient } from "../../api/http";
 import { TiloApiError } from "../../api/http";
 import type { Cadence } from "../../api/schedules";
+import { type SkillMatch, skillMatchOf } from "../../api/skillRoute";
 
 // The weekly repeat's types and weekday names travel with the one-step start, so a page imports them from park/api.
 export { WEEKDAYS } from "../../api/schedules";
@@ -38,6 +39,8 @@ export interface RunPlan {
   readonly cap: number;
   readonly usd: number | null;
   readonly time: string;
+  readonly makeChoices: readonly PlanMakeChoice[];
+  readonly skill?: SkillMatch | null;
 }
 
 export interface OneStepApi {
@@ -105,6 +108,8 @@ function planOf(
     recommended: string;
     credit_usd: number;
     min_grant?: number;
+    make_choices?: PlanMakeChoice[];
+    skill?: unknown;
   },
 ): RunPlan {
   const chosen =
@@ -149,6 +154,8 @@ function planOf(
       t.min_s >= 60 && t.min_s % 60 === 0 && t.max_s % 60 === 0
         ? `${t.min_s / 60}–${t.max_s / 60} min`
         : `${t.min_s}–${t.max_s} s`,
+    makeChoices: priced.make_choices ?? [],
+    skill: skillMatchOf(priced.skill),
   };
 }
 
@@ -212,6 +219,14 @@ export function oneStepOver(http: HttpClient): OneStepApi {
         const { world_id } = await http.approve(plan.taskId, {
           approach_id: plan.approachId,
           budget_cap: plan.cap,
+          ...(plan.makeChoices.length
+            ? {
+                make_with: plan.makeChoices.map(({ deliverable, selected }) => ({
+                  deliverable,
+                  make_with: selected,
+                })),
+              }
+            : {}),
         });
         if (!isText(world_id) || world_id === "")
           throw new TiloApiError(BAD_REPLY, 200, true, true);

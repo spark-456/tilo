@@ -3,6 +3,7 @@ import type { Event } from "@tilo/contracts";
 import type { ReactNode } from "react";
 import { useClient, useIsFixtureClient } from "../../../api/ClientProvider";
 import { FIXTURE_APPROACHES } from "../../../api/fixtures/derived";
+import { EmptyState } from "../../../design/tilo-t";
 import { useRunLog } from "../../../world/runLog";
 import { worldStatus } from "../../../world/runSummary";
 import { useRunWorld } from "../../../world/worldContext";
@@ -37,7 +38,7 @@ function Events({
       ))}
     </ul>
   ) : (
-    <p>{empty}</p>
+    <EmptyState title={empty} />
   );
 }
 export type RunSection = "autonomy" | "channels" | "estimate";
@@ -70,7 +71,10 @@ export function RunSectionView({ section }: { section: RunSection }) {
       {worldId ? (
         <RecordedSection key={`${section}/${worldId}`} section={section} worldId={worldId} />
       ) : (
-        <p>No run yet. Start a run from Home to see its recorded activity.</p>
+        <EmptyState
+          title="No run yet."
+          body="Start a run from Home to see its recorded activity."
+        />
       )}
     </>
   );

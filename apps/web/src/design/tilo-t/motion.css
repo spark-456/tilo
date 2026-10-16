@@ -128,6 +128,10 @@
 .tt-landing-replay.is-painted .tt-landing-replay__c{animation:tLoopC 9s ease-in-out infinite}
 .tt-landing-replay.is-painted .tt-landing-replay__d{animation:tLoopD 9s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.tt-landing-replay.is-painted span{animation:none!important;opacity:1!important;transform:none!important}}
+/* triggeredBy: Start click in HomePage, world.started and world.planned in PendingWorldRoute. */
+[data-park] .park-home-plan--starting{animation:tRunCard 6s cubic-bezier(.6,0,.2,1) both}
+[data-park] .park-home-plan--starting .park-home-run-blueprint{animation:tRunBp 6s ease-in-out both}
+[data-park] .park-world-enter{animation:tRise .3s var(--tt-ease-standard) both}
 
 /* Pool loader: one request/event starts the splash; the phase machine only completes its visual sequence. */
 .tt-pool-page{transition:filter .8s var(--tt-ease-standard),transform .8s var(--tt-ease-standard)}
@@ -162,6 +166,12 @@
 }
 /* The person's own 'still' choice (Profile > Appearance) is the same list. */
 [data-motion="still"] .tt-bd,[data-motion="still"] .tt-bd *,[data-motion="still"] .tt-shim,[data-motion="still"] .tt-dots span{animation:none!important}
+@media (prefers-reduced-motion:reduce){
+[data-park] .park-home-plan--starting{animation:none!important;opacity:0;transition:opacity .2s!important}
+[data-park] .park-world-enter{animation:tFade .2s ease-out both!important}
+}
+[data-motion="still"] .park-home-plan--starting{animation:none!important;opacity:0;transition:opacity .2s!important}
+[data-motion="still"] .park-world-enter{animation:tFade .2s ease-out both!important}
 [data-motion="still"] .tt-pool__stage,[data-motion="still"] .tt-pool__stage *{animation:none!important}
 
 /* TILO-T-WORLD: the World page's own classes over the design's keyframes (spec: Tilo T Motion.dc.html). Each names the

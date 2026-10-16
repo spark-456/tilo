@@ -11,6 +11,7 @@ import {
   buttons,
   card,
   cardIds,
+  flush,
   hrefOf,
   leaf,
   renderWorlds,
@@ -54,6 +55,37 @@ const has = (t: string, w: string | RegExp) =>
   typeof w === "string" ? expect(t).toContain(w) : expect(t).toMatch(w);
 
 describe("WEB_5_worlds: header, search and New world", () => {
+  it("TILO_T_STATES_HR1_worlds_use_shared_empty_loading_and_error_states", async () => {
+    const pending = worldsApi();
+    pending.getWorlds = vi.fn(() => new Promise<never>(() => undefined));
+    const loading = await renderWorlds({ api: pending });
+    expect(loading.c.querySelector('[data-testid="tt-loading"]')?.textContent).toContain(
+      "Loading worlds",
+    );
+
+    const failed = worldsApi();
+    failed.getWorlds = vi.fn(() => Promise.reject(new Error("offline")));
+    const error = await renderWorlds({ api: failed });
+    expect(error.c.querySelector('[data-testid="tt-error"]')?.getAttribute("role")).toBe("alert");
+
+    const retryApi = worldsApi();
+    const result = await retryApi.getWorlds({}, []);
+    const retryPending = new Promise<typeof result>(() => undefined);
+    retryApi.getWorlds = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockReturnValueOnce(retryPending);
+    const retry = await renderWorlds({ api: retryApi });
+    await act(async () => {
+      buttons(retry.c, "Try again")[0]?.click();
+    });
+    await flush();
+    expect(retry.c.querySelector('[data-testid="tt-loading"]')).not.toBeNull();
+
+    const empty = await renderWorlds({ api: worldsApi(() => []) });
+    expect(empty.c.querySelector('[data-testid="tt-empty"]')).not.toBeNull();
+  });
+
   it("WEB_5_worlds_header_title_total_and_subtitle_verbatim", async () => {
     const { c } = await renderWorlds();
     expect(qa(c, "h1").map(text)).toEqual(["Worlds"]);

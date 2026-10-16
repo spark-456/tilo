@@ -46,6 +46,7 @@ from tilo_api.cards import (
 )
 from tilo_api.connector_rpc import NO_DRAFT, ConnectorRpcStub
 from tilo_api.office_screen import office_text
+from tilo_api.skills_route import pin_matched_skill
 
 DESTINATION_CHANGED = "the email goes somewhere other than its draft, so it is not the same item"
 
@@ -251,7 +252,11 @@ class Run:
         self.store, self.seams, self.cap, self.approach = store, seams, cap, copy.deepcopy(approach)
         self.org_id = deps.ORG_ID  # the run's artifact Scope is (org_id, world_id, owner); never a request's
         self.scope: Scope | None = None  # set when the run starts
-        self.world_id, self.run_id, self.owner, self.brief = task.world_id, task.run_id, task.owner, task.brief
+        self.world_id, self.run_id, self.owner = task.world_id, task.run_id, task.owner
+        self.brief = copy.deepcopy(task.brief)
+        for pick in task.maker_picks:
+            self.brief["deliverables"][pick["deliverable"]]["make_with"] = pick["make_with"]
+        self.skill = task.skill  # SKILL-ROUTE: what the start-plan card named; a library skill is pinned in `_prepare`
         self.intake_answers = (
             tuple(  # (the Director's question, the person's answer) for the units' prompts (UNIT-PROMPT)
                 (q.text, str(task.answers[q.field]))
@@ -613,7 +618,7 @@ class Run:
                 connectors={c: registry.get(c) for c in registry.ids()}, risk_table=tilo_policy.load_risk_table(),
                 policies=dict(self.store.policies),
             )  # fmt: skip
-            plan = self._compile(context)
+            plan = pin_matched_skill(self._compile(context), self.skill, set(context.skills))
         except Exception as exc:
             logger.warning("run %s: no plan (%s)", self.run_id, type(exc).__name__)
             self._fail("the Director could not plan this task", None)

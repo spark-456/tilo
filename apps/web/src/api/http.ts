@@ -22,6 +22,7 @@ import {
   type SchedulesApi,
   isScheduleView,
 } from "./schedules";
+import { type SkillMatch, skillMatchOf } from "./skillRoute";
 import { type StopResult, isStopResult } from "./stop";
 
 /** What a person reads when a call fails (PRD 18.4). `retryable` is true for 5xx and for network
@@ -161,6 +162,8 @@ export function displayApiError(error: unknown): string {
     already_resolved: "This card was already answered.",
     analysis_failed: "The analysis could not finish. Try again later.",
     analysis_inputs_unavailable: "The information needed for this analysis is unavailable.",
+    audio_not_supported:
+      "Tilo cannot read the sound in this recording. Record it again without narration.",
     app_check_required: "Reload this page to verify the app before trying again.",
     ask_first_required: "Ask for approval before making this change.",
     assignment_not_in_force: "This assignment is no longer active.",
@@ -183,6 +186,7 @@ export function displayApiError(error: unknown): string {
     feedback_limit_reached: "You have reached the feedback limit. Try again later.",
     followup_failed: "The follow-up could not finish. Try again later.",
     followup_unavailable: "The follow-up is unavailable right now.",
+    file_too_large: "This file is too large to keep. Use one under 50 MB.",
     forbidden: "You do not have access to do this.",
     full_session_required: "Sign in with a full account to do this.",
     hold_open: "The previous meeting activity is still being processed.",
@@ -257,6 +261,8 @@ export function displayApiError(error: unknown): string {
     start_again: "Start the connection again.",
     teach_not_understood:
       "Tilo could not match your steps to the apps it can use. Name the app and the action in each step, for example Read the new mail in Gmail or Save the summary to Google Drive, then try again.",
+    too_long_to_read:
+      "This file is stored, but it is too long for Tilo to read. Use a shorter recording or file.",
     too_large: "This is too large to send. Reduce its size and try again.",
     transcript_unavailable: "The meeting transcript is unavailable right now.",
     try_again: "This could not finish. Try again in a moment.",
@@ -265,7 +271,9 @@ export function displayApiError(error: unknown): string {
       "The follow-up returned an unexpected reply. Reload before trying again.",
     unknown: "This feature could not answer. Try again later.",
     unknown_action: "This action is not available here.",
+    unreadable_file: "Tilo could not read this file. Check it opens, or use another file.",
     unreachable: "The provider could not be reached. Try again later.",
+    unsupported_type: "Use a WebM or MP4 recording, a PDF, a PNG or JPEG image, or a text file.",
     unverified: "Verify the model key before continuing.",
     world_paused: "This world is paused. Resume it before continuing.",
     write_failed: "We could not confirm the saved change. Reload before trying again.",
@@ -496,8 +504,8 @@ export interface QuickCost {
 
 /** A Quick ask's two answers (services/api COST-FAST-1): the model's text with its cost, or an offer to switch. */
 export type QuickIntakeResult =
-  | { kind: "answered"; text: string; cost: QuickCost | null }
-  | { kind: "switch"; reason: QuickReason };
+  | { kind: "answered"; text: string; cost: QuickCost | null; skill?: SkillMatch }
+  | { kind: "switch"; reason: QuickReason; skill?: SkillMatch };
 
 const figure = (v: unknown): number | undefined =>
   typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined;
@@ -507,9 +515,11 @@ function quickOf(body: unknown): QuickIntakeResult | null {
   if (typeof body !== "object" || body === null) return null;
   const b = body as Record<string, unknown>;
   if (b.mode !== "quick") return null;
+  const skill = skillMatchOf(b.skill);
+  const offered = skill === null ? {} : { skill };
   if (b.outcome === "switch_to_thinking") {
     const reason = QUICK_REASONS.find((r) => r === b.reason);
-    return reason ? { kind: "switch", reason } : null;
+    return reason ? { kind: "switch", reason, ...offered } : null;
   }
   if (b.outcome !== "answered" || typeof b.text !== "string" || b.text === "") return null;
   const c =
@@ -519,7 +529,12 @@ function quickOf(body: unknown): QuickIntakeResult | null {
   const saved = figure(c.saved_credits);
   if (credits !== undefined) cost.credits = credits;
   if (saved !== undefined) cost.savedCredits = saved;
-  return { kind: "answered", text: b.text, cost: Object.keys(cost).length > 0 ? cost : null };
+  return {
+    kind: "answered",
+    text: b.text,
+    cost: Object.keys(cost).length > 0 ? cost : null,
+    ...offered,
+  };
 }
 
 // Shared by the session's clients so Connectors and World coalesce the first read.

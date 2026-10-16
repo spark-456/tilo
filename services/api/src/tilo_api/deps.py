@@ -160,11 +160,15 @@ class TaskRecord:
     answers: dict[str, str | None] = field(default_factory=dict)  # field -> answer; None when skipped
     edits: dict[str, Any] = field(default_factory=dict)
     approaches: list[dict] | None = None  # proposed for the current brief
+    maker_picks: list[dict] = field(default_factory=list)
     granted: bool = False
     scenario: str | None = None  # FR-INT-11: the scenario id named at intake; its policies are created at approve
     gaps: tuple[Gap, ...] = ()  # FR-INT-15: the parts Tilo cannot do, set once at intake; answers and edits keep them
     lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
     approaches_work: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+    skill: dict[str, Any] | None = (
+        None  # SKILL-ROUTE: the skill the task matched (or was tagged with), pinned at the run
+    )
 
 
 @dataclass

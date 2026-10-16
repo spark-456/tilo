@@ -39,7 +39,7 @@ it.each(["getUser", "getProfileSettings", "getLedger"] as const)(
   },
 );
 
-it("NFR22 FR_SET_01 settings retry keeps the reserved loading/error box and no guessed form", async () => {
+it("TILO_T_STATES_HR1_FR_SET_01_settings_use_shared_loading_and_error_states", async () => {
   const base = createFixtureApi();
   let reject: (e: unknown) => void = () => {};
   const held = new Promise<never>((_, fail) => {
@@ -53,11 +53,13 @@ it("NFR22 FR_SET_01 settings retry keeps the reserved loading/error box and no g
   const box = root.querySelector<HTMLElement>("[data-profile-settings-state]");
   expect(box).not.toBeNull();
   expect(box?.style.blockSize).toBe("176px");
+  expect(box?.querySelector('[data-testid="tt-loading"]')?.getAttribute("aria-busy")).toBe("true");
   expect(root.querySelector("input")).toBeNull();
   await act(async () => reject(failure()));
   await settle();
   expect(root.querySelector("[data-profile-settings-state]")).toBe(box);
-  expect(text(root.querySelector('[role="alert"]'))).toBe(displayApiError(failure()));
+  expect(box?.querySelector('[data-testid="tt-error"]')?.getAttribute("role")).toBe("alert");
+  expect(text(root.querySelector('[role="alert"] h2'))).toBe(displayApiError(failure()));
   await clickAndSettle(buttonNamed(root, "Try again"));
   expect(api.getUserSettings).toHaveBeenCalledTimes(2);
   expect(api.saveUserSettings).not.toHaveBeenCalled();

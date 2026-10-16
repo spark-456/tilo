@@ -194,8 +194,8 @@ describe("STARTER_1 the pages", () => {
   it("STARTER_1_home_card_marks_the_sample", async () => {
     const api = liveSourced({ getWorlds: async () => sampleWorlds([sampleItem]) });
     const rig = await mountLiveHome(api);
-    // UI-STUDIO-2: the sample card sits in the Your worlds section
-    const today = q(rig.el, 'section[aria-label="Your worlds"]');
+    // UI-STUDIO-2: the sample card sits in the Recent worlds section
+    const today = q(rig.el, 'section[aria-label="Recent worlds"]');
     expect(q(today, ".park-sample-badge").textContent).toBe("Sample");
     expect(today.textContent).toContain(SAMPLE_NOTE);
     await act(async () => {

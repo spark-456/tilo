@@ -342,6 +342,7 @@ describe("WEB_7_ledger_decide: every approval goes through app.decide(key)", () 
     expect(api.decide.mock.calls.map((c) => c[0])).toEqual(["depot", "mail"]);
     click(byText(activity, '[role="radio"]', "Waiting"));
     expect(text(activity)).toContain("Nothing here this month.");
+    expect(activity.querySelector('[data-testid="tt-empty"]')).not.toBeNull();
     click(byText(activity, '[role="radio"]', "All"));
     expect(text(activity)).toContain("Sent the supplier brief to 3 battery suppliers");
   });

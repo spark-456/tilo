@@ -64,7 +64,8 @@ READ_ONLY_CAPABILITIES = {"read", "search", "list"}
 # config/connectors.yaml: nothing for a person to connect. Its per-action case below runs the real push path.
 PUSH_ACTION, PUSH_CONNECTOR = "send_push", "web_push"
 # ADR-0048: the agents' Gmail and Drive read tools joined the risk table as T1 reads (like read_events)
-NOT_AN_OUTBOX_ACTION = {
+# SEC-11 excludes only these explicit action ids from outbox side-effect coverage.
+SEC_11_SKIP_ACTION_IDS = {
     "read_events", "search_email", "read_email", "list_files", "read_file", "web_search", "fetch_url", "grant_budget"
 }  # fmt: skip
 MUTATION_VERBS = ("send", "create", "save", "share", "delete", "insert", "patch", "update", "upload", "post", "write")
@@ -108,7 +109,7 @@ def test_SEC_11_an_oauth_write_with_no_scopes_is_still_discovered(monkeypatch: p
 
 DECLARED = _declared()
 RISK = load_risk_table()
-ACTION_TYPES = sorted(set(RISK.actions) - NOT_AN_OUTBOX_ACTION)
+ACTION_TYPES = sorted(set(RISK.actions) - SEC_11_SKIP_ACTION_IDS)
 CONNECTOR_OF = {
     action: DECLARED[action][0] if action in DECLARED else (PUSH_CONNECTOR if action == PUSH_ACTION else "gmail")
     for action in ACTION_TYPES
@@ -211,7 +212,7 @@ def test_SEC_11_the_discovered_side_effect_set_is_consistent_between_config_and_
     assert "create_meeting_event" in ACTION_TYPES
     registry = load_registry(REPO_ROOT / "config" / "connectors.yaml")
     actions = {a["id"]: a for c in registry.ids() for a in registry.get(c)["actions"]}
-    for read_only in NOT_AN_OUTBOX_ACTION - {"grant_budget"}:  # excluded only while it stays an ungated read
+    for read_only in SEC_11_SKIP_ACTION_IDS - {"grant_budget"}:  # excluded only while it stays an ungated read
         assert actions[read_only]["gate_type"] == "none", read_only
         assert actions[read_only]["capability"] in READ_ONLY_CAPABILITIES, read_only
 
