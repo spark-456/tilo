@@ -28,12 +28,13 @@ def with_design_team(units: list[dict[str, Any]], brief: dict[str, Any]) -> list
         if len(own) != 1 or own[0].get("format") not in config["formats"]:
             continue
         stages: dict[str, str] = {}
+        team: list[dict[str, Any]] = []
         for stage in config["stages"]:
             if stage.get("revision") and not limits["revision_rounds"]:
                 continue
             ident = f"U{number}"
             number += 1
-            result.append(
+            team.append(
                 {
                     "id": ident,
                     "unit_type": stage["type"],
@@ -48,4 +49,7 @@ def with_design_team(units: list[dict[str, Any]], brief: dict[str, Any]) -> list
             )
             stages[stage["type"]] = ident
         writer["depends_on"] = list(dict.fromkeys([*writer["depends_on"], *stages.values()]))
+        result[result.index(writer) : result.index(writer)] = (
+            team  # designers, reviewer, revisers, then the deliver unit
+        )
     return result
