@@ -164,6 +164,7 @@ describe("STUDIO_2 Chat: honest data", () => {
     expect(qa(history, "a")).toHaveLength(0);
     await send(el, "First live question");
     await send(el, "Second live question");
+    expect(qa(el, ".park-chat-turn .tt-bd")).toHaveLength(2);
     expect(qa(history, "a").map(textOf)).toEqual(["First live question", "Second live question"]);
     expect(textOf(q(el, '[role="log"]'))).toContain("A real answer.");
     act(() => q<HTMLButtonElement>(history, "button").click());

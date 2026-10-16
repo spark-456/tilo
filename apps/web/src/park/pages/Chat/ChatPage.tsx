@@ -3,6 +3,7 @@
 // request only (reading while the call is out, talking while a new answer is shown, done after). Nothing moves:
 // every pose is still (HR-1, HR-2). No past chats are listed: the server keeps no Quick question or answer.
 import { type FormEvent, useId, useState } from "react";
+import { Buddy as TiloBuddy, Icon } from "../../../design/tilo-t";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkStore } from "../../app/context";
 import { usePageTitle } from "../../app/pageTitle";
@@ -37,13 +38,11 @@ const totalCredits = (turns: readonly Turn[]): number | null => {
   return any ? sum : null;
 };
 
-function Face() {
+function Face({ mood }: { mood: BuddyMood }) {
+  const pose = mood === "reading" ? "think" : mood === "talking" ? "talk" : "idle";
   return (
     <span className="park-chat-face" aria-hidden="true">
-      <span className="park-chat-face__visor">
-        <span />
-        <span />
-      </span>
+      <TiloBuddy mood={pose} size={44} />
     </span>
   );
 }
@@ -52,15 +51,17 @@ function Answer({
   turn,
   onWorld,
   onCopy,
+  mood,
 }: {
   turn: Turn;
   onWorld: (question: string) => void;
   onCopy: ((text: string) => void) | null;
+  mood: BuddyMood;
 }) {
   if (turn.state === "asking")
     return (
       <div className="park-chat-turn">
-        <Face />
+        <Face mood={mood} />
         <div className="park-chat-turn__body">
           <div className="park-chat-meta">TILO · READING…</div>
         </div>
@@ -75,7 +76,7 @@ function Answer({
     ].join(" · ");
     return (
       <div className="park-chat-turn">
-        <Face />
+        <Face mood={mood} />
         <div className="park-chat-turn__body">
           <div className="park-chat-meta">
             {meta}
@@ -98,7 +99,7 @@ function Answer({
   }
   return (
     <div className="park-chat-turn">
-      <Face />
+      <Face mood={mood} />
       <div className="park-chat-turn__body">
         <div className="park-chat-meta">TILO</div>
         {turn.state === "switch" ? (
@@ -166,7 +167,7 @@ export function ChatPage({ app }: { app: AppCtx }) {
                 setDraft("");
               }}
             >
-              + New chat
+              <Icon name="plus" size={18} /> New chat
             </button>
             <span className="park-chat-history__label">Current chat</span>
             {chat.turns.map((turn) => (
@@ -238,7 +239,12 @@ export function ChatPage({ app }: { app: AppCtx }) {
                 chat.turns.map((t) => (
                   <div key={t.id} id={`chat-turn-${t.id}`} className="park-chat-pair">
                     <div className="park-chat-you">{t.question}</div>
-                    <Answer turn={t} onWorld={toWorld} onCopy={copy} />
+                    <Answer
+                      turn={t}
+                      onWorld={toWorld}
+                      onCopy={copy}
+                      mood={t.id === last?.id ? chat.mood : "idle"}
+                    />
                   </div>
                 ))
               )}
@@ -267,7 +273,7 @@ export function ChatPage({ app }: { app: AppCtx }) {
                   aria-label="Send"
                   aria-disabled={chat.busy || undefined}
                 >
-                  ↑
+                  <Icon name="send" size={20} />
                 </button>
               </div>
               {chat.note ? (
