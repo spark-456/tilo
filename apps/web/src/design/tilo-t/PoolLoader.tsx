@@ -88,7 +88,7 @@ export function PoolLoader(props: PoolLoaderProps) {
   const motionOff = reduced || still;
   const activeRef = useRef(active);
   activeRef.current = active;
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(() => !isTask && active);
   const [phase, setPhase] = useState<PoolPhase>("leap");
   // One play per mount: without it the buffered replay below re-opened the overlay every time it closed.
   const playedRef = useRef(false);
@@ -115,7 +115,7 @@ export function PoolLoader(props: PoolLoaderProps) {
       }, MIN_LOAD_MS);
       return () => window.clearTimeout(timer);
     }
-    if (!active) return;
+    if (!active || visible) return;
     // triggeredBy: a site request that remains pending for more than 300 ms
     const timer = window.setTimeout(() => {
       setPhase("leap");
