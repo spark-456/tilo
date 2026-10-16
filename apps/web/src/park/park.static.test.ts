@@ -168,7 +168,9 @@ describe("WEB_1a_static: park stays beside the old app", () => {
         const inSrc = relative(SRC, target).replaceAll("\\", "/");
         // Only the shared API client seam (src/api) may be reused from outside park.
         // SEC-16: and the one shared lifetime-cap dialog (src/components, like ReplayBanner: neither tree imports the other).
-        const shared = inSrc === "components/LifetimeCapDialog";
+        // TILO-T-FOUNDATION: and the Tilo T design layer (src/design/tilo-t: icons, Buddy, states, doodle gutter), shared by every page.
+        const shared =
+          inSrc === "components/LifetimeCapDialog" || inSrc.startsWith("design/tilo-t");
         // The run-admin sections read the live run through four engine modules the stage shares: the one named
         // exception to "nothing from world/" (the old app is gone; nothing else may be added here).
         const engine =
