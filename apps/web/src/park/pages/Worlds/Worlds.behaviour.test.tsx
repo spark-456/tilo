@@ -11,6 +11,7 @@ import {
   buttons,
   card,
   cardIds,
+  flush,
   hrefOf,
   leaf,
   renderWorlds,
@@ -76,8 +77,9 @@ describe("WEB_5_worlds: header, search and New world", () => {
       .mockReturnValueOnce(retryPending);
     const retry = await renderWorlds({ api: retryApi });
     await act(async () => {
-      (retry.c.querySelector("button") as HTMLButtonElement).click();
+      buttons(retry.c, "Try again")[0]?.click();
     });
+    await flush();
     expect(retry.c.querySelector('[data-testid="tt-loading"]')).not.toBeNull();
 
     const empty = await renderWorlds({ api: worldsApi(() => []) });
