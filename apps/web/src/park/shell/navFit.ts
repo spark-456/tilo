@@ -14,6 +14,7 @@ const PRIORITY: readonly PageId[] = [
   "skills",
   "agenda",
   "team",
+  "connectors",
   "ledger",
 ];
 

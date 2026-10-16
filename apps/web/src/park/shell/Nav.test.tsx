@@ -30,11 +30,12 @@ const TABS = [
   ["Home", "/"],
   ["Chat", "/chat"],
   ["Worlds", "/worlds"],
-  ["Skills", "/skills"],
   ["Needs you", "/needs"], // STUDIO-4: the Needs you page joins the tabs (design/studio-v2 "Tilo S Nav")
-  ["Ledger", "/ledger"],
   ["Agenda", "/agenda"],
+  ["Skills", "/skills"],
   ["Team", "/team"],
+  ["Connectors", "/connectors"],
+  ["Ledger", "/ledger"],
 ] as const;
 
 const header = (root: ParentNode) => q(root, "header");
@@ -129,8 +130,8 @@ describe("WEB_3b_nav: the active tab", () => {
     expect(currentLabels(m.container)).toEqual(["Worlds"]);
   });
 
-  it("WEB_3b_nav_profile_and_connectors_have_no_current_tab", async () => {
-    for (const path of ["/park/profile", "/park/profile?tab=notifications", "/park/connectors"]) {
+  it("WEB_3b_nav_profile_has_no_current_tab", async () => {
+    for (const path of ["/park/profile", "/park/profile?tab=notifications"]) {
       const { m } = await mountApp({ path });
       expect(currentLabels(m.container), path).toEqual([]);
       m.unmount();

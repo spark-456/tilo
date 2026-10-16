@@ -22,21 +22,22 @@ const TABS: readonly (readonly [PageId, string])[] = [
   ["home", "Home"],
   ["chat", "Chat"],
   ["worlds", "Worlds"],
-  ["skills", "Skills"],
   ["needs", "Needs you"],
-  ["ledger", "Ledger"],
   ["agenda", "Agenda"],
+  ["skills", "Skills"],
   ["team", "Team"],
+  ["connectors", "Connectors"],
+  ["ledger", "Ledger"],
 ];
 const ids = (tabs: readonly (readonly [PageId, string])[]) => tabs.map(([id]) => id);
 const text = (el: Element | null): string => (el?.textContent ?? "").replace(/\s+/g, " ").trim();
 
 describe("UI_STUDIO_INT navFit: which tabs fit", () => {
-  it("UI_STUDIO_INT_every_tab_fits_from_1100_live_and_from_1280_beside_the_sample_chip", () => {
-    for (const vw of [1100, 1200, 1280, 1440, 1920]) {
+  it("UI_STUDIO_INT_every_tab_fits_from_1280_live_and_from_1440_beside_the_sample_chip", () => {
+    for (const vw of [1280, 1440, 1920]) {
       expect(fitTabs(TABS, vw, { sample: false, badge: true }).more).toEqual([]);
     }
-    for (const vw of [1280, 1440, 1920]) {
+    for (const vw of [1440, 1920]) {
       expect(fitTabs(TABS, vw, { sample: true, badge: true }).more).toEqual([]);
     }
   });
@@ -61,7 +62,7 @@ describe("UI_STUDIO_INT navFit: which tabs fit", () => {
   it("UI_STUDIO_INT_at_840_live_Home_Chat_Worlds_and_Needs_you_stay_the_rest_go_to_More", () => {
     const { shown, more } = fitTabs(TABS, 840, { sample: false, badge: true });
     expect(ids(shown)).toEqual(["home", "chat", "worlds", "needs"]);
-    expect(ids(more)).toEqual(["skills", "ledger", "agenda", "team"]);
+    expect(ids(more)).toEqual(["agenda", "skills", "team", "connectors", "ledger"]);
   });
 
   it("UI_STUDIO_INT_an_unmeasured_window_shows_every_tab", () => {
@@ -76,7 +77,7 @@ describe("UI_STUDIO_INT the nav between 840 and 1199px", () => {
     const rig = await mountApp({ api: fakeApi(), viewport: { vw: 900, vh: 900 }, path: "/" });
     const strip = qa(rig.m.container, "header nav a").map(text);
     expect(strip.length).toBeGreaterThan(2);
-    expect(strip.length).toBeLessThan(8);
+    expect(strip.length).toBeLessThan(9);
     expect(document.body.querySelector("button.park-shell__pagebtn")).toBeNull();
     expect(moreBtn().getAttribute("aria-haspopup")).toBe("menu");
     click(moreBtn());
@@ -108,9 +109,9 @@ describe("UI_STUDIO_INT the nav between 840 and 1199px", () => {
     expect(moreBtn().classList.contains("park-shell__tab--on")).toBe(true);
   });
 
-  it("UI_STUDIO_INT_1440_has_all_eight_tabs_and_no_More", async () => {
+  it("UI_STUDIO_INT_1440_has_all_nine_tabs_and_no_More", async () => {
     const rig = await mountApp({ api: fakeApi(), viewport: { vw: 1440, vh: 900 }, path: "/" });
-    expect(qa(rig.m.container, "header nav a")).toHaveLength(8);
+    expect(qa(rig.m.container, "header nav a")).toHaveLength(9);
     expect(document.body.querySelector("button.park-shell__more")).toBeNull();
   });
 });

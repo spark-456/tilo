@@ -261,6 +261,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         onContext={toggleContext}
         compact={app.vw > 0 && app.vw < COMPACT_NAV_BELOW}
         vw={app.vw}
+        studio={themeFor(app.prefs.theme) === "studio"}
       />
       {contextOpen && <ContextPanel key={contextPerson} onClose={toggleContext} />}
       {state.menu === "notif" ? (

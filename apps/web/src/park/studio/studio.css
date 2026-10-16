@@ -51,14 +51,14 @@
   outline-offset: 1px;
 }
 
-/* ---- Top nav (S Nav, 1440): a 72px bar across the top, card fill, a hairline under it, no glass ---- */
+/* ---- Top nav: T board's 64px bar, card fill, a hairline under it, no glass ---- */
 [data-park][data-theme="studio"] .park-shell__nav {
   left: 0;
   right: 0;
   top: 0;
-  height: 72px;
-  gap: 28px;
-  padding: 0 32px;
+  height: 64px;
+  gap: 20px;
+  padding: 0 24px;
   border: 0;
   border-bottom: 1px solid var(--line);
   border-radius: 0;
@@ -70,7 +70,7 @@
 [data-park][data-theme="studio"] .park-shell__bar {
   left: 0;
   right: 0;
-  top: 69px;
+  top: 61px;
   border-radius: 0;
 }
 [data-park][data-theme="studio"] .park-shell__logo {
@@ -177,9 +177,13 @@
     padding: 0 10px;
   }
 }
-/* The page column starts under the 72px bar. */
+/* The page column starts under the 64px bar. */
 [data-park][data-theme="studio"] .park-shell__page {
-  padding-top: 104px;
+  padding-top: 96px;
+}
+/* The T phone bar uses the same real routes and Needs count as the desktop navigation. */
+[data-park][data-theme="studio"] .park-shell__phone-tabs {
+  display: none;
 }
 /* A phone: the bar is 64px and the tools sit closer. */
 @media (max-width: 560px) {
@@ -214,6 +218,80 @@
   }
   [data-park][data-theme="studio"] .park-shell__page {
     padding-top: 88px;
+    padding-bottom: calc(80px + var(--park-dock-space, 0px));
+  }
+  [data-park][data-theme="studio"] .park-shell__phone-tabs {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 27;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    height: calc(84px + env(safe-area-inset-bottom, 0px));
+    padding: 6px 8px calc(14px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    background: var(--card);
+  }
+  [data-park][data-theme="studio"] .park-shell__phone-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    min-height: 52px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink2);
+    font-size: 11px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  [data-park][data-theme="studio"] .park-shell__phone-tab--on {
+    color: var(--ink);
+  }
+  [data-park][data-theme="studio"] .park-shell__phone-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 28px;
+    border-radius: 99px;
+  }
+  [data-park][data-theme="studio"] .park-shell__phone-tab--on .park-shell__phone-icon {
+    background: var(--heroSoft);
+    color: var(--heroInk);
+  }
+  [data-park][data-theme="studio"] .park-shell__phone-badge {
+    position: absolute;
+    top: -4px;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 99px;
+    background: var(--amber);
+    box-shadow: 0 0 0 2px var(--card);
+    color: #1a1407;
+    font-size: 10px;
+    font-weight: 800;
+  }
+  [data-park][data-theme="studio"] .park-shell__phone-tab:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: -3px;
+  }
+  [data-park][data-theme="studio"] .park-shell__phone-menu {
+    top: auto;
+    right: 8px;
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
   }
 }
 @media (max-width: 360px) {

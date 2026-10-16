@@ -17,11 +17,29 @@ const TABS: readonly (readonly [PageId, string])[] = [
   ["home", "Home"],
   ["chat", "Chat"],
   ["worlds", "Worlds"],
-  ["skills", "Skills"],
   ["needs", "Needs you"],
-  ["ledger", "Ledger"],
   ["agenda", "Agenda"],
+  ["skills", "Skills"],
   ["team", "Team"],
+  ["connectors", "Connectors"],
+  ["ledger", "Ledger"],
+];
+
+const PHONE_TABS: readonly (readonly [PageId, string, string])[] = [
+  ["home", "Home", "home"],
+  ["worlds", "Worlds", "grid"],
+  ["chat", "Chat", "card"],
+  ["needs", "Needs you", "shield"],
+];
+const PHONE_MORE: readonly (readonly [PageId, string])[] = [
+  ["agenda", "Agenda"],
+  ["skills", "Skills"],
+  ["team", "Team"],
+  ["connectors", "Connectors"],
+  ["ledger", "Ledger"],
+  ["library", "Library"],
+  ["profile", "Profile"],
+  ["settings", "Settings"],
 ];
 
 /** The down chevron on the page menu and More buttons. */
@@ -74,6 +92,8 @@ export interface TopNavProps {
   compact?: boolean;
   /** STUDIO-INT: the window width; the tabs that do not fit beside the tools move into a More menu (0 = all). */
   vw?: number;
+  /** Tilo T: only the Studio theme uses the phone tab bar. */
+  studio?: boolean;
 }
 
 export function TopNav(p: TopNavProps) {
@@ -83,6 +103,7 @@ export function TopNav(p: TopNavProps) {
     p.go(page);
   };
   const [pagesOpen, setPagesOpen] = useState(false);
+  const [phoneMoreOpen, setPhoneMoreOpen] = useState(false);
   // STUDIO-INT: the More menu opens under its button; its left edge is read when it opens.
   const [moreAt, setMoreAt] = useState<number | null>(null);
   const current = TABS.find(([id]) => p.page === id || (id === "worlds" && p.page === "world"));
@@ -104,6 +125,10 @@ export function TopNav(p: TopNavProps) {
       return { id, label, ...(hint ? { hint } : {}), onSelect: () => p.go(id) };
     });
   const ringed = p.menu === "acct" || p.page === "profile" || p.page === "connectors";
+  const phoneTabs = p.studio && p.compact && (p.vw ?? 0) > 0 && (p.vw ?? 0) <= 560;
+  const phoneMoreCurrent =
+    p.page !== null &&
+    !PHONE_TABS.some(([id]) => p.page === id || (id === "worlds" && p.page === "world"));
   return (
     <>
       <header className={`park-shell__nav ${p.booting ? "park-shell__booting" : ""}`}>
@@ -226,6 +251,43 @@ export function TopNav(p: TopNavProps) {
           </button>
         </div>
       </header>
+      {phoneTabs ? (
+        <nav aria-label="Phone tabs" className="park-shell__phone-tabs" data-park-floating>
+          {PHONE_TABS.map(([id, label, glyph]) => {
+            const on = p.page === id || (id === "worlds" && p.page === "world");
+            return (
+              <a
+                key={id}
+                href={parkPath(id)}
+                aria-current={on ? "page" : undefined}
+                className={`park-shell__phone-tab ${on ? "park-shell__phone-tab--on" : ""}`}
+                onClick={link(id)}
+                onPointerEnter={() => prefetchPage(id)}
+                onFocus={() => prefetchPage(id)}
+              >
+                <span className="park-shell__phone-icon">
+                  {icon(glyph, 19)}
+                  {id === "needs" && p.needsLeft > 0 ? (
+                    <span className="park-shell__phone-badge">{p.needsLeft}</span>
+                  ) : null}
+                </span>
+                {label}
+              </a>
+            );
+          })}
+          <button
+            type="button"
+            className={`park-shell__phone-tab ${phoneMoreCurrent ? "park-shell__phone-tab--on" : ""}`}
+            aria-current={phoneMoreCurrent ? "page" : undefined}
+            aria-haspopup="menu"
+            aria-expanded={phoneMoreOpen}
+            onClick={() => setPhoneMoreOpen(true)}
+          >
+            <span className="park-shell__phone-icon">{icon("more", 19)}</span>
+            More
+          </button>
+        </nav>
+      ) : null}
       {/* Outside the header: its backdrop-filter would make a fixed panel position against the nav (B2). */}
       {p.compact && pagesOpen ? (
         <Menu
@@ -234,6 +296,15 @@ export function TopNav(p: TopNavProps) {
           width={240}
           onClose={() => setPagesOpen(false)}
           items={items(TABS)}
+        />
+      ) : null}
+      {phoneTabs && phoneMoreOpen ? (
+        <Menu
+          label="More pages"
+          className="park-shell__phone-menu"
+          width={240}
+          onClose={() => setPhoneMoreOpen(false)}
+          items={items(PHONE_MORE)}
         />
       ) : null}
       {!p.compact && moreAt !== null && fit.more.length > 0 ? (
