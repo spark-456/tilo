@@ -160,6 +160,7 @@ class TaskRecord:
     answers: dict[str, str | None] = field(default_factory=dict)  # field -> answer; None when skipped
     edits: dict[str, Any] = field(default_factory=dict)
     approaches: list[dict] | None = None  # proposed for the current brief
+    maker_picks: list[dict] = field(default_factory=list)  # the owner's MK-06 choices, committed with budget grant
     granted: bool = False
     scenario: str | None = None  # FR-INT-11: the scenario id named at intake; its policies are created at approve
     gaps: tuple[Gap, ...] = ()  # FR-INT-15: the parts Tilo cannot do, set once at intake; answers and edits keep them
