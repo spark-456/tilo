@@ -1,0 +1,23 @@
+# RUN-COST-PROGRESS (16 Oct 2026, EFF-03/EFF-04, HR-1): how far one unit's tool loop may go. Read by
+# tilo_harness.tool_limits.load_tool_limits and applied by the API's run runner. Live evidence: one research unit with
+# web_search and fetch_url ran seven minutes and spent 50.9 of a 60-credit cap, a grounded search settling near 6 credits
+# each. The amounts live here, never as literals in code or in the web app (SEC-16). No model id here (PL-01).
+version: 1
+
+rounds: 3 # model calls per unit; the last one is offered no tools, so the unit answers from what it has
+calls_per_round: 4 # tool calls honoured from one model reply (parallel function calls are ONE round)
+max_tool_calls: 6 # tool calls (run, cached or refused) in one unit, all tools together
+calls_per_tool: # a tool named here may be called at most this many times in one unit
+  web_search: 2 # a grounded search is the dear call (about 6 credits settled)
+  fetch_url: 4
+result_chars: 3000 # characters of one tool result shown to the model (was 6000)
+results_total_chars: 8000 # characters of all tool results shown to the model (was 16000)
+credit_share: 0.5 # tools are withheld once a unit has spent this share of the run's credit cap: the writer and the verifier keep the rest
+
+# HR-1: a unit's tool call is recorded as one agent.working event whose summary says what it is doing; the line is
+# written here, never from the call's arguments (a query or a URL is outside text). Only a call that really runs says it.
+progress:
+  default: The agent is using a tool.
+  tools:
+    web_search: The agent is searching the web.
+    fetch_url: The agent is reading a web page.

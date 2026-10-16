@@ -121,6 +121,9 @@ class UnitContext:
     # FR-HIL-10: what the person decided when this unit asked first (code-written from the card and the answer);
     # `unit_prompt` shows it, neutralised, inside the request block. None when the unit never asked.
     decision: str | None = None
+    # RUN-COST-PROGRESS (HR-1): called once, with a plain sentence, when one of the unit's tool calls really runs; the
+    # executor records it as an agent.working event so the world shows the work as it happens. None: nothing recorded.
+    progress: Callable[[str], None] | None = None
 
 
 class UnitRunner(Protocol):
@@ -592,6 +595,7 @@ class _Run:
                 intake_answers=intake_answers,  # the run's answers plus any assumption made for this unit (BQ-ASSUME-1)
                 upstream=upstream,
                 decision=decision,
+                progress=self.progress_for(unit_id, worker, site, cause, at),
             )
             outcome, worker, cause = await self.run_agents(unit, first, site, cause, at)  # a successor may finish it
         made: list[Kept] = []
@@ -635,6 +639,20 @@ class _Run:
             # the store read is synchronous: keep it off the event loop
             self.results[unit_id] = await asyncio.to_thread(_upstream_item, unit, outcome, made, self.store)
         return outcome
+
+    def progress_for(
+        self, unit_id: str, worker: str, site: str, cause: str, at: dict[str, Any]
+    ) -> Callable[[str], None]:
+        """RUN-COST-PROGRESS: one more agent.working per tool call that really runs. A refused write is logged and
+        dropped: a progress note never stops the unit."""
+
+        def say(line: str) -> None:
+            try:
+                self.emit("agent.working", worker, site, _line(line), {"unit": unit_id}, cause=cause, **at)
+            except Exception as caught_error:
+                log_caught(caught_error, __name__, locals())
+
+        return say
 
     async def call(self, work: Awaitable[Any], unit_id: str = "") -> Any:
         """The runner's result, or a `_Crashed` if it crashed or cancelled its own work (a cancel of the run itself

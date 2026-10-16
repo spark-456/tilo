@@ -16,6 +16,7 @@ from tilo_archive import RunArchive
 from tilo_harness.deliverable import render_format
 from tilo_harness.executor import DefaultUnitRunner, UnitContext, UnitOutcome
 from tilo_harness.quiz import validate_spec, verify_answers, wants_quiz
+from tilo_harness.tool_limits import load_tool_limits
 from tilo_harness.tools import ToolRegistry
 from tilo_harness.unit_prompt import UpstreamItem
 from tilo_planning.extraction import ExtractionError, stored_text
@@ -116,6 +117,7 @@ class BoundRunRunner:
     ) -> None:
         self.run_owner, self.providers, self.clock, self.safety = run, providers, clock, safety
         self.budget = RunBudget(run.cap)
+        self.limits = load_tool_limits()  # RUN-COST-PROGRESS: config/tool_loop.yaml, read once per run
         self.router = router
         self.archive = RunArchiveBridge(run, archive)
         self.service = fetch_service(mode, self.archive, fixtures)
@@ -197,6 +199,8 @@ class BoundRunRunner:
             quiz_sources=source_loader(owner.seams.artifacts, owner.scope, owner.store.events[owner.world_id]),
             meter=lambda role, _request, _reply: models[role].take_charge(),
             credit_cap=self.budget.left,
+            limits=self.limits,
+            tool_credit_cap=self.limits.credit_share * owner.cap,  # the rest is for the writer and the verifier
             report_renderer=partial(render_report, fmt=fmt or "pdf", template=template),
         )
         return await runner.run(unit, context)

@@ -93,3 +93,15 @@ def test_RUN_FAIL_1_a_gemini_shaped_tool_passes_unchanged():
     provider = _provider(_Models())
 
     assert provider._config_kwargs(GenerateRequest(prompt="x", tools=[native]))["tools"] == [native]
+
+
+def test_EFF_RUN_COST_the_sdk_never_loops_on_its_own_when_tools_are_sent():
+    """Tilo runs its own capped tool loop (config/tool_loop.yaml). The SDK's automatic function calling ("AFC is enabled
+    with max remote calls: 10", seen live) is off for a request WITH tools too."""
+    provider = _provider(_Models())
+
+    kwargs = provider._config_kwargs(GenerateRequest(prompt="x", tools=[SEARCH]))
+
+    assert kwargs["automatic_function_calling"] == {"disable": True}
+    config = real_genai_types.GenerateContentConfig(**kwargs)
+    assert config.automatic_function_calling.disable is True and config.tools

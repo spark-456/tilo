@@ -183,7 +183,7 @@ def test_PL_LIVE_02_every_call_is_capped_and_sends_only_the_fixed_prompt(tmp_pat
         config = call["config"]
         assert config.max_output_tokens == 64
         # nothing else rides along: no system text, tools or response schema; thinking is the only extra
-        assert set(vars(config)) <= {"max_output_tokens", "thinking_config"}
+        assert set(vars(config)) <= {"max_output_tokens", "thinking_config", "automatic_function_calling"}  # AFC is off
 
 
 @pytest.mark.parametrize(

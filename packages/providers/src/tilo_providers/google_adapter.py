@@ -270,9 +270,10 @@ class GoogleModelProvider(ModelProvider):
     def _config_kwargs(self, request: GenerateRequest) -> dict[str, Any]:
         """The `GenerateContentConfig` fields for `request`; `schema_probe` edits a copy of these."""
         kwargs: dict[str, Any] = {}
-        if not request.tools:
-            # X-LOGS-1: no functions to execute; explicitly opt out of SDK AFC and its warning.
-            kwargs["automatic_function_calling"] = {"disable": True}
+        # X-LOGS-1 / RUN-COST-PROGRESS: always opt out of SDK automatic function calling. With no tools there is nothing
+        # to execute (and a warning to avoid); with tools Tilo runs its own capped loop (config/tool_loop.yaml), so the
+        # SDK must never call a function or re-send the conversation by itself.
+        kwargs["automatic_function_calling"] = {"disable": True}
         if request.system is not None:
             kwargs["system_instruction"] = request.system
         if request.tools is not None:
