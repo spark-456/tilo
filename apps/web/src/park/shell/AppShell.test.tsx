@@ -32,7 +32,8 @@ afterEach(() => {
   window.history.pushState({}, "", "/");
 });
 
-const status = () => qa(document.body, '[role="status"]');
+const status = () =>
+  qa(document.body, '[role="status"]').filter((el) => !el.closest(".tt-pool-overlay"));
 /** The browser's own "the fade has finished" (WEB-MOTION-2: the card and the splash fade out, then go). */
 const animationEnd = (el: Element | null | undefined) =>
   act(() => {

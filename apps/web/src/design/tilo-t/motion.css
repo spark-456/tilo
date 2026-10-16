@@ -152,6 +152,7 @@
 .tt-pool__caption{animation:tCaption .4s ease-out both}
 .tt-pool-overlay{animation:tCaption .25s ease-out both}
 @keyframes ttPoolFade{from{opacity:0}to{opacity:1}}
+@keyframes ttPoolFadeOut{from{opacity:1}to{opacity:0}}
 
 /* ---- Reduced motion (tilo-t.css, last rule, 1:1): every walk, rise and flight becomes a fade of 200 to 300 ms and
    loops stop. Buddy and the loops below also fall back to their static pose. ---- */
@@ -160,6 +161,7 @@
 @media (prefers-reduced-motion:reduce){
 .tt-pool__stage *,.tt-pool__stage{animation:none!important}
 .tt-pool-overlay{animation:ttPoolFade .25s ease-out both!important}
+.tt-pool-overlay[data-phase="sink"]{animation:ttPoolFadeOut .25s ease-in both!important}
 .tt-pool-page,.tt-pool-page--covered,.tt-pool-page--sink{transition:opacity .25s!important;filter:none;transform:none}
 .tt-pool-page--covered{opacity:.72}
 }

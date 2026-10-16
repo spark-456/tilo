@@ -1,4 +1,11 @@
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Buddy } from "./Buddy";
 import { useLoopPaused } from "./loops";
 import "./PoolLoader.css";
@@ -15,8 +22,18 @@ export type PoolLoaderProps = {
 const MIN_LOAD_MS = 300;
 const LEAP_MS = 2600;
 const SINK_MS = 2000;
+const REDUCED_MS = 250;
+const REDUCE_QUERY = "(prefers-reduced-motion: reduce)";
+const subscribeReduced = (onChange: () => void): (() => void) => {
+  if (typeof window.matchMedia !== "function") return () => undefined;
+  const query = window.matchMedia(REDUCE_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+};
+const reducedNow = (): boolean =>
+  typeof window.matchMedia === "function" && window.matchMedia(REDUCE_QUERY).matches;
 const SITE_COPY = {
-  leap: ["Loading Tilo", "Fetching your workspace"],
+  leap: ["Loading Tilo", "Connecting to your organisation"],
   swim: ["Still loading", "The request is still loading"],
   sink: ["Ready", "The request finished"],
 } as const;
@@ -39,9 +56,10 @@ const DROPS = Array.from({ length: 12 }, (_, i) => {
 });
 
 /**
- * Shared Tilo T loader. Site and task loads wait 300 ms before appearing; task event timestamps preserve that gate
- * when world.started and world.planned arrive together. The leap finishes before a completed task sinks; active tasks
- * swim after the leap. The screen behind remains mounted and aria-busy while active.
+ * Shared Tilo T loader. An initially pending site load covers the first paint; later site loads and task events wait
+ * 300 ms before appearing. Task event timestamps preserve that gate when world.started and world.planned arrive
+ * together. The leap and water close finish before a completed load reveals the page; active tasks swim after the leap.
+ * The screen behind remains mounted and aria-busy while active.
  *
  * Task API: <PoolLoader kind="task" events={worldEvents}>…page…</PoolLoader>
  * Site API: <PoolLoader kind="site" loading={isLoading}>…page…</PoolLoader>
@@ -63,9 +81,14 @@ export function PoolLoader(props: PoolLoaderProps) {
       : Number.NaN;
   const active =
     props.kind === "task" ? started && !planned && !failed : props.loading;
+  const reduced = useSyncExternalStore(subscribeReduced, reducedNow, () => false);
+  const still =
+    typeof document !== "undefined" &&
+    document.querySelector('[data-park][data-motion="still"]') !== null;
+  const motionOff = reduced || still;
   const activeRef = useRef(active);
   activeRef.current = active;
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(() => !isTask && active);
   const [phase, setPhase] = useState<PoolPhase>("leap");
 
   useEffect(() => {
@@ -85,7 +108,7 @@ export function PoolLoader(props: PoolLoaderProps) {
       }, MIN_LOAD_MS);
       return () => window.clearTimeout(timer);
     }
-    if (!active) return;
+    if (!active || visible) return;
     // triggeredBy: a site request that remains pending for more than 300 ms
     const timer = window.setTimeout(() => {
       setPhase("leap");
@@ -96,23 +119,27 @@ export function PoolLoader(props: PoolLoaderProps) {
 
   useEffect(() => {
     if (!visible || phase !== "leap") return;
-    const timer = window.setTimeout(() => setPhase(activeRef.current ? "swim" : "sink"), LEAP_MS);
+    const timer = window.setTimeout(
+      () => setPhase(activeRef.current ? "swim" : "sink"),
+      motionOff ? REDUCED_MS : LEAP_MS,
+    );
     return () => window.clearTimeout(timer);
-  }, [visible, phase]);
+  }, [motionOff, visible, phase]);
 
   useEffect(() => {
     if (!visible || phase === "sink" || active || (isTask && phase !== "swim")) return;
+    if (!motionOff && phase === "leap") return;
     // triggeredBy: world.planned/world.failed, or the site request finishing
     setPhase("sink");
-  }, [active, isTask, phase, visible]);
+  }, [active, isTask, motionOff, phase, visible]);
 
   useEffect(() => {
     if (!visible || phase !== "sink") return;
     const timer = window.setTimeout(() => {
       setVisible(false);
-    }, isTask ? SINK_MS : 250);
+    }, motionOff ? REDUCED_MS : SINK_MS);
     return () => window.clearTimeout(timer);
-  }, [isTask, phase, visible]);
+  }, [motionOff, phase, visible]);
 
   const busy = active;
   const [title, subtitle] =
