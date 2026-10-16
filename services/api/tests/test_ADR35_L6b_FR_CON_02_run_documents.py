@@ -297,7 +297,7 @@ def test_WORKSPACE_TOOLS_WT08_update_event_run_builds_approval_card_without_undo
     policy = covering_policy()
     policy.update(id="pol_update_event_ask", action_type="update_event")
     policy["scope"]["connectors"] = ["google_calendar"]
-    lv.rf.rig.store.policies[policy["id"]] = policy
+    lv.rf.store.policies[policy["id"]] = policy
     lv.start()
 
     def ready():
