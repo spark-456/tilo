@@ -17,7 +17,7 @@ import json
 
 import pytest
 from _adr35_l6_lib import FakeGoogle, InProcessConnectors5
-from _clint2_lib import NEW_RECIPIENT, base_plan, build_run_flow, load_json, wait_for
+from _clint2_lib import NEW_RECIPIENT, base_plan, build_run_flow, covering_policy, load_json, wait_for
 from _mtg09b_lib import block_network
 from tilo_api import deps, events
 from tilo_api.connector_rpc import ConnectorRpcStub
@@ -294,6 +294,10 @@ def test_WORKSPACE_TOOLS_WT08_update_event_run_builds_approval_card_without_undo
     lv = live(
         connector="google_calendar", actions=("update_event",), fields=EVENT, destination="event-1", recipients=()
     )
+    policy = covering_policy()
+    policy.update(id="pol_update_event_ask", action_type="update_event")
+    policy["scope"]["connectors"] = ["google_calendar"]
+    lv.rf.rig.store.policies[policy["id"]] = policy
     lv.start()
 
     def ready():
