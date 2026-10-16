@@ -58,9 +58,14 @@ it.each([1440, 390])("CX_WORLD_LAYOUT_1_offsets_convene_from_the_agent_count_at_
   const tagStyle = declared(tag, rules);
   const buttonStyle = declared(button, rules);
 
+  const tagHeight = Number.parseFloat(tagStyle.get("height") ?? "");
+  const tagMinHeight = Number.parseFloat(tagStyle.get("min-height") ?? "");
   const tagBottom =
     Number.parseFloat(tagStyle.get("top") ?? "0") +
-    Number.parseFloat(tagStyle.get("height") ?? "0");
+    Math.max(
+      Number.isFinite(tagHeight) ? tagHeight : 0,
+      Number.isFinite(tagMinHeight) ? tagMinHeight : 0,
+    );
   const buttonTop = Number.parseFloat(buttonStyle.get("top") ?? "0");
   expect(buttonStyle.get("left")).toBe("20px");
   expect(buttonTop).toBeGreaterThanOrEqual(tagBottom);
