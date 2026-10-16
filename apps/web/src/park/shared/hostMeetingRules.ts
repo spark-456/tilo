@@ -1,7 +1,7 @@
 // FR-MTG-01, FR-MTG-09, FR-MTG-10: the hosted-meeting form rules and the attend window. Kept outside `api/` (which may
 // hold no clock, Park's static rule WEB_1a) and outside the Agenda page files (no Date or timers, WEB_9).
 
-import { TiloApiError } from "../../api/http";
+import { TiloApiError } from "../api/hostCopy";
 
 /** The notice version the API stamps (`deps.NOTICE_VERSION`); a stale one is a 422. */
 export const NOTICE_VERSION = "1.0.0";
@@ -97,7 +97,8 @@ export function openMeetTab(): MeetTab | null {
     w.opener = null;
     return {
       go: (url) => {
-        w.location.href = url;
+        // the new Meet tab, not this app's address (only router.ts touches the app's own location)
+        w.location.assign(url);
       },
       close: () => w.close(),
     };
