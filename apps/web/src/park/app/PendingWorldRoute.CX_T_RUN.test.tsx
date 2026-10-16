@@ -86,3 +86,26 @@ it("CX_T_RUN_pending_blueprint_stays_until_the_recorded_world_started_event", as
   await act(async () => receive?.({ type: "world.started" }));
   expect(rig.container.querySelector("[data-testid='run-blueprint']")).toBeNull();
 });
+
+it("CX_T_RUN_pool_stays_mounted_while_the_recorded_plan_reveals_the_world", async () => {
+  let receive: ((event: { type: string; ts?: string }) => void) | undefined;
+  const client = {
+    subscribeEvents: vi.fn((_id: string, onEvent: (event: { type: string; ts?: string }) => void) => {
+      receive = onEvent;
+      return vi.fn();
+    }),
+  };
+  markPendingWorld("pool-handoff", "Plan a team day");
+  const rig = mount(
+    <PendingWorldRoute worldId="pool-handoff" client={client}>
+      <p>World is visible</p>
+    </PendingWorldRoute>,
+  );
+  await act(async () => receive?.({ type: "world.started", ts: "2026-10-16T10:00:00.000Z" }));
+  const host = rig.container.querySelector("[data-testid='tt-pool-host']");
+  expect(host).not.toBeNull();
+  expect(host?.querySelector("[data-phase='leap']")).not.toBeNull();
+  await act(async () => receive?.({ type: "world.planned", ts: "2026-10-16T10:00:00.400Z" }));
+  expect(rig.container.querySelector("[data-testid='tt-pool-host']")).toBe(host);
+  expect(host?.textContent).toContain("World is visible");
+});

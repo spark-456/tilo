@@ -1,5 +1,5 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Buddy, ErrorState, LoadingState, useLoopPaused } from "../../design/tilo-t";
+import { type ReactNode, useEffect, useState } from "react";
+import { ErrorState, LoadingState, PoolLoader, type PoolLoaderEvent } from "../../design/tilo-t";
 
 /** An approval reply proves this id exists; it does not prove that planning has finished. */
 const pending = new Set<string>();
@@ -22,7 +22,7 @@ function clearPendingWorld(worldId: string): void {
 interface EventFeed {
   subscribeEvents(
     worldId: string,
-    onEvent: (event: { readonly type: string }) => void,
+    onEvent: (event: { readonly type: string; readonly ts?: string }) => void,
     onError?: (error: { readonly message: string }) => void,
   ): () => void;
 }
@@ -40,11 +40,10 @@ export function PendingWorldRoute({
   const [phase, setPhase] = useState<"waiting" | "started" | "planned">(() =>
     pendingWorld(worldId) ? "waiting" : "planned",
   );
+  const [events, setEvents] = useState<PoolLoaderEvent[]>([]);
   const goal = pendingWorldGoal(worldId);
   const [error, setError] = useState(false);
   const [worldFailed, setWorldFailed] = useState(false);
-  const loopRef = useRef<HTMLDivElement>(null);
-  const paused = useLoopPaused(loopRef);
   const planned = phase === "planned";
   const failed = error || worldFailed || client === null;
   useEffect(() => {
@@ -52,6 +51,13 @@ export function PendingWorldRoute({
     return client.subscribeEvents(
       worldId,
       (event) => {
+        if (event.type === "world.started" || event.type === "world.planned" || event.type === "world.failed") {
+          setEvents((current) => {
+            if (current.some((recorded) => recorded.type === event.type)) return current;
+            const recorded = event.ts ? { type: event.type, ts: event.ts } : { type: event.type };
+            return [...current, recorded];
+          });
+        }
         if (event.type === "world.started") {
           // triggeredBy: world.started. The pool appears only after this recorded event.
           setPhase((current) => current === "planned" ? current : "started");
@@ -70,34 +76,34 @@ export function PendingWorldRoute({
     );
   }, [client, planned, worldId]);
 
-  if (planned) return <div className="park-world-enter">{children}</div>;
   return (
-    <section className="park-pending-world" data-testid="pending-world">
-      <h1 tabIndex={-1}>{worldFailed ? "This world stopped" : failed ? "We can't open this world yet" : "Tilo is planning your world"}</h1>
-      {failed ? (
-        <ErrorState
-          title={worldFailed ? "This world stopped" : "World updates are unavailable"}
-          body={worldFailed ? "Return to your worlds to see what happened." : "You can return to your worlds and try again."}
-        />
+    <PoolLoader kind="task" events={events}>
+      {planned ? (
+        <div className="park-world-enter">{children}</div>
       ) : (
-        <div ref={loopRef} className={paused}>
-          {phase === "waiting" && goal ? (
-            <div className="park-pending-world__blueprint" data-testid="run-blueprint">
-              BLUEPRINT · {goal}
+        <section className="park-pending-world" data-testid="pending-world">
+          <h1 tabIndex={-1}>{worldFailed ? "This world stopped" : failed ? "We can't open this world yet" : "Tilo is planning your world"}</h1>
+          {failed ? (
+            <ErrorState
+              title={worldFailed ? "This world stopped" : "World updates are unavailable"}
+              body={worldFailed ? "Return to your worlds to see what happened." : "You can return to your worlds and try again."}
+            />
+          ) : (
+            <div>
+              {phase === "waiting" && goal ? (
+                <div className="park-pending-world__blueprint" data-testid="run-blueprint">
+                  BLUEPRINT · {goal}
+                </div>
+              ) : null}
+              <LoadingState
+                layout="world"
+                caption={phase === "started" ? "world.started · Waiting for world.planned" : "Waiting for world.started"}
+              />
             </div>
-          ) : null}
-          {phase === "started" ? (
-            <div className="park-pending-world__pool" aria-hidden="true">
-              <Buddy mood="swim" size={96} />
-            </div>
-          ) : null}
-          <LoadingState
-            layout="world"
-            caption={phase === "started" ? "world.started · Waiting for world.planned" : "Waiting for world.started"}
-          />
-        </div>
+          )}
+          <a href="/worlds">Your worlds</a>
+        </section>
       )}
-      <a href="/worlds">Your worlds</a>
-    </section>
+    </PoolLoader>
   );
 }

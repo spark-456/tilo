@@ -191,13 +191,13 @@ export const ALLOWLIST: readonly AllowEntry[] = [
     file: "src/design/tilo-t/motion.css",
     rule: "css-animation",
     reason:
-      "Class rules that start the Tilo T keyframes: Buddy moods, ambient idle loops, loading shimmer and dots, plus PoolLoader's leap/swim/sink sequence from a site request pending over 300 ms or the recorded world.started event (ending at world.planned/world.failed). Animation-play-state pauses loops in a hidden tab or off-screen section. Reduced motion and the still choice stop the pool motion (leaving its fade) and Buddy loops. Work motion names its real event (HR-1).",
+      "Class rules that start the Tilo T keyframes: Buddy moods, ambient idle loops, loading shimmer and dots, plus PoolLoader's leap/swim/sink sequence after a site request or recorded world.started lasts 300 ms; buffered task events use their recorded timestamps, and world.planned/world.failed end the swim. Animation-play-state pauses loops in a hidden tab or off-screen section. Reduced motion and the still choice stop the pool motion (leaving its fade) and Buddy loops. Work motion names its real event (HR-1).",
   },
   {
     file: "src/design/tilo-t/motion.css",
     rule: "css-transition",
     reason:
-      "The global reduced-motion fallback from tilo-t.css makes walks, rises and flights opacity fades and stops loops; PoolLoader's page blur/scale transition starts only from a site request pending over 300 ms or world.started, then delays clearing at sink. Reduced motion changes it to an opacity fade only. No layout property animates; work movement remains event-driven (HR-1).",
+      "The global reduced-motion fallback from tilo-t.css makes walks, rises and flights opacity fades and stops loops; PoolLoader's page blur/scale transition starts after a site request or world.started remains pending 300 ms, then delays clearing at sink. Reduced motion changes it to an opacity fade only. No layout property animates; work movement remains event-driven (HR-1).",
   },
 ];
 

@@ -70,12 +70,3 @@
   font: 700 13px/1.5 var(--mono);
   overflow-wrap: anywhere;
 }
-[data-park] .park-pending-world__pool {
-  display: grid;
-  place-items: center;
-  width: min(100%, 280px);
-  min-height: 125px;
-  margin: 0 auto 1rem;
-  border-bottom: 6px solid var(--bpLine);
-  background: linear-gradient(180deg, transparent 65%, var(--bp) 65%);
-}
