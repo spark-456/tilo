@@ -20,9 +20,7 @@ it("CX_T_AGENDA_new_menu_creates_a_pin_only_after_the_api_records_it", async () 
     <AgendaNewMenu createPin={createPin} onPinCreated={changed} canHost />,
   );
   click(q(container, "summary"));
-  expect(q(container, '[aria-label="Calendar item"]').getAttribute("aria-disabled")).toBe(
-    "true",
-  );
+  expect(q(container, '[aria-label="Calendar item"]').getAttribute("aria-disabled")).toBe("true");
   click(q(container, 'button[role="menuitem"]'));
   typeInto(q<HTMLInputElement>(container, 'input[name="pin-title"]'), "Call Lin back");
   click(q(container, 'button[type="submit"]'));

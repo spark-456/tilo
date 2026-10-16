@@ -159,7 +159,10 @@
   background: var(--amberSoft);
   overflow-wrap: anywhere;
 }
-[data-park][data-theme="studio"] #agenda-meetings [data-testid="agenda-pinboards"] li:nth-child(even) {
+[data-park][data-theme="studio"]
+  #agenda-meetings
+  [data-testid="agenda-pinboards"]
+  li:nth-child(even) {
   background: var(--blueSoft);
 }
 

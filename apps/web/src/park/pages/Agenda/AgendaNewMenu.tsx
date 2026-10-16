@@ -40,7 +40,7 @@ export function AgendaNewMenu({
       <details ref={details}>
         <summary>+ New</summary>
         <div className="park-agenda-new__menu" role="menu" aria-label="New item">
-          <span role="menuitem" aria-label="Calendar item" aria-disabled="true">
+          <span role="menuitem" tabIndex={-1} aria-label="Calendar item" aria-disabled="true">
             Calendar item <small>Not available here yet</small>
           </span>
           {createPin ? (
@@ -55,7 +55,7 @@ export function AgendaNewMenu({
               Pin <small>A note for you</small>
             </button>
           ) : (
-            <span role="menuitem" aria-label="Pin" aria-disabled="true">
+            <span role="menuitem" tabIndex={-1} aria-label="Pin" aria-disabled="true">
               Pin <small>Not available here yet</small>
             </span>
           )}
@@ -64,7 +64,7 @@ export function AgendaNewMenu({
               Meeting with Tilo <small>Use the meeting host form</small>
             </a>
           ) : (
-            <span role="menuitem" aria-label="Meeting with Tilo" aria-disabled="true">
+            <span role="menuitem" tabIndex={-1} aria-label="Meeting with Tilo" aria-disabled="true">
               Meeting with Tilo <small>Connect the meeting host first</small>
             </span>
           )}

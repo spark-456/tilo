@@ -151,13 +151,10 @@ function PersonalAgendaPage({ app }: AgendaPageProps) {
 function Plate({ A }: { A: LiveAgenda }) {
   const [peopleKey, setPeopleKey] = useState(0);
   const demo = sessionView.demo();
-  const http = useMemo(
-    () => {
-      const baseUrl = API_URL?.trim();
-      return baseUrl && !demo ? new HttpClient({ baseUrl, appCheckToken, authToken }) : null;
-    },
-    [demo],
-  );
+  const http = useMemo(() => {
+    const baseUrl = API_URL?.trim();
+    return baseUrl && !demo ? new HttpClient({ baseUrl, appCheckToken, authToken }) : null;
+  }, [demo]);
   const createPin = http
     ? async (title: string, idempotencyKey: string) => {
         const answer = await http.postJson(
@@ -214,7 +211,8 @@ function Plate({ A }: { A: LiveAgenda }) {
           <div>
             <h1 className="park-agenda-title">Agenda</h1>
             <p className="park-agenda-lede">
-              Tilo prepares a brief before each meeting and takes notes in the ones you invite it to.
+              Tilo prepares a brief before each meeting and takes notes in the ones you invite it
+              to.
             </p>
           </div>
           <AgendaNewMenu
@@ -252,17 +250,19 @@ function Plate({ A }: { A: LiveAgenda }) {
           <div id="agenda-meetings">
             <PeopleLists key={peopleKey} />
           </div>
-          {SIDE.filter(([label]) => http === null || label !== "Boards").map(([label, title, line]) => (
-            <section
-              key={label}
-              aria-label={label}
-              className="park-agenda-state park-agenda-sidecard"
-            >
-              <h2>{title}</h2>
-              <p className="park-agenda-sidena">Not available yet</p>
-              <p>{line}</p>
-            </section>
-          ))}
+          {SIDE.filter(([label]) => http === null || label !== "Boards").map(
+            ([label, title, line]) => (
+              <section
+                key={label}
+                aria-label={label}
+                className="park-agenda-state park-agenda-sidecard"
+              >
+                <h2>{title}</h2>
+                <p className="park-agenda-sidena">Not available yet</p>
+                <p>{line}</p>
+              </section>
+            ),
+          )}
         </aside>
       </div>
     </>
