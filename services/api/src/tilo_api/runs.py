@@ -45,6 +45,7 @@ from tilo_api.cards import (
     get_channels_caller,
 )
 from tilo_api.connector_rpc import NO_DRAFT, ConnectorRpcStub
+from tilo_api.office_screen import office_text
 
 DESTINATION_CHANGED = "the email goes somewhere other than its draft, so it is not the same item"
 
@@ -164,6 +165,8 @@ def screened_by_run(artifacts: Any, mode: Mode, meter: Any) -> Any:
     """RESULT-LIVE: the shared store screens through `deps.get_safety(mode)` with no request, so no meter, which
     deployed is replay: a miss, every run output `unscreened` (AR-07) and none of it ever opens. A live, metered run
     screens what it stores with its own metered safety provider (SEC-16), as its tool results already are."""
+    if hasattr(artifacts, "with_upload_text"):  # DOCS-OUT: a rendered Office file is screened as its parsed text
+        artifacts = artifacts.with_upload_text(office_text)
     if mode != "live" or meter is None:
         return artifacts
     return artifacts.with_screener(deps.get_safety(mode, meter=meter))

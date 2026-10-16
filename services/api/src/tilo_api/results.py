@@ -21,6 +21,16 @@ logger = logging.getLogger("tilo_api.results")
 
 _RECORDS = {"artifact.created", "artifact.versioned", "artifact.rolled_back"}  # the events that record a version
 _MAX_BYTES = 20 * 1024 * 1024
+_OFFICE = "application/vnd.openxmlformats-officedocument."
+_SERVED = {  # the types the owner route names; DOCS-OUT: Office files keep their type and a real extension
+    "application/pdf": ".pdf",
+    "application/json": "",
+    "text/plain": "",
+    "text/markdown": "",
+    _OFFICE + "wordprocessingml.document": ".docx",
+    _OFFICE + "presentationml.presentation": ".pptx",
+    _OFFICE + "spreadsheetml.sheet": ".xlsx",
+}
 
 
 def result_store(request: Request, mode: Annotated[deps.Mode, Depends(deps.get_mode)]) -> Callable[[], ArtifactStore]:
@@ -101,7 +111,7 @@ def get_result(
         log_caught(caught_error, __name__, locals())
         raise HTTPException(status_code=404, detail="Tilo could not find that.") from None
     media = version.record["media_type"]
-    if media not in {"application/pdf", "application/json", "text/plain", "text/markdown"}:
+    if media not in _SERVED:
         media = "application/octet-stream"
     return Response(
         content,
@@ -109,6 +119,6 @@ def get_result(
         headers={
             "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff",
-            "Content-Disposition": 'attachment; filename="tilo-result"',
+            "Content-Disposition": f'attachment; filename="tilo-result{_SERVED.get(media, "")}"',
         },
     )

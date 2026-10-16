@@ -44,7 +44,7 @@ from tilo_providers.interfaces import GenerateRequest, GenerateResponse, ModelPr
 from tilo_providers.media import MediaPart, check_parts
 from tilo_providers.prompts import load_prompt
 
-from tilo_harness.deliverable import DeliverableRefused, render_format, render_output, wants_rendered
+from tilo_harness.deliverable import DeliverableRefused, prompt_name, render_format, render_output, wants_rendered
 from tilo_harness.outputs import UnitOutput
 from tilo_harness.quiz import SourceLoader, quiz_output, wants_quiz
 from tilo_harness.tools import (
@@ -169,9 +169,7 @@ class ToolUnitRunner:
         holds_effects = not loop.tainted and any(self._tools.is_side_effect(tool) for tool in allowed.values())
         base = load_prompt(
             role,
-            "unit_pdf.md"
-            if wants_rendered(unit, context.brief)
-            else "unit.md",  # LW-10: a PDF deliver unit writes a spec
+            prompt_name(unit, context),  # LW-10: a deliver unit for a file writes a spec (or, for a template, cells)
             {
                 "title": data_line(unit["title"], 120),
                 "unit_type": data_line(unit["unit_type"], 80),
