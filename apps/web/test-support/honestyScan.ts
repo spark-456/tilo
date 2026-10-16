@@ -185,7 +185,7 @@ export const ALLOWLIST: readonly AllowEntry[] = [
     file: "src/design/tilo-t/motion.css",
     rule: "css-keyframes",
     reason:
-      "Tilo T design keyframes ported 1:1 (tsBob, tsBlink, tMarch, tRise, tParcel, tConfetti, the run-start and pool-loader storyboards and the rest), plus ttPoolSwim (transform-only pool lap) and ttPoolFade (reduced-motion fade). A keyframe only plays when a component applies its class: work animation names its recorded trigger event, and the pool animation names the pending site request or world.started/world.planned event. Ambient decoration is Buddy idle loops and loading shimmer. Transform, opacity and filter only.",
+      "Tilo T design keyframes ported 1:1 (tsBob, tsBlink, tMarch, tRise, tParcel, tConfetti, the run-start and pool-loader storyboards and the rest), plus ttPoolFade (reduced-motion fade). The pool lap reuses tSwim on its elliptical offset-path. A keyframe only plays when a component applies its class: work animation names its recorded trigger event, and the pool animation names the pending site request or world.started/world.planned event. Ambient decoration is Buddy idle loops and loading shimmer. Transform, opacity and filter only.",
   },
   {
     file: "src/design/tilo-t/motion.css",

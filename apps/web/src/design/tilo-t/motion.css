@@ -135,7 +135,7 @@
 .tt-pool__ring{animation:tRipple 2.6s ease-out 0s infinite}
 .tt-pool__ring--two{animation-delay:.9s}
 .tt-pool__ring--three{animation-delay:1.8s}
-.tt-pool__swimmer{animation:ttPoolSwim 4.2s linear infinite}
+.tt-pool__swimmer{animation:tSwim 4.2s linear infinite}
 .tt-pool__swim-ring{animation:tsBob 1.4s ease-in-out infinite}
 .tt-pool__sink-buddy{animation:tSink 1.4s cubic-bezier(.5,0,.75,0) both}
 .tt-pool__sink-ripple{animation:tRipple 1.2s ease-out .9s both}
@@ -143,7 +143,6 @@
 .tt-pool__caption{animation:tCaption .4s ease-out both}
 .tt-pool__overlay{animation:tCaption .25s ease-out both}
 @keyframes ttPoolFade{from{opacity:0}to{opacity:1}}
-@keyframes ttPoolSwim{0%{transform:translate(-122px,0)}25%{transform:translate(0,-32px)}50%{transform:translate(122px,0)}75%{transform:translate(0,32px)}100%{transform:translate(-122px,0)}}
 
 /* ---- Reduced motion (tilo-t.css, last rule, 1:1): every walk, rise and flight becomes a fade of 200 to 300 ms and
    loops stop. Buddy and the loops below also fall back to their static pose. ---- */
