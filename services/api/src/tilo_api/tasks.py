@@ -16,6 +16,7 @@ import hashlib
 import json
 import logging
 import threading
+from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Iterator, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import UTC, date, datetime
@@ -507,6 +508,10 @@ def get_approaches(
     }
 
 
+_MATCHED: OrderedDict[tuple[str, str], dict[str, Any] | None] = OrderedDict()  # (task, brief hash) -> the match
+_MATCHED_MAX = 256
+
+
 def _matched(
     store: deps.Store, writer: deps.EventWriter | None, task_id: str, task: deps.TaskRecord, skills: SkillContext
 ) -> deps.TaskRecord:
@@ -514,7 +519,15 @@ def _matched(
     the person tagged is never replaced; no fit clears an earlier match. Advisory: a failure changes nothing."""
     if task.skill is not None and task.skill.get("source") == "tagged":
         return task
-    found = skills.match(str(task.brief.get("goal", "")))
+    goal = str(task.brief.get("goal", ""))
+    key = (task_id, hashlib.sha256(goal.encode()).hexdigest())
+    if key in _MATCHED:  # one match per brief: a repeat GET costs no embedding
+        found = _MATCHED[key]
+    else:
+        found = skills.best_for(goal)
+        _MATCHED[key] = found
+        while len(_MATCHED) > _MATCHED_MAX:
+            _MATCHED.popitem(last=False)
     if found == task.skill:
         return task
     try:

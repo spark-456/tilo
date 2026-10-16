@@ -21,7 +21,7 @@ from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import yaml
 from fastapi import Depends, Request
@@ -120,6 +120,8 @@ def taught_entries(records: list[dict[str, Any]], user: str) -> list[dict[str, A
 
     out = []
     for r in records:
+        if r.get("paused"):  # a paused skill is not offered, matched or tagged (TS-10, FR-SKL-06)
+            continue
         steps = "; ".join(_line(s["text"], 60) for s in r["plan"][:3])
         tools = list(dict.fromkeys(s["tool"] for s in r["plan"] if s["tool"] != WRITER[0]))
         out.append(
@@ -164,6 +166,10 @@ class SkillContext:
         """The one skill that fits `text`, or None. `tagged` (an id the person named) wins when they may use it."""
         if tagged is not None:
             return self.resolve_tag(None, tagged)
+        return self.best_for(text)
+
+    def best_for(self, text: str) -> dict[str, Any] | None:
+        """The skill that fits `text` by score alone (no tag): None below the threshold or on any failure."""
         entries = self.catalog()
         if not entries or self.router is None or not text.strip():
             return None
@@ -199,8 +205,12 @@ def _doc(entry: dict[str, Any]) -> str:
     return f"{entry['name']}: {entry['purpose']}"[:500]
 
 
-def _embed(model_router: Router, texts: list[str], task: str, dims: int) -> tuple[str, list[list[float]]]:
-    result = model_router.embed("embed", EmbedRequest(texts=texts, task=task, dimensions=dims))
+def _embed(
+    model_router: Router, texts: list[str], task: Literal["document", "query"], dims: int
+) -> tuple[str, list[list[float]]]:
+    # a deployed router is a MeteredRouter: its embeddings are SEC-16 units, named `metered_embed`; a Router has `embed`
+    call = getattr(model_router, "metered_embed", None) or model_router.embed
+    result = call("embed", EmbedRequest(texts=texts, task=task, dimensions=dims))
     reply = result.embedding
     return reply.profile_id, [list(v) for v in reply.vectors]
 
@@ -233,20 +243,30 @@ def _scores(model_router: Router, text: str, entries: list[dict[str, Any]], cfg:
     return {i: _cosine(query, v) for i, v in vectors.items()}
 
 
+def _fenced(entry: dict[str, Any]) -> str:
+    """An entry line that cannot close the SKILLS block or open another block of the prompt."""
+    return neutralise_marker(neutralise_marker(_doc(entry), "SKILLS"), "TASK")
+
+
 def _pick(model_router: Router, text: str, first: dict[str, Any], second: dict[str, Any]) -> str | None:
     """One cheap `assistant` call between two near-equal skills: 'a', 'b', 'none' or None when it cannot answer."""
     try:
         prompt = load_prompt(
             "assistant",
             "skill_route_task.md",
-            {"task": neutralise_marker(text, "TASK")[:1000], "a": _doc(first), "b": _doc(second)},
+            {
+                "task": neutralise_marker(text, "TASK")[:1000],
+                "a": _fenced(first),
+                "b": _fenced(second),
+            },
         )
         system = load_prompt("assistant", "skill_route_system.md")
         result = model_router.generate(
             "assistant",
             GenerateRequest(system=system, prompt=prompt, json_mode=True, response_schema=_PICK, max_output_tokens=64),
         )
-        doc = json.loads(result.response.text) if result.outcome == "ok" and result.response is not None else None
+        reply = result.response.text if result.outcome == "ok" and result.response is not None else None
+        doc = None if reply is None else json.loads(reply)
         return doc["pick"] if doc is not None and first_error(doc, _PICK) is None else None
     except Exception as exc:  # noqa: BLE001
         logger.warning("skill tie-break not answered: %s", type(exc).__name__)

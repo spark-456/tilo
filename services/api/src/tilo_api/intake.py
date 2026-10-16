@@ -131,7 +131,8 @@ async def intake(
             return _rejected("That scenario is not available.")
     skills = skill_context_for(http, principal, model_router)
     try:  # MN-02, MN-09: before any world, upload or model call; a ref the person cannot use is one 422
-        tagged = tagged_skill(parse_refs(refs), skills) if refs is not None and refs.strip() else None
+        parsed = parse_refs(refs)
+        tagged = tagged_skill(parsed, skills) if parsed else None
     except RefsRefused as refused:
         return refused.response()
     if tagged is not None and chosen and chosen[0] == "quick":  # MN-06: Quick keeps no record; refs make it Thinking
@@ -170,7 +171,7 @@ async def intake(
 
     if key is None or (chosen and chosen[0] == "quick"):
         return await perform()
-    return await intake_requests.once(allowance, principal.user_id, key, request, scenario, perform)
+    return await intake_requests.once(allowance, principal.user_id, key, request, scenario, perform, parsed)
 
 
 async def _thinking(
@@ -219,7 +220,9 @@ async def _thinking(
                 flags,
                 work_mode,
                 scenario,
-                skill_context_for(http, principal, model_router),
+                skill_context_for(
+                    http, principal, getattr(model_router, "raw", model_router)
+                ),  # inside Quick's own hold
             )
         file_screen = None
         if request.files and isinstance(store, RunUploads):

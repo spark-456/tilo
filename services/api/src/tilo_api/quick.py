@@ -244,12 +244,12 @@ def respond(
     verdict = classify(rules, text, max_chars=max_chars, has_files=has_files, scenario=scenario is not None)
 
     def tag(body: dict[str, Any]) -> dict[str, Any]:
-        """SKILL-ROUTE: the skill that fits, as data for a "Run with skill" chip; the key is absent when none does."""
+        """SKILL-ROUTE: the skill that fits, for a "Run with skill" chip; absent when none does (inside the hold)."""
         found = None if skills is None else skills.match(question)
         return body if found is None else {**body, "skill": found}
 
     if verdict.kind == "work":
-        return tag(offer(verdict.reason))  # decided by rules: no model call to answer it, nothing stored
+        return offer(verdict.reason)  # decided by rules: no model, no cost, nothing stored; so no skill is looked for
     if rules.role not in deps.providers_config().roles:
         raise QuickRefusal(503, "not_configured")  # never a fallback to the Director
 
