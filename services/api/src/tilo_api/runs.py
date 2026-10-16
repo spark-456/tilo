@@ -765,7 +765,9 @@ class Run:
                 and all(isinstance(r, str) and r.strip() for r in recipients)):  # fmt: skip
             raise _GateFailed("the send has no recipients or no destination")  # fails closed, before any gate
         line, body_ref = None, dict(item)
-        if live and action == "create_event" and recipients:  # LC-09: the guest-less action refuses a guest first
+        if (
+            live and action in ("create_event", "update_event") and recipients
+        ):  # LC-09: own-calendar edits refuse guests
             raise _GateFailed(item_documents.NO_GUESTS)
         if live:
             item, line = await self._item_document(unit, worker, action, item, made, destination, declared)
@@ -951,12 +953,14 @@ class Run:
                    tier: str, irreversible: bool) -> dict:  # fmt: skip
         """The deterministic gate card (PRD 10.3): from the plan gate, the connector action and the send."""
         building = self._building(unit)
-        name, undo = self.seams.connectors.get(connector)["name"], "cannot" if irreversible else "can"
+        name = self.seams.connectors.get(connector)["name"]
+        undo = "cannot be undone" if irreversible or action == "update_event" else "can be undone"
         return {
             "id": card_id, "world_id": self.world_id, "run_id": self.run_id, "kind": "gate", "rung": "gate",
             "header": {"building": building, "agent": worker},
             "what_happened": f"{unit['title']}: the draft is ready."[:140],
-            "why_it_matters": f"It goes out by {name} ({action}) and {undo} be undone."[:280],
+            "why_it_matters": (f"It goes out by {name} ({action}); this change {undo}." if action == "update_event"
+                               else f"It goes out by {name} ({action}) and {undo}.")[:280],
             "options": [
                 {"id": "approve", "label": "Approve", "suggested": False, "irreversible": irreversible},
                 {"id": "edit", "label": "Edit first", "suggested": True, "irreversible": False,

@@ -383,6 +383,80 @@ def test_WORKSPACE_TOOLS_WT08_update_event_reads_own_guestless_event_then_patche
         {"status": "tentative", "organizer": {"self": True}, "attendees": [{"email": GUEST}]},
     ],
 )
+@pytest.mark.parametrize("destination", ["", "has/slash", "bad.event", "\u00e9vent"])
+def test_WORKSPACE_TOOLS_WT08_update_event_rejects_non_google_ids_before_requests(destination: str) -> None:
+    rig = Rig5()
+    assert rig.run(update_request(destination)[1])["outcome"] == "refused"
+    assert rig.google.reached() == 0
+
+
+@pytest.mark.parametrize("changes", [{"recipients": [GUEST]}, {"attachments": [{"artifact_id": "x", "version": 1}]}])
+def test_WORKSPACE_TOOLS_WT08_update_event_refuses_recipients_and_attachments_before_google(changes) -> None:
+    rig = Rig5()
+    entry, body = update_request("own-event-1")
+    entry.update(changes)
+    body["entry"].update(changes)
+    assert rig.run(body)["outcome"] == "refused"
+    assert rig.google.reached() == 0
+
+
+def test_WORKSPACE_TOOLS_WT08_update_event_requires_attendee_subfield_and_fails_closed(monkeypatch) -> None:
+    rig = Rig5()
+    monkeypatch.setattr(
+        rig.cal,
+        "request",
+        lambda method, url, **kw: FakeApiResponse(
+            200, {"id": "own-event-1", "status": "confirmed", "organizer": {"self": True}}
+        ),
+    )
+    assert rig.run(update_request("own-event-1")[1])["outcome"] == "refused"
+
+
+def test_WORKSPACE_TOOLS_WT08_update_event_id_echo_is_checked_on_get_and_patch(monkeypatch) -> None:
+    for mismatch_method in ("GET", "PATCH"):
+        rig = Rig5()
+        calls = []
+
+        def request(method, url, **kw):
+            calls.append(method)
+            if method == "GET":
+                return FakeApiResponse(
+                    200,
+                    {
+                        "id": "different-id" if mismatch_method == "GET" else "own-event-1",
+                        "status": "confirmed",
+                        "organizer": {"self": True},
+                        "attendees": [],
+                    },
+                )
+            return FakeApiResponse(200, {"id": "different-id"})
+
+        monkeypatch.setattr(rig.cal, "request", request)
+        assert rig.run(update_request("own-event-1")[1])["outcome"] == "refused"
+        assert calls == (["GET"] if mismatch_method == "GET" else ["GET", "PATCH"])
+
+
+def test_WORKSPACE_TOOLS_WT08_update_event_marker_is_idempotent(monkeypatch) -> None:
+    rig = Rig5()
+    entry, body = update_request("own-event-1")
+
+    def request(method, url, **kw):
+        return FakeApiResponse(
+            200,
+            {
+                "id": "own-event-1",
+                "status": "confirmed",
+                "organizer": {"self": True},
+                "attendees": [],
+                "extendedProperties": {"private": {"tilo_update": side_effect_marker(entry)}},
+            },
+        )
+
+    monkeypatch.setattr(rig.cal, "request", request)
+    assert sent_ok(rig.run(body), entry) == "own-event-1"
+    assert [request.method for request in rig.cal.requests] == ["GET"]
+
+
 def test_WORKSPACE_TOOLS_WT08_update_event_refuses_foreign_cancelled_or_guest_event(monkeypatch, event) -> None:
     rig = Rig5()
     calls = []

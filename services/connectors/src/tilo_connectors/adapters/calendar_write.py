@@ -114,10 +114,8 @@ class CalendarWriteAdapter(GoogleAdapter):
             raise SideEffectRefused("the event cannot be verified")
         extended = found.get("extendedProperties")
         private = extended.get("private") if isinstance(extended, Mapping) else None
-        if isinstance(private, Mapping) and private.get("tilo_update") == marker:
-            return {"id": destination}  # OB-03: the earlier patch already took effect
         organizer = found.get("organizer")
-        attendees = found.get("attendees", [])
+        attendees = found.get("attendees")
         if (
             found.get("status") not in ("confirmed", "tentative")
             or not isinstance(organizer, Mapping)
@@ -126,6 +124,8 @@ class CalendarWriteAdapter(GoogleAdapter):
             or any(not isinstance(a, Mapping) or a.get("self") is not True for a in attendees)
         ):
             raise SideEffectRefused("only an own event without other attendees can be updated")
+        if isinstance(private, Mapping) and private.get("tilo_update") == marker:
+            return {"id": destination}  # OB-03: the earlier patch already took effect
         body: dict[str, Any] = {
             "summary": document["title"],
             "start": {"dateTime": document["start"], "timeZone": document["time_zone"]},

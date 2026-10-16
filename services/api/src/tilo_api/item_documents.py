@@ -84,7 +84,8 @@ def _moment(field: str, value: Any) -> str:
 def check_fields(action: str, fields: Mapping[str, Any]) -> dict[str, Any]:
     """The declared fields that belong to this action's document, each validated; DocumentRefused on a bad one.
     An absent or blank required field is simply not in the result (`build_document` then says what is needed)."""
-    kind, out = KIND_OF.get(action), {}
+    kind = KIND_OF.get(action)
+    out: dict[str, Any] = {}
     if kind is None:
         raise DocumentRefused("this action has no document to build")
     if action in ("create_event", "update_event") and (fields.get("attendees") or fields.get("guests")):

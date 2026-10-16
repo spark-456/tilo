@@ -62,7 +62,13 @@ class Live:
         plan["units"][3] |= {"connectors": [self.connector], "actions": list(self.actions)}
         if self.unit_type:
             plan["units"][3]["unit_type"] = self.unit_type
-        tiers = {"create_draft": "T1", "send_email": "T3", "create_event": "T1", "save_file": "T1"}
+        tiers = {
+            "create_draft": "T1",
+            "send_email": "T3",
+            "create_event": "T1",
+            "update_event": "T2",
+            "save_file": "T1",
+        }
         plan["gates"] = [
             {"id": f"G{n}", "action_type": a, "risk_tier": tiers[a], "guards": ["U4"], "policy_ref": None}
             for n, a in enumerate(self.actions, start=1)
@@ -282,6 +288,18 @@ def test_ADR35_L6b_FR_CON_02_an_event_needs_no_recipient_and_lands_on_the_own_ca
     wait_for(lambda: lv.rf.events("world.completed"), what="world.completed")
     (made,) = lv.google.events.values()
     assert made["summary"] == "Review" and "attendees" not in made
+
+
+def test_WORKSPACE_TOOLS_WT08_update_event_run_builds_approval_card_without_undo_claim(live):
+    lv = live(
+        connector="google_calendar", actions=("update_event",), fields=EVENT, destination="event-1", recipients=()
+    )
+    lv.start()
+    card = lv.gate_card("update_event")
+    assert "cannot be undone" in card["why_it_matters"]
+    document = json.loads(lv.read(card["gate"]["action"]["item"]))
+    assert document == {"kind": "calendar_event", **EVENT}
+    assert lv.google.reached() == 0
 
 
 def test_WORKSPACE_TOOLS_WT08_reminder_unit_pins_15_minute_popup_before_approval(live):

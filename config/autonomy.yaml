@@ -23,7 +23,8 @@
 # web_search and fetch_url (web, ADR-0029 decision 7, PRD 12.2) read the public web: no side effect, never gated,
 # never an outbox entry. Listed because an unlisted action is T3, which would put a person in front of every search.
 # create_event (google_calendar, ADR-0035 decision 6) adds an event with no guests to the person's own primary
-# calendar: T1, an approval card and an undo window. create_event_with_guests invites guests and Google emails them
+# calendar: T1, an approval card and an undo window. update_event changes an existing own guestless event (T2),
+# with no automatic undo. create_event_with_guests invites guests and Google emails them
 # (FR-CAL-04), so it is T3 and always needs a person, listed so removing the line cannot pass unnoticed.
 # org_model_key_change (ADR-0041 BK-07, `/v1/org/model-key`) sets or widens an org's own model key: it sends the
 # org's data to a new third party, so it is T3 and always needs a person. Listed, not left to the unlisted-is-T3

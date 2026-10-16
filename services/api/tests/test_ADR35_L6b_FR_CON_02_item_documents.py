@@ -184,3 +184,8 @@ def test_ADR35_L6b_FR_CON_02_the_new_modules_import_no_connectors_token_live_or_
         names = [n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module]
         names += [a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
         assert not [n for n in names if n.startswith("tilo_connectors")], name
+
+
+def test_WORKSPACE_TOOLS_WT08_update_event_document_refuses_attendees():
+    with pytest.raises(DocumentRefused, match="guest"):
+        make("update_event", {**EVENT, "attendees": ["guest@example.org"]})

@@ -62,7 +62,8 @@
 # Google for no description, attendee address, conference link or location, so there is nothing to redact (PE-13).
 # Writing adds the one scope calendar.events.owned (events on calendars the person owns), asked only when a task
 # needs it (incremental scopes, CON-D10): create_event (write) makes an event with no guests on their own primary
-# calendar and is T1; create_event_with_guests (send) makes Google email the guests, so it is T3 and always needs a
+# calendar and is T1; update_event (write) changes an own guestless event and has no automatic undo (T2);
+# create_event_with_guests (send) makes Google email the guests, so it is T3 and always needs a
 # person (FR-CAL-04). per_minute is per connected person; batch_size is the page size (Google's maximum for events.list).
 - id: google_calendar
   name: Google Calendar
