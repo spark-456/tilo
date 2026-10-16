@@ -25,18 +25,17 @@ class Views:
         return self.states.get(connector), [], None
 
 
-def test_WEBSITE_MK_01_options_MK_02_config_and_setup_MK_06_model_field_rules(monkeypatch):
-    choices = makers.make_choices(WEBSITE, OWNER, views=Views())
-
-    choice = choices[0]
+def test_WEBSITE_MK_01_options_MK_02_config_MK_03_editable_text_MK_06_model_field_rules(monkeypatch):
+    choice = makers.make_choices(WEBSITE, OWNER, views=Views())[0]
     assert [o["make_with"] for o in choice["options"]] == ["native", "connector:lovable"]
     assert (
         choice["options"][1]["suggested"] is True
         and "4 pages" in choice["options"][1]["note"]
         and choice["selected"] == "connector:lovable"
     )
-    small = {**WEBSITE, "goal": "Build a one page site"}
-    website = makers.make_choices(small, OWNER, views=Views())[0]
+    audience = {**WEBSITE, "goal": "Build a site", "audience": "Needs four pages"}
+    assert makers.make_choices(audience, OWNER, views=Views())[0]["selected"] == "connector:lovable"
+    website = makers.make_choices({**WEBSITE, "goal": "Build a one page site"}, OWNER, views=Views())[0]
     deck = {"goal": "Build slides", "deliverables": [{"title": "Deck", "format": "pptx"}]}
     pptx = makers.make_choices(deck, OWNER, views=Views())[0]
 
@@ -62,8 +61,7 @@ def test_WEBSITE_MK_06_approve_saves_events_after_grant_and_compiles_the_persons
 
     intake = run_flow.start()
     run_flow.store.tasks[intake["task_id"]].brief = WEBSITE
-    offered = run_flow.flow.approaches(intake["task_id"])
-    assert offered.json()["make_choices"]
+    assert run_flow.flow.approaches(intake["task_id"]).json()["make_choices"]
     response = run_flow.flow.client.post(
         f"/tasks/{intake['task_id']}/approve",
         json={"approach_id": "quick", "budget_cap": 50, "make_with": [{"deliverable": 0, "make_with": "native"}]},

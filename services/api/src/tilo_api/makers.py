@@ -99,7 +99,7 @@ def _state(views: Any, owner: str, connector: str) -> str | None:
     try:
         state, _, _ = views.view(owner, connector)
         return state
-    except Exception:  # a failed connection read is not a ready partner
+    except Exception:
         return None
 
 
@@ -113,7 +113,14 @@ _WORDS = dict(zip(_PAGE_WORDS, range(1, 21)))
 
 def _large_reason(deliverable: dict[str, Any], brief: dict[str, Any], cfg: dict[str, Any]) -> str | None:
     rule = cfg["large_site"]
-    chunks = [brief.get("goal", ""), deliverable.get("title", ""), *brief.get("constraints", [])]
+    chunks = [brief.get(field, "") for field in ("goal", "audience")]
+    chunks.extend([deliverable.get("title", ""), *brief.get("constraints", [])])
+    for key, fields in (
+        ("assumptions", ("question", "assumed")),
+        ("applied_preferences", ("value",)),
+        ("sources", ("label",)),
+    ):
+        chunks.extend(row.get(field, "") for row in brief.get(key, []) for field in fields)
     text = " ".join(" ".join(str(v).lower().split()) for v in chunks)
     for need in rule["needs"]:
         pattern = r"(?<![a-z0-9])" + re.escape(need).replace(r"\ ", r"[ -]") + r"(?![a-z0-9])"
