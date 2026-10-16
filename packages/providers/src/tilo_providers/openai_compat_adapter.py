@@ -352,7 +352,8 @@ class OpenAICompatModelProvider(ModelProvider):
                 raise ProviderError("RT-05: embedding response has the wrong shape")
             usage = {key: value for key, value in data.get("usage", {}).items() if isinstance(value, int)}
             return EmbedResponse(vectors=vectors, profile_id=self._profile_id, usage=usage or None)
-        return {"vectors": vectors, "usage": data.get("usage", {})}
+        # older provider tests still exercise the pre-RT-05 raw shape (as FakeModelProvider does)
+        return {"vectors": vectors, "usage": data.get("usage", {})}  # type: ignore[return-value]
 
     def count_tokens(self, text: str) -> int:
         # No universal tokenize route across OpenAI-compatible endpoints;

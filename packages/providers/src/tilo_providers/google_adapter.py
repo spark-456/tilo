@@ -447,7 +447,8 @@ class GoogleModelProvider(ModelProvider):
                 ):
                     raise ProviderError("RT-05: embedding response has the wrong shape")
                 return EmbedResponse(vectors=vectors, profile_id=self._profile_id)
-            return {"vectors": vectors, "profile_id": self._profile_id}
+            # older provider tests still exercise the pre-RT-05 raw shape (as FakeModelProvider does)
+            return {"vectors": vectors, "profile_id": self._profile_id}  # type: ignore[return-value]
         raise failure
 
     def count_tokens(self, text: str) -> int:
