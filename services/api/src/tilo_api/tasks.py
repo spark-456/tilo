@@ -45,6 +45,7 @@ from tilo_providers.router import Deadline, Router, RouterDeadlineError
 from tilo_api import deps, makers, runs
 from tilo_api.intake_deadline import INTAKE_DEADLINE_DETAIL, load_intake_deadline
 from tilo_api.people_writes import _capped_body
+from tilo_api.skills_route import SkillContext, get_skill_context
 
 logger = logging.getLogger("tilo_api.tasks")
 router = APIRouter()
@@ -468,8 +469,10 @@ def get_approaches(
     model_router: Annotated[Router, Depends(deps.get_router)],
     flags: FlagsDep,
     clock: Annotated[Clock, Depends(deps.get_today)],
+    skills: Annotated[SkillContext, Depends(get_skill_context)],
 ) -> dict[str, Any]:
-    """FR-INT-06: the Director's 2-3 approaches for the confirmed brief, proposed once per brief."""
+    """FR-INT-06: the Director's 2-3 approaches for the confirmed brief, proposed once per brief. SKILL-ROUTE: and the
+    skill that fits the task, if one does (`skill`: id, kind, name, version, score, source; null when none)."""
     task = _owned(store, task_id, principal)
     deps.refuse_if_replay_only(flags)  # NFR-24: this reaches the Director
     try:
@@ -484,6 +487,7 @@ def get_approaches(
         make_choices = makers.make_choices(task.brief, task.owner)
     except makers.MakerConfigError as exc:
         raise HTTPException(status_code=503, detail="Maker choices are unavailable; nothing changed.") from exc
+    task = _matched(store, writer, task_id, task, skills)
     # Default (PRD silent, BQ-83): the cheapest approach is recommended; ties keep the Director's order.
     recommended = min(approaches, key=lambda a: a["credits"]["max"])["id"]
     floor = deps.min_run_grant()
@@ -497,7 +501,26 @@ def get_approaches(
         # SIMPLE-RUN-2: the most one approval may grant, so a one-step Start sends min(estimate, ceiling), never a 422.
         "budget_ceiling": deps.budget_cap_ceiling(),
         "min_grant": floor,  # BQ-BUDGET-FLOOR-1: and the least; approve raises a smaller cap to this
+        "skill": task.skill,
     }
+
+
+def _matched(
+    store: deps.Store, writer: deps.EventWriter | None, task_id: str, task: deps.TaskRecord, skills: SkillContext
+) -> deps.TaskRecord:
+    """SKILL-ROUTE: the skill the task fits, kept on the task so the run pins what the start-plan card named. A skill
+    the person tagged is never replaced; no fit clears an earlier match. Advisory: a failure changes nothing."""
+    if task.skill is not None and task.skill.get("source") == "tagged":
+        return task
+    found = skills.match(str(task.brief.get("goal", "")))
+    if found == task.skill:
+        return task
+    try:
+        with task.lock:
+            return _saved(store, writer, task_id, _latest(store, task_id), [], {"skill": found})
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("skill match not kept: %s", type(exc).__name__)
+        return task
 
 
 def _floored(approach: dict[str, Any], floor: float) -> dict[str, Any]:

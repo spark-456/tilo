@@ -588,7 +588,8 @@ class _Run:
         else:
             for skill in loaded:
                 data = {"skill": skill.id, "version": skill.version}
-                cause = self.emit("skill.loaded", worker, worker, "The agent loaded a skill.", data, cause=cause, **at)
+                summary = f"The agent loaded the skill {skill.id}, version {skill.version}."
+                cause = self.emit("skill.loaded", worker, worker, summary, data, cause=cause, **at)
             site = self.roster.sites.get(unit_id, district)
             cause = self.arrive(unit, lead, worker, site, cause)
             cause = self.emit(
