@@ -5,8 +5,7 @@
 // state that survives blocked storage.
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fakeScheduler, stubApp } from "../../../../test-support/park/appHarness";
-import { fakeApi } from "../../../../test-support/park/appHarness";
+import { fakeApi, fakeScheduler, stubApp } from "../../../../test-support/park/appHarness";
 import { cleanup, mount, q, qa } from "../../../../test-support/park/componentsHarness";
 import { settle, textOf } from "../../../../test-support/park/homeHarness";
 import { gate, liveSourced } from "../../../../test-support/park/liveHomeHarness";

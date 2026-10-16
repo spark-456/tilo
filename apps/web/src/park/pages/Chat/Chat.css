@@ -394,18 +394,15 @@
 }
 
 /* CX-T-CHAT: a session-only rail beside the real Quick conversation. */
-[data-park] .park-chat {
-  gap: 0;
-}
 [data-park] .park-chat-grid {
-  grid-template-columns: 272px minmax(0, 1fr);
+  grid-template: auto / 272px minmax(0, 1fr);
   gap: 0;
   height: calc(100vh - 158px);
   min-height: 560px;
 }
 [data-park] .park-chat-rail {
   display: flex;
-  flex-direction: column;
+  flex-flow: column;
   min-height: 0;
   padding: 12px;
   border-right: 1px solid var(--line);
@@ -414,7 +411,7 @@
 [data-park] .park-chat-history {
   display: flex;
   flex: 1;
-  flex-direction: column;
+  flex-flow: column;
   gap: 4px;
   min-height: 0;
   overflow-y: auto;
@@ -474,7 +471,6 @@
 [data-park] .park-chat-rail .park-chat-scene {
   flex: none;
   height: 230px;
-  min-height: 0;
   border-radius: 16px;
 }
 [data-park] .park-chat-rail .park-chat-scene__buddy {
@@ -484,7 +480,7 @@
 }
 [data-park] .park-chat-main {
   display: flex;
-  flex-direction: column;
+  flex-flow: column;
   min-width: 0;
   min-height: 0;
 }
@@ -513,20 +509,16 @@
   box-shadow: none;
 }
 [data-park] .park-chat-main .park-chat-log {
-  width: 100%;
   max-width: 800px;
-  box-sizing: border-box;
   margin: 0 auto;
 }
 [data-park] .park-chat-main .park-chat-compose {
-  width: 100%;
   max-width: 800px;
-  box-sizing: border-box;
   margin: 0 auto;
 }
 [data-park] .park-chat-world-card {
   display: flex;
-  flex-direction: column;
+  flex-flow: column;
   align-items: flex-start;
   gap: 10px;
   max-width: 520px;
@@ -555,7 +547,7 @@
   }
   [data-park] .park-chat-rail {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template: auto / minmax(0, 1fr) minmax(0, 1fr);
     gap: 12px;
     border-right: 0;
   }
