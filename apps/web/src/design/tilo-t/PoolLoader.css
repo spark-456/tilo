@@ -1,6 +1,6 @@
 .tt-pool-host{position:relative;min-height:100%}
 .tt-pool-page{position:relative;min-height:inherit}
-.tt-pool-page--covered{filter:blur(8px) saturate(.85);transform:scale(1.015)}
+.tt-pool-page--covered{opacity:.72}
 .tt-pool-page--sink{filter:none;transform:none}
 .tt-pool-overlay{position:fixed;z-index:1000;inset:0;display:grid;place-items:center;overflow:hidden;pointer-events:auto;color:var(--ink,#0b0b0c)}
 .tt-pool-scrim{position:absolute;inset:0;background:var(--bg,#fff);opacity:.35}

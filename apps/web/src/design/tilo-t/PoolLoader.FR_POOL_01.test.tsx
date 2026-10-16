@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { act, createElement } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, mount } from "../../../test-support/park/componentsHarness";
@@ -41,4 +43,10 @@ it("FR_POOL_01_site_finishing_before_300ms_never_shows_overlay", async () => {
   await settle();
   await act(async () => vi.advanceTimersByTimeAsync(1000));
   expect(mounted.container.querySelector('[role="status"]')).toBeNull();
+});
+
+it("CX_PERF_1_covered_page_avoids_full_page_filter_and_transform", () => {
+  const css = readFileSync(resolve(process.cwd(), "src/design/tilo-t/PoolLoader.css"), "utf8");
+  const rule = /\.tt-pool-page--covered\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+  expect(rule).not.toMatch(/\b(?:filter|transform)\s*:/);
 });
