@@ -116,50 +116,35 @@ def test_PPL_11a_SEC_15_the_people_routes_exist_and_none_of_them_is_public(peopl
 
 
 @pytest.mark.parametrize("route", PEOPLE_ROUTES, ids=[f"{m} {p}" for m, p in PEOPLE_ROUTES])
-def test_PPL_11a_SEC_15_a_visitor_an_undeclared_person_and_nobody_are_refused_before_anything_is_touched(
-    people_rig, route
-):
-    """Given a deployed process, when a visitor calls any people route with any body, then 403 `under_construction`,
-    the same body every time; an undeclared person gets 403 `declaration_required`; a signed-out caller 401. In every
-    case no people seam was resolved, no store or source was read, nothing was written and no router was built."""
+def test_PPL_11a_SEC_15_a_signed_out_caller_is_refused_before_anything_is_touched_and_nobody_else_is(people_rig, route):
+    """OPEN-ACCESS (16 Oct 2026): a signed-out caller is 401 and no people seam was resolved, no store or source was
+    read, nothing was written and no router was built. A "visitor" and an undeclared person are signed in, so the gate
+    lets them through to the route's own rules (never `under_construction` or `declaration_required`)."""
     rig = people_rig(deployed=True, access=_access())
     rig.require_route(route)
     rig.add_people()
     before = rig.snapshot()
-    bodies = (
-        {},
-        {"json": {}},
-        {"data": {"declaration": "judge"}},
-        {"content": "x", "headers": {"content-type": "text/plain"}},
-        _valid_request(route),
-    )
-    seen = set()
-    rig.as_user(VISITOR)
-    for kwargs in bodies:
-        response = _call(rig, route, **kwargs)
-        assert response.status_code == 403 and response.json()["code"] == CODE_UNDER_CONSTRUCTION, (
-            kwargs,
-            response.text,
-        )
-        seen.add(response.text)
-    assert len(seen) == 1, "the refusal is identical for every body and route state"
-    rig.as_user(NEWCOMER)
-    response = _call(rig, route, **_valid_request(route))
-    assert response.status_code == 403 and response.json()["code"] == CODE_DECLARATION_REQUIRED
     rig.sign_out()
-    assert _call(rig, route, **_valid_request(route)).status_code == 401
+    for kwargs in ({}, {"json": {}}, _valid_request(route)):
+        assert _call(rig, route, **kwargs).status_code == 401
     assert rig.resolved == [], f"a refused request resolved {rig.resolved}"
     assert rig.store_calls == [] and rig.sources.calls == [] and rig.owners.calls == []
     assert rig.snapshot() == before and rig.router_calls == []
+    for user in (VISITOR, NEWCOMER):
+        rig.as_user(user)
+        response = _call(rig, route, **_valid_request(route))
+        assert response.json().get("code") not in {CODE_UNDER_CONSTRUCTION, CODE_DECLARATION_REQUIRED}, response.text
 
 
 @pytest.mark.parametrize("route", [R_PLATE, R_QUOTES, R_CREATE_MEETING], ids=lambda r: f"{r[0]} {r[1]}")
-def test_PPL_11a_SEC_15_a_deployed_process_with_no_access_store_lets_nobody_in(people_rig, route):
-    rig = people_rig(deployed=True)  # no `get_access_store` override: the production default
+def test_PPL_11a_SEC_15_a_deployed_process_with_no_access_store_still_serves_a_signed_in_person(people_rig, route):
+    """OPEN-ACCESS: no declaration is read, so a missing access store no longer closes the gate."""
+    rig = people_rig(deployed=True)  # no `get_access_store` override
     rig.require_route(route)
     rig.as_user(PRIYA)
     response = _call(rig, route, **_valid_request(route))
-    assert response.status_code == 503 and rig.resolved == []
+    assert response.json().get("code") not in {CODE_UNDER_CONSTRUCTION, CODE_DECLARATION_REQUIRED}, response.text
+    assert not (response.status_code == 503 and response.json() == {"detail": "not_configured"} and rig.resolved == [])
 
 
 def test_PPL_11a_SEC_15_a_judge_reaches_the_routes_own_rules_unchanged(people_rig):

@@ -33,7 +33,7 @@ export class TiloApiError extends Error {
     readonly retryable: boolean,
     /** The call changes something on the server: a retryable failure may still have happened there. */
     readonly write = false,
-    /** The server's stable refusal code (SEC-15: `under_construction`, `declaration_required`), or null. */
+    /** The server's stable refusal code (for example `spend_cap_reached` or `rate_limited`), or null. */
     readonly code: string | null = null,
     /** NFR-22 / NFR-24: a 503 that said `replay_only: true` (live models unavailable); finished runs can still be replayed. */
     readonly replayOnly = false,
@@ -172,8 +172,6 @@ export function displayApiError(error: unknown): string {
     cards_unavailable: "Your cards are unavailable. Try again later.",
     channel_not_permitted: "This answer cannot be sent from the web.",
     confirm_required: "Confirm this change before continuing.",
-    declaration_locked: "Your visitor or judge choice has already been saved.",
-    declaration_required: "Choose whether you are a visitor or a judge to continue.",
     demo_runs_busy: "The sample runs are busy. Try again later.",
     demo_schedules_unavailable: "Schedules are unavailable in this sample.",
     dev_tick_needs_memory_store: "This development action is unavailable on this server.",
@@ -262,7 +260,6 @@ export function displayApiError(error: unknown): string {
     transcript_unavailable: "The meeting transcript is unavailable right now.",
     try_again: "This could not finish. Try again in a moment.",
     unauthenticated: "Sign in to continue.",
-    under_construction: "Tilo is still under construction and not open to the public.",
     unexpected_followup_event:
       "The follow-up returned an unexpected reply. Reload before trying again.",
     unknown: "This feature could not answer. Try again later.",

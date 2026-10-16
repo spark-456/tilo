@@ -53,7 +53,6 @@ describe("GLASS_1_signin: the sign-in card is opaque", () => {
 describe("GLASS_1_import: the override loads wherever the handoff tokens do", () => {
   it("GLASS_1_import_every_park_css_importer_loads_park_opaque_css_after_it", () => {
     const files = [
-      "access/AccessScreen.tsx",
       "auth/SignInScreen.tsx",
       "legal/LegalPage.tsx",
       "oauth/CallbackPage.tsx",

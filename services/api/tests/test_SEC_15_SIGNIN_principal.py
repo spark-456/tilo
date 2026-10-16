@@ -377,36 +377,26 @@ def test_SEC_15_SIGNIN_signed_out_requests_to_the_real_app_are_401_and_the_probe
     assert real_app.get("/worlds", headers=bearer("a.b.c")).status_code == 401
 
 
-def test_SEC_15_SIGNIN_a_google_sign_in_with_no_declaration_is_asked_to_declare(real_app, signer):
+def test_SEC_15_SIGNIN_a_google_sign_in_with_no_declaration_is_let_in(real_app, signer):
+    """OPEN-ACCESS (16 Oct 2026): nobody is asked to declare; a fresh Google sign-in reaches its routes."""
     headers = bearer(_token(signer))
-    assert real_app.get("/access", headers=headers).json()["declaration"] is None
+    view = real_app.get("/access", headers=headers).json()
+    assert view["declaration"] == "judge" and view["allowed"] is True
     reply = real_app.get("/worlds", headers=headers)
-    assert reply.status_code == 403
-    assert reply.json()["code"] == "declaration_required"
+    assert reply.status_code == 200, reply.text
+    assert real_app.store.get(firebase_auth.user_id_for(GOOGLE_SUB)) is None, "nothing is stored for a sign-in"
 
 
-def test_SEC_15_SIGNIN_an_anonymous_demo_session_can_declare_and_is_gated_by_the_same_rules(real_app, signer):
+def test_SEC_15_SIGNIN_an_anonymous_demo_session_is_let_in_by_the_same_rules(real_app, signer):
     headers = bearer(_token(signer, provider="anonymous", sub=ANON_SUB))
-    assert real_app.get("/worlds", headers=headers).json()["code"] == "declaration_required"
+    assert real_app.get("/worlds", headers=headers).status_code == 200
     reply = real_app.post("/access/declaration", json={"declaration": "visitor"}, headers=headers)
     assert reply.status_code == 200, reply.text
-    assert real_app.store.get(firebase_auth.user_id_for(ANON_SUB)) == "visitor"
-    refused = real_app.get("/worlds", headers=headers)
-    assert refused.status_code == 403 and refused.json()["code"] == "under_construction"
-    assert real_app.post("/access/declaration", json={"declaration": "judge"}, headers=headers).status_code == 409
-
-
-def test_SEC_15_SIGNIN_a_judge_signed_in_with_google_gets_through_the_gate(real_app, signer):
-    headers = bearer(_token(signer))
+    assert real_app.store.get(firebase_auth.user_id_for(ANON_SUB)) is None
     assert real_app.post("/access/declaration", json={"declaration": "judge"}, headers=headers).status_code == 200
-    assert real_app.store.get(firebase_auth.user_id_for(GOOGLE_SUB)) == "judge"
-    reply = real_app.get("/worlds", headers=headers)
-    assert reply.status_code == 200, reply.text
-    access_view = real_app.get("/access", headers=headers).json()
-    assert access_view["declaration"] == "judge" and access_view["allowed"] is True
 
 
-def test_SEC_15_SIGNIN_a_declaration_belongs_to_the_verified_uid_not_to_anything_the_request_names(real_app, signer):
+def test_SEC_15_SIGNIN_the_old_sign_up_answer_changes_nothing_for_anyone_else(real_app, signer):
     mine = bearer(_token(signer))
     real_app.post(
         "/access/declaration",
@@ -414,9 +404,9 @@ def test_SEC_15_SIGNIN_a_declaration_belongs_to_the_verified_uid_not_to_anything
         headers={**mine, "X-User-Id": "u_victim", "X-Tilo-User": "u_victim"},
     )
     assert real_app.store.get("u_victim") is None
-    assert real_app.store.get(firebase_auth.user_id_for(GOOGLE_SUB)) == "judge"
+    assert real_app.store.get(firebase_auth.user_id_for(GOOGLE_SUB)) is None
     someone_else = bearer(_token(signer, sub="someone" + "Z" * 10))
-    assert real_app.get("/worlds", headers=someone_else).json()["code"] == "declaration_required"
+    assert real_app.get("/worlds", headers=someone_else).status_code == 200
 
 
 def test_SEC_15_SIGNIN_an_expired_token_is_a_401_at_the_real_app_even_for_a_declared_judge(real_app, signer):
@@ -425,12 +415,13 @@ def test_SEC_15_SIGNIN_an_expired_token_is_a_401_at_the_real_app_even_for_a_decl
     assert reply.status_code == 401
 
 
-def test_SEC_15_SIGNIN_signing_in_does_not_make_a_gated_route_open_to_a_no_op_token_swap(real_app, signer):
-    """A token for uid A with a body or header naming uid B: the judge A declared does not make B a judge."""
-    real_app.store.declare(firebase_auth.user_id_for(GOOGLE_SUB), "judge")
+def test_SEC_15_SIGNIN_a_token_for_one_uid_with_a_header_naming_another_acts_as_the_token_uid(real_app, signer):
+    """A token for uid A with a header naming uid B is still A: the header never moves the principal."""
     other = _token(signer, sub="mallory" + "M" * 10)
-    reply = real_app.get("/worlds", headers={**bearer(other), "X-User-Id": firebase_auth.user_id_for(GOOGLE_SUB)})
-    assert reply.status_code == 403
+    victim = firebase_auth.user_id_for(GOOGLE_SUB)
+    reply = real_app.get("/worlds", headers={**bearer(other), "X-User-Id": victim})
+    assert reply.status_code == 200, reply.text
+    assert reply.json() == real_app.get("/worlds", headers=bearer(other)).json()
 
 
 def test_SEC_15_SIGNIN_the_gate_has_the_same_public_routes_as_before():

@@ -1,12 +1,18 @@
-"""SEC-15: deployed access, visitor or Google AI Builder Cup judge, enforced server-side (PRD supplement 4;
-services/api/tests/API_SEC_15.md).
+"""SEC-15 / OPEN-ACCESS: who may call the deployed API. The owner's order (16 Oct 2026): "Everyone must be able to
+access through their mail, lets remove the entire judge and non judge blockers". Every person with a verified
+sign-in (Google, or an anonymous demo session) is let in; there is no visitor/judge declaration to make and
+nobody is refused for lacking one.
 
-Everything here is deterministic code; a model never decides who gets in. The declaration is a record behind a
-store seam (`deps.get_access_store`), set once, and read only for the verified `Principal`, never from a header,
-query, cookie or body field. `AccessGate` runs before any store or world work (only middleware with no I/O, such as the
-log context and no-store headers, wraps it): it refuses every route that is not in `PUBLIC_ROUTES` before any body
-is read or any world looked up. Not deployed (no `K_SERVICE` or
-`CLOUD_RUN_JOB`) nothing is enforced, so CI and `just dev-api` behave as before.
+What stays, all deterministic code (a model never decides who gets in): the sign-in itself (401 for nobody), the
+per-uid rate limit (SEC-16, 429), the demo session's replay-only models, and, in `deps.spend_mode`, the per-uid
+lifetime spend cap, the per-run cap, the daily deployment cap and the NFR-24 kill switch. A signed-in person is
+given the allowance the former "judge" had: `OPEN_DECLARATION`, so `provider_mode` returns live only on a
+deployment whose owner set `TILO_JUDGE_LIVE=1` (or the owner's own `LIVE=1`), and the caps above bound what each
+person can spend.
+
+`AccessGate` runs before any store or world work (only middleware with no I/O, such as the log context and the
+no-store headers, wraps it): it resolves the verified `Principal` before any body is read or any world looked up.
+Not deployed (no `K_SERVICE` or `CLOUD_RUN_JOB`) nothing is enforced, so CI and `just dev-api` behave as before.
 
 `provider_mode` is the one decision about live models for a request: pure, no I/O, never sets `LIVE`.
 """
@@ -30,6 +36,9 @@ logger = logging.getLogger("tilo_api.access")
 
 Declaration = Literal["visitor", "judge"]
 Mode = Literal["live", "replay"]
+# OPEN-ACCESS: what every signed-in person is treated as. Nobody is asked to declare; the former judge's policy (live
+# models where the deployment permits it, per-uid rate limit and spend caps) is the one policy for everyone.
+OPEN_DECLARATION: Declaration = "judge"
 
 # The only routes a person without access may call. A new public route is an owner decision (the test pins this).
 PUBLIC_ROUTES: frozenset[tuple[str, str]] = frozenset(
@@ -61,8 +70,6 @@ def public_link(method: str, path: str) -> bool:
     return method in ("GET", "POST") and _LINK_PATH.fullmatch(path) is not None
 
 
-UNDER_CONSTRUCTION = "Tilo is still under construction and not open to the public."
-DECLARATION_REQUIRED = "Tell Tilo whether you are a visitor or a Google AI Builder Cup judge."
 RATE_LIMITED = "Too many requests in a short time. Wait a moment, then try again."
 
 
@@ -124,27 +131,21 @@ def _refusal(
 
 
 def _decide(scope: Scope) -> JSONResponse | None:
-    """None to let the request through (the declaration and uid are left on `scope["state"]` for `deps.get_mode`),
-    or the refusal. 401 first (the store is not read for nobody), then fail closed on an unwired or failing store,
-    then the judge's rate limit (429, SEC-16)."""
+    """None to let the request through (the open declaration and uid are left on `scope["state"]` for
+    `deps.get_mode`), or the refusal. 401 for nobody signed in, then the per-uid rate limit (429, SEC-16). No store is
+    read: nobody is refused for a missing or "visitor" declaration (OPEN-ACCESS)."""
     from tilo_api import deps  # noqa: PLC0415  (deps imports this module)
 
     overrides = scope["app"].dependency_overrides
     try:
         # SEC-15 sign-in reads the request's Authorization header; a test double that takes no argument still works
         principal = deps.resolve_principal(scope["app"], HTTPConnection(scope))
-        store = overrides.get(deps.get_access_store, deps.get_access_store)()
-        declaration = store.get(principal.user_id)
     except HTTPException as exc:
         return _refusal(exc.status_code, str(exc.detail), headers=exc.headers)
     except Exception as exc:
-        logger.warning("access store unavailable, so nothing is let through: %s", type(exc).__name__)
+        logger.warning("sign-in unavailable, so nothing is let through: %s", type(exc).__name__)
         return _refusal(503, "not_configured")
-    if declaration is None:
-        return _refusal(403, DECLARATION_REQUIRED, "declaration_required")
-    if declaration != "judge":  # a visitor, or anything the store should never hold: no access
-        return _refusal(403, UNDER_CONSTRUCTION, "under_construction")
-    try:  # SEC-16: a judge's every gated request counts, keyed by the verified uid only
+    try:  # SEC-16: every gated request counts, keyed by the verified uid only
         decision = overrides.get(deps.get_rate_limiter, deps.get_rate_limiter)().check(principal.user_id)
     except Exception as exc:
         logger.warning("rate limiter unavailable, so nothing is let through: %s", type(exc).__name__)
@@ -152,7 +153,7 @@ def _decide(scope: Scope) -> JSONResponse | None:
     if not decision.allowed:
         return _refusal(429, RATE_LIMITED, "rate_limited", {"Retry-After": str(decision.retry_after_s)})
     state = scope.setdefault("state", {})
-    state["declaration"], state["uid"] = declaration, principal.user_id
+    state["declaration"], state["uid"] = OPEN_DECLARATION, principal.user_id
     state["principal"] = principal  # resolved once per request: the route's own dependency reuses it (BQ-SIGNIN-9)
     state["demo_session"] = principal.demo_session  # an anonymous demo session: replay models only (BQ-SIGNIN-10)
     return None

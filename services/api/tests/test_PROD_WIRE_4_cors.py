@@ -233,10 +233,11 @@ def test_PROD_WIRE_4_a_method_no_router_serves_is_not_granted(deployed, method):
 # --- the gate's own refusals still carry the headers ----------------------------------------------------------
 
 
-def test_PROD_WIRE_4_a_visitors_403_from_the_gate_carries_the_cors_headers(deployed):
+def test_PROD_WIRE_4_a_signed_in_person_with_no_declaration_is_answered_with_the_cors_headers(deployed):
+    """OPEN-ACCESS (16 Oct 2026): the gate no longer refuses a person for lacking a declaration."""
     response = deployed.client.get("/worlds", headers={"Origin": WEB_APP})
 
-    assert response.status_code == 403 and response.json()["code"] == "under_construction"
+    assert response.status_code == 200, response.text
     assert response.headers.get("access-control-allow-origin") == WEB_APP
     assert "origin" in tokens(response, "vary")
     assert "access-control-allow-credentials" not in response.headers
@@ -252,20 +253,21 @@ def test_PROD_WIRE_4_a_signed_out_401_from_the_gate_carries_the_cors_headers(dep
     assert "origin" in tokens(response, "vary")
 
 
-def test_PROD_WIRE_4_an_unwired_access_store_503_from_the_gate_carries_the_cors_headers(deployed):
+def test_PROD_WIRE_4_an_unwired_access_store_no_longer_closes_the_gate(deployed):
     deployed.as_user(JUDGE)
-    del app.dependency_overrides[deps.get_access_store]  # nothing wired: the gate fails closed
+    del app.dependency_overrides[deps.get_access_store]  # OPEN-ACCESS: the gate never reads it
 
     response = deployed.client.get("/worlds", headers={"Origin": WEB_APP})
 
-    assert response.status_code == 503
+    assert response.status_code == 200, response.text
     assert response.headers.get("access-control-allow-origin") == WEB_APP
 
 
 def test_PROD_WIRE_4_a_gate_refusal_on_a_v1_route_has_both_the_cors_headers_and_no_store(deployed):
+    deployed.sign_out()
     response = deployed.client.get("/v1/plate", headers={"Origin": WEB_APP})
 
-    assert response.status_code == 403
+    assert response.status_code == 401
     assert response.headers.get("access-control-allow-origin") == WEB_APP
     assert response.headers.get("cache-control") == "no-store"
 
