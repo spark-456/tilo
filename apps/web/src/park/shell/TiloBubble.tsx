@@ -105,7 +105,7 @@ export function TiloBubble({
   vh: number;
   go: (page: PageId) => void;
 }) {
-  const chat = useQuickChat();
+  const chat = useQuickChat(Date.now, page ? PAGE_LABEL[page] : undefined);
   const [saved, setSaved] = useState<BubblePos | null>(readBubblePos);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");

@@ -63,7 +63,7 @@ export interface QuickChat {
   clear(): void;
 }
 
-export function useQuickChat(now: () => number = Date.now): QuickChat {
+export function useQuickChat(now: () => number = Date.now, pageContext?: string): QuickChat {
   const api = useParkApi();
   const schedule = useSchedule();
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -108,7 +108,7 @@ export function useQuickChat(now: () => number = Date.now): QuickChat {
         }
       };
       new Promise<Awaited<ReturnType<typeof askQuick>>>((resolve) =>
-        resolve(askQuick(api, "quick", question)),
+        resolve(askQuick(api, "quick", pageContext ? `${question}\nYou're on ${pageContext}.` : question)),
       ).then(
         ({ data, source }) =>
           settle(
@@ -128,7 +128,7 @@ export function useQuickChat(now: () => number = Date.now): QuickChat {
       );
       return true;
     },
-    [api, schedule, now],
+    [api, schedule, now, pageContext],
   );
 
   const last = turns[turns.length - 1];
