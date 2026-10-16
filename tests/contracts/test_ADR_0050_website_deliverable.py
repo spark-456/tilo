@@ -149,6 +149,7 @@ def test_FR_AGT_16_owner_accepted_residual_and_the_preview_written_handshake_are
     rows = {m.group(1): m.group(0) for m in re.finditer(r"^\| (WS-\d\d) .*$", rules, re.M)}
     assert '"tilo":"preview-written"' in rows["WS-11"] and "AFTER `preview-written`" in rows["WS-12"]
     assert "private data" in rows["WS-01"] and "never produces HTML" in rows["WS-01"]
+    assert "SEC-05" not in rows["WS-01"]
     assert "go on accept website residual" in adr and "NON-private" in adr
     questions = (repo_root / "docs/open-questions.md").read_text(encoding="utf-8")
     assert "| BQ-WEBSITE-4a |" in questions and "go on accept website residual" in questions

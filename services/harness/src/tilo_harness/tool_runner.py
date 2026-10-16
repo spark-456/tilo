@@ -194,9 +194,9 @@ class ToolUnitRunner:
             progress=context.progress,
         )
         wanted = wants_website(unit, context.brief)  # WEB-1: the final writer's reply is one HTML file
-        # WT-04, SEC-05: a page can run script, so a run that rests on the person's private data or on outside
-        # content never makes one; it answers in Markdown with a plain note
-        website = wanted and not (loop.private or loop.tainted)
+        # WT-04: a page can run script, so a run that rests on the person's private data never makes one; it
+        # answers in Markdown with a plain note. Outside (tainted) content alone may (owner, 16 Oct 2026).
+        website = wanted and not loop.private
         holds_effects = not loop.tainted and any(self._tools.is_side_effect(tool) for tool in allowed.values())
         base = load_prompt(
             role,
@@ -240,7 +240,7 @@ class ToolUnitRunner:
                 if not response.text or not response.text.strip():
                     return self._finish(UnitOutcome(False, f"No result for {unit['title']}."), loop, "no_text")
 
-                if wanted and (loop.private or loop.tainted):  # also when this unit's own tool calls tainted it
+                if wanted and loop.private:  # also when this unit's own tool calls read private data
                     note = f"Tilo could not build the {fmt} file, so here is the result as text."
                     text = UnitOutput(media_type="text/markdown", content=degraded(response.text))
                     outcome = UnitOutcome(True, note, outputs=(text,), provenance_ids=_refs(loop))

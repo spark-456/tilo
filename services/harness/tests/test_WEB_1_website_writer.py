@@ -158,10 +158,8 @@ def test_WEB_1_WS_01_only_a_native_website_deliver_unit_may_make_html(unit: dict
     assert result.outcome.outputs[0].media_type == "text/markdown"
 
 
-@pytest.mark.parametrize("tainted, private", [(False, True), (True, False), (True, True)])
-def test_WEB_1_WT_04_a_run_that_read_private_or_outside_data_never_makes_an_html_page(
-    tainted: bool, private: bool
-) -> None:
+@pytest.mark.parametrize("tainted, private", [(False, True), (True, True)])
+def test_WEB_1_WT_04_a_run_that_read_private_data_never_makes_an_html_page(tainted: bool, private: bool) -> None:
     item = UpstreamItem(
         "U0", "Research", "Notes from the person's mail.", screening="clean", tainted=tainted, private=private
     )
@@ -174,6 +172,15 @@ def test_WEB_1_WT_04_a_run_that_read_private_or_outside_data_never_makes_an_html
     assert "<!doctype html>" not in provider.requests[0].prompt.split("<<<REQUEST")[0]
     assert "could not build the website file, so here is the result as text" in result.outcome.summary
     assert len(provider.requests) == 1
+
+
+def test_WEB_1_WT_04_a_run_that_only_read_outside_content_still_makes_the_page() -> None:
+    item = UpstreamItem("U0", "Research", "Time zones from the web.", screening="clean", tainted=True)
+    result = asyncio.run(
+        ToolUnitRunner({"writer": Script(PAGE)}).run_unit(UNIT, UnitContext("A_s0", (), brief=BRIEF, upstream=(item,)))
+    )
+    out = result.outcome.outputs[0]
+    assert out.media_type == "text/html" and out.content == PAGE.encode()
 
 
 def test_WEB_1_WS_01_a_native_website_with_make_with_native_takes_the_html_path() -> None:

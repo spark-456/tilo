@@ -71,9 +71,10 @@ sandboxed preview, no network, security review)."
      that loads after the shell's `preview-written` message (WS-12). A page made from NON-private run data may
      still navigate itself, or open a WebRTC or other self-navigation channel, carrying what it displays.
      The owner accepted this residual in chat on 16 Oct 2026, verbatim: "go on accept website residual" (BQ-WEBSITE-4).
-   - Private or tainted runs never produce HTML (WS-01, WT-04, SEC-05): a run whose upstream units or own tool
-     calls read the person's private data or outside content answers in Markdown with a plain note. So what a
-     page could carry out is only what a non-private run chose to display.
+   - Private runs never produce HTML (WS-01, WT-04): a run whose upstream units or own tool calls read the
+     person's private data answers in Markdown with a plain note. Web research (outside content) alone does
+     not stop a page, which the timezone demo needs. So what a page could carry out is only what a non-private
+     run chose to display.
    - Handshake (WS-11, WS-12): after the shell has rendered the page it posts one `{"tilo":"preview-written"}`
      message to its parent. The web app ignores iframe `load` counts, and closes the frame only if a `load`
      arrives after `preview-written`; messages after the first `preview-written` are ignored.
