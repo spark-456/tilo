@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLoopPaused } from "../design/tilo-t";
-import { usePrefersReducedMotion } from "./media";
 import { Reveal } from "./Reveal";
+import { usePrefersReducedMotion } from "./media";
 import { RECORDED_RUN } from "./recordedRun";
 
 /** T board's week and pin layout, empty until the signed-in API supplies a person's data. */
@@ -60,7 +60,11 @@ export function TaskIdeasSection() {
   }, []);
   const { planned, work, done } = RECORDED_RUN.facts;
   return (
-    <Reveal as="section" className="landing-section landing-t-ideas" aria-labelledby="landing-ideas">
+    <Reveal
+      as="section"
+      className="landing-section landing-t-ideas"
+      aria-labelledby="landing-ideas"
+    >
       <div className="landing-section__head">
         <span className="landing-eyebrow">IDEAS TO TRY</span>
         <h2 id="landing-ideas">A good place to start.</h2>
