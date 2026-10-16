@@ -162,6 +162,38 @@ export function skillsOfBody(v: unknown): Skill[] | null {
   return [...builtins, ...v.skills.filter(isSkillRow).map(skillFromRow)];
 }
 
+/** Enrich only library entries with the caller-visible catalog's real purpose, inputs and connector ids. */
+export function withSkillCatalog(skills: Skill[], value: unknown): Skill[] {
+  if (!isObject(value) || !Array.isArray(value.skills)) return skills;
+  const catalog = new Map<string, { purpose: string; inputs: SkillInput[]; tools: string[] }>();
+  for (const raw of value.skills) {
+    if (!isObject(raw) || raw.kind !== "library" || !isText(raw.id) || !isText(raw.purpose))
+      continue;
+    const inputs = Array.isArray(raw.inputs)
+      ? raw.inputs.filter(
+          (input): input is SkillInput =>
+            isObject(input) &&
+            isText(input.name) &&
+            isText(input.label) &&
+            ["text", "file", "date", "person", "url", "number"].includes(String(input.kind)) &&
+            typeof input.required === "boolean",
+        )
+      : [];
+    const tools = Array.isArray(raw.tools) ? raw.tools.filter(isText) : [];
+    catalog.set(raw.id, { purpose: raw.purpose, inputs, tools });
+  }
+  return skills.map((skill) => {
+    const entry = skill.builtin ? catalog.get(skill.id) : undefined;
+    return entry
+      ? {
+          ...skill,
+          description: entry.purpose,
+          catalog: { inputs: entry.inputs, tools: entry.tools },
+        }
+      : skill;
+  });
+}
+
 /** A body that is a Learn answer (`learning` rows, `needs_rating`) the page can read. */
 export const isLearnBody = (v: unknown): boolean =>
   isObject(v) && Array.isArray(v.learning) && Array.isArray(v.needs_rating);

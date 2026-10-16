@@ -249,6 +249,8 @@ export interface Skill {
     hosts: string[];
     estimatedCredits: number | null;
   };
+  /** Library catalog data; no run history, step sequence or access level is implied. */
+  catalog?: { inputs: SkillInput[]; tools: string[] };
   fix?: { version: number; asks: boolean[]; locked: boolean[] };
   ask?: { q: string; a: string[] };
   /** STUDIO-4: the served record says the skill is paused (live only; absent otherwise). */

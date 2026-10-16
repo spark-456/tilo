@@ -58,6 +58,38 @@ const failure = (p: Promise<unknown>) =>
   );
 
 describe("SKILLS_3_getSkills: GET /v1/skills as the Skills library", () => {
+  it("FR_SKL_04_catalog_adds_only_served_library_purpose_inputs_and_tools", async () => {
+    const spy = vi.fn(async (url: unknown) =>
+      String(url).endsWith("/v1/skills/catalog")
+        ? json({
+            skills: [
+              {
+                id: "exec_summary",
+                kind: "library",
+                scope: "library",
+                name: "Executive summary",
+                purpose: "Summarise a document",
+                inputs: [{ name: "document", label: "Document", kind: "file", required: true }],
+                tools: ["google_drive"],
+                version: "1.0.0",
+              },
+            ],
+          })
+        : json({
+            skills: [],
+            builtins: [{ id: "exec_summary", description: "Summarises", version: "1.0.0" }],
+          }),
+    );
+    const skill = (await live(spy).getSkills()).data[0];
+    expect(skill?.description).toBe("Summarise a document");
+    expect(skill?.catalog).toEqual({
+      inputs: [{ name: "document", label: "Document", kind: "file", required: true }],
+      tools: ["google_drive"],
+    });
+    expect(skill?.steps).toEqual([]);
+    expect(skill?.last).toBe("");
+    expect(skill?.now).toBeUndefined();
+  });
   it("SKILLS_3_getSkills_maps_a_record_to_a_Skill_and_says_live", async () => {
     const spy = vi.fn(async (_u: unknown) => json({ skills: [row()] }));
     const r = await live(spy).getSkills();

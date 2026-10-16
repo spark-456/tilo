@@ -139,6 +139,11 @@ export function SkillDrawer({
                 <strong>What it needs:</strong> {skill.tools.map(([tool]) => tool).join(", ")}
               </p>
             ) : null}
+            {skill.catalog?.tools.length ? (
+              <p className="park-skill-drawer__p">
+                <strong>Connectors it uses:</strong> {skill.catalog.tools.join(", ")}
+              </p>
+            ) : null}
             <Button
               variant="secondary"
               onClick={() => {
@@ -174,11 +179,11 @@ export function SkillDrawer({
               </ol>
             </section>
           ) : null}
-          {skill.details?.inputs.length ? (
+          {skill.details?.inputs.length || skill.catalog?.inputs.length ? (
             <section className="park-skill-drawer__sec" aria-label="Inputs for this skill">
               <h3 className="park-skill-drawer__h3">What you provide</h3>
               <ul>
-                {skill.details.inputs.map((input) => (
+                {(skill.details?.inputs ?? skill.catalog?.inputs ?? []).map((input) => (
                   <li key={input.name}>
                     {input.label}
                     {input.required ? " (required)" : " (optional)"}

@@ -42,3 +42,43 @@ it("CX_SKILL_UX_1 shows only served step tools inputs hosts and cost", () => {
   expect(body).not.toContain("What it produces");
   expect(body).not.toContain("Last run 0");
 });
+
+it("FR_SKL_04_catalog_shows_library_inputs_and_connectors_without_inventing_steps_or_cost", () => {
+  const skill = {
+    ...skillFromRow({
+      id: "tsk_a",
+      name: "A",
+      scope: { kind: "just_me" as const, team: null },
+      status: "learning" as const,
+      paused: false,
+      plan: [],
+      question: null,
+    }),
+    id: "exec_summary",
+    name: "Executive summary",
+    builtin: true,
+    description: "Summarise a document",
+    catalog: {
+      inputs: [{ name: "document", label: "Document", kind: "file" as const, required: true }],
+      tools: ["google_drive"],
+    },
+  };
+  const m = mount(
+    <SkillDrawer
+      app={stubApp("skills")}
+      skill={skill}
+      paused={false}
+      currency="USD"
+      onPause={null}
+      pauseOff=""
+      onTeach={() => {}}
+      onClose={() => {}}
+    />,
+  );
+  const body = m.container.textContent ?? "";
+  expect(body).toContain("Summarise a document");
+  expect(body).toContain("Document (required)");
+  expect(body).toContain("google_drive");
+  expect(body).not.toContain("Steps it follows");
+  expect(body).not.toContain("Estimated cost");
+});

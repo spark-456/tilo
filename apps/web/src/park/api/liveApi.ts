@@ -30,6 +30,7 @@ import {
   skillFromRow,
   skillsOfBody,
   versionOfBody,
+  withSkillCatalog,
 } from "./live/skillsFromApi";
 import { teamFromPeople } from "./live/teamFromPeople";
 import { type TeamView, isTeamView, requestOf } from "./live/teamLive";
@@ -376,7 +377,15 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
   api.getSkills = async () => {
     const skills = skillsOfBody(await http.getJson("/v1/skills?include_builtin=true"));
     if (!skills) throw new TiloApiError(BAD_REPLY, 200, true);
-    return { data: skills, source: "live" };
+    if (!skills.some((s) => s.builtin)) return { data: skills, source: "live" };
+    try {
+      return {
+        data: withSkillCatalog(skills, await http.getJson("/v1/skills/catalog")),
+        source: "live",
+      };
+    } catch {
+      return { data: skills, source: "live" };
+    }
   };
   api.getLearn = async () => {
     if (!isLearnBody(await http.getJson("/v1/learn?include_builtin=true")))
