@@ -164,10 +164,14 @@ class SkillContext:
 
     def match(self, text: str, *, tagged: str | None = None) -> dict[str, Any] | None:
         """The one skill that fits `text`, or None. `tagged` (an id the person named) wins when they may use it."""
-        entries = self.catalog()
         if tagged is not None:
-            found = next((e for e in entries if e["id"] == tagged), None)
+            found = next((e for e in self.catalog() if e["id"] == tagged), None)
             return None if found is None else _data(found, 1.0, "tagged")
+        return self.best_for(text)
+
+    def best_for(self, text: str) -> dict[str, Any] | None:
+        """The skill that fits `text` by score alone (no tag): None below the threshold or on any failure."""
+        entries = self.catalog()
         if not entries or self.router is None or not text.strip():
             return None
         try:
@@ -175,10 +179,6 @@ class SkillContext:
         except Exception as exc:  # noqa: BLE001
             logger.warning("skill match failed: %s", type(exc).__name__)
             return None
-
-    def best_for(self, text: str) -> dict[str, Any] | None:
-        """The skill that fits `text` (a plain match, no tag)."""
-        return self.match(text)
 
     def block(self) -> str:
         """The catalog as fenced data for a prompt: one line per skill, name and purpose only."""
