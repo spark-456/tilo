@@ -6,6 +6,7 @@ import { FIXTURE_APPROACHES } from "../../../api/fixtures/derived";
 import { useRunLog } from "../../../world/runLog";
 import { worldStatus } from "../../../world/runSummary";
 import { useRunWorld } from "../../../world/worldContext";
+import { EmptyState } from "../../../design/tilo-t";
 import { useRemote } from "../../shared/remote";
 import { StopAutopilot } from "./StopAutopilot";
 import { Block, nameOf } from "./shared";
@@ -37,7 +38,7 @@ function Events({
       ))}
     </ul>
   ) : (
-    <p>{empty}</p>
+    <EmptyState title={empty} />
   );
 }
 export type RunSection = "autonomy" | "channels" | "estimate";
@@ -70,7 +71,10 @@ export function RunSectionView({ section }: { section: RunSection }) {
       {worldId ? (
         <RecordedSection key={`${section}/${worldId}`} section={section} worldId={worldId} />
       ) : (
-        <p>No run yet. Start a run from Home to see its recorded activity.</p>
+        <EmptyState
+          title="No run yet."
+          body="Start a run from Home to see its recorded activity."
+        />
       )}
     </>
   );
