@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // UI-STUDIO-5 Agenda (design/studio-v2 "Tilo S Agenda"): the live Agenda lays today's calendar, the plate, the
-// meetings and parked work from the live plate. Sections without data are hidden.
+// meetings and parked work from the live plate. Empty week structures remain visible.
 import { afterEach, expect, it } from "vitest";
 import { cleanup, renderAgenda } from "../../../../test-support/park/agendaHarness";
 import { createLiveApi } from "../../api/liveApi";
@@ -53,12 +53,16 @@ it("STUDIO_5 agenda live: today and the recorded plate", async () => {
     "Supplier call",
   );
   expect(main?.querySelector('[aria-label="Your plate"]')?.textContent).toContain("Send the quote");
-  expect(container.querySelector(".park-agenda-studioside")).toBeNull();
+  expect(container.querySelector('[aria-label="Week calendar"]')).not.toBeNull();
+  expect(container.querySelector(".park-agenda-studioside")).not.toBeNull();
 });
 
-it("STUDIO_5 agenda live: no invented brief, suggestion or button without a read behind it", async () => {
+it("STUDIO_5 agenda live: honest empty structures have no invented data", async () => {
   const { container } = await mount();
   expect(container.textContent).not.toContain("Not available yet");
-  expect(container.querySelector("button")).toBeNull();
+  expect(container.querySelector('[aria-label="Available times"]')?.textContent).toContain(
+    "Suggested times",
+  );
+  expect(container.querySelector('[aria-label="Boards"]')?.textContent).toContain("Pinboards");
   expect(container.textContent).not.toMatch(/Voltway|Add to calendar|Dismiss|Open the full brief/);
 });

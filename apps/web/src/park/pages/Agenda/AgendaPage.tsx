@@ -9,11 +9,11 @@ import { HttpClient } from "../../../api/http";
 import { EmptyState, ErrorState, LoadingState } from "../../../design/tilo-t";
 import type { Api } from "../../api/index";
 import { isCalendarEntry } from "../../api/live/agendaFromPlate";
-import { ORGANISATION_SETUP } from "../../api/organisationSetup";
-import type { Agenda, AgendaPlateRow, Decision, LiveAgenda } from "../../api/types";
-import type { PeopleRow } from "../../api/live/peopleLists";
 import { meetingHostApi } from "../../api/live/meetingHost";
 import { meetingMinutesApi } from "../../api/live/meetingMinutes";
+import type { PeopleRow } from "../../api/live/peopleLists";
+import { ORGANISATION_SETUP } from "../../api/organisationSetup";
+import type { Agenda, AgendaPlateRow, Decision, LiveAgenda } from "../../api/types";
 import { useParkApi } from "../../app/context";
 import { useStagedCount } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
@@ -24,8 +24,8 @@ import "../../components/park.components.css";
 import type { AppCtx } from "../../app/AppCtx";
 import { AgendaNewMenu } from "./AgendaNewMenu";
 import { Boards } from "./Boards";
-import { PeopleLists } from "./PeopleLists";
 import { LiveWeek } from "./LiveWeek";
+import { PeopleLists } from "./PeopleLists";
 import { ScheduleWithOthersDialog } from "./ScheduleWithOthersDialog";
 import { Week } from "./Week";
 import { icon } from "./icons";
@@ -55,13 +55,15 @@ function Frame({ source, children }: { source?: string; children?: ReactNode }) 
 const SAMPLE_SYNC = "Sample data · no calendar sync recorded";
 
 function humanAgendaDate(value: string): string {
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? new Date(`${value}T12:00:00`)
-    : new Date(value);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T12:00:00`) : new Date(value);
   if (Number.isNaN(date.getTime())) return "Date not supplied";
   const now = new Date();
   const sameDay = date.toDateString() === now.toDateString();
-  const day = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" }).format(date);
+  const day = new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(date);
   return sameDay
     ? `Today ${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(date)}`
     : `${day}${/^\d{4}-\d{2}-\d{2}$/.test(value) ? "" : ` · ${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(date)}`}`;
@@ -212,10 +214,14 @@ function Plate({ A }: { A: LiveAgenda }) {
           <li key={`${r.ref.kind}:${r.ref.id}`}>
             <strong>{r.title ?? "Untitled item"}</strong>
             {r.due ? (
-                <p>Due <time dateTime={r.due}>{humanAgendaDate(r.due)}</time></p>
+              <p>
+                Due <time dateTime={r.due}>{humanAgendaDate(r.due)}</time>
+              </p>
             ) : null}
             {isCalendarEntry(r) && r.at ? (
-              <p><time dateTime={r.at}>{humanAgendaDate(r.at)}</time></p>
+              <p>
+                <time dateTime={r.at}>{humanAgendaDate(r.at)}</time>
+              </p>
             ) : null}
           </li>
         ))}
@@ -246,7 +252,9 @@ function Plate({ A }: { A: LiveAgenda }) {
             }}
           />
         </div>
-        <p className="park-agenda-date">{A.plate.today ? humanAgendaDate(A.plate.today) : "This week"}</p>
+        <p className="park-agenda-date">
+          {A.plate.today ? humanAgendaDate(A.plate.today) : "This week"}
+        </p>
       </div>
       <div className="park-agenda-studio">
         <div className="park-agenda-studiomain">

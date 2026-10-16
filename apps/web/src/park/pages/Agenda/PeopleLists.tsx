@@ -24,6 +24,22 @@ const EMPTY: Record<Kind, string> = {
 };
 const READ = { meetings: "getMeetings", pinboards: "getPinboards" } as const;
 const cap = (s: string): string => (s[0] ?? "").toUpperCase() + s.slice(1);
+const humanTime = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Time not supplied";
+  const time = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(
+    date,
+  );
+  return date.toDateString() === new Date().toDateString()
+    ? `Today ${time}`
+    : new Intl.DateTimeFormat(undefined, {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(date);
+};
 
 function List({
   kind,
@@ -89,8 +105,8 @@ function List({
               <li key={row.id}>
                 <strong>{row.title}</strong>
                 <p>
-                  {row.scope ? `${row.scope} · ` : ""}
-                  {cap(row.status)} · {row.at}
+                  {row.scope ? `${row.scope === "Personal" ? "Personal" : "Team"} · ` : ""}
+                  {cap(row.status)} · {humanTime(row.at)}
                 </p>
                 {row.body ? <p>{row.body}</p> : null}
                 {readBrief ? <MeetingBrief id={row.id} getJson={readBrief} /> : null}
@@ -135,7 +151,14 @@ export function PeopleLists({ onMeetings }: { onMeetings?: (rows: PeopleRow[]) =
   if (!api) return null;
   return (
     <>
-      <List kind="meetings" api={api} minutes={minutes} host={host} readBrief={readBrief} onRows={onMeetings} />
+      <List
+        kind="meetings"
+        api={api}
+        minutes={minutes}
+        host={host}
+        readBrief={readBrief}
+        onRows={onMeetings}
+      />
       <List kind="pinboards" api={api} minutes={null} host={null} readBrief={null} />
     </>
   );

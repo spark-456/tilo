@@ -42,7 +42,14 @@ export function AgendaNewMenu({
       <details ref={details}>
         <summary>+ New</summary>
         <div className="park-agenda-new__menu" role="menu" aria-label="New item">
-          <button type="button" role="menuitem" onClick={() => { details.current && (details.current.open = false); onSchedule(); }}>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              if (details.current) details.current.open = false;
+              onSchedule();
+            }}
+          >
             Schedule meeting <small>Choose a time and invite people</small>
           </button>
           {createPin ? (

@@ -83,7 +83,7 @@ export function ScheduleWithOthersDialog({
   };
 
   return (
-    <div className="park-agenda-modal" role="dialog" aria-modal="true" aria-label="Schedule with others">
+    <dialog open className="park-agenda-modal" aria-label="Schedule with others">
       <form
         className="park-agenda-hostform"
         aria-label="Schedule with others"
@@ -96,16 +96,33 @@ export function ScheduleWithOthersDialog({
         <h2>Schedule with others</h2>
         <label className="park-agenda-hostfield">
           <span>Title</span>
-          <input name="title" value={form.title} maxLength={120} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          <input
+            name="title"
+            value={form.title}
+            maxLength={120}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+          />
         </label>
         <label className="park-agenda-hostfield">
           <span>Starts (your local time)</span>
-          <input name="start" type="datetime-local" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} />
+          <input
+            name="start"
+            type="datetime-local"
+            value={form.start}
+            onChange={(e) => setForm({ ...form, start: e.target.value })}
+          />
         </label>
         <label className="park-agenda-hostfield">
           <span>Length</span>
-          <select value={form.minutes} onChange={(e) => setForm({ ...form, minutes: Number(e.target.value) })}>
-            {LENGTHS.map((length) => <option key={length} value={length}>{length} minutes</option>)}
+          <select
+            value={form.minutes}
+            onChange={(e) => setForm({ ...form, minutes: Number(e.target.value) })}
+          >
+            {LENGTHS.map((length) => (
+              <option key={length} value={length}>
+                {length} minutes
+              </option>
+            ))}
           </select>
         </label>
         <fieldset>
@@ -117,7 +134,13 @@ export function ScheduleWithOthersDialog({
               <input
                 type="checkbox"
                 checked={chosen.includes(person.id)}
-                onChange={(event) => setChosen(event.target.checked ? [...chosen, person.id] : chosen.filter((id) => id !== person.id))}
+                onChange={(event) =>
+                  setChosen(
+                    event.target.checked
+                      ? [...chosen, person.id]
+                      : chosen.filter((id) => id !== person.id),
+                  )
+                }
               />
               <span>{person.name}</span>
             </label>
@@ -125,16 +148,24 @@ export function ScheduleWithOthersDialog({
         </fieldset>
         <p>{`Invitations will go to: you${picked.length ? `, ${picked.map((person) => person.name).join(", ")}` : ""}. No one else.`}</p>
         <label className="park-agenda-hostnotice">
-          <input type="checkbox" checked={form.attested} onChange={(e) => setForm({ ...form, attested: e.target.checked })} />
+          <input
+            type="checkbox"
+            checked={form.attested}
+            onChange={(e) => setForm({ ...form, attested: e.target.checked })}
+          />
           <span>{NOTICE_TEXT}</span>
         </label>
         {error ? <p role="alert">{error}</p> : null}
         <div className="park-agenda-hostactions">
-          <button type="submit" disabled={busy || people === null || !you}>Confirm and send invitations</button>
-          <button type="button" className="secondary" onClick={onClose}>Cancel</button>
+          <button type="submit" disabled={busy || people === null || !you}>
+            Confirm and send invitations
+          </button>
+          <button type="button" className="secondary" onClick={onClose}>
+            Cancel
+          </button>
         </div>
         {busy ? <output>Working…</output> : null}
       </form>
-    </div>
+    </dialog>
   );
 }
