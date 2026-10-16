@@ -1,14 +1,14 @@
-/* STUDIO-4 Needs you (design/studio-v2 "Tilo S Needs"): values read from the artboard's inline styles. Colours are
-   role tokens (both themes); no transition, animation or keyframes (HR-1..7). Every tap target is 44px or more. */
+/* CX-T-NEEDS: card inbox structure from Tilo T Needs. Existing role tokens and states remain until the
+   shared Tilo T foundation lands. No animation is implied by a pending card (HR-1..7). */
 [data-park] .park-needs {
   box-sizing: border-box;
   width: 100%;
-  max-width: 1296px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 40px 32px 64px;
+  padding: 24px 32px 64px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 16px;
   color: var(--ink);
 }
 [data-park] .park-needs__head {
@@ -32,9 +32,9 @@
 [data-park] .park-needs__h1 {
   margin: 0;
   font-weight: 700;
-  font-size: 48px;
+  font-size: 40px;
   line-height: 1.05;
-  letter-spacing: -2px;
+  letter-spacing: -1.2px;
 }
 [data-park] .park-needs__h1:focus {
   outline: none;
@@ -52,7 +52,7 @@
 }
 [data-park] .park-needs__lede {
   margin: 0;
-  font-size: 18px;
+  font-size: 14px;
   color: var(--ink2);
 }
 [data-park] .park-needs__keys {
@@ -74,8 +74,8 @@
 }
 [data-park] .park-needs__grid {
   display: grid;
-  grid-template-columns: 380px minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 16px;
   align-items: start;
 }
 [data-park] .park-needs__side {
@@ -230,8 +230,7 @@
 [data-park] .park-needs__card {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 28px;
-  box-shadow: var(--sh);
+  border-radius: 24px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -303,9 +302,9 @@
 [data-park] .park-needs__q {
   margin: 0;
   font-weight: 700;
-  font-size: 36px;
-  line-height: 1.12;
-  letter-spacing: -1.4px;
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
   overflow-wrap: anywhere;
 }
 [data-park] .park-needs__q:focus {
@@ -317,9 +316,32 @@
 }
 [data-park] .park-needs__context {
   margin: 0;
-  font-size: 17px;
+  font-size: 14px;
   color: var(--ink2);
   white-space: pre-line;
+}
+[data-park] .park-needs__risk {
+  margin: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+[data-park] .park-needs__risk--low {
+  background: var(--okSoft);
+  color: var(--okInk);
+}
+[data-park] .park-needs__risk--medium {
+  background: var(--amberSoft);
+  color: var(--amberInk);
+}
+[data-park] .park-needs__risk--high {
+  background: var(--redSoft);
+  color: var(--redInk);
+}
+[data-park] .park-needs__risk--unknown {
+  background: var(--sunk);
+  color: var(--ink2);
 }
 [data-park] .park-needs__what {
   display: grid;
@@ -514,9 +536,6 @@
 @media (max-width: 1080px) {
   [data-park] .park-needs__grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-  [data-park] .park-needs__card {
-    order: -1;
   }
   [data-park] .park-needs__what {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

@@ -170,6 +170,36 @@ const button = (root: ParentNode, name: string) =>
 const box = (root: ParentNode, label: string) => q(root, `section[aria-label="${label}"]`);
 
 describe("STUDIO_4 Needs you: one decision at a time, made clear", () => {
+  it("CX_T_NEEDS_gate_shows_plain_risk_and_posts_each_served_action", async () => {
+    const { api, posts } = liveRig();
+    const { m } = await mountNeeds(api);
+    const card = q(m.container, "article");
+    expect(text(q(card, '[aria-label="Risk"]'))).toContain("cannot be undone");
+    expect(text(q(card, '[aria-label="Risk"]'))).toContain("orders@example.com");
+    expect(q(card, '[aria-label="Risk"]').classList.contains("park-needs__risk--high")).toBe(true);
+    expect(button(card, "Edit first")).toBeTruthy();
+    expect(button(card, "Hold")).toBeTruthy();
+    click(button(card, "Edit first") as HTMLButtonElement);
+    await settle();
+    expect(posts(ANSWER(GATE))).toEqual([{ option: "edit" }]);
+  });
+
+  it("CX_T_NEEDS_hold_uses_the_served_hold_option", async () => {
+    const { api, posts } = liveRig();
+    const { m } = await mountNeeds(api);
+    click(button(m.container, "Hold") as HTMLButtonElement);
+    await settle();
+    expect(posts(ANSWER(GATE))).toEqual([{ option: "hold" }]);
+  });
+
+  it("CX_T_NEEDS_rejects_an_option_the_card_did_not_serve", async () => {
+    const { api, posts } = liveRig();
+    const first = (await api.getDecisions()).data[0];
+    if (!first) throw new Error("missing served decision");
+    await expect(api.decide(first.k, undefined, "forged")).rejects.toThrow();
+    expect(posts(ANSWER(GATE))).toEqual([]);
+  });
+
   it("STUDIO_4_needs_shows_one_decision_with_its_plain_question_yes_no_cost_and_what_is_sent", async () => {
     const { api } = liveRig();
     const { m } = await mountNeeds(api);

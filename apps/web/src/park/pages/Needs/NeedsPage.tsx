@@ -161,6 +161,16 @@ export function NeedsPage({ app }: { app: AppCtx }) {
         </>
       ) : (
         <div className="park-needs__grid">
+          <OneDecision
+            key={current.k}
+            app={app}
+            d={current}
+            position={`${at + 1} of ${open.length}`}
+            worldName={worldName(current.world)}
+            heading={heading}
+            onPrev={at > 0 ? () => move(-1) : null}
+            onNext={at < open.length - 1 ? () => move(1) : null}
+          />
           <div className="park-needs__side">
             <nav aria-label="Waiting on you" className="park-needs__queue">
               <div className="park-needs__queuehead">
@@ -197,16 +207,6 @@ export function NeedsPage({ app }: { app: AppCtx }) {
             </nav>
             <Decided done={done} />
           </div>
-          <OneDecision
-            key={current.k}
-            app={app}
-            d={current}
-            position={`${at + 1} of ${open.length}`}
-            worldName={worldName(current.world)}
-            heading={heading}
-            onPrev={at > 0 ? () => move(-1) : null}
-            onNext={at < open.length - 1 ? () => move(1) : null}
-          />
         </div>
       )}
     </div>
@@ -217,7 +217,7 @@ function Decided({ done }: { done: readonly Decision[] }) {
   if (done.length === 0) return null;
   return (
     <section aria-label="Answered here" className="park-needs__done">
-      <h2 className="park-needs__h3">Answered here</h2>
+      <h2 className="park-needs__h3">Recently decided</h2>
       <ul className="park-needs__donelist">
         {done.map((d) => (
           <li key={d.k} className="park-needs__doneitem">
@@ -256,6 +256,8 @@ function OneDecision({
     return a && isItemApi(a) ? a : null;
   }, [fieldsFor, d.world]);
   const tapAnswer = v.kind === "gate" || v.kind === "consent" || v.kind === "plain";
+  const gateAlternatives =
+    d.card?.kind === "gate" ? d.card.options.filter((option) => option.id !== "approve") : [];
   const says = `need-says-${d.k}`.replace(/[^A-Za-z0-9_-]/g, "_");
   return (
     <article className="park-needs__card" aria-labelledby={`${says}-q`}>
@@ -295,6 +297,11 @@ function OneDecision({
             {v.question}
           </h2>
           {v.context ? <p className="park-needs__context">{v.context}</p> : null}
+          {v.risk ? (
+            <p className={`park-needs__risk park-needs__risk--${v.risk.tone}`} aria-label="Risk">
+              <strong>{v.risk.label}:</strong> {v.risk.detail}
+            </p>
+          ) : null}
         </div>
 
         <div className="park-needs__what">
@@ -393,6 +400,15 @@ function OneDecision({
             >
               {v.yesLabel}
             </Button>
+            {gateAlternatives.map((option) => (
+              <Button
+                key={option.id}
+                variant="secondary"
+                onClick={() => app.decide(d.k, undefined, option.id)}
+              >
+                {option.label}
+              </Button>
+            ))}
             <Button
               variant="secondary"
               onClick={onNext ?? (() => app.go("world", { id: d.world }))}

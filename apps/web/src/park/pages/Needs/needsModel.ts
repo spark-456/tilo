@@ -21,6 +21,8 @@ export interface NeedView {
   sent: { exact: string; to: string[]; item: string | null } | null;
   /** Why the person sees it, in plain words; null when nothing served says so. */
   why: string | null;
+  /** Plain risk derived only from the served gate tier, reversibility and recipients. */
+  risk: { tone: "low" | "medium" | "high" | "unknown"; label: string; detail: string } | null;
   /** Answer-by moment (ISO), or null when none was served. */
   due: string | null;
   /** The label of the answer a tap sends (a gate's fixed "Approve", the fixture's designed copy). */
@@ -84,6 +86,27 @@ export function needView(d: Decision): NeedView {
       cost: null,
       sent: { exact: g.exact, to: g.recipients, item: g.item },
       why: `This step is a gate in the plan (risk ${g.riskTier}): Tilo never does it without a person’s answer.`,
+      risk: {
+        tone:
+          g.riskTier === "T3"
+            ? "high"
+            : g.riskTier === "T2"
+              ? "medium"
+              : g.riskTier === "T1"
+                ? "low"
+                : "unknown",
+        label:
+          g.riskTier === "T3"
+            ? "High risk"
+            : g.riskTier === "T2"
+              ? "Medium risk"
+              : g.riskTier === "T1"
+                ? "Low risk"
+                : "Risk tier unavailable",
+        detail: `${g.irreversible ? "This action cannot be undone" : "This action can be undone"}${
+          g.recipients.length ? ` and reaches ${g.recipients.join(", ")}` : ""
+        }.`,
+      },
       due,
       yesLabel: approve?.label ?? d.yes,
       yesSays: "Approve releases exactly what is shown above, and nothing else.",
@@ -104,6 +127,7 @@ export function needView(d: Decision): NeedView {
       cost: null,
       sent: null,
       why: "Connecting an account always needs a person’s answer.",
+      risk: null,
       due,
       yesLabel: c.options.find((o) => o.id === "connect")?.label ?? d.yes,
       yesSays: "Connect grants only the access listed above.",
@@ -123,6 +147,7 @@ export function needView(d: Decision): NeedView {
       cost: null,
       sent: null,
       why: null,
+      risk: null,
       due: c ? dueOf(c.createdAt, c.timeout) : null,
       yesLabel: "",
       yesSays: "",
@@ -153,6 +178,7 @@ export function needView(d: Decision): NeedView {
       cost: null,
       sent: null,
       why: null,
+      risk: null,
       due,
       yesLabel: "",
       yesSays: "",
@@ -173,6 +199,7 @@ export function needView(d: Decision): NeedView {
     cost: f?.amount != null ? money(f.amount) : null,
     sent: null,
     why: f?.approver ? `${f.approver} approves this kind of step.` : null,
+    risk: null,
     due: null,
     yesLabel: d.yes,
     yesSays: f?.approveLabel ? `${f.approveLabel}: ${f.activity}.` : "",

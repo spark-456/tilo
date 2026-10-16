@@ -250,6 +250,7 @@ interface Answerable {
   path: string;
   option: string;
   question: boolean;
+  options: readonly string[];
 }
 
 export function createLiveApi(options: LiveApiOptions = {}): Api {
@@ -445,6 +446,7 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
         path,
         option: answerOption(card) as string,
         question: card.kind === "needs_you",
+        options: card.options.map((option) => option.id),
       });
     }
     return { data: decisionsFromCards(items), source: "live" };
@@ -456,8 +458,10 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     if (!target) throw new TiloApiError("That decision is not on this page any more.", null, false);
     let body: unknown;
     try {
-      if ((text !== undefined || option !== undefined) && !target.question)
+      if (text !== undefined && !target.question)
         throw new TiloApiError("You can only type an answer to a question.", null, false);
+      if (option !== undefined && !target.options.includes(option))
+        throw new TiloApiError("That answer is not offered by this card.", null, false);
       body = await http.postJson(
         target.path,
         text !== undefined ? { text } : { option: option ?? target.option },
