@@ -426,14 +426,20 @@ class GoogleModelProvider(ModelProvider):
                 output_dimensionality=request.dimensions,
             )
         try:
-            response = self._client.models.embed_content(**kwargs)
+            # Vertex accepts one input per gemini-embedding-001 request; keep the typed
+            # batch API by making one call for each text (Google's embedding docs).
+            if typed and self._profile.model == "gemini-embedding-001":
+                responses = [self._client.models.embed_content(**(kwargs | {"contents": [text]})) for text in contents]
+                vectors = [item.values for response in responses for item in response.embeddings]
+            else:
+                response = self._client.models.embed_content(**kwargs)
+                vectors = [item.values for item in response.embeddings]
         except Exception as error:
             log_caught(error, __name__, locals())
             failure = self._failure(error)
         else:
             # `.values` is the float vector; `list(item)` would iterate the
             # pydantic model's *fields* instead.
-            vectors = [item.values for item in response.embeddings]
             if typed:
                 if len(vectors) != len(request.texts) or any(
                     len(vector or []) != request.dimensions for vector in vectors

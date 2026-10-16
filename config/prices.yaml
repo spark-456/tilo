@@ -42,6 +42,9 @@ credit_usd: 0.005
 
 profiles:
   embed-fake: { input: 0, output: 0 } # RT-05 offline vectors; no paid call
+  # BQ-MEMB-7: Google Standard online input, US$0.15/1M tokens; output has no charge.
+  # https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing
+  embed-google: { input: 0.15, output: 0 }
   # Paid tier, Standard, per 1M tokens; output includes thinking tokens. cached_input prices prompt-cache hits
   # (ADR-0022 tokens_cached); Tilo creates no explicit caches, so cache storage is not modelled.
   flash-38: { input: 0.825, output: 4.125, cached_input: 0.0825, valid_until: "2026-12-31" }

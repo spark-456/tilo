@@ -16,7 +16,7 @@ from tilo_providers.factory import build_provider
 from tilo_providers.fake import FakeModelProvider
 from tilo_providers.interfaces import EmbedRequest, EmbedResponse
 from tilo_providers.memory_config import load_memory_config
-from tilo_providers.replay import RecordReplayProvider, embed_recording_key
+from tilo_providers.replay import RecordReplayProvider, ReplayMissError, embed_recording_key
 from tilo_providers.router import Router
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -57,11 +57,18 @@ def test_RT_05_embed_role_and_memory_config_are_offline_and_checked(tmp_path):
         load_providers_config(ROOT / f"config/models{name}.yaml", ROOT / "config/prices.yaml")
         for name in ("", ".dev", ".gemini", ".nim")
     ]
-    for selected in configs:
+    for selected in configs[1:]:
         role = selected.roles["embed"]
         assert role.primary == role.fallback == "embed-fake"
         assert selected.profiles[role.primary].provider == "fake"
         assert selected.price(role.primary).input == selected.price(role.primary).output == 0
+    live = configs[0]
+    role = live.roles["embed"]
+    assert role.primary == role.fallback == "embed-google"
+    assert live.profiles[role.primary].provider == "google"
+    assert live.profiles[role.primary].model == "gemini-embedding-001"
+    assert live.price(role.primary).input == 0.15
+    assert live.price(role.primary).output == 0
     memory = load_memory_config(ROOT / "config/memory.yaml")
     assert (memory.vector.dimensions, memory.vector.k, memory.embed.batch_max) == (768, 5, 64)
     bad = tmp_path / "memory.yaml"
@@ -69,7 +76,40 @@ def test_RT_05_embed_role_and_memory_config_are_offline_and_checked(tmp_path):
     with pytest.raises(ValueError):
         load_memory_config(bad)
     with pytest.raises(ProviderConfigError, match="live embedding model is not configured"):
-        build_provider("embed", configs[0], fixtures_dir=tmp_path, live_permitted=True)
+        build_provider("embed", configs[1], fixtures_dir=tmp_path, live_permitted=True)
+
+
+def test_RT_05_approved_vertex_embedding_batches_one_text_per_request_without_network():
+    from tilo_providers.google_adapter import GoogleModelProvider
+
+    calls = []
+
+    def embed_content(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(embeddings=[SimpleNamespace(values=[1.0] + [0.0] * 63)])
+
+    profile = ProvidersProfile.model_validate(
+        {"provider": "google", "model": "gemini-embedding-001", "context": 2048, "caps": []}
+    )
+    provider = GoogleModelProvider(
+        profile,
+        "embed-google",
+        "fake-project",
+        "global",
+        client=SimpleNamespace(models=SimpleNamespace(embed_content=embed_content)),
+    )
+    result = provider.embed(EmbedRequest(texts=["first", "second"], task="document", dimensions=64))
+    assert result == EmbedResponse(vectors=[[1.0] + [0.0] * 63] * 2, profile_id="embed-google")
+    assert [call["contents"] for call in calls] == [["first"], ["second"]]
+    assert all(call["config"].task_type == "RETRIEVAL_DOCUMENT" for call in calls)
+
+
+def test_RT_05_approved_vertex_embedding_needs_live_switch_even_with_injected_permission(tmp_path, monkeypatch):
+    monkeypatch.delenv("LIVE", raising=False)
+    config = load_providers_config(ROOT / "config/models.yaml", ROOT / "config/prices.yaml")
+    provider = build_provider("embed", config, fixtures_dir=tmp_path, live_permitted=True)
+    with pytest.raises(ReplayMissError):
+        provider.embed(EmbedRequest(texts=["offline"], task="query", dimensions=64))
 
 
 def test_RT_05_router_and_replay_keep_typed_embed_result(tmp_path, monkeypatch):

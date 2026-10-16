@@ -31,8 +31,7 @@ def build_provider(
     profile_id = profile_id or config.roles[role_id].primary  # the router passes any cascade profile
     profile = config.profiles[profile_id]
 
-    # RT-05: the owner has not selected/priced a live embedding model. Never let
-    # the offline placeholder produce synthetic vectors for a live lookup.
+    # RT-05: never let the offline placeholder produce synthetic vectors for a live lookup.
     if profile.model == "fake-embed" and (
         live_permitted or os.environ.get("LIVE") == "1" or os.environ.get("K_SERVICE")
     ):
@@ -59,7 +58,8 @@ def build_provider(
         live_factory=live_factory,
         fixtures_dir=Path(fixtures_dir),
         capabilities={Capability(c) for c in profile.caps},
-        live_permitted=live_permitted,
+        # BQ-MEMB-7: embedding may call Vertex only with the explicit LIVE switch.
+        live_permitted=live_permitted and role_id != "embed",
         force_replay=force_replay,
     )
 
