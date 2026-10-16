@@ -527,7 +527,10 @@ describe("CL-INT-3: error mapping", () => {
 
 describe("CL-INT-3 / FR-WLD-05: subscribeEvents polls GET /worlds/{id}/events with a seq cursor", () => {
   beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
   // An up-to-date server (CL-INT-4) returns the stored event whole, for the requested world.
   const view = (e: Event): Event => ({ ...e, world_id: "w1" });
@@ -537,6 +540,47 @@ describe("CL-INT-3 / FR-WLD-05: subscribeEvents polls GET /worlds/{id}/events wi
   const settle = async (ms: number) => {
     await vi.advanceTimersByTimeAsync(ms);
   };
+
+  it("test_CX_PERF_1 backs off empty event polls and resumes immediately when the tab returns", async () => {
+    const { calls, fetch } = script(
+      json({ events: [] }),
+      json({ events: [] }),
+      json({ events: [] }),
+      json({ events: [] }),
+    );
+    const visibility = new EventTarget();
+    Object.defineProperty(visibility, "hidden", { configurable: true, value: true });
+    vi.stubGlobal("document", visibility);
+    const stop = client(fetch).subscribeEvents("w1", () => undefined);
+    await settle(0);
+    expect(calls).toHaveLength(0);
+    await settle(1_000);
+    expect(calls).toHaveLength(0);
+    Object.defineProperty(visibility, "hidden", { configurable: true, value: false });
+    visibility.dispatchEvent(new Event("visibilitychange"));
+    await settle(0);
+    expect(calls).toHaveLength(1);
+    await settle(1_999);
+    expect(calls).toHaveLength(1);
+    await settle(1);
+    expect(calls).toHaveLength(2);
+    stop();
+  });
+
+  it("test_CX_PERF_1 keeps the fast cadence while a page awaits world.started", async () => {
+    const { calls, fetch } = script(
+      json({ events: [] }),
+      json({ events: [] }),
+      json({ events: [] }),
+      json({ events: [] }),
+    );
+    const abort = new AbortController();
+    const waiting = client(fetch).getLayout("w1", abort.signal).catch((error: unknown) => error);
+    await settle(2_000);
+    expect(calls).toHaveLength(3);
+    abort.abort();
+    await waiting;
+  });
 
   it("delivers in seq order, keeps run_id and item as sent and dedupes by id", async () => {
     const { calls, fetch } = script(

@@ -1078,6 +1078,9 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
   ): () => void {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let idlePolls = 0;
+    let polling = false;
+    let resumeWhenIdle = false;
     let cursor = 0;
     let failures = 0;
     const seen = new Map<string, number>(); // id -> seq, only ids at or after the cursor
@@ -1090,7 +1093,11 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       for (const wake of [...feed.waiters]) wake();
     };
 
+    const hidden = () => typeof document !== "undefined" && document.hidden;
     const poll = async () => {
+      if (stopped || polling) return;
+      polling = true;
+      timer = undefined;
       let delay = this.pollMs;
       let fresh: EventView[] = [];
       try {
@@ -1139,14 +1146,42 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
         if (TERMINAL.has(view.type)) stopped = true;
       }
       for (const [id, seq] of seen) if (seq < cursor) seen.delete(id);
-      if (!stopped) timer = setTimeout(poll, delay);
+      polling = false;
+      if (!stopped) {
+        const backOffIdle = fresh.length === 0 && feed.waiters.size === 0 && failures === 0;
+        idlePolls = backOffIdle ? idlePolls + 1 : 0;
+        if (!hidden()) {
+          if (resumeWhenIdle) {
+            resumeWhenIdle = false;
+            timer = setTimeout(poll, 0);
+          } else {
+            if (backOffIdle) delay = Math.min(this.pollMs * 2 ** idlePolls, MAX_BACKOFF_MS);
+            timer = setTimeout(poll, delay);
+          }
+        }
+      }
     };
-    void poll();
+    const onVisibilityChange = () => {
+      if (hidden()) {
+        clearTimeout(timer);
+        timer = undefined;
+      } else if (!stopped) {
+        clearTimeout(timer);
+        timer = undefined;
+        if (polling) resumeWhenIdle = true;
+        else void poll();
+      }
+    };
+    if (typeof document !== "undefined")
+      document.addEventListener("visibilitychange", onVisibilityChange);
+    if (!hidden()) void poll();
     return () => {
       if (open) feed.subs -= 1;
       open = false;
       stopped = true;
       clearTimeout(timer);
+      if (typeof document !== "undefined")
+        document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }
 
