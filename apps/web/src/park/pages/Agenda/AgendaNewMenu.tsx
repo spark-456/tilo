@@ -30,7 +30,7 @@ export function AgendaNewMenu({
       setMessage("Pin saved");
       onPinCreated();
     } catch {
-      setMessage("Pin not saved. Try again.");
+      setMessage("Could not confirm the pin was saved. Check your pinboard before trying again.");
     } finally {
       setSaving(false);
     }
@@ -84,7 +84,10 @@ export function AgendaNewMenu({
               name="pin-title"
               value={title}
               maxLength={120}
-              onChange={(event) => setTitle(event.target.value)}
+              onChange={(event) => {
+                key.current = null;
+                setTitle(event.target.value);
+              }}
             />
           </label>
           <button type="submit" disabled={saving || !title.trim()}>

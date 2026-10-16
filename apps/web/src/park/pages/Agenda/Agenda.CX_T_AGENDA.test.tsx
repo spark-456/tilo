@@ -49,3 +49,21 @@ it("CX_T_AGENDA_new_menu_keeps_unavailable_actions_disabled", () => {
     "true",
   );
 });
+
+it("CX_T_AGENDA_pin_error_does_not_claim_the_write_failed_or_refresh_the_list", async () => {
+  const changed = vi.fn();
+  const { container } = mount(
+    <AgendaNewMenu
+      createPin={vi.fn(async () => Promise.reject(new Error("response lost")))}
+      onPinCreated={changed}
+      canHost
+    />,
+  );
+  click(q(container, "summary"));
+  click(q(container, 'button[role="menuitem"]'));
+  typeInto(q<HTMLInputElement>(container, 'input[name="pin-title"]'), "Call Lin back");
+  click(q(container, 'button[type="submit"]'));
+  await settle();
+  expect(container.textContent).toContain("Could not confirm");
+  expect(changed).not.toHaveBeenCalled();
+});
