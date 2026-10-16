@@ -171,11 +171,14 @@ def _with_deliver(units: list[dict[str, Any]], brief: dict[str, Any]) -> list[di
         number += 1
     for item in items:
         title = item.get("title")
+        canva = item.get("format") in ("pptx", "pdf") and item.get("make_with") == "connector:canva"
         result.append(
             {
                 **deliver,
                 "id": f"U{number}",
                 "title": title.strip()[:80] if isinstance(title, str) and title.strip() else DELIVER_TITLE,
+                "connectors": ["canva"] if canva else [],
+                "actions": ["create_design"] if canva else [],
             }
         )
         number += 1

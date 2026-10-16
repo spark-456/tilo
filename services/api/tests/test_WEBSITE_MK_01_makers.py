@@ -49,6 +49,23 @@ def test_WEBSITE_MK_01_options_MK_02_config_MK_03_editable_text_MK_06_model_fiel
         validate_brief(invalid)
 
 
+def test_WEBSITE_MK_07_activated_connected_canva_is_ready_and_kept_visible(monkeypatch):
+    original = makers._read_yaml
+    canva = original(makers._CONFIG_DIR / "canva.yaml")
+
+    def activated(path):
+        rows = original(path)
+        return [*rows, *canva] if path.name == "connectors.yaml" else rows
+
+    monkeypatch.setattr(makers, "_read_yaml", activated)
+    deck = {"goal": "Build slides", "deliverables": [{"title": "Deck", "format": "pptx"}]}
+    choice = makers.make_choices(deck, OWNER, views=Views({"canva": "connected"}))[0]
+    canva_option = next(option for option in choice["options"] if option["make_with"] == "connector:canva")
+
+    assert canva_option["status"] == "ready" and canva_option["note"] is None
+    assert [option["make_with"] for option in choice["options"]] == ["native", "connector:canva"]
+
+
 def test_WEBSITE_MK_06_approve_saves_events_after_grant_and_compiles_the_persons_pick(run_flow):
     from _clint2_lib import wait_for
 
