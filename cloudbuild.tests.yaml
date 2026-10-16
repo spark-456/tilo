@@ -168,7 +168,7 @@ steps:
     /workspace/.venv/bin/python -m pytest services/api/tests/test_BQ_CTX_TEAMWORLD*.py services/api/tests/test_PPL_11c_s4_write_limits.py
     services/api/tests/test_PPL_11c_FS_a_record_contract.py services/api/tests/test_PPL_11c_FS_c_directory.py services/api/tests/test_SEC_16*.py
     services/api/tests/test_FR_PA_10*.py services/api/tests/test_FR_HIL_09_SEC_07_roles_redaction.py services/api/tests/test_FR_CON_10_in_app_delivery_run.py
-    services/api/tests/test_SEC_15_visitor_refused.py services/api/tests/test_SEC_15_gate_hardening.py services/api/tests/test_SEC_15_declaration.py
+    services/api/tests/test_SEC_15_open_access.py
     services/api/tests/test_SEC_10_appcheck*.py -q -p no:cacheprovider
 
     /workspace/.venv/bin/python -m pytest tests/system/test_SYS_fail_closed_and_services.py -k tilo_api -q -p no:cacheprovider
