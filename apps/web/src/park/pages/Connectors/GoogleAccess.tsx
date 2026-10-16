@@ -115,7 +115,7 @@ export function GoogleAccess({ flow }: { flow: ConnectFlow }) {
           return (
             <div className="park-connectors-avail" key={id}>
               <span className="park-connectors-avail-mono">
-                <BrandIcon id={id} mono={MONO[id]} />
+                <BrandIcon id={id} mono={MONO[id] ?? row.name.charAt(0)} />
               </span>
               <span className="park-connectors-avail-names">
                 <span className="park-connectors-avail-name">{row.name}</span>
