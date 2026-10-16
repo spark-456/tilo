@@ -141,7 +141,7 @@ async def media_route(
     """Store one capture file in the owner's Desk world: 201 with its pinned ref and whether Tilo can read it."""
     deps.refuse_if_replay_only(flags)
     limits = load_capture_limits()
-    # the declared length first, then the bytes counted as they stream (this route has its own cap, like /v1/feedback)
+    # the declared length first, then the bytes counted as they stream (this route has its own cap)
     request._body = await capped_bytes(  # noqa: SLF001 - Starlette's own cache: the form is parsed from what was counted
         request, limits.max_file_bytes + _FORM_SLACK, too_large="file_too_large", length_required=True
     )
