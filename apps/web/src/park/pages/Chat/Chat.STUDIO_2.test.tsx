@@ -152,6 +152,23 @@ describe("STUDIO_2 Chat: the helper's mood follows the real request", () => {
 });
 
 describe("STUDIO_2 Chat: honest data", () => {
+  it("CX_T_CHAT renders each real turn as message bubbles with an inline answer card", async () => {
+    const api = quickApi(async () => ({
+      data: { kind: "answered", text: "The meeting is at 2 pm.", cost: { credits: 0.02 } },
+      source: "live",
+    }));
+    const { el } = await mountChat(api);
+    await send(el, "When is the meeting?");
+
+    expect(textOf(q(el, '[role="log"] .park-chat-you'))).toBe("When is the meeting?");
+    expect(textOf(q(el, '[role="log"] .park-chat-result-card'))).toContain(
+      "The meeting is at 2 pm.",
+    );
+    expect(textOf(q(el, '[role="log"] .park-chat-result-card'))).toMatch(/0\.02 credits/i);
+    expect(qa(el, '[role="log"] .park-chat-result-card')).toHaveLength(1);
+    expect(status(el)).toBe("Tilo is answering");
+  });
+
   it("CX_T_CHAT lists only current-session questions and New chat clears them", async () => {
     const api = quickApi(async () => ({
       data: { kind: "answered", text: "A real answer.", cost: null },

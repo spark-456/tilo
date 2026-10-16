@@ -20,7 +20,7 @@ const SCENE_OPTIONS: SegmentOption[] = SCENES.map((s) => ({ value: s, label: SCE
 
 function statusLine(last: Turn | undefined, mood: BuddyMood): string {
   if (mood === "reading") return "Tilo is reading your question";
-  if (mood === "talking") return "Tilo is answering · 1 helper";
+  if (mood === "talking") return "Tilo is answering";
   if (last?.state === "answered")
     return last.seconds > 0 ? `Answered in ${last.seconds}s` : "Answered";
   return "Ready when you are";
@@ -82,16 +82,18 @@ function Answer({
             {meta}
             {turn.sample ? <span className="park-chat-sample">Sample answer</span> : null}
           </div>
-          <p className="park-chat-text">{turn.text}</p>
-          <div className="park-chat-actions">
-            {onCopy ? (
-              <button type="button" className="park-chat-quiet" onClick={() => onCopy(turn.text)}>
-                Copy
+          <div className="park-chat-result-card">
+            <p className="park-chat-text">{turn.text}</p>
+            <div className="park-chat-actions">
+              {onCopy ? (
+                <button type="button" className="park-chat-quiet" onClick={() => onCopy(turn.text)}>
+                  Copy
+                </button>
+              ) : null}
+              <button type="button" className="park-chat-soft" onClick={() => onWorld(turn.question)}>
+                Make it a world →
               </button>
-            ) : null}
-            <button type="button" className="park-chat-soft" onClick={() => onWorld(turn.question)}>
-              Make it a world →
-            </button>
+            </div>
           </div>
         </div>
       </div>
