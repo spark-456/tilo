@@ -1,0 +1,23 @@
+{
+  "url": "http://127.0.0.1:5684/",
+  "status": 200,
+  "title": "Home · Tilo",
+  "path": "/",
+  "longTasks": [
+    73,
+    724,
+    141,
+    72
+  ],
+  "navigation": [
+    {
+      "duration": 2443.0999999940395,
+      "domContentLoadedEventEnd": 578.0999999940395,
+      "loadEventEnd": 2443.0999999940395
+    }
+  ],
+  "scrollFrames": 149,
+  "scrollOver50ms": 3,
+  "maxScrollGapMs": 1112.300000011921,
+  "medianScrollGapMs": 11.199999988079071
+}
