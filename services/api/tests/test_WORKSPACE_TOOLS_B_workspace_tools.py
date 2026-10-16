@@ -331,6 +331,43 @@ def test_WORKSPACE_TOOLS_B_WT01_what_cannot_be_checked_counts_as_shared_unless_n
     assert team_share_in_force(WORLD, ASHA, stores=unavailable, configured=lambda: False) is False
 
 
+def _assigner_chain(hops: int, *, cycle: bool = False) -> tuple[Any, list[str]]:
+    records = {}
+    calls: list[str] = []
+    for step in range(hops + 1):
+        next_uid = "u_0" if cycle and step == hops else f"u_{step + 1}"
+        memberships = [{"team": LAUNCH, "assigned_by": {"by": next_uid}}] if step < hops or cycle else []
+        records[f"u_{step}"] = SimpleNamespace(record={"id": f"u_{step}", "memberships": memberships})
+
+    def get(_org: str, uid: str) -> Any:
+        calls.append(uid)
+        return records.get(uid)
+
+    return SimpleNamespace(get=get), calls
+
+
+def test_ADR_0048_WT_01_a_24_step_assigner_chain_reads_all_25_people() -> None:
+    persons, calls = _assigner_chain(24)
+    result = workspace_tools._chain(persons, "u_0", {LAUNCH})
+    assert result is not None and len(result) == 25
+    assert calls == [f"u_{step}" for step in range(25)]
+
+
+def test_ADR_0048_WT_01_a_25_step_chain_is_treated_as_shared(monkeypatch: pytest.MonkeyPatch) -> None:
+    persons, calls = _assigner_chain(25)
+    shares = SimpleNamespace(list=lambda *_: [SimpleNamespace(record={"team": LAUNCH})])
+    monkeypatch.setattr(workspace_tools, "in_force", lambda *_: False)
+    assert team_share_in_force(WORLD, "u_0", stores=lambda: SimpleNamespace(persons=persons, world_shares=shares))
+    assert calls == [f"u_{step}" for step in range(25)]
+
+
+def test_ADR_0048_WT_01_a_cycle_ends_after_each_person_is_read_once() -> None:
+    persons, calls = _assigner_chain(2, cycle=True)
+    result = workspace_tools._chain(persons, "u_0", {LAUNCH})
+    assert result is not None and len(result) == 3
+    assert calls == ["u_0", "u_1", "u_2"]
+
+
 def test_WORKSPACE_TOOLS_B_WT01_only_a_live_run_has_workspace_access_a_demo_is_replay_and_has_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
