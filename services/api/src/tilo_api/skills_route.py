@@ -21,7 +21,7 @@ from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import yaml
 from fastapi import Depends, Request
@@ -199,7 +199,9 @@ def _doc(entry: dict[str, Any]) -> str:
     return f"{entry['name']}: {entry['purpose']}"[:500]
 
 
-def _embed(model_router: Router, texts: list[str], task: str, dims: int) -> tuple[str, list[list[float]]]:
+def _embed(
+    model_router: Router, texts: list[str], task: Literal["document", "query"], dims: int
+) -> tuple[str, list[list[float]]]:
     # a deployed router is a MeteredRouter: its embeddings are SEC-16 units, named `metered_embed`; a Router has `embed`
     call = getattr(model_router, "metered_embed", None) or model_router.embed
     result = call("embed", EmbedRequest(texts=texts, task=task, dimensions=dims))
@@ -257,7 +259,8 @@ def _pick(model_router: Router, text: str, first: dict[str, Any], second: dict[s
             "assistant",
             GenerateRequest(system=system, prompt=prompt, json_mode=True, response_schema=_PICK, max_output_tokens=64),
         )
-        doc = json.loads(result.response.text) if result.outcome == "ok" and result.response is not None else None
+        reply = result.response.text if result.outcome == "ok" and result.response is not None else None
+        doc = None if reply is None else json.loads(reply)
         return doc["pick"] if doc is not None and first_error(doc, _PICK) is None else None
     except Exception as exc:  # noqa: BLE001
         logger.warning("skill tie-break not answered: %s", type(exc).__name__)
