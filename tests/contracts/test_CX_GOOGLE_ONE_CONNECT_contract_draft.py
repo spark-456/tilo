@@ -8,7 +8,7 @@ import pathlib
 import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-FIXTURES = ROOT / "contracts" / "fixtures" / "meeting_host_rpc"
+FIXTURES = ROOT / "contracts" / "fixtures"
 GOOGLE = ("gmail", "google_calendar", "google_drive")
 
 
@@ -29,8 +29,8 @@ def test_CX_GOOGLE_ONE_CONNECT_scope_set_is_exactly_the_registry_union():
 
 
 def test_CX_GOOGLE_ONE_CONNECT_partial_grant_keeps_only_fully_scoped_connectors_connected():
-    start = _read(FIXTURES / "start_request" / "valid" / "google_connect.json")
-    answer = _read(FIXTURES / "callback_answer" / "valid" / "google_partial_scopes.json")
+    start = _read(FIXTURES / "meeting_host_rpc.start_request" / "valid" / "google_connect.json")
+    answer = _read(FIXTURES / "meeting_host_rpc.callback_answer" / "valid" / "google_partial_scopes.json")
     assert set(start["connectors"]) == set(GOOGLE)
     states = {item["connector"]: item for item in answer["connections"]}
     connectors = yaml.safe_load((ROOT / "config" / "connectors.yaml").read_text(encoding="utf-8"))
