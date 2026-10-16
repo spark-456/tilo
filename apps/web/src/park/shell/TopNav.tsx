@@ -252,7 +252,11 @@ export function TopNav(p: TopNavProps) {
         </div>
       </header>
       {phoneTabs ? (
-        <nav aria-label="Phone tabs" className="park-shell__phone-tabs" data-park-floating>
+        <nav
+          aria-label="Phone tabs"
+          className={`park-shell__phone-tabs ${p.booting ? "park-shell__booting" : ""}`}
+          data-park-floating
+        >
           {PHONE_TABS.map(([id, label, glyph]) => {
             const on = p.page === id || (id === "worlds" && p.page === "world");
             return (
