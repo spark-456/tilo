@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { EmptyState, ErrorState } from "../../../design/tilo-t";
 import { type QuizView, readQuizApp } from "../../api/quizApps";
 import type { AppCtx } from "../../app/AppCtx";
 import {
@@ -29,7 +30,6 @@ import {
 } from "../../app/appspec.draft";
 import { useApp, useExpectsSample, useParkApi, useSchedule } from "../../app/context";
 import { Button, PageSheet } from "../../components";
-import { EmptyState, ErrorState } from "../../../design/tilo-t";
 import "./QuizPlayer.css";
 
 export interface QuizPlayerPageProps {

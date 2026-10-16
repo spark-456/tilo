@@ -1,8 +1,8 @@
 import { useState } from "react";
+import { EmptyState } from "../../../design/tilo-t";
 import type { Decision, Ledger } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { Button, SegmentedControl } from "../../components";
-import { EmptyState } from "../../../design/tilo-t";
 import { icon } from "./icons";
 import { KINDS, type Kind, activityGroups } from "./model";
 

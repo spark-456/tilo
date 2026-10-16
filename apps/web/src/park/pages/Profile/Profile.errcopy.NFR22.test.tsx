@@ -53,9 +53,7 @@ it("TILO_T_STATES_HR1_FR_SET_01_settings_use_shared_loading_and_error_states", a
   const box = root.querySelector<HTMLElement>("[data-profile-settings-state]");
   expect(box).not.toBeNull();
   expect(box?.style.blockSize).toBe("176px");
-  expect(
-    box?.querySelector('[data-testid="tt-loading"]')?.getAttribute("aria-busy"),
-  ).toBe("true");
+  expect(box?.querySelector('[data-testid="tt-loading"]')?.getAttribute("aria-busy")).toBe("true");
   expect(root.querySelector("input")).toBeNull();
   await act(async () => reject(failure()));
   await settle();

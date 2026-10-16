@@ -47,9 +47,9 @@ describe("LW_14_fix the player accepts exactly what the schema accepts", () => {
         <QuizPlayerPage worldId="w1" artifactId="art_bad" spec={withQuestion({ topic: "9-x" })} />
       </ParkProvider>,
     );
-    expect(
-      invalid.container.querySelector('[data-testid="tt-error"]')?.getAttribute("role"),
-    ).toBe("alert");
+    expect(invalid.container.querySelector('[data-testid="tt-error"]')?.getAttribute("role")).toBe(
+      "alert",
+    );
     expect(invalid.container.querySelector("h1")?.textContent).toBe(
       "Quiz specification is invalid",
     );

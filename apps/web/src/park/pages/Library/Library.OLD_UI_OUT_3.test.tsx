@@ -49,9 +49,9 @@ describe("OLD_UI_OUT_3_library_page", () => {
     ).toBe("true");
 
     const failed = mount(<LibraryView app={app} state={{ status: "error" }} retry={vi.fn()} />);
-    expect(
-      failed.container.querySelector('[data-testid="tt-error"]')?.getAttribute("role"),
-    ).toBe("alert");
+    expect(failed.container.querySelector('[data-testid="tt-error"]')?.getAttribute("role")).toBe(
+      "alert",
+    );
 
     const empty = mount(<LibraryView app={app} state={ready({ items: [] })} retry={vi.fn()} />);
     expect(empty.container.querySelector('[data-testid="tt-empty"]')).not.toBeNull();

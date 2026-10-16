@@ -4,6 +4,7 @@
 // Slack, getLedger for the spend so far) and the routines client; a person moves with app.go and approves with
 // app.decide. Filters are page state. No timers: nothing here moves by itself.
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ErrorState, StateAction } from "../../../design/tilo-t";
 import { createRoutinesClient } from "../../api/live/routines";
 import type { Connector, Decision, Ledger, Plan, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
@@ -19,7 +20,6 @@ import {
 } from "../../app/slackShare";
 import { useStaged } from "../../app/useStaged";
 import { PageSheet } from "../../components";
-import { ErrorState, StateAction } from "../../../design/tilo-t";
 import { FirstRunOverview } from "../../sample/FirstRunOverview";
 import { SampleControls } from "../../sample/SampleControls";
 import { hideSample, showSample } from "../../sample/sampleChoice";

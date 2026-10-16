@@ -2,8 +2,8 @@
 // (STUDIO-3, "Tilo S Worlds.dc.html"). The town's counts are the list's own; its picture is the shell's city,
 // drawn still (no motion on this page).
 import type { ReactNode } from "react";
-import { backdropScene } from "../../shell/scene";
 import { EmptyState, LoadingState } from "../../../design/tilo-t";
+import { backdropScene } from "../../shell/scene";
 import { type TownCounts, plural } from "./model";
 
 /** A still placeholder in the card's own size; no invented world data or motion. */
