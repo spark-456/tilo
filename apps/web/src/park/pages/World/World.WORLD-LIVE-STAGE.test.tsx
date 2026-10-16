@@ -10,6 +10,7 @@ import type { RunEvent } from "./useRunEvents";
 
 vi.mock("../../../worldView/LiveStageEmbed", () => ({
   default: ({ worldId }: { worldId: string }) => <div data-testid="live-stage-stub">{worldId}</div>,
+  LiveChat: ({ worldId }: { worldId: string }) => <div data-testid="live-chat-stub">{worldId}</div>,
 }));
 
 afterEach(() => {
@@ -69,5 +70,16 @@ describe("WORLD-LIVE: the live stage on the World page", () => {
     const rig = await open(false);
     expect(rig.el.querySelector('[data-testid="live-stage-stub"]')).toBeNull();
     expect(rig.el.querySelector("[data-recorded-world]")).not.toBeNull();
+  });
+
+  it("TILO_T_WORLD_chat_tab_shows_the_agents_conversations_of_a_real_run", async () => {
+    const rig = await open(true);
+    const tab = [...rig.el.querySelectorAll<HTMLElement>('[role="tab"]')].find((t) =>
+      t.textContent?.startsWith("Chat"),
+    );
+    expect(tab).toBeDefined();
+    expect(rig.el.querySelector('[data-testid="live-chat-stub"]')).toBeNull(); // nothing loads until it is chosen
+    await act(async () => tab?.click());
+    expect(rig.el.querySelector('[data-testid="live-chat-stub"]')?.textContent).toBe("hires");
   });
 });

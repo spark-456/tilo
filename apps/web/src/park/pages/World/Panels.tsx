@@ -6,12 +6,14 @@ import { cx } from "../../components/cx";
 import { type RunStep, clockOf, runSteps, storyOf } from "./runSteps";
 import type { RunEvent } from "./useRunEvents";
 
-export type WorldTab = "story" | "steps" | "result";
+export type WorldTab = "story" | "steps" | "result" | "chat";
 const TABS: readonly (readonly [WorldTab, string])[] = [
   ["story", "Story"],
   ["steps", "Steps"],
   ["result", "Result"],
 ];
+/** TILO-T-WORLD: a real run with a stage also has its Chat (the agents talking), after the three. */
+const CHAT: readonly [WorldTab, string] = ["chat", "Chat"];
 export const tabId = (t: WorldTab): string => `park-world-tab-${t}`;
 export const panelId = (t: WorldTab): string => `park-world-panel-${t}`;
 
@@ -20,24 +22,27 @@ export function WorldTabs({
   on,
   onPick,
   counts,
+  chat = false,
 }: {
   on: WorldTab;
   onPick: (t: WorldTab) => void;
   counts: Partial<Record<WorldTab, string>>;
+  chat?: boolean;
 }) {
+  const tabs = chat ? [...TABS, CHAT] : TABS;
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   const move = (e: KeyboardEvent<HTMLButtonElement>, at: number) => {
     const to =
       e.key === "ArrowRight"
-        ? (at + 1) % TABS.length
+        ? (at + 1) % tabs.length
         : e.key === "ArrowLeft"
-          ? (at + TABS.length - 1) % TABS.length
+          ? (at + tabs.length - 1) % tabs.length
           : e.key === "Home"
             ? 0
             : e.key === "End"
-              ? TABS.length - 1
+              ? tabs.length - 1
               : -1;
-    const next = TABS[to];
+    const next = tabs[to];
     if (!next) return;
     e.preventDefault();
     onPick(next[0]);
@@ -45,7 +50,7 @@ export function WorldTabs({
   };
   return (
     <div role="tablist" aria-label="World views" className="park-world-tabs">
-      {TABS.map(([t, label], i) => (
+      {tabs.map(([t, label], i) => (
         <button
           key={t}
           ref={(el) => {

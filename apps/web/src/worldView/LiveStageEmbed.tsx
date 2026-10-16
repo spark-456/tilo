@@ -9,6 +9,7 @@ import { Stage } from "../stage/Stage";
 import { useRunStatus } from "../world/runLog";
 import { type RoomWords, useClientWorld } from "../world/useClientWorld";
 import { AgentLayer } from "./live/AgentLayer";
+import { Conversations } from "./live/Conversations";
 
 export default function LiveStageEmbed({ worldId }: { worldId: string }) {
   const client = useClient();
@@ -54,4 +55,10 @@ export default function LiveStageEmbed({ worldId }: { worldId: string }) {
       ) : null}
     </div>
   );
+}
+
+/** TILO-T-WORLD: the agents' chat for the World page's Chat tab; it lives in this chunk so the page imports one module. */
+export function LiveChat({ worldId }: { worldId: string }) {
+  const rooms = useMemo(createRoomClient, []);
+  return <Conversations worldId={worldId} rooms={rooms} />;
 }

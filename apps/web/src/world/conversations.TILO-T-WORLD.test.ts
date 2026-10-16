@@ -6,7 +6,14 @@
 import type { Event, Layout } from "@tilo/contracts";
 import { expect, test } from "vitest";
 import { villageBasicEvents, villageBasicLayout } from "../../test-support/worldFixtures";
-import { type Message, conversationsOf, pairOf, withWords } from "./conversations";
+import {
+  type Message,
+  conversationsOf,
+  filterMessages,
+  pairOf,
+  partiesOf,
+  withWords,
+} from "./conversations";
 
 const layout = villageBasicLayout() as unknown as Layout;
 const events = villageBasicEvents() as unknown as Event[];
@@ -118,4 +125,19 @@ test("FR-WLD-04 TILO-T-WORLD conversations: a room turn has no text of its own u
 
 test("FR-WLD-04 TILO-T-WORLD conversations: pairOf is the same pair either way round", () => {
   expect(pairOf("A_l1", "A_s1")).toBe(pairOf("A_s1", "A_l1"));
+});
+
+test("FR-WLD-04 TILO-T-WORLD conversations: filter by agent and by pair keeps only the messages between them", () => {
+  n = 0;
+  const run = [
+    ev("agent.assigned", "A_l1", "A_s1", { unit: "U1" }, "gave"),
+    ev("agent.handoff", "A_s1", "A_l1", { envelope: { summary: "done" } }),
+    ev("agent.help_requested", "A_s2", "A_l1", {}, "help"),
+    ev("question.routed", "A_l1", "u_owner", {}, "which?"),
+  ];
+  const all = conversationsOf(layout, run);
+  expect(filterMessages(all, { agent: "", other: "" })).toHaveLength(4);
+  expect(filterMessages(all, { agent: "A_s1", other: "" }).map((m) => m.seq)).toEqual([1, 2]);
+  expect(filterMessages(all, { agent: "A_l1", other: "A_s2" }).map((m) => m.seq)).toEqual([3]);
+  expect(partiesOf(all).get("A_l1")).toEqual(["A_s1", "A_s2", "u_owner"]);
 });

@@ -127,3 +127,35 @@ export function withWords(
     return text ? { ...m, text } : m;
   });
 }
+
+export interface MessageFilter {
+  /** Keep messages this party sent or received; "" keeps all. */
+  readonly agent: string;
+  /** With `agent`: keep only the messages between the two; "" keeps every counterpart. */
+  readonly other: string;
+}
+
+/** The filter by agent, and by pair when a second party is chosen. */
+export function filterMessages(messages: readonly Message[], f: MessageFilter): Message[] {
+  if (!f.agent) return [...messages];
+  return messages.filter((m) => {
+    const mine = m.from === f.agent || m.to === f.agent;
+    if (!mine) return false;
+    return !f.other || m.from === f.other || m.to === f.other;
+  });
+}
+
+/** Everyone who sent or received a message, and who each of them talked with, in the order they first spoke. */
+export function partiesOf(messages: readonly Message[]): Map<string, string[]> {
+  const parties = new Map<string, string[]>();
+  const see = (a: string, b: string) => {
+    const list = parties.get(a) ?? [];
+    if (!list.includes(b)) list.push(b);
+    parties.set(a, list);
+  };
+  for (const m of messages) {
+    see(m.from, m.to);
+    see(m.to, m.from);
+  }
+  return parties;
+}
