@@ -55,7 +55,7 @@ from tilo_providers.safety import build_safety_provider
 from tilo_redact import redact
 
 from tilo_api import events, firebase_auth, spend
-from tilo_api.access import AccessStore, Mode, enforced, provider_mode
+from tilo_api.access import Mode, enforced, provider_mode
 from tilo_api.appcheck import AppCheckVerifier, default_verifier
 from tilo_api.assistant.config import AssistantConfig, AssistantConfigError, load_assistant_config
 from tilo_api.meeting_host_rpc import MeetingHostRpc, open_meeting_host_rpc
@@ -688,30 +688,6 @@ def min_run_grant() -> float:
     return min(float(value), budget_cap_ceiling())
 
 
-def get_access_store() -> AccessStore:
-    """SEC-15: where each person's visitor-or-judge declaration is kept. Deployed: a `FirestoreAccessStore` on the
-    process's shared client when `TILO_API_STORE=firestore` and the api store door opens (the same rules as
-    `store_door.open_api_store`); otherwise 503 `not_configured`, never cached, so a deployed process closes every
-    gated route rather than guess. A failing client build is 503 `store_unavailable`, never with the error text, and is
-    remembered for `PEOPLE_STORES_BACKOFF_S` like the people door's (FS-18): inside the window a request is refused at
-    once, with no client call; a refusal for configuration is not backed off."""
-    global _access_retry_at
-    from tilo_api import prod, store_door  # noqa: PLC0415  (they import this module's neighbours)
-
-    retry_at = _access_retry_at
-    if retry_at is not None and people_stores_clock() < retry_at:
-        raise store_door.ApiStoreUnavailable
-    try:
-        opened = store_door.open_api_store()
-    except store_door.ApiStoreNotConfigured:
-        raise HTTPException(status_code=503, detail="not_configured") from None
-    except store_door.ApiStoreUnavailable:
-        _access_retry_at = people_stores_clock() + PEOPLE_STORES_BACKOFF_S
-        raise
-    _access_retry_at = None
-    return prod.FirestoreAccessStore(opened.client, ORG_ID)
-
-
 def get_feedback_store() -> Any:
     """SEC-16 beta-allowance feedback (BQ-FEEDBACK-1): the Firestore store behind `store_door` (`TILO_API_STORE`,
     ADR-0026), else 503 `not_configured`. Dev mode and the tests override this seam."""
@@ -786,10 +762,6 @@ def get_app_check_verifier() -> AppCheckVerifier:
     """SEC-10: checks a client's App Check token (`tilo_api.appcheck`). Google's keys for the API's own project; dev
     mode and an unconfigured project refuse without any call. Tests override it; it never decides authorisation."""
     return default_verifier()
-
-
-# After a failed client build the access door makes no new attempt until then (its FS-18 window).
-_access_retry_at: float | None = None
 
 
 def get_spend_caps() -> spend.SpendCaps:
@@ -1352,9 +1324,9 @@ def get_people_stores(request: Request = None) -> PeopleStores:  # type: ignore[
 
 
 def _forget_people_stores() -> None:
-    global _people_stores, _people_stores_retry_at, _access_retry_at
+    global _people_stores, _people_stores_retry_at
     with _people_stores_lock:
-        _people_stores, _people_stores_retry_at, _access_retry_at = None, None, None
+        _people_stores, _people_stores_retry_at = None, None
 
 
 get_people_stores.cache_clear = _forget_people_stores  # type: ignore[attr-defined]  # tests start from a cold process
@@ -1370,21 +1342,6 @@ def get_founder_gate() -> Callable[[str], bool]:
     if _BOOTSTRAP_UID.fullmatch(configured) is None:
         return lambda user_id: False
     return lambda user_id: user_id == configured
-
-
-def get_judge_gate(request: Request = None) -> Callable[[str], bool]:  # type: ignore[assignment]
-    """Who may join the org as a plain member (JUDGE-FIRST-RUN F1): a person whose stored declaration is `judge`. The
-    store is opened only when asked, and any failure (not configured, unavailable, an unstorable id) is "no": the gate
-    only ever widens `/v1/people/first` to a member record, never to ownership, and fails closed."""
-
-    def is_judge(user_id: str) -> bool:
-        try:
-            seam = request.app.dependency_overrides.get(get_access_store, get_access_store)
-            return seam().get(user_id) == "judge"
-        except Exception:
-            return False
-
-    return is_judge
 
 
 def get_clock() -> Callable[[], str]:

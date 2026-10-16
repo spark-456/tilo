@@ -9,7 +9,7 @@ import math
 import threading
 import time
 import uuid
-from collections import deque
+from collections import OrderedDict, deque
 from collections.abc import Callable
 from dataclasses import dataclass, fields
 from datetime import UTC, datetime
@@ -180,6 +180,8 @@ class InMemorySpendLedger:
         flipped, self._switch["on"] = not self._switch["on"], True
         if flipped:
             self._switch["log"].append(("tripped", str(reason)))
+            if "daily hard cap" in reason:
+                logger.warning("daily deployment spend cap reached; live models switched to replay_only")
         return flipped
 
     def trip_replay_only(self, reason: str) -> bool:
@@ -204,13 +206,28 @@ class RateDecision:
 class RateLimiter:
     """Sliding window per key, the key being exactly the uid given. A denied check is not recorded."""
 
+    MAX_UIDS = 10_000
+    IDLE_TTL_S = 30 * 60
+
     def __init__(self, *, limit: int, window_s: int, clock: Callable[[], float] = time.monotonic) -> None:
         self._limit, self._window = _int(limit, "limit", 1), _int(window_s, "window_s", 1)
-        self._clock, self._hits, self._lock = clock, dict[str, deque[float]](), threading.Lock()
+        self._clock = clock
+        self._hits: OrderedDict[str, tuple[deque[float], float]] = OrderedDict()
+        self._lock = threading.Lock()
 
     def check(self, uid: str) -> RateDecision:
         with self._lock:
-            now, hits = self._clock(), self._hits.setdefault(uid, deque())
+            now = self._clock()
+            while self._hits:
+                oldest_uid, (_, touched) = next(iter(self._hits.items()))
+                if now - touched < max(self.IDLE_TTL_S, self._window):
+                    break
+                self._hits.pop(oldest_uid)
+            entry = self._hits.pop(uid, None)
+            if entry is None and len(self._hits) >= self.MAX_UIDS:
+                return RateDecision(False, self._window)
+            hits = entry[0] if entry is not None else deque()
+            self._hits[uid] = (hits, now)
             while hits and hits[0] <= now - self._window:
                 hits.popleft()
             if len(hits) < self._limit:

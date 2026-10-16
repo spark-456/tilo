@@ -1,36 +1,38 @@
-"""SEC-15's two public routes (services/api/tests/API_SEC_15.md): `GET /access` says what the signed-in person is and
-may do; `POST /access/declaration` is the sign-up step, set once. Neither takes a password. The declaration is for
-`principal.user_id` only; the body names nothing else (`extra="forbid"`), and only `application/json` is read (415:
-a cross-site form post needs no CORS preflight)."""
+"""OPEN-ACCESS (16 Oct 2026, the owner's order): everyone who signs in may use Tilo. SEC-15's two public routes
+stay only so a web bundle that still calls them keeps working. `GET /access` says what the signed-in person's
+next request gets (`allowed` is always true; `models` is "live" or "replay", NFR-22: an honest label). `POST
+/access/declaration` accepts the old sign-up body and stores nothing: it answers exactly as `GET /access` and
+never refuses an answer (no 409 `declaration_locked`). Neither takes a password; only `application/json` is read
+(415: a cross-site form post needs no CORS preflight)."""
 
 from __future__ import annotations
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from tilo_metering.flags import FlagStore
 
 from tilo_api import deps
-from tilo_api.access import AccessStore, Declaration, Mode
+from tilo_api.access import OPEN_DECLARATION, Declaration, Mode
 
 router = APIRouter()
 
 Principal = Annotated[deps.Principal, Depends(deps.get_current_principal)]
-Store = Annotated[AccessStore, Depends(deps.get_access_store)]
 Flags = Annotated[FlagStore, Depends(deps.get_switches)]
 
 
 class DeclarationIn(BaseModel):
+    """The retired sign-up answer. Accepted and ignored."""
+
     model_config = ConfigDict(extra="forbid")
     declaration: Declaration
 
 
 class AccessOut(BaseModel):
-    declaration: Declaration | None
+    declaration: Declaration
     allowed: bool
-    models: Mode | None  # "live" or "replay" for an allowed person (NFR-22: an honest label), else null
+    models: Mode  # "live" or "replay" (NFR-22: an honest label)
 
 
 def _json_only(request: Request) -> None:
@@ -38,41 +40,18 @@ def _json_only(request: Request) -> None:
         raise HTTPException(status_code=415, detail="Send application/json.")
 
 
-def _view(request: Request, principal: deps.Principal, declaration: Declaration | None, flags: FlagStore) -> AccessOut:
-    """`models`: what the person's next request gets (SEC-16); a visitor's view reads no switch and no ledger."""
-    allowed = declaration == "judge"
+def _view(request: Request, principal: deps.Principal, flags: FlagStore) -> AccessOut:
+    """`models`: what the person's next request gets (SEC-16)."""
     # these routes are public, so the gate has not flagged the session: the principal says if it is a demo session
-    demo = principal.demo_session
-    models = deps.spend_mode(request, principal.user_id, declaration, flags, demo=demo)[0] if allowed else None
-    return AccessOut(declaration=declaration, allowed=allowed, models=models)
-
-
-def _refuse_an_unstorable_id() -> HTTPException:
-    """The store holds nobody under a uid Firestore refuses as a document id: the same fail-closed 503 the gate gives
-    (`access._decide`), never a 500 and never the id."""
-    return HTTPException(status_code=503, detail="not_configured")
+    models = deps.spend_mode(request, principal.user_id, OPEN_DECLARATION, flags, demo=principal.demo_session)[0]
+    return AccessOut(declaration=OPEN_DECLARATION, allowed=True, models=models)
 
 
 @router.get("/access")
-def get_access(request: Request, principal: Principal, store: Store, flags: Flags) -> AccessOut:
-    try:
-        declaration = store.get(principal.user_id)
-    except ValueError:
-        raise _refuse_an_unstorable_id() from None
-    return _view(request, principal, declaration, flags)
+def get_access(request: Request, principal: Principal, flags: Flags) -> AccessOut:
+    return _view(request, principal, flags)
 
 
-@router.post("/access/declaration", dependencies=[Depends(_json_only)], response_model=None)
-def declare(
-    request: Request, body: DeclarationIn, principal: Principal, store: Store, flags: Flags
-) -> AccessOut | JSONResponse:
-    try:
-        stored = store.declare(principal.user_id, body.declaration)  # atomic, first write wins
-    except ValueError:
-        raise _refuse_an_unstorable_id() from None
-    if stored != body.declaration:
-        return JSONResponse(
-            status_code=409,
-            content={"detail": "Your answer was already recorded and cannot be changed.", "code": "declaration_locked"},
-        )
-    return _view(request, principal, stored, flags)
+@router.post("/access/declaration", dependencies=[Depends(_json_only)])
+def declare(request: Request, body: DeclarationIn, principal: Principal, flags: Flags) -> AccessOut:
+    return _view(request, principal, flags)

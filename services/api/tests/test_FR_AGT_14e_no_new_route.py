@@ -78,5 +78,6 @@ def test_FR_AGT_14e_deployed_the_tasks_caller_reaches_the_routes_own_check_and_o
     ok = sched.task_call(body)  # the Tasks identity: a schedule that is gone is a permanent refusal, not a gate answer
     assert (ok.status_code, ok.json()) == (200, {"ran": 0, "skipped": "schedule_missing"})
     assert TASKS_SA not in ok.text
+    sched.sign_out()  # OPEN-ACCESS: a route is gated by the sign-in alone now (no declaration)
     for call in (sched.listing, lambda: sched.get("sched_a")):
         assert call().status_code in (401, 403, 503)  # the gate's refusal, never a route answer

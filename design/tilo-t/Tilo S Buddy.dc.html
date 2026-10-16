@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<style>body{margin:0}</style>
+</helmet>
+<div aria-hidden="true" style="position:relative;width:{{ w }};height:{{ h }}">
+  <div style="position:absolute;left:0;top:0;width:200px;height:236px;transform:scale({{ k }});transform-origin:0 0">
+    <div style="position:absolute;left:46px;top:212px;width:116px;height:16px;border-radius:50%;background:#000000;opacity:.16;animation:tsShadow {{ bobT }} ease-in-out {{ delay }} infinite"></div>
+    <sc-if value="{{ think }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:150px;top:6px;display:flex;gap:6px">
+        <span style="width:10px;height:10px;border-radius:99px;background:{{ col }};animation:tsDots 1.2s ease-in-out infinite"></span>
+        <span style="width:10px;height:10px;border-radius:99px;background:{{ col }};animation:tsDots 1.2s ease-in-out .2s infinite"></span>
+        <span style="width:10px;height:10px;border-radius:99px;background:{{ col }};animation:tsDots 1.2s ease-in-out .4s infinite"></span>
+      </div>
+    </sc-if>
+    <div style="position:absolute;left:0;top:0;width:200px;height:220px;transform:{{ tilt }};transform-origin:100px 200px">
+    <div style="position:absolute;left:0;top:0;width:200px;height:220px;animation:{{ bob }}">
+      <div style="position:absolute;left:68px;top:188px;width:24px;height:26px;border-radius:5px;background:{{ limb }}"></div>
+      <div style="position:absolute;left:112px;top:188px;width:24px;height:26px;border-radius:5px;background:{{ limb }}"></div>
+      <div style="position:absolute;left:92px;top:188px;width:6px;height:26px;background:{{ limbD }};clip-path:polygon(0 4px,100% 0,100% 22px,0 100%)"></div>
+      <div style="position:absolute;left:136px;top:188px;width:6px;height:26px;background:{{ limbD }};clip-path:polygon(0 4px,100% 0,100% 22px,0 100%)"></div>
+
+      <div style="position:absolute;left:26px;top:96px;width:20px;height:58px;border-radius:6px;background:{{ limb }};transform-origin:10px 6px;transform:{{ armLStatic }};animation:{{ armL }}"><span style="position:absolute;left:-1px;bottom:-2px;width:22px;height:16px;border-radius:5px;background:{{ limbD }}"></span></div>
+
+      <sc-if value="{{ crown }}" hint-placeholder-val="{{ true }}">
+        <div style="position:absolute;left:70px;top:44px;width:20px;height:26px;border-radius:4px;background:{{ cR }}"></div>
+        <div style="position:absolute;left:94px;top:30px;width:22px;height:40px;border-radius:4px;background:{{ col }}"></div>
+        <div style="position:absolute;left:94px;top:30px;width:22px;height:7px;border-radius:4px 4px 0 0;background:{{ cT }}"></div>
+        <div style="position:absolute;left:120px;top:44px;width:20px;height:26px;border-radius:4px;background:{{ cR }}"></div>
+      </sc-if>
+      <sc-if value="{{ lead }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:94px;top:44px;width:22px;height:26px;border-radius:4px;background:{{ col }}"></div>
+        <div style="position:absolute;left:94px;top:44px;width:22px;height:7px;border-radius:4px 4px 0 0;background:{{ cT }}"></div>
+      </sc-if>
+
+      <div style="position:absolute;left:44px;top:62px;width:124px;height:10px;background:{{ cT }};clip-path:polygon(0 100%,10px 0,100% 0,112px 100%)"></div>
+      <div style="position:absolute;left:156px;top:62px;width:12px;height:134px;background:{{ cR }};clip-path:polygon(0 10px,100% 0,100% 124px,0 100%)"></div>
+      <div style="position:absolute;left:44px;top:72px;width:112px;height:124px;border-radius:10px 6px 12px 12px;background:{{ col }};box-shadow:inset 0 -8px 0 {{ cShade }}"></div>
+
+      <div style="position:absolute;left:58px;top:88px;width:84px;height:54px;border-radius:14px;background:#FFFFFF;box-shadow:inset 0 -4px 0 rgba(0,0,0,.06)">
+        <div style="position:absolute;left:0;top:0;width:84px;height:54px;transform:{{ eyeShift }}">
+          <sc-if value="{{ eyesOpen }}" hint-placeholder-val="{{ true }}">
+            <span style="position:absolute;left:20px;top:13px;width:11px;height:14px;border-radius:6px;background:#1F1D2B;animation:{{ blink }}"><span style="position:absolute;left:2px;top:2px;width:4px;height:4px;border-radius:9px;background:#FFFFFF"></span></span>
+            <span style="position:absolute;left:53px;top:13px;width:11px;height:14px;border-radius:6px;background:#1F1D2B;animation:{{ blink }}"><span style="position:absolute;left:2px;top:2px;width:4px;height:4px;border-radius:9px;background:#FFFFFF"></span></span>
+          </sc-if>
+          <sc-if value="{{ eyesHappy }}" hint-placeholder-val="{{ false }}">
+            <span style="position:absolute;left:18px;top:16px;width:15px;height:9px;box-sizing:border-box;border:3.5px solid #1F1D2B;border-bottom:0;border-radius:10px 10px 0 0"></span>
+            <span style="position:absolute;left:51px;top:16px;width:15px;height:9px;box-sizing:border-box;border:3.5px solid #1F1D2B;border-bottom:0;border-radius:10px 10px 0 0"></span>
+          </sc-if>
+        </div>
+        <span style="position:absolute;left:9px;top:31px;width:10px;height:6px;border-radius:99px;background:{{ blushC }};opacity:{{ blush }}"></span>
+        <span style="position:absolute;left:65px;top:31px;width:10px;height:6px;border-radius:99px;background:{{ blushC }};opacity:{{ blush }}"></span>
+        <span style="position:absolute;left:{{ mX }};top:{{ mY }};width:{{ mW }};height:{{ mH }};border-radius:{{ mR }};background:#1F1D2B;transform-origin:50% 30%;transform:{{ mStatic }};animation:{{ mouth }}"></span>
+      </div>
+
+      <div style="position:absolute;left:168px;top:96px;width:20px;height:58px;border-radius:6px;background:{{ limb }};transform-origin:10px 6px;transform:{{ armRStatic }};animation:{{ armR }}"><span style="position:absolute;left:-1px;bottom:-2px;width:22px;height:16px;border-radius:5px;background:{{ limbD }}"></span></div>
+    </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:260,&quot;height&quot;:280},&quot;size&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:236,&quot;min&quot;:24,&quot;max&quot;:600,&quot;tsType&quot;:&quot;number&quot;},&quot;mood&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;idle&quot;,&quot;talk&quot;,&quot;think&quot;,&quot;happy&quot;,&quot;listen&quot;,&quot;sad&quot;,&quot;hand&quot;,&quot;work&quot;,&quot;swim&quot;],&quot;default&quot;:&quot;talk&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;role&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;director&quot;,&quot;research&quot;,&quot;builder&quot;,&quot;tester&quot;,&quot;browser&quot;,&quot;connector&quot;,&quot;delivery&quot;,&quot;designer&quot;,&quot;finance&quot;],&quot;default&quot;:&quot;director&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;look&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;c&quot;,&quot;l&quot;,&quot;r&quot;],&quot;default&quot;:&quot;c&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;delay&quot;:{&quot;editor&quot;:&quot;float&quot;,&quot;default&quot;:0,&quot;min&quot;:-5,&quot;max&quot;:5,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const size = this.props.size ?? 236, k = size / 236, mood = this.props.mood ?? 'idle', role = this.props.role ?? 'director', delay = (this.props.delay ?? 0) + 's';
+    const ROLE = { director: '#E8643F', research: '#3F7FE0', builder: '#E57F3E', tester: '#C9982A', browser: '#2BA3B8', connector: '#D9588C', delivery: '#76A035', designer: '#A45DB8', finance: '#3E9A7C' };
+    const hx = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+    const mix = (c, t, f) => '#' + hx(c).map((v, i) => Math.round(v + (t[i] - v) * f).toString(16).padStart(2, '0')).join('');
+    const col = ROLE[role] || ROLE.director, lt = f => mix(col, [255, 255, 255], f), dk = f => mix(col, [0, 0, 0], f);
+    const talk = mood === 'talk', think = mood === 'think', happy = mood === 'happy', listen = mood === 'listen', sad = mood === 'sad', hand = mood === 'hand', work = mood === 'work', swim = mood === 'swim';
+    const look = this.props.look ?? 'c', lx = look === 'l' ? -5 : look === 'r' ? 5 : 0;
+    const M = happy || swim ? ['33px', '34px', '18px', '10px', '2px 2px 10px 10px'] : sad ? ['35px', '38px', '14px', '6px', '10px 10px 2px 2px'] : talk ? ['36px', '35px', '12px', '10px', '6px'] : think || hand ? ['39px', '37px', '7px', '7px', '99px'] : listen ? ['37px', '37px', '10px', '4px', '3px'] : ['36px', '38px', '12px', '3px', '2px'];
+    const ey = think ? -3 : sad || work ? 3 : hand ? -2 : 0;
+    return {
+      w: (200 * k).toFixed(1) + 'px', h: size + 'px', k: k.toFixed(4), delay, think,
+      col, cT: lt(.25), cR: dk(.22), cShade: dk(.08), limb: dk(.3), limbD: dk(.45), blushC: lt(.45),
+      crown: role === 'director', lead: role === 'builder',
+      tilt: listen ? 'rotate(-7deg)' : sad ? 'rotate(2deg)' : 'none',
+      bobT: happy ? '1.1s' : sad ? '4.6s' : '3.2s',
+      bob: (happy ? 'tsHop 1.1s' : swim ? 'tsBob 1.4s' : sad ? 'tsBob 4.6s' : 'tsBob 3.2s') + ' ease-in-out ' + delay + ' infinite',
+      armL: talk ? 'tsArmL 1.7s ease-in-out infinite' : work ? 'tWorkL .5s ease-in-out infinite' : swim ? 'tsArmL .9s ease-in-out infinite' : 'none',
+      armR: talk ? 'tsArmR 2s ease-in-out infinite' : happy ? 'tsWave .9s ease-in-out infinite' : hand ? 'tHand 1.6s ease-in-out infinite' : work ? 'tWorkR .5s ease-in-out .25s infinite' : swim ? 'tsArmR .9s ease-in-out .45s infinite' : 'none',
+      armLStatic: happy ? 'rotate(155deg)' : listen ? 'rotate(20deg)' : sad ? 'rotate(3deg)' : 'rotate(8deg)',
+      armRStatic: happy ? 'rotate(-150deg)' : think ? 'rotate(-118deg)' : hand ? 'rotate(-170deg)' : listen ? 'rotate(-150deg)' : sad ? 'rotate(-3deg)' : 'rotate(-8deg)',
+      eyesOpen: !happy && !swim, eyesHappy: happy || swim, eyeShift: (lx || ey) ? 'translate(' + lx + 'px,' + ey + 'px)' : 'none',
+      blink: 'tsBlink ' + (think ? '3s' : '4.2s') + ' ease-in-out ' + delay + ' infinite',
+      blush: happy || talk || swim ? '.9' : sad ? '0' : '.45',
+      mX: M[0], mY: M[1], mW: M[2], mH: M[3], mR: M[4],
+      mStatic: talk ? 'scaleY(.5)' : 'none', mouth: talk ? 'tsTalk .55s ease-in-out infinite' : 'none'
+    };
+  }
+}
+</script>
+</body>
+</html>

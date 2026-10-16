@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-t.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" data-screen-label="Chat" style="position:relative;width:100%;height:{{ H }};overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:15px;line-height:1.5;display:flex;flex-direction:column">
+  <dc-import name="Tilo T Nav" active="chat" device="{{ navD }}" theme="{{ theme }}" title="Chat" hint-size="100%,64px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <sc-if value="{{ desk }}" hint-placeholder-val="{{ true }}">
+      <nav aria-label="Chat history" style="flex:0 0 272px;box-sizing:border-box;border-right:1px solid var(--line);background:var(--card);padding:14px 12px;display:flex;flex-direction:column;gap:4px">
+        <span role="button" style="height:44px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:14px;margin-bottom:10px">{{ iPlus }}New chat</span>
+        <sc-for list="{{ hist }}" as="c" hint-placeholder-count="7">
+          <sc-if value="{{ c.head }}"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px;padding:10px 10px 4px">{{ c.head }}</span></sc-if>
+          <a href="#" style="min-height:44px;box-sizing:border-box;padding:8px 10px;border-radius:12px;background:{{ c.bg }};display:flex;align-items:center;gap:10px" style-hover="background:var(--sunk)"><span style="color:var(--ink3)">{{ c.ic }}</span><span style="flex:1;min-width:0;font-size:13.5px;font-weight:{{ c.w }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.t }}</span></a>
+        </sc-for>
+      </nav>
+    </sc-if>
+    <div style="position:relative;flex:1;min-width:0;display:flex;flex-direction:column">
+      <div style="height:56px;flex:none;box-sizing:border-box;padding:0 20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);background:var(--card)">
+        <span style="flex:1;min-width:0;font-weight:700;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ title }}</span>
+        <span style="height:28px;padding:0 10px;border-radius:99px;background:var(--sunk);font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;color:var(--ink2);white-space:nowrap">Quick answer · 1 helper</span>
+      </div>
+      <div style="flex:1;min-height:0;display:flex">
+        <div aria-hidden="true" style="flex:1 1 0;min-width:0;background-image:var(--doodle);background-size:280px 280px"></div>
+        <div style="flex:0 1 800px;min-width:0;box-sizing:border-box;padding:{{ cpad }};display:flex;flex-direction:column;gap:14px;overflow:hidden;justify-content:flex-end">
+          <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T State" kind="loading" layout="chat" caption="Loading this chat" hint-size="100%,500px"></dc-import></sc-if>
+          <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding-bottom:20px">
+              <dc-import name="Tilo S Buddy" size="120" mood="talk" hint-size="102px,120px"></dc-import>
+              <h2 style="margin:0;font-weight:700;font-size:28px;letter-spacing:-.8px">Ask me anything quick</h2>
+              <p style="margin:0;color:var(--ink2);max-width:440px">One helper, a few seconds. If it turns out to need a team, I’ll offer to build a world for it.</p>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;width:100%;max-width:620px;padding-top:6px">
+                <sc-for list="{{ sugg }}" as="s" hint-placeholder-count="4"><span role="button" style="min-height:56px;box-sizing:border-box;padding:10px 14px;border-radius:14px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:10px;text-align:left;font-size:14px;font-weight:600" style-hover="border-color:var(--ink)"><span style="color:var(--ink2)">{{ s.ic }}</span>{{ s.t }}</span></sc-for>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ convo }}" hint-placeholder-val="{{ true }}">
+            <div style="align-self:flex-end;max-width:80%;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+              <span style="height:40px;padding:0 6px 0 8px;border-radius:12px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><span style="width:26px;height:26px;border-radius:7px;background:var(--mintSoft);color:var(--mintInk);display:flex;align-items:center;justify-content:center">{{ iSheet }}</span>budget.xlsx<span style="font-family:var(--mono);font-size:11px;color:var(--ink3);padding-right:6px">24 KB</span></span>
+              <span style="background:var(--pri);color:var(--onPri);border-radius:18px 18px 4px 18px;padding:10px 14px;text-wrap:pretty">Does Casa do Rio include breakfast? And does the budget sheet still fit if it doesn’t?</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-end">
+              <span style="width:40px;height:44px;flex:none;display:flex;align-items:flex-end"><dc-import name="Tilo S Buddy" size="44" mood="{{ m1 }}" hint-size="37px,44px"></dc-import></span>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  <span style="height:30px;padding:0 10px;border-radius:99px;background:var(--sunk);font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px;color:var(--ink2)">{{ iSearch }}Searched the web · 3 sources</span>
+                  <span style="height:30px;padding:0 10px;border-radius:99px;background:var(--sunk);font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px;color:var(--ink2)">{{ iFileS }}Read your file budget.xlsx</span>
+                </div>
+                <span style="align-self:flex-start;max-width:92%;background:var(--card);border:1px solid var(--line);border-radius:18px 18px 18px 4px;padding:10px 14px;text-wrap:pretty">Yes, breakfast is included for all 12 rooms. If you booked it separately it would be €14 a head, so it saves about €670. Your budget still fits: <strong>€14,280 of €16,000</strong>.</span>
+                <div style="align-self:flex-start;width:min(440px,100%);box-sizing:border-box;border-radius:18px;border:1px solid var(--line);background:var(--card);overflow:clip;flex:none">
+                  <div style="padding:12px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)"><span style="width:34px;height:34px;border-radius:10px;background:var(--skySoft);color:var(--skyInk);display:flex;align-items:center;justify-content:center">{{ iGlobe }}</span><span style="flex:1;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:14px">Casa do Rio, Ribeira</span><span style="font-size:12px;color:var(--ink3)">venue site · checked 2 min ago</span></span></div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;font-size:13px"><span style="padding:10px 14px;display:flex;flex-direction:column"><span style="color:var(--ink3);font-size:11.5px">Breakfast</span><strong>Included</strong></span><span style="padding:10px 14px;display:flex;flex-direction:column;border-left:1px solid var(--line)"><span style="color:var(--ink3);font-size:11.5px">Per night</span><strong>€168</strong></span><span style="padding:10px 14px;display:flex;flex-direction:column;border-left:1px solid var(--line)"><span style="color:var(--ink3);font-size:11.5px">Rooms free</span><strong>12 of 14</strong></span></div>
+                  <div style="padding:8px 10px;display:flex;gap:6px;border-top:1px solid var(--line)"><span style="height:36px;padding:0 10px;border-radius:10px;display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700">{{ iPin }}Pin</span><span style="height:36px;padding:0 10px;border-radius:10px;display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700">{{ iCopy }}Copy</span><span style="height:36px;padding:0 10px;border-radius:10px;display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700">{{ iLink }}Source</span></div>
+                </div>
+              </div>
+            </div>
+            <span style="align-self:flex-end;max-width:80%;background:var(--pri);color:var(--onPri);border-radius:18px 18px 4px 18px;padding:10px 14px">Great. Book the rooms and send everyone the details.</span>
+            <sc-if value="{{ grad }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;gap:10px;align-items:flex-end">
+                <span style="width:40px;height:44px;flex:none;display:flex;align-items:flex-end"><dc-import name="Tilo S Buddy" size="44" mood="happy" hint-size="37px,44px"></dc-import></span>
+                <div style="flex:1;min-width:0;max-width:520px;border-radius:20px;background:var(--ink);color:var(--card);padding:16px;display:flex;flex-direction:column;gap:12px;animation:tPop .3s ease-out both">
+                  <div style="display:flex;align-items:center;gap:12px"><span style="width:52px;height:52px;border-radius:14px;background:var(--cityBg);display:flex;align-items:flex-end;justify-content:center;gap:2px;overflow:hidden;flex:none"><dc-import name="Tilo S Buddy" size="26" role="research" hint-size="22px,26px"></dc-import><dc-import name="Tilo S Buddy" size="32" mood="think" hint-size="27px,32px"></dc-import></span><span style="display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:16px">This needs a team, building a world</span><span style="font-size:13px;opacity:.75">Booking 12 rooms and emailing 12 people takes several steps, and two need your yes.</span></span></div>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:12px"><span style="height:26px;padding:0 9px;border-radius:99px;border:1px solid rgba(255,255,255,.25);display:flex;align-items:center">Book rooms · asks first</span><span style="height:26px;padding:0 9px;border-radius:99px;border:1px solid rgba(255,255,255,.25);display:flex;align-items:center">Email 12 people · asks first</span><span style="height:26px;padding:0 9px;border-radius:99px;border:1px solid rgba(255,255,255,.25);display:flex;align-items:center">About 30 credits</span></div>
+                  <div style="display:flex;gap:8px;align-items:center"><span role="button" style="height:44px;padding:0 16px;border-radius:12px;background:var(--lime);color:#0B0B0C;display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px">Open the world →</span><span style="font-family:var(--mono);font-size:11px;opacity:.7">world.planned · 3 parts</span></div>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ running }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;gap:10px;align-items:flex-end">
+                <span style="width:40px;height:44px;flex:none;display:flex;align-items:flex-end"><dc-import name="Tilo S Buddy" size="44" mood="think" hint-size="37px,44px"></dc-import></span>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;gap:6px;flex-wrap:wrap"><span style="height:30px;padding:0 10px;border-radius:99px;background:var(--sunk);font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px;color:var(--ink2)">{{ iCal }}Read the room calendar</span><span style="height:30px;padding:0 10px;border-radius:99px;border:1px solid var(--ink);font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px">{{ iSearch }}Checking cancellation rules<span style="display:flex;gap:3px;margin-left:2px"><span style="width:4px;height:4px;border-radius:9px;background:var(--ink);animation:tsDots 1.2s infinite"></span><span style="width:4px;height:4px;border-radius:9px;background:var(--ink);animation:tsDots 1.2s .2s infinite"></span><span style="width:4px;height:4px;border-radius:9px;background:var(--ink);animation:tsDots 1.2s .4s infinite"></span></span></span></div>
+                  <span style="align-self:flex-start;background:var(--card);border:1px solid var(--line);border-radius:18px 18px 18px 4px;padding:10px 14px">Before I book, let me check the cancellation rules<span style="display:inline-block;width:2px;height:16px;margin-left:2px;vertical-align:-3px;background:var(--ink);animation:tsCaret 1s steps(1) infinite"></span></span>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ error }}" hint-placeholder-val="{{ false }}">
+              <div role="alert" style="align-self:flex-end;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--redInk);font-weight:600">{{ iAlert }}Not sent. You’re offline.<span role="button" style="height:36px;padding:0 12px;border-radius:10px;border:1px solid var(--redInk);display:flex;align-items:center">Retry</span></div>
+            </sc-if>
+          </sc-if>
+        </div>
+        <div aria-hidden="true" style="flex:1 1 0;min-width:0;background-image:var(--doodle);background-size:280px 280px;background-position:140px 80px"></div>
+      </div>
+      <div style="flex:none;padding:{{ compPad }};display:flex;justify-content:center;background:linear-gradient(transparent,var(--bg) 30%)">
+        <div style="width:100%;max-width:760px;background:var(--card);border:1.5px solid var(--ink);border-radius:20px;padding:10px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <sc-for list="{{ files }}" as="f" hint-placeholder-count="2"><span style="height:36px;padding:0 4px 0 6px;border-radius:10px;background:var(--sunk);display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600"><span style="width:24px;height:24px;border-radius:7px;background:{{ f.bg }};color:{{ f.fg }};display:flex;align-items:center;justify-content:center">{{ f.ic }}</span>{{ f.n }}<span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3)">{{ f.s }}</span><span aria-label="Remove file" style="width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--ink3)">{{ iX }}</span></span></sc-for>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span aria-label="Attach" style="width:44px;height:44px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;color:var(--ink2);flex:none">{{ iFile }}</span>
+            <span style="flex:1;min-width:0;color:var(--ink3);font-size:15px">Message Tilo, or drop files here</span>
+            <span aria-label="Send" style="width:44px;height:44px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;flex:none">{{ iSend }}</span>
+          </div>
+        </div>
+      </div>
+      <sc-if value="{{ drop }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:24px;z-index:5">
+          <div style="width:100%;max-width:620px;height:360px;box-sizing:border-box;border-radius:28px;border:3px dashed #0B0B0C;background:var(--lime);color:#0B0B0C;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;animation:tPop .2s ease-out both">
+            <dc-import name="Tilo S Buddy" size="110" mood="happy" hint-size="93px,110px"></dc-import>
+            <span style="font-weight:700;font-size:26px;letter-spacing:-.6px">Drop files for Tilo to read</span>
+            <span style="font-size:14px">PDF, Docs, Sheets, images · up to 50 MB · stays in this chat</span>
+            <span style="height:36px;padding:0 12px;border-radius:10px;background:#FFFFFF;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700">{{ iFileS }}3 files: venue-notes.pdf, budget.xlsx, logo.png</span>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;graduate&quot;,&quot;running&quot;,&quot;drop&quot;,&quot;loading&quot;,&quot;empty&quot;,&quot;error&quot;],&quot;default&quot;:&quot;graduate&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloT) this.t = setInterval(() => { if (window.TiloT) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const T = window.TiloT, ic = (n, s) => T ? T.ic(React.createElement, n, s) : null;
+    const p = this.props, d = (p.device ?? 'desktop') === 'desktop', s = p.state ?? 'graduate';
+    const convo = ['graduate', 'running', 'error', 'drop', 'ready'].includes(s);
+    return {
+      theme: p.theme ?? 'studio', desk: d, navD: d ? 'desktop' : 'phone', H: d ? '900px' : '844px',
+      cpad: d ? '24px 20px 8px' : '14px 14px 6px', compPad: d ? '8px 20px 20px' : '6px 10px 30px',
+      loading: s === 'loading', empty: s === 'empty', convo, grad: s === 'graduate' || s === 'drop', running: s === 'running', error: s === 'error', drop: s === 'drop', m1: s === 'running' ? 'idle' : 'idle',
+      title: s === 'empty' ? 'New chat' : 'Breakfast at Casa do Rio?',
+      hist: [['TODAY', 'Breakfast at Casa do Rio?', 'chat', 1], ['', 'Rewrite the Q3 intro, shorter', 'chat', 0], ['', 'Is the 14:00 room booked?', 'chat', 0], ['YESTERDAY', 'Which supplier ships fastest?', 'chat', 0], ['', 'Became a world: Compare 3 suppliers', 'city', 0], ['', 'Summarise the 40-page PDF', 'file', 0], ['LAST WEEK', 'Dentist open on Saturday', 'chat', 0]].map(([head, t, i, on]) => ({ head, t, ic: ic(i, 16), bg: on ? 'var(--sunk)' : 'transparent', w: on ? 700 : 500 })),
+      sugg: [['Summarise this PDF in 5 bullets', 'file'], ['Is my 2 pm free tomorrow?', 'calendar'], ['Rewrite this email, kinder', 'pen'], ['What did we decide on Monday?', 'memory']].map(([t, i]) => ({ t, ic: ic(i, 18) })),
+      files: (s === 'empty' || s === 'loading') ? [] : [['venue-notes.pdf', '1.2 MB', 'file', 'red'], ['budget.xlsx', '24 KB', 'sheet', 'mint']].map(([n, sz, i, c]) => ({ n, s: sz, ic: ic(i, 14), bg: `var(--${c}Soft)`, fg: `var(--${c}Ink)` })),
+      iPlus: ic('plus', 18), iSheet: ic('sheet', 15), iSearch: ic('search', 14), iFileS: ic('file', 14), iGlobe: ic('globe', 18), iPin: ic('pin', 15), iCopy: ic('copy', 15), iLink: ic('link', 15), iCal: ic('calendar', 14), iAlert: ic('alert', 16), iX: ic('x', 14), iFile: ic('file', 20), iSend: ic('send', 18)
+    };
+  }
+}
+</script>
+</body>
+</html>

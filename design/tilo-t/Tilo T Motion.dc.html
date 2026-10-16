@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<style>body{margin:0;-webkit-font-smoothing:antialiased}</style>
+</helmet>
+<div data-theme="studio" data-screen-label="Motion spec" style="width:100%;box-sizing:border-box;padding:48px;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:14px;line-height:1.45;display:flex;flex-direction:column;gap:24px">
+  <div style="display:flex;gap:32px;align-items:flex-end;flex-wrap:wrap">
+    <div style="flex:1;min-width:320px;display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.5px">MOTION SPEC</span><h1 style="margin:0;font-weight:700;font-size:48px;letter-spacing:-2px;line-height:1">Tilo never fakes progress.</h1><p style="margin:0;font-size:17px;color:var(--ink2);max-width:720px">Every work animation names the recorded event that triggers it. Ambient decoration (clouds, doodles, idle blinks on Home) is the only motion without an event. Reduced motion swaps every walk, rise and flight for a 200–300 ms fade.</p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:12px"><span style="height:30px;padding:0 10px;border-radius:99px;background:#0B0B0C;color:#C8F23A;display:flex;align-items:center">standard (.2,.8,.2,1)</span><span style="height:30px;padding:0 10px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center">walk (.45,0,.2,1)</span><span style="height:30px;padding:0 10px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center">leap (.5,0,.5,1)</span></div>
+  </div>
+  <div role="table" style="border-radius:20px;border:1px solid var(--line);background:var(--card);overflow:clip">
+    <div role="row" style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.4fr) minmax(0,1.6fr) minmax(0,1fr) minmax(0,1.4fr);gap:16px;padding:12px 18px;background:var(--sunk);font-size:12px;font-weight:700;color:var(--ink2)"><span>Element</span><span>Trigger event</span><span>What moves · duration</span><span>Easing</span><span>Reduced motion</span></div>
+    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="20">
+      <div role="row" style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.4fr) minmax(0,1.6fr) minmax(0,1fr) minmax(0,1.4fr);gap:16px;padding:10px 18px;border-top:1px solid var(--line);background:{{ r.bg }}">
+        <span style="font-weight:700">{{ r.a }}</span><span style="font-family:var(--mono);font-size:12px;color:{{ r.ec }}">{{ r.b }}</span><span style="color:var(--ink2)">{{ r.c }}</span><span style="font-family:var(--mono);font-size:12px;color:var(--ink2)">{{ r.d }}</span><span style="color:var(--ink2)">{{ r.e }}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1500}}">
+class Component extends DCLogic {
+  renderVals() {
+    const R = [
+      ['Dashed plot + label', 'building.planned', 'Fade in 400 ms; dashes march 1.2 s loop while waiting', 'ease-out · linear', 'Static dashed outline'],
+      ['Scaffold rising', 'building.constructing', 'Scaffold grows from the ground 2.4 s; agent works beside it', '(.2,.8,.2,1)', 'Fade in at full height, 200 ms'],
+      ['Finished building', 'building.operational · building.completed', 'Cross-fade 400 ms; ✓ pin pops 300 ms', 'ease-out', 'Instant swap'],
+      ['Status chip', 'any building.* event', 'Colour and label cross-fade 200 ms', 'ease', 'Instant'],
+      ['District ground tint', 'district.created', 'Tint spreads across the block 600 ms', 'ease-out', 'Instant'],
+      ['Agent appears', 'agent.spawned', 'Pop from 0.9 scale 300 ms near the Hall', 'ease-out', 'Fade 200 ms'],
+      ['Agent walks', 'agent.assigned · agent.moved', 'Walks to its building 1.2 s, steps bob', '(.45,0,.2,1)', 'Fade out and in at the new spot, 300 ms'],
+      ['Handoff', 'agent.handoff', 'Sender walks 1.2 s, faces receiver, bubble with the real note pops 240 ms; stays for 2 events', '(.45,0,.2,1) · (.2,.8,.2,1)', 'No walk; bubble fades in beside both'],
+      ['Question', 'question.routed', 'Asker walks to whoever knows, bubble shows the question', 'same as handoff', 'Bubble fades in'],
+      ['Tool icon', 'agent.working', 'Search, mail, sheet or browser icon bobs 1.6 s while the tool call is open', 'ease-in-out', 'Static icon'],
+      ['Raised hand', 'agent.help_requested · approval.requested', 'Arm waves 1.6 s; amber chip pulses 1.4 s until resolved', 'ease-in-out', 'Static hand and chip'],
+      ['Hand lowers', 'approval.resolved', 'Arm drops 300 ms, chip turns to Done', 'ease-out', 'Instant'],
+      ['Blocked agent', 'agent.blocked', 'Sad pose, head down. No loop', '—', 'Same pose'],
+      ['Idle agent', 'agent.idle', 'Slow blink every 4.2 s', 'ease-in-out', 'No blink'],
+      ['Agent leaves', 'agent.retired', 'Fades and sinks 4 px, 400 ms', 'ease-in', 'Fade'],
+      ['Artifact chip', 'artifact.created', 'Pops into the Story line 240 ms', 'ease-out', 'Fade'],
+      ['Review stamp', 'artifact.reviewed', '✓ stamp on the Hall 300 ms', 'ease-out', 'Fade'],
+      ['Parcel', 'artifact.delivered', 'Arcs from the Hall to the Result hall 1.6 s', '(.45,0,.2,1)', 'Parcel appears at the Result hall'],
+      ['Result panel', 'artifact.delivered', 'Slides in from the right 420 ms; bottom sheet rises on phone', '(.2,.8,.2,1)', 'Fade 200 ms'],
+      ['City lights up', 'world.completed', 'Buildings go from muted to full colour 800 ms', 'ease-out', 'Instant'],
+      ['Confetti', 'world.completed', 'One burst 1.8 s from the Result hall. Never loops', '(.2,.7,.3,1)', 'None'],
+      ['Failure card', 'world.failed', 'Construction stops, chip turns red, reason card drops 300 ms', 'ease-out', 'Fade'],
+      ['Plan lines', 'world.planned (streamed)', 'Each line appears as the Director writes it, 300 ms', 'ease-out', 'Appear'],
+      ['Memory glow', 'memory.hit', 'Dashed path to the Hall glows 900 ms', 'ease-out', 'Chip only'],
+      ['Meet bust', 'meeting.started · meeting.ended', 'Pose changes: listen, think, speak, happy, sad', 'ease-in-out', 'Static poses'],
+      ['Event toast', 'every recorded event', 'Slides in 300 ms with the event name', 'ease-out', 'Fade'],
+      ['Camera fly', 'user clicks a Story line', 'Pan and zoom to the building 900 ms', '(.2,.8,.2,1)', 'Jump cut'],
+      ['Run start', 'user presses Run → world.started', 'Card folds into a blueprint 0.8 s, flies into the plot 1 s, plot glows', '(.6,0,.2,1)', 'Cross-fade to the world 300 ms'],
+      ['Pool loader', 'page load · world.started until world.planned', 'Leap out 2.6 s with splash, swim laps 4.2 s, sink 1.4 s, page unblurs 0.8 s', '(.5,0,.5,1) · linear', 'Static pool and caption; unblur fade'],
+      ['Ambient', 'none (decoration)', 'Clouds, side doodles, idle blinks on Home only', 'ease-in-out', 'Off']
+    ];
+    return { rows: R.map(([a, b, c, d, e], k) => ({ a, b, c, d, e, ec: b.startsWith('none') || b.startsWith('user') || b.startsWith('page') ? 'var(--ink3)' : 'var(--limeK)', bg: k % 2 ? 'var(--bg)' : 'var(--card)' })) };
+  }
+}
+</script>
+</body>
+</html>

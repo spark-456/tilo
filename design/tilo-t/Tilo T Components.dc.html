@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-t.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}</style>
+</helmet>
+<div data-theme="{{ theme }}" data-screen-label="Components" style="width:100%;box-sizing:border-box;padding:48px;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:14px;line-height:1.45;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:20px">
+  <div style="grid-column:span 12;display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.5px">TILO T · NEW COMPONENTS</span><h1 style="margin:0;font-weight:700;font-size:48px;letter-spacing:-2px;line-height:1">Component sheet</h1></div>
+
+  <section style="grid-column:span 4;border-radius:24px;background:var(--card);border:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:14px">
+    <span style="font-weight:700;font-size:16px">Speech bubble <span style="font-family:var(--mono);font-size:11px;color:var(--ink3);font-weight:500">agent.handoff · question.routed</span></span>
+    <div style="background:var(--cityBg);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:18px">
+      <sc-for list="{{ bubbles }}" as="m" hint-placeholder-count="2">
+        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:0">
+          <div style="width:230px;background:var(--card);border:1px solid var(--line2);border-radius:16px;padding:9px 12px;display:flex;flex-direction:column;gap:3px;box-shadow:var(--sh2)"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3)">{{ m.k }}</span><span style="font-size:13px;line-height:1.4;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:{{ m.cl }};overflow:hidden">{{ m.t }}</span><span style="font-size:11.5px;font-weight:700;color:var(--ink2)">{{ m.more }}</span></div>
+          <div style="width:12px;height:12px;margin:-7px 0 0 24px;background:var(--card);border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);transform:rotate(45deg)"></div>
+          <div style="margin:2px 0 0 10px"><dc-import name="Tilo S Buddy" role="{{ m.role }}" mood="talk" look="r" size="44" hint-size="37px,44px"></dc-import></div>
+        </div>
+      </sc-for>
+    </div>
+    <span style="font-size:12.5px;color:var(--ink2)">Real message text, 2 lines, click to read all. Tail points at the sender; opens away from the receiver.</span>
+  </section>
+
+  <section style="grid-column:span 4;border-radius:24px;background:var(--card);border:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:12px">
+    <span style="font-weight:700;font-size:16px">Building label + status chip</span>
+    <sc-for list="{{ labels }}" as="b" hint-placeholder-count="7">
+      <div style="display:flex;align-items:center;gap:10px"><span style="height:30px;padding:0 4px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="width:22px;height:22px;border-radius:99px;background:var(--sunk);display:flex;align-items:center;justify-content:center">{{ b.ic }}</span><span style="font-size:12.5px;font-weight:600">{{ b.n }}</span><span style="height:22px;padding:0 8px;border-radius:99px;background:{{ b.bg }};color:{{ b.fg }};border:1px {{ b.bs }} {{ b.bd }};box-sizing:border-box;font-size:11px;font-weight:700;display:flex;align-items:center">{{ b.c }}</span></span><span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">{{ b.ev }}</span></div>
+    </sc-for>
+  </section>
+
+  <section style="grid-column:span 4;border-radius:24px;background:var(--card);border:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:14px">
+    <span style="font-weight:700;font-size:16px">Agent signals</span>
+    <div style="display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap;padding-top:34px">
+      <div style="position:relative"><span style="position:absolute;left:50%;top:-32px;margin-left:-14px;width:28px;height:28px;border-radius:99px;background:var(--card);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;animation:tToolBob 1.6s ease-in-out infinite">{{ iSearch }}</span><dc-import name="Tilo S Buddy" role="research" mood="work" size="56" hint-size="47px,56px"></dc-import></div>
+      <div style="position:relative"><span style="position:absolute;left:50%;top:-32px;margin-left:-14px;width:28px;height:28px;border-radius:99px;background:var(--card);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;animation:tToolBob 1.6s ease-in-out infinite">{{ iSheet }}</span><dc-import name="Tilo S Buddy" role="finance" mood="work" size="56" hint-size="47px,56px"></dc-import></div>
+      <div style="position:relative"><span style="position:absolute;left:50%;top:-34px;transform:translateX(-50%);height:28px;padding:0 9px;border-radius:99px;background:var(--amber);color:#1A1407;font-size:11.5px;font-weight:800;display:flex;align-items:center;gap:4px;white-space:nowrap;animation:tPulse 1.4s ease-out infinite">{{ iHand }}Needs you</span><dc-import name="Tilo S Buddy" role="connector" mood="hand" size="56" hint-size="47px,56px"></dc-import></div>
+      <dc-import name="Tilo S Buddy" role="browser" mood="sad" size="56" hint-size="47px,56px"></dc-import>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ tools }}" as="t" hint-placeholder-count="4"><span style="height:30px;padding:0 10px;border-radius:99px;background:var(--sunk);font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px;color:var(--ink2)">{{ t.ic }}{{ t.t }}</span></sc-for></div>
+    <span style="font-size:12.5px;color:var(--ink2)">Tool icon = agent.working. Hand = agent.help_requested. Head down = agent.blocked. Tool-use chips are the chat version.</span>
+  </section>
+
+  <section style="grid-column:span 4;grid-row:span 2;border-radius:24px;background:var(--card);border:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:14px;overflow:clip;max-height:1060px">
+    <span style="font-weight:700;font-size:16px">Result panel <span style="font-family:var(--mono);font-size:11px;color:var(--ink3);font-weight:500">artifact.delivered</span></span>
+    <dc-import name="Tilo T Result" closable="{{ true }}" hint-size="100%,1000px"></dc-import>
+  </section>
+
+  <section style="grid-column:span 4;border-radius:24px;background:var(--card);border:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:14px">
+    <span style="font-weight:700;font-size:16px">Context chip</span>
+    <div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ ctx }}" as="c" hint-placeholder-count="3"><span style="height:32px;padding:0 6px 0 10px;border-radius:99px;background:var(--sunk);display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600"><span style="color:var(--ink2)">{{ c.ic }}</span>{{ c.t }}<span style="width:22px;height:22px;border-radius:99px;display:flex;align-items:center;justify-content:center;color:var(--ink3)">{{ iX }}</span></span></sc-for><span style="height:32px;padding:0 10px;border-radius:99px;border:1px dashed var(--line2);display:flex;align-items:center;font-size:12.5px;font-weight:600;color:var(--ink2)">+ Add</span></div>
+    <span style="font-weight:700;font-size:16px;margin-top:6px">Pin note</span>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding-top:6px">
+      <sc-for list="{{ pins }}" as="n" hint-placeholder-count="3"><div style="position:relative;min-height:120px;box-sizing:border-box;padding:12px;border-radius:6px 6px 16px 6px;background:{{ n.bg }};transform:rotate({{ n.r }});box-shadow:{{ n.sh }};animation:{{ n.a }};display:flex;flex-direction:column;gap:5px"><span style="position:absolute;top:-6px;left:50%;margin-left:-6px;width:12px;height:12px;border-radius:99px;background:var(--ink);border:2px solid var(--card)"></span><strong style="font-size:13px;line-height:1.3">{{ n.t }}</strong><span style="margin-top:auto;font-family:var(--mono);font-size:9.5px;color:var(--ink2)">{{ n.s }}</span></div></sc-for>
+    </div>
+  </section>
+
+  <section style="grid-column:span 4;border-radius:24px;background:var(--card);border:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:12px">
+    <span style="font-weight:700;font-size:16px">Skeleton cards</span>
+    <span style="align-self:flex-start;height:44px;padding:0 14px 0 6px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><dc-import name="Tilo S Buddy" size="32" mood="work" hint-size="27px,32px"></dc-import>Tilo is fetching your worlds</span>
+    <div style="height:120px;border-radius:18px;border:1px dashed var(--bpLine);background-color:var(--bp);background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%),linear-gradient(var(--bpLine) 1px,transparent 1px),linear-gradient(90deg,var(--bpLine) 1px,transparent 1px);background-size:700px 100%,20px 20px,20px 20px;background-repeat:no-repeat,repeat,repeat;animation:tShim 1.8s linear infinite;padding:16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-end;gap:8px"><span style="width:60%;height:11px;border-radius:9px;background:var(--bpLine)"></span><span style="width:36%;height:9px;border-radius:9px;background:var(--bpLine);opacity:.7"></span></div>
+    <div style="height:64px;border-radius:16px;border:1px dashed var(--bpLine);background-color:var(--bp);background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%);background-size:700px 100%;background-repeat:no-repeat;animation:tShim 1.8s linear infinite;padding:0 14px;box-sizing:border-box;display:flex;align-items:center;gap:12px"><span style="width:38px;height:38px;border-radius:12px;background:var(--bpLine)"></span><span style="flex:1;display:flex;flex-direction:column;gap:7px"><span style="width:50%;height:10px;border-radius:9px;background:var(--bpLine)"></span><span style="width:30%;height:8px;border-radius:9px;background:var(--bpLine);opacity:.7"></span></span></div>
+    <span style="font-size:12.5px;color:var(--ink2)">Blueprint paper + one shimmer. Same size as the real content, so nothing shifts on load.</span>
+  </section>
+
+  <section style="grid-column:span 8;border-radius:24px;background:var(--card);border:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:14px">
+    <span style="font-weight:700;font-size:16px">Skill icons <span style="font-family:var(--mono);font-size:11px;color:var(--ink3);font-weight:500">24 px grid · 1.8 stroke · round caps</span></span>
+    <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px">
+      <sc-for list="{{ skillIcons }}" as="s" hint-placeholder-count="12"><div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 6px;border-radius:16px;border:1px solid var(--line)"><span style="width:56px;height:56px;border-radius:16px;background:{{ s.bg }};color:{{ s.fg }};display:flex;align-items:center;justify-content:center">{{ s.ic }}</span><span style="font-size:12.5px;font-weight:700;text-align:center;line-height:1.25">{{ s.t }}</span><span style="font-family:var(--mono);font-size:10px;color:var(--ink3)">{{ s.n }}</span></div></sc-for>
+    </div>
+    <span style="font-weight:700;font-size:14px;margin-top:4px">Interface icons</span>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px">
+      <sc-for list="{{ uiIcons }}" as="u" hint-placeholder-count="30"><div style="height:64px;border-radius:12px;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">{{ u.ic }}<span style="font-family:var(--mono);font-size:9.5px;color:var(--ink3)">{{ u.n }}</span></div></sc-for>
+    </div>
+  </section>
+
+  <section style="grid-column:span 8;border-radius:24px;background:var(--card);border:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:14px">
+    <span style="font-weight:700;font-size:16px">Side doodle tile <span style="font-family:var(--mono);font-size:11px;color:var(--ink3);font-weight:500">tilo-doodles.svg · tilo-doodles-dark.svg · 280 × 280 · 7–9% ink</span></span>
+    <div style="display:grid;grid-template-columns:280px minmax(0,1fr) 280px minmax(0,1fr);gap:12px">
+      <div data-theme="studio" style="width:280px;height:280px;border-radius:14px;border:1px dashed var(--line2);background:#F6F6F4 var(--doodle);box-sizing:border-box"></div>
+      <div data-theme="studio" style="height:280px;border-radius:14px;background:#F6F6F4 var(--doodle);background-size:280px;display:flex;align-items:flex-end;padding:10px;box-sizing:border-box"><span style="font-family:var(--mono);font-size:10.5px;color:#46464A;background:#FFFFFF;padding:3px 7px;border-radius:6px">light · repeat</span></div>
+      <div data-theme="studioDark" style="width:280px;height:280px;border-radius:14px;border:1px dashed #36363B;background:#0A0A0B var(--doodle);box-sizing:border-box"></div>
+      <div data-theme="studioDark" style="height:280px;border-radius:14px;background:#0A0A0B var(--doodle);background-size:280px;display:flex;align-items:flex-end;padding:10px;box-sizing:border-box"><span style="font-family:var(--mono);font-size:10.5px;color:#C2C2C6;background:#141416;padding:3px 7px;border-radius:6px">dark · repeat</span></div>
+    </div>
+    <span style="font-size:12.5px;color:var(--ink2)">Only in the gutters outside the 1200 px content column, never behind content. Gutters collapse to zero below 1200 px, so the tile disappears with them.</span>
+  </section>
+
+  <section style="grid-column:span 12;border-radius:24px;background:var(--card);border:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:14px">
+    <span style="font-weight:700;font-size:16px">Tilo poses</span>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+      <sc-for list="{{ poses }}" as="p" hint-placeholder-count="9"><div style="flex:1 1 100px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 6px;border-radius:16px;background:var(--bg)"><dc-import name="Tilo S Buddy" mood="{{ p.m }}" role="{{ p.r }}" size="84" hint-size="71px,84px"></dc-import><span style="font-weight:700;font-size:13px">{{ p.t }}</span><span style="font-family:var(--mono);font-size:10px;color:var(--ink3);text-align:center">{{ p.e }}</span></div></sc-for>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:2200},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloT) this.t = setInterval(() => { if (window.TiloT) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const T = window.TiloT, ic = (n, s) => T ? T.ic(React.createElement, n, s) : null;
+    const CH = [['Planned', 'transparent', 'var(--ink2)', 'dashed', 'var(--line2)', 'building.planned'], ['Building', 'var(--lime)', '#0B0B0C', 'solid', 'var(--limeD)', 'building.constructing'], ['Working', 'var(--ink)', 'var(--card)', 'solid', 'var(--ink)', 'building.operational'], ['Done', 'var(--mintSoft)', 'var(--mintInk)', 'solid', 'transparent', 'building.completed'], ['Needs you', 'var(--amber)', '#1A1407', 'solid', 'transparent', 'approval.requested'], ['Failed', 'var(--redSoft)', 'var(--redInk)', 'solid', 'var(--redInk)', 'world.failed'], ['Stopped', 'var(--sunk)', 'var(--ink2)', 'solid', 'transparent', 'world.failed (others)']];
+    const names = ['Agenda draft', 'Budget sheet', 'Offsite plan', 'Venue research', 'Invite email', 'Flight research', 'Email draft'], icons = ['calendar', 'sheet', 'pen', 'search', 'mail', 'plane', 'mail'];
+    return {
+      theme: this.props.theme ?? 'studio',
+      bubbles: [['HANDOFF → MONEY KEEPER', '4 venues under €180 a night, all walkable to the river. Can you cost them for 12 people, 2 nights?', 2, 'Read all', 'research'], ['QUESTION → DIRECTOR', 'Two people fly from Berlin. The direct flight is €40 more each. Worth it?', 6, 'Show less', 'browser']].map(([k, t, cl, more, role]) => ({ k, t, cl, more, role })),
+      labels: CH.map(([c, bg, fg, bs, bd, ev], i) => ({ c, bg, fg, bs, bd, ev, n: names[i], ic: ic(icons[i], 13) })),
+      tools: [['Searched the web', 'search'], ['Read budget.xlsx', 'sheet'], ['Opened a website', 'browser'], ['Drafted an email', 'mail']].map(([t, i]) => ({ t, ic: ic(i, 14) })),
+      ctx: [['3 recent worlds', 'city'], ['Today’s agenda', 'calendar'], ['Team pins', 'pin']].map(([t, i]) => ({ t, ic: ic(i, 14) })),
+      pins: [['Brightcell: €74 a pack', 'FROM A RESULT', 'var(--amberSoft)', '-1.5deg', 'none', 'none'], ['Porto: Casa do Rio', 'DRAGGING', 'var(--priSoft)', '3deg', 'var(--sh3)', 'none'], ['Q3 goals doc', 'TEAM · JO', 'var(--skySoft)', '1deg', 'none', 'none']].map(([t, s, bg, r, sh, a]) => ({ t, s, bg, r, sh, a })),
+      skillIcons: [['Email', 'mail', 'lilac'], ['Research', 'research', 'sky'], ['Calendar', 'calendar', 'amber'], ['Spreadsheet', 'sheet', 'teal'], ['Browser', 'globe', 'sky'], ['Writing', 'pen', 'lilac'], ['Meetings', 'people', 'pink'], ['Code', 'code', 'mint'], ['Design', 'palette', 'pink'], ['Travel', 'plane', 'amber'], ['Finance', 'coins', 'mint'], ['Search', 'search', 'teal']].map(([t, n, c]) => ({ t, n, ic: ic(n, 26), bg: `var(--${c}Soft)`, fg: `var(--${c}Ink)` })),
+      uiIcons: (T ? T.names : []).filter(n => !['dot'].includes(n)).map(n => ({ n, ic: ic(n, 20) })),
+      poses: [['idle', 'director', 'Idle', 'agent.idle · ambient'], ['talk', 'director', 'Talking', 'agent.handoff (sender)'], ['listen', 'research', 'Listening', 'handoff (receiver)'], ['think', 'director', 'Thinking', 'planning'], ['work', 'finance', 'Working', 'agent.working'], ['hand', 'connector', 'Hand up', 'agent.help_requested'], ['sad', 'browser', 'Blocked', 'agent.blocked'], ['happy', 'designer', 'Done', 'world.completed'], ['swim', 'director', 'Swimming', 'pool loader']].map(([m, r, t, e]) => ({ m, r, t, e })),
+      iSearch: ic('search', 15), iSheet: ic('sheet', 15), iHand: ic('hand', 13), iX: ic('x', 12)
+    };
+  }
+}
+</script>
+</body>
+</html>

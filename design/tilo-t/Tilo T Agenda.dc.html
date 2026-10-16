@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-t.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" data-screen-label="Agenda" style="position:relative;width:100%;height:{{ H }};overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:15px;line-height:1.5;display:flex;flex-direction:column">
+  <dc-import name="Tilo T Nav" active="agenda" device="{{ navD }}" theme="{{ theme }}" hint-size="100%,64px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <div aria-hidden="true" style="flex:1 1 0;min-width:0;background-image:var(--doodle);background-size:280px 280px"></div>
+    <main style="flex:0 1 1240px;min-width:0;box-sizing:border-box;padding:{{ pad }};display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:16px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px;display:flex;flex-direction:column"><h1 style="margin:0;font-weight:700;font-size:{{ h1 }};letter-spacing:-1.2px;line-height:1.05">Agenda</h1><span style="color:var(--ink2);font-size:14px">{{ sub }}</span></div>
+        <div role="radiogroup" aria-label="View" style="display:flex;padding:3px;border-radius:12px;background:var(--sunk)"><span role="radio" aria-checked="{{ dayOn }}" style="height:38px;padding:0 14px;border-radius:9px;display:flex;align-items:center;font-size:13.5px;font-weight:700;background:{{ dayBg }}">Day</span><span role="radio" aria-checked="{{ weekOn }}" style="height:38px;padding:0 14px;border-radius:9px;display:flex;align-items:center;font-size:13.5px;font-weight:700;background:{{ weekBg }}">Week</span></div>
+        <div style="position:relative">
+          <span role="button" aria-haspopup="menu" aria-expanded="{{ menuOn }}" style="height:44px;padding:0 16px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px">{{ iPlus }}New</span>
+          <sc-if value="{{ menu }}" hint-placeholder-val="{{ false }}">
+            <div role="menu" style="position:absolute;right:0;top:52px;width:320px;z-index:20;background:var(--card);border:1px solid var(--line2);border-radius:18px;box-shadow:var(--sh3);padding:6px;display:flex;flex-direction:column;animation:tPop .18s ease-out both">
+              <sc-for list="{{ newItems }}" as="n" hint-placeholder-count="3"><span role="menuitem" style="min-height:60px;box-sizing:border-box;padding:10px;border-radius:12px;display:flex;gap:12px;align-items:center;background:{{ n.bg }}"><span style="width:40px;height:40px;border-radius:12px;background:{{ n.ibg }};color:{{ n.ifg }};display:flex;align-items:center;justify-content:center;flex:none">{{ n.ic }}</span><span style="display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:14.5px">{{ n.t }}</span><span style="font-size:12.5px;color:var(--ink3)">{{ n.d }}</span></span></span></sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+      <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T State" kind="loading" layout="calendar" caption="Syncing your calendar" hint-size="100%,520px"></dc-import></sc-if>
+      <sc-if value="{{ error }}" hint-placeholder-val="{{ false }}"><div style="border-radius:24px;background:var(--card);border:1px solid var(--line)"><dc-import name="Tilo T State" kind="error" title="Your calendar stopped syncing" body="Google Calendar asked Tilo to sign in again. Your pins and meeting notes are safe." cta="Reconnect calendar" cta2="Show pins only" code="calendar.sync · token expired · 8:58 am" hint-size="100%,420px"></dc-import></div></sc-if>
+      <sc-if value="{{ ok }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+        <section aria-label="Calendar" style="flex:2 1 560px;min-width:0;border-radius:24px;background:var(--card);border:1px solid var(--line);overflow:clip">
+          <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T State" kind="empty" title="A clear week" body="Nothing on your calendar yet. Add a meeting, or ask Tilo to find time for a focus block." cta="Meeting with Tilo" cta2="Connect a calendar" hint-size="100%,460px"></dc-import></sc-if>
+          <sc-if value="{{ week }}" hint-placeholder-val="{{ true }}">
+            <div style="display:grid;grid-template-columns:52px repeat(5,minmax(0,1fr));border-bottom:1px solid var(--line)">
+              <span></span>
+              <sc-for list="{{ days }}" as="d" hint-placeholder-count="5"><span style="padding:10px 10px 8px;display:flex;align-items:baseline;gap:6px;border-left:1px solid var(--line);background:{{ d.bg }}"><span style="font-size:12.5px;font-weight:600;color:var(--ink3)">{{ d.n }}</span><span style="font-weight:700;font-size:17px;{{ d.st }}">{{ d.d }}</span></span></sc-for>
+            </div>
+            <div style="position:relative;display:grid;grid-template-columns:52px repeat(5,minmax(0,1fr));height:504px">
+              <div style="display:flex;flex-direction:column"><sc-for list="{{ hours }}" as="h" hint-placeholder-count="9"><span style="height:56px;font-family:var(--mono);font-size:10.5px;color:var(--ink3);padding:4px 8px 0 0;text-align:right;box-sizing:border-box">{{ h }}</span></sc-for></div>
+              <sc-for list="{{ days }}" as="d" hint-placeholder-count="5">
+                <div style="position:relative;border-left:1px solid var(--line);background-image:linear-gradient(var(--line) 1px,transparent 1px);background-size:100% 56px;background:{{ d.bg }};background-image:linear-gradient(var(--line) 1px,transparent 1px);background-size:100% 56px">
+                  <sc-for list="{{ d.ev }}" as="e" hint-placeholder-count="2">
+                    <div style="position:absolute;left:4px;right:4px;top:{{ e.t }};height:{{ e.h }};box-sizing:border-box;border-radius:10px;padding:5px 8px;background:{{ e.bg }};color:{{ e.fg }};border:1px solid {{ e.bd }};border-left:{{ e.bl }};overflow:clip;display:flex;flex-direction:column;gap:1px;font-size:12px;line-height:1.3">
+                      <span style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:4px"><sc-if value="{{ e.mini }}"><span style="width:14px;height:14px;border-radius:4px;background:#E8643F;display:flex;align-items:center;justify-content:center;flex:none"><span style="width:9px;height:5px;border-radius:3px;background:#FFFFFF"></span></span></sc-if>{{ e.n }}</span>
+                      <sc-if value="{{ e.long }}"><span style="font-size:11px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.s }}</span></sc-if>
+                      <sc-if value="{{ e.tilo }}"><span style="margin-top:auto;align-self:flex-start;height:20px;padding:0 7px 0 3px;border-radius:99px;background:var(--card);color:var(--ink);border:1px solid var(--line);display:flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700"><span style="width:14px;height:14px;border-radius:4px;background:#E8643F;display:flex;align-items:center;justify-content:center"><span style="width:9px;height:5px;border-radius:3px;background:#FFFFFF"></span></span>Tilo joins</span></sc-if>
+                    </div>
+                  </sc-for>
+                  <sc-if value="{{ d.now }}"><div style="position:absolute;left:-1px;right:0;top:{{ nowT }};height:0;border-top:2px solid var(--red);z-index:3"><span style="position:absolute;left:-5px;top:-6px;width:10px;height:10px;border-radius:9px;background:var(--red)"></span></div></sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ day }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:8px 12px;display:flex;flex-direction:column">
+              <sc-for list="{{ dayList }}" as="e" hint-placeholder-count="5"><div style="display:flex;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line)"><span style="width:44px;font-family:var(--mono);font-size:12px;color:var(--ink3);padding-top:2px;flex:none">{{ e.time }}</span><div style="flex:1;min-width:0;border-radius:12px;padding:8px 10px;background:{{ e.bg }};color:{{ e.fg }};border:1px solid {{ e.bd }};border-left:{{ e.bl }};display:flex;flex-direction:column"><span style="font-weight:700;font-size:14px">{{ e.n }}</span><span style="font-size:12.5px;opacity:.85">{{ e.s }}</span></div></div></sc-for>
+            </div>
+          </sc-if>
+        </section>
+        <aside style="flex:1 1 340px;min-width:0;max-width:{{ asideMax }};display:flex;flex-direction:column;gap:12px">
+          <sc-if value="{{ pins }}" hint-placeholder-val="{{ true }}">
+            <div style="border-radius:24px;background:var(--card);border:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:center;gap:8px"><span style="color:var(--ink2)">{{ iPin }}</span><span style="font-weight:700;font-size:16px;flex:1">Pin board</span><div role="tablist" style="display:flex;padding:3px;border-radius:10px;background:var(--sunk)"><span role="tab" aria-selected="true" style="height:32px;padding:0 10px;border-radius:8px;background:var(--card);font-size:12.5px;font-weight:700;display:flex;align-items:center">Mine</span><span role="tab" aria-selected="false" style="height:32px;padding:0 10px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--ink2);display:flex;align-items:center">Team · 6</span></div></div>
+              <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+                <sc-for list="{{ notes }}" as="n" hint-placeholder-count="4">
+                  <div style="position:relative;min-height:128px;box-sizing:border-box;padding:12px 12px 10px;border-radius:6px 6px 16px 6px;background:{{ n.bg }};color:var(--ink);transform:rotate({{ n.r }});animation:{{ n.anim }};box-shadow:{{ n.sh }};z-index:{{ n.z }};display:flex;flex-direction:column;gap:6px">
+                    <span style="position:absolute;top:-6px;left:50%;margin-left:-6px;width:12px;height:12px;border-radius:99px;background:var(--ink);border:2px solid var(--card)"></span>
+                    <span style="font-weight:700;font-size:13.5px;line-height:1.3">{{ n.t }}</span>
+                    <span style="font-size:12px;color:var(--ink2);line-height:1.35">{{ n.d }}</span>
+                    <span style="margin-top:auto;display:flex;align-items:center;gap:4px;font-size:10.5px;font-family:var(--mono);color:var(--ink2)"><span style="color:var(--ink3)">{{ iGrip }}</span>{{ n.src }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <span style="font-size:12.5px;color:var(--ink3)">Drag to reorder. Pin anything from a result with one click.</span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ mtg }}" hint-placeholder-val="{{ false }}">
+            <div style="border-radius:24px;background:var(--card);border:1.5px solid var(--ink);padding:16px;display:flex;flex-direction:column;gap:14px;animation:tSlideR .3s ease-out both">
+              <div style="display:flex;flex-direction:column;gap:2px"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">THU 16 OCT · 11:00–11:45 · VIDEO CALL</span><span style="font-weight:700;font-size:20px;letter-spacing:-.4px">Supplier call with Brightcell</span><span style="font-size:13px;color:var(--ink2)">Hosted by you, with Tilo</span></div>
+              <div style="display:flex;align-items:center;gap:8px"><div style="display:flex"><sc-for list="{{ people }}" as="a" hint-placeholder-count="3"><span style="width:32px;height:32px;border-radius:99px;background:{{ a.bg }};color:{{ a.fg }};border:2px solid var(--card);margin-left:-6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">{{ a.i }}</span></sc-for></div><span style="flex:1;height:40px;box-sizing:border-box;padding:0 12px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;font-size:13px;color:var(--ink3)">Invite by email…</span></div>
+              <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:var(--sunk)"><dc-import name="Tilo S Buddy" size="40" mood="{{ tiloMood }}" hint-size="34px,40px"></dc-import><span style="flex:1;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:14px">Send Tilo to the meeting</span><span style="font-size:12px;color:var(--ink2)">Joins as notetaker, says hello, records only with everyone’s okay</span></span><span role="switch" aria-checked="true" style="width:48px;height:28px;border-radius:99px;background:var(--ink);position:relative;flex:none"><span style="position:absolute;right:3px;top:3px;width:22px;height:22px;border-radius:99px;background:var(--lime)"></span></span></div>
+              <sc-if value="{{ before }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:6px"><span style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px;flex:1">BRIEF · READY 10:45, 15 MIN BEFORE</span></span>
+                  <sc-for list="{{ brief }}" as="b" hint-placeholder-count="3"><span style="display:flex;gap:8px;font-size:13.5px;line-height:1.4"><span style="width:6px;height:6px;border-radius:9px;background:var(--ink);margin-top:7px;flex:none"></span>{{ b }}</span></sc-for>
+                </div>
+                <div style="display:flex;gap:8px"><span role="button" style="flex:1;height:48px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700">{{ iVideo }}Join</span><span role="button" aria-disabled="true" style="height:48px;padding:0 16px;border-radius:14px;border:1px solid var(--line);color:var(--ink3);display:flex;align-items:center;font-weight:600">Wrap up</span></div>
+              </sc-if>
+              <sc-if value="{{ live }}" hint-placeholder-val="{{ false }}">
+                <div style="position:relative;height:150px;border-radius:14px;overflow:clip;border:1px solid var(--line)"><div style="position:absolute;left:50%;top:50%;width:320px;height:240px;margin:-120px 0 0 -160px;transform:scale(.7)"><dc-import name="Tilo T Meet" pose="listen" hint-size="320px,240px"></dc-import></div><span style="position:absolute;left:8px;top:8px;height:24px;padding:0 8px;border-radius:99px;background:var(--red);color:#FFFFFF;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:9px;background:#FFFFFF;animation:tBlinkDot 1s infinite"></span>meeting.started · 11:02</span></div>
+                <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">LIVE MINUTES</span><sc-for list="{{ liveMin }}" as="m" hint-placeholder-count="3"><span style="display:flex;gap:8px;font-size:13px;line-height:1.4;animation:tPop .3s ease-out both"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3);flex:none">{{ m.t }}</span>{{ m.s }}</span></sc-for></div>
+              </sc-if>
+              <sc-if value="{{ wrap }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <span style="font-family:var(--mono);font-size:11px;color:var(--mintInk);letter-spacing:.4px">WRAPPED UP · meeting.ended 11:41</span>
+                  <sc-for list="{{ wrapSec }}" as="w" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:4px"><span style="font-weight:700;font-size:13.5px">{{ w.h }}</span><sc-for list="{{ w.items }}" as="x" hint-placeholder-count="2"><span style="display:flex;gap:8px;font-size:13px;line-height:1.4;color:var(--ink2)"><span style="width:5px;height:5px;border-radius:9px;background:var(--ink3);margin-top:7px;flex:none"></span>{{ x }}</span></sc-for></div></sc-for>
+                  <a href="#" style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:14px;border:1px solid var(--line)"><span style="width:36px;height:36px;border-radius:10px;background:var(--lime);color:#0B0B0C;display:flex;align-items:center;justify-content:center">{{ iFile }}</span><span style="flex:1;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:13.5px">Meeting report · 1 page</span><span style="font-size:12px;color:var(--ink3)">artifact.created · 11:42</span></span>{{ iChev }}</a>
+                  <div style="display:flex;gap:8px"><span role="button" style="flex:1;height:48px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;font-weight:700">Send follow-ups · asks first</span><span role="button" style="height:48px;padding:0 14px;border-radius:14px;border:1px solid var(--line2);display:flex;align-items:center;gap:6px;font-weight:600">{{ iPin }}Pin</span></div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+        </aside>
+      </div>
+      </sc-if>
+    </main>
+    <div aria-hidden="true" style="flex:1 1 0;min-width:0;background-image:var(--doodle);background-size:280px 280px;background-position:140px 60px"></div>
+  </div>
+  <sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T Nav" active="agenda" device="tabs" theme="{{ theme }}" hint-size="100%,84px"></dc-import></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;week&quot;,&quot;new&quot;,&quot;meeting&quot;,&quot;running&quot;,&quot;wrap&quot;,&quot;loading&quot;,&quot;empty&quot;,&quot;error&quot;],&quot;default&quot;:&quot;week&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloT) this.t = setInterval(() => { if (window.TiloT) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const T = window.TiloT, ic = (n, s) => T ? T.ic(React.createElement, n, s) : null;
+    const p = this.props, d = (p.device ?? 'desktop') === 'desktop', v = p.view ?? 'week';
+    const H0 = 9, PX = 56, y = h => ((h - H0) * PX) + 'px';
+    const ty = { mtg: ['var(--skySoft)', 'var(--skyInk)', 'transparent', '3px solid var(--skyInk)'], tilo: ['var(--priSoft)', 'var(--priInk)', 'transparent', '3px solid var(--ink)'], due: ['var(--redSoft)', 'var(--redInk)', 'transparent', '3px solid var(--red)'], focus: ['var(--card)', 'var(--ink2)', 'var(--line2)', '3px dashed var(--ink3)'], sel: ['var(--ink)', 'var(--card)', 'var(--ink)', '3px solid var(--lime)'] };
+    const sel = v === 'meeting' || v === 'wrap' || v === 'running';
+    const ev = (n, s, a, b, k, tilo) => { const c = ty[k]; return { n, s, t: y(a), h: ((b - a) * PX - 3) + 'px', bg: c[0], fg: c[1], bd: c[2], bl: c[3], tilo: !!tilo && b - a >= 1, mini: !!tilo && b - a < 1, long: b - a >= .7 }; };
+    const W = [
+      ['Mon', '13', [ev('Standup', '9:30', 9.5, 10, 'tilo', 1), ev('Design review', '14:00', 14, 15, 'mtg')]],
+      ['Tue', '14', [ev('Standup', '9:30', 9.5, 10, 'tilo', 1), ev('Hiring sync', '11:00', 11, 12, 'mtg'), ev('Due: budget sign-off', '16:00', 16, 16.6, 'due')]],
+      ['Wed', '15', [ev('Standup', '9:30', 9.5, 10, 'tilo', 1), ev('Focus block', 'Tilo kept this free', 13, 14.5, 'focus')]],
+      ['Thu', '16', [ev('Standup', '9:30', 9.5, 10, 'tilo', 1), ev('Supplier call', 'Brief ready 10:45', 11, 11.75, sel ? 'sel' : 'tilo', 1), ev('Due: Q3 deck', '14:00', 14, 14.6, 'due'), ev('1:1 with Jo', '16:30', 16.5, 17, 'mtg')], 1],
+      ['Fri', '17', [ev('Offsite planning', 'World: Porto', 10, 11, 'mtg'), ev('Due: invites out', '15:00', 15, 15.6, 'due')]]
+    ].map(([n, dd, e, now]) => ({ n, d: dd, ev: e, now: !!now, bg: now ? 'var(--bg)' : 'transparent', st: now ? 'background:var(--lime);color:#0B0B0C;border-radius:8px;padding:0 6px' : '' }));
+    const dayList = [['9:30', 'Standup', 'Tilo joins, takes notes', 'tilo'], ['11:00', 'Supplier call with Brightcell', 'Brief ready 10:45 · Tilo joins', 'tilo'], ['14:00', 'Due: Q3 deck', 'Draft 80% done', 'due'], ['16:30', '1:1 with Jo', 'No prep needed', 'mtg']].map(([time, n, s, k]) => { const c = ty[k]; return { time, n, s, bg: c[0], fg: c[1], bd: c[2], bl: c[3] }; });
+    const ld = v === 'loading', er = v === 'error';
+    return {
+      theme: p.theme ?? 'studio', phone: !d, navD: d ? 'desktop' : 'phone', H: d ? '900px' : '844px', pad: d ? '24px 28px' : '14px 14px 110px', h1: d ? '40px' : '30px', asideMax: d ? '400px' : '100%',
+      sub: d ? 'Week of 13 October · Tilo joins 6 meetings' : 'Thursday 16 October',
+      loading: ld, error: er, ok: !ld && !er, empty: v === 'empty', week: d && v !== 'empty', day: !d && v !== 'empty',
+      dayOn: d ? 'false' : 'true', weekOn: d ? 'true' : 'false', dayBg: d ? 'transparent' : 'var(--card)', weekBg: d ? 'var(--card)' : 'transparent',
+      menu: v === 'new', menuOn: v === 'new' ? 'true' : 'false',
+      newItems: [['Calendar item', 'Meeting, reminder or deadline', 'calendar', 'sky'], ['Pin', 'A sticky note for you or the team', 'pin', 'amber'], ['Meeting with Tilo', 'Tilo hosts, briefs and takes minutes', 'people', 'pri']].map(([t, dd, i, c], k) => ({ t, d: dd, ic: ic(i, 20), ibg: `var(--${c}Soft)`, ifg: `var(--${c}Ink)`, bg: k === 2 ? 'var(--sunk)' : 'transparent' })),
+      days: W, hours: ['9:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'], nowT: y(10.67), dayList,
+      pins: !sel, mtg: sel, before: v === 'meeting', live: v === 'running', wrap: v === 'wrap', tiloMood: v === 'running' ? 'listen' : v === 'wrap' ? 'happy' : 'idle',
+      notes: [['Brightcell: €78 a pack', '3-year warranty, ships in 2 weeks', 'FROM COMPARE 3 SUPPLIERS', 'amberSoft', '-1.5deg'], ['Porto venue', 'Casa do Rio, breakfast included', 'FROM TEAM OFFSITE', 'priSoft', '1deg', 1], ['Call Lin back', 'About the contract, before Fri', 'MINE', 'skySoft', '1.2deg'], ['Q3 goals doc', 'Agreed in Monday’s review', 'FROM DESIGN REVIEW', 'pinkSoft', '-1deg']].map(([t, dd, src, c, r, drag]) => ({ t, d: dd, src, bg: `var(--${c})`, r, anim: drag && v === 'week' ? 'tDrag 4s cubic-bezier(.45,0,.2,1) infinite' : 'none', sh: drag && v === 'week' ? 'var(--sh3)' : 'none', z: drag ? 2 : 1 })),
+      people: [['MR', 'lilac'], ['JO', 'sky'], ['OB', 'teal']].map(([i, c]) => ({ i, bg: `var(--${c}Soft)`, fg: `var(--${c}Ink)` })),
+      brief: ['Oskar quoted €71 on the phone but €78 in writing. Ask which one stands.', 'Their warranty is 3 years; Voltway offers 2.', 'You need 2,000 units by 1 December.'],
+      liveMin: [['11:04', 'Oskar confirmed €74 a pack for 2,000 units.'], ['11:09', 'Shipping in 2 weeks if the order lands by Friday.'], ['11:12', 'Maya asked for the warranty terms in writing.']].map(([t, s]) => ({ t, s })),
+      wrapSec: [['Minutes', ['Price settled at €74 a pack for 2,000 units', 'Ships 2 weeks after order']], ['Decisions', ['Go with Brightcell if terms arrive by Friday']], ['Follow-ups', ['Oskar: send warranty terms · Tilo drafts a nudge Thu', 'Maya: sign-off by Monday']]].map(([hh, items]) => ({ h: hh, items })),
+      iPlus: ic('plus', 18), iPin: ic('pin', 18), iGrip: ic('grip', 12), iVideo: ic('video', 18), iFile: ic('file', 18), iChev: ic('chev', 16)
+    };
+  }
+}
+</script>
+</body>
+</html>
