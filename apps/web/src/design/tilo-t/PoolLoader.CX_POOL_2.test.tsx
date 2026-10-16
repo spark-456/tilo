@@ -15,7 +15,7 @@ it("CX_POOL_2_site_covers_the_first_paint_with_workspace_connection_copy", () =>
     createElement(PoolLoader, { kind: "site", loading: true, children: null }),
   );
   expect(mounted.container.querySelector(".tt-pool-overlay [role='status']")).not.toBeNull();
-  expect(mounted.container.textContent).toContain("Connecting to your organisation");
+  expect(mounted.container.textContent).toContain("Fetching your workspace");
 });
 
 it("CX_POOL_2_fast_site_completion_waits_for_the_leap_and_back_to_water_cycle", async () => {
@@ -44,6 +44,7 @@ it("CX_POOL_2_reduced_motion_reveals_a_fast_completion_after_a_short_fade", asyn
     createElement(PoolLoader, { kind: "site", loading: true, children: null }),
   );
   mounted.render(createElement(PoolLoader, { kind: "site", loading: false, children: null }));
-  await act(async () => vi.advanceTimersByTimeAsync(500));
+  await act(async () => vi.advanceTimersByTimeAsync(250));
+  await act(async () => vi.advanceTimersByTimeAsync(250));
   expect(mounted.container.querySelector(".tt-pool-overlay")).toBeNull();
 });
