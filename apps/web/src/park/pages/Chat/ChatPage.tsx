@@ -102,8 +102,9 @@ function Answer({
       <div className="park-chat-turn__body">
         <div className="park-chat-meta">TILO</div>
         {turn.state === "switch" ? (
-          <>
-            <p className="park-chat-text">{`This needs a world. ${SWITCH_WORDS[turn.reason]}`}</p>
+          <div className="park-chat-world-card">
+            <strong>This needs a world.</strong>
+            <p>{SWITCH_WORDS[turn.reason]}</p>
             <div className="park-chat-actions">
               <button
                 type="button"
@@ -113,7 +114,7 @@ function Answer({
                 Make it a world →
               </button>
             </div>
-          </>
+          </div>
         ) : (
           <p className="park-chat-text park-chat-text--note">{turn.message}</p>
         )}

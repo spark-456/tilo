@@ -525,6 +525,28 @@
   box-sizing: border-box;
   margin: 0 auto;
 }
+[data-park] .park-chat-world-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 520px;
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--ink);
+  color: var(--card);
+}
+[data-park] .park-chat-world-card strong {
+  font-size: 16px;
+}
+[data-park] .park-chat-world-card p {
+  margin: 0;
+  font-size: 13px;
+}
+[data-park] .park-chat-world-card .park-chat-soft {
+  background: var(--lime, var(--hero));
+  color: #0b0b0c;
+}
 
 @media (max-width: 840px) {
   [data-park] .park-chat-grid {

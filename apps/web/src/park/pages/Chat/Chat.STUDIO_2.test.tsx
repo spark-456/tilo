@@ -208,7 +208,7 @@ describe("STUDIO_2 Chat: honest data", () => {
     expect(window.location.search).not.toContain("Gokarna");
   });
 
-  it("STUDIO_2 chat a switch offer says why in words and offers Make it a world", async () => {
+  it("CX_T_CHAT switch card says why and offers Make it a world", async () => {
     const api = quickApi(async () => ({
       data: { kind: "switch", reason: "side_effect" },
       source: "live",
@@ -216,6 +216,10 @@ describe("STUDIO_2 Chat: honest data", () => {
     const { el } = await mountChat(api);
     await send(el, "Email my suppliers");
     expect(textOf(q(el, '[role="log"]'))).toContain("This needs a world.");
+    const card = q(el, ".park-chat-world-card");
+    expect(textOf(card)).toContain("It would send, post, delete or book something");
+    expect(textOf(card)).not.toMatch(/credits|workstreams|people|planned/i);
+    expect(textOf(q(card, "button"))).toBe("Make it a world →");
     expect(mood(el)).toBe("idle");
   });
 });
