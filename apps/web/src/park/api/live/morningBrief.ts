@@ -1,5 +1,8 @@
 import { type HttpClient, TiloApiError } from "../../../api/http";
 
+// Home imports the error class from here, so a page never reaches outside park/ (WEB_4 static rule).
+export { TiloApiError };
+
 export type BriefSource = {
   kind: "calendar_event" | "mail" | "work_item" | "pinboard_item" | "world";
   id: string;

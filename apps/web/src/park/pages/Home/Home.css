@@ -1398,39 +1398,39 @@
 }
 
 /* POLISH-1: the 390px placeholder ("e.g. Summarise this week's feedback") was cut at "fe"; 16px with no tracking fits. */
-.park-home-brief {
+[data-park] .park-home-brief {
   display: grid;
   gap: 12px;
 }
-.park-home-brief__head {
+[data-park] .park-home-brief__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
 }
-.park-home-brief__head p {
+[data-park] .park-home-brief__head p {
   margin: 4px 0 0;
 }
-.park-home-brief section {
+[data-park] .park-home-brief section {
   border-top: 1px solid currentColor;
   padding-top: 10px;
 }
-.park-home-brief h3 {
+[data-park] .park-home-brief h3 {
   margin: 0 0 6px;
   font-size: 1rem;
 }
-.park-home-brief ul {
+[data-park] .park-home-brief ul {
   margin: 0;
   padding-left: 20px;
 }
-.park-home-brief li {
+[data-park] .park-home-brief li {
   margin: 5px 0;
 }
-.park-home-brief button {
+[data-park] .park-home-brief button {
   min-height: 36px;
   cursor: pointer;
 }
-.park-home-brief__cites {
+[data-park] .park-home-brief__cites {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -1438,7 +1438,7 @@
   opacity: 0.78;
 }
 @media (max-width: 600px) {
-  .park-home-brief__head {
+  [data-park] .park-home-brief__head {
     flex-direction: column;
   }
 }
