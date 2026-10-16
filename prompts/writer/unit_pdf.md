@@ -40,3 +40,5 @@ Unit type: $unit_type
 <<<EARLIER
 $inputs
 EARLIER>>>
+
+For pptx, use the reviewed designers' visual system and content story. Within sections use structured slide blocks: {"type":"slide","layout":"two_column" or "stat" or "image","title":"...","left":"...","right":"...","notes":"..."}. Titles are at most 120 characters. Use concise copy; overflow continues on further slides. A stat uses a source-backed figure in left and its explanation in right. An image requires image_base64 containing actual recorded PNG/JPEG bytes (at most 1 MB, 4 million pixels); never invent bytes or use a URL/path. Keep image captions in left and right empty. Include speaker notes grounded in the sources. For other formats keep paragraph/bullet/table/chart blocks.

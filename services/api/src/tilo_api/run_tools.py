@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import json
+import math
 import threading
 from collections.abc import Callable, Mapping
 from datetime import UTC, date, datetime
@@ -63,18 +64,26 @@ def brief_texts(run: Any) -> list[str]:
 
 
 class RunBudget:
-    def __init__(self, cap: float) -> None:
+    def __init__(self, cap: float, parent: RunBudget | None = None) -> None:
         self.left = cap
-        self.lock = threading.Lock()
+        self.parent = parent
+        self.lock = parent.lock if parent else threading.Lock()
+
+    def portion(self, share: float) -> RunBudget:
+        return RunBudget(self.left * share, self)
 
     def call(self, method: Callable[..., RouterResult], *args: Any) -> tuple[RouterResult, float]:
         with self.lock:
-            before = self.left
+            before = min(self.left, self.parent.left) if self.parent else self.left
+            if before <= 0:
+                raise ValueError("The run budget is exhausted")
             result = method(*args, budget=before)
-            if result.budget is None:
-                raise ValueError("The provider returned no remaining budget")
-            self.left = result.budget
-            return result, max(0.0, before - self.left)
+            if result.budget is None or not math.isfinite(result.budget) or not 0 <= result.budget <= before:
+                raise ValueError("The provider returned an invalid remaining budget")
+            self.left -= before - result.budget
+            if self.parent:
+                self.parent.left -= before - result.budget
+            return result, before - result.budget
 
 
 class BoundModel:
@@ -141,6 +150,7 @@ class BoundRunRunner:
         self.run_owner, self.providers, self.clock, self.safety = run, providers, clock, safety
         self.budget = RunBudget(run.cap)
         self.limits = load_tool_limits()  # RUN-COST-PROGRESS: config/tool_loop.yaml, read once per run
+        self.design_budget = self.budget.portion(self.limits.design_credit_share)
         self.router = router
         self.archive = RunArchiveBridge(run, archive)
         self.service = fetch_service(mode, self.archive, fixtures)
@@ -171,6 +181,10 @@ class BoundRunRunner:
 
     async def run(self, unit: Mapping[str, Any], context: UnitContext) -> UnitOutcome:
         owner = self.run_owner
+        design = unit["unit_type"].startswith("design_")
+        budget = self.design_budget if design else self.budget
+        if design and budget.left <= 0:
+            return UnitOutcome(True, "The design allowance is spent; keeping the available designs.")
         context = dataclasses.replace(context, brief=self.brief_for(unit))
         native = {
             part.sha256: (ref, part) for ident in self.dependencies(unit) for ref, part in self.sources.get(ident, [])
@@ -224,7 +238,7 @@ class BoundRunRunner:
             if fmt and template is None
             else self.clock()
         )
-        models = {role: BoundModel(model, self.budget) for role, model in self.providers.items()}
+        models = {role: BoundModel(model, budget) for role, model in self.providers.items()}
         fetch = FetchTool(owner, self.service, self.hosts, unit, context, self.sources)
         tools: list[Any] = [SearchTool(self.search, self.hosts), fetch]
         defaults: Mapping[str, tuple[str, ...]] = DEFAULT_TOOLS
@@ -240,7 +254,7 @@ class BoundRunRunner:
             models,
             clock=lambda: day,
             tools=ToolRegistry(tools),
-            default_tools=defaults,
+            default_tools={} if design else defaults,
             on_tool_call=on_call,
             safety=self.safety,
             archive=self.archive,
@@ -248,7 +262,7 @@ class BoundRunRunner:
             quiz_sources=source_loader(owner.seams.artifacts, owner.scope, owner.store.events[owner.world_id]),
             quiz_available=quiz_available,
             meter=lambda role, _request, _reply: models[role].take_charge(),
-            credit_cap=self.budget.left,
+            credit_cap=budget.left,
             limits=self.limits,
             tool_credit_cap=self.limits.credit_share * owner.cap,  # the rest is for the writer and the verifier
             report_renderer=partial(render_report, fmt=fmt or "pdf", template=template, report_date=day),

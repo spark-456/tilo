@@ -126,6 +126,8 @@ def parse_fill(reply: Any) -> tuple[FillCell, ...]:
 def prompt_name(unit: Mapping[str, Any], context: Any) -> str:
     """The writer prompt for a unit: a deliver unit writes a spec, or cells for a template the person uploaded."""
     brief = context.brief
+    if unit.get("unit_type", "").startswith("design_"):
+        return "design.md"
     if not wants_rendered(unit, brief):
         return "unit.md"
     has_template = any(item.unit_id == TEMPLATE_ID for item in context.upstream)

@@ -3,6 +3,9 @@
 # web_search and fetch_url ran seven minutes and spent 50.9 of a 60-credit cap, a grounded search settling near 6 credits
 # each. The amounts live here, never as literals in code or in the web app (SEC-16). No model id here (PL-01).
 version: 1
+design:
+  revision_rounds: 1
+  credit_share: 0.3 # all design + review + revision calls together; the run retains the rest
 
 rounds: 3 # model calls per unit; the last one is offered no tools, so the unit answers from what it has
 calls_per_round: 4 # tool calls honoured from one model reply (parallel function calls are ONE round)
