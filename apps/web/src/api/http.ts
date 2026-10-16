@@ -22,6 +22,7 @@ import {
   type SchedulesApi,
   isScheduleView,
 } from "./schedules";
+import { type SkillMatch, skillMatchOf } from "./skillRoute";
 import { type StopResult, isStopResult } from "./stop";
 
 /** What a person reads when a call fails (PRD 18.4). `retryable` is true for 5xx and for network
@@ -503,8 +504,8 @@ export interface QuickCost {
 
 /** A Quick ask's two answers (services/api COST-FAST-1): the model's text with its cost, or an offer to switch. */
 export type QuickIntakeResult =
-  | { kind: "answered"; text: string; cost: QuickCost | null }
-  | { kind: "switch"; reason: QuickReason };
+  | { kind: "answered"; text: string; cost: QuickCost | null; skill?: SkillMatch }
+  | { kind: "switch"; reason: QuickReason; skill?: SkillMatch };
 
 const figure = (v: unknown): number | undefined =>
   typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined;
@@ -514,9 +515,11 @@ function quickOf(body: unknown): QuickIntakeResult | null {
   if (typeof body !== "object" || body === null) return null;
   const b = body as Record<string, unknown>;
   if (b.mode !== "quick") return null;
+  const skill = skillMatchOf(b.skill);
+  const offered = skill === null ? {} : { skill };
   if (b.outcome === "switch_to_thinking") {
     const reason = QUICK_REASONS.find((r) => r === b.reason);
-    return reason ? { kind: "switch", reason } : null;
+    return reason ? { kind: "switch", reason, ...offered } : null;
   }
   if (b.outcome !== "answered" || typeof b.text !== "string" || b.text === "") return null;
   const c =
@@ -526,7 +529,12 @@ function quickOf(body: unknown): QuickIntakeResult | null {
   const saved = figure(c.saved_credits);
   if (credits !== undefined) cost.credits = credits;
   if (saved !== undefined) cost.savedCredits = saved;
-  return { kind: "answered", text: b.text, cost: Object.keys(cost).length > 0 ? cost : null };
+  return {
+    kind: "answered",
+    text: b.text,
+    cost: Object.keys(cost).length > 0 ? cost : null,
+    ...offered,
+  };
 }
 
 // Shared by the session's clients so Connectors and World coalesce the first read.

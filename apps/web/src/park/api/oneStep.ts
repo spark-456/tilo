@@ -7,6 +7,7 @@ import type { IntakeResult } from "../../api/client";
 import type { HttpClient } from "../../api/http";
 import { TiloApiError } from "../../api/http";
 import type { Cadence } from "../../api/schedules";
+import { type SkillMatch, skillMatchOf } from "../../api/skillRoute";
 
 // The weekly repeat's types and weekday names travel with the one-step start, so a page imports them from park/api.
 export { WEEKDAYS } from "../../api/schedules";
@@ -39,6 +40,7 @@ export interface RunPlan {
   readonly usd: number | null;
   readonly time: string;
   readonly makeChoices: readonly PlanMakeChoice[];
+  readonly skill?: SkillMatch | null;
 }
 
 export interface OneStepApi {
@@ -107,6 +109,7 @@ function planOf(
     credit_usd: number;
     min_grant?: number;
     make_choices?: PlanMakeChoice[];
+    skill?: unknown;
   },
 ): RunPlan {
   const chosen =
@@ -152,6 +155,7 @@ function planOf(
         ? `${t.min_s / 60}–${t.max_s / 60} min`
         : `${t.min_s}–${t.max_s} s`,
     makeChoices: priced.make_choices ?? [],
+    skill: skillMatchOf(priced.skill),
   };
 }
 
