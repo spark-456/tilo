@@ -28,6 +28,7 @@ import {
   waitFor,
 } from "../../../../test-support/park/connectorsDom";
 import { connectors } from "../../api/fixtures";
+import { colorLogoOf } from "./BrandIcon";
 
 afterEach(cleanup);
 
@@ -69,7 +70,8 @@ describe("WEB_11_connectors_render: every designed element", () => {
       const t = textOf(tiles[i] as HTMLElement);
       const level = LV[c.level ?? 1] as string;
       const sync = c.st === "attention" ? c.sync : "Connected";
-      expect(t.startsWith(c.mono), `${c.name} monogram (BQ-WEB-1: monograms stay)`).toBe(true);
+      // A connector with a colour logo (CX-LOGOS-2) shows the logo; the rest keep their monogram (BQ-WEB-1).
+      if (!colorLogoOf(c.id)) expect(t.startsWith(c.mono), `${c.name} monogram`).toBe(true);
       expect(t, `${c.name} name`).toContain(c.name);
       expect(t, `${c.name} account`).toContain(c.acct ?? "");
       expect(t, `${c.name} level chip`).toContain(level);
@@ -105,7 +107,7 @@ describe("WEB_11_connectors_render: every designed element", () => {
       const t = textOf(region);
       expect(t, c.name).toContain(c.name);
       expect(t, `${c.name} blurb`).toContain(c.blurb as string);
-      expect(hasExactText(region, c.mono), `${c.name} monogram`).toBe(true);
+      if (!colorLogoOf(c.id)) expect(hasExactText(region, c.mono), `${c.name} monogram`).toBe(true);
     }
     for (const b of buttons) expect(textOf(b)).toBe("Connect");
   });
