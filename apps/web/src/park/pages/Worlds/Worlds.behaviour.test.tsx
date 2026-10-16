@@ -58,12 +58,27 @@ describe("WEB_5_worlds: header, search and New world", () => {
     const pending = worldsApi();
     pending.getWorlds = vi.fn(() => new Promise<never>(() => undefined));
     const loading = await renderWorlds({ api: pending });
-    expect(loading.c.querySelector('[data-testid="tt-loading"]')?.textContent).toContain("Loading worlds");
+    expect(loading.c.querySelector('[data-testid="tt-loading"]')?.textContent).toContain(
+      "Loading worlds",
+    );
 
     const failed = worldsApi();
     failed.getWorlds = vi.fn(() => Promise.reject(new Error("offline")));
     const error = await renderWorlds({ api: failed });
     expect(error.c.querySelector('[data-testid="tt-error"]')?.getAttribute("role")).toBe("alert");
+
+    const retryApi = worldsApi();
+    const result = await retryApi.getWorlds({}, []);
+    const retryPending = new Promise<typeof result>(() => undefined);
+    retryApi.getWorlds = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockReturnValueOnce(retryPending);
+    const retry = await renderWorlds({ api: retryApi });
+    await act(async () => {
+      (retry.c.querySelector("button") as HTMLButtonElement).click();
+    });
+    expect(retry.c.querySelector('[data-testid="tt-loading"]')).not.toBeNull();
 
     const empty = await renderWorlds({ api: worldsApi(() => []) });
     expect(empty.c.querySelector('[data-testid="tt-empty"]')).not.toBeNull();

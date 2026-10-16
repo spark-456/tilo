@@ -270,7 +270,14 @@ export function WorldsPage({ app }: { app: AppCtx }) {
               title="Worlds data is unavailable"
               body="We couldn't load your worlds. Try again."
               action={
-                <StateAction icon="refresh" onClick={() => setReload((n) => n + 1)}>
+                <StateAction
+                  icon="refresh"
+                  onClick={() => {
+                    setData(null);
+                    setFailed(false);
+                    setReload((n) => n + 1);
+                  }}
+                >
                   Try again
                 </StateAction>
               }
