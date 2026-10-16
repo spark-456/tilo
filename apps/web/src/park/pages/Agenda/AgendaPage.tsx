@@ -13,6 +13,7 @@ import { useStagedCount } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
 import { FirstRunPanels } from "../../sample/FirstRunPanels";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
+import { AppLink } from "../../shared/AppLink";
 import "../../components/park.components.css";
 import type { AppCtx } from "../../app/AppCtx";
 import { Boards } from "./Boards";
@@ -175,9 +176,7 @@ function Plate({ A }: { A: LiveAgenda }) {
     ) : (
       <p>{empty}</p>
     );
-  // UI-STUDIO-5 (design/studio-v2 "Tilo S Agenda"): today and the meetings on the left; the brief and Tilo's
-  // suggestions on the right. Only what the plate, meetings and pinboard reads send is shown; the parts with no
-  // read yet (a week grid, a prepared brief, suggested times, boards) say "Not available yet".
+  const calendar = A.plate.rows.filter(isCalendarEntry);
   return (
     <>
       <div className="park-agenda-titles">
@@ -191,11 +190,14 @@ function Plate({ A }: { A: LiveAgenda }) {
         <div className="park-agenda-studiomain">
           <section aria-label="Today's calendar" className="park-agenda-state park-agenda-daycard">
             <h2>Today's calendar</h2>
-            {list(A.plate.rows.filter(isCalendarEntry), "No calendar entries for today.")}
-            <section aria-label="Week view" className="park-agenda-weeknote">
-              <h3>Week view</h3>
-              <p>Not available yet</p>
-            </section>
+            {calendar.length ? (
+              list(calendar, "")
+            ) : (
+              <p>
+                No calendar entries for today.{" "}
+                <AppLink to="/connectors">Check Google Calendar</AppLink>
+              </p>
+            )}
           </section>
           <section aria-label="Your plate" className="park-agenda-state">
             <h2>Your plate</h2>
@@ -203,6 +205,7 @@ function Plate({ A }: { A: LiveAgenda }) {
               A.plate.rows.filter((r) => !isCalendarEntry(r)),
               "Nothing on your plate",
             )}
+            <AppLink to="/home">Morning brief on Home</AppLink>
             {A.plate.truncated ? <p>Showing a limited list.</p> : null}
           </section>
           <PeopleLists />
@@ -211,35 +214,7 @@ function Plate({ A }: { A: LiveAgenda }) {
             {list(A.plate.parked, "No parked work.")}
           </section>
         </div>
-        <aside className="park-agenda-studioside">
-          {SIDE.map(([label, title, line]) => (
-            <section
-              key={label}
-              aria-label={label}
-              className="park-agenda-state park-agenda-sidecard"
-            >
-              <h2>{title}</h2>
-              <p className="park-agenda-sidena">Not available yet</p>
-              <p>{line}</p>
-            </section>
-          ))}
-        </aside>
       </div>
     </>
   );
 }
-
-/** The design's side panels with no read behind them yet: `[region, heading, what it will hold]`. */
-const SIDE: readonly (readonly [string, string, string])[] = [
-  [
-    "Event details",
-    "Tilo’s brief",
-    "Before a meeting Tilo joins, its brief for that meeting shows here.",
-  ],
-  [
-    "Available times",
-    "Tilo suggests",
-    "Times and focus blocks Tilo suggests show here to accept or dismiss.",
-  ],
-  ["Boards", "Boards", "The pinboard view shows here. Pinboard items are listed under Pinboards."],
-];

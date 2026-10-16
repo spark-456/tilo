@@ -10,6 +10,7 @@ import { HttpClient } from "../../../api/http";
 import { type MeetingHostApi, meetingHostApi } from "../../api/live/meetingHost";
 import { type MeetingMinutesApi, meetingMinutesApi } from "../../api/live/meetingMinutes";
 import { type PeopleList, peopleListsApi } from "../../api/live/peopleLists";
+import { MeetingBrief } from "./MeetingBrief";
 import { HostMeeting, MeetingAttend } from "./MeetingHost";
 import { MeetingMinutes } from "./MeetingMinutes";
 
@@ -29,11 +30,13 @@ function List({
   api,
   minutes,
   host,
+  readBrief,
 }: {
   kind: Kind;
   api: ReturnType<typeof peopleListsApi>;
   minutes: MeetingMinutesApi | null;
   host: { api: MeetingHostApi; state: () => Promise<HostState> } | null;
+  readBrief: ((path: string) => Promise<unknown>) | null;
 }) {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<State>("loading");
@@ -79,6 +82,7 @@ function List({
                   {cap(row.status)} · {row.at}
                 </p>
                 {row.body ? <p>{row.body}</p> : null}
+                {readBrief ? <MeetingBrief id={row.id} getJson={readBrief} /> : null}
                 {host ? (
                   <MeetingAttend
                     id={row.id}
@@ -111,6 +115,7 @@ export function PeopleLists() {
   );
   const api = useMemo(() => (http ? peopleListsApi(http) : null), [http]);
   const minutes = useMemo(() => (http ? meetingMinutesApi(http) : null), [http]);
+  const readBrief = useMemo(() => (http ? (path: string) => http.getJson(path) : null), [http]);
   // The host's state is read by the one flow the Connectors page uses, so both pages say the same thing.
   const host = useMemo(() => {
     const flow = http ? liveConnectFlow() : null;
@@ -119,8 +124,8 @@ export function PeopleLists() {
   if (!api) return null;
   return (
     <>
-      <List kind="meetings" api={api} minutes={minutes} host={host} />
-      <List kind="pinboards" api={api} minutes={null} host={null} />
+      <List kind="meetings" api={api} minutes={minutes} host={host} readBrief={readBrief} />
+      <List kind="pinboards" api={api} minutes={null} host={null} readBrief={null} />
     </>
   );
 }
