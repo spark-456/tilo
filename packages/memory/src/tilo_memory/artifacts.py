@@ -378,6 +378,14 @@ class ArtifactStore:
         view._screener = screener
         return view
 
+    def with_new_id(self, new_id: Callable[[], str]) -> ArtifactStore:
+        """A request-local view that names a new artifact with `new_id` (the id is still checked as any other): for a
+        producer whose artifact has a derived id, such as one morning brief per local date (ADR-0049, MO-09). Backends,
+        caps, redaction, screening, scope checks and locks are shared; other users of the store are unchanged."""
+        view = copy.copy(self)
+        view._new_id = new_id
+        return view
+
     def __init__(
         self,
         meta: MetaBackend,
