@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLoopPaused } from "../design/tilo-t";
+import { usePrefersReducedMotion } from "./media";
 import { Reveal } from "./Reveal";
 import { RECORDED_RUN } from "./recordedRun";
 
@@ -46,8 +47,10 @@ const IDEAS = [
 
 /** Suggestions, explicitly labelled as examples: they do not claim past customer activity. */
 export function TaskIdeasSection() {
+  const reduced = usePrefersReducedMotion();
   const replayRef = useRef<HTMLElement>(null);
-  const paused = useLoopPaused(replayRef);
+  const staticRef = useRef<HTMLElement>(null);
+  const paused = useLoopPaused(reduced ? staticRef : replayRef);
   const [manuallyPaused, setManuallyPaused] = useState(false);
   const [painted, setPainted] = useState(false);
   useEffect(() => {
@@ -69,15 +72,17 @@ export function TaskIdeasSection() {
         ))}
       </ul>
       <aside
-        ref={replayRef}
+        ref={reduced ? undefined : replayRef}
         className={`landing-t-ideas__replay tt-landing-replay ${paused} ${manuallyPaused ? "tt-paused" : ""} ${painted ? "is-painted" : ""}`}
         aria-label="Recorded example events"
       >
         <div className="landing-t-ideas__replay-head">
           <strong>Recorded example</strong>
-          <button type="button" onClick={() => setManuallyPaused((value) => !value)}>
-            {manuallyPaused ? "Play example" : "Pause example"}
-          </button>
+          {!reduced && (
+            <button type="button" onClick={() => setManuallyPaused((value) => !value)}>
+              {manuallyPaused ? "Play example" : "Pause example"}
+            </button>
+          )}
         </div>
         <div className="landing-t-ideas__events">
           {/* triggeredBy: recorded village-basic events; this is a labelled replay, never live progress. */}
