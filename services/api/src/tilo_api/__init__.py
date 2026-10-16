@@ -25,6 +25,7 @@ from tilo_api import nudge_sweep as _nudge_sweep
 from tilo_api import owner_minutes_routes as _owner_minutes_routes
 from tilo_api import people as _people
 from tilo_api import plate_links as _plate_links
+from tilo_api import preview as _preview
 from tilo_api import quiz_apps as _quiz_apps
 from tilo_api import results as _results
 from tilo_api import runs as _runs
@@ -137,6 +138,7 @@ def _world_views(store: Annotated[_deps.Store, Depends(_deps.get_store)]) -> Cal
 
 
 app.include_router(_access_router)
+app.include_router(_preview.router)  # WEB-2: the fixed website preview shell (public, WS-10)
 app.include_router(_sample_router)  # STARTER-1: ahead of the owner-scoped /worlds/{id} routes
 app.include_router(intake_router)
 app.include_router(_dispatch_router)

@@ -45,6 +45,8 @@ PINNED_PUBLIC_ROUTES = frozenset(
         ("GET", "/healthz/deps"),
         ("GET", "/access"),
         ("POST", "/access/declaration"),
+        # ADR-0050 (WS-10, the owner's yes of 16 Oct): the fixed website preview shell, same bytes for everyone.
+        ("GET", "/preview/website"),
         ("POST", "/internal/schedules/tick"),  # owner decision (FR-AGT-14b): the Scheduler's own OIDC-checked route
         # ADR-0042, BQ-M2-5 (the user's decision is pending; both are inert until `TILO_VOICE_METER=1`): the meeting
         # bot's two meter routes, each checking its own Google ID token and the attend's nonce.

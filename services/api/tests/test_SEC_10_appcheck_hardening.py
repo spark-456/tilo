@@ -66,6 +66,7 @@ def test_SEC_10_exempt_routes_are_exactly_the_three_pairs_and_the_meeting_meters
         # X-HEALTH-1 (security review GATE-LIVE3: booleans and fixed kinds only, nothing echoed), public like /health.
         ("GET", "/health/deps"),
         ("GET", "/healthz/deps"),
+        ("GET", "/preview/website"),  # ADR-0050 (WS-10): a sandboxed frame loads the shell, with no token
         ("POST", "/internal/schedules/tick"),
         ("POST", "/internal/meeting-voice/reserve"),  # ADR-0042 (BQ-M2-5): the bot's own token check, inert until on
         ("POST", "/internal/meeting-voice/close"),

@@ -20,6 +20,7 @@ PUBLIC = frozenset(
         ("GET", "/healthz/deps"),
         ("GET", "/access"),
         ("POST", "/access/declaration"),
+        ("GET", "/preview/website"),  # ADR-0050 (WS-10): the website preview shell, public by the owner's decision
         ("POST", "/internal/schedules/tick"),
     }
 )

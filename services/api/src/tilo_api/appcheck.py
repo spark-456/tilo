@@ -48,6 +48,7 @@ EXEMPT_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/healthz"),
         ("GET", "/healthz/deps"),
         ("GET", "/health/deps"),
+        ("GET", "/preview/website"),  # ADR-0050 (WS-10): a sandboxed frame loads it, so it can carry no App Check token
         ("POST", "/internal/schedules/tick"),
         # ADR-0042: the meeting bot's two meter routes; a service has no App Check token, each checks its own token.
         ("POST", "/internal/meeting-voice/reserve"),

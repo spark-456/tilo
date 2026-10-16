@@ -1197,10 +1197,15 @@ def get_delivery(
         raise HTTPException(status_code=409, detail="Nothing is delivered until the work is done.")
     titles = run.titles if (run := store.runs.get(world_id)) else {}
     delivered = [(e["data"]["artifact"], e["data"]["format"]) for e in stream if e["type"] == "artifact.delivered"]
-    artifacts = [
-        {"id": a["artifact_id"], "title": titles.get(a["artifact_id"], "Delivered item"), "kind": kind,
-         "version": a["version"]}
-        for a, kind in delivered
-    ]  # fmt: skip
+    made: dict[tuple[str, int], dict[str, Any]] = {}  # WS-11: what the harness recorded after the store committed
+    for e in stream:
+        if e["type"] in _RECORDS:
+            made[(e["data"]["artifact"]["artifact_id"], e["data"]["artifact"]["version"])] = e["data"]
+    artifacts = []
+    for a, kind in delivered:
+        row = {"id": a["artifact_id"], "title": titles.get(a["artifact_id"], "Delivered item"), "kind": kind,
+               "version": a["version"]}  # fmt: skip
+        record = made.get((a["artifact_id"], a["version"]), {})
+        artifacts.append(row | {k: record[k] for k in ("media_type", "content_sha256") if record.get(k)})
     credits = completed["data"]["credits_used"]
     return {"world_id": world_id, "artifacts": artifacts, "credits_used": credits, "time_saved": None}  # FR-MTR-02

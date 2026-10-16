@@ -40,6 +40,7 @@ PUBLIC_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/health/deps"),
         ("GET", "/access"),
         ("POST", "/access/declaration"),
+        ("GET", "/preview/website"),  # ADR-0050 (WS-10): the fixed preview shell; same bytes for all, no data, no token
         (
             "POST",
             "/internal/schedules/tick",
