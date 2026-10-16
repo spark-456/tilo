@@ -219,7 +219,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       });
   };
   return (
-    <PoolLoader kind="site" loading={!ready}>
+    <PoolLoader kind="site" loading={!ready && !document.getElementById("tilo-boot-cover")}>
       <CityBackdrop
         scene={scene}
         vw={app.vw}
@@ -310,6 +310,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* The same elements on every page, so a page swap never remounts the outlet (focus stays). */}
       <main
         className={`park-shell__main ${ready ? "" : "park-shell__booting"}`}
+        data-boot-ready={ready ? "true" : undefined}
         data-phase={swap.phase === "in" ? undefined : swap.phase}
       >
         {/* QA-DEMO-1 M1: inside the column on a page (below the fixed nav's padding), pinned under the nav on Home */}

@@ -68,6 +68,8 @@ it("FR_POOL_01_site_waits_300ms_before_showing", async () => {
   expect(mounted.container.querySelector('[role="status"]')).toBeNull();
   await act(async () => vi.advanceTimersByTimeAsync(301));
   expect(mounted.container.querySelector('[role="status"]')).not.toBeNull();
+  expect(mounted.container.querySelector('img[src="/loader/pool-c1bfe0ad6d7a.webp"]')).not.toBeNull();
+  expect(mounted.container.querySelector(".tt-pool__water")).toBeNull();
 });
 
 it("FR_POOL_01_site_finishing_before_300ms_never_shows_overlay", async () => {

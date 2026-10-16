@@ -41,6 +41,8 @@ it.each([201, 403, 503, 409])(
       await Promise.resolve();
     });
     expect(ui.container.textContent).not.toContain("First-load consumers");
+    expect(ui.container.textContent).not.toContain("Getting your organisation ready");
+    expect(ui.container.querySelector("output[aria-label]")).not.toBeNull();
     await act(async () => {
       finish();
       await pending;
