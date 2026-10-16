@@ -45,7 +45,7 @@ from tilo_providers.media import MediaPart
 from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Deadline, Router, RouterDeadlineError
 
-from tilo_api import deps, ephemeral, grounding, intake_requests, quick
+from tilo_api import deps, ephemeral, grounding, grounding_prompt, intake_requests, quick
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
 from tilo_api.intake_deadline import INTAKE_DEADLINE_DETAIL, load_intake_deadline
@@ -198,8 +198,9 @@ async def _thinking(
         await run_in_threadpool(screen_task_text, request, safety=safety)
         if chosen and chosen[0] == "quick":  # COST-FAST-1: the rules answer, offer Thinking, or call the cheap role
             return await _quick(
-                http, request, principal.user_id, safety, model_router, allowance, flags, work_mode, scenario
-            )
+                http, request, principal.user_id, safety, model_router, allowance, flags, work_mode, scenario,
+                ground=grounding.enabled() and grounding_prompt.eligible(principal),
+            )  # fmt: skip
         file_screen = None
         if request.files and isinstance(store, RunUploads):
             try:
@@ -217,6 +218,12 @@ async def _thinking(
         if prepared.screened and all(error == FILE_SCREEN_UNAVAILABLE for _, error, _, _ in prepared.screened):
             raise HTTPException(status_code=503, detail="The attached files could not be screened; retry.")
         # The Director receives only the stored verdict; failed pre-commit attempts clean their owned versions.
+        passages, memory_ids = "", frozenset[str]()
+        if grounding.enabled() and grounding_prompt.eligible(principal):  # RT-04: the person's own signed-in intake
+            opened = await run_in_threadpool(grounding.opener(http, mode=work_mode, router=model_router))
+            hits = await run_in_threadpool(grounding_prompt.recall, opened, principal.user_id, text)
+            passages = grounding_prompt.render(hits, "director", "brief_passages.md")
+            memory_ids = frozenset(h.id for h in hits)
         try:
             extraction = await run_in_threadpool(
                 extract_brief,
@@ -226,6 +233,8 @@ async def _thinking(
                 source_text=prepared.source_text,
                 parts=prepared.parts,
                 deadline=deadline,
+                passages=passages,
+                memory_ids=memory_ids,
             )
             extraction = replace(extraction, brief=safe_app_brief(extraction.brief, text, prepared.parts))
         except TaskRefused as refused:
@@ -350,6 +359,8 @@ async def _quick(
     flags: FlagStore,
     work_mode: deps.Mode,
     scenario: str | None,
+    *,
+    ground: bool = False,
 ) -> JSONResponse:
     """COST-FAST-1: nothing is created or stored; the body is the answer or the offer to switch to Thinking. Quick holds
     its own SEC-16 unit around the whole ask, so it gets the Router unmetered (`raw`): one hold, not one per call."""
@@ -359,6 +370,7 @@ async def _quick(
             safety=safety, router=getattr(model_router, "raw", model_router), allowance=allowance, switches=flags,
             mode=work_mode,
             caps=deps.caps_for(http), key=http.headers.get("idempotency-key"), ledger=deps.ledger_writer_for(http),
+            grounding=(lambda r, b: grounding.opener(http, mode=work_mode, router=r, budget=b)()) if ground else None,
         )  # fmt: skip
     except quick.QuickRefusal as refusal:
         return JSONResponse(status_code=refusal.status, content={"error": refusal.message})
