@@ -3,7 +3,7 @@
 // request only (reading while the call is out, talking while a new answer is shown, done after). Nothing moves:
 // every pose is still (HR-1, HR-2). No past chats are listed: the server keeps no Quick question or answer.
 import { type FormEvent, useId, useState } from "react";
-import { Buddy as TiloBuddy, Icon } from "../../../design/tilo-t";
+import { Icon, Buddy as TiloBuddy } from "../../../design/tilo-t";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkStore } from "../../app/context";
 import { usePageTitle } from "../../app/pageTitle";
