@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
-test.use({ trace: "off" });
+test.use({ trace: "on" });
 
 test("CX_POOL_2_pool_cycle_records_screenshots_trace_and_frame_gaps", async ({
   page,
