@@ -341,7 +341,7 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
         allow_headers=["Content-Type", "Idempotency-Key", "X-Firebase-AppCheck"],  # SEC-10: the web client's token
         expose_headers=["Retry-After"],
     )  # no credentials: the dev principal reads no cookie or header

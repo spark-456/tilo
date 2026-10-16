@@ -18,6 +18,7 @@ from typing import Any, cast
 from fastapi import Request
 from tilo_memory.artifacts import ArtifactError, ArtifactNotFound, ArtifactStore, NewVersion, Origin, Scope
 from tilo_metering.flags import FlagStore
+from tilo_people.access import _minutes_confirmed
 from tilo_people.errors import NotFound, VersionConflict
 from tilo_policy.schemas import conforms
 from tilo_providers.interfaces import GenerateRequest, SafetyProvider
@@ -31,7 +32,7 @@ from tilo_api.meeting_allowance import allowance_router
 from tilo_api.meeting_analysis_mode import _Calls, _Router, _Safety
 from tilo_api.people_meetings import _clean, _mine, set_world
 from tilo_api.people_quotes import GONE, read_doc
-from tilo_api.people_writes import Refusal, Writer
+from tilo_api.people_writes import Refusal, Writer, _unhide
 
 SCHEMA = "meeting_brief.schema.json"
 MAX_POINTS = 5  # talk points per agenda line (schema)
@@ -98,7 +99,7 @@ def _prior_meeting(w: Writer, meeting: dict[str, Any]) -> dict[str, Any] | None:
             and r.get("series") == series
             and r["created_at"] < meeting["created_at"]
             and r["status"] == "minuted"
-            and r["minutes_confirmed_by"] is not None
+            and _minutes_confirmed(r, w.now)
             and r["minutes"] is not None
             and r.get("world_id") is not None
             and (until is None or w.now < until)
@@ -120,9 +121,11 @@ def prior_items(w: Writer, artifacts: ArtifactStore, meeting: dict[str, Any]) ->
     minutes: dict[str, Any] = {} if doc is None else _clean(doc, w.redact)
     if not conforms("minutes.schema.json", minutes) or minutes["meeting_id"] != prior["id"]:
         return []
-    out = [PriorItem(prior["id"], f"d{n}", "decision", d["text"]) for n, d in enumerate(minutes["decisions"])]
+    # Hidden characters out of everything code copies or offers, as Writer.text does for a person's text (MB-11).
+    out = [PriorItem(prior["id"], f"d{n}", "decision", _unhide(d["text"])) for n, d in enumerate(minutes["decisions"])]
     out += [
-        PriorItem(prior["id"], a["id"], "open_action", a["text"], a["work_item_id"]) for a in minutes["action_items"]
+        PriorItem(prior["id"], a["id"], "open_action", _unhide(a["text"]), a["work_item_id"])
+        for a in minutes["action_items"]
     ]
     return out
 
@@ -250,7 +253,7 @@ def build_brief(
             text = result.response.text or ""
             try:
                 reply = json.loads(text)
-            except ValueError:
+            except (ValueError, RecursionError):
                 raise _try_again() from None
             flagged = _screened(safety, text)
             if not flagged:
@@ -309,7 +312,7 @@ def store_brief(
     doc: dict[str, Any],
 ) -> dict[str, Any]:
     """A new version of the meeting's brief artifact in its world, announced, then pinned by a compare-and-set. A
-    version whose event failed is deleted; one that was announced stays (a lost pin is retried on the next make)."""
+    version that was not pinned is deleted, except a newer version of a pinned artifact that was already announced."""
     current, version, _ = _mine(w, meeting["id"], "read_full", GONE)
     if current["agenda"] != meeting["agenda"]:
         raise Refusal(409, "version_conflict")
@@ -346,28 +349,36 @@ def store_brief(
             doc = {**doc, "flagged": True, "agenda_points": [{**p, "talk_points": []} for p in doc["agenda_points"]]}
         else:
             raise _try_again()
-        stored = json.loads(artifacts.read(scope, made.ref))
     except (ArtifactError, ValueError):
         raise _try_again() from None
-    if parent is None:
-        data = {"artifact": made.ref} | {k: made.doc[k] for k in ("content_sha256", "media_type", "size_bytes")}
-        kind = "artifact.created"
-    else:
-        data, kind = {"artifact": made.ref, "previous_version": parent["version"]}, "artifact.versioned"
+    announced = False
     try:
+        try:
+            stored = json.loads(artifacts.read(scope, made.ref))
+        except (ArtifactError, ValueError, RecursionError):
+            raise _try_again() from None
+        if parent is None:
+            data = {"artifact": made.ref} | {k: made.doc[k] for k in ("content_sha256", "media_type", "size_bytes")}
+            kind = "artifact.created"
+        else:
+            data, kind = {"artifact": made.ref, "previous_version": parent["version"]}, "artifact.versioned"
         _announce(events, world_id, w, kind, data)
+        announced = True
+        after = {**current, "brief": made.ref}
+        if not conforms("meeting.schema.json", after):
+            raise Refusal(422, "invalid_record")
+        try:
+            w.stores.meetings.replace(after, expected_version=version)
+        except VersionConflict:
+            raise Refusal(409, "version_conflict", code="version_conflict") from None
+        except NotFound:
+            raise Refusal(404, "not_found") from None
     except BaseException:
-        _delete_version(artifacts, scope, made.ref)
+        # A version nobody pinned goes at once, so a lost pin leaves no brief behind (MB-09). One announced as a new
+        # version of a pinned artifact stays: the chain EV-15 checks needs it, and a delete purges it by content.
+        if parent is None or not announced:
+            _delete_version(artifacts, scope, made.ref)
         raise
-    after = {**current, "brief": made.ref}
-    if not conforms("meeting.schema.json", after):
-        raise Refusal(422, "invalid_record")
-    try:
-        w.stores.meetings.replace(after, expected_version=version)
-    except VersionConflict:
-        raise Refusal(409, "version_conflict", code="version_conflict") from None
-    except NotFound:
-        raise Refusal(404, "not_found") from None
     return cast(dict[str, Any], stored)
 
 

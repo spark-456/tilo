@@ -564,3 +564,56 @@ def test_MEETING_BRIEF_MB12_making_a_brief_writes_no_outbox_entry_card_message_o
     assert all(e["authz"] is None for e in c.rig.event_store.events[c.world])
     stored = c.rig.stored("meetings", NEXT)
     assert {k for k in stored if stored[k] != c.rig.stored("meetings", PRIOR).get(k)} >= {"brief", "world_id"}
+
+
+HIDDEN = "".join(chr(c) for c in (0xE0100, 0xE0101, 0xE0002, 0xE00AA))
+
+
+def test_MEETING_BRIEF_MB11_hidden_characters_never_reach_carry_over_or_the_prompt(case):
+    c = case
+    linked = minutes_for([f"Use the{HIDDEN} new column.", "Plain decision."], [(f"Send{HIDDEN} the sheet.", None)])
+    ref = c.rig.put_doc(
+        Scope(c.rig.org, "w_meeting_q4_plan", OWNER), "art_minutes_hidden", {**linked, "meeting_id": PRIOR}
+    ).ref
+    fresh_ids(c)
+    stored = c.rig.stored("meetings", PRIOR)
+    c.rig.real.meetings.replace({**stored, "minutes": ref}, expected_version=c.rig.version_of("meetings", PRIOR))
+    doc = post(c).json()
+    assert [x["text"] for x in doc["carry_over"]] == ["Use the new column.", "Plain decision.", "Send the sheet."]
+    sent = c.script.calls[0][1].prompt
+    saved = c.rig.artifacts.read(c.scope, c.rig.stored("meetings", NEXT)["brief"]).decode()
+    assert not any(0xE0000 <= ord(ch) <= 0xE0FFF for ch in sent + saved + json.dumps(doc))
+
+
+# --- MB-09: a lost pin leaves no brief behind --------------------------------------------------------------------
+
+
+def test_MEETING_BRIEF_MB09_a_lost_pin_on_a_new_brief_stores_nothing(case):
+    c = case
+    c.rig.real.meetings.replace(
+        {**c.rig.stored("meetings", NEXT), "world_id": c.world}, expected_version=c.rig.version_of("meetings", NEXT)
+    )
+    c.rig.conflicting_stores("meetings")
+    lost = post(c)
+    c.rig.stores.meetings.fail_replace = False
+    assert lost.status_code == 409 and not holds_artifact(c.rig, "art_brief_1")
+    assert "brief" not in c.rig.stored("meetings", NEXT)
+
+
+def test_MEETING_BRIEF_MB09_delete_leaves_no_brief_even_one_the_meeting_never_pinned(case):
+    c = case
+    assert post(c).status_code == 200
+    orphan = {
+        "v": "1.0",
+        "meeting_id": NEXT,
+        "generated_at": NOW,
+        "flagged": False,
+        "agenda_points": [],
+        "carry_over": [],
+    }
+    other = {**orphan, "meeting_id": PRIOR}
+    c.rig.put_doc(c.scope, "art_brief_orphan", orphan)  # a brief version the meeting does not pin
+    c.rig.put_doc(c.scope, "art_brief_other", other)  # another meeting's brief in the same world stays
+    assert c.rig.client.post(f"/v1/meetings/{NEXT}/delete", json={}).status_code == 200
+    assert not holds_artifact(c.rig, "art_brief_1") and not holds_artifact(c.rig, "art_brief_orphan")
+    assert holds_artifact(c.rig, "art_brief_other")
