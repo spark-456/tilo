@@ -49,7 +49,6 @@
   color: var(--ink);
   font-size: 13px;
   font-weight: 500;
-  cursor: pointer;
 }
 [data-park] .park-chat-quiet--lg {
   min-height: 36px;
@@ -62,7 +61,6 @@
 }
 [data-park] .park-chat-quiet:disabled {
   color: var(--ink3);
-  cursor: not-allowed;
 }
 [data-park] .park-chat-soft {
   display: inline-flex;
@@ -419,7 +417,6 @@
 }
 [data-park] .park-chat-new:disabled {
   opacity: 0.6;
-  cursor: not-allowed;
 }
 [data-park] .park-chat-new:focus-visible,
 [data-park] .park-chat-history__turn:focus-visible {

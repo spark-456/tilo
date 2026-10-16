@@ -7,9 +7,9 @@ import { SCENES, SCENE_LABEL, type SceneId, readScene, writeScene } from "../../
 import { handDraft } from "../../chat/handoff";
 import { type Turn, useQuickChat } from "../../chat/useQuickChat";
 import { type SegmentOption, SegmentedControl } from "../../components";
-import { SWITCH_WORDS, quickCostLine } from "../Home/homeData";
-import { Buddy as TiloBuddy, TiloIcon as Icon } from "../../shared/icons";
+import { TiloIcon as Icon, Buddy as TiloBuddy } from "../../shared/icons";
 import { Buddy, type BuddyMood } from "../../studio/Buddy";
+import { SWITCH_WORDS, quickCostLine } from "../Home/homeData";
 import "./Chat.css";
 
 const SCENE_OPTIONS: SegmentOption[] = SCENES.map((s) => ({ value: s, label: SCENE_LABEL[s] }));
@@ -54,6 +54,7 @@ function Answer({
   onCopy: ((text: string) => void) | null;
   mood: BuddyMood;
 }) {
+  const makeWorld = () => onWorld(turn.question);
   if (turn.state === "asking")
     return (
       <div className="park-chat-turn">
@@ -65,10 +66,7 @@ function Answer({
     );
   if (turn.state === "answered") {
     const cost = turn.sample ? null : quickCostLine(turn.cost);
-    const meta = [
-      "TILO",
-      turn.seconds > 0 ? `ANSWERED IN ${turn.seconds}S` : "ANSWERED",
-    ].join(" · ");
+    const meta = `TILO · ${turn.seconds > 0 ? `ANSWERED IN ${turn.seconds}S` : "ANSWERED"}`;
     return (
       <div className="park-chat-turn">
         <Face mood={mood} />
@@ -86,7 +84,7 @@ function Answer({
                   Copy
                 </button>
               ) : null}
-              <button type="button" className="park-chat-soft" onClick={() => onWorld(turn.question)}>
+              <button type="button" className="park-chat-soft" onClick={makeWorld}>
                 Make it a world →
               </button>
             </div>
@@ -105,11 +103,7 @@ function Answer({
             <strong>This needs a world.</strong>
             <p>{SWITCH_WORDS[turn.reason]}</p>
             <div className="park-chat-actions">
-              <button
-                type="button"
-                className="park-chat-soft"
-                onClick={() => onWorld(turn.question)}
-              >
+              <button type="button" className="park-chat-soft" onClick={makeWorld}>
                 Make it a world →
               </button>
             </div>

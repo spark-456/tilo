@@ -1,8 +1,4 @@
 // @vitest-environment happy-dom
-// UI-STUDIO-2 Chat (design/studio-v2 "Tilo S Chat"): a direct question goes to the real Quick answer path once, the
-// helper's pose follows the request state only (reading in flight, talking while a new answer shows, done after),
-// a fixture answer is labelled a sample, nothing is listed that the server did not keep, and the scene is display
-// state that survives blocked storage.
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeApi, fakeScheduler, stubApp } from "../../../../test-support/park/appHarness";
@@ -72,7 +68,7 @@ async function send(el: HTMLElement, text: string) {
 }
 
 describe("STUDIO_2 Chat: the helper's mood follows the real request", () => {
-  it("CX_T_CHAT_STUDIO_2 chat mood follows the Quick request through done", async () => {
+  it("STUDIO_2 chat mood is idle, then reading while the call is out, talking when the answer lands, done after", async () => {
     const reply = gate<unknown>();
     const api = quickApi(() => reply.promise);
     const { el, sch } = await mountChat(api);
