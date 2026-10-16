@@ -15,7 +15,7 @@ import { useFieldsFor } from "../../app/fieldsContext";
 import { Button } from "../../components";
 import { SampleBadge } from "../../sample/SampleBadge";
 import { SAMPLE_WORLD_ID } from "../../sample/sampleChoice";
-import { EmptyState, ErrorState, Skeleton } from "../../studio/States";
+import { EmptyState, ErrorState, LoadingState } from "../../../design/tilo-t";
 import "./Needs.css";
 import { ShowMe } from "./ShowMe";
 import { currentOf, dueLabel, needView, splitQueue } from "./needsModel";
@@ -128,18 +128,11 @@ export function NeedsPage({ app }: { app: AppCtx }) {
       </div>
 
       {data === null ? (
-        <div className="park-needs__grid">
-          <div className="park-needs__queue">
-            <Skeleton label="Loading what needs you" lines={4} />
-          </div>
-          <div className="park-needs__card park-needs__card--loading">
-            <Skeleton label="Loading the first decision" lines={6} card />
-          </div>
-        </div>
+        <LoadingState layout="split" caption="Loading what needs you" />
       ) : data === "failed" ? (
         <ErrorState
           title="Needs you could not load"
-          detail="Nothing was answered. Try again in a moment."
+          body="Nothing was answered. Try again in a moment."
           action={
             <Button variant="primary" onClick={() => setAttempt((n) => n + 1)}>
               Try again
@@ -150,7 +143,7 @@ export function NeedsPage({ app }: { app: AppCtx }) {
         <>
           <EmptyState
             title="Nothing needs you"
-            line="Tilo will ask here when a decision is yours to make."
+            body="Tilo will ask here when a decision is yours to make."
             action={
               <Button variant="primary" onClick={() => app.go("worlds")}>
                 See your worlds

@@ -294,7 +294,7 @@ describe("STUDIO_4 Needs you: one decision at a time, made clear", () => {
     expect(qa(m.container, "article b")).toHaveLength(0);
   });
 
-  it("STUDIO_4_needs_answered_decisions_leave_the_queue_and_the_last_one_leaves_an_empty_state", async () => {
+  it("CX_T_NEEDS_answered_decisions_use_the_shared_empty_state", async () => {
     const api = createFixtureApi();
     const { m, app, rerender } = await mountNeeds(api);
     const first = text(q(m.container, "article h2"));
@@ -304,17 +304,19 @@ describe("STUDIO_4 Needs you: one decision at a time, made clear", () => {
     await rerender({ ...app, dec });
     expect(qa(m.container, "article")).toHaveLength(0);
     expect(text(m.container)).toContain("Nothing needs you");
+    expect(q(m.container, '[data-testid="tt-empty"]')).toBeTruthy();
     expect(text(q(m.container, 'section[aria-label="Answered here"]'))).toContain(first);
     expect(qa(m.container, ".park-btn--primary")).toHaveLength(1);
   });
 
-  it("STUDIO_4_needs_a_failed_read_says_so_and_answers_nothing", async () => {
+  it("CX_T_NEEDS_failed_read_uses_the_shared_error_state_and_answers_nothing", async () => {
     const api = {
       ...createFixtureApi(),
       getDecisions: vi.fn(async () => Promise.reject(new Error("down"))),
     } as Api;
     const { m, app } = await mountNeeds(api);
     expect(text(q(m.container, '[role="alert"]'))).toContain("Needs you could not load");
+    expect(q(m.container, '[data-testid="tt-error"]')).toBeTruthy();
     expect(app.decide).not.toHaveBeenCalled();
   });
 });
