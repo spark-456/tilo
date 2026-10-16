@@ -29,6 +29,7 @@ import {
 } from "../../app/appspec.draft";
 import { useApp, useExpectsSample, useParkApi, useSchedule } from "../../app/context";
 import { Button, PageSheet } from "../../components";
+import { EmptyState, ErrorState } from "../../../design/tilo-t";
 import "./QuizPlayer.css";
 
 export interface QuizPlayerPageProps {
@@ -187,10 +188,10 @@ export function QuizPlayerPage({
             </button>
           </div>
           <div data-testid="quiz-unavailable" className="park-quiz-error">
-            <h1 className="park-quiz-h1" tabIndex={-1}>
-              This quiz is not available yet
-            </h1>
-            <p className="park-quiz-scoresub">Quizzes are not connected to your workspace yet.</p>
+            <EmptyState
+              title="This quiz is not available yet"
+              body="Quizzes are not connected to your workspace yet."
+            />
           </div>
         </PageSheet>
       </div>
@@ -216,11 +217,8 @@ export function QuizPlayerPage({
               Back to world
             </button>
           </div>
-          <div role="alert" data-testid="quiz-error" className="park-quiz-error">
-            <h1 className="park-quiz-h1" tabIndex={-1}>
-              Quiz specification is invalid
-            </h1>
-            <p className="park-quiz-scoresub">{validation.reason}</p>
+          <div data-testid="quiz-error" className="park-quiz-error">
+            <ErrorState title="Quiz specification is invalid" body={validation.reason} />
           </div>
         </PageSheet>
       </div>
