@@ -254,10 +254,7 @@ class Run:
         self.world_id, self.run_id, self.owner = task.world_id, task.run_id, task.owner
         self.brief = copy.deepcopy(task.brief)
         for pick in task.maker_picks:
-            index = pick.get("deliverable")
-            items = self.brief.get("deliverables", [])
-            if isinstance(index, int) and 0 <= index < len(items):
-                items[index]["make_with"] = pick["make_with"]
+            self.brief["deliverables"][pick["deliverable"]]["make_with"] = pick["make_with"]
         self.intake_answers = (
             tuple(  # (the Director's question, the person's answer) for the units' prompts (UNIT-PROMPT)
                 (q.text, str(task.answers[q.field]))

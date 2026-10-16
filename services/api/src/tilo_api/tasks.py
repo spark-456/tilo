@@ -481,7 +481,7 @@ def get_approaches(
     assert task.approaches is not None
     approaches = task.approaches
     try:
-        make_choices = makers.make_choices(task.brief, principal.user_id)
+        make_choices = makers.make_choices(task.brief, task.owner)
     except makers.MakerConfigError as exc:
         raise HTTPException(status_code=503, detail="Maker choices are unavailable; nothing changed.") from exc
     # Default (PRD silent, BQ-83): the cheapest approach is recommended; ties keep the Director's order.
@@ -625,7 +625,7 @@ def approve(
         if body.approach_id not in {a["id"] for a in task.approaches}:
             raise HTTPException(status_code=422, detail="Pick one of the proposed approaches.")
         try:
-            current_choices = makers.make_choices(task.brief, principal.user_id)
+            current_choices = makers.make_choices(task.brief, task.owner)
             picks = makers.resolve_picks(
                 current_choices,
                 [item.model_dump(mode="json") for item in body.make_with],
