@@ -9,6 +9,7 @@ import {
   type ConnectionRow,
   GOOGLE_PERSON_CONNECTORS,
 } from "../../../api/connect";
+import { BrandIcon } from "./BrandIcon";
 
 const MONO: Record<string, string> = { gmail: "G", google_drive: "D", google_calendar: "C" };
 const READ = {
@@ -113,7 +114,9 @@ export function GoogleAccess({ flow }: { flow: ConnectFlow }) {
           const granted = row.scopes?.includes(read.scope);
           return (
             <div className="park-connectors-avail" key={id}>
-              <span className="park-connectors-avail-mono">{MONO[id]}</span>
+              <span className="park-connectors-avail-mono">
+                <BrandIcon id={id} mono={MONO[id]} />
+              </span>
               <span className="park-connectors-avail-names">
                 <span className="park-connectors-avail-name">{row.name}</span>
                 <span className="park-connectors-avail-blurb">{STATE_TEXT[row.state]}</span>
@@ -137,7 +140,7 @@ export function GoogleAccess({ flow }: { flow: ConnectFlow }) {
               {on ? (
                 <button
                   type="button"
-                  className="park-connectors-connect"
+                  className="park-connectors-connect park-connectors-disconnect-action"
                   disabled={busy !== null}
                   onClick={() => setConfirm(id)}
                 >
