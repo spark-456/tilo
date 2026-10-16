@@ -9,7 +9,7 @@ import { type Turn, useQuickChat } from "../../chat/useQuickChat";
 import { type SegmentOption, SegmentedControl } from "../../components";
 import { SkillMention } from "../../shared/SkillMention";
 import { TiloIcon as Icon, Buddy as TiloBuddy } from "../../shared/icons";
-import { type CatalogSkill, sendWithSkill } from "../../shared/skillRoute";
+import { type CatalogSkill, type SkillMatch, sendWithSkill } from "../../shared/skillRoute";
 import { Buddy, type BuddyMood } from "../../studio/Buddy";
 import { SWITCH_WORDS, quickCostLine } from "../Home/homeData";
 import "./Chat.css";
@@ -52,11 +52,11 @@ function Answer({
   mood,
 }: {
   turn: Turn;
-  onWorld: (question: string) => void;
+  onWorld: (question: string, skill?: SkillMatch) => void;
   onCopy: ((text: string) => void) | null;
   mood: BuddyMood;
 }) {
-  const makeWorld = () => onWorld(turn.question);
+  const makeWorld = () => onWorld(turn.question, "skill" in turn ? turn.skill : undefined);
   if (turn.state === "asking")
     return (
       <div className="park-chat-turn">
@@ -140,15 +140,15 @@ export function ChatPage({ app }: { app: AppCtx }) {
 
   const send = (e: FormEvent) => {
     e.preventDefault();
-    const sent = sendWithSkill(draft, selectedSkill?.id ?? null, chat.ask);
-    if (sent === null) setSkillNote("Skill tagging needs setup before this question can be sent.");
-    else if (sent) {
+    const sent = sendWithSkill(draft, selectedSkill, chat.ask);
+    if (sent) {
       setDraft("");
+      setSelectedSkill(null);
       setSkillNote(null);
     }
   };
-  const toWorld = (question: string) => {
-    handDraft(question);
+  const toWorld = (question: string, skill?: SkillMatch) => {
+    handDraft(question, skill ? { ...skill, purpose: "", inputs: [], tools: [] } : null);
     app.go("home");
   };
   const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
@@ -271,7 +271,6 @@ export function ChatPage({ app }: { app: AppCtx }) {
                   placeholder={chat.turns.length ? "Ask a follow-up…" : "Ask a question…"}
                   onChange={(e) => {
                     setDraft(e.target.value);
-                    setSelectedSkill(null);
                     setSkillNote(null);
                   }}
                 />

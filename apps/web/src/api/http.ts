@@ -485,6 +485,7 @@ const CHANNEL_HEADER = "X-Tilo-Channel";
 
 /** Why a Quick ask is offered as Thinking instead: the server's closed set (COST-FAST-1), written once, here. */
 export const QUICK_REASONS = [
+  "refs",
   "attachments",
   "side_effect",
   "deliverable",
@@ -561,6 +562,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
         text: string;
         files: File[];
         mode: "quick" | undefined;
+        refs?: readonly import("./skillRoute").SkillRef[];
         key: string;
         pending?: Promise<IntakeResult | QuickIntakeResult> | undefined;
       }
@@ -823,25 +825,39 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
    */
   submitIntake(text: string, files: File[]): Promise<IntakeResult>;
   submitIntake(text: string, files: File[], mode: "quick"): Promise<QuickIntakeResult>;
+  submitIntake(
+    text: string,
+    files: File[],
+    mode: "quick" | undefined,
+    refs: readonly import("./skillRoute").SkillRef[],
+  ): Promise<IntakeResult | QuickIntakeResult>;
   async submitIntake(
     text: string,
     files: File[],
     mode?: "quick",
+    refs: readonly import("./skillRoute").SkillRef[] = [],
   ): Promise<IntakeResult | QuickIntakeResult> {
     let intent = this.intakeIntent;
     if (
       !intent ||
       intent.text !== text ||
       intent.mode !== mode ||
+      JSON.stringify(intent.refs ?? []) !== JSON.stringify(refs) ||
       intent.files.length !== files.length ||
       !intent.files.every((file, i) => file === files[i])
     ) {
-      intent = { text, files: [...files], mode, key: crypto.randomUUID() };
+      intent = { text, files: [...files], mode, refs: [...refs], key: crypto.randomUUID() };
       this.intakeIntent = intent;
     }
     // QA-11: sharing the key alone still sends two POSTs while the first is pending.
     if (intent.pending) return intent.pending;
-    const pending = this.sendIntakeRecovering(text, intent.files, mode, intent.key);
+    const pending = this.sendIntakeRecovering(
+      text,
+      intent.files,
+      mode,
+      intent.key,
+      intent.refs ?? [],
+    );
     intent.pending = pending;
     try {
       const result = await pending;
@@ -866,9 +882,10 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     files: File[],
     mode: "quick" | undefined,
     key: string,
+    refs: readonly import("./skillRoute").SkillRef[],
   ): Promise<IntakeResult | QuickIntakeResult> {
     try {
-      return await this.sendIntake(text, files, mode, key);
+      return await this.sendIntake(text, files, mode, key, refs);
     } catch (error) {
       if (
         mode === "quick" ||
@@ -878,7 +895,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       ) {
         throw error;
       }
-      return this.sendIntake(text, files, mode, key);
+      return this.sendIntake(text, files, mode, key, refs);
     }
   }
 
@@ -887,9 +904,11 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     files: File[],
     mode: "quick" | undefined,
     key: string,
+    refs: readonly import("./skillRoute").SkillRef[],
   ): Promise<IntakeResult | QuickIntakeResult> {
     const form = new FormData();
     form.append("text", text);
+    if (refs.length) form.append("refs", JSON.stringify(refs));
     for (const file of files) form.append("files", file);
     const init = { method: "POST", body: form, headers: { "Idempotency-Key": key } };
     if (mode === "quick") {

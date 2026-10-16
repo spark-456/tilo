@@ -32,6 +32,7 @@ import { BRIEF_SUPPLIER_COMPARISON } from "../../../api/fixtures/brief";
 import type { Api } from "../../api/index";
 import { createLiveApi } from "../../api/liveApi";
 import { carryOneStep } from "../../api/oneStep";
+import { handDraft } from "../../chat/handoff";
 
 afterEach(() => {
   cleanup();
@@ -95,6 +96,26 @@ function serverWith(intake: () => Response | Promise<Response>) {
 }
 
 describe("FR_UX_13 live composer over the real live Api", () => {
+  it("FR_PA_11 a handed skill stays pinned on the Home Thinking intake", async () => {
+    const { api, intakes } = serverWith(() => json(INTAKE));
+    handDraft("Compare suppliers", {
+      id: "competitor-scan",
+      kind: "library",
+      scope: "library",
+      name: "Competitor scan",
+      purpose: "Compare options",
+      inputs: [],
+      tools: [],
+      version: "1",
+    });
+    const rig = await mountLiveHome(api);
+    expect(rig.el.textContent).toContain("Skill selected: Competitor scan");
+    clickEl(control(rig.el, "Start task"));
+    await settle();
+    expect((intakes()[0]?.[1]?.body as FormData).get("refs")).toBe(
+      '[{"kind":"skill","id":"competitor-scan"}]',
+    );
+  });
   it("FR_UX_13 live composer: a configured deployment shows the composer although the user, today and agenda reads are not built yet", async () => {
     const { api } = serverWith(() => json(INTAKE));
     const rig = await mountLiveHome(api);

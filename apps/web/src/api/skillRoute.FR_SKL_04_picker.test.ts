@@ -47,9 +47,12 @@ describe("FR-SKL-04 skill mention picker", () => {
     ]);
   });
 
-  it("FR_SKL_04 never submits an unbound selected skill as if it were pinned", () => {
-    const send = (text: string) => text;
-    expect(sendWithSkill("Write a plan", null, send)).toBe("Write a plan");
-    expect(sendWithSkill("Write a plan", "my_plan", send)).toBeNull();
+  it("FR_PA_11 sends a selected skill as an id-only typed ref", () => {
+    const send = (text: string, ref: unknown) => ({ text, ref });
+    expect(sendWithSkill("Write a plan", null, send)).toEqual({ text: "Write a plan", ref: null });
+    expect(sendWithSkill("Write a plan", { id: "my_plan", kind: "taught" }, send)).toEqual({
+      text: "Write a plan",
+      ref: { kind: "taught_skill", id: "my_plan" },
+    });
   });
 });

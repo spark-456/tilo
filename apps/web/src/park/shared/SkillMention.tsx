@@ -45,9 +45,7 @@ export function SkillMention({
   if (selected)
     return (
       <div className="park-skill-mention__selected">
-        <output>
-          Skill selected: {selected.name}. Skill tagging needs setup before this can be sent.
-        </output>
+        <output>Skill selected: {selected.name}. Tilo will use it with your task.</output>
         <button type="button" onClick={onClear} aria-label={`Remove ${selected.name} skill`}>
           Remove
         </button>

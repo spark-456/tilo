@@ -41,6 +41,15 @@ export interface CatalogSkill {
   readonly version: string | number;
 }
 
+export interface SkillRef {
+  readonly kind: "skill" | "taught_skill";
+  readonly id: string;
+}
+export const skillRefOf = (skill: Pick<CatalogSkill, "id" | "kind">): SkillRef => ({
+  kind: skill.kind === "library" ? "skill" : "taught_skill",
+  id: skill.id,
+});
+
 /** The catalog is untrusted network data; malformed entries never enter the picker. */
 export function catalogOf(value: unknown): CatalogSkill[] {
   if (!value || typeof value !== "object" || !Array.isArray((value as { skills?: unknown }).skills))
@@ -70,12 +79,11 @@ export function mentionQuery(text: string): string | null {
   return match ? (match[1] ?? "") : null;
 }
 
-/** Single send seam: a chosen skill waits for the backend's persisted tag field. */
+/** One send seam maps the served catalog choice to the API's id-only ref. */
 export function sendWithSkill<T>(
   text: string,
-  skillId: string | null,
-  send: (text: string) => T,
-): T | null {
-  if (skillId !== null) return null;
-  return send(text);
+  skill: Pick<CatalogSkill, "id" | "kind"> | null,
+  send: (text: string, ref: SkillRef | null) => T,
+): T {
+  return send(text, skill ? skillRefOf(skill) : null);
 }

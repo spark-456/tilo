@@ -24,10 +24,15 @@ import { BUILD_SHA } from "../../app/buildStamp";
 import { useDemoSession, useParkApi, useParkStore, useSchedule } from "../../app/context";
 import { useWorldClient } from "../../app/context";
 import { DEMO_START } from "../../app/store";
-import { takeDraft } from "../../chat/handoff";
+import { takeDraft, takeDraftSkill } from "../../chat/handoff";
 import { FirstRunOverview } from "../../sample/FirstRunOverview";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
-import { type CatalogSkill, sendWithSkill } from "../../shared/skillRoute";
+import {
+  type CatalogSkill,
+  type SkillRef,
+  sendWithSkill,
+  skillRefOf,
+} from "../../shared/skillRoute";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
 import { HomeAssistant, type HomeContextChip } from "./HomeAssistant";
 import "./Home.css";
@@ -150,6 +155,10 @@ export function HomePage({ app }: { app: AppCtx }) {
   const [modeKey, setModeKey] = useState<TierKey>("quick");
   const [query, setQuery] = useState("");
   const [selectedSkill, setSelectedSkill] = useState<CatalogSkill | null>(null);
+  const skillRefs = (ref?: SkillRef | null): SkillRef[] => {
+    const chosen = ref === undefined ? (selectedSkill ? skillRefOf(selectedSkill) : null) : ref;
+    return chosen ? [chosen] : [];
+  };
   const [phase, setPhase] = useState<Phase>("idle");
   const phaseNow = useRef<Phase>("idle");
   const pending = useRef<(() => void) | null>(null);
@@ -221,7 +230,7 @@ export function HomePage({ app }: { app: AppCtx }) {
     }
     sendingNow.current = true;
     setSending(true);
-    store.startWorld(modeKey, text, files).then((ok) => {
+    store.startWorld(modeKey, text, files, skillRefs()).then((ok) => {
       sendingNow.current = false;
       setSending(false);
       // A8: the confirm button was disabled while the call ran, so focus fell to the page; it goes back to the
@@ -232,6 +241,7 @@ export function HomePage({ app }: { app: AppCtx }) {
       }
       setQuery("");
       setFiles([]);
+      setSelectedSkill(null);
       toIdle();
       setRefocus("input");
     });
@@ -256,7 +266,7 @@ export function HomePage({ app }: { app: AppCtx }) {
   // SIMPLE-RUN-1: Start on a live Thinking task goes straight to the real calls (intake, every question skipped,
   // pricing) and lands on the one confirm card; there is no example plan and no other screen in between.
   const oneStepLive = () => !demo && store.getState().sources.live && store.oneStep;
-  const prepare = () => {
+  const prepare = (ref?: SkillRef | null) => {
     if (sendingNow.current || asking.current || phaseNow.current === "ready") return;
     const text = query.trim();
     if (text === "") {
@@ -273,18 +283,19 @@ export function HomePage({ app }: { app: AppCtx }) {
     setSending(true);
     setQuick(QUICK_IDLE);
     settle("drafting");
-    store.prepareRun(text, files).then((r) => {
+    store.prepareRun(text, files, skillRefs(ref)).then((r) => {
       sendingNow.current = false;
       if (!alive.current) return;
       setSending(false);
       if (r.ok) {
         setFiles([]); // the intake took them: a second Start must not upload them again
+        setSelectedSkill(null);
         setRun(r.value);
         settle("ready");
         return;
       }
       settle("idle");
-      if (!r.capped) setQuick({ state: "error", message: r.message, retry: prepare });
+      if (!r.capped) setQuick({ state: "error", message: r.message, retry: () => prepare() });
     });
   };
   const startRun = (repeat: Cadence | null, makeChoices = run?.makeChoices ?? []) => {
@@ -351,6 +362,8 @@ export function HomePage({ app }: { app: AppCtx }) {
   useEffect(() => {
     const handed = takeDraft();
     if (handed === null) return;
+    const handedSkill = takeDraftSkill();
+    if (handedSkill) setSelectedSkill(handedSkill);
     chosenNow.current = true;
     setEffort("thinking");
     setQuery(handed);
@@ -373,7 +386,7 @@ export function HomePage({ app }: { app: AppCtx }) {
     setQuick(QUICK_IDLE);
     toIdle();
   };
-  const ask = () => {
+  const ask = (ref?: SkillRef | null) => {
     if (busy()) return;
     const text = query.trim();
     if (text === "") {
@@ -390,7 +403,7 @@ export function HomePage({ app }: { app: AppCtx }) {
     }
     asking.current = true;
     setQuick({ state: "asking" });
-    store.askQuick(modeKey, text).then((out) => {
+    store.askQuick(modeKey, text, skillRefs(ref)).then((out) => {
       asking.current = false;
       if (!alive.current) return;
       setQuick(
@@ -572,7 +585,6 @@ export function HomePage({ app }: { app: AppCtx }) {
           onQuery={(value) => {
             if (busy()) return;
             setQuery(value);
-            setSelectedSkill(null);
             setQuick(QUICK_IDLE);
             toIdle();
           }}
@@ -589,13 +601,11 @@ export function HomePage({ app }: { app: AppCtx }) {
             toIdle();
           }}
           onDraft={() => {
-            const result = sendWithSkill(
-              query,
-              selectedSkill?.id ?? null,
-              effort === "quick" ? ask : oneStepLive() ? prepare : draft,
-            );
-            if (result === null)
-              store.toast("Skill tagging needs setup before this task can be sent.");
+            sendWithSkill(query, selectedSkill, (_text, ref) => {
+              if (effort === "quick") ask(ref);
+              else if (oneStepLive()) prepare(ref);
+              else draft();
+            });
           }}
           run={
             run === null

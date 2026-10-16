@@ -142,6 +142,7 @@ export const EFFORTS = [
 
 /** Why a Quick ask was sent back to Thinking, in plain words (the server's closed set of reasons). */
 export const SWITCH_WORDS: Readonly<Record<SwitchReason, string>> = {
+  refs: "The selected skill runs with a Thinking plan you approve.",
   attachments: "It has files, which a Quick answer cannot read.",
   side_effect: "It would send, post, delete or book something, which needs a plan you approve.",
   deliverable: "It asks for a document, deck or sheet to be made.",

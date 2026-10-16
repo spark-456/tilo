@@ -3,6 +3,7 @@
 // context.tsx. State is replaced on every change, never mutated. The one timer is the toast's, and it
 // is injected as `schedule` so a test never waits.
 import { TiloApiError, isLifetimeCap } from "../../api/http";
+import type { SkillRef } from "../../api/skillRoute";
 import { buildHandoffDecisions } from "../api/fixtures/buildHandoff";
 import { needsLeft as countNeedsLeft, makeWorld, worlds } from "../api/fixtures/worlds";
 import { type Api, askQuick, startWithFiles } from "../api/index";
@@ -115,18 +116,27 @@ export interface ParkStore {
   addWorld(mode: TierKey, query: string): World;
   /** The live path (FR-UX-13): the Api is asked first and the promise settles with whether the server accepted
    * the task; a world is added, and Open offered, only then (HR-1). The shell picks one of the two (`useApp`). */
-  startWorld(mode: TierKey, query: string, files?: readonly File[]): Promise<boolean>;
+  startWorld(
+    mode: TierKey,
+    query: string,
+    files?: readonly File[],
+    refs?: readonly SkillRef[],
+  ): Promise<boolean>;
   /**
    * Quick (COST-FAST-1): one direct question. It makes no world, adds nothing, toasts nothing and never animates;
    * the page shows the outcome. `mode` is only the size on screen. A second call while one is in flight shares it.
    */
-  askQuick(mode: TierKey, query: string): Promise<QuickOutcome>;
+  askQuick(mode: TierKey, query: string, refs?: readonly SkillRef[]): Promise<QuickOutcome>;
   /**
    * SIMPLE-RUN-1: the one-step start (live only; false on a fixture Api). `prepareRun` makes the intake, skips every
    * question and prices the recommended approach; `startRun` is the person's Start, the approval of that plan's cap.
    */
   readonly oneStep: boolean;
-  prepareRun(text: string, files?: readonly File[]): Promise<RunStep<RunPlan>>;
+  prepareRun(
+    text: string,
+    files?: readonly File[],
+    refs?: readonly SkillRef[],
+  ): Promise<RunStep<RunPlan>>;
   reviseRun(plan: RunPlan, field: string, answer: string): Promise<RunStep<RunPlan>>;
   startRun(plan: RunPlan, repeat?: Cadence | null): Promise<RunStep<RunStart>>;
   toast(message: string, actionLabel?: string, action?: () => void): void;
@@ -387,13 +397,15 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
       });
     },
     undo,
-    startWorld(mode, query, files) {
+    startWorld(mode, query, files, refs) {
       // Live (FR-UX-13): the intake call is made first; the world is added, and Open offered, only after the
       // server accepted the task. The task is not approved yet, so Open goes to its understanding screen and
       // nothing says it is running (HR-1). A failure adds nothing and says why.
       if (starting) return starting;
       starting = (
-        files?.length ? startWithFiles(api, mode, query, files) : api.startWorld(mode, query)
+        files?.length || refs?.length
+          ? startWithFiles(api, mode, query, files ?? [], refs)
+          : api.startWorld(mode, query)
       ).then(
         ({ data }) => {
           starting = null;
@@ -425,12 +437,12 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
       return starting;
     },
     oneStep: oneStepOf(api) !== null,
-    prepareRun: (text, files) => runStep((one) => one.prepare(text, files ?? [])),
+    prepareRun: (text, files, refs) => runStep((one) => one.prepare(text, files ?? [], refs)),
     reviseRun: (plan, field, answer) => runStep((one) => one.revise(plan.taskId, field, answer)),
     startRun: (plan, repeat) => runStep((one) => one.start(plan, repeat)),
-    askQuick(mode, query) {
+    askQuick(mode, query, refs) {
       if (asking) return asking;
-      asking = askQuick(api, mode, query).then(
+      asking = askQuick(api, mode, query, refs).then(
         ({ data, source }): QuickOutcome => {
           asking = null;
           return data.kind === "answered"
