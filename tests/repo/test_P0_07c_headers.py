@@ -65,6 +65,7 @@ OFF_ORIGIN_ALLOWED = {
     "frame-src": [
         "https://www.google.com/recaptcha/",
         "https://essential-wares-510320-f0.firebaseapp.com/__/auth/",
+        "https://tilo-api-4qhkpsn5ga-as.a.run.app",
     ],
     "connect-src": [
         "https://content-firebaseappcheck.googleapis.com",
@@ -90,6 +91,11 @@ def test_P0_07c_csp_forbids_framing_and_off_origin_loads(repo_root: pathlib.Path
         assert "*" not in sources, f"{name}: wildcard source"
         off_origin = [s for s in sources if re.match(r"https?:", s)]
         assert off_origin == OFF_ORIGIN_ALLOWED.get(name, []), f"{name}: off-origin source {sources}"
+
+
+def test_P0_07c_WEBSITE_WS_10_allows_only_the_api_preview_frame_origin(repo_root: pathlib.Path) -> None:
+    csp = _directives(_site_wide(repo_root)["content-security-policy"])
+    assert csp["frame-src"] == OFF_ORIGIN_ALLOWED["frame-src"]
 
 
 def test_P0_07c_csp_script_src_allows_neither_eval_nor_inline_scripts(repo_root: pathlib.Path) -> None:
