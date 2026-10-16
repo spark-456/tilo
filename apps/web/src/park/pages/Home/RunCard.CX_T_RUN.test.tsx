@@ -16,6 +16,7 @@ const plan: RunPlan = {
   cap: 3,
   usd: null,
   time: "a few minutes",
+  makeChoices: [],
 };
 
 it("CX_T_RUN_card_folds_only_for_a_real_Start_click_not_other_busy_work", () => {
