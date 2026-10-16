@@ -300,6 +300,9 @@ def test_WORKSPACE_TOOLS_WT08_update_event_run_builds_approval_card_without_undo
         failed = lv.rf.events("world.failed")
         if failed:
             return ("failed", failed)
+        completed = lv.rf.events("world.completed")
+        if completed:
+            return ("completed", completed, lv.rf.events())
         response = lv.rf.cards()
         if response.status_code != 200:
             return ("http", response.status_code, response.text)
@@ -309,7 +312,10 @@ def test_WORKSPACE_TOOLS_WT08_update_event_run_builds_approval_card_without_undo
         found = next((c for c in cards if c["kind"] == "gate" and c["gate"]["action"]["type"] == "update_event"), None)
         return ("card", found) if found else None
 
-    state = wait_for(ready, what="the update_event approval card")
+    try:
+        state = wait_for(ready, what="the update_event approval card")
+    except AssertionError as exc:
+        raise AssertionError(lv.rf.events()) from exc
     assert state[0] == "card", state
     card = state[1]
     assert "cannot be undone" in card["why_it_matters"]
