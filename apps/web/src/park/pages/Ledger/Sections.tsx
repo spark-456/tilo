@@ -139,6 +139,10 @@ export function RecordedRuns({ L }: { L: Ledger }) {
           {L.totalCredits.toLocaleString()} credits · {money(L, L.spent)}
         </p>
       ) : null}
+      <div className="park-ledger-type park-ledger-recorded" aria-hidden="true">
+        <span>Run</span>
+        <span>Cost · status</span>
+      </div>
       <div className="park-ledger-types">
         {L.recordedRuns?.map((run, index) => (
           <div key={run.id} className="park-ledger-type park-ledger-recorded">

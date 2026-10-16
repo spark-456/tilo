@@ -76,6 +76,27 @@ const radio = (root: ParentNode, name: string) =>
 const sum = (xs: readonly number[]) => xs.reduce((a, v) => a + v, 0);
 const num = (s: string) => Number(s.replace(/[^0-9.]/g, ""));
 
+it("CX_PAGES_ENRICH_LEDGER_empty_cost_data_keeps_chart_group_and_table_frames", async () => {
+  const empty = {
+    ...fixtureLedger,
+    budget: 0,
+    daily: [],
+    runs: [],
+    recordedRuns: [],
+    by: {
+      world: { head: "By world", rows: [] },
+      tool: { head: "By tool", rows: [] },
+      role: { head: "By work", rows: [] },
+    },
+  } as Ledger;
+  const { container } = await mountLedger(empty, []);
+  expect(region(container, "Spend over the month").textContent).toContain(
+    "Daily costs will appear here",
+  );
+  expect(region(container, "Where it goes")).not.toBeNull();
+  expect(region(container, "Recorded run costs").textContent).toContain("Cost · status");
+});
+
 it("FR_SPD_04_recorded_runs_show_totals_and_completion_without_skill_navigation", async () => {
   const { container } = await mountLedger({
     ...fixtureLedger,
