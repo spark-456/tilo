@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-type RecorderModule = typeof import("../src/park/pages/Skills/recorder");
 
 test.use({
   launchOptions: {
@@ -11,29 +10,17 @@ test.use({
   },
 });
 
-test("test_FR_SKL_01_S3_records_three_seconds_locally_before_any_upload", async ({ page }) => {
+test("test_FR_SKL_01_S3_record_preview_use_shows_served_steps", async ({ page }) => {
   test.setTimeout(60_000);
-  let uploads = 0;
-  page.on("request", (request) => {
-    if (request.url().includes("/v1/skills/captures/media")) uploads++;
-  });
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.evaluate(() => {
-    const button = document.createElement("button");
-    button.textContent = "Capture sample";
-    button.onclick = async () => {
-      const path = "/src/park/pages/Skills/recorder.ts";
-      const { recordScreen } = (await import(/* @vite-ignore */ path)) as RecorderModule;
-      const recording = await recordScreen(false, (file) => {
-        document.body.dataset.recorded = file?.name ?? "empty";
-      });
-      window.setTimeout(() => recording.stop(), 3000);
-    };
-    document.body.append(button);
-  });
-  await page.getByRole("button", { name: "Capture sample" }).click();
-  await expect(page.locator("body")).toHaveAttribute("data-recorded", "screen-recording.webm", {
-    timeout: 10_000,
-  });
-  expect(uploads).toBe(0);
+  await page.goto("/skills-record-harness.html", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "+ Teach Tilo a skill" }).click();
+  await page.getByRole("button", { name: "Start recording" }).click();
+  await expect(page.getByRole("button", { name: "Stop recording" })).toBeVisible();
+  await page.waitForTimeout(3_000);
+  await page.getByRole("button", { name: "Stop recording" }).click();
+  await expect(page.getByLabel("Recording preview")).toBeVisible();
+  await expect(page.locator("body")).toHaveAttribute("data-captures", "0");
+  await page.getByRole("button", { name: "Use this recording" }).click();
+  await expect(page.locator("body")).toHaveAttribute("data-captures", "1");
+  await expect(page.getByText("Open the page and review the request.")).toBeVisible();
 });
