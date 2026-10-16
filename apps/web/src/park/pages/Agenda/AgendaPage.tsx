@@ -3,7 +3,9 @@
 // Data comes only from the Park Api (fixture or live, with its `source`); the page reads approvals from
 // `app.dec` (the shell's `decide(key)` is the only way one changes); navigation only through `app.go`.
 // No motion until WEB-3 (BQ-WEB-3).
-import { type ReactNode, useRef } from "react";
+import { type ReactNode, useMemo, useRef, useState } from "react";
+import { API_URL, appCheckToken, authToken, sessionView } from "../../../api/ClientProvider";
+import { HttpClient } from "../../../api/http";
 import type { Api } from "../../api/index";
 import { isCalendarEntry } from "../../api/live/agendaFromPlate";
 import { ORGANISATION_SETUP } from "../../api/organisationSetup";
@@ -16,6 +18,7 @@ import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import "../../components/park.components.css";
 import type { AppCtx } from "../../app/AppCtx";
 import { Boards } from "./Boards";
+import { AgendaNewMenu } from "./AgendaNewMenu";
 import { PeopleLists } from "./PeopleLists";
 import { Week } from "./Week";
 import { icon } from "./icons";
@@ -146,6 +149,32 @@ function PersonalAgendaPage({ app }: AgendaPageProps) {
 }
 
 function Plate({ A }: { A: LiveAgenda }) {
+  const [peopleKey, setPeopleKey] = useState(0);
+  const demo = sessionView.demo();
+  const http = useMemo(
+    () => {
+      const baseUrl = API_URL?.trim();
+      return baseUrl && !demo ? new HttpClient({ baseUrl, appCheckToken, authToken }) : null;
+    },
+    [demo],
+  );
+  const createPin = http
+    ? async (title: string, idempotencyKey: string) => {
+        const answer = await http.postJson(
+          "/v1/pinboards",
+          { title },
+          { "Idempotency-Key": idempotencyKey },
+        );
+        if (
+          !answer ||
+          typeof answer !== "object" ||
+          !("id" in answer) ||
+          typeof answer.id !== "string" ||
+          !/^pb_[A-Za-z0-9_]{1,48}$/.test(answer.id)
+        )
+          throw new Error("Unreadable pin reply");
+      }
+    : null;
   if (A.setupRequired)
     return (
       <>
@@ -181,10 +210,19 @@ function Plate({ A }: { A: LiveAgenda }) {
   return (
     <>
       <div className="park-agenda-titles">
-        <h1 className="park-agenda-title">Agenda</h1>
-        <p className="park-agenda-lede">
-          Tilo prepares a brief before each meeting and takes notes in the ones you invite it to.
-        </p>
+        <div className="park-agenda-t-head">
+          <div>
+            <h1 className="park-agenda-title">Agenda</h1>
+            <p className="park-agenda-lede">
+              Tilo prepares a brief before each meeting and takes notes in the ones you invite it to.
+            </p>
+          </div>
+          <AgendaNewMenu
+            createPin={createPin}
+            canHost={http !== null}
+            onPinCreated={() => setPeopleKey((n) => n + 1)}
+          />
+        </div>
         <p className="park-agenda-date">{A.plate.today}</p>
       </div>
       <div className="park-agenda-studio">
@@ -205,14 +243,16 @@ function Plate({ A }: { A: LiveAgenda }) {
             )}
             {A.plate.truncated ? <p>Showing a limited list.</p> : null}
           </section>
-          <PeopleLists />
           <section aria-label="Parked work" className="park-agenda-state">
             <h2>Parked work</h2>
             {list(A.plate.parked, "No parked work.")}
           </section>
         </div>
         <aside className="park-agenda-studioside">
-          {SIDE.map(([label, title, line]) => (
+          <div id="agenda-meetings">
+            <PeopleLists key={peopleKey} />
+          </div>
+          {SIDE.filter(([label]) => http === null || label !== "Boards").map(([label, title, line]) => (
             <section
               key={label}
               aria-label={label}

@@ -2,10 +2,10 @@
    styles. Only under the Studio theme, so Agenda.css keeps the Park look. Colours are role tokens (light and dark).
    No transition, animation or keyframes (HR-1..7). Every tap target is 44px or more where the design allows. */
 [data-park][data-theme="studio"] .park-agenda-root > .park-sheet {
-  max-width: 1296px;
+  max-width: 1240px;
   margin: 0 auto;
-  padding: 8px 8px 64px;
-  gap: 24px;
+  padding: 24px 28px 64px;
+  gap: 16px;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -14,14 +14,85 @@
   gap: 8px;
 }
 [data-park][data-theme="studio"] .park-agenda-title {
-  font-size: 48px;
+  font-size: 40px;
   font-weight: 700;
-  letter-spacing: -2px;
+  letter-spacing: -1.2px;
 }
 [data-park][data-theme="studio"] .park-agenda-lede {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--ink2);
+}
+[data-park][data-theme="studio"] .park-agenda-t-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+[data-park][data-theme="studio"] .park-agenda-new {
+  position: relative;
+  z-index: 3;
+}
+[data-park][data-theme="studio"] .park-agenda-new summary {
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: var(--priFill);
+  color: var(--onPri);
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+[data-park][data-theme="studio"] .park-agenda-new__menu {
+  position: absolute;
+  right: 0;
+  top: 52px;
+  min-width: min(320px, 90vw);
+  padding: 6px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--sh);
+  display: grid;
+  gap: 4px;
+}
+[data-park][data-theme="studio"] .park-agenda-new__menu > * {
+  box-sizing: border-box;
+  min-height: 60px;
+  padding: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 700;
+  display: grid;
+  align-content: center;
+  cursor: pointer;
+}
+[data-park][data-theme="studio"] .park-agenda-new__menu small {
+  color: var(--ink3);
+  font-size: 12px;
+  font-weight: 500;
+}
+[data-park][data-theme="studio"] .park-agenda-new__menu [aria-disabled="true"] {
+  color: var(--ink3);
+  cursor: default;
+}
+[data-park][data-theme="studio"] .park-agenda-new__pin {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+[data-park][data-theme="studio"] .park-agenda-new__pin input {
+  min-height: 44px;
 }
 [data-park][data-theme="studio"] .park-agenda-synced {
   font-weight: 600;
@@ -69,6 +140,27 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+}
+[data-park][data-theme="studio"] #agenda-meetings {
+  display: grid;
+  gap: 12px;
+}
+[data-park][data-theme="studio"] #agenda-meetings [data-testid="agenda-pinboards"] ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+[data-park][data-theme="studio"] #agenda-meetings [data-testid="agenda-pinboards"] li {
+  box-sizing: border-box;
+  min-height: 128px;
+  padding: 12px;
+  border: 0;
+  border-radius: 6px 6px 16px 6px;
+  background: var(--amberSoft);
+  overflow-wrap: anywhere;
+}
+[data-park][data-theme="studio"] #agenda-meetings [data-testid="agenda-pinboards"] li:nth-child(even) {
+  background: var(--blueSoft);
 }
 
 /* ---- The sample week (fixture): the calendar card and the brief beside it ---- */
