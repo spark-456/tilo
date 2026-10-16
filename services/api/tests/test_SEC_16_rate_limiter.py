@@ -74,6 +74,7 @@ def test_SEC_16_each_uid_has_its_own_window():
 def test_SEC_16_idle_uid_buckets_expire_and_active_uid_remains_limited():
     clock = FakeClock(0.0)
     rl = limiter(1, 5, clock)
+    rl.IDLE_TTL_S = 5
     assert rl.check("idle").allowed
     assert rl.check("active").allowed
     clock.advance(4)
