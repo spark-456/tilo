@@ -56,7 +56,9 @@ try {
       (ms) => {
         for (const animation of document.getAnimations()) {
           animation.pause();
-          animation.currentTime = animation.effect?.target?.matches?.(".tt-pool__water, .tt-pool__lip")
+          animation.currentTime = animation.effect?.target?.matches?.(
+            ".tt-pool__water, .tt-pool__lip",
+          )
             ? 500
             : ms;
         }
