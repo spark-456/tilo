@@ -102,7 +102,7 @@ export function WebsitePreview({
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [sendPreview]);
+  }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: html is the state transition that makes the stored page available for this post.
   useEffect(() => sendPreview(), [html, sendPreview]);

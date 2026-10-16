@@ -129,12 +129,24 @@ describe("WebsitePreview WEBSITE", () => {
     });
     await act(async () => frame().dispatchEvent(new Event("load")));
     expect(container.querySelector("iframe")).not.toBeNull();
-    await act(async () => window.dispatchEvent(new MessageEvent("message", {
-      data: { tilo: "preview-written" }, origin: "null", source: shell,
-    })));
-    await act(async () => window.dispatchEvent(new MessageEvent("message", {
-      data: { tilo: "preview-written" }, origin: "null", source: shell,
-    })));
+    await act(async () =>
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { tilo: "preview-written" },
+          origin: "null",
+          source: shell,
+        }),
+      ),
+    );
+    await act(async () =>
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { tilo: "preview-written" },
+          origin: "null",
+          source: shell,
+        }),
+      ),
+    );
     expect(container.querySelector("iframe")).not.toBeNull();
     await act(async () => frame().dispatchEvent(new Event("load")));
     expect(container.querySelector("iframe")).toBeNull();
