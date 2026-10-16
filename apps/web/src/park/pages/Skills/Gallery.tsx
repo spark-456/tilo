@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { Skill } from "../../api/types";
 import { Button } from "../../components";
 import { cx } from "../../components/cx";
-import { Icon } from "../../../design/tilo-t";
+import { Icon } from "../../shared/icons";
 import { statusOf } from "./SkillDrawer";
 import { WIZARD_STEPS } from "./TeachWizard";
 import { SkillIcon } from "./skillIcon";

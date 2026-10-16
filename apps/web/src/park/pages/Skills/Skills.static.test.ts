@@ -202,7 +202,7 @@ describe("WEB_8a_static: imports", () => {
     expect(bad).toEqual([]);
   });
 
-  it("CX_T_SKILLS_foundation_icons_are_imported_from_the_shared_design_layer", () => {
-    expect(code(join(DIR, "Gallery.tsx"))).toMatch(/from "\.\.\/\.\.\.\/design\/tilo-t"/);
+  it("CX_T_SKILLS_foundation_icons_are_imported_from_the_park_boundary", () => {
+    expect(code(join(DIR, "Gallery.tsx"))).toMatch(/from "\.\.\/\.\.\/shared\/icons"/);
   });
 });

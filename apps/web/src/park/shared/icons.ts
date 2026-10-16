@@ -1,5 +1,6 @@
 // Icon set for park pages. Pages import icons from here, never from the icon package, so a page's
 // imports stay React and park modules only (WEB_8a static rule) and the set has one place to change.
+export { Icon } from "../../design/tilo-t";
 export {
   BookOpen,
   Braces,
