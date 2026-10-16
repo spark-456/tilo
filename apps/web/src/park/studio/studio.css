@@ -288,10 +288,11 @@
     outline: 3px solid var(--focus);
     outline-offset: -3px;
   }
-  [data-park][data-theme="studio"] .park-shell__phone-menu {
+  [data-park][data-theme="studio"] .park-popover.park-shell__phone-menu {
     top: auto;
     right: 8px;
     bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+    z-index: 34;
   }
 }
 @media (max-width: 360px) {
