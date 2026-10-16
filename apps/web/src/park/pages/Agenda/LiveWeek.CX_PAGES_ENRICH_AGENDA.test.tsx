@@ -35,7 +35,7 @@ it("CX_PAGES_ENRICH_AGENDA_drag_prefills_schedule_dialog_with_snapped_time_and_l
   const api = {
     people: vi.fn(async () => ({ you: "person", people: [] })),
   } as unknown as MeetingHostApi;
-  let dialog: ReturnType<typeof mount>;
+  let dialog = null as unknown as ReturnType<typeof mount>;
   await act(async () => {
     dialog = mount(
       <ScheduleWithOthersDialog

@@ -10,7 +10,7 @@ export function AgendaNewMenu({
   createPin: ((title: string, idempotencyKey: string) => Promise<void>) | null;
   onPinCreated: () => void;
   canHost: boolean;
-  onSchedule: () => void;
+  onSchedule?: () => void;
 }) {
   const [pinOpen, setPinOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -47,7 +47,7 @@ export function AgendaNewMenu({
             role="menuitem"
             onClick={() => {
               if (details.current) details.current.open = false;
-              onSchedule();
+              onSchedule?.();
             }}
           >
             Schedule meeting <small>Choose a time and invite people</small>

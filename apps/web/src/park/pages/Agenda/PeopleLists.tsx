@@ -157,7 +157,7 @@ export function PeopleLists({ onMeetings }: { onMeetings?: (rows: PeopleRow[]) =
         minutes={minutes}
         host={host}
         readBrief={readBrief}
-        onRows={onMeetings}
+        {...(onMeetings ? { onRows: onMeetings } : {})}
       />
       <List kind="pinboards" api={api} minutes={null} host={null} readBrief={null} />
     </>
