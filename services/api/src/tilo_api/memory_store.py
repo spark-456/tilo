@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import threading
 import unicodedata
 from dataclasses import dataclass
@@ -10,6 +11,10 @@ from typing import Any
 from uuid import uuid4
 
 from tilo_policy.schemas import conforms
+
+_ORG = re.compile(r"org_[0-9A-Za-z_]{1,48}\Z")
+_USER = re.compile(r"u_[0-9A-Za-z_]{1,48}\Z")
+_ID = re.compile(r"mem_[0-9A-Za-z_]{1,48}\Z")
 
 
 class MemoryFull(Exception):
@@ -109,14 +114,19 @@ class FirestoreMemoryStore:
         self.client = client
 
     def _collection(self, org: str, owner: str) -> Any:
-        if not (
-            org.startswith("org_")
-            and owner.startswith("u_")
-            and org[4:].replace("_", "").isalnum()
-            and owner[2:].replace("_", "").isalnum()
-        ):
+        if not (_ORG.fullmatch(org) and _USER.fullmatch(owner)):
             raise MemoryStoreError("invalid address")
         return self.client.collection(f"orgs/{org}/users/{owner}/memory")
+
+    def _ref(self, org: str, owner: str, item_id: str) -> Any:
+        self._collection(org, owner)  # validate the address before building a document path
+        if not _ID.fullmatch(item_id):
+            raise MemoryStoreError("invalid item id")
+        return self.client.document(f"orgs/{org}/users/{owner}/memory/{item_id}")
+
+    def _meta(self, org: str, owner: str) -> Any:
+        self._collection(org, owner)
+        return self.client.document(f"orgs/{org}/users/{owner}/memory_meta/state")
 
     @staticmethod
     def _checked(snap: Any, org: str, owner: str) -> dict[str, Any]:
@@ -134,16 +144,18 @@ class FirestoreMemoryStore:
     def get(self, org: str, owner: str, item_id: str) -> dict[str, Any] | None:
         if not item_id.startswith("mem_"):
             return None
-        snap = self._collection(org, owner).document(item_id).get()
+        snap = self._ref(org, owner, item_id).get()
         return self._checked(snap, org, owner) if snap.exists else None
 
     def create(self, org: str, owner: str, text: str, kind: str, source: str, now: str) -> tuple[dict[str, Any], bool]:
         from google.cloud import firestore
 
         coll = self._collection(org, owner)
+        meta = self._meta(org, owner)
 
         @firestore.transactional
         def write(tx: Any) -> tuple[dict[str, Any], bool]:
+            held = meta.get(transaction=tx)
             items = [self._checked(s, org, owner) for s in coll.stream(transaction=tx)]
             duplicate = next((v for v in items if _key(v["text"]) == _key(text)), None)
             if duplicate:
@@ -151,7 +163,12 @@ class FirestoreMemoryStore:
             if len(items) >= 100:
                 raise MemoryFull
             item = _item(org, owner, text, kind, source, now)
-            tx.set(coll.document(item["id"]), item)
+            next_meta = {"count": len(items) + 1, "rev": (held.to_dict()["rev"] if held.exists else 0) + 1}
+            if held.exists:
+                tx.set(meta, next_meta)
+            else:
+                tx.create(meta, next_meta)
+            tx.create(self._ref(org, owner, item["id"]), item)
             return item, True
 
         return write(self.client.transaction())
@@ -159,7 +176,7 @@ class FirestoreMemoryStore:
     def update(self, org: str, owner: str, item_id: str, changes: dict[str, Any], now: str) -> dict[str, Any] | None:
         from google.cloud import firestore
 
-        ref = self._collection(org, owner).document(item_id)
+        ref = self._ref(org, owner, item_id)
 
         @firestore.transactional
         def write(tx: Any) -> dict[str, Any] | None:
@@ -175,11 +192,22 @@ class FirestoreMemoryStore:
         return write(self.client.transaction())
 
     def delete(self, org: str, owner: str, item_id: str) -> bool:
-        ref = self._collection(org, owner).document(item_id)
-        if not ref.get().exists:
-            return False
-        ref.delete()
-        return True
+        from google.cloud import firestore
+
+        ref, meta = self._ref(org, owner, item_id), self._meta(org, owner)
+
+        @firestore.transactional
+        def remove(tx: Any) -> bool:
+            item, held = ref.get(transaction=tx), meta.get(transaction=tx)
+            if not item.exists:
+                return False
+            tx.delete(ref)
+            if held.exists:
+                data = held.to_dict()
+                tx.set(meta, {"count": max(0, data["count"] - 1), "rev": data["rev"] + 1})
+            return True
+
+        return remove(self.client.transaction())
 
 
 @dataclass(frozen=True)
