@@ -252,6 +252,7 @@ export function displayApiError(error: unknown): string {
     pin_required: "This answer needs a PIN, which this page cannot take.",
     proposal_conflict: "This proposal changed. Reload before trying again.",
     quota: "The provider usage limit has been reached.",
+    ref_unavailable: "That tagged item is not available. Remove it and try again.",
     rate_limit_exceeded: "Too many requests. Wait a moment and try again.",
     rate_limiter_unavailable: "Usage checks are unavailable. Try again later.",
     reauth_required: "Sign in again before making this change.",

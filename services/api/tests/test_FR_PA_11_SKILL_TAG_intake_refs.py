@@ -129,3 +129,38 @@ def test_FR_PA_11_SKILL_TAG_a_taught_skill_the_caller_may_use_resolves_and_anoth
         with pytest.raises(RefsRefused) as caught:
             tagged_skill([ref], ctx)
         assert caught.value.index == 0
+
+
+def test_FR_PA_11_SKILL_TAG_deeply_nested_or_huge_refs_are_a_422_never_a_500(clear_flow):
+    for refs in ("[" * 100000, "[" * 3000 + "]" * 3000, '[{"kind":"skill","id":"' + "x" * 5000 + '"}]'):
+        response = post(clear_flow, refs)
+        assert response.status_code == 422 and set(response.json()) == {"error"}, refs[:20]
+    assert clear_flow.store.tasks == {} and clear_flow.provider.calls == []
+
+
+def test_FR_PA_11_SKILL_TAG_the_same_ref_twice_is_refused_on_its_own(clear_flow):
+    response = post(clear_flow, json.dumps([SKILL, SKILL]))
+    assert response.status_code == 422 and set(response.json()) == {"error"}
+    assert clear_flow.store.tasks == {}
+
+
+def test_FR_PA_11_SKILL_TAG_a_paused_taught_skill_cannot_be_tagged(repo_root):
+    from test_FR_SKL_04_ROUTE_skill_routing import Embedder, context, taught  # noqa: PLC0415
+    from tilo_api.intake_refs import RefsRefused, tagged_skill  # noqa: PLC0415
+
+    paused = {**taught("tsk_paused", "u_priya", "Weekly digest"), "paused": True}
+    with pytest.raises(RefsRefused) as caught:
+        tagged_skill([{"kind": "taught_skill", "id": "tsk_paused"}], context(repo_root, Embedder({}), taught=[paused]))
+    assert caught.value.index == 0
+
+
+def test_FR_PA_11_SKILL_TAG_an_idempotency_key_reused_with_other_refs_is_not_a_replay(clear_flow):
+    def send(refs):
+        data = {"text": "Compare our top rivals this week.", "refs": json.dumps(refs)}
+        return clear_flow.client.post("/intake", data=data, headers={"Idempotency-Key": "tag-key-1"})
+
+    first = send([SKILL])
+    assert first.status_code == 201 and first.json()["skill"]["id"] == "competitor-scan"
+    other = send([OTHER])
+    assert other.status_code == 422  # another body under the same key, not the first answer
+    assert "skill" not in other.json() or other.json()["skill"]["id"] != "competitor-scan"

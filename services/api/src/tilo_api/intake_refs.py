@@ -17,6 +17,7 @@ from tilo_policy.schemas import conforms
 from tilo_api.skills_route import SkillContext
 
 _SKILLS = ("skill", "taught_skill")
+_MAX_CHARS = 4096
 
 
 class RefsRefused(Exception):
@@ -36,9 +37,11 @@ def parse_refs(raw: str | None) -> list[dict[str, Any]]:
     """The refs of the form field, checked against mentions.schema.json: at most 10, none twice, each a closed ref."""
     if raw is None or not raw.strip():
         return []
+    if len(raw) > _MAX_CHARS:  # ten refs are well under this; nothing deeper or longer is a list of refs
+        raise RefsRefused()
     try:
         parsed = json.loads(raw)
-    except ValueError:
+    except Exception:  # noqa: BLE001 - bad JSON, a RecursionError from deep nesting, anything: one refusal, never a 500
         raise RefsRefused() from None
     if not isinstance(parsed, list) or len(parsed) > 10 or any(parsed.count(r) > 1 for r in parsed):
         raise RefsRefused()
