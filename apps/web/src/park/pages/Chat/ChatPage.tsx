@@ -1,9 +1,4 @@
-// UI-STUDIO-2: Chat with your Tilo (design/studio-v2 "Tilo S Chat", canvas section 03). A direct question gets one
-// helper over the real Quick answer path; the helper sits in a scene the person picks and its pose follows the
-// request only (reading while the call is out, talking while a new answer is shown, done after). Nothing moves:
-// every pose is still (HR-1, HR-2). No past chats are listed: the server keeps no Quick question or answer.
 import { type FormEvent, useId, useState } from "react";
-import { Icon, Buddy as TiloBuddy } from "../../../design/tilo-t";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkStore } from "../../app/context";
 import { usePageTitle } from "../../app/pageTitle";
@@ -12,8 +7,9 @@ import { SCENES, SCENE_LABEL, type SceneId, readScene, writeScene } from "../../
 import { handDraft } from "../../chat/handoff";
 import { type Turn, useQuickChat } from "../../chat/useQuickChat";
 import { type SegmentOption, SegmentedControl } from "../../components";
-import { Buddy, type BuddyMood } from "../../studio/Buddy";
 import { SWITCH_WORDS, quickCostLine } from "../Home/homeData";
+import { Buddy as TiloBuddy, TiloIcon as Icon } from "../../shared/icons";
+import { Buddy, type BuddyMood } from "../../studio/Buddy";
 import "./Chat.css";
 
 const SCENE_OPTIONS: SegmentOption[] = SCENES.map((s) => ({ value: s, label: SCENE_LABEL[s] }));

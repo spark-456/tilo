@@ -72,7 +72,7 @@ async function send(el: HTMLElement, text: string) {
 }
 
 describe("STUDIO_2 Chat: the helper's mood follows the real request", () => {
-  it("STUDIO_2 chat mood is idle, then reading while the call is out, talking when the answer lands, done after", async () => {
+  it("CX_T_CHAT_STUDIO_2 chat mood follows the Quick request through done", async () => {
     const reply = gate<unknown>();
     const api = quickApi(() => reply.promise);
     const { el, sch } = await mountChat(api);

@@ -12,3 +12,4 @@ export {
   Table2,
   UsersRound,
 } from "lucide-react";
+export { Buddy, Icon as TiloIcon } from "../../design/tilo-t";
