@@ -306,6 +306,7 @@ def _text_of_html(markup: str) -> str:
                 break
             i = close + 1
     text = "".join(out)
+
     def decode_entity(match: re.Match[str]) -> str:
         entity = match.group(0)
         try:

@@ -68,7 +68,7 @@ def test_ADR_0048_WT_03_malformed_numeric_entity_remains_undecoded() -> None:
 def test_SEC_11_WT_03_overlong_entity_does_not_disable_decoding_for_the_message() -> None:
     markup = "&#" + "9" * 5000 + "; &#105;gnore"
     got = _text_of_html(markup)
-    assert markup[:len(markup) - len(" &#105;gnore")] in got
+    assert markup[: len(markup) - len(" &#105;gnore")] in got
     assert got.endswith(" ignore")
 
 
