@@ -5,7 +5,20 @@ from __future__ import annotations
 
 # ruff: noqa: F811  (the shared `case` fixture is imported by name)
 import pytest
-from _morning_brief_lib import DAY, NOW, ZONE, case, desk_events, get, made, post, sweep, turn_on  # noqa: F401
+from _morning_brief_lib import (  # noqa: F401
+    DAY,
+    NOW,
+    ZONE,
+    case,
+    desk_events,
+    get,
+    kept_days,
+    made,
+    make_on,
+    post,
+    sweep,
+    turn_on,
+)
 from _ppl11a_lib import OWNER, PRIYA, conforms
 from tilo_api import brief_routes, deps
 
@@ -171,3 +184,80 @@ def test_MORNING_BRIEF_B1A_MO04_a_version_adds_to_the_days_artifact_and_get_answ
     assert kinds == ["artifact.created", "artifact.versioned"]
     refs = {e["data"]["artifact"]["artifact_id"] for e in desk_events(c) if e["type"].startswith("artifact.")}
     assert refs == {"art_mbrief_20261016"}
+
+
+# --- MO-09: retention does not depend on the sweep or the switch ------------------------------------------------------
+
+OLD = ("20261006", "20261008", "20261009", "20261016")  # 10, 8 and 7 days before today, and today
+
+
+def test_MORNING_BRIEF_B1A_MO09_an_on_demand_only_persons_old_briefs_go_without_the_flag_or_the_setting(case):
+    c = case  # TILO_MORNING_BRIEF is unset and the person never turned the schedule on
+    for stamp in ("2026-10-06T02:30:00.000Z", "2026-10-08T02:30:00.000Z", "2026-10-09T02:30:00.000Z"):
+        make_on(c, stamp)
+    assert kept_days(c, OLD) == ["20261006", "20261008", "20261009"]  # each was too young when made
+    made(c)  # today's: the first brief of the day also clears what is older than seven days
+    assert kept_days(c, OLD) == ["20261009", "20261016"]
+
+
+def test_MORNING_BRIEF_B1A_MO09_a_person_who_turned_the_schedule_off_loses_old_briefs_when_they_open_the_app(case):
+    c = case
+    turn_on(c, enabled=False)
+    for stamp in ("2026-10-06T02:30:00.000Z", "2026-10-09T02:30:00.000Z"):
+        make_on(c, stamp)
+    assert get(c).status_code == 404  # nothing today: but reading clears what has expired, only the own Desk world
+    assert kept_days(c, OLD) == ["20261009"]
+
+
+def test_MORNING_BRIEF_B1A_MO09_the_purge_is_once_a_day_and_never_touches_another_persons_briefs(case):
+    c = case
+    make_on(c, "2026-10-06T02:30:00.000Z", PRIYA)
+    make_on(c, "2026-10-06T02:30:00.000Z", OWNER)
+    made(c)
+    assert kept_days(c, OLD) == ["20261016"] and kept_days(c, OLD, PRIYA) == ["20261006"]
+    assert c.briefs.claim(deps.ORG_ID, OWNER, DAY, "purge") is False  # spent by the first brief of the day
+
+
+def test_MORNING_BRIEF_B1A_MO09_a_failing_purge_never_fails_the_brief_or_the_read(case):
+    c = case
+    c.monkeypatch.setattr("tilo_api.morning_brief_doc.purge_old", lambda *a, **k: 1 / 0)
+    assert made(c)["local_date"] == DAY
+    c.briefs._claims.clear()
+    assert get(c).status_code == 200
+
+
+# --- the sweep decides its mode as the request path does (OPEN-ACCESS) ------------------------------------------------
+
+
+def test_MORNING_BRIEF_B1A_MO07_the_sweep_asks_spend_mode_with_the_open_declaration_and_fails_closed(case):
+    from tilo_api.access import OPEN_DECLARATION
+
+    c = case
+    c.monkeypatch.setenv(brief_routes.ENV_BRIEF, "1")
+    seen = []
+
+    def spend_mode(request, uid, declaration, switches, demo=None):
+        seen.append((uid, declaration, demo))
+        return "replay", False
+
+    c.monkeypatch.setattr(deps, "spend_mode", spend_mode)
+    turn_on(c)
+    assert sweep(c) == 1 and seen == [(OWNER, OPEN_DECLARATION, False)]
+    assert c.script.calls != []  # a replay-mode call is still made through the scripted router
+
+
+def test_MORNING_BRIEF_B1A_MO07_a_capped_person_or_an_unreadable_ledger_gets_no_model_call_in_the_sweep(case):
+    c = case
+    c.monkeypatch.setenv(brief_routes.ENV_BRIEF, "1")
+    turn_on(c)
+    turn_on(c, PRIYA)
+    answers = {OWNER: ("live", True), PRIYA: None}
+
+    def spend_mode(request, uid, declaration, switches, demo=None):
+        if answers[uid] is None:
+            raise RuntimeError("ledger unreadable")
+        return answers[uid]
+
+    c.monkeypatch.setattr(deps, "spend_mode", spend_mode)
+    assert sweep(c) == 2 and c.script.calls == []
+    assert get(c, OWNER).json()["model"] == "skipped" and get(c, PRIYA).json()["model"] == "skipped"

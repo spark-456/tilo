@@ -74,3 +74,23 @@ def test_MORNING_BRIEF_B1A_MO03_a_malformed_id_never_reaches_a_document_path():
     for call in (lambda: fs.claim(ORG, "../x", "2026-10-16", "schedule"), lambda: fs.settings(ORG, "not a user")):
         with pytest.raises(ValueError):
             call()
+
+
+def test_MORNING_BRIEF_B1A_MO01_a_bounded_memory_store_keeps_the_newest_and_never_grows_past_its_limit():
+    store = MemoryBriefStore(limit=50)
+    for n in range(500):
+        user = f"u_demo{n}"
+        store.save_settings(ORG, user, {**SETTING, "owner_id": user})
+        store.claim(ORG, user, "2026-10-16", "schedule")
+        store.take_on_demand(ORG, user, "2026-10-16", 3)
+        store.index_mail(ORG, user, [f"m{n}"], "2026-10-16")
+    assert all(v <= 50 for v in store.sizes().values())
+    assert store.settings(ORG, "u_demo499") is not None and store.settings(ORG, "u_demo0") is None
+    assert store.mail_owner(ORG, "m499", "2026-10-16") == "u_demo499"
+    assert store.claim(ORG, "u_demo0", "2026-10-16", "schedule")  # the oldest claim was forgotten
+
+
+def test_MORNING_BRIEF_B1A_MO01_the_demo_stores_in_the_routes_are_bounded():
+    from tilo_api import brief_routes
+
+    assert brief_routes._DEMO_STORE.limit <= 5000

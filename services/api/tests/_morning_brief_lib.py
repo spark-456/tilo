@@ -19,6 +19,7 @@ from tilo_api.assistant.metering import InMemorySpendLedger
 from tilo_api.brief_store import brief_store_of
 from tilo_api.meeting_host_rpc import HostRpcError
 from tilo_contracts import MeetingHostRpcReadAnswer
+from tilo_memory.artifacts import ArtifactNotFound, Scope
 from tilo_metering.flags import InMemoryFlagStore
 from tilo_providers.safety import FakeSafetyProvider
 
@@ -114,7 +115,6 @@ def case(people_rig, monkeypatch):
     ov[deps.get_switches] = lambda: InMemoryFlagStore()
     ov[deps.get_spend_ledger] = lambda: ledger
     ov[deps.get_assistant_config] = lambda: replace(load_assistant_config(), user_day_credits=100)
-    ov[deps.get_access_store] = lambda: SimpleNamespace(get=lambda uid: None)
     ov[brief_routes.get_brief_mailer] = lambda: mailer
     for user in (OWNER, PRIYA):
         rig.event_store.worlds["w_desk_" + user[2:]] = deps.WorldRecord(user, {}, run_id="r_desk_" + user[2:])
@@ -153,6 +153,26 @@ def desk_events(c, user: str = OWNER) -> list[dict[str, Any]]:
 def sweep(c, now: str = NOW) -> int:
     request = SimpleNamespace(app=c.rig.app, state=SimpleNamespace())
     return brief_routes.sweep(request, now)  # type: ignore[arg-type]
+
+
+def kept_days(c, days: tuple[str, ...], user: str = OWNER) -> list[str]:
+    """Which of these `yyyymmdd` briefs are still stored in the person's Desk world."""
+    scope = Scope(deps.ORG_ID, "w_desk_" + user[2:], user)
+    out = []
+    for day in days:
+        try:
+            if c.rig.artifacts.versions(scope, f"art_mbrief_{day}"):
+                out.append(day)
+        except ArtifactNotFound:
+            pass
+    return out
+
+
+def make_on(c, stamp: str, user: str = OWNER) -> None:
+    """An on-demand brief as of `stamp`, then back to NOW."""
+    c.rig.set_now(stamp)
+    assert post(c, user).status_code == 200
+    c.rig.set_now(NOW)
 
 
 def turn_on(c, user: str = OWNER, **over: Any) -> None:

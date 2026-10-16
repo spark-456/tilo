@@ -20,6 +20,7 @@ from _morning_brief_lib import (  # noqa: F401
     case,
     desk_events,
     get,
+    kept_days,
     made,
     post,
     sweep,
@@ -256,3 +257,77 @@ def test_MORNING_BRIEF_B1A_MO09_briefs_older_than_seven_days_are_deleted_by_the_
             return False
 
     assert [d for d in ("20261006", "20261009", "20261016") if kept(d)] == ["20261009", "20261016"]
+
+
+# --- bare domains, the citation check's call site and the store's own screen ------------------------------------------
+
+
+def test_MORNING_BRIEF_B1A_MO07_a_model_line_with_a_bare_domain_is_dropped_and_the_email_masks_one(case):
+    c = case
+    c.script.reply = {
+        "needs_reply": [3],
+        "suggestions": [
+            {"text": "Pay at evil-pay.com before noon", "items": [3]},  # a bare domain: dropped, not repaired
+            {"text": "Mail support@evil-pay.com", "items": [3]},
+            {"text": "Prepare for Standup", "items": [1]},
+        ],
+        "todos": [{"title": "Pay via evil-pay.com", "due_text": None, "item": 3}],
+    }
+    brief = made(c)
+    assert [s["text"] for s in brief["suggestions"]] == ["Prepare for Standup"] and brief["todo_suggestions"] == []
+    brief["suggestions"][0]["text"] = "Look at evil-pay.com today"  # a stored line the copy must still not carry
+    brief["meetings"]["items"][0]["title"] = "Sync on docs.example.org"
+    text = morning_brief_doc.render_email(brief)
+    assert "evil-pay.com" not in text and "docs.example.org" not in text and "[removed]" in text
+
+
+def test_MORNING_BRIEF_B1A_MO08_make_brief_checks_the_citations_and_falls_back_to_no_model_parts(case):
+    c = case
+    c.script.reply = {"needs_reply": [3], "suggestions": [{"text": "Prepare for Standup", "items": [1]}], "todos": []}
+    real, calls = morning_brief_doc.check, []
+
+    def first_fails(doc, searched):
+        calls.append(doc["model"])
+        return False if len(calls) == 1 else real(doc, searched)
+
+    c.monkeypatch.setattr(morning_brief_doc, "check", first_fails)
+    brief = made(c)
+    assert calls == ["used", "failed"]  # the broken brief was not stored: the one without model parts was
+    assert (
+        brief["model"] == "failed"
+        and brief["suggestions"] == []
+        and brief["mail_needing_reply"]["status"] == "unsorted"
+    )
+
+
+def test_MORNING_BRIEF_B1A_MO08_a_brief_that_never_passes_the_check_is_not_stored_at_all(case):
+    c = case
+    c.monkeypatch.setattr(morning_brief_doc, "check", lambda doc, searched: False)
+    response = post(c)
+    assert response.status_code == 503 and response.json() == {"detail": "try_again"}
+    assert kept_days(c, ("20261016",)) == [] and [e for e in desk_events(c) if e["type"].startswith("artifact.")] == []
+
+
+def test_MORNING_BRIEF_B1A_MO09_a_version_the_store_screens_as_flagged_is_replaced_by_one_without_model_parts(case):
+    c = case
+    c.script.reply = {"needs_reply": [3], "suggestions": [{"text": "Prepare for Standup", "items": [1]}], "todos": []}
+    verdicts = iter(["flagged", "clean"])
+    c.rig.screener.check = lambda text, **k: {"flagged": next(verdicts) == "flagged", "reason": None}
+    brief = made(c)
+    assert (
+        brief["model"] == "flagged"
+        and brief["suggestions"] == []
+        and brief["mail_needing_reply"]["status"] == "unsorted"
+    )
+    assert kept_days(c, ("20261016",)) == ["20261016"]
+    scope = Scope(deps.ORG_ID, DESK, OWNER)
+    assert [v.version for v in c.rig.artifacts.versions(scope, "art_mbrief_20261016")] == [1]  # the flagged one is gone
+    assert [e["type"] for e in desk_events(c) if e["type"].startswith("artifact.")] == ["artifact.created"]
+
+
+def test_MORNING_BRIEF_B1A_MO09_a_brief_the_store_always_flags_is_not_kept(case):
+    c = case
+    c.rig.screener.verdict = "flagged"
+    response = post(c)
+    assert response.status_code == 503 and response.json() == {"detail": "try_again"}
+    assert kept_days(c, ("20261016",)) == [] and [e for e in desk_events(c) if e["type"].startswith("artifact.")] == []
