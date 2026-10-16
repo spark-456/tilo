@@ -1,7 +1,9 @@
 # ADR-0030: Hybrid memory: Memory Bank preferences and Firestore vector search
 
 - Status: Accepted (user approved 8 Oct 2026). The supervisor asked for this design on the user's behalf;
-  the user approved it in the supervisor chat. Open questions keep their stated defaults.
+  the user approved it in the supervisor chat. Open questions keep their stated defaults. Amended by ADR-0049
+  (16 Oct 2026): decision 3's summary index is replaced by the passage index `retrieval_chunk.schema.json`
+  (same owner pre-filter, Scope re-check, profile pinning and erasure), and MEM30-a ships as ticket R1a.
 - Deciders: user (approval, embedding price, the region question), architect (design)
 - Requirement: PRD 13.1 (memory layers), FR-MEM-01, FR-MEM-02, FR-MEM-05, FR-MEM-09, FR-INT-05, FR-AGT-07;
   PRD 6.4 (`ModelProvider.embed`), 6.6 (efficiency), 14.3 (credits saved), 16.5 (deletion); PL-01, PL-06,
