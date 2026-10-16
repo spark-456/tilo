@@ -1,0 +1,7 @@
+{
+  "user_id": "u_owner",
+  "tool": "list_files",
+  "args": {
+    "folder_id": "0BxFolder123"
+  }
+}

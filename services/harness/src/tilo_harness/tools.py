@@ -68,6 +68,18 @@ class ToolRegistry:
         """The one place that decides it: a tool that declares a side effect, or any tool above T1 (a read)."""
         return bool(tool.side_effect) or tool.tier != "T1"
 
+    @staticmethod
+    def is_private(tool: Tool) -> bool:
+        """WT-04 (ADR-0048): does its result hold the person's own private data (mail, calendar, Drive)? A unit that
+        called one, and any unit whose input rests on that unit's output, can no longer send anything out by the web."""
+        return bool(getattr(tool, "reads_private", False))
+
+    @staticmethod
+    def is_egress(tool: Tool) -> bool:
+        """WT-04: does the tool's call carry text to a server outside Tilo (a fetched address)? A search query goes
+        only to the search provider and is not egress."""
+        return bool(getattr(tool, "web_egress", False))
+
     @classmethod
     def is_external(cls, tool: Tool) -> bool:
         """Does reading its result make the unit an outside-content reader (SEC-05)? Every read tool does, whatever
@@ -186,6 +198,7 @@ class FakeFetchUrl:
     """FAKE `fetch_url` (LW-08 plugs the real fetch in): a canned page for the address, no network."""
 
     name = "fetch_url"
+    web_egress = True  # WT-04: the address a model chooses can carry text out
     description = "Fetch one web page and return its readable text."
     input_schema: Mapping[str, Any] = {
         "type": "object",

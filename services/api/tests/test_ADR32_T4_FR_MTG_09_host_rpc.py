@@ -416,6 +416,7 @@ def test_ADR32_T4_FR_MTG_09_only_the_stub_may_reach_the_client_send():
         "connect_start",  # ADR-0035 L4: the person's own connect, from connect_routes only (no side effect on Google)
         "connect_callback",
         "connect_disconnect",
+        "read",  # ADR-0048: an agent's read of the person's own Gmail, Calendar or Drive; sends nothing, no side effect
     }
     tree = ast.parse((src / "meeting_host_rpc.py").read_text(encoding="utf-8"))
     callers = [

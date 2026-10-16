@@ -20,7 +20,8 @@ DONE_TYPES = ("artifact.created", "data.transfer")
 
 
 def _event(store, world_id: str, seq: int, type_: str, ts: str, summary: str = "x") -> dict:
-    ev = base_event(seq=seq, type_=type_, data={"note": SECRET}, world_id=world_id, summary=summary, ts=ts)
+    data = {"note": SECRET, **({"direction": "out"} if type_ == "data.transfer" else {})}  # a read is not a send
+    ev = base_event(seq=seq, type_=type_, data=data, world_id=world_id, summary=summary, ts=ts)
     store.events.setdefault(world_id, []).append(ev)
     return ev
 

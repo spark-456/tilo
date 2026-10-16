@@ -29,6 +29,7 @@ from tilo_api.access import Mode
 from tilo_api.quiz_apps import source_loader
 from tilo_api.report_render import render_report
 from tilo_api.web_tools import FetchTool, RunArchiveBridge, SearchTool, fetch_service, typed_hosts
+from tilo_api.workspace_tools import READS_OF, WorkspaceAccess, WorkspaceUnit
 from tilo_api.xlsx_template import attach_template
 
 FILE_TEXT_CAP = 4000  # characters of one converted upload a run agent reads (the prompt's upstream item cap)
@@ -82,10 +83,17 @@ class BoundModel:
 
 class ApiUnitRunner(DefaultUnitRunner):
     def __init__(
-        self, providers: Mapping[str, Any], *, mode: Mode, clock: Callable[[], date], meter: Any = None
+        self,
+        providers: Mapping[str, Any],
+        *,
+        mode: Mode,
+        clock: Callable[[], date],
+        meter: Any = None,
+        workspace: WorkspaceAccess | None = None,
     ) -> None:
         super().__init__(providers, clock=clock)
         self.mode, self.meter = mode, meter  # SEC-16: the run's meter; deployed, live with none is replay
+        self.workspace = workspace  # ADR-0048 WT-01: set for a live run only; a demo or replay run reads nothing
 
     def bind_run(self, run: Any, archive: RunArchive) -> BoundRunRunner:
         from tilo_api import deps
@@ -100,6 +108,7 @@ class ApiUnitRunner(DefaultUnitRunner):
             safety,
             deps._seam_router(self.mode, self.meter),
             deps.FIXTURES_DIR,
+            self.workspace,
         )
 
 
@@ -114,7 +123,9 @@ class BoundRunRunner:
         safety: SafetyProvider,
         router: Router,
         fixtures: Path,
+        workspace: WorkspaceAccess | None = None,
     ) -> None:
+        self.workspace = workspace
         self.run_owner, self.providers, self.clock, self.safety = run, providers, clock, safety
         self.budget = RunBudget(run.cap)
         self.limits = load_tool_limits()  # RUN-COST-PROGRESS: config/tool_loop.yaml, read once per run
@@ -188,11 +199,22 @@ class BoundRunRunner:
         template, context = attach_template(fmt, owner.seams.artifacts, owner.scope, stream, owner.run_id, context)
         models = {role: BoundModel(model, self.budget) for role, model in self.providers.items()}
         fetch = FetchTool(owner, self.service, self.hosts, unit, context, self.sources)
+        tools: list[Any] = [SearchTool(self.search, self.hosts), fetch]
+        defaults: Mapping[str, tuple[str, ...]] = DEFAULT_TOOLS
+        on_call: Callable[[Any], None] | None = None
+        if self.workspace is not None and self.workspace.client() is not None:  # ADR-0048: live and configured only
+            reads = WorkspaceUnit(
+                owner, self.workspace, unit, context.agent_id, self.building_of(unit), self.archive.refs
+            )
+            if reads.owner() is not None:  # WT-01: not offered in a world shared with a team (and checked per call)
+                tools += reads.tools()
+                defaults, on_call = self.default_tools(), reads.on_call
         runner = DefaultUnitRunner(
             models,
             clock=self.clock,
-            tools=ToolRegistry([SearchTool(self.search, self.hosts), fetch]),
-            default_tools=DEFAULT_TOOLS,
+            tools=ToolRegistry(tools),
+            default_tools=defaults,
+            on_tool_call=on_call,
             safety=self.safety,
             archive=self.archive,
             request_options={role: {"parts": parts} for role in models} if parts else {},
@@ -204,6 +226,23 @@ class BoundRunRunner:
             report_renderer=partial(render_report, fmt=fmt or "pdf", template=template),
         )
         return await runner.run(unit, context)
+
+    def default_tools(self) -> dict[str, tuple[str, ...]]:
+        """ADR-0048: a unit with no pinned skill also gets the reads of a connector the brief names as a source
+        ({kind: connector, ref: <id>}); specialist, writer and verifier only, never the Director, Leads or Narrator."""
+        brief = self.run_owner.brief if isinstance(self.run_owner.brief, Mapping) else {}
+        sources = [s for s in brief.get("sources") or [] if isinstance(s, Mapping) and s.get("kind") == "connector"]
+        reads = tuple(dict.fromkeys(r for s in sources for r in READS_OF.get(str(s.get("ref")), ())))
+        return {role: (*DEFAULT_TOOLS.get(role, ()), *reads) for role in ("specialist", "writer", "verifier")}
+
+    def building_of(self, unit: Mapping[str, Any]) -> str:
+        """The unit's building in the run's layout (the target of its read events), else its district."""
+        for level in self.run_owner.layout["semantic"]["levels"]:
+            for district in level["districts"]:
+                for building in district["buildings"]:
+                    if unit["id"] in building.get("plan_units", []):
+                        return str(building["id"])
+        return str(unit["district"])
 
     def file_text(self, ref: Mapping[str, Any], record: Mapping[str, Any]) -> str | None:
         """The stored text of a converted upload (read again from its stored, redacted bytes), only if it was screened

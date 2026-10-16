@@ -10,13 +10,17 @@ File names are data: returned verbatim, never logged, never a path.
 
 from __future__ import annotations
 
+import base64
 import json as jsonlib
 import re
 import secrets
 import threading
+import unicodedata
 from collections.abc import Iterable, Mapping
+from datetime import datetime
 from typing import Any
 
+from .._time import format_ts
 from ..errors import PossiblySent
 from ..outbox import Grant
 from ._google import GoogleAdapter, checked_id, side_effect_marker
@@ -37,6 +41,16 @@ _NATIVE = {  # tilo-render's OOXML type -> (the native Google type Drive convert
     _OOXML + "wordprocessingml.document": ("application/vnd.google-apps.document", "document"),
     _OOXML + "spreadsheetml.sheet": ("application/vnd.google-apps.spreadsheet", "spreadsheets"),
 }
+TEXT_CAP = 32_000  # characters of a file's text an agent reads (meeting_host_rpc read_file_result)
+PDF_MAX = 4 * 1024 * 1024  # a PDF an agent reads natively, in bytes
+_TEXT_BYTES = 4 * TEXT_CAP + 4  # enough UTF-8 for TEXT_CAP characters; a text file is fetched only this far
+_EXPORTS = {  # a native Google file -> the type Drive exports it as
+    "application/vnd.google-apps.document": "text/plain",
+    "application/vnd.google-apps.presentation": "text/plain",
+    "application/vnd.google-apps.spreadsheet": "text/csv",
+}
+_TEXT_TYPES = frozenset({"text/plain", "text/csv", "text/markdown", "application/json"})
+_LISTED = "files(id,name,mimeType,modifiedTime)"
 _OOXML_EXTENSION = re.compile(r"\.(pptx|docx|xlsx)\Z", re.IGNORECASE | re.ASCII)
 
 
@@ -97,6 +111,66 @@ class DriveAdapter(GoogleAdapter):
         if len(response.content) > self._max_download_bytes:
             raise FileTooLarge("the file is over the download limit")
         return bytes(response.content)
+
+    # ADR-0048 agent tools. drive.file is the whole boundary: Google answers 404 for any file the person did not pick
+    # in the Picker and Tilo did not save, so these use no pick list of this process. Results are the contract's
+    # `list_files_result` and `read_file_result`.
+    def search_files(self, user_id: str, query: str | None = None, *, max_results: int = 10) -> dict[str, Any]:
+        """Files Tilo may read, newest first; with `query`, those whose name or text has it. Folders are left out."""
+        if query is None:
+            q = "trashed = false"
+        else:
+            quoted = query.replace("\\", "\\\\").replace("'", "\\'")
+            q = f"(name contains '{quoted}' or fullText contains '{quoted}') and trashed = false"
+        params = {"q": q, "orderBy": "modifiedTime desc", "pageSize": 25, "fields": _LISTED}
+        found = self._get(user_id, self._scopes("list"), "/files", params).get("files") or []
+        files = [_item(f) for f in found if isinstance(f, dict) and f.get("mimeType") != FOLDER_MIME]
+        return {"files": [f for f in files if f is not None][:max_results]}
+
+    def read_text(self, user_id: str, file_id: str) -> dict[str, Any]:
+        """One file as text (a Google Doc, Slides or Sheet exported, or a text file) or, for a PDF, its bytes."""
+        fid, scopes = checked_id(file_id), self._scopes("read")
+        try:
+            meta = self._get(user_id, scopes, f"/files/{fid}", {"fields": "id,name,mimeType,size,trashed"})
+        except AdapterError as exc:
+            if exc.status in (403, 404):
+                raise NotPicked("the file is not one Tilo may read") from None
+            raise
+        if meta.get("id") != fid or meta.get("trashed") is True:
+            raise NotPicked("the file is not one Tilo may read")
+        mime, size = str(meta.get("mimeType", "")), _meta(meta)["size"]
+        result: dict[str, Any] = {"id": fid, "name": str(meta.get("name", ""))[:255], "mime_type": mime[:255]}
+        text, pdf = None, None
+        if mime in _EXPORTS:
+            export = {"mimeType": _EXPORTS[mime]}
+            try:
+                text = bytes(
+                    self._call(user_id, scopes, "GET", f"{DRIVE_API}/files/{fid}/export", params=export).content
+                )
+            except AdapterError as exc:
+                if exc.status == 403:  # Drive refuses an export over its own size limit this way
+                    raise FileTooLarge("Drive would not export the file") from None
+                raise
+        elif mime in _TEXT_TYPES:
+            if size is not None and size > self._max_download_bytes:
+                raise FileTooLarge("the file is over the download limit")
+            got = self._call(user_id, scopes, "GET", f"{DRIVE_API}/files/{fid}", params={"alt": "media"},
+                             headers={"range": f"bytes=0-{_TEXT_BYTES - 1}"})  # fmt: skip
+            text = bytes(got.content[:_TEXT_BYTES])
+        elif mime == "application/pdf":
+            if size is not None and size > PDF_MAX:
+                raise FileTooLarge("the PDF is over 4 MiB")
+            got = self._call(user_id, scopes, "GET", f"{DRIVE_API}/files/{fid}", params={"alt": "media"})
+            if len(got.content) > PDF_MAX:
+                raise FileTooLarge("the PDF is over 4 MiB")
+            if not bytes(got.content).startswith(b"%PDF"):
+                raise UnsupportedType("not a PDF")
+            pdf = base64.b64encode(bytes(got.content)).decode("ascii")
+        else:
+            raise UnsupportedType("only Google files, text files and PDFs are read")
+        shown = _plain(text.decode("utf-8", errors="replace")) if text is not None else None
+        more = shown is not None and len(shown) > TEXT_CAP
+        return {**result, "text": shown[:TEXT_CAP] if shown is not None else None, "pdf_b64": pdf, "truncated": more}
 
     def _readable(self, user_id: str, file_id: str) -> str:
         known = self._picks.picked(user_id) | self._known(self._listed, user_id) | self._known(self._created, user_id)
@@ -209,6 +283,28 @@ class DriveAdapter(GoogleAdapter):
             folders = listed() or [checked_id(made.get("id"))]
         self._remember(self._created, user, folders)
         return folders
+
+
+class UnsupportedType(AdapterError):
+    """A Drive file an agent cannot read: not a Google Doc, Sheet or Slides file, a text file or a PDF."""
+
+
+def _plain(text: str) -> str:
+    """File text without control characters (a line break and a tab stay)."""
+    return "".join(c for c in text.replace("\r\n", "\n") if c in "\n\t" or unicodedata.category(c) not in ("Cc", "Cs"))
+
+
+def _item(raw: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The contract's `drive_item`, or None for an entry whose id has an odd shape."""
+    fid, changed = raw.get("id"), raw.get("modifiedTime")
+    if not isinstance(fid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", fid):
+        return None
+    try:
+        modified = format_ts(datetime.fromisoformat(changed)) if isinstance(changed, str) else None
+    except ValueError:
+        modified = None
+    return {"id": fid, "name": str(raw.get("name", ""))[:255], "mime_type": str(raw.get("mimeType", ""))[:255],
+            "modified_at": modified}  # fmt: skip
 
 
 def _final_id(value: Any) -> str:

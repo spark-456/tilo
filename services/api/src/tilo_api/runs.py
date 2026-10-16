@@ -327,6 +327,8 @@ class Run:
             "credits": kw.get("credits", 0), "summary": summary[:140], "cause": kw.get("cause"), "vis": vis,
             "authz": kw.get("authz"), "data": data,
         }  # fmt: skip
+        if kw.get("trace") is not None:  # the call's own columns (WT-05: tool, latency_ms, archive_ref); else null ones
+            event["trace"] = kw["trace"]
         if not kw.get("event_id"):
             return self.seams.writer.append(self.world_id, event)
         same = ("type", "actor", "target", "data", "authz", "cause")

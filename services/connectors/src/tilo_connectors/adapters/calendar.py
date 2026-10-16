@@ -14,7 +14,7 @@ import re
 import unicodedata
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from .._time import format_ts, parse_ts
@@ -42,6 +42,8 @@ EVENT_ID_SHAPE = re.compile(r"[A-Za-z0-9_-]{1,128}")  # = calendar_entry source_
 _DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _DROPPED = frozenset({"Cc", "Cf", "Cs", "Zl", "Zp"})  # controls, bidi and format, surrogates, separators (PE-24)
 _MAX_INSTANT = 40  # characters of a dateTime looked at
+MAX_WINDOW = timedelta(days=31)  # ADR-0048 WT-02: the longest window an agent's read_events may ask for
+_WINDOW_PAGES, _WINDOW_PAGE_SIZE = 3, 100  # at most 300 items looked at for one window
 
 
 @dataclass(frozen=True)
@@ -113,6 +115,60 @@ class CalendarAdapter(GoogleAdapter):
                 raise SyncTokenExpired("Google answered 410: the sync token expired") from None
             raise
         return _page(response, params["maxResults"])
+
+    def list_window(self, user_id: str, start: str, end: str, max_results: int = 50) -> dict[str, Any]:
+        """ADR-0048 `read_events`: the usable events of the primary calendar between two RFC 3339 instants (a
+        ValueError for a window that does not end after it starts or is over 31 days), in time order, at most
+        `max_results`, as the PE-13 fields only. `truncated` says more were there. Several pages are read at most."""
+        low, high = window(start, end)
+        found: list[dict[str, Any]] = []
+        token: str | None = None
+        for _ in range(_WINDOW_PAGES):
+            params: dict[str, Any] = {
+                "timeMin": low, "timeMax": high, "singleEvents": "true", "orderBy": "startTime",
+                "maxResults": _WINDOW_PAGE_SIZE, "fields": EVENT_FIELDS,
+            }  # fmt: skip
+            if token is not None:
+                params["pageToken"] = _token(token)
+            try:
+                body = self._call(user_id, [CALENDAR_READONLY], "GET", EVENTS_URL, params=params).json()
+            except ValueError:
+                raise AdapterError("Google answered without JSON") from None
+            items = body.get("items", []) if isinstance(body, dict) else None
+            if not isinstance(items, list):
+                raise AdapterError("Google's answer is not an event list")
+            found += [_item(e) for e in map(_event, items) if e is not None and not e.removed]
+            token = body.get("nextPageToken")
+            if token is None or len(found) > max_results:
+                break
+        return {"events": found[:max_results], "truncated": token is not None or len(found) > max_results}
+
+
+def window(start: str, end: str) -> tuple[str, str]:
+    """The two instants as common timestamps (UTC), or a ValueError: no offset, end not after start, over 31 days."""
+    first, last = (_offset_instant(v) for v in (start, end))
+    if last <= first or last - first > MAX_WINDOW:
+        raise ValueError("not a window of at most 31 days")
+    return format_ts(first), format_ts(last)
+
+
+def _offset_instant(value: Any) -> datetime:
+    moment = datetime.fromisoformat(value) if isinstance(value, str) and len(value) <= _MAX_INSTANT else None
+    if moment is None or moment.utcoffset() is None:
+        raise ValueError("not an RFC 3339 instant with an offset")
+    try:
+        return moment.astimezone(UTC)
+    except OverflowError:  # year 9999 with an offset: out of range, so not a window
+        raise ValueError("an instant out of range") from None
+
+
+def _item(event: CalendarEvent) -> dict[str, Any]:
+    """The contract's `calendar_item`: dates for an all-day event, UTC instants otherwise."""
+    start, end = (v.isoformat() if event.all_day else format_ts(v) for v in (event.start, event.end))  # type: ignore[union-attr, arg-type]
+    return {
+        "id": event.event_id, "title": event.title, "start": start, "end": end,
+        "all_day": event.all_day, "attendee_count": event.attendee_count,
+    }  # fmt: skip
 
 
 # -- the request ---------------------------------------------------------------------------------------

@@ -1124,9 +1124,11 @@ def _worker_models(mode: Mode = "replay", meter: Any = None) -> Mapping[str, Any
 
 def get_unit_runner(mode: Mode = "replay", today: Clock = real_today, meter: Any = None) -> Any:
     from tilo_api.run_tools import ApiUnitRunner
+    from tilo_api.workspace_tools import WorkspaceAccess
 
     models = _worker_models(mode, meter) if meter is not None else _worker_models(mode)
-    return ApiUnitRunner(models, mode=mode, clock=today, meter=meter)
+    workspace = WorkspaceAccess(get_meeting_host_client) if mode == "live" else None  # ADR-0048 WT-01: never a demo
+    return ApiUnitRunner(models, mode=mode, clock=today, meter=meter, workspace=workspace)
 
 
 def get_must_ask_providers(mode: Mode = "replay", meter: Any = None) -> Mapping[str, Any]:

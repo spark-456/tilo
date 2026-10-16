@@ -52,11 +52,14 @@ class RunArchiveBridge(RawArchiveStore):
         self.run, self.archive = run, archive
         self._lock = threading.RLock()
         self._bytes: dict[str, bytes] = {}
+        self.refs: dict[
+            str, str
+        ] = {}  # a tool call's id -> its record in the run's archive (event `trace.archive_ref`)
 
     def record(self, payload):
         with self._lock:
             ident = archive_id({"run_id": self.run.run_id, **payload})
-            self.archive.append("tool_call", {"id": ident, **payload})
+            self.refs[ident] = self.archive.append("tool_call", {"id": ident, **payload})
             return ident
 
     def archive_fetch(self, *, org_id, run_id, source_url, publisher_host, media_type, sha256_hex, raw_bytes, clock):
@@ -143,6 +146,7 @@ class FetchTool:
     name, description = FakeFetchUrl.name, FakeFetchUrl.description
     input_schema = FakeFetchUrl.input_schema
     tier, external_content, side_effect = "T1", True, False
+    web_egress = True  # WT-04: a unit that read the person's private data loses it
 
     def __init__(self, run, service, hosts, unit, context, sources):
         self.owner, self.service, self.hosts = run, service, hosts

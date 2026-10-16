@@ -45,6 +45,7 @@ class UpstreamItem:
     refs: tuple[str, ...] = ()  # artifact ids of what it stored or selected
     screening: str = "unscreened"  # the stored item's verdict; only "clean" may reach a unit that can act (LW-07)
     tainted: bool = True  # it rests on outside content (SEC-05, transitive); unknown counts as tainted
+    private: bool = False  # it rests on the person's own mail, calendar or Drive (WT-04, transitive): no web egress
 
 
 def data_line(value: Any, cap: int) -> str:

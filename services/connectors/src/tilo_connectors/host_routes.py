@@ -58,6 +58,8 @@ from .side_effect_execute import Reach, checked_documents, execute, tier_and_tim
 from .side_effect_execute import answer as execute_answer
 from .store import InMemoryOutboxStore
 from .tokens import _ulid, grant_group
+from .workspace_read import TOOLS as WORKSPACE_TOOLS
+from .workspace_read import invalid_window, read
 
 MAX_BODY_BYTES = 65_536
 MAX_PARTS = 16
@@ -357,6 +359,18 @@ class HostRuntime:
                 stopped=self._stopped, emit=self._emit, clock=self._clock, parts=parts,
             )  # fmt: skip
 
+    def workspace_read(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        """ADR-0048: one agent read of the person's own Gmail, Calendar or Drive (`workspace_read.py`)."""
+        if invalid_window(body):  # WT-02, before the broker or Google is touched
+            raise Refused("invalid_request")
+        broker, transport = self._broker.get(), self._transport.get()
+        with self.capture(body["user_id"], wide=True) as parts:
+            return read(
+                body, declaration=_registry().get(WORKSPACE_TOOLS[body["tool"]]), broker=broker, transport=transport,
+                clock=self._clock, emit=self._emit, parts=parts,
+                stopped=self._stopped,
+            )  # fmt: skip
+
     def send(self, body: Mapping[str, Any]) -> dict[str, Any]:
         entry, evidence, draft = body["entry"], body["evidence"], body["draft"]
         user_id = entry["authz"]["ref"]
@@ -524,6 +538,10 @@ def host_router(runtime: HostRuntime) -> APIRouter:
     @router.post("/side-effects/execute")
     async def side_effect_execute(request: Request) -> Any:
         return await serve(request, "execute_request", "execute_answer", runtime.execute)
+
+    @router.post("/workspace/read")
+    async def workspace_read(request: Request) -> Any:
+        return await serve(request, "read_request", "read_answer", runtime.workspace_read)
 
     @router.post("/connections/start")
     async def connection_start(request: Request) -> Any:
