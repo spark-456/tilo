@@ -185,8 +185,11 @@ export function displayApiError(error: unknown): string {
     feedback_limit_reached: "You have reached the feedback limit. Try again later.",
     followup_failed: "The follow-up could not finish. Try again later.",
     followup_unavailable: "The follow-up is unavailable right now.",
-    file_too_large: "This file is too large to keep. Use one under 50 MB.",
+    file_too_large: "This file is too large to keep. Use one under 30 MB.",
     forbidden: "You do not have access to do this.",
+    length_required: "This file could not be sent. Try again from a current browser.",
+    one_file: "Send one file at a time.",
+    storage_full: "Your storage is full. Delete something and try again.",
     full_session_required: "Sign in with a full account to do this.",
     hold_open: "The previous meeting activity is still being processed.",
     idempotency_key_reused:
