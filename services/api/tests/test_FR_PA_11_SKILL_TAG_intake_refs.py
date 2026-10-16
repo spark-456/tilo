@@ -164,3 +164,22 @@ def test_FR_PA_11_SKILL_TAG_an_idempotency_key_reused_with_other_refs_is_not_a_r
     other = send([OTHER])
     assert other.status_code == 422  # another body under the same key, not the first answer
     assert "skill" not in other.json() or other.json()["skill"]["id"] != "competitor-scan"
+
+
+def test_FR_PA_11_SKILL_TAG_a_nested_array_under_the_length_limit_is_refused_and_a_parser_failure_is_caught(
+    clear_flow, monkeypatch
+):
+    from tilo_api import intake_refs  # noqa: PLC0415
+
+    nested = "[" * 2000 + "]" * 2000  # 4000 characters: under the length limit
+    response = post(clear_flow, nested)
+    assert response.status_code == 422 and response.json()["error"] in ("ref_unavailable", "The refs are not valid.")
+
+    def too_deep(_raw):
+        raise RecursionError  # what the parser raises on a hostile array on a build with a lower C recursion limit
+
+    with monkeypatch.context() as patched:  # only for this call: the web stack parses JSON too
+        patched.setattr(intake_refs.json, "loads", too_deep)
+        with pytest.raises(intake_refs.RefsRefused):
+            intake_refs.parse_refs('[{"kind":"skill","id":"competitor-scan"}]')
+    assert clear_flow.store.tasks == {}
