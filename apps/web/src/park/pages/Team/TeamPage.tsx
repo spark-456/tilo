@@ -111,6 +111,7 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
   const [controlsOpen, setControlsOpen] = useState(false);
   const [liveTeam, setLiveTeam] = useState<Team | null>(null);
   const [teamWorlds, setTeamWorlds] = useState<World[]>([]);
+  const [teamWorldsState, setTeamWorldsState] = useState<"loading" | "ready" | "failed">("loading");
   const [people, setPeople] = useState<Member[] | null>(null);
   const [email, setEmail] = useState("");
   const [mine, setMine] = useState<{ you: string | null; teams: MyTeamName[] }>({
@@ -133,7 +134,12 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
         if (t.source === "live") {
           setLiveTeam(t.data);
           const worlds = await api.getWorlds(dec, added).catch(() => null);
-          if (live && worlds?.source === "live") setTeamWorlds(worlds.data);
+          if (live && worlds?.source === "live") {
+            setTeamWorlds(worlds.data);
+            setTeamWorldsState("ready");
+          } else if (live) {
+            setTeamWorldsState("failed");
+          }
           return;
         }
         const [pol, l, s, w] = await Promise.all([
@@ -246,7 +252,7 @@ function PersonalTeamPage({ app }: { app: AppCtx }) {
             </div>
             <WhoCanSayYes />
           </div>
-          <TeamResources worlds={teamWorlds} />
+          <TeamResources worlds={teamWorlds} worldsState={teamWorldsState} />
           <details
             className="park-team-disclosure"
             onToggle={(e) => setControlsOpen(e.currentTarget.open)}

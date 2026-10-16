@@ -53,7 +53,7 @@ it("FR_TEAM_01_team_resources_show_real_shared_worlds_and_pins_with_honest_empty
   expect(root.textContent).toContain("Shared worlds");
   expect(root.textContent).toContain("Q3 deck");
   expect(root.textContent).toContain("Team pins");
-  expect(root.textContent).toContain("Team pins are not connected on this install.");
+  expect(root.textContent).toContain("Team pins aren’t connected");
 });
 
 it("FR_TEAM_01_team_resources_show_server_returned_team_pins_only", async () => {
@@ -93,7 +93,9 @@ it("FR_TEAM_01_team_resources_show_server_returned_team_pins_only", async () => 
     source: "live" as const,
   });
   await act(async () => {
-    resourceRoot?.render(createElement(TeamResources, { worlds: [], readPinboards }));
+    resourceRoot?.render(
+      createElement(TeamResources, { worlds: [], worldsState: "ready", readPinboards }),
+    );
   });
   expect(host.textContent).toContain("Launch notes");
   expect(host.textContent).not.toContain("Private note");
