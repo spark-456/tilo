@@ -1,4 +1,11 @@
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Buddy } from "./Buddy";
 import { useLoopPaused } from "./loops";
 import "./PoolLoader.css";
@@ -15,6 +22,16 @@ export type PoolLoaderProps = {
 const MIN_LOAD_MS = 300;
 const LEAP_MS = 2600;
 const SINK_MS = 2000;
+const REDUCED_MS = 250;
+const REDUCE_QUERY = "(prefers-reduced-motion: reduce)";
+const subscribeReduced = (onChange: () => void): (() => void) => {
+  if (typeof window.matchMedia !== "function") return () => undefined;
+  const query = window.matchMedia(REDUCE_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+};
+const reducedNow = (): boolean =>
+  typeof window.matchMedia === "function" && window.matchMedia(REDUCE_QUERY).matches;
 const RECENT_END_MS = 10_000;
 const SITE_COPY = {
   leap: ["Loading Tilo", "Fetching your workspace"],
@@ -64,6 +81,11 @@ export function PoolLoader(props: PoolLoaderProps) {
       : Number.NaN;
   const active =
     props.kind === "task" ? started && !planned && !failed : props.loading;
+  const reduced = useSyncExternalStore(subscribeReduced, reducedNow, () => false);
+  const still =
+    typeof document !== "undefined" &&
+    document.querySelector('[data-park][data-motion="still"]') !== null;
+  const motionOff = reduced || still;
   const activeRef = useRef(active);
   activeRef.current = active;
   const [visible, setVisible] = useState(false);
@@ -104,9 +126,12 @@ export function PoolLoader(props: PoolLoaderProps) {
 
   useEffect(() => {
     if (!visible || phase !== "leap") return;
-    const timer = window.setTimeout(() => setPhase(activeRef.current ? "swim" : "sink"), LEAP_MS);
+    const timer = window.setTimeout(
+      () => setPhase(activeRef.current ? "swim" : "sink"),
+      motionOff ? REDUCED_MS : LEAP_MS,
+    );
     return () => window.clearTimeout(timer);
-  }, [visible, phase]);
+  }, [motionOff, visible, phase]);
 
   useEffect(() => {
     if (!visible || phase !== "swim" || active) return;
@@ -118,9 +143,9 @@ export function PoolLoader(props: PoolLoaderProps) {
     if (!visible || phase !== "sink") return;
     const timer = window.setTimeout(() => {
       setVisible(false);
-    }, SINK_MS);
+    }, motionOff ? REDUCED_MS : SINK_MS);
     return () => window.clearTimeout(timer);
-  }, [phase, visible]);
+  }, [motionOff, phase, visible]);
 
   const busy = active;
   const [title, subtitle] =

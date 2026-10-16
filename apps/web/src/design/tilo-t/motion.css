@@ -161,6 +161,8 @@
 @media (prefers-reduced-motion:reduce){
 .tt-pool__stage *,.tt-pool__stage{animation:none!important}
 .tt-pool__overlay{animation:ttPoolFade .25s ease-out both!important}
+.tt-pool-overlay{animation:ttPoolFade .25s ease-out both!important}
+.tt-pool-overlay[data-phase="sink"]{animation:ttPoolFadeOut .25s ease-in both!important}
 .tt-pool-page,.tt-pool-page--covered,.tt-pool-page--sink{transition:opacity .25s!important;filter:none;transform:none}
 .tt-pool-page--covered{opacity:.72}
 }

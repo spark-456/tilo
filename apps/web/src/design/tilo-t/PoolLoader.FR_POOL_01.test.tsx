@@ -61,9 +61,12 @@ it("CX_T_RUN_quick_started_and_planned_events_skip_the_pool_overlay", async () =
   expect(mounted.container.querySelector("[data-testid='tt-pool-host'] [data-phase]")).toBeNull();
 });
 
-it("FR_POOL_01_site_waits_300ms_before_showing", async () => {
+it("FR_POOL_01_initial_site_load_covers_first_paint_and_later_load_waits_300ms", async () => {
   vi.useFakeTimers();
-  const mounted = mount(createElement(PoolLoader, { kind: "site", loading: true, children: null }));
+  const mounted = mount(createElement(PoolLoader, { kind: "site", loading: false, children: null }));
+  await settle();
+  expect(mounted.container.querySelector('[role="status"]')).toBeNull();
+  mounted.render(createElement(PoolLoader, { kind: "site", loading: true, children: null }));
   await settle();
   expect(mounted.container.querySelector('[role="status"]')).toBeNull();
   await act(async () => vi.advanceTimersByTimeAsync(301));
@@ -72,7 +75,9 @@ it("FR_POOL_01_site_waits_300ms_before_showing", async () => {
 
 it("FR_POOL_01_site_finishing_before_300ms_never_shows_overlay", async () => {
   vi.useFakeTimers();
-  const mounted = mount(createElement(PoolLoader, { kind: "site", loading: true, children: null }));
+  const mounted = mount(createElement(PoolLoader, { kind: "site", loading: false, children: null }));
+  await settle();
+  mounted.render(createElement(PoolLoader, { kind: "site", loading: true, children: null }));
   await settle();
   await act(async () => vi.advanceTimersByTimeAsync(299));
   mounted.render(createElement(PoolLoader, { kind: "site", loading: false, children: null }));
