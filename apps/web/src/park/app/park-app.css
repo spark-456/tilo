@@ -55,3 +55,18 @@
 [data-park] .park-pending-world p {
   color: var(--ink2);
 }
+[data-park] .park-pending-world__blueprint {
+  box-sizing: border-box;
+  width: min(100%, 28rem);
+  margin: 0 auto 1rem;
+  padding: 1rem;
+  border: 1px dashed var(--bpInk);
+  border-radius: 14px;
+  background-color: var(--bp);
+  background-image: linear-gradient(var(--bpLine) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bpLine) 1px, transparent 1px);
+  background-size: 16px 16px;
+  color: var(--bpInk);
+  font: 700 13px / 1.5 var(--mono);
+  overflow-wrap: anywhere;
+}
