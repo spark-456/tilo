@@ -643,7 +643,7 @@ class _Run:
             if self.before_handoff is not None and not await self.before_handoff(unit, worker, announced):
                 outcome = UnitOutcome(success=False, summary="The unit's step before its handoff did not finish.")
                 envelope = None
-        stored = None
+        stored: UpstreamItem | None = None
         if envelope is not None and unit["unit_type"].startswith("design_"):
             stored = await asyncio.to_thread(_upstream_item, unit, outcome, made, self.store)
             if stored.text:
@@ -669,7 +669,11 @@ class _Run:
         self.emit("agent.retired", lead, worker, "The agent finished and left.", {}, cause=cause, **at)
         if outcome.success is True:
             # the store read is synchronous: keep it off the event loop
-            self.results[unit_id] = stored or await asyncio.to_thread(_upstream_item, unit, outcome, made, self.store)
+            self.results[unit_id] = (
+                stored
+                if stored is not None
+                else await asyncio.to_thread(_upstream_item, unit, outcome, made, self.store)
+            )
         return outcome
 
     def progress_for(

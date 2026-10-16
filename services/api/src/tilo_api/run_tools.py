@@ -67,7 +67,7 @@ class RunBudget:
     def __init__(self, cap: float, parent: RunBudget | None = None) -> None:
         self.left = cap
         self.parent = parent
-        self.lock = parent.lock if parent else threading.Lock()
+        self.lock: threading.Lock = parent.lock if parent else threading.Lock()
 
     def portion(self, share: float) -> RunBudget:
         return RunBudget(self.left * share, self)
