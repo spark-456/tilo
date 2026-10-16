@@ -1,7 +1,7 @@
 // UI-STUDIO-5 (design/studio-v2 "Tilo S Team"): the side card "Who can say yes" and the "Your helpers" cards on the
 // live Team page. Both say only what is true for every team: the rules that always ask a person (the policy engine's
 // must-ask switches) and the helper roles Tilo works with. No counts, names or backups are shown that the server
-// does not send; what is missing says "Not available yet".
+// does not send; panels without a read are omitted.
 import type { ReactNode } from "react";
 import { helperArt } from "./teamKit";
 
@@ -60,11 +60,6 @@ export function WhoCanSayYes() {
             </li>
           ))}
         </ul>
-        <p className="park-team-sidenote">Backups for when someone is away: not available yet.</p>
-      </SideCard>
-      <SideCard label="Who helped Tilo learn">
-        <h2 className="park-team-sidetitle park-team-sidetitle--sm">Who helped Tilo learn</h2>
-        <p className="park-team-sideline">Not available yet.</p>
       </SideCard>
     </aside>
   );
