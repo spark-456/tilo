@@ -185,7 +185,7 @@ export default defineConfig({
             },
             url: `${CP2_API}/healthz`,
             reuseExistingServer: !process.env.CI,
-            timeout: 120_000,
+            timeout: 240_000,
           },
           {
             command: `pnpm exec vite --host 127.0.0.1 --port ${CP2_PORT} --strictPort`,

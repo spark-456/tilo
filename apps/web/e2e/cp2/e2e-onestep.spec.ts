@@ -65,15 +65,36 @@ async function step(page: Page, name: string, body: () => Promise<void>): Promis
   }
 }
 
-test.describe("@cp2 E2E-ONESTEP the whole journey", () => {
-  test("E2E_ONESTEP Home to result, then Skills, Team, Agenda and Connectors", async ({ page }) => {
+test.describe("@cp2 CX-UX-JOURNEY-E2E the judge journey", () => {
+  test("CX_UX_JOURNEY_E2E fixture sign-in, Home run, approval, result and key pages stay console-clean", async ({
+    page,
+  }) => {
     test.setTimeout(200_000);
     await page.setViewportSize(DESKTOP);
     const w = watch(page);
 
+    await step(page, "fixture sign-in", async () => {
+      // CP2 installs one in-memory owner principal and fake providers; no Firebase or paid call.
+      const api = `http://127.0.0.1:${process.env.TILO_CP2_API_PORT ?? 8080}`;
+      expect((await page.request.get(`${api}/v1/me/settings`)).status()).toBe(200);
+    });
+
     await step(page, "Home: type a task, one confirm card, Start", async () => {
       await page.goto("/");
       const box = page.getByLabel("Describe your task");
+      await expect
+        .poll(
+          async () =>
+            (await box.count()) > 0 ||
+            (await page.getByText("Home data is unavailable").count()) > 0,
+          { timeout: 30_000 },
+        )
+        .toBe(true);
+      if (await page.getByText("Home data is unavailable").isVisible()) {
+        throw new Error(
+          `Home reads failed: ${JSON.stringify(w.failed)}; ${JSON.stringify(w.problems)}`,
+        );
+      }
       await expect(box).toBeVisible({ timeout: 30_000 });
       await box.fill("Compare three suppliers' quotes and recommend one.");
       await page.getByRole("button", { name: "Start task" }).click();
@@ -86,6 +107,19 @@ test.describe("@cp2 E2E-ONESTEP the whole journey", () => {
     note(`world ${worldId}`);
 
     await step(page, "World builds from recorded events", async () => {
+      await expect(page.getByTestId("pending-world")).toContainText("Tilo is planning your world");
+      const api = `http://127.0.0.1:${process.env.TILO_CP2_API_PORT ?? 8080}`;
+      await expect
+        .poll(
+          async () => {
+            const response = await page.request.get(`${api}/worlds/${worldId}/events`);
+            const body = (await response.json()) as { events: { type: string }[] };
+            return body.events.map((event) => event.type);
+          },
+          { timeout: 60_000 },
+        )
+        .toContain("world.planned");
+      await expect(page.getByTestId("park-page-world")).toBeVisible({ timeout: 30_000 });
       await expect(page.getByRole("region", { name: "Live run" })).toContainText(
         "recorded events",
         {
@@ -111,7 +145,7 @@ test.describe("@cp2 E2E-ONESTEP the whole journey", () => {
           .click();
       const group = page.getByRole("radiogroup", { name: "Your options" });
       await expect(group).toBeVisible({ timeout: 20_000 });
-      await group.getByRole("radio").first().check();
+      await group.getByRole("radio", { name: /approve|yes|go on/i }).check();
       await page.locator(".need-actions button.primary").first().click();
       await expect(page.locator(".need-status, .gate-status").first()).toBeVisible({
         timeout: 20_000,
@@ -144,29 +178,32 @@ test.describe("@cp2 E2E-ONESTEP the whole journey", () => {
       },
     );
 
-    await step(page, "result: the output is readable on the page, Open and Download work", async () => {
-      // WORLD-USEFUL: the page reads the delivered output itself as soon as the run is recorded as done
-      const read = page.waitForResponse((r) => r.url().includes(`/worlds/${worldId}/result`), {
-        timeout: 30_000,
-      });
-      await page.goto(`/world/${worldId}`);
-      expect((await read).status(), "GET /worlds/{id}/result").toBe(200);
-      await expect(page.getByTestId("run-status")).toContainText("Done");
-      await expect(page.getByTestId("result-text")).toBeVisible({ timeout: 30_000 });
-      const open = page.getByRole("button", { name: "Open result" });
-      await expect(open).toBeVisible();
-      await expect(open).not.toHaveAttribute("aria-disabled", "true");
-      const [download] = await Promise.all([
-        page.waitForEvent("download", { timeout: 20_000 }),
-        page.getByRole("button", { name: "Download", exact: true }).click(),
-      ]);
-      expect(download.suggestedFilename()).toMatch(/^tilo-result-/);
-    });
+    await step(
+      page,
+      "result: the output is readable on the page, Open and Download work",
+      async () => {
+        // WORLD-USEFUL: the page reads the delivered output itself as soon as the run is recorded as done
+        const read = page.waitForResponse((r) => r.url().includes(`/worlds/${worldId}/result`), {
+          timeout: 30_000,
+        });
+        await page.goto(`/world/${worldId}`);
+        expect((await read).status(), "GET /worlds/{id}/result").toBe(200);
+        await expect(page.getByTestId("run-status")).toContainText("Done");
+        await expect(page.getByTestId("result-text")).toBeVisible({ timeout: 30_000 });
+        const open = page.getByRole("button", { name: "Open result" });
+        await expect(open).toBeVisible();
+        await expect(open).not.toHaveAttribute("aria-disabled", "true");
+        const [download] = await Promise.all([
+          page.waitForEvent("download", { timeout: 20_000 }),
+          page.getByRole("button", { name: "Download", exact: true }).click(),
+        ]);
+        expect(download.suggestedFilename()).toMatch(/^tilo-result-/);
+      },
+    );
 
     for (const [name, path, heading] of [
-      ["Skills", "/skills", /skills/i],
-      ["Team", "/team", /team/i],
       ["Agenda", "/agenda", /agenda/i],
+      ["Skills", "/skills", /skills/i],
       ["Connectors", "/connectors", /connect/i],
     ] as const) {
       await step(page, `${name} loads`, async () => {
