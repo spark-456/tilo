@@ -19,6 +19,7 @@ import {
 } from "../../app/slackShare";
 import { useStaged } from "../../app/useStaged";
 import { PageSheet } from "../../components";
+import { ErrorState, StateAction } from "../../../design/tilo-t";
 import { FirstRunOverview } from "../../sample/FirstRunOverview";
 import { SampleControls } from "../../sample/SampleControls";
 import { hideSample, showSample } from "../../sample/sampleChoice";
@@ -265,7 +266,15 @@ export function WorldsPage({ app }: { app: AppCtx }) {
             </div>
           ) : null}
           {failed ? (
-            <EmptyBox title="Worlds data is unavailable" />
+            <ErrorState
+              title="Worlds data is unavailable"
+              body="We couldn't load your worlds. Try again."
+              action={
+                <StateAction icon="refresh" onClick={() => setReload((n) => n + 1)}>
+                  Try again
+                </StateAction>
+              }
+            />
           ) : data ? (
             <>
               {data.live ? (
