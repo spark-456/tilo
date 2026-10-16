@@ -1,6 +1,4 @@
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
-import { Buddy } from "./Buddy";
-import { useLoopPaused } from "./loops";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import "./PoolLoader.css";
 
 type PoolPhase = "leap" | "swim" | "sink";
@@ -15,6 +13,9 @@ export type PoolLoaderProps = {
 const MIN_LOAD_MS = 300;
 const LEAP_MS = 2600;
 const SINK_MS = 2000;
+const LOOP_MS = LEAP_MS + SINK_MS;
+const ASSET = "/loader/pool-c1bfe0ad6d7a.webp";
+const STILL = "/loader/pool-77eb84806e83.png";
 const SITE_COPY = {
   leap: ["Loading Tilo", "Fetching your workspace"],
   swim: ["Still loading", "The request is still loading"],
@@ -25,19 +26,6 @@ const TASK_COPY = {
   swim: ["The Director is still planning", "Waiting for world.planned"],
   sink: ["Your plan is ready", "world.planned"],
 } as const;
-const DROPS = Array.from({ length: 12 }, (_, i) => {
-  const angle = Math.PI * (1.05 + (i / 11) * 0.9);
-  const radius = 70 + ((i * 29) % 60);
-  return {
-    dx: `${Math.round(Math.cos(angle) * radius * 1.6)}px`,
-    dy: `${Math.round(Math.sin(angle) * radius * 1.2 - 30)}px`,
-    width: `${i % 3 ? 10 : 14}px`,
-    height: `${i % 3 ? 13 : 18}px`,
-    delay: `${2.236 + (i % 4) * 0.03}s`,
-    color: i % 4 ? "#9FCFE0" : "#FFFFFF",
-  };
-});
-
 /**
  * Shared Tilo T loader. Site and task loads wait 300 ms before appearing; task event timestamps preserve that gate
  * when world.started and world.planned arrive together. The leap finishes before a completed task sinks; active tasks
@@ -47,8 +35,7 @@ const DROPS = Array.from({ length: 12 }, (_, i) => {
  * Site API: <PoolLoader kind="site" loading={isLoading}>…page…</PoolLoader>
  */
 export function PoolLoader(props: PoolLoaderProps) {
-  const poolRef = useRef<HTMLDivElement>(null);
-  const paused = useLoopPaused(poolRef);
+  const shownAt = useRef(0);
   const isTask = props.kind === "task";
   const startedEvent = isTask ? props.events.find((event) => event.type === "world.started") : undefined;
   const plannedEvent = isTask ? props.events.find((event) => event.type === "world.planned") : undefined;
@@ -74,12 +61,14 @@ export function PoolLoader(props: PoolLoaderProps) {
       if (!active) {
         // Buffered world.started plus a terminal event plays only when their real event times exceed the 300 ms gate.
         if (!Number.isFinite(recordedDuration) || recordedDuration < MIN_LOAD_MS) return;
+        shownAt.current = performance.now();
         setPhase("leap");
         setVisible(true);
         return;
       }
       // triggeredBy: world.started (recorded event); short runs cancel this 300 ms reveal.
       const timer = window.setTimeout(() => {
+        shownAt.current = performance.now();
         setPhase("leap");
         setVisible(true);
       }, MIN_LOAD_MS);
@@ -88,6 +77,7 @@ export function PoolLoader(props: PoolLoaderProps) {
     if (!active) return;
     // triggeredBy: a site request that remains pending for more than 300 ms
     const timer = window.setTimeout(() => {
+      shownAt.current = performance.now();
       setPhase("leap");
       setVisible(true);
     }, MIN_LOAD_MS);
@@ -108,9 +98,12 @@ export function PoolLoader(props: PoolLoaderProps) {
 
   useEffect(() => {
     if (!visible || phase !== "sink") return;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const elapsed = Math.max(0, performance.now() - shownAt.current);
+    const remaining = reduced ? 200 : LOOP_MS - (elapsed % LOOP_MS);
     const timer = window.setTimeout(() => {
       setVisible(false);
-    }, SINK_MS);
+    }, remaining);
     return () => window.clearTimeout(timer);
   }, [phase, visible]);
 
@@ -119,16 +112,6 @@ export function PoolLoader(props: PoolLoaderProps) {
     isTask && phase === "sink" && failed
       ? ["The world stopped", "world.failed"]
       : (isTask ? TASK_COPY : SITE_COPY)[phase];
-  const surfaceStyle = (index: number): CSSProperties =>
-    ({
-      "--dx": DROPS[index]?.dx,
-      "--dy": DROPS[index]?.dy,
-      "--tt-drop-delay": DROPS[index]?.delay,
-      background: DROPS[index]?.color,
-      width: DROPS[index]?.width,
-      height: DROPS[index]?.height,
-    }) as CSSProperties;
-
   return (
     <div className="tt-pool-host" data-testid="tt-pool-host">
       <div
@@ -141,66 +124,15 @@ export function PoolLoader(props: PoolLoaderProps) {
         <div className="tt-pool-overlay" data-phase={phase}>
           <div className="tt-pool-scrim" aria-hidden="true" />
           <div
-            className={`tt-pool__stage${paused ? " tt-paused" : ""}`}
-            ref={poolRef}
+            className="tt-pool__stage"
             role="status"
             aria-live="polite"
             aria-busy={busy}
           >
-            <div className={`tt-pool__water${phase === "sink" ? " tt-pool__water--closing" : ""}`}>
-              {phase !== "sink" ? (
-                <>
-                  <span className="tt-pool__ring tt-pool__ring--one" />
-                  <span className="tt-pool__ring tt-pool__ring--two" />
-                  <span className="tt-pool__ring tt-pool__ring--three" />
-                </>
-              ) : null}
-            </div>
-            {phase === "leap" ? (
-              <>
-                <span className="tt-pool__shadow" />
-                <div className="tt-pool__buddy tt-pool__buddy--leap tt-pool__leap">
-                  <Buddy size={120} mood="happy" />
-                </div>
-                <div className="tt-pool__drops" aria-hidden="true">
-                  {DROPS.map((drop, i) => (
-                    <span
-                      className="tt-pool__drop"
-                      key={i}
-                      style={{
-                        ...surfaceStyle(i),
-                        left: `${50 + (i % 3) * 2}%`,
-                        top: "50%",
-                      }}
-                    />
-                  ))}
-                  <span className="tt-pool__splash" />
-                </div>
-              </>
-            ) : phase === "swim" ? (
-              <div className="tt-pool__swimmer">
-                <div className="tt-pool__swimmer-clip">
-                  <Buddy size={64} mood="swim" />
-                </div>
-                <span className="tt-pool__swim-ring" />
-              </div>
-            ) : phase === "sink" ? (
-              <>
-                <div className="tt-pool__buddy tt-pool__buddy--sink tt-pool__sink-buddy">
-                  <Buddy size={80} mood="swim" />
-                </div>
-                <span className="tt-pool__sink-ripple" />
-                <div className="tt-pool__bubbles" aria-hidden="true">
-                  {[-14, 6, -2, 14, -20].map((x, i) => (
-                    <span
-                      className="tt-pool__bubble"
-                      key={i}
-                      style={{ left: `calc(50% + ${x}px)`, "--tt-bubble-delay": `${0.2 + i * 0.15}s` } as CSSProperties}
-                    />
-                  ))}
-                </div>
-              </>
-            ) : null}
+            <picture aria-hidden="true">
+              <source media="(prefers-reduced-motion: reduce)" srcSet={STILL} />
+              <img className="tt-pool__asset" src={ASSET} alt="" width="560" height="412" />
+            </picture>
             <div className="tt-pool__caption" aria-atomic="true">
               <strong>{title}</strong>
               <span>{subtitle}</span>

@@ -24,5 +24,11 @@ export function PersonStartup({
       active = false;
     };
   }, [http]);
-  return settled ? <>{children}</> : <output>Getting your organisation ready…</output>;
+  return settled ? (
+    <>{children}</>
+  ) : (
+    <output aria-label="Tilo is preparing your space">
+      <span className="sr-only">Preparing your space</span>
+    </output>
+  );
 }
