@@ -94,3 +94,78 @@ def test_MORNING_BRIEF_B1A_MO01_the_demo_stores_in_the_routes_are_bounded():
     from tilo_api import brief_routes
 
     assert brief_routes._DEMO_STORE.limit <= 5000
+
+
+def test_MORNING_BRIEF_B1A_MO09_firestore_erasure_removes_claims_and_mail_ownership():
+    from google.cloud.firestore import DELETE_FIELD
+
+    data = {
+        f"orgs/{ORG}/brief_settings/{ME}": SETTING,
+        f"orgs/{ORG}/brief_claims/{ME}_2026-10-16_schedule": {"at": "2026-10-16"},
+        f"orgs/{ORG}/brief_claims/{YOU}_2026-10-16_schedule": {"at": "2026-10-16"},
+        f"orgs/{ORG}/brief_mail/m1": {"owners": {ME: "2026-10-16", YOU: "2026-10-16"}},
+        f"orgs/{ORG}/brief_mail/m2": {"owners": {ME: "2026-10-16"}},
+        f"orgs/{ORG}/brief_mail/m3": {"owners": {YOU: "2026-10-16"}},
+    }
+
+    class Ref:
+        def __init__(self, path):
+            self.path = path
+
+        def delete(self):
+            data.pop(self.path, None)
+
+        def update(self, changes):
+            owners = data[self.path]["owners"]
+            key, owner = next(iter(changes)).split(".")
+            assert key == "owners" and changes[f"owners.{owner}"] is DELETE_FIELD
+            owners.pop(owner, None)
+
+    class Snapshot:
+        def __init__(self, path):
+            self.id, self.reference = path.rsplit("/", 1)[-1], Ref(path)
+
+        def to_dict(self):
+            return data.get(self.reference.path)
+
+    class Collection:
+        def __init__(self, prefix):
+            self.prefix = prefix + "/"
+
+        def stream(self):
+            return [Snapshot(path) for path in list(data) if path.startswith(self.prefix)]
+
+    class Client:
+        def document(self, path):
+            return Ref(path)
+
+        def collection(self, path):
+            return Collection(path)
+
+    FirestoreBriefStore(Client()).erase(ORG, ME)
+    assert f"orgs/{ORG}/brief_settings/{ME}" not in data
+    assert f"orgs/{ORG}/brief_claims/{ME}_2026-10-16_schedule" not in data
+    assert f"orgs/{ORG}/brief_claims/{YOU}_2026-10-16_schedule" in data
+    assert data[f"orgs/{ORG}/brief_mail/m1"]["owners"] == {YOU: "2026-10-16"}
+    assert f"orgs/{ORG}/brief_mail/m2" not in data and f"orgs/{ORG}/brief_mail/m3" in data
+
+
+def test_MORNING_BRIEF_B1A_MO09_memory_erasure_removes_claims_counts_and_mail_indexes():
+    store = MemoryBriefStore()
+    store.claim(ORG, ME, "2026-10-16", "schedule")
+    store.take_on_demand(ORG, ME, "2026-10-16", 3)
+    store.index_mail(ORG, ME, ["m1"], "2026-10-16")
+    store.erase(ORG, ME)
+    assert store.sizes() == {"settings": 0, "claims": 0, "counts": 0, "mail": 0}
+
+
+def test_MORNING_BRIEF_B1A_MO09_people_erasure_hook_erases_brief_records(monkeypatch):
+    from tilo_api import people_firestore
+
+    calls = []
+    monkeypatch.setattr(FirestoreBriefStore, "erase", lambda self, org, user: calls.append((org, user)))
+    monkeypatch.setattr("tilo_api.followup_outbox_sources.cancel_source_entries", lambda *args: None)
+    monkeypatch.setattr("tilo_api.followup_draft_retention.followup_retention", lambda *args: [])
+    stores = people_firestore.firestore_people_stores(object())
+    stores.erase_followup(ORG, ME)
+    assert (ORG, ME) in calls

@@ -135,8 +135,13 @@ class MemoryBriefStore:
     def erase(self, org: str, user: str) -> None:
         with self._lock:
             self._settings.pop((org, user), None)
-            for key in [k for k in self._mail if user in self._mail[k]]:
+            for table in (self._claims, self._counts):
+                for key in [k for k in table if k[0] == org and k[1] == user]:
+                    table.pop(key, None)
+            for key in [k for k in self._mail if k[0] == org and user in self._mail[k]]:
                 self._mail[key].pop(user, None)
+                if not self._mail[key]:
+                    self._mail.pop(key, None)
 
 
 class FirestoreBriefStore:
@@ -213,6 +218,21 @@ class FirestoreBriefStore:
     def erase(self, org: str, user: str) -> None:
         self._checked(user)
         self._doc(org, "brief_settings", user).delete()
+        claims = self._client.collection(f"orgs/{org}/brief_claims")
+        for snap in claims.stream():
+            if snap.id.startswith(f"{user}_"):
+                snap.reference.delete()
+        from google.cloud.firestore import DELETE_FIELD  # noqa: PLC0415
+
+        mail = self._client.collection(f"orgs/{org}/brief_mail")
+        for snap in mail.stream():
+            owners = (snap.to_dict() or {}).get("owners")
+            if not isinstance(owners, dict) or user not in owners:
+                continue
+            if len(owners) > 1:
+                snap.reference.update({f"owners.{user}": DELETE_FIELD})
+            else:
+                snap.reference.delete()
 
 
 _STORES: dict[int, BriefStore] = {}

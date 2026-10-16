@@ -333,6 +333,48 @@ def test_MORNING_BRIEF_B1A_MO09_a_brief_the_store_always_flags_is_not_kept(case)
     assert kept_days(c, ("20261016",)) == [] and [e for e in desk_events(c) if e["type"].startswith("artifact.")] == []
 
 
+def test_MORNING_BRIEF_B1A_MO09_old_email_copies_are_purged_by_stored_creation_date():
+    from types import SimpleNamespace
+
+    from tilo_api.morning_brief_doc import purge_old
+
+    old = SimpleNamespace(
+        doc={"created_at": "2026-10-08T00:00:00.000Z"},
+        ref={"artifact_id": "art_morning_brief_old", "version": 1},
+    )
+    recent = SimpleNamespace(
+        doc={"created_at": "2026-10-09T00:00:00.000Z"},
+        ref={"artifact_id": "art_morning_brief_recent", "version": 1},
+    )
+
+    class Artifacts:
+        def __init__(self):
+            self.deleted = []
+
+        def artifact_ids(self, scope, prefix):
+            return ["art_morning_brief_old", "art_morning_brief_recent"] if prefix == "art_morning_brief_" else []
+
+        def versions(self, scope, aid):
+            return [old if aid.endswith("old") else recent]
+
+        def retention(self):
+            return self
+
+        def delete(self, path):
+            self.deleted.append(path)
+
+    class Desks:
+        def desk_world(self, org, user):
+            return "w_desk"
+
+        def desk_owner(self, world):
+            return "u_me"
+
+    store = Artifacts()
+    purge_old(store, Desks(), "org_tilo", "u_me", "2026-10-16")
+    assert store.deleted == ["orgs/org_tilo/worlds/w_desk/artifacts/art_morning_brief_old/versions/000001"]
+
+
 @pytest.mark.parametrize(
     "domain",
     [
@@ -375,3 +417,13 @@ def test_MORNING_BRIEF_B1A_MO07_ordinary_words_and_numbers_are_not_taken_for_dom
         "Q4 plan",
     ):
         assert DOMAIN.search(text) is None, text
+
+
+def test_MORNING_BRIEF_B1A_MO06_a_hidden_character_removed_by_cleaning_cannot_hide_a_domain(case):
+    c = case
+    c.script.reply = {
+        "needs_reply": [3],
+        "suggestions": [{"text": "Pay at evil-pay\u200b.com today", "items": [3]}],
+        "todos": [],
+    }
+    assert made(c)["suggestions"] == []

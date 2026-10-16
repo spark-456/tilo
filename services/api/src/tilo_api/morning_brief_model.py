@@ -91,6 +91,8 @@ def _own_line(ctx: Ctx, value: Any, cap: int, kind: str) -> str | None:
     if DOMAIN.search(unicodedata.normalize("NFKC", value[:RAW_CAP])):
         return None  # a bare domain is a link a mail client may open: dropped, never repaired
     text = clean(ctx, value, cap)
+    if DOMAIN.search(unicodedata.normalize("NFKC", text)):
+        return None
     same = text == " ".join(_unhide(clean_line(value[:RAW_CAP])).split())
     return text if text and same and len(value) <= RAW_CAP and conforms(f"{SCHEMA}#/$defs/{kind}", text) else None
 
