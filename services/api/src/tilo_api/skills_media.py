@@ -108,9 +108,9 @@ def read_capture_file(artifacts: ArtifactStore, scope: Scope, ref: dict[str, Any
     the owner cannot read, `too_long_to_read` over `max_read_bytes`, `audio_not_supported` as at upload."""
     try:
         head = artifacts.head(scope, ref)
-        media = None if head is None else head.record["media_type"]
         if head is None or head.record["origin"]["kind"] != "upload":
             raise Refusal(404, "not_found")
+        media = str(head.record["media_type"])
         if head.record["size_bytes"] > load_capture_limits().max_read_bytes:
             raise Refusal(422, "too_long_to_read")
         data = artifacts.read(scope, ref)
