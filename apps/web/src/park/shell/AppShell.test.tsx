@@ -47,7 +47,7 @@ const waitDone = async () => {
 
 describe("WEB_3b_shell: the pieces and where they sit", () => {
   it("CX_POOL_2_slow_page_chunk_uses_the_existing_shell_pool", async () => {
-    let begin = () => undefined;
+    let begin: () => void = () => undefined;
     function PageWait() {
       const [pageLoading, setPageLoading] = useState(false);
       begin = () => setPageLoading(true);

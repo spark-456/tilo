@@ -17,7 +17,9 @@ describe("WEB_3b_typecheck: the pinned surface", () => {
   });
 
   it("WEB_3b_typecheck_AppShell_takes_children_and_BootSplash_takes_ready", () => {
-    expectTypeOf<typeof AppShell>().parameter(0).toEqualTypeOf<{ children: ReactNode }>();
+    expectTypeOf<typeof AppShell>()
+      .parameter(0)
+      .toEqualTypeOf<{ children: ReactNode; pageLoading?: boolean }>();
     expectTypeOf<typeof BootSplash>().parameter(0).toEqualTypeOf<{ ready: boolean }>();
   });
 });
