@@ -45,7 +45,7 @@ from tilo_providers.media import MediaPart
 from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Deadline, Router, RouterDeadlineError
 
-from tilo_api import deps, ephemeral, intake_requests, quick
+from tilo_api import deps, ephemeral, grounding, intake_requests, quick
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
 from tilo_api.intake_deadline import INTAKE_DEADLINE_DETAIL, load_intake_deadline
@@ -304,6 +304,8 @@ async def _thinking(
         logger.warning("intake persistence failed: %s", type(exc).__name__)
         detail = "Upload storage is unavailable; retry." if request.files else "store_unavailable"
         raise HTTPException(status_code=503, detail=detail) from exc
+    if grounding.enabled():  # RT-01: each clean, readable upload becomes the owner's own passages; best effort
+        await run_in_threadpool(_remember_uploads, http, principal.user_id, result)
     body = asdict(result)  # per-file text and events stay server-side
     body["files"] = [{k: v for k, v in f.items() if k not in ("text", "events")} for f in body["files"]]
     questions = [
@@ -318,6 +320,14 @@ async def _thinking(
         "scenario": scenario,
         "gaps": [g.as_dict() for g in task.gaps],
     }
+
+
+def _remember_uploads(http: Request, uid: str, result: Any) -> None:
+    if (opened := grounding.opener(http)()) is None:
+        return
+    for f in result.files:
+        if f.status == "ok" and not f.safety_flagged:
+            opened.index_upload(uid, result.world_id, f.filename, f.artifact, f.text)
 
 
 async def _abort_uncommitted(store: InMemoryArtifactStore, tasks: deps.Store, ids: tuple[str, str, str]) -> None:
