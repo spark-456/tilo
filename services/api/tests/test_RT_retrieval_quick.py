@@ -8,7 +8,7 @@ import pytest
 from _clint1_lib import FLOW_USER, OTHER_USER
 from _costfast1_lib import ANSWER_KEYS, SIMPLE_TEXT
 from _rt_lib import WordEmbedder
-from tilo_api import deps, grounding
+from tilo_api import deps, grounding, grounding_prompt
 from tilo_memory.chunks import ChunkConfig, ChunkStore, SourceDoc
 from tilo_memory.chunks_backends import MemoryChunkBackend
 from tilo_providers.prompts import load_prompt, neutralise_marker
@@ -191,3 +191,52 @@ def test_RT_04_a_director_brief_without_passages_is_unchanged(wired):
     rig, opened = wired  # no chunks for this person
     assert rig.ask("Prepare the Acme supplier review pack.", mode="thinking").status_code == 201
     assert "PASSAGES" not in _director_request(rig).prompt and opened.embedder.calls == []
+
+
+def test_RT_04_the_shipped_config_sets_a_distance_so_irrelevant_passages_are_not_sent():
+    from pathlib import Path
+
+    from tilo_providers.memory_config import load_memory_config
+
+    limit = load_memory_config(Path(__file__).resolve().parents[3] / "config/memory.yaml").vector.max_distance
+    assert limit is not None and 0 < limit < 0.7
+
+
+def test_RT_06_a_slow_search_is_dropped_after_its_own_short_deadline(monkeypatch):
+    import time
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(grounding_prompt, "RECALL_TIMEOUT_S", 0.05)
+    slow = SimpleNamespace(store=SimpleNamespace(search=lambda *a, **kw: time.sleep(0.4)))
+    started = time.monotonic()
+    assert grounding_prompt.recall(slow, FLOW_USER, QUESTION) == []
+    assert time.monotonic() - started < 0.3  # the ask goes on without waiting for it
+
+
+def test_RT_04_render_re_bounds_a_passage_whatever_the_store_returned():
+    from tilo_memory.chunks import Hit
+
+    hit = Hit(
+        "ch_" + "a" * 32, {"kind": "pin", "id": "pb_x", "version": None}, "L" * 500 + "\u202e", "x" * 5000 + "\x07", 0.9
+    )
+    block = grounding_prompt.render([hit], "assistant", "quick_passages.md")
+    assert "\u202e" not in block and "\x07" not in block
+    assert block.count("x") == grounding_prompt.MAX_TEXT_CHARS and block.count("L") == 120
+
+
+def test_RT_04_the_worst_case_grounded_quick_ask_still_reserves_under_half_a_credit(wired):
+    rig, opened = wired
+    for n in range(5):
+        opened.add(FLOW_USER, ("acme supplier review " * 60)[:1200], source_id=f"pb_{n}", label="Acme notes " * 10)
+    body = rig.ask(QUESTION).json()
+    assert set(body) >= ANSWER_KEYS and len(body["grounded_on"]) == 5  # five full passages, still answered
+    (call,) = rig.answer_calls
+    assert call.budget is not None and call.budget <= 0.5
+    # the price sheet bounds the worst case: the longest question, five full passages and labels, the static prompts
+    from tilo_api.assistant.config import load_assistant_config
+
+    role = rig.providers.roles["assistant"]
+    worst_chars = len(call.request.system) + 400 + load_assistant_config().question_max_chars + 5 * (1200 + 120 + 80)
+    worst_tokens = worst_chars // 2  # pessimistic: two characters a token
+    assert worst_tokens < role.max_input_tokens
+    assert rig.credits_for(worst_tokens, 600) < 0.5  # plus the classifier's tiny call, still inside one Quick budget
