@@ -77,11 +77,11 @@
   color: var(--ink);
 }
 [data-park][data-theme="studio"] .park-shell__logomark {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  background: var(--priFill);
-  box-shadow: 0 3px 0 var(--priLip);
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--pri);
+  box-shadow: none;
 }
 [data-park][data-theme="studio"] .park-shell__eye {
   background: #0b0b0c;
@@ -106,8 +106,8 @@
 }
 [data-park][data-theme="studio"] .park-shell__tab--on,
 [data-park][data-theme="studio"] .park-shell__tab--on:hover {
-  background: var(--heroSoft);
-  color: var(--heroInk);
+  background: var(--sunk);
+  color: var(--ink);
 }
 [data-park][data-theme="studio"] .park-shell__tab:not(.park-shell__tab--on):hover,
 [data-park][data-theme="studio"] .park-shell__tab:not(.park-shell__tab--on):focus-visible,
@@ -245,7 +245,7 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--ink2);
+    color: var(--ink3);
     font-size: 11px;
     font-weight: 700;
     text-decoration: none;
@@ -264,8 +264,8 @@
     border-radius: 99px;
   }
   [data-park][data-theme="studio"] .park-shell__phone-tab--on .park-shell__phone-icon {
-    background: var(--heroSoft);
-    color: var(--heroInk);
+    background: var(--lime);
+    color: #0b0b0c;
   }
   [data-park][data-theme="studio"] .park-shell__phone-badge {
     position: absolute;
