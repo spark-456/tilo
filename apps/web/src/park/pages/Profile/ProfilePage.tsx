@@ -12,6 +12,7 @@ import type { AppCtx } from "../../app/AppCtx";
 import { useDemoSession, useParkApi } from "../../app/context";
 import { useFollowed } from "../../app/followed";
 import { PageSheet, StatusChip, Switch } from "../../components";
+import { ErrorState, LoadingState, StateAction } from "../../../design/tilo-t";
 import { SampleBadge } from "../../sample/SampleBadge";
 import { ApiReadState } from "../../shared/ApiReadState";
 import { ModelKeyControl } from "./ModelKey";
@@ -156,21 +157,17 @@ function SettingsState({ remote, retry }: { remote: Remote; retry: () => void })
       style={{ blockSize: 176, overflow: "auto" }}
     >
       {failed ? (
-        <p role="alert" className="park-profile-alert">
-          {remote.text}
-        </p>
+        <ErrorState
+          title={remote.text}
+          action={
+            <StateAction onClick={retry} icon="refresh">
+              Try again
+            </StateAction>
+          }
+        />
       ) : (
-        <output className="park-profile-note">Loading your settings…</output>
+        <LoadingState layout="list" caption="Loading your settings" />
       )}
-      <button
-        type="button"
-        className="park-profile-small"
-        onClick={retry}
-        disabled={!failed}
-        style={{ visibility: failed ? "visible" : "hidden" }}
-      >
-        Try again
-      </button>
     </div>
   );
 }
