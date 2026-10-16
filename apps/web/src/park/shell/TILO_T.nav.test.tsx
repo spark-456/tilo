@@ -36,6 +36,9 @@ describe("CX-T-NAV phone navigation", () => {
     });
     const nav = q<HTMLElement>(m.container, 'nav[aria-label="Phone tabs"]');
     const links = qa<HTMLAnchorElement>(nav, "a");
+    expect(qa<SVGElement>(nav, "svg").map((svg) => svg.getAttribute("viewBox"))).toEqual([
+      "0 0 24 24", "0 0 24 24", "0 0 24 24", "0 0 24 24", "0 0 24 24",
+    ]);
     expect(links.map((link) => link.textContent?.trim())).toEqual([
       "Home",
       "Worlds",

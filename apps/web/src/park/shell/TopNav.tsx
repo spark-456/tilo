@@ -4,6 +4,7 @@
 // Connectors). The 3px progress bar on its bottom edge follows the world loader and the page swap: it fades
 // with its opacity and fills with a scaleX (the stylesheet times both).
 import { type CSSProperties, type MouseEvent, useState } from "react";
+import { Icon, type IconName } from "../../design/tilo-t";
 import { PAGE_LABEL, type PageId } from "../app/AppCtx";
 import { parkPath } from "../app/router";
 import { Menu } from "../components";
@@ -25,11 +26,11 @@ const TABS: readonly (readonly [PageId, string])[] = [
   ["ledger", "Ledger"],
 ];
 
-const PHONE_TABS: readonly (readonly [PageId, string, string])[] = [
+const PHONE_TABS: readonly (readonly [PageId, string, IconName])[] = [
   ["home", "Home", "home"],
-  ["worlds", "Worlds", "grid"],
-  ["chat", "Chat", "card"],
-  ["needs", "Needs you", "shield"],
+  ["worlds", "Worlds", "city"],
+  ["chat", "Chat", "chat"],
+  ["needs", "Needs you", "inbox"],
 ];
 const PHONE_MORE: readonly (readonly [PageId, string])[] = [
   ["agenda", "Agenda"],
@@ -270,7 +271,7 @@ export function TopNav(p: TopNavProps) {
                 onFocus={() => prefetchPage(id)}
               >
                 <span className="park-shell__phone-icon">
-                  {icon(glyph, 19)}
+                  <Icon name={glyph} size={19} />
                   {id === "needs" && p.needsLeft > 0 ? (
                     <span className="park-shell__phone-badge">{p.needsLeft}</span>
                   ) : null}
@@ -287,7 +288,7 @@ export function TopNav(p: TopNavProps) {
             aria-expanded={phoneMoreOpen}
             onClick={() => setPhoneMoreOpen(true)}
           >
-            <span className="park-shell__phone-icon">{icon("more", 19)}</span>
+            <span className="park-shell__phone-icon"><Icon name="more" size={19} /></span>
             More
           </button>
         </nav>
