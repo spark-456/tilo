@@ -22,15 +22,17 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import Field
+from tilo_memory.artifacts import ArtifactStore, Scope
 from tilo_metering.flags import FlagStore
 from tilo_planning.artifacts import new_ulid
 from tilo_policy.schemas import conforms
 from tilo_providers.interfaces import GenerateRequest, SafetyProvider
+from tilo_providers.media import MediaPart
 from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.router import Router
 from tilo_providers.schema_guard import first_error
 
-from tilo_api import deps, events
+from tilo_api import deps, events, skills_understand
 from tilo_api.connectors_list import _optional_views
 from tilo_api.people import _PeopleRoute
 from tilo_api.people_events import _DESK_WORLD, WorkEvents, get_work_events
@@ -38,10 +40,9 @@ from tilo_api.people_writes import Refusal, Writer, _capped_body, _Closed, json_
 from tilo_api.skill_store import SkillStore
 from tilo_api.skills_routes import (
     _SKILL_ID,
-    StepIn,
-    _declared,
     _guarded,
     _now,
+    _teams,
     estimates_for,
     load_skill_config,
     plan_steps,
@@ -50,7 +51,7 @@ from tilo_api.skills_routes import (
 logger = logging.getLogger("tilo_api.skills_capture")
 router = APIRouter(route_class=_PeopleRoute)
 
-CAPTURE_ROLE = "specialist"  # the one place: ADR-0034's `skill_capture` role is a one-line switch once config has it
+CAPTURE_ROLE = "skill_capture"  # the one place (ADR-0034 decision 3); config/models.yaml names its profiles
 _MAX_TEXT = 4000
 _DROPPED = frozenset(
     {"Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp"}
@@ -84,6 +85,8 @@ _VERSION_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
     "required": ["steps", "question"],
     "properties": {
+        "inputs": {"type": "array", "maxItems": 8, "items": {"type": "object"}},  # TS-19: code keeps the valid slots
+        "hosts": {"type": "array", "maxItems": 10, "items": {"type": "string", "maxLength": 253}},  # TS-18
         "steps": {
             "type": "array",
             "minItems": 1,
@@ -123,9 +126,15 @@ _VERSION_SCHEMA: dict[str, Any] = {
 }
 
 
+class ArtifactRefIn(_Closed):
+    artifact_id: Annotated[str, Field(min_length=1, max_length=64)]
+    version: Annotated[int, Field(ge=1)]
+
+
 class CaptureIn(_Closed):
     method: Literal["describe"]
     text: Annotated[str, Field(min_length=1, max_length=_MAX_TEXT)]
+    documents: Annotated[list[ArtifactRefIn], Field(max_length=skills_understand.MAX_DOCUMENTS)] | None = None
 
 
 class _Failed(Exception):
@@ -157,11 +166,14 @@ def _flagged(safety: SafetyProvider, text: str) -> bool:
         raise HTTPException(status_code=503, detail="unavailable") from None  # a screen that is down never passes
 
 
-def _ask(router: Router, system: str, prompt: str, schema: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+def _ask(
+    router: Router, system: str, prompt: str, schema: dict[str, Any], parts: list[MediaPart] | None = None
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """One call through the Router; returns the reply (checked against `schema`) and the event's credits and trace."""
     try:
         result = router.generate(
-            CAPTURE_ROLE, GenerateRequest(system=system, prompt=prompt, json_mode=True, response_schema=schema)
+            CAPTURE_ROLE,
+            GenerateRequest(system=system, prompt=prompt, json_mode=True, response_schema=schema, parts=parts or None),
         )
         text = None if result.response is None else result.response.text
         if result.outcome != "ok" or type(text) is not str:
@@ -195,10 +207,6 @@ def _ask(router: Router, system: str, prompt: str, schema: dict[str, Any]) -> tu
     return doc, {"credits": credits, "trace": trace}
 
 
-def _fold(name: str) -> str:
-    return re.sub(r"[\s\-]+", "_", name.strip().lower())
-
-
 def _usable(registry: Any, views: Any, user_id: str) -> list[str]:
     """TEACH-PAIRS: the tools this person can use now, in the registry's order: their connected connectors, the Google
     sign-in tools, and any tool that needs no sign-in. A view that cannot be read counts as not connected."""
@@ -212,28 +220,6 @@ def _usable(registry: Any, views: Any, user_id: str) -> list[str]:
         except Exception:  # noqa: BLE001, S112 - unknown state is never "connected"; no text is shown
             continue
     return [t for t in registry.ids() if t in connected or registry.get(t)["auth"] != "oauth2"]
-
-
-def _listed(registry: Any, doc: dict[str, Any], usable: list[str]) -> tuple[list[StepIn], int]:
-    """The reply's steps whose pair config/connectors.yaml lists and the person can use (`usable`); no invented
-    channel or action. Also how many listed pairs were dropped for a tool the person has not connected. A pair written
-    as a model writes it (`tool.action` in either field, other case, spaces for underscores) is read as the listed
-    pair."""
-    kept, steered = [], 0
-    for s in doc["steps"]:
-        tool, action = _fold(s["tool"]), _fold(s["action"])
-        if "." in tool:  # `gmail.read_email` in the tool field
-            tool, _, joined = tool.partition(".")
-            action = action or joined
-        if action.startswith(tool + "."):  # `gmail.read_email` in the action field
-            action = action[len(tool) + 1 :]
-        if _declared(registry, tool, action) is None:
-            continue
-        if tool not in usable:
-            steered += 1
-            continue
-        kept.append(StepIn(text=s["text"], tool=tool, action=action, verb=s["verb"]))
-    return kept, steered
 
 
 def _ready(flags: FlagStore) -> None:
@@ -281,15 +267,25 @@ def capture_route(
     model_router: Annotated[Router, Depends(deps.get_router)],
     flags: Annotated[FlagStore, Depends(deps.get_flag_store)],
     we: Annotated[WorkEvents, Depends(get_work_events)],
+    artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
 ) -> dict[str, Any]:
-    """Describe a skill in words: 201 with the captured steps (text only) and the id of the draft."""
+    """Describe a skill in words (and, optionally, attached documents): 201 with the captured steps (text only) and
+    the id of the draft."""
     _ready(flags)
     text = _description(body.text, redact)
     if _flagged(safety, text):
         raise _not_understood()
+    blocks, doc_texts, parts = "", [], []
+    if body.documents:
+        scope = Scope(deps.ORG_ID, _guarded(lambda: _desk(we, deps.ORG_ID, principal.user_id)), principal.user_id)
+        refs = [r.model_dump() for r in body.documents]
+        blocks, doc_texts, parts = skills_understand.read_documents(artifacts, scope, refs, redact)
+        if doc_texts and _flagged(safety, "\n".join(doc_texts)):
+            raise _not_understood()
     system = load_prompt("skill_describe", "capture_system.md")
-    task = load_prompt("skill_describe", "capture_task.md", {"description": neutralise_marker(text, "DESCRIPTION")})
-    doc, used = _ask(model_router, system, task, _CAPTURE_SCHEMA)
+    variables = {"description": neutralise_marker(text, "DESCRIPTION"), "documents": blocks}
+    task = load_prompt("skill_describe", "capture_task.md", variables)
+    doc, used = _ask(model_router, system, task, _CAPTURE_SCHEMA, parts)
 
     def save() -> dict[str, Any]:
         now, owner = _now(clock), principal.user_id
@@ -341,13 +337,20 @@ def capture_route(
     return _guarded(save)
 
 
-def _view(draft: dict[str, Any]) -> dict[str, Any]:
+def _view(
+    draft: dict[str, Any], registry: Any, views: Any, team: Any, cannot: list[dict[str, str]] | None
+) -> dict[str, Any]:
     q = draft["question"]
+    joined = skills_understand.connected(registry, views, draft["owner"])
     return {
         "capture_id": draft["id"],
         "plan_steps": draft["plan"],
         "clarifying_question": None if q is None else {"text": q["text"], "options": q["options"]},
         "estimates": draft["estimates"],
+        "inputs": draft.get("inputs", []),
+        "hosts": draft.get("hosts", []),
+        "cannot": cannot,  # null: a repeat answer no longer knows which steps were dropped (never an empty list)
+        "needs_setup": skills_understand.needs_setup(draft["plan"], registry, joined, team),  # TS-21: never stored
     }
 
 
@@ -376,43 +379,46 @@ def version_route(
     registry: Annotated[Any, Depends(deps.get_connector_registry)],
     views: Annotated[Any, Depends(_optional_views)],
     we: Annotated[WorkEvents, Depends(get_work_events)],
+    team: Annotated[Any, Depends(skills_understand.team_state)],
 ) -> dict[str, Any]:
     """Tilo's version of the person's own draft; asked twice it answers the same version (no new call, no new event)."""
 
     def find() -> dict[str, Any]:
         found = None if _SKILL_ID.fullmatch(capture_id) is None else store.get(deps.ORG_ID, capture_id)
-        if (
-            found is None
-            or found["owner"] != principal.user_id
-            or found["status"] != "draft"
-            or found["method"] != "describe"
-        ):
+        if found is None or found["owner"] != principal.user_id or found["status"] != "draft":
             raise HTTPException(status_code=404, detail="not_found")
         return found
 
     draft = _guarded(find)
     if draft["plan"]:
-        return _view(draft)
+        return _view(draft, registry, views, team, None)
     _ready(flags)
+    allow = skills_understand.capture_tools()
     steps_block = "\n".join(f"{n}. {neutralise_marker(c['text'], 'STEPS')}" for n, c in enumerate(draft["captured"], 1))
     usable = _usable(registry, views, principal.user_id)
     actions = "\n".join(
         f'tool "{tool}", action "{a["id"]}": {a["description"]}'
         for tool in usable
         for a in registry.get(tool)["actions"]
+        if a["id"] in allow.get(tool, ())
     )
     preferred = ", ".join(t for t in usable if registry.get(t)["auth"] == "oauth2")
     system = load_prompt("skill_describe", "version_system.md")  # static: the person's tools ride in the task (EFF-04)
     variables = {"steps": steps_block, "actions": actions, "preferred": preferred}
     doc, used = _ask(model_router, system, load_prompt("skill_describe", "version_task.md", variables), _VERSION_SCHEMA)
-    kept, steered = _listed(registry, doc, usable)
+    kept, cannot, steered = skills_understand.allocate(registry, doc["steps"], usable, allow)
     if not kept or steered:  # SKILL-TEACH-422 / TEACH-PAIRS: nothing usable, or a step lost to an unconnected tool
         retry = load_prompt("skill_describe", "version_retry.md", variables)
         again_doc, again = _ask(model_router, system, retry, _VERSION_SCHEMA)
-        again_kept, _skipped = _listed(registry, again_doc, usable)
+        again_kept, again_cannot, _steered = skills_understand.allocate(registry, again_doc["steps"], usable, allow)
         if len(again_kept) >= len(kept):  # the first reply stays when the second keeps fewer steps
-            doc, kept = again_doc, again_kept
+            doc, kept, cannot = again_doc, again_kept, again_cannot
         used = {"credits": used["credits"] + again["credits"], "trace": again["trace"]}
+    typed = " ".join(c["text"] for c in draft["captured"]).casefold() if draft["method"] == "describe" else None
+    hosts = skills_understand.clean_hosts(doc.get("hosts"), kept, typed)
+    if not hosts:  # TS-18: a browse step names the hosts it may open; with none kept it cannot run
+        cannot += [{"text": k.text, "reason": "no_host"} for k in kept if k.action == "browse_web"]
+        kept = [k for k in kept if k.action != "browse_web"]
 
     def save() -> dict[str, Any]:
         now, owner = _now(clock), principal.user_id
@@ -422,17 +428,25 @@ def version_route(
                 raise _not_understood()
             plan = plan_steps(kept, writer.text, registry)
             question = _one_question(doc["question"], writer.text)
+            said = [*(c["text"] for c in draft["captured"]), *(s["text"] for s in plan)]
+            question = skills_understand.own_address_question(question, said)
+            lost = [{"text": writer.text(c["text"]), "reason": c["reason"]} for c in cannot]
+            inputs = [
+                {**i, "label": writer.text(i["label"])} for i in skills_understand.clean_inputs(doc.get("inputs"))
+            ]
         except Refusal as refusal:
             raise (refusal if refusal.detail == "not_understood" else _draft_failed()) from None
         shown = "\n".join([s["text"] for s in plan] + ([question["text"], *question["options"]] if question else []))
         if _flagged(safety, shown):
             raise _draft_failed()
+        extra = {**({"inputs": inputs} if inputs else {}), **({"hosts": hosts} if hosts else {})}
         after = {
             **draft,
             "plan": plan,
             "question": question,
             "estimates": estimates_for(plan, load_skill_config()),
             "updated_at": now,
+            **extra,
         }
         if not conforms("taught_skill.schema.json", after):
             raise _draft_failed()
@@ -463,6 +477,34 @@ def version_route(
         except Exception:
             store.put(draft)  # the proposal only exists once its event does
             raise
-        return _view(after)
+        return _view(after, registry, views, team, lost)
 
     return _guarded(save)
+
+
+@router.get("/v1/skills/{skill_id}/needs-setup")
+def needs_setup_route(
+    skill_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    store: Annotated[SkillStore, Depends(deps.get_skill_store)],
+    stores: Annotated[Any, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    registry: Annotated[Any, Depends(deps.get_connector_registry)],
+    views: Annotated[Any, Depends(_optional_views)],
+    team: Annotated[Any, Depends(skills_understand.team_state)],
+) -> dict[str, Any]:
+    """What a skill the caller may read still needs (TS-21): worked out now from their connections and the team's
+    levels, never stored. Absent, malformed or unreadable is the one 404 (TS-01)."""
+
+    def read() -> dict[str, Any]:
+        teams = _teams(stores, principal.user_id, _now(clock))
+        found = None if _SKILL_ID.fullmatch(skill_id) is None else store.get(deps.ORG_ID, skill_id)
+        if found is None or not (
+            found["owner"] == principal.user_id
+            or (found["status"] != "draft" and found["scope"]["kind"] == "team" and found["scope"]["team"] in teams)
+        ):
+            raise HTTPException(status_code=404, detail="not_found")
+        joined = skills_understand.connected(registry, views, principal.user_id)
+        return {"needs_setup": skills_understand.needs_setup(found["plan"], registry, joined, team)}
+
+    return _guarded(read)
