@@ -1,3 +1,4 @@
+import type { Skill } from "../../api/types";
 import {
   BookOpen,
   Braces,
@@ -10,7 +11,6 @@ import {
   Table2,
   UsersRound,
 } from "../../shared/icons";
-import type { Skill } from "../../api/types";
 
 export type SkillIconKind =
   | "mail"
