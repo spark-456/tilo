@@ -141,9 +141,8 @@ def _plain_name(text: str, fallback: str, *, room: int = 24) -> str:
 
 
 def _unit_building(building_id: str, group: list[dict[str, Any]]) -> dict[str, Any]:
-    """One building for one unit of work, named from its plan title; a run of units takes the first's, plus the rest."""
-    more = f" +{len(group) - 1}" if len(group) > 1 else ""
-    name = _plain_name(str(group[0].get("title", "")), "Workshop", room=24 - len(more)) + more
+    """One building for a run of units, named with the first unit's plain plan title."""
+    name = _plain_name(str(group[0].get("title", "")), "Workshop")
     return {
         "id": building_id,
         "name": name,

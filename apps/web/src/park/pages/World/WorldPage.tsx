@@ -612,10 +612,6 @@ export function WorldPage({ app }: { app: AppCtx }) {
             : {})}
         />
       ) : null}
-      {loaded.live && worldClient ? <SkillProposals client={worldClient} worldId={w.id} /> : null}
-      {loaded.live && worldClient && !w.sample ? (
-        <TeamItems client={worldClient} worldId={w.id} auto={false} />
-      ) : null}
       {slackOpen ? (
         // biome-ignore lint/a11y/useKeyWithClickEvents: Escape already closes the dialog (its onKeyDown); the backdrop click is the pointer shortcut
         <div
@@ -923,6 +919,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
           </TabPanel>
         </div>
       </div>
+
+      {loaded.live && worldClient ? <SkillProposals client={worldClient} worldId={w.id} /> : null}
+      {loaded.live && worldClient && !w.sample ? (
+        <TeamItems client={worldClient} worldId={w.id} auto={false} />
+      ) : null}
 
       {part(3) ? (
         <div className="park-world-more">

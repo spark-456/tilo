@@ -1605,6 +1605,10 @@
   align-items: stretch;
   justify-content: stretch;
 }
+[data-park] .park-world-map--live .tw-convene {
+  top: 68px;
+  left: 20px;
+}
 [data-park] .park-world-livestage {
   position: absolute;
   inset: 0;
