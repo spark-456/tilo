@@ -67,6 +67,6 @@
     linear-gradient(90deg, var(--bpLine) 1px, transparent 1px);
   background-size: 16px 16px;
   color: var(--bpInk);
-  font: 700 13px/1.5 var(--mono);
+  font: 700 13px / 1.5 var(--mono);
   overflow-wrap: anywhere;
 }

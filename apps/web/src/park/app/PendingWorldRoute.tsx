@@ -51,7 +51,11 @@ export function PendingWorldRoute({
     return client.subscribeEvents(
       worldId,
       (event) => {
-        if (event.type === "world.started" || event.type === "world.planned" || event.type === "world.failed") {
+        if (
+          event.type === "world.started" ||
+          event.type === "world.planned" ||
+          event.type === "world.failed"
+        ) {
           setEvents((current) => {
             if (current.some((recorded) => recorded.type === event.type)) return current;
             const recorded = event.ts ? { type: event.type, ts: event.ts } : { type: event.type };
@@ -60,7 +64,7 @@ export function PendingWorldRoute({
         }
         if (event.type === "world.started") {
           // triggeredBy: world.started. The pool appears only after this recorded event.
-          setPhase((current) => current === "planned" ? current : "started");
+          setPhase((current) => (current === "planned" ? current : "started"));
         }
         if (event.type === "world.planned") {
           // triggeredBy: world.planned. Enter the actual World only after its plan is recorded.
@@ -82,11 +86,21 @@ export function PendingWorldRoute({
         <div className="park-world-enter">{children}</div>
       ) : (
         <section className="park-pending-world" data-testid="pending-world">
-          <h1 tabIndex={-1}>{worldFailed ? "This world stopped" : failed ? "We can't open this world yet" : "Tilo is planning your world"}</h1>
+          <h1 tabIndex={-1}>
+            {worldFailed
+              ? "This world stopped"
+              : failed
+                ? "We can't open this world yet"
+                : "Tilo is planning your world"}
+          </h1>
           {failed ? (
             <ErrorState
               title={worldFailed ? "This world stopped" : "World updates are unavailable"}
-              body={worldFailed ? "Return to your worlds to see what happened." : "You can return to your worlds and try again."}
+              body={
+                worldFailed
+                  ? "Return to your worlds to see what happened."
+                  : "You can return to your worlds and try again."
+              }
             />
           ) : (
             <div>
@@ -97,7 +111,11 @@ export function PendingWorldRoute({
               ) : null}
               <LoadingState
                 layout="world"
-                caption={phase === "started" ? "world.started · Waiting for world.planned" : "Waiting for world.started"}
+                caption={
+                  phase === "started"
+                    ? "world.started · Waiting for world.planned"
+                    : "Waiting for world.started"
+                }
               />
             </div>
           )}

@@ -37,14 +37,22 @@ it("CX_T_RUN_starts_the_storyboard_only_from_recorded_world_events", async () =>
 
 it("CX_T_RUN_existing_world_skips_the_start_storyboard", () => {
   const client = { subscribeEvents: vi.fn() };
-  const rig = mount(<PendingWorldRoute worldId="existing" client={client}><p>World is visible</p></PendingWorldRoute>);
+  const rig = mount(
+    <PendingWorldRoute worldId="existing" client={client}>
+      <p>World is visible</p>
+    </PendingWorldRoute>,
+  );
   expect(rig.container.textContent).toContain("World is visible");
   expect(client.subscribeEvents).not.toHaveBeenCalled();
 });
 
 it("CX_T_RUN_missing_event_feed_shows_an_error_without_a_fake_loader", () => {
   markPendingWorld("no-feed");
-  const rig = mount(<PendingWorldRoute worldId="no-feed" client={null}><p>World is visible</p></PendingWorldRoute>);
+  const rig = mount(
+    <PendingWorldRoute worldId="no-feed" client={null}>
+      <p>World is visible</p>
+    </PendingWorldRoute>,
+  );
   expect(rig.container.textContent).toContain("World updates are unavailable");
   expect(rig.container.querySelector("[data-testid='tt-loading']")).toBeNull();
   expect(rig.container.textContent).not.toContain("World is visible");
@@ -60,7 +68,9 @@ it("CX_T_RUN_failed_start_stops_the_loader_and_releases_the_pending_route", asyn
   };
   markPendingWorld("failed-start");
   const rig = mount(
-    <PendingWorldRoute worldId="failed-start" client={client}><p>World is visible</p></PendingWorldRoute>,
+    <PendingWorldRoute worldId="failed-start" client={client}>
+      <p>World is visible</p>
+    </PendingWorldRoute>,
   );
   await act(async () => receive?.({ type: "world.failed" }));
   expect(rig.container.textContent).toContain("This world stopped");
@@ -82,7 +92,9 @@ it("CX_T_RUN_pending_blueprint_stays_until_the_recorded_world_started_event", as
       <p>World is visible</p>
     </PendingWorldRoute>,
   );
-  expect(rig.container.querySelector("[data-testid='run-blueprint']")?.textContent).toContain("Prepare the team offsite");
+  expect(rig.container.querySelector("[data-testid='run-blueprint']")?.textContent).toContain(
+    "Prepare the team offsite",
+  );
   expect(rig.container.textContent).toContain("Waiting for world.started");
   await act(async () => receive?.({ type: "agent.spawned" }));
   expect(rig.container.querySelector("[data-testid='run-blueprint']")).not.toBeNull();
@@ -94,10 +106,12 @@ it("CX_T_RUN_pool_stays_mounted_while_the_recorded_plan_reveals_the_world", asyn
   vi.useFakeTimers();
   let receive: ((event: { type: string; ts?: string }) => void) | undefined;
   const client = {
-    subscribeEvents: vi.fn((_id: string, onEvent: (event: { type: string; ts?: string }) => void) => {
-      receive = onEvent;
-      return vi.fn();
-    }),
+    subscribeEvents: vi.fn(
+      (_id: string, onEvent: (event: { type: string; ts?: string }) => void) => {
+        receive = onEvent;
+        return vi.fn();
+      },
+    ),
   };
   markPendingWorld("pool-handoff", "Plan a team day");
   const rig = mount(

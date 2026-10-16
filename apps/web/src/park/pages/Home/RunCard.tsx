@@ -22,7 +22,15 @@ export interface RunCardProps {
 
 const credits = (n: number): string => `${Number.isInteger(n) ? n : n.toFixed(1)}`;
 
-export function RunCard({ plan, busy, starting = false, error, onStart, onCancel, onEdit }: RunCardProps) {
+export function RunCard({
+  plan,
+  busy,
+  starting = false,
+  error,
+  onStart,
+  onCancel,
+  onEdit,
+}: RunCardProps) {
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const repeat = useRepeatWeekly(busy);
@@ -33,109 +41,112 @@ export function RunCard({ plan, busy, starting = false, error, onStart, onCancel
   const usd = plan.usd === null ? "" : ` (about US$${plan.usd.toFixed(2)} at most)`;
   return (
     <>
-    <div className={starting ? "park-home-plan park-home-plan--starting" : "park-home-plan"} data-testid="run-card">
-      {starting ? (
-        <span className="park-home-run-blueprint" data-testid="run-blueprint" aria-hidden="true">
-          BLUEPRINT · {plan.goal}
-        </span>
-      ) : null}
-      <div className="park-home-plan__main">
-        <div className="park-home-plan__head">
-          <span className="park-home-tier">READY</span>
-          <span className="park-home-plan__query">{plan.goal}</span>
-        </div>
-        <div className="park-home-meta">
-          <span>
-            <span className="park-home-meta__k">Cost</span>{" "}
-            <span className="park-home-meta__v">{`${price}${usd}`}</span>
+      <div
+        className={starting ? "park-home-plan park-home-plan--starting" : "park-home-plan"}
+        data-testid="run-card"
+      >
+        {starting ? (
+          <span className="park-home-run-blueprint" data-testid="run-blueprint" aria-hidden="true">
+            BLUEPRINT · {plan.goal}
           </span>
-          <span>
-            <span className="park-home-meta__k">Time</span>{" "}
-            <span className="park-home-meta__v">{plan.time}</span>
-          </span>
-        </div>
-        <BudgetBar min={plan.credits.min} max={plan.credits.max} cap={plan.cap} />
-        <p className="park-home-plan__sample" data-testid="budget-line">
-          {`Start approves up to ${plan.cap} credits${plan.usd === null ? "" : ` (about US$${plan.usd.toFixed(2)})`}. You can pause it any time.`}
-        </p>
-        {plan.lines.length > 0 ? (
-          <ol className="park-home-steps" aria-label="What Tilo assumed">
-            {plan.lines.map((line, i) => (
-              <li key={`${line.field ?? "line"}:${line.text}`} className="park-home-step">
-                {editing === i && line.field !== null ? (
-                  <form
-                    className="park-home-run__edit"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const answer = draft.trim();
-                      if (answer === "" || line.field === null) return;
-                      setEditing(null);
-                      onEdit(line.field, answer);
-                    }}
-                  >
-                    <input
-                      aria-label={`Change: ${line.text}`}
-                      value={draft}
-                      maxLength={300}
-                      // biome-ignore lint/a11y/noAutofocus: the person just asked to change this line
-                      autoFocus
-                      onChange={(e) => setDraft(e.target.value)}
-                    />
-                    <button type="submit" className="park-home-change" disabled={busy}>
-                      Save
-                    </button>
-                  </form>
-                ) : (
-                  <>
-                    <span>{`Assumed: ${line.text}`}</span>
-                    {line.field !== null ? (
-                      <button
-                        type="button"
-                        className="park-home-run__link"
-                        disabled={busy}
-                        onClick={() => {
-                          setEditing(i);
-                          setDraft(line.text);
-                        }}
-                      >
-                        Change
+        ) : null}
+        <div className="park-home-plan__main">
+          <div className="park-home-plan__head">
+            <span className="park-home-tier">READY</span>
+            <span className="park-home-plan__query">{plan.goal}</span>
+          </div>
+          <div className="park-home-meta">
+            <span>
+              <span className="park-home-meta__k">Cost</span>{" "}
+              <span className="park-home-meta__v">{`${price}${usd}`}</span>
+            </span>
+            <span>
+              <span className="park-home-meta__k">Time</span>{" "}
+              <span className="park-home-meta__v">{plan.time}</span>
+            </span>
+          </div>
+          <BudgetBar min={plan.credits.min} max={plan.credits.max} cap={plan.cap} />
+          <p className="park-home-plan__sample" data-testid="budget-line">
+            {`Start approves up to ${plan.cap} credits${plan.usd === null ? "" : ` (about US$${plan.usd.toFixed(2)})`}. You can pause it any time.`}
+          </p>
+          {plan.lines.length > 0 ? (
+            <ol className="park-home-steps" aria-label="What Tilo assumed">
+              {plan.lines.map((line, i) => (
+                <li key={`${line.field ?? "line"}:${line.text}`} className="park-home-step">
+                  {editing === i && line.field !== null ? (
+                    <form
+                      className="park-home-run__edit"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const answer = draft.trim();
+                        if (answer === "" || line.field === null) return;
+                        setEditing(null);
+                        onEdit(line.field, answer);
+                      }}
+                    >
+                      <input
+                        aria-label={`Change: ${line.text}`}
+                        value={draft}
+                        maxLength={300}
+                        // biome-ignore lint/a11y/noAutofocus: the person just asked to change this line
+                        autoFocus
+                        onChange={(e) => setDraft(e.target.value)}
+                      />
+                      <button type="submit" className="park-home-change" disabled={busy}>
+                        Save
                       </button>
-                    ) : null}
-                  </>
-                )}
-              </li>
-            ))}
-          </ol>
-        ) : null}
-        {repeat.control}
-        {busy ? (
-          // biome-ignore lint/a11y/useSemanticElements: a status line, not a form result
-          <p role="status" className="park-home-plan__sample">
-            Working on it…
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" className="park-home-plan__sample" data-testid="run-error">
-            {error}
-          </p>
-        ) : null}
+                    </form>
+                  ) : (
+                    <>
+                      <span>{`Assumed: ${line.text}`}</span>
+                      {line.field !== null ? (
+                        <button
+                          type="button"
+                          className="park-home-run__link"
+                          disabled={busy}
+                          onClick={() => {
+                            setEditing(i);
+                            setDraft(line.text);
+                          }}
+                        >
+                          Change
+                        </button>
+                      ) : null}
+                    </>
+                  )}
+                </li>
+              ))}
+            </ol>
+          ) : null}
+          {repeat.control}
+          {busy ? (
+            // biome-ignore lint/a11y/useSemanticElements: a status line, not a form result
+            <p role="status" className="park-home-plan__sample">
+              Working on it…
+            </p>
+          ) : null}
+          {error ? (
+            <p role="alert" className="park-home-plan__sample" data-testid="run-error">
+              {error}
+            </p>
+          ) : null}
+        </div>
+        <div className="park-home-plan__actions">
+          <button
+            type="button"
+            className="park-home-confirm"
+            disabled={busy || repeat.invalid}
+            aria-busy={busy ? true : undefined}
+            onClick={() => onStart(repeat.cadence)}
+          >
+            {error ? "Try again" : "Start"}
+          </button>
+          <button type="button" className="park-home-change" disabled={busy} onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
       </div>
-      <div className="park-home-plan__actions">
-        <button
-          type="button"
-          className="park-home-confirm"
-          disabled={busy || repeat.invalid}
-          aria-busy={busy ? true : undefined}
-          onClick={() => onStart(repeat.cadence)}
-        >
-          {error ? "Try again" : "Start"}
-        </button>
-        <button type="button" className="park-home-change" disabled={busy} onClick={onCancel}>
-          Cancel
-        </button>
-      </div>
-    </div>
-    {starting ? <p className="park-home-start-status" role="status">Starting your world…</p> : null}
+      {starting ? <output className="park-home-start-status">Starting your world…</output> : null}
     </>
   );
 }
