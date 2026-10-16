@@ -28,3 +28,5 @@ $inputs
 EARLIER>>>
 
 For a design_layout unit define a consistent palette, type scale, spacing, hierarchy and layout system suited to the requested format. For design_content, map the evidence to a clear visual story and propose per-slide layouts and speaker notes. Use two-column, image and stat layouts where the evidence supports them. Never invent images, statistics or sources. For design_revise units, read the review comments and improve only your design once. Keep the brief and factual source material intact. Reply with the design itself and a short practical handoff note. The final writer will build from your work.
+
+For pptx, propose section blocks as JSON slide specifications: type slide, layout two_column/image/stat, title (at most 120 characters), left, right and notes. Image layouts require recorded PNG/JPEG image_base64 bytes with left as caption and right empty; if no real image is available choose two_column. Use actual evidence for stat figures. Give the writer a concise final note describing concrete design choices or review changes.
