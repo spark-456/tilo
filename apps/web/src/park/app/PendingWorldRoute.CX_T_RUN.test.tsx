@@ -2,7 +2,7 @@
 import { act } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, mount } from "../../../test-support/park/componentsHarness";
-import { PendingWorldRoute, markPendingWorld } from "./PendingWorldRoute";
+import { PendingWorldRoute, markPendingWorld, pendingWorld } from "./PendingWorldRoute";
 
 afterEach(cleanup);
 
@@ -45,4 +45,22 @@ it("CX_T_RUN_missing_event_feed_shows_an_error_without_a_fake_loader", () => {
   expect(rig.container.textContent).toContain("World updates are unavailable");
   expect(rig.container.querySelector("[data-testid='tt-loading']")).toBeNull();
   expect(rig.container.textContent).not.toContain("World is visible");
+});
+
+it("CX_T_RUN_failed_start_stops_the_loader_and_releases_the_pending_route", async () => {
+  let receive: ((event: { type: string }) => void) | undefined;
+  const client = {
+    subscribeEvents: vi.fn((_id: string, onEvent: (event: { type: string }) => void) => {
+      receive = onEvent;
+      return vi.fn();
+    }),
+  };
+  markPendingWorld("failed-start");
+  const rig = mount(
+    <PendingWorldRoute worldId="failed-start" client={client}><p>World is visible</p></PendingWorldRoute>,
+  );
+  await act(async () => receive?.({ type: "world.failed" }));
+  expect(rig.container.textContent).toContain("This world stopped");
+  expect(rig.container.querySelector("[data-testid='tt-loading']")).toBeNull();
+  expect(pendingWorld("failed-start")).toBe(false);
 });

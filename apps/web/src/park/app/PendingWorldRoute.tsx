@@ -32,10 +32,11 @@ export function PendingWorldRoute({
     pendingWorld(worldId) ? "waiting" : "planned",
   );
   const [error, setError] = useState(false);
+  const [worldFailed, setWorldFailed] = useState(false);
   const loopRef = useRef<HTMLDivElement>(null);
   const paused = useLoopPaused(loopRef);
   const planned = phase === "planned";
-  const failed = error || client === null;
+  const failed = error || worldFailed || client === null;
   useEffect(() => {
     if (planned || client === null) return undefined;
     return client.subscribeEvents(
@@ -50,6 +51,10 @@ export function PendingWorldRoute({
           pending.delete(worldId);
           setPhase("planned");
         }
+        if (event.type === "world.failed") {
+          pending.delete(worldId);
+          setWorldFailed(true);
+        }
       },
       () => setError(true),
     );
@@ -58,11 +63,11 @@ export function PendingWorldRoute({
   if (planned) return <div className="park-world-enter">{children}</div>;
   return (
     <section className="park-pending-world" data-testid="pending-world">
-      <h1 tabIndex={-1}>{failed ? "We can't open this world yet" : "Tilo is planning your world"}</h1>
+      <h1 tabIndex={-1}>{worldFailed ? "This world stopped" : failed ? "We can't open this world yet" : "Tilo is planning your world"}</h1>
       {failed ? (
         <ErrorState
-          title="World updates are unavailable"
-          body="You can return to your worlds and try again."
+          title={worldFailed ? "This world stopped" : "World updates are unavailable"}
+          body={worldFailed ? "Return to your worlds to see what happened." : "You can return to your worlds and try again."}
         />
       ) : (
         <div ref={loopRef} className={paused}>
