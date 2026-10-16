@@ -4,15 +4,13 @@
 // - file `apps/web/src/park/api/live/ledgerFromCosts.ts`, named export `ledgerFromCosts(report): Ledger`.
 //   Pure, total on any valid report, never mutates its input, never imports fixtures.
 // - served fields only: `spent` = totals.usd (US dollars as served: no currency conversion);
-//   `by.tool.rows` from `by_profile` ([profile ?? "Unlabelled", usd]);
-//   `by.role.rows` from `by_task_type` ([task_type ?? "Unlabelled", usd]); report order is kept.
+//   profile ids stay internal; work rows use plain labels from `by_task_type`.
 //   `by.world.rows` is EMPTY: the report groups by world tier, profile and unit type, never by world.
 // - everything the report does not serve is EMPTY or ZERO, never a fixture value: budget 0, forecast 0,
 //   daily/tx/runs/memory/hours/activity [], waits {buckets: [], types: []}.
 // - each `by.*.head` is a string that is not one of the fixture's sentences (a builder may write "" or a
 //   computed sentence; it must not be the prototype's copy).
-// Ambiguity (PRD default, open-questions BQ-WIRE1-1): which by_* group is a "tool" and which a "role". The PRD
-// has no mapping; profile (what ran the work) is the tool and unit type (what the work was) is the role.
+// The report has no world grouping or model role, so neither is inferred.
 import fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
 import { ledger as fixtureLedger } from "../fixtures";
@@ -80,16 +78,29 @@ const EMPTY_REPORT = {
 it("FR_SPD_04_preserves_recorded_run_totals_without_inventing_skill_curves", () => {
   const L = ledgerFromCosts(REPORT);
   expect(L.recordedRuns).toEqual(
-    REPORT.tasks.map(({ run_id, usd, completed }) => ({
+    REPORT.tasks.map(({ run_id, usd, completed, credits }) => ({
       id: run_id,
       usd,
       completed,
+      credits,
     })),
   );
   expect(L.runs).toEqual([]);
   expect(
     ledgerFromCosts({ totals: { usd: 0 }, by_profile: [], by_task_type: [] }).recordedRuns,
   ).toEqual([]);
+});
+
+it("CX_PAGES_ENRICH_LEDGER_uses_plain_language_groups_and_recorded_credits", () => {
+  const L = ledgerFromCosts(REPORT);
+  expect(L.by.tool.rows).toEqual([]);
+  expect(L.by.role.rows).toEqual([
+    ["Web search", 1],
+    ["Planning and writing", 0.15],
+    ["Other work", 0.06],
+  ]);
+  expect(L.recordedRuns?.[0]?.credits).toBe(100);
+  expect(L.totalCredits).toBe(242);
 });
 
 it("FR_SPD_05_07_maps_recorded_waits_and_history_without_assuming_approval", () => {
@@ -151,7 +162,6 @@ it("FR_SPD_07 recorded timestamps are independent of the injected fixed clock", 
       detail: [
         ["Event", "approval.requested"],
         ["Recorded at", ts],
-        ["Run", "run-a"],
       ],
     });
   } finally {
@@ -180,15 +190,14 @@ describe("WIRE_1_ledgerFromCosts: what the report carries", () => {
     expect(ledgerFromCosts(REPORT).spent).toBeCloseTo(1.21, 10);
   });
 
-  it("WIRE_1_ledgerFromCosts_by_tool_rows_come_from_by_profile_in_usd_and_report_order", () => {
+  it("CX_PAGES_ENRICH_LEDGER_hides_profile_ids", () => {
     const rows = ledgerFromCosts(REPORT).by.tool.rows;
-    expect(rows.map((r) => r[0])).toEqual(["fast", "deep", "Unlabelled"]);
-    expect(rows.map((r) => r[1])).toEqual([0.5, 0.65, 0.06]);
+    expect(rows).toEqual([]);
   });
 
-  it("WIRE_1_ledgerFromCosts_by_role_rows_come_from_by_task_type_in_usd_and_report_order", () => {
+  it("CX_PAGES_ENRICH_LEDGER_work_rows_use_person_facing_labels", () => {
     const rows = ledgerFromCosts(REPORT).by.role.rows;
-    expect(rows.map((r) => r[0])).toEqual(["research", "summarise", "Unlabelled"]);
+    expect(rows.map((r) => r[0])).toEqual(["Web search", "Planning and writing", "Other work"]);
     expect(rows.map((r) => r[1])).toEqual([1, 0.15, 0.06]);
   });
 
@@ -295,8 +304,8 @@ describe("WIRE_1_ledgerFromCosts: property", () => {
       fc.property(reports, (report) => {
         const L = ledgerFromCosts(report);
         expect(L.spent).toBe(report.totals.usd);
-        expect(L.by.tool.rows).toHaveLength(report.by_profile.length);
-        expect(L.by.role.rows).toHaveLength(report.by_task_type.length);
+        expect(L.by.tool.rows).toEqual([]);
+        expect(L.by.role.rows.length).toBeLessThanOrEqual(report.by_task_type.length);
         expect(L.by.world.rows).toEqual([]);
         expect([L.budget, L.forecast]).toEqual([0, 0]);
         expect(

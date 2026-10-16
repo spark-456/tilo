@@ -326,7 +326,9 @@ export interface Ledger {
   tx: LedgerTx[];
   runs: [string, number[], number, string][];
   /** Recorded task totals; these are not ordered repetitions of a skill. */
-  recordedRuns?: { id: string; usd: number; completed: boolean }[];
+  recordedRuns?: { id: string; usd: number; completed: boolean; credits?: number }[];
+  /** Credits reported by /costs; no conversion is inferred from US dollars. */
+  totalCredits?: number;
   waits: {
     buckets: [string, number][];
     types: [string, string, string][];

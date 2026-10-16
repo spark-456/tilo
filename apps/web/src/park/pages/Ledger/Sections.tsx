@@ -47,7 +47,9 @@ export function WhereItGoes({ L }: { L: Ledger }) {
   const [picked, setBy] = useState<By>("world");
   // Only the groupings the Ledger has rows for are offered; the first of them opens.
   const by = groups.includes(picked) ? picked : (groups[0] ?? picked);
-  const tabs = BY_TABS.filter((t) => groups.includes(t.value));
+  const tabs = BY_TABS.filter((t) => groups.includes(t.value)).map((tab) =>
+    tab.value === "role" && L.recordedRuns !== undefined ? { ...tab, label: "Work" } : tab,
+  );
   const d = donut(L, by);
   return (
     <section aria-label="Where it goes" className="park-ledger-card">
@@ -132,17 +134,18 @@ export function RecordedRuns({ L }: { L: Ledger }) {
   return (
     <section aria-label="Recorded run costs" className="park-ledger-card">
       <Head eyebrow="COST PER RUN" title="Recorded run totals" />
-      <p className="park-ledger-sub">
-        Costs recorded so far. Skill cost trends are not available yet.
-      </p>
+      {L.totalCredits !== undefined ? (
+        <p className="park-ledger-sub">
+          {L.totalCredits.toLocaleString()} credits · {money(L, L.spent)}
+        </p>
+      ) : null}
       <div className="park-ledger-types">
-        {L.recordedRuns?.map((run) => (
+        {L.recordedRuns?.map((run, index) => (
           <div key={run.id} className="park-ledger-type park-ledger-recorded">
-            <span className="park-ledger-ellipsis" title={run.id}>
-              {run.id}
-            </span>
+            <span className="park-ledger-ellipsis">Run {index + 1}</span>
             <span>
-              {money(L, run.usd)} · {run.completed ? "Completed" : "Completion not recorded"}
+              {run.credits !== undefined ? `${run.credits.toLocaleString()} credits · ` : ""}
+              {money(L, run.usd)} · {run.completed ? "Completed" : "No finish event"}
             </span>
           </div>
         ))}
@@ -178,11 +181,7 @@ export function ApprovalWaits({ L, app }: { L: Ledger; app: AppCtx }) {
           </div>
         ))}
       </div>
-      {L.recordedRuns !== undefined ? (
-        <p className="park-ledger-sub">
-          Measured from recorded requests to answers. Backup impact is not available yet.
-        </p>
-      ) : backup ? null : (
+      {L.recordedRuns !== undefined || backup ? null : (
         <div className="park-ledger-callout">
           <span className="park-ledger-callout-text">
             Jin approves all outside sharing. A backup approver would cut the wait.

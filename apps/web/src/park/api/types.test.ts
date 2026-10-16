@@ -72,6 +72,7 @@ describe("WEB_1a_types: entity shapes follow the README data model", () => {
       | "tx"
       | "runs"
       | "recordedRuns"
+      | "totalCredits"
       | "waits"
       | "memory"
       | "hours"

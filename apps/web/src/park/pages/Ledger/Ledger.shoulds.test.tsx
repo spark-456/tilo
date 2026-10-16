@@ -87,10 +87,11 @@ it("FR_SPD_04_recorded_runs_show_totals_and_completion_without_skill_navigation"
     currency: "USD",
   });
   const card = region(container, "Recorded run costs");
-  expect(text(card)).toContain("recorded-a");
+  expect(text(card)).toContain("Run 1");
+  expect(text(card)).not.toContain("recorded-a");
   expect(text(card)).toContain("$1.25");
   expect(text(card)).toContain("Completed");
-  expect(text(card)).toContain("Completion not recorded");
+  expect(text(card)).toContain("No finish event");
   expect(qa(card, "button")).toHaveLength(0);
 });
 
@@ -113,9 +114,7 @@ it("FR_SPD_05_06_07_live_history_shows_only_recorded_waits_and_honest_unavailabl
   });
   const { container, navigate } = await mountLedger(L);
   expect(text(region(container, "Approval wait times"))).toContain("2.0 min");
-  expect(text(container)).toContain(
-    "Memory savings by week and hours handed back are not available yet.",
-  );
+  expect(text(container)).not.toContain("not available yet");
   const activity = region(container, "Activity");
   expect(text(activity)).toContain("Held for edits");
   expect(text(activity)).toContain("Approval answered");
