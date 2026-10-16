@@ -28,7 +28,7 @@ ERASURE_DEADLINE_DAYS = 30
 UNREADABLE = -1
 # PRD 13.1/13.2: Firestore, the BigQuery ledger, Memory Bank, and Cloud Storage for archive, artifacts and cache blobs.
 REQUIRED_STORES: frozenset[str] = frozenset(
-    {"firestore", "bigquery_ledger", "memory_bank", "gcs_archive", "gcs_artifacts", "gcs_cache"}
+    {"firestore", "memory_items", "bigquery_ledger", "memory_bank", "gcs_archive", "gcs_artifacts", "gcs_cache"}
 )
 EXIT_OK, EXIT_DATA_REMAINS, EXIT_BAD_INPUT, EXIT_INCOMPLETE = 0, 1, 2, 3
 
