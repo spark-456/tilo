@@ -61,7 +61,7 @@ it("TILO_T_STATES_HR1_FR_SET_01_settings_use_shared_loading_and_error_states", a
   await settle();
   expect(root.querySelector("[data-profile-settings-state]")).toBe(box);
   expect(box?.querySelector('[data-testid="tt-error"]')?.getAttribute("role")).toBe("alert");
-  expect(text(root.querySelector('[role="alert"] p'))).toBe(displayApiError(failure()));
+  expect(text(root.querySelector('[role="alert"] h2'))).toBe(displayApiError(failure()));
   await clickAndSettle(buttonNamed(root, "Try again"));
   expect(api.getUserSettings).toHaveBeenCalledTimes(2);
   expect(api.saveUserSettings).not.toHaveBeenCalled();
