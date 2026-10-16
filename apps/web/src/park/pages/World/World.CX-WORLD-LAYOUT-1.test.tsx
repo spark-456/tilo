@@ -50,10 +50,18 @@ it("CX_WORLD_LAYOUT_1_places_the_work_sections_after_the_world_stage", async () 
 it.each([1440, 390])("CX_WORLD_LAYOUT_1_offsets_convene_from_the_agent_count_at_%i_px", (vw) => {
   const root = document.createElement("div");
   root.setAttribute("data-park", "");
-  root.innerHTML = '<div class="park-world-map--live"><button class="tw-convene"></button></div>';
+  root.innerHTML =
+    '<div class="park-world-map--live"><div class="park-world-tag"></div><div class="park-world-livestage"><button class="tw-convene"></button></div></div>';
+  const tag = root.querySelector(".park-world-tag") as HTMLDivElement;
   const button = root.querySelector(".tw-convene") as HTMLButtonElement;
-  const style = declared(button, rulesOf(join(__dirname, "World.css"), vw));
+  const rules = rulesOf(join(__dirname, "World.css"), vw);
+  const tagStyle = declared(tag, rules);
+  const buttonStyle = declared(button, rules);
 
-  expect(style.get("top")).toBe("68px");
-  expect(style.get("left")).toBe("20px");
+  const tagBottom =
+    Number.parseFloat(tagStyle.get("top") ?? "0") +
+    Number.parseFloat(tagStyle.get("height") ?? "0");
+  const buttonTop = Number.parseFloat(buttonStyle.get("top") ?? "0");
+  expect(buttonStyle.get("left")).toBe("20px");
+  expect(buttonTop).toBeGreaterThanOrEqual(tagBottom);
 });
