@@ -50,7 +50,10 @@ _ID = {
     "tasks": re.compile(r"t_[0-7][0-9A-HJKMNP-TV-Z]{25}"),
     "policies": re.compile(r"pol_[0-9a-z_]{1,48}"),
 }
-_JSON_FIELDS = {"worlds": ("layout",), "tasks": ("draft", "brief", "edits", "approaches")}  # free-form: may nest arrays
+_JSON_FIELDS = {
+    "worlds": ("layout",),
+    "tasks": ("draft", "brief", "edits", "approaches", "maker_picks"),
+}  # free-form: may nest arrays
 RESTARTED = "the service restarted, so the work stopped"
 STARTUP_RESTARTED = "Tilo restarted during this run; start it again"  # X-ORPHAN-1 / HR-1
 _CLOSE_BUDGET_S = 5.0  # shutdown, well under Cloud Run's 10 s SIGTERM grace
@@ -108,6 +111,7 @@ def _task_from(d: Mapping[str, Any]) -> deps.TaskRecord:
     t.answers, t.edits, t.approaches, t.granted, t.scenario = (
         d[k] for k in ("answers", "edits", "approaches", "granted", "scenario")
     )
+    t.maker_picks = d.get("maker_picks", [])  # persisted tasks from before WEB-4a have no maker selection
     t.gaps = tuple(Gap(**g) for g in d["gaps"])
     return t
 

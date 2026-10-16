@@ -24,7 +24,8 @@ from typing import Annotated, Any
 import tilo_planning.budget as budget
 import tilo_policy
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from tilo_contracts import MakeWith
 from tilo_metering.flags import FlagStore
 from tilo_planning.approaches import ApproachProposalError, propose_approaches
 from tilo_planning.brief import BriefValidationError, ExtractionResult, edit_brief_field
@@ -41,7 +42,7 @@ from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Deadline, Router, RouterDeadlineError
 
-from tilo_api import deps, runs
+from tilo_api import deps, makers, runs
 from tilo_api.intake_deadline import INTAKE_DEADLINE_DETAIL, load_intake_deadline
 from tilo_api.people_writes import _capped_body
 
@@ -65,10 +66,24 @@ class AnswersIn(BaseModel):
     brief_edits: dict[str, Any] = Field(default_factory=dict)
 
 
+class MakerPickIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    deliverable: Annotated[int, Field(ge=0, le=9)]
+    make_with: MakeWith
+
+
 class ApproveIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     approach_id: str
     budget_cap: Annotated[float, Field(strict=True, gt=0, allow_inf_nan=False)]  # credits, the person's own
+    make_with: list[MakerPickIn] = Field(default_factory=list, max_length=10)
+
+    @field_validator("make_with")
+    @classmethod
+    def unique_deliverables(cls, value: list[MakerPickIn]) -> list[MakerPickIn]:
+        if len({item.deliverable for item in value}) != len(value):
+            raise ValueError("Choose one maker per deliverable.")
+        return value
 
 
 def _json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaitable[Body]]:
@@ -464,6 +479,10 @@ def get_approaches(
     task = _proposed(store, writer, task_id, task, model_router, clock)
     assert task.approaches is not None
     approaches = task.approaches
+    try:
+        make_choices = makers.make_choices(task.brief, principal.user_id)
+    except makers.MakerConfigError as exc:
+        raise HTTPException(status_code=503, detail="Maker choices are unavailable; nothing changed.") from exc
     # Default (PRD silent, BQ-83): the cheapest approach is recommended; ties keep the Director's order.
     recommended = min(approaches, key=lambda a: a["credits"]["max"])["id"]
     floor = deps.min_run_grant()
@@ -471,6 +490,7 @@ def get_approaches(
     return {
         "task_id": task_id,
         "approaches": shown,
+        "make_choices": make_choices,
         "recommended": recommended,
         "credit_usd": credit_usd,
         # SIMPLE-RUN-2: the most one approval may grant, so a one-step Start sends min(estimate, ceiling), never a 422.
@@ -603,6 +623,17 @@ def approve(
             raise HTTPException(status_code=409, detail="Get the approaches first.")
         if body.approach_id not in {a["id"] for a in task.approaches}:
             raise HTTPException(status_code=422, detail="Pick one of the proposed approaches.")
+        try:
+            current_choices = makers.make_choices(task.brief, principal.user_id)
+            picks = makers.resolve_picks(
+                current_choices,
+                [item.model_dump(mode="json") for item in body.make_with],
+                task.brief,
+            )
+        except makers.MakerConfigError as exc:
+            raise HTTPException(status_code=503, detail="Maker choices are unavailable; nothing changed.") from exc
+        except makers.MakerSelectionError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         preload = _load_scenario(task)  # before anything changes: a scenario that no longer loads stops the approval
         now, base = now_ts(), _base(task, task.owner)
         cap = max(body.budget_cap, deps.min_run_grant())  # BQ-BUDGET-FLOOR-1: never below the floor, above it kept
@@ -623,9 +654,24 @@ def approve(
             raise HTTPException(status_code=403, detail="Only the world's owner sets budgets.") from exc
         policies, policy_events = _scenario_policies(task, preload, event["seq"] + 1)  # built before anything is stored
         approach = next(a for a in task.approaches if a["id"] == body.approach_id)
-        # One save: the grant, its policy events, the policies and the task, or none of them (ADR-0026 decision 3).
+        maker_events = [
+            build_event(
+                {**base, "actor": principal.user_id},
+                seq=event["seq"] + 1 + len(policy_events) + offset,
+                type="plan.maker_chosen",
+                target=task.world_id,
+                item=None,
+                severity="info",
+                tool=None,
+                cause=event["id"],
+                data=pick,
+                summary=f"You picked {pick['label']} to make the {pick['format']} deliverable.",
+            )
+            for offset, pick in enumerate(picks)
+        ]
         task = _saved(
-            store, writer, task_id, task, [event, *policy_events], {"granted": True},
+            store, writer, task_id, task, [event, *policy_events, *maker_events],
+            {"granted": True, "maker_picks": picks},
             policies={p["id"]: p for p in policies}, policy_worlds={p["id"]: task.world_id for p in policies},
         )  # fmt: skip
     _start(store, task, approach=approach, budget_cap=cap, seams=seams)
