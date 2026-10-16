@@ -378,6 +378,14 @@ class ArtifactStore:
         view._screener = screener
         return view
 
+    def with_new_id(self, new_id: Callable[[], str]) -> ArtifactStore:
+        """A request-local view that names a new artifact with `new_id` (the id is still checked as any other): for a
+        producer whose artifact has a derived id, such as one morning brief per local date (ADR-0049, MO-09). Backends,
+        caps, redaction, screening, scope checks and locks are shared; other users of the store are unchanged."""
+        view = copy.copy(self)
+        view._new_id = new_id
+        return view
+
     def __init__(
         self,
         meta: MetaBackend,
@@ -460,6 +468,14 @@ class ArtifactStore:
             self._alert(alert)
         except Exception:  # noqa: BLE001 - a failing sink must not turn corruption into a different error
             pass
+
+    def artifact_ids(self, scope: Scope, prefix: str = "art_") -> list[str]:
+        """The ids of the owner's artifacts in this Scope's world that start with `prefix`, sorted (the records of the
+        Scope's own owner only; a retention pass such as the morning brief's lists its own artifacts with this)."""
+        _check_scope(scope)
+        docs = self._docs(f"orgs/{scope.org_id}/worlds/{scope.world_id}/artifacts/")
+        found = {d["artifact"]["artifact_id"] for d in docs if d["owner"] == scope.owner}
+        return sorted(i for i in found if i.startswith(prefix))
 
     def versions(self, scope: Scope, artifact_id: str) -> list[StoredVersion]:
         _check_scope(scope)

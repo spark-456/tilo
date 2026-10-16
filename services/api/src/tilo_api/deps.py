@@ -1365,7 +1365,15 @@ def get_source_owners(request: Request = None) -> SourceOwners:  # type: ignore[
     """Who owns a mail message or a request, from the same store; `None` for anything it cannot vouch for."""
     from tilo_api import seams_store  # noqa: PLC0415
 
-    return seams_store.StoreSourceOwners(seams_store.resolve_store(request))
+    briefs = None
+    try:  # MO-11: the morning brief's index of message ids; none where the people stores are not wired
+        from tilo_api import brief_store  # noqa: PLC0415
+
+        overrides = request.app.dependency_overrides if request is not None else {}
+        briefs = brief_store.brief_store_of(overrides.get(get_people_stores, get_people_stores)())
+    except Exception:  # noqa: BLE001
+        briefs = None
+    return seams_store.StoreSourceOwners(seams_store.resolve_store(request), briefs)
 
 
 class MeetingWorlds(Protocol):
