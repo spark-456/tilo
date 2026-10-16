@@ -5,8 +5,7 @@
 // Strings keep the design's typographic quotes and apostrophes. Nothing here is bundled.
 
 /** STUDIO-4 (design/studio-v2 "Tilo S Skills"). */
-export const INTRO =
-  "Things Tilo knows how to do. They grow with you.";
+export const INTRO = "Things Tilo knows how to do. They grow with you.";
 export const CARD_TITLE = "Teach Tilo something new";
 export const CARD_SUB =
   "Show it once. Tilo repeats it, you check the result, and it becomes a skill your agents can reuse.";
