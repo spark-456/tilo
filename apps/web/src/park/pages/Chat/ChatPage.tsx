@@ -2,6 +2,7 @@ import { type FormEvent, useId, useState } from "react";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkStore } from "../../app/context";
 import { usePageTitle } from "../../app/pageTitle";
+import { RememberChip } from "../../chat/RememberChip";
 import { SCENE_FLOOR, SCENE_SKY, SceneArt, SceneFront } from "../../chat/Scene";
 import { SCENES, SCENE_LABEL, type SceneId, readScene, writeScene } from "../../chat/displayPrefs";
 import { handDraft } from "../../chat/handoff";
@@ -78,6 +79,7 @@ function Answer({
           <div className="park-chat-result-card">
             {cost ? <span className="park-chat-meta">{cost.toUpperCase()}</span> : null}
             <p className="park-chat-text">{turn.text}</p>
+            {!turn.sample ? <RememberChip suggestion={turn.memorySuggestion} /> : null}
             <div className="park-chat-actions">
               {onCopy ? (
                 <button type="button" className="park-chat-quiet" onClick={() => onCopy(turn.text)}>

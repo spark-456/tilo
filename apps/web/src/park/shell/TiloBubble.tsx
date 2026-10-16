@@ -12,6 +12,7 @@ import {
   useState,
 } from "react";
 import { PAGE_LABEL, type PageId } from "../app/AppCtx";
+import { RememberChip } from "../chat/RememberChip";
 import { type BubblePos, readBubblePos, writeBubblePos } from "../chat/displayPrefs";
 import { type Turn, useQuickChat } from "../chat/useQuickChat";
 import { SWITCH_WORDS } from "../pages/Home/homeData";
@@ -89,6 +90,9 @@ function Said({ turn }: { turn: Turn }) {
           <span className="park-bubble__sample">Sample answer</span>
         ) : null}
         {reply}
+        {turn.state === "answered" && !turn.sample ? (
+          <RememberChip suggestion={turn.memorySuggestion} />
+        ) : null}
       </div>
     </>
   );

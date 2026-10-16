@@ -496,7 +496,12 @@ export interface QuickCost {
 
 /** A Quick ask's two answers (services/api COST-FAST-1): the model's text with its cost, or an offer to switch. */
 export type QuickIntakeResult =
-  | { kind: "answered"; text: string; cost: QuickCost | null }
+  | {
+      kind: "answered";
+      text: string;
+      cost: QuickCost | null;
+      memorySuggestion?: { text: string; kind: "preference" | "fact" | "person" };
+    }
   | { kind: "switch"; reason: QuickReason };
 
 const figure = (v: unknown): number | undefined =>
@@ -519,7 +524,23 @@ function quickOf(body: unknown): QuickIntakeResult | null {
   const saved = figure(c.saved_credits);
   if (credits !== undefined) cost.credits = credits;
   if (saved !== undefined) cost.savedCredits = saved;
-  return { kind: "answered", text: b.text, cost: Object.keys(cost).length > 0 ? cost : null };
+  const suggestion = b.memory_suggestion;
+  const memorySuggestion =
+    typeof suggestion === "object" &&
+    suggestion !== null &&
+    !Array.isArray(suggestion) &&
+    typeof (suggestion as { text?: unknown }).text === "string" &&
+    (suggestion as { text: string }).text.length > 0 &&
+    (suggestion as { text: string }).text.length <= 280 &&
+    ["preference", "fact", "person"].includes(String((suggestion as { kind?: unknown }).kind))
+      ? (suggestion as { text: string; kind: "preference" | "fact" | "person" })
+      : undefined;
+  return {
+    kind: "answered",
+    text: b.text,
+    cost: Object.keys(cost).length > 0 ? cost : null,
+    ...(memorySuggestion ? { memorySuggestion } : {}),
+  };
 }
 
 // Shared by the session's clients so Connectors and World coalesce the first read.

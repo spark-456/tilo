@@ -5,6 +5,7 @@
 // The conversation lives in this component only: the server keeps no Quick question or answer (quick.py), so there
 // is no history to list (docs/open-questions.md BQ-STUDIO-2).
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { QuickIntakeResult } from "../../api/http";
 import { askQuick } from "../api/index";
 import type { QuickCost, SwitchReason } from "../api/types";
 import { useParkApi, useSchedule } from "../app/context";
@@ -20,6 +21,7 @@ export type Turn =
       state: "answered";
       text: string;
       cost: QuickCost | null;
+      memorySuggestion?: Extract<QuickIntakeResult, { kind: "answered" }>["memorySuggestion"];
       /** The fixture Api answered: a labelled sample, never shown as a live answer. */
       sample: boolean;
       /** Seconds from send to answer, measured here. */
@@ -119,6 +121,7 @@ export function useQuickChat(now: () => number = Date.now): QuickChat {
                   state: "answered",
                   text: data.text,
                   cost: data.cost,
+                  ...(data.memorySuggestion ? { memorySuggestion: data.memorySuggestion } : {}),
                   sample: source !== "live",
                   seconds: Math.max(0, Math.round((now() - started) / 1000)),
                 }
