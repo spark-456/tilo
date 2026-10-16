@@ -16,7 +16,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Annotated, Any
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from tilo_memory.artifacts import ArtifactStore
@@ -24,14 +24,15 @@ from tilo_people.stores import PeopleStores
 from tilo_policy.schemas import conforms
 from tilo_providers.interfaces import GenerateRequest
 
-from tilo_api import deps, events, morning_brief_model, plate_mailer
+from tilo_api import deps, morning_brief_model, plate_mailer
+from tilo_api.access import OPEN_DECLARATION
 from tilo_api.assistant.config import AssistantConfig
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.brief_store import BriefStore, MemoryBriefStore, brief_store_of
 from tilo_api.meeting_allowance import allowance_router
 from tilo_api.meeting_analysis_mode import _Calls, _Router, _Safety
 from tilo_api.morning_brief import ON_DEMAND_MAX, SCHEMA, Ctx, local_date
-from tilo_api.morning_brief_doc import make_brief, purge_old, read_latest
+from tilo_api.morning_brief_doc import make_brief, purge_daily, read_latest
 from tilo_api.people import _PeopleRoute
 from tilo_api.people_limits import write_limit
 from tilo_api.people_plate import build_plate
@@ -47,7 +48,7 @@ MAX_PER_TICK = 10  # MO-03
 MAX_PEOPLE = 500
 WINDOW = timedelta(hours=3)  # MO-03: a brief is made from the person's time until this long after it
 DEFAULT_TIME = "07:30"
-_DEMO_STORE = MemoryBriefStore()  # a demo session keeps its setting in the process, never durably (MO-01)
+_DEMO_STORE = MemoryBriefStore(limit=2000)  # a demo session keeps its setting in the process, never durably (MO-01)
 
 router = APIRouter(route_class=_PeopleRoute)
 Principal = Annotated[deps.Principal, Depends(deps.get_current_principal)]
@@ -158,23 +159,24 @@ def get_brief(
     clock: Clock,
 ) -> dict[str, Any]:
     """Today's latest version in the person's zone, or 404 `not_ready` (MO-01); it never makes one."""
-    user = principal.user_id
-    zone = (_briefs(principal, stores).settings(deps.ORG_ID, user) or {}).get("time_zone") or _zone_of(stores, user)
-    found = read_latest(artifacts, desks, deps.ORG_ID, user, local_date(clock(), zone))
+    user, briefs = principal.user_id, _briefs(principal, stores)
+    zone = (briefs.settings(deps.ORG_ID, user) or {}).get("time_zone") or _zone_of(stores, user)
+    today = local_date(clock(), zone)
+    purge_daily(briefs, artifacts, desks, deps.ORG_ID, user, today)  # MO-09: retention needs no sweep and no switch
+    found = read_latest(artifacts, desks, deps.ORG_ID, user, today)
     if found is None:
         raise Refusal(404, "not_ready")
     return found
 
 
 def _mode(request: Request, user: str | None, switches: Any, *, demo: bool) -> str | None:
-    """The provider mode for this person's call: the request's own for a route, the person's declared mode for the
-    sweep. None when a switch or the person's cap says no new work (the model is then skipped)."""
+    """The provider mode for this person's call: the request's own for a route; for the sweep `spend_mode` with the
+    open declaration every signed-in person has. None when a switch, the person's cap or an unreadable ledger says no
+    new work (the model is then skipped)."""
     try:
         if user is None:
             return str(deps.get_work_mode(request, switches))
-        ov = request.app.dependency_overrides
-        declaration = ov.get(deps.get_access_store, deps.get_access_store)().get(user)
-        mode, capped = deps.spend_mode(request, user, declaration, switches, demo=demo)
+        mode, capped = deps.spend_mode(request, user, OPEN_DECLARATION, switches, demo=demo)
         return None if capped else str(mode)
     except Exception:  # noqa: BLE001 - replay-only, capped or unreadable: no model call
         return None
@@ -337,12 +339,7 @@ def sweep(request: Request, now: str) -> int:
             mode = _mode(request, user, seams["switches"], demo=False)
             ctx = _context(request, user, demo=False, now=now, zone=setting["time_zone"], trigger="schedule",
                            mode=mode, email_copy=setting["email_copy"], seams=seams)  # fmt: skip
-            make_brief(ctx, day)
-            if briefs.claim(deps.ORG_ID, user, local_date(now, setting["time_zone"]), "purge"):
-                purge_old(seams["artifacts"], seams["desks"], deps.ORG_ID, user, day)
+            make_brief(ctx, day)  # which also clears the person's expired briefs, once a day
         except Exception as exc:  # noqa: BLE001 - the type only; never a title, subject or address
             logger.warning("a morning brief failed for one person (%s)", type(exc).__name__)
     return made
-
-
-__all__ = ["router", "sweep", "events", "ZoneInfoNotFoundError"]

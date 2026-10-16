@@ -34,6 +34,7 @@ from tilo_memory.artifacts import ArtifactStore, NewVersion, Origin, Scope
 from tilo_policy.schemas import conforms
 
 from tilo_api import deps, events, item_documents
+from tilo_api.user_settings import StoredPreferences, settings_store_of
 
 logger = logging.getLogger("tilo_api.plate_mailer")
 
@@ -263,7 +264,7 @@ class DeskPlateMailer:
         """Mails `text` to the person's own address once per UTC day and `kind` (the digest key), under the same
         standing rule, quiet hours and outbox path as the plate; True when it went out (MO-10)."""
         try:
-            built = self._build(user_id, now)
+            built = self._build(user_id, now, quiet=True)
             cleared = None if built is None else built[0].ready(user_id, now=now)
             if built is None or cleared is None:
                 return False
@@ -280,9 +281,12 @@ class DeskPlateMailer:
             logger.warning("mail not sent (%s)", type(exc).__name__)
             return False
 
-    def _build(self, user_id: str, now: str) -> tuple[DigestService, Outbox, DeskEvents, str] | None:
+    def _build(
+        self, user_id: str, now: str, *, quiet: bool = False
+    ) -> tuple[DigestService, Outbox, DeskEvents, str] | None:
         """The sender for one person's own mail, or None when nothing may be built: no address, no standing rule, or a
-        Desk world that is not theirs, unreadable or paused."""
+        Desk world that is not theirs, unreadable or paused. With `quiet` the sender holds the mail during the person's
+        own saved quiet hours (the morning brief's copy; the plate digest keeps its window)."""
         address = self._address(user_id)
         if address is None:
             return None
@@ -305,11 +309,12 @@ class DeskPlateMailer:
             self._outbox_store, {CONNECTOR: bound}, emit=desk.transfer, clock=lambda: now, world_id=world_id,
             halted=halted, alert=desk.alert, retry=RetryPolicy(),
         )  # fmt: skip
+        preferences = StoredPreferences(settings_store_of(self._people), deps.ORG_ID) if quiet else None
         sender = DigestService(
             builder=self._builder.daily_builder(), outbox=_EvidenceOutbox(outbox, bound), policy=policies,
             artifacts=DeskArtifacts(self._artifacts, scope, record.run_id), emit=desk.applied,
             mailbox=lambda uid: self._address(uid) if uid == user_id else None, world_id=world_id,
-            world_owner=user_id, run_id=record.run_id,
+            world_owner=user_id, run_id=record.run_id, preferences=preferences,
         )  # fmt: skip
         return sender, outbox, desk, address
 

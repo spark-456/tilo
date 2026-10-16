@@ -16,7 +16,7 @@ from tilo_policy.schemas import conforms
 from tilo_providers.prompts import load_prompt, neutralise_marker
 
 from tilo_api import deps, spend
-from tilo_api.morning_brief import MAX_MAIL, RAW_CAP, SCHEMA, Ctx, clean
+from tilo_api.morning_brief import DOMAIN, MAX_MAIL, RAW_CAP, SCHEMA, Ctx, clean
 from tilo_api.people_writes import _unhide
 
 logger = logging.getLogger("tilo_api.morning_brief")
@@ -87,6 +87,8 @@ def _own_line(ctx: Ctx, value: Any, cap: int, kind: str) -> str | None:
     """A model-written line that is already exactly what cleaning leaves, and fits the contract; else None (dropped)."""
     if not isinstance(value, str):
         return None
+    if DOMAIN.search(value[:RAW_CAP]):
+        return None  # a bare domain is a link a mail client may open: dropped, never repaired
     text = clean(ctx, value, cap)
     same = text == " ".join(_unhide(clean_line(value[:RAW_CAP])).split())
     return text if text and same and len(value) <= RAW_CAP and conforms(f"{SCHEMA}#/$defs/{kind}", text) else None

@@ -15,8 +15,9 @@ from tilo_memory.artifacts import ArtifactError, ArtifactNotFound, ArtifactStore
 from tilo_policy.schemas import conforms
 
 from tilo_api import events as event_parts
-from tilo_api.brief_store import KEEP_DAYS
+from tilo_api.brief_store import KEEP_DAYS, BriefStore
 from tilo_api.morning_brief import (
+    DOMAIN,
     MAX_MAIL,
     SCHEMA,
     Ctx,
@@ -173,6 +174,16 @@ def purge_old(artifacts: ArtifactStore, desks: Any, org: str, user: str, day: st
             _delete(artifacts, scope, version.ref)
 
 
+def purge_daily(briefs: BriefStore, artifacts: ArtifactStore, desks: Any, org: str, user: str, day: str) -> None:
+    """MO-09 retention for everyone with a brief, whatever the sweep, its switch or their setting: the first brief made
+    or read each local day clears that person's expired ones (a claim, so once a day). It never fails its caller."""
+    try:
+        if briefs.claim(org, user, day, "purge"):
+            purge_old(artifacts, desks, org, user, day)
+    except Exception as exc:  # noqa: BLE001 - the type only
+        logger.warning("expired briefs were not purged (%s)", type(exc).__name__)
+
+
 # -- making one ------------------------------------------------------------------------------------------------------
 
 
@@ -199,6 +210,7 @@ def make_brief(ctx: Ctx, day: str | None = None) -> dict[str, Any]:
         stored, clean_verdict = store(ctx, doc)
         if not clean_verdict or not check(doc, searched):
             raise Refusal(503, "try_again")
+    purge_daily(ctx.briefs, ctx.artifacts, ctx.desks, ctx.org, ctx.user, day)
     shown = [m["source"]["id"] for m in stored["mail_needing_reply"]["items"]]
     shown += [t["mail"]["source"]["id"] for t in stored["todo_suggestions"]]
     try:
@@ -246,4 +258,4 @@ def render_email(doc: dict[str, Any]) -> str:
     section("Deadlines", doc["deadlines"], lambda d: f"{d['title']} (due {d['due']})", "None.")
     if doc["suggestions"]:
         out += ["Suggestions", *(f"  - {s['text']}" for s in doc["suggestions"]), ""]
-    return "\n".join(out).rstrip() + "\n"
+    return DOMAIN.sub("[removed]", "\n".join(out).rstrip() + "\n")  # no link in the copy, not even a bare domain

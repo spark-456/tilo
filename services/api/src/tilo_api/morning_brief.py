@@ -64,6 +64,10 @@ class Ctx:
     email_copy: bool = False
 
 
+DOMAIN = re.compile(r"(?<![\w@.-])(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}(?![\w-])")
+# a bare domain name ("evil-pay.com"): a title may carry one, but a line a model wrote, or a mail body, may not
+
+
 def local_date(now: str, zone: str) -> str:
     return datetime.fromisoformat(now.replace("Z", "+00:00")).astimezone(ZoneInfo(zone)).date().isoformat()
 

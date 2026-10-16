@@ -66,13 +66,31 @@ def _fresh(day: str, today: str) -> bool:
         return False
 
 
+MEMORY_LIMIT = 5000  # records of each kind a process keeps in memory; the oldest are forgotten past it
+
+
 class MemoryBriefStore:
-    def __init__(self) -> None:
+    """In memory, bounded: past `limit` records of a kind the oldest are forgotten (a demo session's setting and a
+    dev process's claims are not durable anyway, and an unbounded dict would be a memory leak)."""
+
+    def __init__(self, limit: int = MEMORY_LIMIT) -> None:
+        self.limit = limit
         self._lock = threading.Lock()
         self._settings: dict[tuple[str, str], dict[str, Any]] = {}
-        self._claims: set[tuple[str, str, str, str]] = set()
+        self._claims: dict[tuple[str, str, str, str], None] = {}
         self._counts: dict[tuple[str, str, str], int] = {}
         self._mail: dict[tuple[str, str], dict[str, str]] = {}
+
+    def _put(self, table: dict[Any, Any], key: Any, value: Any) -> None:
+        table.pop(key, None)
+        table[key] = value
+        while len(table) > self.limit:
+            del table[next(iter(table))]
+
+    def sizes(self) -> dict[str, int]:
+        with self._lock:
+            return {k: len(v) for k, v in (("settings", self._settings), ("claims", self._claims),
+                                            ("counts", self._counts), ("mail", self._mail))}  # fmt: skip
 
     def settings(self, org: str, user: str) -> dict[str, Any] | None:
         with self._lock:
@@ -80,7 +98,7 @@ class MemoryBriefStore:
 
     def save_settings(self, org: str, user: str, doc: dict[str, Any]) -> None:
         with self._lock:
-            self._settings[(org, user)] = copy.deepcopy(doc)
+            self._put(self._settings, (org, user), copy.deepcopy(doc))
 
     def enabled(self, org: str, limit: int) -> list[dict[str, Any]]:
         with self._lock:
@@ -90,22 +108,24 @@ class MemoryBriefStore:
     def claim(self, org: str, user: str, day: str, kind: str) -> bool:
         with self._lock:
             key = (org, user, day, kind)
-            held = key in self._claims
-            self._claims.add(key)
-            return not held
+            if key in self._claims:
+                return False
+            self._put(self._claims, key, None)
+            return True
 
     def take_on_demand(self, org: str, user: str, day: str, limit: int) -> bool:
         with self._lock:
             n = self._counts.get((org, user, day), 0)
             if n >= limit:
                 return False
-            self._counts[(org, user, day)] = n + 1
+            self._put(self._counts, (org, user, day), n + 1)
             return True
 
     def index_mail(self, org: str, user: str, ids: list[str], day: str) -> None:
         with self._lock:
             for message_id in ids:
-                self._mail.setdefault((org, message_id), {})[user] = day
+                held = self._mail.get((org, message_id), {})
+                self._put(self._mail, (org, message_id), {**held, user: day})
 
     def mail_owner(self, org: str, message_id: str, today: str) -> str | None:
         with self._lock:
