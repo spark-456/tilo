@@ -97,4 +97,8 @@ export const KNOWN_EVENT_TYPES: readonly string[] = [
   "assistant.replied",
   "team_rule.changed",
   "world.share_changed",
+  "browser.started",
+  "browser.acted",
+  "browser.controlled",
+  "browser.stopped",
 ];

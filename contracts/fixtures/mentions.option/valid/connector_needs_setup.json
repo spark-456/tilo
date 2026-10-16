@@ -1,0 +1,10 @@
+{
+  "ref": {
+    "kind": "connector",
+    "id": "gmail"
+  },
+  "label": "Gmail",
+  "detail": null,
+  "scope": "mine",
+  "state": "needs_setup"
+}

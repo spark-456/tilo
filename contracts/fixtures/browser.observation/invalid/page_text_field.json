@@ -1,0 +1,13 @@
+{
+  "session": "bs_01JB7A0000000000000000BRW1",
+  "step": 3,
+  "url": "https://shop.example.com/cart",
+  "host": "shop.example.com",
+  "title": "Your cart",
+  "screenshot": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+  "masked": 1,
+  "blocked": 2,
+  "state": "ok",
+  "reason": null,
+  "text": "Your cart has 1 item"
+}

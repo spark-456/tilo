@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/artifact.schema.json",
-  "x-version": "1.2.0",
+  "x-version": "1.3.0",
   "title": "ArtifactVersion",
-  "description": "One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-10 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser. 1.2.0 (ADR-0050) lets a writer unit store one self-contained HTML file for a website deliverable, at most 524,288 bytes; an upload never stores HTML (AR-10).",
+  "description": "One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-10 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser. 1.2.0 (ADR-0050) lets a writer unit store one self-contained HTML file for a website deliverable, at most 524,288 bytes; an upload never stores HTML (AR-10). 1.3.0 (ADR-0051) adds the browser origin: a masked screenshot (PNG) of an agentic browser step (AR-11).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -72,7 +72,7 @@
       "type": "boolean"
     },
     "idempotency_key": {
-      "description": "Set for unit, render and fetch outputs (AR-05); null for uploads and restores.",
+      "description": "Set for unit, render and fetch outputs (AR-05); null for uploads, restores and browser frames (AR-11).",
       "anyOf": [{ "$ref": "#/$defs/idempotency_key" }, { "type": "null" }]
     },
     "created_at": { "$ref": "common.schema.json#/$defs/timestamp" }
@@ -145,6 +145,18 @@
         "sources": { "maxItems": 0 },
         "media_type": { "not": { "const": "text/html" } }
       }
+    },
+    "else": {
+      "if": {
+        "properties": {
+          "origin": { "properties": { "kind": { "const": "browser" } }, "required": ["kind"] }
+        },
+        "required": ["origin"]
+      },
+      "then": {
+        "description": "A browser frame is one masked PNG screenshot that tilo-browser took for a unit's agentic browser step; no archive sources and no key (AR-11).",
+        "properties": { "sources": { "maxItems": 0 }, "media_type": { "const": "image/png" } }
+      }
     }
   },
   "dependentSchemas": {
@@ -174,24 +186,30 @@
   },
   "$defs": {
     "origin": {
-      "description": "What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither), a restore (FR-MEM-06; no unit) or, since 1.1.0 (ADR-0029), a fetch: a file a unit's worker agent downloaded through tilo-browser (unit and agent set). Set by the store from the run, never by a runner.",
+      "description": "What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither), a restore (FR-MEM-06; no unit) or, since 1.1.0 (ADR-0029), a fetch: a file a unit's worker agent downloaded through tilo-browser (unit and agent set), or, since 1.3.0 (ADR-0051), a browser frame: a masked screenshot of a unit's agentic browser step (unit and agent set). Set by the store from the run, never by a runner.",
       "type": "object",
       "additionalProperties": false,
       "required": ["kind", "unit", "agent"],
       "properties": {
-        "kind": { "type": "string", "enum": ["unit", "render", "upload", "restore", "fetch"] },
+        "kind": {
+          "type": "string",
+          "enum": ["unit", "render", "upload", "restore", "fetch", "browser"]
+        },
         "unit": { "anyOf": [{ "$ref": "common.schema.json#/$defs/unit_id" }, { "type": "null" }] },
         "agent": {
           "anyOf": [{ "$ref": "common.schema.json#/$defs/agent_id" }, { "type": "null" }]
         }
       },
       "if": {
-        "properties": { "kind": { "enum": ["unit", "render", "fetch"] } },
+        "properties": { "kind": { "enum": ["unit", "render", "fetch", "browser"] } },
         "required": ["kind"]
       },
       "then": {
         "properties": { "unit": { "$ref": "common.schema.json#/$defs/unit_id" } },
-        "if": { "properties": { "kind": { "enum": ["unit", "fetch"] } }, "required": ["kind"] },
+        "if": {
+          "properties": { "kind": { "enum": ["unit", "fetch", "browser"] } },
+          "required": ["kind"]
+        },
         "then": { "properties": { "agent": { "$ref": "common.schema.json#/$defs/agent_id" } } }
       },
       "else": {
