@@ -28,7 +28,7 @@
     },
     "content_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     "media_type": "text/html",
-    "size_bytes": 1840
+    "size_bytes": 524289
   },
   "trace": {
     "model_role": "specialist",

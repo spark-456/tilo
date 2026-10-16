@@ -3,13 +3,13 @@
 # `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
 # agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
 # appspec.schema.json 1.0.0 sha256:e3638e1ae19f9b9b
-# artifact.schema.json 1.1.0 sha256:ce5a30aeae826180
+# artifact.schema.json 1.2.0 sha256:e840ce55967af231
 # attention.schema.json 1.0.0 sha256:f35cff84728304af
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
 # byok.schema.json 1.0.0 sha256:683d5d2b4fc8b0fe
 # calendar_entry.schema.json 1.1.0 sha256:291531543be88320
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
-# common.schema.json 1.7.0 sha256:71b116e3caa126a8
+# common.schema.json 1.8.0 sha256:519aa76cc4543df9
 # connector.schema.json 1.0.0 sha256:cc3a7d9b3820e12c
 # decision.schema.json 1.0.0 sha256:06915b6db08dc4b7
 # envelope.schema.json 1.0.0 sha256:8a5c75c61807baa2
@@ -38,8 +38,8 @@
 # events/data/app.tested.schema.json 1.0.0 sha256:7cc150abdade1ee3
 # events/data/approval.requested.schema.json 1.0.0 sha256:fa01c18f73338a6d
 # events/data/approval.resolved.schema.json 1.0.0 sha256:3c56d4ad96d63941
-# events/data/artifact.created.schema.json 1.1.0 sha256:e796f958760d0464
-# events/data/artifact.delivered.schema.json 1.0.0 sha256:a0e7a46e56965c1d
+# events/data/artifact.created.schema.json 1.2.0 sha256:0df200011b9cfb66
+# events/data/artifact.delivered.schema.json 1.1.0 sha256:65d00e00c4f3261d
 # events/data/artifact.reviewed.schema.json 1.0.0 sha256:fee51f5f590c73c4
 # events/data/artifact.rolled_back.schema.json 1.0.0 sha256:4c4dac77a4b5c873
 # events/data/artifact.versioned.schema.json 1.0.0 sha256:b6ceac1481d2595b
@@ -87,6 +87,7 @@
 # events/data/pinboard.item_added.schema.json 1.0.0 sha256:f36dccb547318b08
 # events/data/pinboard.item_changed.schema.json 1.0.0 sha256:2db181d1a51c6c84
 # events/data/plan.approaches_proposed.schema.json 1.0.0 sha256:4e67dfd9f1e856b4
+# events/data/plan.maker_chosen.schema.json 1.0.0 sha256:587d15f93e9054ca
 # events/data/plan.questions_asked.schema.json 1.0.0 sha256:5fe5359427d0e04b
 # events/data/plan.revised.schema.json 1.0.0 sha256:55005a10fa84656a
 # events/data/policy.applied.schema.json 1.0.0 sha256:3ca104f308b12dce
@@ -114,8 +115,9 @@
 # events/registry.schema.json 1.2.0 sha256:5a2b8514c1e7e2b1
 # handoff.schema.json 1.0.0 sha256:7ed882f92b634672
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
+# makers.schema.json 1.0.0 sha256:311892161a9ac570
 # manifest.schema.json 1.0.0 sha256:9b885d1826522bb7
-# mcp_tools.schema.json 1.0.0 sha256:46a498402c9b1e4e
+# mcp_tools.schema.json 1.1.0 sha256:f2a2e81377dc3337
 # meeting.schema.json 1.3.0 sha256:2042ae5ef2dc73c2
 # meeting_brief.schema.json 1.0.0 sha256:1f6442fa4f0c3e86
 # meeting_host_rpc.schema.json 1.4.0 sha256:38bb31a808bfe7f0
@@ -132,7 +134,7 @@
 # person.schema.json 1.1.0 sha256:2d974d326607d569
 # pilot.schema.json 1.0.0 sha256:5d091f814844b3b1
 # pinboard_item.schema.json 1.1.0 sha256:edf4c50a588211ee
-# plan.schema.json 1.1.0 sha256:f0722cc94a84e2d1
+# plan.schema.json 1.2.0 sha256:56b88d2b8bac8f09
 # plate.schema.json 1.0.0 sha256:d2a4e4361a714c8f
 # policy.schema.json 1.0.0 sha256:307bca25f6efc07e
 # providers.schema.json 1.4.0 sha256:e39a636e4de90ab6
@@ -146,7 +148,7 @@
 # user_settings.schema.json 1.0.0 sha256:dfc439371ba69131
 # work_item.schema.json 1.1.0 sha256:9ee739ef8bdb7579
 # world_share.schema.json 1.0.0 sha256:89d31e9968dc95cc
-# events/registry.yaml 1.5.0 sha256:ffb369c84ae3eff7
+# events/registry.yaml 1.6.0 sha256:73d1110f8751fe0b
 
 from __future__ import annotations
 
@@ -576,15 +578,15 @@ Data class (PRD 12.1): personal, business or public.
 """
 
 
-type DeliverableFormat = Literal["pdf", "pptx", "docx", "xlsx", "csv", "markdown", "google_slides", "google_docs", "google_sheets", "email", "in_app", "app"]
+type DeliverableFormat = Literal["pdf", "pptx", "docx", "xlsx", "csv", "markdown", "google_slides", "google_docs", "google_sheets", "email", "in_app", "app", "website"]
 """
-Deliverable format (PRD 12.4), plus email for replies, in_app for answers shown in Tilo and, since 1.6.0 (ADR-0029), app: an AppSpec (appspec.schema.json) that fixed web code renders (FR-AGT-16).
+Deliverable format (PRD 12.4), plus email for replies, in_app for answers shown in Tilo, since 1.6.0 (ADR-0029) app: an AppSpec (appspec.schema.json) that fixed web code renders (FR-AGT-16), and since 1.8.0 (ADR-0050) website: a site made natively as one self-contained HTML file by a writer unit (website.rules.md) or by a build partner the person picked (make_with, makers.rules.md).
 """
 
 
-type MediaType = Literal["text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/png", "image/jpeg", "video/webm", "video/mp4"]
+type MediaType = Literal["text/markdown", "text/csv", "application/json", "application/pdf", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/png", "image/jpeg", "video/webm", "video/mp4", "text/html"]
 """
-Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG, and since 1.7.0 (ADR-0034) WebM and MP4 video, which only a taught-skill capture upload stores (a screen recording or an uploaded example; never rendered or fetched). Code picks it, never a model: from the role and the pinned skill for a unit or render output, and from the file's own leading bytes for an upload (whose extension must agree) or a fetch (ADR-0029), never from a file name, a URL or a Content-Type header alone. Closed: no HTML or SVG.
+Media type of a stored artifact version (ADR-0018). Text: Markdown and CSV; structured: JSON; files (made only by tilo-render or an intake upload, never by a model): PDF, PPTX, DOCX, XLSX, PNG and JPEG, and since 1.7.0 (ADR-0034) WebM and MP4 video, which only a taught-skill capture upload stores (a screen recording or an uploaded example; never rendered or fetched). Code picks it, never a model: from the role and the pinned skill for a unit or render output, and from the file's own leading bytes for an upload (whose extension must agree) or a fetch (ADR-0029), never from a file name, a URL or a Content-Type header alone. Since 1.8.0 (ADR-0050) text/html is allowed for one case only: a writer unit's website, one self-contained HTML file of at most 524,288 bytes that passed the static checks (website.rules.md WS-01 to WS-09), never an upload, a fetch or a render (artifact.rules.md AR-10). Closed: no SVG file and no other HTML.
 """
 
 
@@ -662,6 +664,17 @@ class RecordRef(BaseModel):
     )
     kind: Literal["work_item", "calendar_entry", "meeting", "pinboard_item", "mention", "card", "world", "event", "mail"]
     id: Annotated[str, Field(pattern="^[A-Za-z0-9_]{1,64}$")]
+
+
+type MakeWith = Annotated[
+    str,
+    Field(
+        pattern="^(native|connector:[a-z][a-z0-9_]{1,31}|mcp:[a-z][a-z0-9_]{1,31}:[A-Za-z0-9_.-]{1,64})$"
+    ),
+]
+"""
+Where a deliverable is made (1.8.0, ADR-0050): native (Tilo's own units), connector:<connector id> (a build partner such as lovable or canva) or mcp:<server id>:<tool name> (a tool of an allowlisted MCP server, config/mcp.yaml). The person picks it on the start plan from the options code offers (makers.rules.md); a model never picks it, and picking a partner authorises nothing: the partner's action stays T3 behind its own card. Not to be confused with maker, a record's provenance.
+"""
 
 
 type ConnectorCapability = Literal["read", "list", "search", "write", "send", "share", "delete"]
@@ -1449,6 +1462,31 @@ class PlanApproachesProposedData(BaseModel):
     approach_count: Annotated[int, Field(ge=2, le=3)]
 
 
+class PlanMakerChosenData(BaseModel):
+    """
+    data of plan.maker_chosen (ADR-0050, MK-06): at Start, where the person chose to make one deliverable whose format offers a choice in config/makers.yaml; one event per such deliverable, in brief order, in the same save as the budget grant. The actor is the person and the target the world. A choice authorises nothing: a partner's action stays T3 behind its own card (MK-07). suggested is the option code suggested (MK-04), or null when it suggested none, so the Trace shows whether the person followed it.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    deliverable: Annotated[int, Field(ge=0, le=9)]
+    """
+    0-based position of the deliverable in the brief (a brief has at most 10).
+    """
+    title: Annotated[str, Field(max_length=120, min_length=1)]
+    """
+    The deliverable's title in the brief.
+    """
+    format: DeliverableFormat
+    make_with: MakeWith
+    label: Annotated[str, Field(max_length=40, min_length=1)]
+    """
+    The chosen option's display name as the start plan showed it, e.g. Tilo, Lovable or Canva.
+    """
+    suggested: MakeWith | None
+
+
 class PlanQuestionsAskedData(BaseModel):
     """
     data of plan.questions_asked (PRD 9.5). At most three ranked clarifying questions (FR-INT-04); each is a card.
@@ -1854,6 +1892,23 @@ class LayoutGateGeometry(BaseModel):
     )
     id: GateId
     cell: LayoutPoint
+
+
+class MakersConfigPartner(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    make_with: MakeWith
+    action: ActionType
+    """
+    The action that makes the deliverable there: the connector's T3, gated action (build_handoff, create_design) or the MCP tool's action type. Picking the partner authorises nothing; this action keeps its own card (MK-07).
+    """
+
+
+type MakersConfigNeed = Annotated[str, Field(pattern="^[a-z0-9]+([ -][a-z0-9]+){0,3}$")]
+"""
+Lower-case words separated by one space or hyphen.
+"""
 
 
 class ManifestSkillVersion(BaseModel):
@@ -3339,6 +3394,30 @@ class PinboardItemHistoryEntry(BaseModel):
 type PlanApproachId = Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,31}$")]
 
 
+type PlanMakeNote = Annotated[str, Field(max_length=200, min_length=1)]
+"""
+One plain sentence Tilo wrote from the rule that applied (MK-02, MK-04).
+"""
+
+
+class PlanMakeOption(BaseModel):
+    """
+    One place a deliverable can be made (MK-02 to MK-04). A partner that is not set up is shown with status needs_setup, never hidden, never suggested and never selected. note is one plain sentence: why the option is suggested, or what must be set up first; null otherwise.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    make_with: MakeWith
+    label: Annotated[str, Field(max_length=40, min_length=1)]
+    """
+    Display name: Tilo for native, else the connector's or MCP server's name.
+    """
+    status: Literal["ready", "needs_setup"]
+    suggested: bool
+    note: PlanMakeNote | None
+
+
 type Risk = Annotated[str, Field(max_length=200, min_length=1)]
 
 
@@ -4717,7 +4796,7 @@ class ApprovalRequestedDataApproverAssignment(BaseModel):
 
 class ArtifactCreatedData(BaseModel):
     """
-    data of artifact.created (PRD 9.5): version 1 of a new artifact (EV-15). A version that went through the artifact store (ADR-0018) carries content_sha256, media_type and size_bytes copied from its stored record (artifact.schema.json), all three or none; the event is written only after the store committed it. Events from before the store, and the intake and channels producers, carry none (1.0.0 shape).
+    data of artifact.created (PRD 9.5): version 1 of a new artifact (EV-15). A version that went through the artifact store (ADR-0018) carries content_sha256, media_type and size_bytes copied from its stored record (artifact.schema.json), all three or none; the event is written only after the store committed it. Events from before the store, and the intake and channels producers, carry none (1.0.0 shape). 1.2.0 (ADR-0050): a website's HTML (text/html) is at most 524,288 bytes, as in the record (AR-10).
     """
 
     model_config = ConfigDict(
@@ -4739,7 +4818,7 @@ class ArtifactCreatedData(BaseModel):
 
 class ArtifactDeliveredData(BaseModel):
     """
-    data of artifact.delivered (PRD 9.5): a deliverable reached the Delivery Dock. This event is the notice, not the side effect, so it carries no authz. A format that leaves Tilo (email, or google_docs, google_sheets or google_slides through the Drive connector, PRD 12.4) went through the outbox: outbox_id names the entry that sent it, and the event's cause is that entry's data.transfer out, which carries the authorisation (EV-14, HR-7). A format kept in Tilo (a file to download, or in_app) has outbox_id null.
+    data of artifact.delivered (PRD 9.5): a deliverable reached the Delivery Dock. This event is the notice, not the side effect, so it carries no authz. A format that leaves Tilo (email, or google_docs, google_sheets or google_slides through the Drive connector, PRD 12.4) went through the outbox: outbox_id names the entry that sent it, and the event's cause is that entry's data.transfer out, which carries the authorisation (EV-14, HR-7). A format kept in Tilo (a file to download, or in_app) has outbox_id null. 1.1.0 (ADR-0050): make_with says where the deliverable was made, and a website always carries it. A deliverable a partner made (make_with not native: a Lovable build link, a Canva export) left Tilo through that partner's T3 outbox entry, so outbox_id names it and the cause is its data.transfer out (EV-14); a native one kept in Tilo has outbox_id null.
     """
 
     model_config = ConfigDict(
@@ -4748,6 +4827,7 @@ class ArtifactDeliveredData(BaseModel):
     artifact: ArtifactRef
     format: DeliverableFormat
     outbox_id: Ulid | None
+    make_with: MakeWith | None = None
 
 
 class ArtifactReviewedData(BaseModel):
@@ -5141,6 +5221,34 @@ class LayoutGeometry(BaseModel):
     gates: list[LayoutGateGeometry]
 
 
+class MakersConfigFormatOptions(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    partners: Annotated[list[MakersConfigPartner], Field(max_length=5, min_length=1)]
+    """
+    The partner options after native, in display order.
+    """
+
+
+class MakersConfigLargeSite(BaseModel):
+    """
+    MK-03: a website deliverable is large when its brief text names more than max_native_pages pages or one of the needs. The brief text is the goal, the deliverable's title and each constraint, lower-cased with whitespace collapsed; a need matches as whole words; a page count is a number (digits, or a word from one to twenty) directly before page or pages, a space or hyphen between.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    max_native_pages: Annotated[int, Field(ge=1, le=20)]
+    """
+    The most pages one self-contained HTML file is asked to hold (in-page sections or tabs).
+    """
+    needs: Annotated[list[MakersConfigNeed], Field(max_length=60)]
+    """
+    Lower-case phrases of one to four words naming a need a single file with no network cannot meet (sign-in, a database, payments).
+    """
+
+
 class ManifestProducer(BaseModel):
     """
     Who produced the version: the agent and its role, the pinned skill version (null without a skill), and the model role and profile from config/models.yaml (null when no model was called), never a model id.
@@ -5170,7 +5278,7 @@ class McpTools(BaseModel):
 
 class McpToolsReadArtifactOut(BaseModel):
     """
-    `text` is the version's bytes as UTF-8 for `text/markdown`, `text/csv` and `application/json` up to 262,144 bytes, else null with `withheld` saying why (MC-07).
+    `text` is the version's bytes as UTF-8 for `text/markdown`, `text/csv` and `application/json` up to 262,144 bytes, else null with `withheld` saying why (MC-07). Since 1.1.0 (ADR-0050) the schema holds the type half: text is null for any other type, a website's HTML included.
     """
 
     model_config = ConfigDict(
@@ -5624,6 +5732,25 @@ class PinboardItemPlacement(BaseModel):
     order: Annotated[int, Field(ge=0, le=9999)]
 
 
+class PlanMakeChoice(BaseModel):
+    """
+    Where one deliverable can be made (ADR-0050, MK-01): sent with the approaches for every deliverable whose format config/makers.yaml lists, native first, then each partner in config order. Code builds it, never a model. The selected option is the one whose make_with the start plan holds; a deliverable with no choice is made natively.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    deliverable: Annotated[int, Field(ge=0, le=9)]
+    """
+    0-based position of the deliverable in the brief.
+    """
+    options: Annotated[list[PlanMakeOption], Field(max_length=6, min_length=2)]
+    selected: MakeWith
+    """
+    The option selected before Start (MK-05): native, or the suggested ready option when config/makers.yaml preselect_suggested is true. Never an option that needs setup (MK-05, checked by code).
+    """
+
+
 class PlanApproach(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -6044,7 +6171,7 @@ class AppSpecSource(BaseModel):
 
 class ArtifactVersion(BaseModel):
     """
-    One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-09 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser.
+    One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-10 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser. 1.2.0 (ADR-0050) lets a writer unit store one self-contained HTML file for a website deliverable, at most 524,288 bytes; an upload never stores HTML (AR-10).
     """
 
     model_config = ConfigDict(
@@ -6229,6 +6356,7 @@ class Common(BaseModel):
     opaque_ref: OpaqueRef | None = None
     maker: Maker | None = None
     record_ref: RecordRef | None = None
+    make_with: MakeWith | None = None
 
 
 class Decision(BaseModel):
@@ -6411,6 +6539,26 @@ class LayoutDistrict(BaseModel):
     icon: IconName
     lead: AgentId
     buildings: Annotated[list[LayoutBuilding], Field(max_length=5, min_length=1)]
+
+
+class MakersConfig(BaseModel):
+    """
+    config/makers.yaml (ADR-0050; FR-CON-16, FR-CON-17, FR-CON-19): where each deliverable can be made. For a format listed in formats the start plan offers native (made in Tilo: always first, never listed here) and then each partner in order; a format not listed is made natively with no choice shown. Code applies MK-01 to MK-08 (makers.rules.md); a model never picks. Every key is required and no other key is allowed. The loader also checks what the schema cannot: a connector partner is declared in config/connectors.yaml or config/canva.yaml with that action as T3 and gated, and an mcp partner is a tool of config/mcp.yaml's allowlist with that action type; it refuses the whole file otherwise.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    formats: dict[DeliverableFormat, MakersConfigFormatOptions]
+    """
+    The formats that offer a choice, keyed by deliverable format, each with at least one partner (MK-01).
+    """
+    large_site: MakersConfigLargeSite
+    preselect_suggested: bool
+    """
+    MK-05: true selects a suggested ready partner before Start (the person can switch back to native); false always selects native first.
+    """
 
 
 class Manifest(BaseModel):
@@ -6762,7 +6910,7 @@ class PinboardItem(BaseModel):
 
 class Plan(BaseModel):
     """
-    PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md.
+    PlanGraph (PRD 7.1 FR-INT-06, FR-INT-09): the approaches offered, the chosen one compiled to units, dependencies, roles, skills, connectors and gates, and the confirmed budget cap. Cross-reference rules PG-01.. are in contracts/plan.rules.md. 1.2.0 (ADR-0050) adds make_choice and make_option: where each deliverable can be made, as the start plan shows it (makers.rules.md); the Plan root is unchanged.
     """
 
     model_config = ConfigDict(
@@ -7251,6 +7399,7 @@ type RegisteredEventType = Literal[
     "plan.questions_asked",
     "plan.approaches_proposed",
     "plan.revised",
+    "plan.maker_chosen",
     "budget.requested",
     "budget.granted",
     "level.created",
@@ -7350,6 +7499,7 @@ EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
     "plan.questions_asked",
     "plan.approaches_proposed",
     "plan.revised",
+    "plan.maker_chosen",
     "budget.requested",
     "budget.granted",
     "level.created",
@@ -7460,6 +7610,7 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
     "plan.questions_asked": PlanQuestionsAskedData,
     "plan.approaches_proposed": PlanApproachesProposedData,
     "plan.revised": PlanRevisedData,
+    "plan.maker_chosen": PlanMakerChosenData,
     "budget.requested": BudgetRequestedData,
     "budget.granted": BudgetGrantedData,
     "level.created": LevelCreatedData,
@@ -7549,7 +7700,7 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
 }
 
 EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
-    {'version': '1.5.0',
+    {'version': '1.6.0',
      'unknown_types': 'trace_only',
      'types': {'world.requested': {'family': 'world',
                                    'verb': 'requested',
@@ -7686,6 +7837,23 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                 'trace_row': 'proposal={data.proposal_id} run={data.run}',
                                 'data_schema': 'events/data/plan.revised.schema.json',
                                 'fixture': 'fixtures/events/valid/plan.revised.json'},
+               'plan.maker_chosen': {'family': 'plan',
+                                     'verb': 'maker_chosen',
+                                     'priority': 'should',
+                                     'pillar': 'P1',
+                                     'default_severity': 'info',
+                                     'side_effect': False,
+                                     'world_effect': 'A signpost at the Town Hall names who makes the '
+                                                     'deliverable: Tilo or the partner the person '
+                                                     'picked.',
+                                     'hud_effect': 'none',
+                                     'story_template': '{actor} picked {data.label} to make a '
+                                                       '{data.format} deliverable.',
+                                     'trace_row': 'deliverable={data.deliverable} '
+                                                  'make_with={data.make_with} '
+                                                  'suggested={data.suggested}',
+                                     'data_schema': 'events/data/plan.maker_chosen.schema.json',
+                                     'fixture': 'fixtures/events/valid/plan.maker_chosen.json'},
                'budget.requested': {'family': 'budget',
                                     'verb': 'requested',
                                     'priority': 'must',
