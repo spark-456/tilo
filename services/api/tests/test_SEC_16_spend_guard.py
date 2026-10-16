@@ -185,7 +185,7 @@ def test_SEC_16_abort_unit_rolls_the_reservation_back():
 # --- the durable replay_only switch ----------------------------------------------------------------------------------
 
 
-def test_FR_MTR_04_crossing_the_global_hard_cap_flips_replay_only_and_the_next_unit_is_replay():
+def test_FR_MTR_04_crossing_the_global_hard_cap_logs_warning_and_next_unit_is_replay(caplog):
     ledger = make_ledger(only("global_day_hard_minor", 1_000))
     guard = make_guard(ledger, caps=only("global_day_hard_minor", 1_000))
     first = begin(guard, uid=JUDGE_A, run_id="r_a", estimate=900)
@@ -194,6 +194,7 @@ def test_FR_MTR_04_crossing_the_global_hard_cap_flips_replay_only_and_the_next_u
     crossing = begin(guard, uid=JUDGE_B, run_id="r_b", estimate=200)  # 900 + 200 > 1,000
 
     assert crossing.mode == "replay" and crossing.reason == "global_hard"
+    assert "daily deployment spend cap reached" in caplog.text
     assert ledger.replay_only() is True and guard.replay_only() is True
     after = begin(guard, uid=JUDGE_B, run_id="r_c", estimate=1)
     assert (after.mode, after.reason) == ("replay", "replay_only")

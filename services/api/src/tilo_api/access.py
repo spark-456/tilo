@@ -22,9 +22,8 @@ from __future__ import annotations
 import logging
 import os
 import re
-import threading
 from collections.abc import Mapping
-from typing import Literal, Protocol
+from typing import Literal
 
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
@@ -71,33 +70,6 @@ def public_link(method: str, path: str) -> bool:
 
 
 RATE_LIMITED = "Too many requests in a short time. Wait a moment, then try again."
-
-
-class AccessStore(Protocol):
-    def get(self, user_id: str) -> Declaration | None: ...
-
-    def declare(self, user_id: str, declaration: Declaration) -> Declaration:
-        """First write wins; returns what is stored (so a second, different call gets the first value). A Firestore
-        store must do this as one transactional create-if-absent (create the document, on AlreadyExists read it
-        back): never read-then-write, never an overwrite, so two concurrent first calls leave exactly one winner and
-        a stored declaration is never changed by a request."""
-        ...
-
-
-class InMemoryAccessStore:
-    """The process's own store until Firestore is wired (a replacement for this class, not for the gate)."""
-
-    def __init__(self) -> None:
-        self._data: dict[str, Declaration] = {}
-        self._lock = threading.Lock()
-
-    def get(self, user_id: str) -> Declaration | None:
-        with self._lock:
-            return self._data.get(user_id)
-
-    def declare(self, user_id: str, declaration: Declaration) -> Declaration:
-        with self._lock:
-            return self._data.setdefault(user_id, declaration)
 
 
 def enforced(env: Mapping[str, str] | None = None) -> bool:

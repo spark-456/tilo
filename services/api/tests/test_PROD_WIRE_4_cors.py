@@ -255,7 +255,6 @@ def test_PROD_WIRE_4_a_signed_out_401_from_the_gate_carries_the_cors_headers(dep
 
 def test_PROD_WIRE_4_an_unwired_access_store_no_longer_closes_the_gate(deployed):
     deployed.as_user(JUDGE)
-    del app.dependency_overrides[deps.get_access_store]  # OPEN-ACCESS: the gate never reads it
 
     response = deployed.client.get("/worlds", headers={"Origin": WEB_APP})
 

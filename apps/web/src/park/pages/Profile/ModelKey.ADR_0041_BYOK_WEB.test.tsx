@@ -94,8 +94,6 @@ describe("ADR-0041 BQ-BYOK-WEB-1 states", () => {
 
   it("ADR_0041_R34_3_SEC_15_gate_refusals_have_gate_copy_without_owner_claims_or_writes", async () => {
     for (const [code, copy] of [
-      ["under_construction", "Access to Tilo is not available for this account yet."],
-      ["declaration_required", "Complete the sign-up question before using Tilo."],
     ]) {
       const { flow, calls } = fake({ get: [refuse(403, code ?? null)] });
       const m = mount(<ModelKeyControl flow={flow} demo={false} />);

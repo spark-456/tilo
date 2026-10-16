@@ -170,7 +170,6 @@ def test_SEC_15_a_judge_declaration_never_makes_dev_or_ci_live(sec15_factory, mo
 
     assert response.status_code == 201, response.text
     assert set(sec.router_modes) == {"replay"}, sec.router_modes
-    assert sec.access.reads == [], "dev and CI never need the access store"
     assert os.environ.get(LIVE) is None
 
 
