@@ -17,7 +17,6 @@ import pytest
 from _clint1_lib import seam
 from _ppl11a_lib import (
     ATTEST,
-    DEV,
     OWNER,
     PEOPLE_ROUTES,
     PRIYA,
@@ -33,22 +32,12 @@ from _ppl11a_lib import (
     fixture_case,
     own_item,
 )
-from _sec15_lib import (
-    CODE_DECLARATION_REQUIRED,
-    CODE_UNDER_CONSTRUCTION,
-    PINNED_PUBLIC_ROUTES,
-    FakeAccessStore,
-    concrete,
-)
+from _sec15_lib import PINNED_PUBLIC_ROUTES, concrete
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 SRC = pathlib.Path(__file__).resolve().parents[1] / "src" / "tilo_api"
 VISITOR, JUDGE, NEWCOMER = SAM, PRIYA, OWNER  # a visitor, a judge and a person who never declared (see `_access`)
-
-
-def _access() -> FakeAccessStore:
-    return FakeAccessStore({SAM: "visitor", PRIYA: "judge", DEV: "judge"})
 
 
 def _call(rig, route, **kwargs):
@@ -120,7 +109,7 @@ def test_PPL_11a_SEC_15_a_signed_out_caller_is_refused_before_anything_is_touche
     """OPEN-ACCESS (16 Oct 2026): a signed-out caller is 401 and no people seam was resolved, no store or source was
     read, nothing was written and no router was built. A "visitor" and an undeclared person are signed in, so the gate
     lets them through to the route's own rules (never `under_construction` or `declaration_required`)."""
-    rig = people_rig(deployed=True, access=_access())
+    rig = people_rig(deployed=True)
     rig.require_route(route)
     rig.add_people()
     before = rig.snapshot()
@@ -133,31 +122,30 @@ def test_PPL_11a_SEC_15_a_signed_out_caller_is_refused_before_anything_is_touche
     for user in (VISITOR, NEWCOMER):
         rig.as_user(user)
         response = _call(rig, route, **_valid_request(route))
-        assert response.json().get("code") not in {CODE_UNDER_CONSTRUCTION, CODE_DECLARATION_REQUIRED}, response.text
+        assert response.status_code != 401, (route, response.text)
 
 
 @pytest.mark.parametrize("route", [R_PLATE, R_QUOTES, R_CREATE_MEETING], ids=lambda r: f"{r[0]} {r[1]}")
 def test_PPL_11a_SEC_15_a_deployed_process_with_no_access_store_still_serves_a_signed_in_person(people_rig, route):
     """OPEN-ACCESS: no declaration is read, so a missing access store no longer closes the gate."""
-    rig = people_rig(deployed=True)  # no `get_access_store` override
+    rig = people_rig(deployed=True)
     rig.require_route(route)
     rig.as_user(PRIYA)
     response = _call(rig, route, **_valid_request(route))
-    assert response.json().get("code") not in {CODE_UNDER_CONSTRUCTION, CODE_DECLARATION_REQUIRED}, response.text
     assert not (response.status_code == 503 and response.json() == {"detail": "not_configured"} and rig.resolved == [])
 
 
 def test_PPL_11a_SEC_15_a_judge_reaches_the_routes_own_rules_unchanged(people_rig):
     """The gate adds nothing and takes nothing: a judge is answered by the route's own rules (their own plate, a 404
     for another person's meeting, a 403 where only an org owner may act)."""
-    rig = people_rig(deployed=True, access=_access())
+    rig = people_rig(deployed=True)
     rig.add_people()
     rig.add("work_items", own_item("wi_priya", PRIYA))
     rig.as_user(JUDGE)
     plate = rig.plate()
     assert plate.status_code == 200 and [r["ref"]["id"] for r in plate.json()["rows"]] == ["wi_priya"]
     case = fixture_case("transcript", "valid", "owner_reads_quotes")
-    rig2 = people_rig(deployed=True, access=FakeAccessStore({PRIYA: "judge", OWNER: "judge"}))
+    rig2 = people_rig(deployed=True)
     rig2.seed_quote_case(case)
     rig2.as_user(PRIYA)
     assert rig2.get("/v1/meetings/mt_q4_plan/quotes", params={"ids": "u0021"}).status_code == 404
@@ -289,7 +277,7 @@ def test_PPL_11a_PL_01_the_people_code_names_no_model_no_switch_no_network_and_n
         "a model id": r"(?i)\b(gemini|gpt-?[0-9]|claude|llama|nemotron|mistral|qwen|deepseek)\b",
         "a live switch": r"\bLIVE\b|TILO_JUDGE_LIVE|replay_only|K_SERVICE|CLOUD_RUN_JOB",
         "the provider layer": r"tilo_providers|router_for_mode|get_router|get_safety|provider_mode",
-        "a flag or mode seam": r"get_flag_store|get_mode\b|get_access_store",
+        "a flag or mode seam": r"get_flag_store|get_mode\b",
         "a network client": r"\b(import|from)\s+(httpx|requests|urllib|socket|aiohttp|http\.client)\b",
         "print": r"(?m)^\s*print\(",
         "a secret-looking literal": r"(?i)(api[_-]?key|secret|password|token)\s*=\s*[\"'][A-Za-z0-9_\-]{12,}[\"']",

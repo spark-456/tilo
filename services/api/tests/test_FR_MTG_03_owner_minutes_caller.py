@@ -108,13 +108,11 @@ def test_FR_MTG_03_caller_server_dependencies_replay_under_outer_live(caller_app
     assert c.ledger.spent_minor(c.writer.actor) == 0
 
 
-@pytest.mark.parametrize("declaration", [None, "visitor"])
-def test_FR_MTG_03_caller_deployed_gate_asks_for_no_declaration(caller_app, monkeypatch, declaration):
+def test_FR_MTG_03_caller_deployed_gate_allows_signed_in_person(caller_app, monkeypatch):
     """OPEN-ACCESS (16 Oct 2026): the deployed gate refuses nobody signed in for a missing or "visitor" declaration."""
     c = caller_app
     monkeypatch.setenv("K_SERVICE", "test-only-api")
     c.app.add_middleware(AccessGate)
-    c.app.dependency_overrides[deps.get_access_store] = lambda: SimpleNamespace(get=lambda uid: declaration)
     c.app.dependency_overrides[c.budget_seam] = lambda: 2
     response = call(c)
     assert response.json().get("code") not in {"under_construction", "declaration_required"}, response.text

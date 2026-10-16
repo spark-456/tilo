@@ -16,7 +16,7 @@ from test_FR_MTG_03_owner_minutes_caller import caller_app  # noqa: F401
 from test_FR_MTG_08_draft_retention import DB
 from tilo_api import app as production_app
 from tilo_api import deps, outbox_firestore, people, store_door
-from tilo_api.access import AccessGate, InMemoryAccessStore
+from tilo_api.access import AccessGate
 from tilo_api.assistant.config import load_assistant_config
 from tilo_api.assistant.metering import InMemorySpendLedger
 from tilo_api.owner_minutes_routes import MINUTES_FLAG, install_owner_minutes_routes
@@ -55,9 +55,6 @@ def chain(caller_app, monkeypatch):  # noqa: F811
             raise HTTPException(401, "sign_in_required")
         return deps.Principal(c.writer.actor, "owner", demo_session=c.demo)
 
-    access = InMemoryAccessStore()
-    for user in (OWNER, SAM):
-        access.declare(user, "judge")
     monkeypatch.setenv("K_SERVICE", "offline-minutes-test")
     monkeypatch.setenv("TILO_OUTBOX_STORE", "firestore")
     monkeypatch.setattr(deps, "get_work_mode", WORK_MODE)
@@ -71,7 +68,6 @@ def chain(caller_app, monkeypatch):  # noqa: F811
     c.app.dependency_overrides.update(
         {
             deps.get_current_principal: principal,
-            deps.get_access_store: lambda: access,
             deps.get_flag_store: lambda: c.flags,
             deps.get_spend_ledger: lambda: c.allowance,
             deps.get_assistant_config: lambda: replace(load_assistant_config(), user_day_credits=c.cap),

@@ -72,7 +72,6 @@ def test_SEC_15_OPEN_ACCESS_a_signed_in_person_is_never_refused_by_the_gate_on_a
 
         assert not retired_refusal(response), f"{method} {path}: the gate still refuses: {response.text[:200]}"
         assert response.status_code != 401  # the route's own answer, never the gate's
-    assert sec.access.reads == [] and sec.access.writes == [], "nobody's declaration is read or written any more"
 
 
 def test_SEC_15_OPEN_ACCESS_a_fresh_person_can_use_the_main_routes(sec15_factory):
@@ -109,7 +108,6 @@ def test_SEC_15_OPEN_ACCESS_the_old_sign_up_answer_is_accepted_stores_nothing_an
     for response in (first, second):
         assert response.status_code == 200, response.text
         assert response.json() == {"declaration": "judge", "allowed": True, "models": "replay"}
-    assert sec.access.writes == [] and sec.access.reads == []
     assert sec.client.post("/access/declaration", json={"declaration": "admin"}).status_code == 422
     assert sec.client.post("/access/declaration", data={"declaration": "judge"}).status_code == 415
     sec.sign_out()
@@ -190,7 +188,6 @@ def test_SEC_15_OPEN_ACCESS_every_spelling_of_a_route_gives_a_new_person_the_rou
     response = sec.client.request(method, f"http://testserver{path}")
 
     assert not retired_refusal(response), f"{method} {path}: {response.status_code} {response.text[:200]}"
-    assert sec.access.writes == []
 
 
 def test_SEC_15_OPEN_ACCESS_not_deployed_the_gate_is_off_and_needs_no_access_store(sec15_factory):
@@ -199,7 +196,6 @@ def test_SEC_15_OPEN_ACCESS_not_deployed_the_gate_is_off_and_needs_no_access_sto
 
     for method, path in NON_PUBLIC:
         assert not retired_refusal(sec.call(method, path)), f"{method} {path}"
-    assert sec.access.reads == []
 
 
 def test_SEC_15_OPEN_ACCESS_dev_mode_serves_its_fixed_owner_with_no_declaration():

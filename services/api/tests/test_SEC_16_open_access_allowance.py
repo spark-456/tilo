@@ -58,6 +58,26 @@ def test_SEC_16_OPEN_ACCESS_a_new_person_is_rate_limited_per_uid(sec16_factory):
     assert h.client.get(concrete("/worlds/{world_id}/events")).status_code != 429, "another uid has its own window"
 
 
+def test_SEC_16_OPEN_ACCESS_deployed_demo_is_replay_and_google_session_is_live(sec16_factory, monkeypatch):
+    h = sec16_factory(declarations={}, **BIG_LIMIT)
+    monkeypatch.setenv("K_SERVICE", "tilo-api")
+    monkeypatch.setenv("TILO_JUDGE_LIVE", "1")
+    from tilo_api import app, deps
+
+    h.demo_session = True
+    app.dependency_overrides[deps.get_current_principal] = lambda: deps.Principal(
+        user_id=NEWCOMER, role="owner", demo_session=h.demo_session, full_session=not h.demo_session
+    )
+    demo = h.intake()
+    assert demo.status_code == 201, demo.text
+    assert h.router_modes[-1] == "replay", "SEC-15 access.py:158 carries verified demo_session into request state"
+
+    h.demo_session = False
+    google = h.intake()
+    assert google.status_code == 201, google.text
+    assert h.router_modes[-1] == "live"
+
+
 def test_SEC_16_OPEN_ACCESS_the_kill_switch_still_forces_replay_for_a_new_person(sec16_factory):
     h = sec16_factory(declarations={}, **BIG_LIMIT)
     h.as_user(NEWCOMER)

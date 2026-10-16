@@ -715,9 +715,7 @@ def test_PPL_11c_s4_BQ_PPL11C_12_meeting_world_and_delete_read_the_actor_by_id_a
 
 
 def test_PPL_11c_s4_PE_22_every_answer_is_no_store_the_gates_401_and_a_validation_422_included(people_rig):
-    from _sec15_lib import FakeAccessStore  # noqa: PLC0415
-
-    rig = people_rig(deployed=True, access=FakeAccessStore({SAM: "visitor", PRIYA: "judge"}))
+    rig = people_rig(deployed=True)
     rig.add_people()
     rig.as_user(SAM)
     answers = {"visitor": rig.get("/v1/plate")}  # OPEN-ACCESS: a signed-in visitor reaches the route

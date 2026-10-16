@@ -358,14 +358,11 @@ def test_SEC_15_SIGNIN_a_dev_owner_token_is_not_obtainable_by_naming_it_in_a_fir
 
 @pytest.fixture
 def real_app(signer, monkeypatch):
-    """`tilo_api.app` as deployed: K_SERVICE set, sign-in via the verifier seam, an in-memory access store and Store."""
+    """`tilo_api.app` as deployed: K_SERVICE set, sign-in via the verifier seam and an in-memory Store."""
     monkeypatch.setenv("K_SERVICE", "tilo-api")
-    store = access.InMemoryAccessStore()
     tilo_app.dependency_overrides[deps.get_firebase_verifier] = lambda: verifier_for(signer)
-    tilo_app.dependency_overrides[deps.get_access_store] = lambda: store
     tilo_app.dependency_overrides[deps.get_store] = lambda: deps.Store()
     with TestClient(tilo_app, raise_server_exceptions=False) as client:
-        client.store = store  # type: ignore[attr-defined]
         yield client
 
 
@@ -384,7 +381,6 @@ def test_SEC_15_SIGNIN_a_google_sign_in_with_no_declaration_is_let_in(real_app, 
     assert view["declaration"] == "judge" and view["allowed"] is True
     reply = real_app.get("/worlds", headers=headers)
     assert reply.status_code == 200, reply.text
-    assert real_app.store.get(firebase_auth.user_id_for(GOOGLE_SUB)) is None, "nothing is stored for a sign-in"
 
 
 def test_SEC_15_SIGNIN_an_anonymous_demo_session_is_let_in_by_the_same_rules(real_app, signer):
@@ -392,7 +388,6 @@ def test_SEC_15_SIGNIN_an_anonymous_demo_session_is_let_in_by_the_same_rules(rea
     assert real_app.get("/worlds", headers=headers).status_code == 200
     reply = real_app.post("/access/declaration", json={"declaration": "visitor"}, headers=headers)
     assert reply.status_code == 200, reply.text
-    assert real_app.store.get(firebase_auth.user_id_for(ANON_SUB)) is None
     assert real_app.post("/access/declaration", json={"declaration": "judge"}, headers=headers).status_code == 200
 
 
@@ -443,7 +438,6 @@ def test_SEC_15_SIGNIN_the_real_app_makes_no_key_fetch_when_nobody_sends_a_token
     monkeypatch.setenv("K_SERVICE", "tilo-api")
     fetch = Fetch({"k1": signer.public_key()})
     tilo_app.dependency_overrides[deps.get_firebase_verifier] = lambda: verifier_for(signer, fetch=fetch)
-    tilo_app.dependency_overrides[deps.get_access_store] = lambda: access.InMemoryAccessStore()
     with TestClient(tilo_app, raise_server_exceptions=False) as client:
         for path in ("/health", "/healthz", "/worlds", "/access"):
             client.get(path)
