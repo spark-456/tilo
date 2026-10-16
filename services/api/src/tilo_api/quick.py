@@ -200,7 +200,7 @@ def _plain(reply: str) -> str:
     return "".join(c for c in reply if c in ("\n", "\t") or unicodedata.category(c)[0] != "C")
 
 
-def _offer(reason: str | None) -> dict[str, Any]:
+def offer(reason: str | None) -> dict[str, Any]:
     return {"mode": "quick", "outcome": "switch_to_thinking", "reason": reason or "unclear"}
 
 
@@ -249,7 +249,7 @@ def respond(
         return body if found is None else {**body, "skill": found}
 
     if verdict.kind == "work":
-        return tag(_offer(verdict.reason))  # decided by rules: no model call to answer it, nothing stored
+        return tag(offer(verdict.reason))  # decided by rules: no model call to answer it, nothing stored
     if rules.role not in deps.providers_config().roles:
         raise QuickRefusal(503, "not_configured")  # never a fallback to the Director
 
@@ -283,7 +283,7 @@ def respond(
         held.commit(tally.spent)
         record(tally)
         if "offer" in done:
-            return tag(_offer(done["offer"]))
+            return tag(offer(done["offer"]))
         cost = {"model_calls": done["calls"], "credits": float(tally.spent), "saved_credits": 0.0}
         return tag({"mode": "quick", "outcome": "answered", "text": done["text"], "cost": cost})
 

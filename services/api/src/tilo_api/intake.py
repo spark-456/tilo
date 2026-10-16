@@ -49,6 +49,7 @@ from tilo_api import deps, ephemeral, intake_requests, quick
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
 from tilo_api.intake_deadline import INTAKE_DEADLINE_DETAIL, load_intake_deadline
+from tilo_api.intake_refs import RefsRefused, parse_refs, tagged_skill
 from tilo_api.intake_uploads import FILE_SCREEN_UNAVAILABLE, RunUploads, UploadStorageError
 from tilo_api.skills_route import SkillContext, skill_context_for
 from tilo_api.tasks import create_task
@@ -117,6 +118,7 @@ async def intake(
     scenario: Annotated[str | None, Form()] = None,
     mode: Annotated[str | None, Form()] = None,  # COST-FAST-1: "quick" or "thinking" (read from the form below)
     files: Annotated[list[UploadFile], File()] = [],  # noqa: B006 (FastAPI copies defaults)
+    refs: Annotated[str | None, Form()] = None,  # MN-01: a JSON array of mention refs (mentions.schema.json)
 ) -> Any:
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in, before any work
     chosen = (await http.form()).getlist("mode")  # exactly one of quick or thinking; two fields are never resolved
@@ -127,6 +129,13 @@ async def intake(
             await run_in_threadpool(load_scenario, scenario)
         except ScenarioError:
             return _rejected("That scenario is not available.")
+    skills = skill_context_for(http, principal, model_router)
+    try:  # MN-02, MN-09: before any world, upload or model call; a ref the person cannot use is one 422
+        tagged = tagged_skill(parse_refs(refs), skills) if refs is not None and refs.strip() else None
+    except RefsRefused as refused:
+        return refused.response()
+    if tagged is not None and chosen and chosen[0] == "quick":  # MN-06: Quick keeps no record; refs make it Thinking
+        return JSONResponse({**quick.offer("refs"), "skill": tagged})
     if len(files) > MAX_FILES:
         return _rejected(f"{len(files)} files attached; the limit is {MAX_FILES}.")
     uploads, remaining = [], MAX_TOTAL_BYTES
@@ -156,6 +165,7 @@ async def intake(
             chosen,
             scenario,
             key,
+            tagged,
         )
 
     if key is None or (chosen and chosen[0] == "quick"):
@@ -179,6 +189,7 @@ async def _thinking(
     chosen: list[Any],
     scenario: str | None,
     key: str | None,
+    tagged: dict[str, Any] | None = None,
 ) -> Any:
     text = request.text
     limit = load_intake_deadline()
@@ -301,7 +312,7 @@ async def _thinking(
         raise
     try:
         task_id, task = await run_in_threadpool(
-            create_task, tasks, writer, result, extraction, scenario=scenario, kinds=kinds
+            create_task, tasks, writer, result, extraction, scenario=scenario, kinds=kinds, skill=tagged
         )
     except WriterBusy:
         raise  # the existing app handler preserves store_unavailable; retain sources after any ambiguous write
@@ -327,6 +338,7 @@ async def _thinking(
         "questions": questions,
         "scenario": scenario,
         "gaps": [g.as_dict() for g in task.gaps],
+        **({"skill": task.skill} if task.skill is not None else {}),  # SKILL-TAG: the skill the person tagged
     }
 
 
