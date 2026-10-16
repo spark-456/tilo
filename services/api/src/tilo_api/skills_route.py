@@ -120,6 +120,8 @@ def taught_entries(records: list[dict[str, Any]], user: str) -> list[dict[str, A
 
     out = []
     for r in records:
+        if r.get("paused"):  # a paused skill is not offered, matched or tagged (TS-10, FR-SKL-06)
+            continue
         steps = "; ".join(_line(s["text"], 60) for s in r["plan"][:3])
         tools = list(dict.fromkeys(s["tool"] for s in r["plan"] if s["tool"] != WRITER[0]))
         out.append(
@@ -194,7 +196,9 @@ def _doc(entry: dict[str, Any]) -> str:
 
 
 def _embed(model_router: Router, texts: list[str], task: str, dims: int) -> tuple[str, list[list[float]]]:
-    result = model_router.embed("embed", EmbedRequest(texts=texts, task=task, dimensions=dims))
+    # a deployed router is a MeteredRouter: its embeddings are SEC-16 units, named `metered_embed`; a Router has `embed`
+    call = getattr(model_router, "metered_embed", None) or model_router.embed
+    result = call("embed", EmbedRequest(texts=texts, task=task, dimensions=dims))
     reply = result.embedding
     return reply.profile_id, [list(v) for v in reply.vectors]
 
@@ -227,13 +231,22 @@ def _scores(model_router: Router, text: str, entries: list[dict[str, Any]], cfg:
     return {i: _cosine(query, v) for i, v in vectors.items()}
 
 
+def _fenced(entry: dict[str, Any]) -> str:
+    """An entry line that cannot close the SKILLS block or open another block of the prompt."""
+    return neutralise_marker(neutralise_marker(_doc(entry), "SKILLS"), "TASK")
+
+
 def _pick(model_router: Router, text: str, first: dict[str, Any], second: dict[str, Any]) -> str | None:
     """One cheap `assistant` call between two near-equal skills: 'a', 'b', 'none' or None when it cannot answer."""
     try:
         prompt = load_prompt(
             "assistant",
             "skill_route_task.md",
-            {"task": neutralise_marker(text, "TASK")[:1000], "a": _doc(first), "b": _doc(second)},
+            {
+                "task": neutralise_marker(text, "TASK")[:1000],
+                "a": _fenced(first),
+                "b": _fenced(second),
+            },
         )
         system = load_prompt("assistant", "skill_route_system.md")
         result = model_router.generate(
