@@ -100,6 +100,20 @@ export const DRAFT_MS = 900;
 // Quick / Thinking (COST-FAST-1). Words only: no number here is an estimate, a price or a time. The one number is
 // the server's own input cap for a Quick question (config/assistant.yaml question.max_chars).
 export const QUICK_MAX_CHARS = 500;
+
+/** Attach selected served context without sending Quick past its server-side character cap. */
+export function withQuickContext(
+  question: string,
+  contexts: readonly { readonly id: string; readonly label: string; readonly detail: string }[],
+  selected: readonly string[],
+): string {
+  const details = contexts
+    .filter((context) => selected.includes(context.id))
+    .map((context) => `${context.label}: ${context.detail}`);
+  const combined = details.length ? `${question}\n\n${details.join("\n")}` : question;
+  return Array.from(combined).slice(0, QUICK_MAX_CHARS).join("");
+}
+
 // A3 (14 Oct QA): the task box stops at the server's cap for a Thinking task (packages/planning intake.py
 // MAX_TEXT_CHARS), so a paste of 4,500 characters cannot go further than the server would take.
 export const INTAKE_MAX_CHARS = 4000;

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Buddy as TiloTBuddy, type TiloMood } from "../../../design/tilo-t/Buddy";
 import { useQuickChat } from "../../chat/useQuickChat";
+import { withQuickContext } from "./homeData";
 import "./Home.css";
 
 export interface HomeContextChip {
@@ -37,11 +38,7 @@ export function HomeAssistant({ contexts }: { contexts: readonly HomeContextChip
     e.preventDefault();
     const query = draft.trim();
     if (!query) return;
-    const details = contexts
-      .filter((c) => selected.includes(c.id))
-      .map((c) => `${c.label}: ${c.detail}`);
-    const withContext = details.length ? `${query}\n\n${details.join("\n")}` : query;
-    if (chat.ask(withContext)) setDraft("");
+    if (chat.ask(withQuickContext(query, contexts, selected))) setDraft("");
   };
 
   return (

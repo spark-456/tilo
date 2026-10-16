@@ -11,6 +11,7 @@ import {
 } from "../../../../test-support/park/homeHarness";
 import { liveSourced } from "../../../../test-support/park/liveHomeHarness";
 import type { Api } from "../../api/index";
+import { withQuickContext } from "./homeData";
 
 afterEach(() => {
   cleanup();
@@ -18,6 +19,15 @@ afterEach(() => {
 });
 
 describe("CX_T_HOME Home assistant", () => {
+  it("CX_T_HOME keeps selected served context within the Quick API character limit", () => {
+    const contexts = [
+      { id: "agenda", label: "Today’s agenda", detail: "🗓️".repeat(600) },
+    ];
+    const question = withQuickContext("Summarize my day", contexts, ["agenda"]);
+    expect(Array.from(question)).toHaveLength(500);
+    expect(question.startsWith("Summarize my day\n\nToday’s agenda: ")).toBe(true);
+  });
+
   it("CX_T_HOME opens context chips from Home data and asks through Quick", async () => {
     const startWorld = vi.fn(async () => ({
       data: {
