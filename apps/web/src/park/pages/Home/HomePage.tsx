@@ -27,6 +27,7 @@ import { DEMO_START } from "../../app/store";
 import { takeDraft } from "../../chat/handoff";
 import { FirstRunOverview } from "../../sample/FirstRunOverview";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
+import { type CatalogSkill, sendWithSkill } from "../../shared/skillRoute";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
 import { HomeAssistant, type HomeContextChip } from "./HomeAssistant";
 import "./Home.css";
@@ -148,6 +149,7 @@ export function HomePage({ app }: { app: AppCtx }) {
   // The composer: { size, text, phase } of the reference.
   const [modeKey, setModeKey] = useState<TierKey>("quick");
   const [query, setQuery] = useState("");
+  const [selectedSkill, setSelectedSkill] = useState<CatalogSkill | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const phaseNow = useRef<Phase>("idle");
   const pending = useRef<(() => void) | null>(null);
@@ -554,6 +556,13 @@ export function HomePage({ app }: { app: AppCtx }) {
           mode={mode}
           modes={MODES}
           query={query}
+          selectedSkill={selectedSkill}
+          skillClient={briefClient}
+          onSkill={(skill) => {
+            setQuery(query.replace(/(?:^|\s)@[^\s@]*$/, "").trimEnd());
+            setSelectedSkill(skill);
+          }}
+          onClearSkill={() => setSelectedSkill(null)}
           shown={query.trim() || mode.example}
           phase={phase}
           effort={effort}
@@ -563,6 +572,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           onQuery={(value) => {
             if (busy()) return;
             setQuery(value);
+            setSelectedSkill(null);
             setQuick(QUICK_IDLE);
             toIdle();
           }}
@@ -578,7 +588,15 @@ export function HomePage({ app }: { app: AppCtx }) {
             setQuick(QUICK_IDLE);
             toIdle();
           }}
-          onDraft={effort === "quick" ? ask : oneStepLive() ? prepare : draft}
+          onDraft={() => {
+            const result = sendWithSkill(
+              query,
+              selectedSkill?.id ?? null,
+              effort === "quick" ? ask : oneStepLive() ? prepare : draft,
+            );
+            if (result === null)
+              store.toast("Skill tagging needs setup before this task can be sent.");
+          }}
           run={
             run === null
               ? undefined

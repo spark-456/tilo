@@ -6,6 +6,8 @@ import type { Ref } from "react";
 import type { Effort, QuickCost, SwitchReason } from "../../api/types";
 import { RECORDED_RUN_PATH } from "../../app/router";
 import { type SegmentOption, SegmentedControl } from "../../components";
+import { SkillMention } from "../../shared/SkillMention";
+import type { CatalogSkill, HttpClient } from "../../shared/skillRoute";
 import { Buddy, type BuddyMood } from "../../studio/Buddy";
 import { type IntakeClient, IntakeControl } from "./IntakeControl";
 import { RunCard, type RunCardProps } from "./RunCard";
@@ -99,6 +101,10 @@ export interface ComposerProps {
   readonly mode: Mode;
   readonly modes: readonly Mode[];
   readonly query: string;
+  readonly selectedSkill?: CatalogSkill | null;
+  readonly skillClient?: HttpClient | null;
+  readonly onSkill?: (skill: CatalogSkill) => void;
+  readonly onClearSkill?: () => void;
   /** What the person typed, or the size's example task when the box is empty. */
   readonly shown: string;
   readonly phase: Phase;
@@ -171,6 +177,15 @@ export function ComposerPanel(p: ComposerProps) {
             />
           </div>
         </IntakeControl>
+        {p.onSkill && p.onClearSkill ? (
+          <SkillMention
+            text={p.query}
+            selected={p.selectedSkill ?? null}
+            client={p.skillClient ?? null}
+            onChoose={p.onSkill}
+            onClear={p.onClearSkill}
+          />
+        ) : null}
         <div className="park-home-mode-row">
           <div className="park-home-effort">
             <SegmentedControl
