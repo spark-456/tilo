@@ -89,3 +89,12 @@ def test_RT_05_a_bad_embedder_result_is_refused_not_stored():
     with pytest.raises(ChunkError):
         store.index(doc(ALICE, "some text"))
     assert list(backend.scan(ORG)) == []
+
+
+def test_RT_05_vectors_are_unit_length_before_they_are_stored_or_compared():
+    store, backend, embedder, _ = make_store()
+    embedder.embed = lambda texts, task: [[3.0] + [0.0] * 63 for _ in texts]  # type: ignore[method-assign]
+    store.index(doc(ALICE, "some text about budgets"))
+    (stored,) = backend._docs.values()
+    assert stored["embedding"][0] == 1.0  # a truncated, unnormalised embedding is scaled once
+    assert store.search(ORG, ALICE, "budgets")[0].score == pytest.approx(1.0)

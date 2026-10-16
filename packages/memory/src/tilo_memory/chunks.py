@@ -165,6 +165,10 @@ class ChunkStore:
         self._backend, self._embedder, self._rules, self._cfg = backend, embedder, rules, config
         self._screen, self._redact, self._clock = screen, redact, clock
 
+    @property
+    def embedder(self) -> Embedder:
+        return self._embedder
+
     def index(self, doc: SourceDoc) -> int:
         """Replace the chunks of one source version; returns the passages now held. 0 for empty, flagged text."""
         self._check_doc(doc)
@@ -182,23 +186,27 @@ class ChunkStore:
         shas = [hashlib.sha256(p.encode()).hexdigest() for p in passages]
         ids = [chunk_id(doc.org_id, doc.kind, doc.source_id, doc.version, i, profile) for i in range(len(passages))]
         known = {d["text_sha256"]: d["embedding"] for d in held if d["embed_profile"] == profile}
-        todo = [
-            i
-            for i, (cid, sha) in enumerate(zip(ids, shas, strict=True))
-            if by_id.get(cid, {}).get("text_sha256") != sha
-        ]
+        label = clean_label(doc.label)
+
+        def current(cid: str, sha: str) -> bool:  # same passage, same scope: nothing to rewrite
+            d = by_id.get(cid)
+            return d is not None and (d["text_sha256"], d["team_id"], d["world_id"], d["label"], d["expires_at"]) == (
+                sha, doc.team_id, doc.world_id, label, doc.expires_at,
+            )  # fmt: skip
+
+        todo = [i for i, (cid, sha) in enumerate(zip(ids, shas, strict=True)) if not current(cid, sha)]
         fresh = [i for i in todo if shas[i] not in known]  # same text and profile: the stored vector is reused
         for start in range(0, len(fresh), self._cfg.batch_max):
             batch = fresh[start : start + self._cfg.batch_max]
             vectors = self._embedder.embed([passages[i] for i in batch], "document")
             if len(vectors) != len(batch) or any(not _valid(v, dims) for v in vectors):
                 raise ChunkError("the embedder returned an unusable result")
-            known.update({shas[i]: v for i, v in zip(batch, vectors, strict=True)})
+            known.update({shas[i]: _unit(v) for i, v in zip(batch, vectors, strict=True)})
         now = _iso(self._clock())
         for i in todo:
             record = {
                 "id": ids[i], "org_id": doc.org_id, "owner": doc.owner, "team_id": doc.team_id,
-                "world_id": doc.world_id, "label": clean_label(doc.label), "position": i, "text": passages[i],
+                "world_id": doc.world_id, "label": label, "position": i, "text": passages[i],
                 "source": {"kind": doc.kind, "id": doc.source_id, "version": doc.version},
                 "text_sha256": shas[i], "embed_profile": profile, "dimensions": dims, "screening": "clean",
                 "created_at": now, "expires_at": doc.expires_at,
@@ -227,10 +235,11 @@ class ChunkStore:
         vectors = self._embedder.embed([clean_text(query)], "query")
         if len(vectors) != 1 or not _valid(vectors[0], self._embedder.dimensions):
             raise ChunkError("the embedder returned an unusable result")
+        query_vector = _unit(vectors[0])  # dot product is cosine only for unit vectors (truncated ones are not)
         found: dict[str, tuple[float, dict[str, Any]]] = {}
         for field, value in scopes:  # one query per readable scope, the filter inside it (RT-03)
             for score, doc in self._backend.nearest(
-                org_id, field, value, self._embedder.profile, vectors[0], min(want * 3, 20)
+                org_id, field, value, self._embedder.profile, query_vector, min(want * 3, 20)
             ):
                 if doc.get("org_id") == org_id and doc.get(field) == value and doc.get("id") not in found:
                     found[doc["id"]] = (score, doc)
@@ -256,6 +265,13 @@ class ChunkStore:
             self._backend.delete(org_id, d["id"])
         return len(docs)
 
+    def delete_for_owner(self, org_id: str, owner: str) -> int:
+        """FR-MEM-09: every chunk of one person, in the same operation as their erasure."""
+        gone = [d["id"] for d in self._backend.scan(org_id) if d["owner"] == owner]
+        for chunk in gone:
+            self._backend.delete(org_id, chunk)
+        return len(gone)
+
     def sweep(self, org_id: str) -> int:
         """RT-07: delete every chunk whose source is gone or whose team scope lapsed, or whose retention has passed."""
         now, removed = _iso(self._clock()), 0
@@ -279,6 +295,11 @@ class ChunkStore:
             raise ChunkError("this kind of source is never a team chunk")  # RT-02
         if doc.team_id is not None and doc.kind == "deliverable" and doc.world_id is None:
             raise ChunkError("a team deliverable names its world")
+
+
+def _unit(vector: Sequence[float]) -> list[float]:
+    length = math.sqrt(sum(x * x for x in vector))
+    return [x / length for x in vector] if length > 0 else list(vector)
 
 
 def _valid(vector: Sequence[float], dims: int) -> bool:
