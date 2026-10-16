@@ -69,12 +69,23 @@ def test_WEB_2_WS_10_the_shell_is_the_same_bytes_for_every_caller() -> None:
 def test_WEB_2_WS_11_the_shell_script_does_the_handshake_once() -> None:
     body = shell().text
     assert body.count("<script>") == 1
-    assert '"tilo":"preview-ready"' in body.replace(" ", "") or "tilo: 'preview-ready'" in body
+    assert '"tilo":"preview-written"' in body.replace(" ", "") or "tilo: 'preview-written'" in body
     for needle in ("524288", "document.open()", "document.write(", "document.close()", "removeEventListener", '"*"'):
         assert needle in body
     assert '"https://app.example"' in body and '"https://alt.example:8443"' in body  # the same list as the CSP
     for banned in ("fetch", "XMLHttpRequest", "localStorage", "eval(", "src=", "href="):
         assert banned not in body
+
+
+def test_CX_WEB_2_SHELL_posts_preview_written_after_the_replaced_document_loads() -> None:
+    body = shell().text
+    opened = body.index("document.open()")
+    listener = body.index('addEventListener("load"')
+    written = body.index("document.write(")
+    closed = body.index("document.close()")
+    assert opened < listener < written < closed
+    assert body.replace(" ", "").count('"tilo":"preview-written"') == 1
+    assert "preview-ready" not in body
 
 
 def test_WEB_2_WS_10_deployed_the_ancestors_are_the_two_hosting_origins(monkeypatch: pytest.MonkeyPatch) -> None:

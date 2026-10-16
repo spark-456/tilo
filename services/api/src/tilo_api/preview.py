@@ -1,9 +1,10 @@
 """WEB-2 (ADR-0050, contracts/website.rules.md WS-10, WS-11, WS-13): the fixed preview shell for a native website.
 
 `GET /preview/website` returns the same bytes to every caller: no data, no token, no sign-in, nothing from the request.
-The web app frames it as `<iframe sandbox="allow-scripts">`; its one inline script posts `{"tilo":"preview-ready"}` to
-the parent, takes exactly ONE `{"tilo":"preview","html":<text>}` message whose origin is one of the web app's origins,
-writes the text into its own document and drops the listener. The page keeps the shell's CSP (`sandbox allow-scripts`
+The web app frames it as `<iframe sandbox="allow-scripts">`; its one inline script takes exactly ONE
+`{"tilo":"preview","html":<text>}` message whose origin is one of the web app's origins, writes the text into its
+own document and drops the listener. Once that document loads, the shell posts one `{"tilo":"preview-written"}` to
+the parent. The page keeps the shell's CSP (`sandbox allow-scripts`
 makes the origin opaque even when the shell is opened alone; no network of any kind). The response carries no
 `X-Frame-Options`: framing is limited by `frame-ancestors` (the web origins), and this is the only route that is
 framed. The same CSP rides on a website download (`results.py`, WS-13), so a browser that renders the file anyway runs
@@ -42,11 +43,13 @@ _SCRIPT = """(function () {
     if (new TextEncoder().encode(data.html).length > __MAX__) return;
     window.removeEventListener("message", take);
     document.open();
+    window.addEventListener("load", function () {
+      window.parent.postMessage({"tilo": "preview-written"}, "*");
+    }, {once: true});
     document.write(data.html);
     document.close();
   }
   window.addEventListener("message", take);
-  window.parent.postMessage({"tilo": "preview-ready"}, "*");
 })();"""
 
 
