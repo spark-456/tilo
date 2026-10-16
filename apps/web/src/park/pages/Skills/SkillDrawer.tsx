@@ -63,6 +63,9 @@ export function SkillDrawer({
   const [busy, setBusy] = useState(false);
   const st = statusOf(skill, paused);
   const isPaused = paused || skill.paused === true;
+  const inputs = skill.details?.inputs.length
+    ? skill.details.inputs
+    : (skill.catalog?.inputs ?? []);
 
   useEffect(() => {
     close.current?.focus();
@@ -179,11 +182,11 @@ export function SkillDrawer({
               </ol>
             </section>
           ) : null}
-          {skill.details?.inputs.length || skill.catalog?.inputs.length ? (
+          {inputs.length ? (
             <section className="park-skill-drawer__sec" aria-label="Inputs for this skill">
               <h3 className="park-skill-drawer__h3">What you provide</h3>
               <ul>
-                {(skill.details?.inputs ?? skill.catalog?.inputs ?? []).map((input) => (
+                {inputs.map((input) => (
                   <li key={input.name}>
                     {input.label}
                     {input.required ? " (required)" : " (optional)"}
