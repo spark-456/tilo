@@ -24,7 +24,7 @@ import { useFirstRun } from "../sample/useFirstRun";
 import "../tokens/fonts";
 import { appearanceOf } from "../studio/ThemeSwitch";
 import { AccountMenu, type AccountPerson } from "./AccountMenu";
-import { BootSplash } from "./BootSplash";
+import { PoolLoader } from "../../design/tilo-t/PoolLoader";
 import { CityBackdrop } from "./CityBackdrop";
 import { ContextPanel, useContextChoice } from "./ContextPanel";
 import { Enter } from "./Enter";
@@ -219,7 +219,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       });
   };
   return (
-    <>
+    <PoolLoader kind="site" loading={!ready}>
       <CityBackdrop
         scene={scene}
         vw={app.vw}
@@ -356,7 +356,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           onGone={done}
         />
       ) : null}
-      <BootSplash ready={ready} />
-    </>
+    </PoolLoader>
   );
 }

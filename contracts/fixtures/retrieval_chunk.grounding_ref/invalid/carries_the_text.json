@@ -1,0 +1,9 @@
+{
+  "source": {
+    "kind": "deliverable",
+    "id": "art_q4_plan_report",
+    "version": 2
+  },
+  "label": "Q4 supplier comparison",
+  "text": "Supplier B quoted 12% less than Supplier A.\nDelivery is 6 weeks for both."
+}

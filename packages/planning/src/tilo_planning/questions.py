@@ -329,6 +329,7 @@ _FORMATS = (
     "email",
     "in_app",
     "app",
+    "website",
 )
 _FORMAT_WORDS = {  # what a person types for a format
     "powerpoint": "pptx", "ppt": "pptx", "slides": "pptx", "slide deck": "pptx", "deck": "pptx", "word": "docx",

@@ -113,7 +113,7 @@ def test_PROD_WIRE_3_k_service_alone_opens_nothing(pw3, config):
     builder = Builder()
     pw3.use(builder)
     pw3.deployed(PROJECT, **config)  # Cloud Run, a project, and no switch for any store
-    for call in (deps.get_store, deps.get_people_stores, deps.get_access_store, deps.get_event_writer):
+    for call in (deps.get_store, deps.get_people_stores, deps.get_event_writer):
         for _ in range(2):
             assert _is_503(_refused(call), "not_configured")
     assert builder.calls == [] and pw3.real.calls == []

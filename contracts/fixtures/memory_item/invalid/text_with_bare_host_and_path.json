@@ -1,0 +1,10 @@
+{
+  "id": "mem_01JB5VQ0000000000000000001",
+  "org_id": "org_example",
+  "owner": "u_alex",
+  "text": "My notes are at example.com/notes",
+  "kind": "preference",
+  "source": "user",
+  "created_at": "2026-10-16T03:00:00.000Z",
+  "updated_at": "2026-10-16T03:00:00.000Z"
+}

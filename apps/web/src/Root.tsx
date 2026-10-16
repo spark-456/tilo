@@ -1,10 +1,9 @@
 // The mount point: the Park app serves every address (/, /worlds, /world/:id, /team, ...), the /park alias and every
 // address no page owns (its own "Page not found"). The old app is gone (OLD-UI-OUT Final). /privacy and /terms
 // (WEB-LEGAL) are static public pages: their own chunk, loading no app (no sign-in, no API). /oauth/google/callback
-// (ADR-0035 L4) is its own chunk behind the sign-in gate; it loads no app. SEC-15: the Park app sits behind the
+// (ADR-0035 L4) is its own chunk behind the sign-in gate; it loads no app. The Park app sits behind the
 // sign-in gate; with no Firebase here (a local host, a build with no config) the gate shows the app at once.
 import { type ReactNode, Suspense, lazy, useEffect, useMemo, useSyncExternalStore } from "react";
-import { AccessLayer, needsAccess } from "./access/AccessLayer";
 import { API_URL, appCheckToken, authToken } from "./api/ClientProvider";
 import { PersonStartup } from "./api/PersonStartup";
 import { HttpClient } from "./api/http";
@@ -49,8 +48,11 @@ function routedOf(view: ViewRoute) {
   };
 }
 
-/** SEC-15 W0b: on a deployment with an API, a Google sign-in is asked who it is before the app (the server enforces it).
- * A demo session reads the sample company and is not asked; a local host or a build with no API has no gate. */
+/** OPEN-ACCESS (owner's order, 16 Oct 2026): everyone who signs in with Google reaches the app; nobody is asked whether
+ * they are a visitor or a judge and nobody is shown an "under construction" notice. The server still verifies every
+ * call (sign-in, App Check, rate limit, per-person spend cap). A signed-in person gets their record in the org
+ * (PersonStartup) before the app mounts. A demo session reads the sample company; a local host or a build with no API
+ * has no gate. */
 function AccessGuard({ children }: { children: ReactNode }) {
   const state = useSyncExternalStore(session.subscribe, session.getState);
   const base = API_URL?.trim();
@@ -58,15 +60,12 @@ function AccessGuard({ children }: { children: ReactNode }) {
     () => (base ? new HttpClient({ baseUrl: base, appCheckToken, authToken }) : null),
     [base],
   );
-  if (!http || !needsAccess(state.status, base)) return <>{children}</>;
+  if (!http || state.status !== "google") return <>{children}</>;
   return (
-    // keyed on who is signed in: another account on the same page never inherits the first one's verdict
-    <AccessLayer
-      key={state.status === "google" ? (state.email ?? state.displayName ?? "google") : "google"}
-      http={http}
-    >
-      <PersonStartup http={http}>{children}</PersonStartup>
-    </AccessLayer>
+    // keyed on who is signed in: another account on the same page never inherits the first one's setup
+    <PersonStartup key={state.email ?? state.displayName ?? "google"} http={http}>
+      {children}
+    </PersonStartup>
   );
 }
 

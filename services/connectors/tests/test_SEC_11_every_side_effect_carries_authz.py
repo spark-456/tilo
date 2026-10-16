@@ -37,6 +37,7 @@ import inspect
 import json
 import pathlib
 import pkgutil
+from types import SimpleNamespace
 
 import jsonschema
 import pytest
@@ -80,11 +81,29 @@ def _declared() -> dict[str, tuple[str, dict]]:
     for connector_id in registry.ids():
         declaration = registry.get(connector_id)
         for action in declaration["actions"]:
-            if declaration["auth"] == "oauth2" and not declaration["scopes"].get(action["capability"]):
-                continue  # FR-UX-18 setup catalogue (Slack, Notion, ...): no scope and no adapter, nothing to execute
+            if (
+                declaration["auth"] == "oauth2"
+                and action["capability"] == "read"
+                and not declaration["scopes"].get("read")
+            ):
+                continue  # FR-UX-18 read-only setup catalogue entries with no scope have nothing to execute
             if action["gate_type"] != "none" or action["capability"] not in READ_ONLY_CAPABILITIES:
                 found[action["id"]] = (connector_id, action)
     return found
+
+
+def test_SEC_11_an_oauth_write_with_no_scopes_is_still_discovered(monkeypatch: pytest.MonkeyPatch) -> None:
+    declaration = {
+        "auth": "oauth2",
+        "scopes": {"read": [], "write": []},
+        "actions": [
+            {"id": "empty_read", "capability": "read", "gate_type": "none"},
+            {"id": "empty_write", "capability": "write", "gate_type": "approval"},
+        ],
+    }
+    registry = SimpleNamespace(ids=lambda: ["future"], get=lambda _id: declaration)
+    monkeypatch.setattr("test_SEC_11_every_side_effect_carries_authz.load_registry", lambda _path: registry)
+    assert set(_declared()) == {"empty_write"}
 
 
 DECLARED = _declared()

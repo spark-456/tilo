@@ -93,7 +93,7 @@ it("X-APIERR-2 maps every API source and contract-fixed refusal to a sentence", 
     for (const code of codes) add(code, file);
   }
   expect(origins.has("app_check_required")).toBe(true);
-  expect(origins.has("declaration_required")).toBe(true);
+  expect(origins.has("declaration_required")).toBe(false); // OPEN-ACCESS: the sign-up question is gone
   expect(origins.has("invalid_option")).toBe(true);
   expect(origins.has("MH-02")).toBe(true);
   for (const [code, files] of origins) {

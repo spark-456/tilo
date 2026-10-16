@@ -3,7 +3,8 @@
 // no landmark of its own. Data comes only through the Api (`useParkApi`); a page whose Api
 // is not built shows "Home data is unavailable", never sample values. The composer's 900 ms goes through the
 // provider's `useSchedule`, so a test never waits and a pending draft is cancelled when the page goes.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { morningBriefApi } from "../../api/live/morningBrief";
 import type { Cadence, RunPlan } from "../../api/oneStep";
 import { ORGANISATION_SETUP } from "../../api/organisationSetup";
 import type {
@@ -21,6 +22,7 @@ import type { AppCtx } from "../../app/AppCtx";
 import { markPendingWorld } from "../../app/PendingWorldRoute";
 import { BUILD_SHA } from "../../app/buildStamp";
 import { useDemoSession, useParkApi, useParkStore, useSchedule } from "../../app/context";
+import { useWorldClient } from "../../app/context";
 import { DEMO_START } from "../../app/store";
 import { takeDraft } from "../../chat/handoff";
 import { FirstRunOverview } from "../../sample/FirstRunOverview";
@@ -29,6 +31,7 @@ import { HomeAssistant, type HomeContextChip } from "./HomeAssistant";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
 import "./Home.css";
 import { HomeSkeleton } from "./HomeSkeleton";
+import { MorningBriefCard } from "./MorningBriefCard";
 import { ChatHistory, Crew, Hero, KpiStrip, TodayPanel, WorldsSection } from "./Panels";
 import { readEffort, writeEffort } from "./effortStore";
 import {
@@ -74,6 +77,8 @@ export function HomePage({ app }: { app: AppCtx }) {
   const preview = useFirstRunPreview();
   // QA-DEMO-1: a demo session (the sample company) replays recorded data and starts no run.
   const demo = useDemoSession();
+  const briefClient = useWorldClient();
+  const briefApi = useMemo(() => briefClient && morningBriefApi(briefClient), [briefClient]);
   const { go, dec, added, night, vw, needsLeft } = app;
 
   const [base, setBase] = useState<Loaded<Base>>(null);
@@ -521,6 +526,7 @@ export function HomePage({ app }: { app: AppCtx }) {
           </div>
         </div>
       ) : null}
+      {briefApi && !demo ? <MorningBriefCard api={briefApi} /> : null}
       {composerShown ? (
         <ComposerPanel
           sending={sending}

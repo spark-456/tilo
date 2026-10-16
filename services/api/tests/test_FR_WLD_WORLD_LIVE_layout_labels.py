@@ -87,3 +87,18 @@ def test_FR_WLD_04_WORLD_LIVE_units_that_share_a_building_say_how_many_more(repo
     names = [b["name"] for b in buildings(layout) if b["plan_units"]]
     assert names == ["Step 1 of the job +2", "Step 4 of the job +2", "Step 7 of the job +1"]
     assert schema_errors(repo_root, layout) == []
+
+
+def test_FR_WLD_04_TILO_T_WORLD_districts_and_islands_are_named_for_their_work(repo_root):
+    plan = plan_of("Compare the top three bakery suppliers", "Draft the order email")
+    plan["units"][1]["connectors"] = ["google_calendar"]
+    layout = build_layout(plan, world_id="w_x")
+    assert schema_errors(repo_root, layout) == []
+    district = layout["semantic"]["levels"][0]["districts"][0]
+    assert district["name"] == "Compare the top team"
+    assert [i["name"] for i in layout["semantic"]["islands"]] == ["Google calendar"]
+
+
+def test_FR_WLD_04_TILO_T_WORLD_a_district_with_no_plain_title_keeps_the_numbered_name(repo_root):
+    layout = build_layout(plan_of("x"), world_id="w_x")
+    assert layout["semantic"]["levels"][0]["districts"][0]["name"] == "Workstream 1"

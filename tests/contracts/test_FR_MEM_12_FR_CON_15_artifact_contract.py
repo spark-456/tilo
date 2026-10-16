@@ -19,6 +19,7 @@ OOXML = "application/vnd.openxmlformats-officedocument."
 MEDIA_TYPES = {"text/markdown", "text/csv", "application/json", "application/pdf", "image/png", "image/jpeg"}
 MEDIA_TYPES |= {OOXML + t for t in ("presentationml.presentation", "wordprocessingml.document", "spreadsheetml.sheet")}
 MEDIA_TYPES |= {"video/webm", "video/mp4"}  # common 1.7.0: taught-skill capture uploads only (ADR-0034)
+MEDIA_TYPES |= {"text/html"}  # common 1.8.0: a writer unit's website only (ADR-0050, AR-10)
 REQUIRED = {"v", "artifact", "org_id", "world_id", "run_id", "owner", "media_type", "size_bytes", "content_sha256"}
 REQUIRED |= {"parents", "origin", "sources", "screening", "screened_at", "redacted", "idempotency_key", "created_at"}
 SHA = "0123456789abcdef" * 4
@@ -41,7 +42,7 @@ INVALID = {
         *("stage_unknown", "n_zero", "manifest_without_content_sha256", "reviewed_without_cause"),
         "sent_without_cause",
     ),
-    "common": ("media_type_text_html",),
+    "common": ("media_type_image_svg",),
 }
 INVALID_STREAMS = (
     *("ev15_created_names_version_2", "ev15_reviewed_version_never_recorded", "ev15_delivered_before_created"),
@@ -81,7 +82,7 @@ def test_FR_MEM_12_media_type_is_a_closed_enum(repo_root):
     version = tuple(int(p) for p in common["x-version"].split("."))
     assert version >= (1, 2, 0), "an added $defs entry is a minor bump (ADR-0002); 1.2.0 merges both 1.1.0s"
     enum = common["$defs"]["media_type"]["enum"]
-    assert set(enum) == MEDIA_TYPES and len(enum) == 11 and "media_type" in common["properties"]
+    assert set(enum) == MEDIA_TYPES and len(enum) == 12 and "media_type" in common["properties"]
 
 
 def test_FR_MEM_12_valid_records_cover_every_origin_and_both_caps(repo_root, registry):
@@ -119,10 +120,12 @@ def test_FR_MEM_12_AR_03_sources_come_from_the_records_own_run(repo_root, regist
 
 def test_FR_MEM_12_artifact_created_data_is_1_1_0_and_additive(repo_root, registry):
     schema = load_json(repo_root / "contracts/events/data/artifact.created.schema.json")
-    assert (schema["x-version"], schema["required"]) == ("1.1.0", ["artifact"])
+    version = tuple(int(p) for p in schema["x-version"].split("."))
+    assert version >= (1, 1, 0) and version[0] == 1 and schema["required"] == ["artifact"], "1.2.0: ADR-0050"
     assert not errors_for(schema, {"artifact": STORED["artifact"]}, registry), "1.0.0 events stay valid"
     assert not errors_for(schema, STORED, registry)
-    for change in ({"media_type": "text/html"}, {"size_bytes": 0}, {"size_bytes": 2_000_001}):
+    html_over_cap = {"media_type": "text/html", "size_bytes": 524_289}  # ADR-0050: a website is at most 512 KiB
+    for change in ({"media_type": "image/svg+xml"}, html_over_cap, {"size_bytes": 0}, {"size_bytes": 2_000_001}):
         assert errors_for(schema, STORED | change, registry), change
     for missing in ("content_sha256", "media_type", "size_bytes"):
         partial = {k: v for k, v in STORED.items() if k != missing}
