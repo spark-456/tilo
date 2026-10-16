@@ -1,0 +1,11 @@
+{
+  "tag": "button",
+  "role": "button",
+  "name": "Place order",
+  "input_type": "submit",
+  "editable": false,
+  "secure": false,
+  "form_method": "put",
+  "link_host": null,
+  "download": false
+}

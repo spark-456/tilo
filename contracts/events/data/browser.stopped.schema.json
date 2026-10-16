@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/browser.stopped.schema.json",
+  "x-version": "1.0.0",
+  "title": "BrowserStoppedData",
+  "description": "data of browser.stopped (registry 1.7.0, ADR-0051): a browser session ended and tilo-browser dropped its context (BR-12). outcome says how (BR-07, BR-08, BR-10); steps counts proposals, refused ones included. A login wall also raises the FR-CON-08 needs-you card, and needs_person a needs-you card with the model's question as data. actor is the unit's agent, or the person for stopped and taken_over; authz null.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["session", "outcome", "steps"],
+  "properties": {
+    "session": { "$ref": "../../browser.schema.json#/$defs/session_id" },
+    "outcome": { "$ref": "../../browser.schema.json#/$defs/outcome" },
+    "steps": { "type": "integer", "minimum": 0, "maximum": 60 }
+  }
+}
