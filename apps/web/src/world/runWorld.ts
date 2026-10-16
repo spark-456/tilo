@@ -37,6 +37,13 @@ const WALKS: ReadonlySet<string> = new Set([
 ]);
 /** The longest meeting-room turn drawn in a bubble; the Meeting Hall panel keeps all of it. */
 const SAY_MAX = 160;
+/** The events whose line is spoken in a bubble over their actor (triggeredBy each: the recorded event itself). */
+const SPEAKS: ReadonlySet<string> = new Set([
+  "agent.handoff",
+  "agent.assigned",
+  "agent.help_requested",
+  "question.routed",
+]);
 const LEAD_IN_MS = 1000; // hold at seq 0 after load before the first event (see startPlayback)
 
 type Trace = ReadonlyArray<{ seq: number; type: string }>;
@@ -436,7 +443,7 @@ function createLive(
         }
       }
       const say =
-        (event.type === "agent.handoff" || event.type === "agent.assigned") && !o.catchingUp?.()
+        SPEAKS.has(event.type) && !o.catchingUp?.()
           ? frame.agents.find((a) => a.id === event.actor)?.say
           : null;
       if (say) {

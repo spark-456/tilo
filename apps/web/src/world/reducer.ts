@@ -139,6 +139,8 @@ const BUILDING_STATUS_BY_VERB: Readonly<Record<string, BuildingStatus>> = {
 };
 
 const NOTE_MAX = 140;
+/** agent.* verbs whose event is the agent saying something (its bubble shows the real line): TILO-T-WORLD adds help. */
+const SAYS: ReadonlySet<string> = new Set(["handoff", "assigned", "help_requested"]);
 
 /** An agent.handoff's note: the envelope's own summary, else the event's line, cut to one short line. */
 function noteOf(event: Event): { text: string; to: string } | null {
@@ -257,7 +259,7 @@ function applyKnown(state: WorldState, event: Event): WorldState {
       const next: AgentState = {
         ...agent,
         working: verb === "working",
-        say: verb === "handoff" || verb === "assigned" ? noteOf(event) : null,
+        say: SAYS.has(verb) ? noteOf(event) : null,
         location: isLocation ? event.target : agent.location,
         post: postAfter(
           agent,
@@ -268,6 +270,16 @@ function applyKnown(state: WorldState, event: Event): WorldState {
         doneAt: verb === "handoff" ? event.seq : null,
       };
       return { ...state, agents: { ...state.agents, [agent.id]: next } };
+    }
+    case "question": {
+      // TILO-T-WORLD: an agent routing a question to a person says it: its bubble is the event's own line, to "You".
+      const asker = state.agents[event.actor];
+      if (verb !== "routed" || !asker) return state;
+      const say = noteOf(event);
+      return {
+        ...state,
+        agents: { ...state.agents, [asker.id]: { ...asker, working: false, say, doneAt: null } },
+      };
     }
     case "meeting": {
       // WORLD-LIVE: a person's room (meeting.convened .. meeting.adjourned). Its agents gather in the layout's Meeting

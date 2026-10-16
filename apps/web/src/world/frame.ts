@@ -294,7 +294,7 @@ export function frameOf(layout: Layout, state: WorldState): Frame {
         level: spot.level,
         working: agent.working,
         say: agent.say
-          ? { text: agent.say.text, to: namesOf(layout).get(agent.say.to) ?? agent.say.to }
+          ? { text: agent.say.text, to: namesOf(layout).get(agent.say.to) ?? "You" }
           : null,
       },
     ];
