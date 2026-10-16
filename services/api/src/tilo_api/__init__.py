@@ -35,6 +35,7 @@ from tilo_api.access import AccessGate as _AccessGate
 from tilo_api.access_routes import router as _access_router
 from tilo_api.appcheck import AppCheckGate as _AppCheckGate
 from tilo_api.assistant.route import router as _assistant_router
+from tilo_api.brief_routes import router as _brief_router
 from tilo_api.cards import build_router as _build_cards_router
 from tilo_api.cards_feed import router as _cards_feed_router
 from tilo_api.connectors_list import router as _connectors_list_router
@@ -181,6 +182,7 @@ app.include_router(_meeting_voice_meter.router)  # ADR-0042: public to the gate,
 app.include_router(_nudge_sweep.router)  # FR-PA-15b: GET /v1/nudges, POST /v1/nudges/{id}/snooze
 app.include_router(_team_router)
 app.include_router(_user_settings_router)  # FR-SET-01/02: GET and PUT /v1/me/settings
+app.include_router(_brief_router)  # ADR-0049: /v1/me/brief and /v1/me/brief-settings (MO-01..04)
 
 
 def _world_owner(world_id: str) -> str | None:
