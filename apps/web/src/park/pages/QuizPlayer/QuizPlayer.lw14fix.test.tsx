@@ -50,6 +50,10 @@ describe("LW_14_fix the player accepts exactly what the schema accepts", () => {
     expect(
       invalid.container.querySelector('[data-testid="tt-error"]')?.getAttribute("role"),
     ).toBe("alert");
+    expect(invalid.container.querySelector("h1")?.textContent).toBe(
+      "Quiz specification is invalid",
+    );
+    expect(invalid.container.querySelector("h1")?.getAttribute("tabindex")).toBe("-1");
 
     const unavailable = mount(
       <ParkProvider api={createLiveApi()}>
@@ -57,6 +61,10 @@ describe("LW_14_fix the player accepts exactly what the schema accepts", () => {
       </ParkProvider>,
     );
     expect(unavailable.container.querySelector('[data-testid="tt-empty"]')).not.toBeNull();
+    expect(unavailable.container.querySelector("h1")?.textContent).toBe(
+      "This quiz is not available yet",
+    );
+    expect(unavailable.container.querySelector("h1")?.getAttribute("tabindex")).toBe("-1");
   });
 
   it("LW_14_fix the schema itself is loaded and the sample quiz is valid under both", () => {

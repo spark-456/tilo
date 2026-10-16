@@ -187,6 +187,9 @@ export function QuizPlayerPage({
               Back to world
             </button>
           </div>
+          <h1 className="visually-hidden" tabIndex={-1}>
+            This quiz is not available yet
+          </h1>
           <div data-testid="quiz-unavailable" className="park-quiz-error">
             <EmptyState
               title="This quiz is not available yet"
@@ -217,6 +220,9 @@ export function QuizPlayerPage({
               Back to world
             </button>
           </div>
+          <h1 className="visually-hidden" tabIndex={-1}>
+            Quiz specification is invalid
+          </h1>
           <div data-testid="quiz-error" className="park-quiz-error">
             <ErrorState title="Quiz specification is invalid" body={validation.reason} />
           </div>
