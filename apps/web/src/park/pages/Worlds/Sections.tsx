@@ -74,5 +74,5 @@ export function TownHero({
 }
 
 export function EmptyBox({ title, body }: { title: string; body?: string }) {
-  return <EmptyState title={title} body={body} />;
+  return <EmptyState title={title} body={body ?? ""} />;
 }
