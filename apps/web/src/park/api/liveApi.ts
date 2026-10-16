@@ -407,7 +407,7 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     if (!data) throw new TiloApiError(BAD_REPLY, 201, true, true);
     return { data, source: "live" };
   };
-  api.captureFile = async (file, onStored) => {
+  api.captureFile = async (file, onStored, method = "upload") => {
     const media = await http.postFile("/v1/skills/captures/media", file);
     if (!isObject(media) || media.readable !== true || !isObject(media.artifact))
       throw new TiloApiError("This file could not be read as an example.", 422, false, true);
@@ -423,7 +423,7 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     onStored?.();
     const data = captureOfBody(
       await http.postJson("/v1/skills/captures", {
-        method: "upload",
+        method,
         artifact: { artifact_id: artifactId, version },
       }),
     );

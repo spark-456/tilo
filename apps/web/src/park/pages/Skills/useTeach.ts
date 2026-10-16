@@ -2,7 +2,7 @@
 // steps 1 and 2 (the description and what Tilo read from it), stage 1 is step 3 (Tilo's version and Save). Live, each
 // step is one request at a time (POST /v1/skills/captures, .../{id}/version, POST /v1/skills) and only the server's
 // answer moves the flow on. On sample data the description is read at once and Save is this page's only. There is no
-// practice run or screen recording yet; an uploaded example uses the two real capture routes (HR-1..7).
+// practice run yet; uploaded examples and confirmed local recordings use the two real capture routes (HR-1..7).
 import { useEffect, useRef, useState } from "react";
 import { displayApiError } from "../../api/errorMessage";
 import type { Api } from "../../api/index";
@@ -75,7 +75,7 @@ export interface Teach {
   setQAns: (a: string) => void;
   toggleAsk: (i: number) => void;
   capture: () => void;
-  captureFiles: (files: FileList | readonly File[]) => boolean;
+  captureFiles: (files: FileList | readonly File[], method?: "upload" | "record") => boolean;
   next: () => void;
   back: () => void;
   save: () => void;
@@ -205,7 +205,10 @@ export function useTeach({
     if (isLive) return describeIt();
     if (desc.trim()) setCap(CAPTURE_STEPS); // nothing to read: no steps from an empty box
   };
-  const captureFiles = (files: FileList | readonly File[]): boolean => {
+  const captureFiles = (
+    files: FileList | readonly File[],
+    method: "upload" | "record" = "upload",
+  ): boolean => {
     if (!isLive || inflight.current) return false;
     if (files.length !== 1) {
       setFileError("Choose one file at a time.");
@@ -236,7 +239,7 @@ export function useTeach({
     setReadingUploaded(false);
     once(async () => {
       try {
-        const r = await api.captureFile(file, () => setReadingUploaded(true));
+        const r = await api.captureFile(file, () => setReadingUploaded(true), method);
         setCaptured(r.data);
         setUsedFile(true);
         setVersion(null);

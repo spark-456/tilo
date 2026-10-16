@@ -274,6 +274,19 @@ const sent = (spy: ReturnType<typeof vi.fn>, n = 0) => ({
 });
 
 describe("SKILLS_5_captureSkill: POST /v1/skills/captures", () => {
+  it("test_FR_SKL_01_S3_marks_a_confirmed_screen_capture_as_record", async () => {
+    const spy = vi.fn(async (_url: unknown, _init?: RequestInit) =>
+      String(_url).endsWith("/media")
+        ? json({ artifact: { artifact_id: "art_video", version: 1 }, readable: true }, 201)
+        : json({ capture_id: "tsk_record", captured_steps: [{ text: "Open page" }] }, 201),
+    );
+    await live(spy).captureFile(
+      new File(["video"], "screen-recording.webm", { type: "video/webm" }),
+      undefined,
+      "record",
+    );
+    expect(JSON.parse(String(spy.mock.calls[1]?.[1]?.body)).method).toBe("record");
+  });
   it("test_FR_SKL_01_S2w_uploads_one_file_then_captures_its_pinned_artifact", async () => {
     const file = new File(["an example"], "example.txt", { type: "text/plain" });
     const spy = vi.fn(async (_url: unknown, init?: RequestInit) =>
