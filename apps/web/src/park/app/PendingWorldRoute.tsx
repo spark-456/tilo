@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useState } from "react";
-import { ErrorState, LoadingState, PoolLoader, type PoolLoaderEvent } from "../../design/tilo-t";
+import { ErrorState, LoadingState, PoolLoader, type PoolLoaderEvent } from "../shared/tiloT";
 
 /** An approval reply proves this id exists; it does not prove that planning has finished. */
 const pending = new Set<string>();
