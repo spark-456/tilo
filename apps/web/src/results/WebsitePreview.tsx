@@ -35,18 +35,16 @@ export function WebsitePreview({
   const [failure, setFailure] = useState<"load" | "hash" | "left" | null>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const htmlRef = useRef<string | null>(null);
-  const readyRef = useRef(false);
+  const writtenRef = useRef(false);
   const sentRef = useRef(false);
-  const loadsRef = useRef(0);
 
   useEffect(() => {
     let active = true;
     setHtml(null);
     setFileBytes(null);
     setFailure(null);
-    readyRef.current = false;
+    writtenRef.current = false;
     sentRef.current = false;
-    loadsRef.current = 0;
     htmlRef.current = null;
     const read = async (): Promise<void> => {
       try {
@@ -86,7 +84,7 @@ export function WebsitePreview({
   const sendPreview = useCallback(() => {
     const target = frameRef.current?.contentWindow;
     const text = htmlRef.current;
-    if (!readyRef.current || sentRef.current || !target || text === null) return;
+    if (sentRef.current || !target || text === null) return;
     sentRef.current = true;
     target.postMessage({ tilo: "preview", html: text }, "*");
   }, []);
@@ -96,12 +94,11 @@ export function WebsitePreview({
       if (
         event.source !== frameRef.current?.contentWindow ||
         event.origin !== "null" ||
-        event.data?.tilo !== "preview-ready" ||
-        readyRef.current
+        event.data?.tilo !== "preview-written" ||
+        writtenRef.current
       )
         return;
-      readyRef.current = true;
-      sendPreview();
+      writtenRef.current = true;
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -130,13 +127,14 @@ export function WebsitePreview({
   };
 
   const loaded = (): void => {
-    loadsRef.current += 1;
-    if (loadsRef.current > 1) {
+    if (writtenRef.current) {
       setHtml(null);
       setFileBytes(null);
       htmlRef.current = null;
       setFailure("left");
+      return;
     }
+    sendPreview();
   };
 
   return (

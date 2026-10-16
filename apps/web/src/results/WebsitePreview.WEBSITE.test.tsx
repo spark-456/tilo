@@ -104,42 +104,38 @@ describe("WebsitePreview WEBSITE", () => {
     );
   });
 
-  it("test_WEBSITE_WS_11_sends_once_only_after_the_shell_handshake", async () => {
+  it("CX_WEB_3_WS_11_sends_once_when_the_shell_first_loads", async () => {
     await mount();
     const shell = shellWindow();
     const post = vi.mocked(shell.postMessage);
-    const ready = new MessageEvent("message", {
-      data: { tilo: "preview-ready" },
-      origin: "null",
-      source: shell,
-    });
-    await act(async () => window.dispatchEvent(ready));
-    await act(async () => window.dispatchEvent(ready));
+    await act(async () => frame().dispatchEvent(new Event("load")));
+    await act(async () => frame().dispatchEvent(new Event("load")));
     expect(post).toHaveBeenCalledTimes(1);
     expect(post).toHaveBeenCalledWith({ tilo: "preview", html: bytes }, "*");
   });
 
-  it("test_WEBSITE_WS_11_ignores_ready_messages_from_other_frames_or_origins", async () => {
+  it("CX_WEB_3_WS_12_ignores_loads_until_preview_written_and_closes_only_on_a_later_load", async () => {
     await mount();
-    const post = vi.mocked(shellWindow().postMessage);
+    const shell = shellWindow();
+    await act(async () => frame().dispatchEvent(new Event("load")));
     await act(async () => {
       window.dispatchEvent(
-        new MessageEvent("message", { data: { tilo: "preview-ready" }, origin: "null" }),
-      );
-      window.dispatchEvent(
         new MessageEvent("message", {
-          data: { tilo: "preview-ready" },
+          data: { tilo: "preview-written" },
           origin: "https://attacker.test",
-          source: frame().contentWindow,
+          source: shell,
         }),
       );
     });
-    expect(post).not.toHaveBeenCalled();
-  });
-
-  it("test_WEBSITE_WS_12_removes_the_frame_on_a_second_load", async () => {
-    await mount();
     await act(async () => frame().dispatchEvent(new Event("load")));
+    expect(container.querySelector("iframe")).not.toBeNull();
+    await act(async () => window.dispatchEvent(new MessageEvent("message", {
+      data: { tilo: "preview-written" }, origin: "null", source: shell,
+    })));
+    await act(async () => window.dispatchEvent(new MessageEvent("message", {
+      data: { tilo: "preview-written" }, origin: "null", source: shell,
+    })));
+    expect(container.querySelector("iframe")).not.toBeNull();
     await act(async () => frame().dispatchEvent(new Event("load")));
     expect(container.querySelector("iframe")).toBeNull();
     expect(container.textContent).toContain("tried to leave Tilo");
