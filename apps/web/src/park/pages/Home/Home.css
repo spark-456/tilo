@@ -885,6 +885,11 @@
 [data-park] .park-home-pill--run .park-home-pill__dot {
   background: var(--lime, var(--hero));
 }
+[data-park] .park-home-pill--done,
+[data-park] .park-home-pill--scheduled {
+  background: var(--sunk);
+  color: var(--ink2);
+}
 [data-park] .park-home-pill--needs {
   background: var(--amberSoft);
   color: var(--amberInk);
