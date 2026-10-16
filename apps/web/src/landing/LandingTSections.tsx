@@ -1,4 +1,7 @@
+import { useEffect, useRef, useState } from "react";
+import { useLoopPaused } from "../design/tilo-t";
 import { Reveal } from "./Reveal";
+import { RECORDED_RUN } from "./recordedRun";
 
 /** T board's week and pin layout, empty until the signed-in API supplies a person's data. */
 export function WeekPreviewSection() {
@@ -43,6 +46,15 @@ const IDEAS = [
 
 /** Suggestions, explicitly labelled as examples: they do not claim past customer activity. */
 export function TaskIdeasSection() {
+  const replayRef = useRef<HTMLElement>(null);
+  const paused = useLoopPaused(replayRef);
+  const [painted, setPainted] = useState(false);
+  useEffect(() => {
+    // The first paint shows the complete record; its labelled replay starts only afterward.
+    const timer = window.setTimeout(() => setPainted(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const { planned, work, done } = RECORDED_RUN.facts;
   return (
     <Reveal as="section" className="landing-section landing-t-ideas" aria-labelledby="landing-ideas">
       <div className="landing-section__head">
@@ -55,6 +67,20 @@ export function TaskIdeasSection() {
           <li key={idea}>{idea}</li>
         ))}
       </ul>
+      <aside
+        ref={replayRef}
+        className={`landing-t-ideas__replay tt-landing-replay ${paused} ${painted ? "is-painted" : ""}`}
+        aria-label="Recorded example events"
+      >
+        <strong>Recorded example</strong>
+        <div className="landing-t-ideas__events">
+          {/* triggeredBy: recorded village-basic events; this is a labelled replay, never live progress. */}
+          {planned && <span className="tt-landing-replay__a">{planned}</span>}
+          {work[0] && <span className="tt-landing-replay__b">{work[0]}</span>}
+          {work[1] && <span className="tt-landing-replay__c">{work[1]}</span>}
+          {done && <span className="tt-landing-replay__d">{done}</span>}
+        </div>
+      </aside>
     </Reveal>
   );
 }
