@@ -56,7 +56,13 @@ function List({
       data-testid={`agenda-${kind}`}
     >
       <h2>{TITLE[kind]}</h2>
-      {host ? <HostMeeting api={host.api} hostState={host.state} /> : null}
+      {host ? (
+        <HostMeeting
+          api={host.api}
+          hostState={host.state}
+          onChanged={() => setAttempt((n) => n + 1)}
+        />
+      ) : null}
       {state === "loading" ? (
         <output>Loading…</output>
       ) : state === "failed" ? (
