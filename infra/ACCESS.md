@@ -258,6 +258,11 @@ Hard requirements from the security review for the routes the infra points at:
   can put `tilo-tasks-invoker` OIDC tokens on Cloud Tasks aimed at any harness
   path. Renew and poll reach Gmail only through connectors and iterate the
   stored watches only (`MailWatcher.renew_due` / `poll_due`).
+- Website preview shell (`GET /preview/website` on **tilo-api**, WEB-2, ADR-0050 WS-10): a public route
+  (`access.PUBLIC_ROUTES`, `appcheck.EXEMPT_ROUTES`) because a sandboxed frame loads it with no token or sign-in. It
+  is the same fixed bytes for every caller, reads nothing from the request and holds no data; its response carries
+  the sandbox CSP (`default-src 'none'`, `connect-src 'none'`, `frame-ancestors` the web origins) and no
+  `X-Frame-Options`. No IAM change.
 - Schedule tick (`POST /internal/schedules/tick` on **tilo-api**, built): api is public (`allUsers`), so
   neither ingress nor IAM protects the route and it checks its caller itself; it verifies the
   token (`aud` = its own URL, `email` exactly, `email_verified` true; a malformed token is
