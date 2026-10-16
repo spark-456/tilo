@@ -179,6 +179,16 @@ class BoundRunRunner:
                     native[part.sha256] = (ref, part)
         parts = [part for _, part in native.values()]
         check_parts(parts)
+        quiz_available = False
+        for ref, part in native.values():
+            if part.mime_type not in {"application/pdf", "image/png", "image/jpeg"}:
+                continue
+            try:
+                quiz_available = load(ref) is not None  # only a recorded, owner-readable source unlocks AppSpec
+            except Exception:
+                continue
+            if quiz_available:
+                break
         context = dataclasses.replace(context, upstream=(*self.file_items(texts), *context.upstream))
         if native:
             refs = json.dumps([ref for ref, _ in native.values()])
@@ -219,6 +229,7 @@ class BoundRunRunner:
             archive=self.archive,
             request_options={role: {"parts": parts} for role in models} if parts else {},
             quiz_sources=source_loader(owner.seams.artifacts, owner.scope, owner.store.events[owner.world_id]),
+            quiz_available=quiz_available,
             meter=lambda role, _request, _reply: models[role].take_charge(),
             credit_cap=self.budget.left,
             limits=self.limits,
@@ -276,7 +287,12 @@ class BoundRunRunner:
 
     async def before_handoff(self, unit: Mapping[str, Any], worker: str, announced: list[tuple[dict, str]]) -> bool:
         owner = self.run_owner
-        if not wants_quiz(unit, self.brief_for(unit)):
+        has_app_output = any(
+            (version := owner.seams.artifacts.head(owner.scope, ref)) is not None
+            and version.record["media_type"] == "application/json"
+            for ref, _ in announced
+        )
+        if not wants_quiz(unit, self.brief_for(unit), source_available=has_app_output):
             return True
         verifier = next(
             (a["id"] for a in owner.layout["semantic"]["agents"] if a["rank"] == "verifier" and a["id"] != worker), None

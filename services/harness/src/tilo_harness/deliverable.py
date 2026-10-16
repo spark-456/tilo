@@ -6,7 +6,8 @@ duplicate key and no NaN or Infinity, and it must pass `tilo_render.spec.Deliver
 table or chart links, and over-size tables are refused there). Nothing in the reply is run or evaluated, and the
 renderer escapes every string, so script-like text is printed, never executed. Any failure raises `DeliverableRefused`
 with a FIXED code: the reply is model text and may echo a secret, so it is never copied into the message. A refused
-reply makes no PDF; the unit fails and the runner does not ask again.
+reply makes no PDF here. The runner may request one bounded JSON repair and, if it still cannot build a file, return
+the writer's useful text as markdown. Oversized replies and unverified quiz citations remain hard refusals.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ _REASONS = {
     "too_large": "the reply is too long",
     "not_json": "the reply is not one JSON object",
     "invalid_spec": "the reply is not a valid report specification",
+    "source_invalid": "a cited source could not be verified",
     "render_failed": "the report could not be laid out",
 }
 
