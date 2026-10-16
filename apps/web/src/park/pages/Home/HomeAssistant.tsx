@@ -1,8 +1,8 @@
-import { useState, type FormEvent } from "react";
-import { Buddy as TiloTBuddy, type TiloMood } from "../../../design/tilo-t/Buddy";
+import { type FormEvent, useState } from "react";
 import { useQuickChat } from "../../chat/useQuickChat";
+import { type TiloMood, TiloTBuddy } from "../../shared/tiloT";
 import { withQuickContext } from "./homeData";
-import "./Home.css";
+import "./HomeAssistant.css";
 
 export interface HomeContextChip {
   readonly id: string;
@@ -59,7 +59,9 @@ export function HomeAssistant({ contexts }: { contexts: readonly HomeContextChip
               <strong>Ask Tilo</strong>
               <span>Answers use the context you choose.</span>
             </div>
-            <button type="button" aria-label="Close Ask Tilo" onClick={() => setOpen(false)}>×</button>
+            <button type="button" aria-label="Close Ask Tilo" onClick={() => setOpen(false)}>
+              ×
+            </button>
           </header>
           {contexts.length > 0 ? (
             <div className="park-home-assistant__contexts" aria-label="Context">
@@ -90,11 +92,11 @@ export function HomeAssistant({ contexts }: { contexts: readonly HomeContextChip
           <div className="park-home-assistant__messages" role="log" aria-label="Assistant messages">
             {chat.turns.slice(-2).map((turn) => (
               <div className="park-home-assistant__turn" key={turn.id}>
-                <span className="park-home-assistant__question">{turn.question.split("\n\n")[0]}</span>
+                <span className="park-home-assistant__question">
+                  {turn.question.split("\n\n")[0]}
+                </span>
                 <span className="park-home-assistant__answer">
-                  {turn.state === "answered" && turn.sample ? (
-                    <b>Sample answer · </b>
-                  ) : null}
+                  {turn.state === "answered" && turn.sample ? <b>Sample answer · </b> : null}
                   {replyText(turn)}
                 </span>
               </div>
@@ -117,7 +119,9 @@ export function HomeAssistant({ contexts }: { contexts: readonly HomeContextChip
               onChange={(e) => setDraft(e.target.value)}
               placeholder="Ask about your work…"
             />
-            <button type="submit" aria-label="Send" disabled={chat.busy}>↑</button>
+            <button type="submit" aria-label="Send" disabled={chat.busy}>
+              ↑
+            </button>
           </form>
         </section>
       ) : null}

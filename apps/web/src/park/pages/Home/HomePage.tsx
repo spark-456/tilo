@@ -27,8 +27,8 @@ import { DEMO_START } from "../../app/store";
 import { takeDraft } from "../../chat/handoff";
 import { FirstRunOverview } from "../../sample/FirstRunOverview";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
-import { HomeAssistant, type HomeContextChip } from "./HomeAssistant";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
+import { HomeAssistant, type HomeContextChip } from "./HomeAssistant";
 import "./Home.css";
 import { HomeSkeleton } from "./HomeSkeleton";
 import { MorningBriefCard } from "./MorningBriefCard";
@@ -40,10 +40,10 @@ import {
   MODES,
   QUICK_MAX_CHARS,
   greetingWord,
-  recentRows,
   liveSummaryLine,
   needsWorld,
   nextEvents,
+  recentRows,
   spendOf,
   suggestedTask,
   summaryLine,
