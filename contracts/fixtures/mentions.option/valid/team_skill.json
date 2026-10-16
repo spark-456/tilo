@@ -1,0 +1,10 @@
+{
+  "ref": {
+    "kind": "taught_skill",
+    "id": "tsk_01JB6Z0000000000000000INV"
+  },
+  "label": "Log supplier invoices",
+  "detail": "Skill taught by your Finance team",
+  "scope": "team",
+  "state": "ready"
+}

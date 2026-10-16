@@ -1,0 +1,13 @@
+{
+  "v": "1.0",
+  "max_sessions_per_world": 3,
+  "max_steps": 30,
+  "max_credits_per_session": 200,
+  "step_timeout_s": 20,
+  "idle_timeout_s": 120,
+  "viewport": {
+    "width": 3840,
+    "height": 800
+  },
+  "model_frames": 1
+}

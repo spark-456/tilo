@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/browser.acted.schema.json",
+  "x-version": "1.0.0",
+  "title": "BrowserActedData",
+  "description": "data of browser.acted (registry 1.7.0, ADR-0051): one step of an agentic browser session, written after the worker answered, so the Browser panel shows only what happened (HR-1, BR-09). verdict done: code allowed the action and the worker ran it; refused: reason says why and nothing ran; gated: a commit waiting at a T3 gate (its approval.requested follows); committed: the outbox ran a commit a person approved, after its data.transfer (BR-05). frame is the masked screenshot after the step (origin browser), null when none. host is the page's host after the step; chars counts typed characters (a type action only). Never typed text, a full URL or page text (BR-13). authz null: a commit's authorisation is on its approval.resolved and data.transfer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "session",
+    "step",
+    "kind",
+    "verdict",
+    "reason",
+    "host",
+    "chars",
+    "masked",
+    "blocked",
+    "frame"
+  ],
+  "properties": {
+    "session": { "$ref": "../../browser.schema.json#/$defs/session_id" },
+    "step": { "type": "integer", "minimum": 1, "maximum": 60 },
+    "kind": { "$ref": "../../browser.schema.json#/$defs/action_kind" },
+    "verdict": { "$ref": "../../browser.schema.json#/$defs/verdict" },
+    "reason": {
+      "anyOf": [{ "$ref": "../../browser.schema.json#/$defs/reason" }, { "type": "null" }]
+    },
+    "host": { "anyOf": [{ "$ref": "../../browser.schema.json#/$defs/host" }, { "type": "null" }] },
+    "chars": {
+      "anyOf": [{ "$ref": "../../browser.schema.json#/$defs/typed_chars" }, { "type": "null" }]
+    },
+    "masked": { "type": "integer", "minimum": 0, "maximum": 1000 },
+    "blocked": { "type": "integer", "minimum": 0 },
+    "frame": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/artifact_ref" }, { "type": "null" }]
+    }
+  },
+  "if": { "properties": { "verdict": { "const": "refused" } }, "required": ["verdict"] },
+  "then": { "properties": { "reason": { "$ref": "../../browser.schema.json#/$defs/reason" } } },
+  "else": {
+    "properties": { "reason": { "type": "null" } },
+    "if": { "properties": { "kind": { "const": "type" } }, "required": ["kind"] },
+    "then": { "properties": { "chars": { "type": "integer" } } },
+    "else": { "properties": { "chars": { "type": "null" } } }
+  }
+}

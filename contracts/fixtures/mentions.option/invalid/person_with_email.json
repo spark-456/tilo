@@ -1,0 +1,11 @@
+{
+  "ref": {
+    "kind": "person",
+    "id": "u_priya"
+  },
+  "label": "Log supplier invoices",
+  "detail": "Skill taught by your Finance team",
+  "scope": "team",
+  "state": "ready",
+  "email": "priya@example.com"
+}
