@@ -37,6 +37,8 @@ export interface RoomTalk {
   readonly error: string;
   /** proposal id -> what the API said when the change was confirmed ("planning started" and so on). */
   readonly confirmed: Readonly<Record<string, string>>;
+  /** Convene the room now, without a question (the team walks into the Meeting Hall). */
+  convene(): Promise<boolean>;
   send(to: string, mode: "quick" | "thinking", text: string): Promise<boolean>;
   adjourn(): Promise<void>;
   confirm(proposalId: string, text: string): Promise<void>;
@@ -86,28 +88,36 @@ export function useRoomTalk(
     }
   }, []);
 
+  /** The open room for this seat: the current one, else a new one (closing this person's own stale room first). */
+  const ensure = useCallback(async (): Promise<Room> => {
+    if (!client || !seat) throw new Error("no room");
+    if (room && room.state === "open") return room;
+    let made: Room;
+    try {
+      made = await conveneRoom(client, worldId, seat);
+    } catch (e) {
+      if (!(e instanceof TiloApiError) || e.code !== "room_open") throw e;
+      // A room of this person's is still open on the world (one at a time): close it, then convene once more.
+      for (const id of openRoomsOf(eventsRef.current)) {
+        await adjournRoom(client, worldId, id).catch(() => undefined);
+      }
+      made = await conveneRoom(client, worldId, seat);
+    }
+    if (live.current) setRoom(made);
+    return made;
+  }, [client, room, seat, worldId]);
+
+  const convene = useCallback(() => run(async () => void (await ensure())), [ensure, run]);
+
   const send = useCallback(
     (to: string, mode: "quick" | "thinking", text: string) =>
       run(async () => {
-        if (!client || !seat) throw new Error("no room");
-        let current = room;
-        if (!current || current.state !== "open") {
-          try {
-            current = await conveneRoom(client, worldId, seat);
-          } catch (e) {
-            if (!(e instanceof TiloApiError) || e.code !== "room_open") throw e;
-            // A room of this person's is still open on the world (one at a time): close it, then convene once more.
-            for (const id of openRoomsOf(eventsRef.current)) {
-              await adjournRoom(client, worldId, id).catch(() => undefined);
-            }
-            current = await conveneRoom(client, worldId, seat);
-          }
-          if (live.current) setRoom(current);
-        }
+        if (!client) throw new Error("no room");
+        const current = await ensure();
         const next = await askTurn(client, worldId, current.room_id, to, mode, text);
         if (live.current) setRoom(next);
       }),
-    [client, room, run, seat, worldId],
+    [client, ensure, run, worldId],
   );
 
   const adjourn = useCallback(async () => {
@@ -130,5 +140,5 @@ export function useRoomTalk(
     [client, room, run, worldId],
   );
 
-  return { room, busy, error, confirmed, send, adjourn, confirm };
+  return { room, busy, error, confirmed, convene, send, adjourn, confirm };
 }

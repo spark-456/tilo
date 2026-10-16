@@ -4,7 +4,7 @@
 // outcome is shown as the API gave it (accepted / queued / failed), never assumed. Nothing here authorises a side
 // effect (MR-11): a room turn is a read and a recorded note.
 import type { Event } from "@tilo/contracts";
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Buddy, Icon } from "../../design/tilo-t";
 import type { RoomClient } from "../../park/api/live/meetingHall";
 import type { Seat } from "../../park/api/live/roomTalk";
@@ -40,6 +40,7 @@ export function RoomThread({
   heading,
   defaultTo,
   changeAsk = false,
+  autoConvene = false,
 }: {
   client: RoomClient | null;
   worldId: string;
@@ -52,8 +53,15 @@ export function RoomThread({
   defaultTo?: string;
   /** Offer "Ask them to change direction" (a team meeting); a 1:1 can also use it. */
   changeAsk?: boolean;
+  /** Convene the room as soon as this opens (a team meeting: triggeredBy the person pressing Convene team). */
+  autoConvene?: boolean;
 }) {
   const talk = useRoomTalk(client, worldId, seat, events);
+  const { convene } = talk;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: convene once, when the meeting opens.
+  useEffect(() => {
+    if (autoConvene && client && seat) void convene();
+  }, []);
   const [to, setTo] = useState(defaultTo ?? stats[stats.length - 1]?.id ?? "");
   const [mode, setMode] = useState<"quick" | "thinking">("quick");
   const [text, setText] = useState("");

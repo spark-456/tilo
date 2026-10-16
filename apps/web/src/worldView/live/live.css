@@ -408,3 +408,77 @@
   color: var(--ink, #0b0b0c);
   font-weight: 500;
 }
+
+/* Team meeting */
+[data-park] .tw-convene {
+  position: absolute;
+  z-index: 5;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  min-height: 44px;
+  gap: 6px;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid var(--line2, #d5d5d0);
+  border-radius: 12px;
+  background: var(--card, #fff);
+  color: var(--ink, #0b0b0c);
+  box-shadow: var(--sh1, none);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+[data-park] .tw-team__row {
+  display: flex;
+  gap: 6px;
+}
+[data-park] .tw-team__form {
+  display: grid;
+  gap: 10px;
+}
+[data-park] .tw-team__form label,
+[data-park] .tw-team__form legend {
+  color: var(--ink3, #6b6b70);
+  font-size: 12px;
+}
+[data-park] .tw-team__form select {
+  min-height: 44px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--line2, #d5d5d0);
+  border-radius: 10px;
+  background: var(--card, #fff);
+  color: var(--ink, #0b0b0c);
+  font: inherit;
+}
+[data-park] .tw-team__form fieldset {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+[data-park] .tw-team__pick {
+  display: flex;
+  min-height: 44px;
+  gap: 8px;
+  align-items: center;
+  color: var(--ink, #0b0b0c);
+  font-size: 14px;
+}
+[data-park] .tw-team__go {
+  min-height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--pri, #0b0b0c);
+  color: var(--onPri, #fff);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+[data-park] .tw-team__go:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
