@@ -42,7 +42,7 @@ _MP4_AUDIO = re.compile(rb"hdlr.{8}soun", re.DOTALL)
 _PLAIN = re.compile(r"[^\x00-\x08\x0b\x0c\x0e-\x1f\x7f]+")
 _MAX_PLAIN = 2_000_000  # the store's cap for text
 _FORM_SLACK = 8192  # the multipart framing around the one file
-_SHIPPED = {"max_steps": 20, "max_recording_seconds": 300, "max_file_bytes": 50_000_000, "max_read_bytes": 10_485_760}
+_SHIPPED = {"max_steps": 20, "max_recording_seconds": 300, "max_file_bytes": 30_000_000, "max_read_bytes": 10_485_760}
 
 
 @dataclass(frozen=True)
