@@ -1,0 +1,21 @@
+{
+  "id": "ch_c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+  "org_id": "org_example",
+  "owner": "u_alex",
+  "team_id": "tm_ops",
+  "world_id": "w_q4_plan",
+  "source": {
+    "kind": "deliverable",
+    "id": "art_q4_plan_report",
+    "version": 2
+  },
+  "label": "Q4 supplier comparison",
+  "position": 3,
+  "text": "Supplier B quoted 12% less than Supplier A.\nDelivery is 6 weeks for both.",
+  "text_sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+  "embed_profile": "embed-fake",
+  "dimensions": 768,
+  "screening": "clean",
+  "created_at": "2026-10-16T03:00:01.000Z",
+  "expires_at": null
+}

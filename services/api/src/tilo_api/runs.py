@@ -102,6 +102,7 @@ class Seams:
     team: Callable[
         [], Any
     ]  # the team's settings (FR-ACC-01; team_store.team_reader): no default, every path passes one
+    people: Callable[[], PeopleStores | None] | None = None  # owner time zone for code-stamped deliverable date
 
 
 _CLOCK_SEAMS = frozenset({"plan_compiler", "unit_runner"})  # the seams whose prompts state the date
@@ -152,10 +153,14 @@ def run_seams(
 
     try:
         built = dict(
-            zip([f.name for f in dataclasses.fields(Seams) if f.name != "team"], map(build, names.split()), strict=True)
+            zip(
+                [f.name for f in dataclasses.fields(Seams) if f.name not in {"team", "people"}],
+                map(build, names.split()),
+                strict=True,
+            )
         )
         built["artifacts"] = screened_by_run(built["artifacts"], mode, meter)
-        return Seams(**built, team=team_store.team_reader(overrides))
+        return Seams(**built, team=team_store.team_reader(overrides), people=deps.get_people_provider(request))
     except Exception as exc:
         logger.warning("the run seams are not wired, so no run starts: %s", type(exc).__name__)
         return None

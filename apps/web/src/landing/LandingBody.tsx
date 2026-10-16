@@ -6,6 +6,7 @@
 // (NFR-01). No invented numbers, quotes or logos: the examples are lines of the recorded run, the skills are the ones
 // in the repository's skills/ folder, and the safety lines are what the policy engine and budgets do (PRD 9.4, 16).
 import type { ReactNode } from "react";
+import "../design/tilo-t/styles";
 import {
   AudiencesSection,
   ConnectorsSection,
@@ -17,10 +18,12 @@ import {
   WhySection,
 } from "./LandingSections";
 import LandingStage, { RecordedStory } from "./LandingStage";
+import { TaskIdeasSection, WeekPreviewSection } from "./LandingTSections";
 import { Reveal } from "./Reveal";
 import { cityArt, helperArt } from "./landingKit";
 import "./landing.sections.css";
 import "./landing.motion.css";
+import "./landing.t.css";
 import { RECORDED_RUN } from "./recordedRun";
 
 const RULES = [
@@ -232,9 +235,11 @@ export default function LandingBody({
       <TeamsSection />
       <OnboardingSection />
       <ContextSection />
+      <WeekPreviewSection />
       <ConnectorsSection />
       <AudiencesSection />
       <WhySection />
+      <TaskIdeasSection />
 
       <Reveal
         as="section"

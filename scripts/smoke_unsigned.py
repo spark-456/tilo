@@ -69,9 +69,7 @@ def main(argv: Sequence[str], *, transport: httpx.BaseTransport | None = None) -
         print("FAIL url: expected the tilo-api Cloud Run URL")
         return 1
     api = argv[0]
-    results: dict[str, bool] = dict.fromkeys(
-        ("sign-in", "bundle-api", "health", "cors-intake", "plate-auth"), False
-    )
+    results: dict[str, bool] = dict.fromkeys(("sign-in", "bundle-api", "health", "cors-intake", "plate-auth"), False)
     target = ""
     if len(argv) == 4:
         if not re.fullmatch(r"tilo-api-[a-z0-9-]+", argv[1]) or not re.fullmatch(r"[a-f0-9]{64}", argv[3]):

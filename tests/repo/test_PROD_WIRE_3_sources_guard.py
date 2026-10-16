@@ -28,8 +28,6 @@ NEW_TESTS = (
     "services/api/tests/_pw3_lib.py",
     "services/api/tests/test_PROD_WIRE_3_one_client_per_project.py",
     "services/api/tests/test_PROD_WIRE_3_doors_share_the_client.py",
-    "services/api/tests/test_PROD_WIRE_3_access_store.py",
-    "services/api/tests/test_PROD_WIRE_3_access_store_emulator.py",
     "tests/repo/test_PROD_WIRE_3_api_service_terraform.py",
     "tests/repo/test_PROD_WIRE_3_sources_guard.py",
 )

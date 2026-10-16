@@ -1,0 +1,570 @@
+/* TILO-T-WORLD: the live World's agent card, panel, chat and team meeting, in the Tilo T tokens (design/tilo-t:
+   --card --ink --ink2 --ink3 --line --lime --amber --red --sunk --sh2, Geist). No animation here: the classes in
+   design/tilo-t/motion.css (.tw-pop, .tw-fade, .tw-slide-*) start from recorded events. */
+[data-park] .tw-card {
+  position: absolute;
+  z-index: 6;
+  padding: 12px;
+  border: 1px solid var(--line, #e6e6e2);
+  border-radius: 16px;
+  background: var(--card, #fff);
+  color: var(--ink, #0b0b0c);
+  box-shadow: var(--sh2, 0 12px 32px -18px rgba(11, 11, 12, 0.25));
+  font-family: var(--fB, inherit);
+  font-size: 13px;
+  pointer-events: none;
+}
+[data-park] .tw-card__head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+[data-park] .tw-card__name {
+  margin: 0;
+  font-family: var(--fH, inherit);
+  font-size: 15px;
+  font-weight: 600;
+}
+[data-park] .tw-card__role {
+  margin: 0;
+  color: var(--ink3, #6b6b70);
+  font-size: 12px;
+}
+[data-park] .tw-facts__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+[data-park] .tw-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--sunk, #eeeeeb);
+  color: var(--ink2, #46464a);
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  text-transform: lowercase;
+}
+[data-park] .tw-chip[data-status="working"] {
+  background: var(--priSoft, #ecfbc2);
+  color: var(--priInk, #2f3d00);
+}
+[data-park] .tw-chip[data-status="in a meeting"] {
+  background: var(--skySoft, #e6eefb);
+  color: var(--skyInk, #24529e);
+}
+[data-park] .tw-facts__at {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--ink2, #46464a);
+  font-size: 12px;
+}
+[data-park] .tw-facts__task {
+  margin: 8px 0 0;
+  color: var(--ink, #0b0b0c);
+}
+[data-park] .tw-facts__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 10px 0 0;
+}
+[data-park] .tw-facts__grid dt {
+  color: var(--ink3, #6b6b70);
+  font-size: 11px;
+}
+[data-park] .tw-facts__grid dd {
+  margin: 0;
+  font-family: var(--mono, monospace);
+  font-size: 16px;
+}
+[data-park] .tw-facts__tools {
+  margin: 8px 0 0;
+  color: var(--ink2, #46464a);
+  font-size: 12px;
+}
+[data-park] .tw-facts__tools span {
+  display: block;
+  color: var(--ink3, #6b6b70);
+  font-size: 11px;
+}
+[data-park] .tw-card__said {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--line, #e6e6e2);
+  list-style: none;
+  color: var(--ink2, #46464a);
+  font-size: 12px;
+}
+[data-park] .tw-card__said li {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+[data-park] .tw-card__quiet,
+[data-park] .tw-card__hint {
+  margin: 8px 0 0;
+  color: var(--ink3, #6b6b70);
+  font-size: 11px;
+}
+
+/* Conversations: the world's chat. */
+[data-park] .tw-chat {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 10px;
+}
+[data-park] .tw-chat__note {
+  margin: 0;
+  color: var(--ink3, #6b6b70);
+  font-size: 13px;
+}
+[data-park] .tw-chat__filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+[data-park] .tw-chat__filters label {
+  display: grid;
+  gap: 2px;
+  color: var(--ink3, #6b6b70);
+  font-size: 11px;
+}
+[data-park] .tw-chat__filters select {
+  min-height: 44px;
+  min-width: 128px;
+  padding: 4px 8px;
+  border: 1px solid var(--line2, #d5d5d0);
+  border-radius: 10px;
+  background: var(--card, #fff);
+  color: var(--ink, #0b0b0c);
+  font: inherit;
+  font-size: 13px;
+}
+[data-park] .tw-chat__log {
+  display: flex;
+  max-height: 460px;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+[data-park] .tw-msg__btn {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line, #e6e6e2);
+  border-radius: 14px;
+  background: var(--card, #fff);
+  color: var(--ink, #0b0b0c);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .tw-msg__btn:hover {
+  background: var(--hover, #f1f1ee);
+}
+[data-park] .tw-msg[data-person="true"] .tw-msg__btn {
+  background: var(--priSoft, #ecfbc2);
+  border-color: var(--limeD, #a6cc1f);
+}
+[data-park] .tw-msg__who {
+  display: grid;
+  width: 34px;
+  flex: none;
+  place-items: center;
+}
+[data-park] .tw-msg__body {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+[data-park] .tw-msg__meta {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  color: var(--ink2, #46464a);
+  font-size: 12px;
+}
+[data-park] .tw-msg__kind,
+[data-park] .tw-msg__meta time {
+  color: var(--ink3, #6b6b70);
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+}
+[data-park] .tw-msg__text {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.4;
+}
+[data-park] .tw-msg__detail {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--ink2, #46464a);
+  font-size: 12px;
+}
+
+/* Agent panel and the room thread. Desktop: a column over the right of the stage. Phone: a bottom sheet. */
+[data-park] .tw-panel {
+  position: absolute;
+  z-index: 7;
+  top: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  width: min(360px, calc(100% - 16px));
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  overflow-y: auto;
+  border: 1px solid var(--line, #e6e6e2);
+  border-radius: 20px;
+  background: var(--card, #fff);
+  color: var(--ink, #0b0b0c);
+  box-shadow: var(--sh2, 0 12px 32px -18px rgba(11, 11, 12, 0.25));
+  font-family: var(--fB, inherit);
+  font-size: 13px;
+}
+@media (max-width: 767px) {
+  [data-park] .tw-panel {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    max-height: 78vh;
+    border-radius: 24px 24px 0 0;
+  }
+}
+[data-park] .tw-panel__head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+[data-park] .tw-panel__name {
+  margin: 0;
+  font-family: var(--fH, inherit);
+  font-size: 18px;
+  font-weight: 600;
+}
+[data-park] .tw-panel__x {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin-left: auto;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink2, #46464a);
+  cursor: pointer;
+}
+[data-park] .tw-panel__mem ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+  color: var(--ink2, #46464a);
+  font-size: 12px;
+}
+[data-park] .tw-panel__mem time {
+  font-family: var(--mono, monospace);
+  color: var(--ink3, #6b6b70);
+}
+[data-park] .tw-room {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line, #e6e6e2);
+}
+[data-park] .tw-room__h {
+  margin: 0;
+  font-family: var(--fH, inherit);
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-park] .tw-room__meta,
+[data-park] .tw-room__off {
+  margin: 0;
+  color: var(--ink3, #6b6b70);
+  font-size: 12px;
+}
+[data-park] .tw-room__log {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .tw-room__turn {
+  display: grid;
+  gap: 6px;
+}
+[data-park] .tw-bubble {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: var(--sunk, #eeeeeb);
+  overflow-wrap: anywhere;
+}
+[data-park] .tw-bubble--me {
+  display: grid;
+  background: var(--priSoft, #ecfbc2);
+  color: var(--priInk, #2f3d00);
+}
+[data-park] .tw-bubble[data-outcome="failed"],
+[data-park] .tw-bubble[data-outcome="declined"] {
+  background: var(--amberSoft, #fff1d4);
+  color: var(--amberInk, #7a4f00);
+}
+[data-park] .tw-bubble__who,
+[data-park] .tw-bubble__cites {
+  display: block;
+  color: var(--ink3, #6b6b70);
+  font-size: 11px;
+}
+[data-park] .tw-bubble__wait {
+  margin: 0;
+  color: var(--ink3, #6b6b70);
+  font-size: 12px;
+}
+[data-park] .tw-room__err {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--redSoft, #fde8e8);
+  color: var(--redInk, #a8202f);
+}
+[data-park] .tw-room__done {
+  display: block;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--mintSoft, #ddf6e8);
+  color: var(--mintInk, #13693f);
+}
+[data-park] .tw-room__change,
+[data-park] .tw-room__form {
+  display: grid;
+  gap: 6px;
+}
+[data-park] .tw-room__form label {
+  display: grid;
+  gap: 2px;
+  color: var(--ink3, #6b6b70);
+  font-size: 11px;
+}
+[data-park] .tw-room__form select,
+[data-park] .tw-room textarea {
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--line2, #d5d5d0);
+  border-radius: 10px;
+  background: var(--card, #fff);
+  color: var(--ink, #0b0b0c);
+  font: inherit;
+}
+[data-park] .tw-room textarea {
+  min-height: 64px;
+  resize: vertical;
+}
+[data-park] .tw-room__btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+[data-park] .tw-room button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--pri, #0b0b0c);
+  color: var(--onPri, #fff);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+[data-park] .tw-room button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+[data-park] .tw-room button.tw-room__quiet {
+  border: 1px solid var(--line2, #d5d5d0);
+  background: transparent;
+  color: var(--ink, #0b0b0c);
+  font-weight: 500;
+}
+
+/* Team meeting */
+[data-park] .tw-convene {
+  position: absolute;
+  z-index: 5;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  min-height: 44px;
+  gap: 6px;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid var(--line2, #d5d5d0);
+  border-radius: 12px;
+  background: var(--card, #fff);
+  color: var(--ink, #0b0b0c);
+  box-shadow: var(--sh1, none);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+[data-park] .tw-team__row {
+  display: flex;
+  gap: 6px;
+}
+[data-park] .tw-team__form {
+  display: grid;
+  gap: 10px;
+}
+[data-park] .tw-team__form label,
+[data-park] .tw-team__form legend {
+  color: var(--ink3, #6b6b70);
+  font-size: 12px;
+}
+[data-park] .tw-team__form select {
+  min-height: 44px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--line2, #d5d5d0);
+  border-radius: 10px;
+  background: var(--card, #fff);
+  color: var(--ink, #0b0b0c);
+  font: inherit;
+}
+[data-park] .tw-team__form fieldset {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+[data-park] .tw-team__pick {
+  display: flex;
+  min-height: 44px;
+  gap: 8px;
+  align-items: center;
+  color: var(--ink, #0b0b0c);
+  font-size: 14px;
+}
+[data-park] .tw-team__go {
+  min-height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--pri, #0b0b0c);
+  color: var(--onPri, #fff);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+[data-park] .tw-team__go:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Stage moments: parcel, confetti, failure card, and the muted city that lights up on world.completed. */
+[data-park] .tw-parcel {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--lime, #c8f23a);
+  box-shadow: 0 0 0 2px var(--ink, #0b0b0c);
+  pointer-events: none;
+}
+[data-park] .tw-confetti {
+  position: absolute;
+  z-index: 5;
+  top: 40%;
+  left: 50%;
+  pointer-events: none;
+}
+[data-park] .tw-confetti i {
+  position: absolute;
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  opacity: 0;
+}
+[data-park] .tw-failed {
+  position: absolute;
+  z-index: 6;
+  top: 8px;
+  left: 50%;
+  display: grid;
+  width: min(420px, calc(100% - 32px));
+  gap: 2px;
+  padding: 10px 14px;
+  transform: translateX(-50%);
+  border: 1px solid var(--redInk, #a8202f);
+  border-radius: 14px;
+  background: var(--redSoft, #fde8e8);
+  color: var(--redInk, #a8202f);
+  font-size: 13px;
+}
+[data-park] .park-world-livestage[data-run-status="started"] .stage-frame canvas,
+[data-park] .park-world-livestage[data-run-status="paused"] .stage-frame canvas {
+  filter: var(--cityFx, none);
+}
+
+/* Replay speeds */
+[data-park] .tw-play {
+  margin: 0;
+  position: absolute;
+  z-index: 5;
+  bottom: 8px;
+  left: 50%;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  transform: translateX(-50%);
+  border: 1px solid var(--line, #e6e6e2);
+  border-radius: 14px;
+  background: var(--card, #fff);
+  box-shadow: var(--sh2, none);
+}
+[data-park] .tw-play__b {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink2, #46464a);
+  font: inherit;
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  cursor: pointer;
+}
+[data-park] .tw-play__b[aria-pressed="true"] {
+  background: var(--pri, #0b0b0c);
+  color: var(--onPri, #fff);
+}

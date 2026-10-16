@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from typing import Any, Literal, TypedDict
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from tilo_providers.errors import NotConfigured, ProviderError, RequestError
 from tilo_providers.media import MAX_PARTS, MediaPart
@@ -58,6 +58,20 @@ class GenerateResponse(BaseModel):  # one generate() result, or one stream() chu
     code_runs: list[dict[str, str]] | None = None
 
 
+class EmbedRequest(BaseModel):  # RT-05 / ADR-0049: one batched document or query embedding
+    model_config = ConfigDict(extra="forbid")
+    texts: list[str] = Field(min_length=1, max_length=64)
+    task: Literal["document", "query"]
+    dimensions: StrictInt = Field(ge=64, le=2048)
+
+
+class EmbedResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    vectors: list[list[float]]
+    profile_id: str
+    usage: dict[str, int] | None = None
+
+
 def cached_tokens_or_none(value: Any, input_tokens: Any) -> int | None:
     """EFF-04 (ADR-0022): a provider's cached-token count if it is a whole number from 0 to `input_tokens`, else None
     (the caller leaves `usage["cached_tokens"]` out, so EV-16 can never refuse an event over a misreport)."""
@@ -78,7 +92,7 @@ class ModelProvider(ABC):  # PRD 6.4: generate, stream, embed, count_tokens, cap
     @abstractmethod
     def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]: ...
     @abstractmethod
-    def embed(self, request: Any) -> Any: ...
+    def embed(self, request: EmbedRequest) -> EmbedResponse: ...
     @abstractmethod
     def count_tokens(self, text: str) -> int: ...
     @abstractmethod

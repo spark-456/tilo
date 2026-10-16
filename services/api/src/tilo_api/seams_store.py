@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections.abc import Iterable, Mapping
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
@@ -197,8 +198,9 @@ def _run_state(stream: Iterable[Mapping[str, Any]]) -> tuple[str, str] | None:
 
 
 class StoreSourceOwners:
-    def __init__(self, store: deps.Store) -> None:
+    def __init__(self, store: deps.Store, briefs: Any = None) -> None:
         self._store = store
+        self._briefs = briefs  # the morning brief's index of message ids (MO-11), or None
         self._known: dict[tuple[str, str], str | None] = {}  # per request: one read per (kind, ref), misses too
 
     def owner_of(self, kind: str, ref: str) -> str | None:
@@ -209,10 +211,14 @@ class StoreSourceOwners:
             self._known[(kind, ref)] = self._look_up(kind, ref)
         return self._known[(kind, ref)]
 
+    def _brief_owner(self, ref: str) -> str | None:
+        return _brief_owner_of(self._briefs, ref)
+
     def _look_up(self, kind: str, ref: str) -> str | None:
         if kind == "mail" and _valid(_MESSAGE, ref):
             triage = _mail_source(self._store)
-            return None if triage is None else triage.owner_of(ref)
+            owner = None if triage is None else triage.owner_of(ref)
+            return owner if owner is not None else self._brief_owner(ref)
         if kind == "request" and _valid(_WORLD, ref):
             world = self._store.load_world(ref, settle=False)
             owner = getattr(world, "owner", None)
@@ -269,6 +275,17 @@ class StoreMeetingWorlds:
             except HTTPException:  # 409 `stale`: another instance made it first; read it and check its owner
                 continue
         raise _store_unavailable()
+
+
+def _brief_owner_of(briefs: Any, ref: str) -> str | None:
+    """MO-11: a message id that appears in exactly one person's own brief of the last 7 days belongs to that person."""
+    if briefs is None:
+        return None
+    try:
+        found = briefs.mail_owner(deps.ORG_ID, ref, datetime.now(UTC).date().isoformat())
+    except Exception:  # an unreadable index vouches for nobody
+        return None
+    return found if _valid(_USER, found) else None
 
 
 def resolve_store(request: Any) -> deps.Store:

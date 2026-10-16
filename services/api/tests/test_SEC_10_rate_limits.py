@@ -13,8 +13,7 @@ import pytest
 from fastapi import Request
 from fastapi.testclient import TestClient
 from tilo_api import app
-from tilo_api.access import InMemoryAccessStore
-from tilo_api.deps import Principal, Store, WorldRecord, get_access_store, get_current_principal, get_store
+from tilo_api.deps import Principal, Store, WorldRecord, get_current_principal, get_store
 from tilo_api.rate_limit import (
     InMemoryRateLimiter,
     RateLimitConfig,
@@ -73,7 +72,6 @@ def test_SEC_10_per_user_rate_limit_429_message_and_isolation() -> None:
     limiter = InMemoryRateLimiter(clock=clock)
     cfg = RateLimitConfig(ip_capacity=50, ip_refill_per_s=10.0, user_capacity=3, user_refill_per_s=0.25)
     store = _seed_store()
-    access_store = InMemoryAccessStore()
     current_user = {"id": "u_alice"}
 
     def principal_with_request(request: Request) -> Principal:
@@ -84,7 +82,6 @@ def test_SEC_10_per_user_rate_limit_429_message_and_isolation() -> None:
         )
 
     app.dependency_overrides[get_store] = lambda: store
-    app.dependency_overrides[get_access_store] = lambda: access_store
     app.dependency_overrides[get_current_principal] = principal_with_request
     app.dependency_overrides[get_rate_limiter] = lambda: limiter
     app.dependency_overrides[get_rate_limit_config] = lambda: cfg

@@ -83,7 +83,12 @@ export function LiveConnectors({
       <section className="park-connectors-section" aria-label="Tools">
         {groupConnectors(rows).map(({ heading, connectors: members }) => (
           <div className="park-connectors-category" key={heading}>
-            <h2>{heading}</h2>
+            <div className="park-connectors-group-head">
+              <h2>{heading}</h2>
+              <span className="park-connectors-group-count">
+                {members.length} {members.length === 1 ? "app" : "apps"}
+              </span>
+            </div>
             <div className="park-connectors-grid">
               {members.map((c) => (
                 <article

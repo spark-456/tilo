@@ -75,6 +75,7 @@ from tilo_metering.flags import FlagStore
 from tilo_planning.events import build_event
 
 from tilo_api import (
+    brief_routes,
     deps,
     dev,
     ephemeral,
@@ -895,6 +896,7 @@ def tick(
         plate_links.sweep(
             request, _stamp(clock())
         )  # FR-PA-06b: off unless TILO_PLATE_DIGEST=1; never changes the answer
+        brief_routes.sweep(request, _stamp(clock()))  # ADR-0049 MO-03: off unless TILO_MORNING_BRIEF=1; same
         return answer
     return _run_task(request, raw, schedule_store, seams_factory, clock, flags, store_factory)
 

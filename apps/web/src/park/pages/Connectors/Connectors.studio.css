@@ -469,3 +469,147 @@
   outline: 3px solid var(--focus, var(--ink));
   outline-offset: 2px;
 }
+
+/* CX-T-CONNECTORS: T board card rhythm; existing theme roles supply day and night colours. */
+[data-park][data-theme="studio"] [data-testid="park-page-connectors"] > .park-sheet {
+  max-width: 1200px;
+  padding: 24px 32px 72px;
+  gap: 18px;
+}
+[data-park][data-theme="studio"] .park-connectors-h1 {
+  font-size: 40px;
+  letter-spacing: -1.2px;
+  line-height: 1.05;
+}
+[data-park][data-theme="studio"] .park-connectors-sub {
+  font-size: 14px;
+  font-weight: 400;
+}
+[data-park][data-theme="studio"] .park-connectors-search {
+  width: 240px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+}
+[data-park][data-theme="studio"] .park-connectors-studio {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
+  gap: 18px;
+}
+[data-park][data-theme="studio"] .park-connectors-main {
+  gap: 18px;
+}
+[data-park][data-theme="studio"] .park-connectors-section,
+[data-park][data-theme="studio"] .park-connectors-category {
+  gap: 10px;
+}
+[data-park][data-theme="studio"] .park-connectors-group-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+[data-park][data-theme="studio"] .park-connectors-category h2,
+[data-park][data-theme="studio"] .park-connectors-sectitle {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--ink);
+}
+[data-park][data-theme="studio"] .park-connectors-group-count {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink3);
+}
+[data-park][data-theme="studio"] .park-connectors-grid,
+[data-park][data-theme="studio"] .park-connectors-availgrid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+[data-park][data-theme="studio"] .park-connectors-live,
+[data-park][data-theme="studio"]
+  .park-connectors-section[aria-label="Your Google account"]
+  .park-connectors-avail {
+  min-width: 0;
+  padding: 14px;
+  border-radius: 20px;
+  box-shadow: none;
+  gap: 10px;
+}
+[data-park][data-theme="studio"]
+  .park-connectors-section[aria-label="Your Google account"]
+  .park-connectors-avail {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+[data-park][data-theme="studio"] .park-connectors-avail-mono {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border: 1px solid var(--lineStrong);
+  border-radius: 12px;
+  background: var(--card);
+}
+[data-park][data-theme="studio"]
+  .park-connectors-section[aria-label="Your Google account"]
+  .park-connectors-avail-names {
+  flex-basis: calc(100% - 56px);
+}
+[data-park][data-theme="studio"]
+  .park-connectors-section[aria-label="Your Google account"]
+  .park-connectors-connect {
+  flex: 1 1 100%;
+  min-height: 44px;
+  background: var(--pri);
+  color: var(--onPri);
+  border-color: var(--pri);
+}
+[data-park][data-theme="studio"]
+  .park-connectors-section[aria-label="Your Google account"]
+  .park-connectors-disconnect-action {
+  background: var(--card);
+  color: var(--ink);
+  border-color: var(--lineStrong);
+}
+[data-park][data-theme="studio"] .park-connectors-live .park-connectors-livestate {
+  padding: 0;
+  background: none;
+  gap: 6px;
+  font-size: 12px;
+}
+[data-park][data-theme="studio"] .park-connectors-live .park-connectors-livestate::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+[data-park][data-theme="studio"] .park-connectors-live .park-connectors-tile-name {
+  font-size: 14.5px;
+}
+[data-park][data-theme="studio"] .park-connectors-live .park-connectors-manage-btn {
+  align-self: stretch;
+  min-height: 44px;
+  margin-top: auto;
+  border-radius: 11px;
+  text-align: center;
+}
+@media (max-width: 1099px) {
+  [data-park][data-theme="studio"] .park-connectors-studio {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  [data-park][data-theme="studio"] [data-testid="park-page-connectors"] > .park-sheet {
+    padding: 14px 14px 110px;
+  }
+  [data-park][data-theme="studio"] .park-connectors-h1 {
+    font-size: 30px;
+  }
+  [data-park][data-theme="studio"] .park-connectors-search {
+    width: 100%;
+  }
+  [data-park][data-theme="studio"] .park-connectors-grid,
+  [data-park][data-theme="studio"] .park-connectors-availgrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

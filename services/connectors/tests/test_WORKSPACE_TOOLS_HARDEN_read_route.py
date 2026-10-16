@@ -60,6 +60,24 @@ def test_WORKSPACE_TOOLS_HARDEN_the_html_stripper_still_keeps_the_text_and_drops
     assert "note" not in got and "x()" not in got and got.startswith("Hi")
 
 
+def test_ADR_0048_WT_03_malformed_numeric_entity_remains_undecoded() -> None:
+    markup = "&#" + "9" * 5000
+    assert _text_of_html(markup) == markup
+
+
+@pytest.mark.parametrize(
+    ("markup", "visible"),
+    [
+        ("\u0130" * 18 + "</script><script>xx>LEAK</script>shown", "shown"),
+        ("\u0130" * 20 + "<script>hidden</script>VISIBLE", "VISIBLE"),
+    ],
+)
+def test_ADR_0048_WT_03_unicode_casefold_cannot_shift_hidden_tag_boundary(markup: str, visible: str) -> None:
+    got = _text_of_html(markup)
+    assert got.endswith(visible)
+    assert "LEAK" not in got and "hidden" not in got
+
+
 @pytest.mark.parametrize("zone", ["-05:00", "-23:59"])
 def test_WORKSPACE_TOOLS_HARDEN_a_window_out_of_the_calendar_range_is_invalid_request_not_an_error(zone: str) -> None:
     start, end = f"9999-12-31T23:00:00{zone}", f"9999-12-31T23:30:00{zone}"  # year 10000 in UTC

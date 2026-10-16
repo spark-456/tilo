@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 const path = require("node:path");
-function face() {
+function face({ reducedMotion = false } = {}) {
   const operations = [];
   const ctx = new Proxy(
     {},
@@ -28,8 +28,10 @@ function face() {
     __TILO_FACE_TEST__: true,
     document: { createElement: () => canvas },
     performance: { now: () => 0 },
+    matchMedia: () => ({ matches: reducedMotion }),
     navigator: {
       mediaDevices: {
+        enumerateDevices: async () => [{ kind: "audioinput", deviceId: "mic" }],
         getUserMedia: async () => {
           throw Error("real camera called");
         },
@@ -83,4 +85,40 @@ test("FR_MTG_14_video_uses_canvas_track_and_never_requests_the_real_camera", asy
   const stream = await rig.sandbox.navigator.mediaDevices.getUserMedia({ video: true });
   assert.equal(stream.fps, 15);
   assert.deepEqual(stream.getVideoTracks(), ["canvas-camera"]);
+});
+test("FR_MTG_14_T_MEET_draws_director_bust_on_desk_inside_the_tile", () => {
+  const rig = face();
+  rig.face.tick(1000);
+  assert.ok(rig.operations.some((op) => op[0] === "fillStyle" && op[1] === "#ECFBC2"));
+  assert.ok(rig.operations.some((op) => op[0] === "fillStyle" && op[1] === "#E8643F"));
+  assert.ok(rig.operations.some((op) => op[0] === "fillStyle" && op[1] === "#D5D5D0"));
+  assert.ok(rig.operations.some((op) => op[0] === "fillStyle" && op[1] === "#1F1D2B"));
+  assert.ok(rig.operations.some((op) => op[0] === "moveTo" && op[1] === 30 && op[2] === 166));
+});
+test("FR_MTG_14_T_MEET_reduced_motion_keeps_an_idle_pose_static", () => {
+  const rig = face({ reducedMotion: true });
+  rig.face.tick(6990);
+  const first = JSON.stringify(rig.operations);
+  rig.operations.length = 0;
+  rig.face.tick(7070);
+  assert.equal(JSON.stringify(rig.operations), first);
+});
+test("FR_MTG_14_T_MEET_lists_the_canvas_camera_for_Meet", async () => {
+  const rig = face();
+  const devices = await rig.sandbox.navigator.mediaDevices.enumerateDevices();
+  assert.equal(devices.filter((device) => device.kind === "videoinput").length, 1);
+  assert.equal(devices[0].deviceId, "mic");
+  assert.match(devices[1].label, /Tilo/);
+});
+test("FR_MTG_14_T_MEET_speaking_mouth_uses_only_recorded_audio_level", () => {
+  const rig = face();
+  rig.face.event("audio_start");
+  rig.face.tick(1000);
+  const closed = rig.operations.find((op) => op[0] === "ellipse" && op[1] === 100);
+  rig.operations.length = 0;
+  rig.face.event("audio_level", 0.8);
+  rig.face.tick(1100);
+  const open = rig.operations.find((op) => op[0] === "ellipse" && op[1] === 100);
+  assert.equal(closed[4], 3);
+  assert.equal(open[4], 11);
 });

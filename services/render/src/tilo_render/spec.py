@@ -1,6 +1,8 @@
 """DeliverableSpec and safety validation for tilo-render (FR-CON-09; PRD 6.6, 12.4, 12.6)."""
 
+import base64
 import datetime
+import io
 import math
 import re
 from enum import StrEnum
@@ -64,7 +66,55 @@ class ChartBlock(BaseModel):
     chart_id: str = Field(min_length=1)
 
 
-Block = Annotated[ParagraphBlock | BulletsBlock | TableBlock | ChartBlock, Field(discriminator="type")]
+def slide_chunks(text: str) -> list[str]:
+    lines: list[str] = []
+    for line in text.split("\n"):
+        while len(line) > 22:
+            split = line.rfind(" ", 0, 22)
+            split = 22 if split <= 0 else split + 1
+            lines.append(line[:split])
+            line = line[split:]
+        lines.append(line)
+    return ["\n".join(lines[i : i + 12]) for i in range(0, len(lines), 12)]
+
+
+class SlideBlock(BaseModel):
+    """GEN-06: bounded slide design; image bytes only, never a path or URL."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    type: Literal["slide"] = "slide"
+    layout: Literal["two_column", "image", "stat"]
+    title: str = Field(min_length=1, max_length=120)
+    left: str = Field(default="", max_length=MAX_PARAGRAPH_CHARS)
+    right: str = Field(default="", max_length=MAX_PARAGRAPH_CHARS)
+    notes: str = Field(default="", max_length=MAX_PARAGRAPH_CHARS)
+    image_base64: str | None = Field(default=None, max_length=1_400_000)
+
+    @model_validator(mode="after")
+    def _image(self) -> "SlideBlock":
+        if self.layout == "image" and not self.image_base64:
+            raise ValueError("Image layout requires recorded image bytes")
+        if self.layout == "image" and self.right:
+            raise ValueError("Image captions belong in left; right must be empty")
+        if self.image_base64:
+            from PIL import Image
+
+            try:
+                raw = base64.b64decode(self.image_base64, validate=True)
+                with Image.open(io.BytesIO(raw)) as image:
+                    if image.format not in {"PNG", "JPEG"} or image.width * image.height > 4_000_000:
+                        raise ValueError("Unsupported or oversized slide image")
+                    image.verify()
+            except Exception as exc:
+                raise ValueError("Invalid slide image") from exc
+        return self
+
+    @property
+    def pages(self) -> int:
+        return max(len(slide_chunks(self.left)), len(slide_chunks(self.right)))
+
+
+Block = Annotated[ParagraphBlock | BulletsBlock | TableBlock | ChartBlock | SlideBlock, Field(discriminator="type")]
 
 
 class Section(BaseModel):
@@ -214,7 +264,9 @@ class DeliverableSpec(BaseModel):
         slide_count = 1 + len(self.sections)
         for section in self.sections:
             for block in section.blocks:
-                if isinstance(block, ParagraphBlock):
+                if isinstance(block, SlideBlock):
+                    slide_count += block.pages
+                elif isinstance(block, ParagraphBlock):
                     slide_count += max(1, math.ceil(len(block.text) / 1000))
                 elif isinstance(block, BulletsBlock):
                     slide_count += max(1, math.ceil(len(block.bullets) / 8))
@@ -287,7 +339,13 @@ class RequestDeliverableSpec(DeliverableSpec):
         for section in self.sections:
             charge(section.heading)
             for block in section.blocks:
-                if isinstance(block, ParagraphBlock):
+                if isinstance(block, SlideBlock):
+                    slide_count += block.pages
+                    charge(block.title, block.pages)
+                    charge(block.left)
+                    charge(block.right)
+                    charge(block.notes, block.pages)
+                elif isinstance(block, ParagraphBlock):
                     slide_count += max(1, math.ceil(len(block.text) / 1000))
                     charge(block.text)
                 elif isinstance(block, BulletsBlock):

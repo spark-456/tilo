@@ -17,7 +17,7 @@ from tilo_harness.validator import repo_validator
 SourceLoader = Callable[[Mapping[str, Any]], MediaPart | None]
 
 
-def wants_quiz(unit: Mapping[str, Any], brief: Mapping[str, Any] | None) -> bool:
+def wants_quiz(unit: Mapping[str, Any], brief: Mapping[str, Any] | None, *, source_available: bool = False) -> bool:
     items = brief.get("deliverables") if isinstance(brief, Mapping) else None
     first = items[0] if isinstance(items, list) and items else None
     return (
@@ -25,6 +25,7 @@ def wants_quiz(unit: Mapping[str, Any], brief: Mapping[str, Any] | None) -> bool
         and unit.get("unit_type") == "deliver"
         and isinstance(first, Mapping)
         and first.get("format") == "app"
+        and source_available
     )
 
 
@@ -42,7 +43,11 @@ def quiz_output(reply: str, load: SourceLoader | None) -> UnitOutput:
         raise DeliverableRefused("too_large")
     try:
         spec = validate_spec(json.loads(reply, object_pairs_hook=_object, parse_constant=_constant))
-        validate_sources(spec, load)
+        try:
+            validate_sources(spec, load)
+        except Exception as caught_error:  # a missing, unrecorded or unreadable citation must still fail closed
+            log_caught(caught_error, __name__, locals())
+            raise DeliverableRefused("source_invalid") from None
     except DeliverableRefused:
         raise
     except Exception as caught_error:

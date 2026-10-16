@@ -295,7 +295,7 @@
 .landing-hero__stage--held {
   border: 1px solid var(--line);
   border-radius: 36px;
-  background: var(--ground);
+  background: var(--cityGround, var(--ground));
 }
 .landing-stage {
   position: relative;
@@ -305,7 +305,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 36px;
-  background: var(--ground);
+  background: var(--cityGround, var(--ground));
   text-align: left;
 }
 .landing-stage__label {
@@ -677,6 +677,9 @@
 }
 .landing-speed__pic--city > * {
   filter: var(--l-cityFx);
+}
+.landing-speed__pic--city {
+  background: var(--cityGround, var(--ground));
 }
 
 /* safety */

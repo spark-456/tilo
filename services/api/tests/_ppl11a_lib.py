@@ -316,11 +316,9 @@ def case_org(case: dict[str, Any]) -> str:
 
 class Rig:
     """The real `tilo_api.app` with every seam of API_PPL_11a.md faked: people stores, an artifact store, a redactor,
-    a clock, plate sources, source owners and (optionally) the SEC-15 access store. `as_user` signs a person in."""
+    a clock, plate sources, and source owners. `as_user` signs a person in."""
 
-    def __init__(
-        self, monkeypatch: Any, *, org: str = ORG, now: str = NOW, deployed: bool = False, access: Any = None
-    ) -> None:
+    def __init__(self, monkeypatch: Any, *, org: str = ORG, now: str = NOW, deployed: bool = False) -> None:
         from tilo_api import app, deps  # noqa: PLC0415
         from tilo_memory.artifacts import ArtifactStore, MemoryBlobBackend, MemoryMetaBackend  # noqa: PLC0415
         from tilo_people.stores import PeopleStores  # noqa: PLC0415
@@ -354,7 +352,6 @@ class Rig:
             screener=self.screener,
             new_id=lambda: self._ids.pop(0),
         )
-        self.access = access
         self.user, self.role, self.world_id, self.signed_in = OWNER, "owner", None, True
         # PPL-11c-FS-1c (FS-19): a full web sign-in session by default; a test may set the channel or drop the marker.
         self.channel, self.full_session = "web", True
@@ -416,8 +413,6 @@ class Rig:
         # PPL-11c-FS (FS-12): production founds an org only for the configured bootstrap uid; the rig lets every
         # principal found an empty org, as the PPL-11c S3 tests assume. The FS-12 tests `unwire("founder_gate")`.
         ov[seam(deps, "get_founder_gate")] = lambda: lambda user_id: True
-        if self.access is not None:
-            ov[seam(deps, "get_access_store")] = lambda: self.access
 
         def no_flags() -> Any:
             self.flag_calls.append("get_flag_store")

@@ -7,10 +7,18 @@ identical). No network, no recordings — just a hash of the prompt."""
 from __future__ import annotations
 
 import hashlib
+import math
 from collections.abc import Iterator
-from typing import Any
 
-from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
+from tilo_providers.interfaces import (
+    Capability,
+    EmbedRequest,
+    EmbedResponse,
+    GenerateRequest,
+    GenerateResponse,
+    ModelProvider,
+    PriceQuote,
+)
 
 _DEFAULT_CAPS = frozenset({Capability.JSON, Capability.TOOLS})
 _DEFAULT_PRICE = PriceQuote(input=0.0, output=0.0)  # UI/fixture work never meters real spend
@@ -48,8 +56,20 @@ class FakeModelProvider(ModelProvider):
     def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]:
         yield self.generate(request)
 
-    def embed(self, request: Any) -> Any:
-        return {"vectors": [[0.0] * 8], "profile_id": self._profile_id}
+    def embed(self, request: EmbedRequest) -> EmbedResponse:
+        if not isinstance(request, EmbedRequest):  # older provider tests still exercise the pre-RT-05 raw shape
+            return {"vectors": [[0.0] * 8], "profile_id": self._profile_id}  # type: ignore[return-value]
+        vectors: list[list[float]] = []
+        for value in request.texts:
+            seed = f"{request.task}\0{value}".encode()
+            numbers: list[float] = []
+            for counter in range((request.dimensions + 7) // 8):
+                digest = hashlib.sha256(seed + counter.to_bytes(4, "big")).digest()
+                numbers.extend(int.from_bytes(digest[i : i + 4], "big") / 0xFFFFFFFF * 2 - 1 for i in range(0, 32, 4))
+            numbers = numbers[: request.dimensions]
+            length = math.sqrt(sum(number * number for number in numbers))
+            vectors.append([number / length for number in numbers])
+        return EmbedResponse(vectors=vectors, profile_id=self._profile_id)
 
     def count_tokens(self, text: str) -> int:
         return len(text.split())

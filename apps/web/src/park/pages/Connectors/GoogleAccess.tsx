@@ -9,8 +9,30 @@ import {
   type ConnectionRow,
   GOOGLE_PERSON_CONNECTORS,
 } from "../../../api/connect";
+import { BrandIcon } from "./BrandIcon";
 
 const MONO: Record<string, string> = { gmail: "G", google_drive: "D", google_calendar: "C" };
+// A scope is named by its last part; the connection row carries the full Google scope URL.
+const READ = {
+  gmail: {
+    label: "Read mail",
+    capabilities: ["read", "search"],
+    scope: "gmail.readonly",
+    copy: "Agents may search and read your mail.",
+  },
+  google_drive: {
+    label: "Read Drive",
+    capabilities: ["read", "list"],
+    scope: "drive.file",
+    copy: "Agents may list and read files you pick for Tilo and files Tilo saves.",
+  },
+  google_calendar: {
+    label: "Read calendar",
+    capabilities: ["read"],
+    scope: "calendar.readonly",
+    copy: "Agents may read your calendar events.",
+  },
+} as const;
 const STATE_TEXT = {
   connected: "Connected",
   attention: "Needs attention",
@@ -47,10 +69,10 @@ export function GoogleAccess({ flow }: { flow: ConnectFlow }) {
     load();
   }, [load]);
 
-  const connect = (id: string) => {
+  const connect = (id: keyof typeof READ) => {
     setBusy(id);
     setNote(null);
-    flow.start(id, ["read"]).then((r) => {
+    flow.start(id, READ[id].capabilities).then((r) => {
       setBusy(null);
       if (r.kind === "redirect") flow.open(r.url);
       else {
@@ -80,37 +102,52 @@ export function GoogleAccess({ flow }: { flow: ConnectFlow }) {
           Sign in with Google. Tilo never sees your password.
         </span>
       </div>
+      <p className="park-connectors-note">
+        Agents may use these reads only in your own worlds. Connecting here starts Google consent;
+        sharing a world later may show others outputs based on those reads.
+      </p>
       <div className="park-connectors-availgrid">
         {GOOGLE_PERSON_CONNECTORS.map((id) => {
           const row = shown.find((r) => r.id === id);
           if (!row) return null;
           const on = row.state !== "available";
+          const read = READ[id];
+          const granted = row.scopes?.some((s) => s.endsWith(`/auth/${read.scope}`));
           return (
             <div className="park-connectors-avail" key={id}>
-              <span className="park-connectors-avail-mono">{MONO[id]}</span>
+              <span className="park-connectors-avail-mono">
+                <BrandIcon id={id} mono={MONO[id] ?? row.name.charAt(0)} />
+              </span>
               <span className="park-connectors-avail-names">
                 <span className="park-connectors-avail-name">{row.name}</span>
                 <span className="park-connectors-avail-blurb">{STATE_TEXT[row.state]}</span>
+                <span className="park-connectors-avail-blurb">{read.copy}</span>
+                <span className="park-connectors-avail-blurb">
+                  {row.scopes === undefined && on
+                    ? "Read permission not available"
+                    : `${read.label} ${granted ? "granted" : "not granted"}`}
+                </span>
               </span>
-              {on ? (
-                <button
-                  type="button"
-                  className="park-connectors-connect"
-                  disabled={busy !== null}
-                  onClick={() => setConfirm(id)}
-                >
-                  Disconnect
-                </button>
-              ) : (
+              {granted !== true && (!on || row.scopes !== undefined) ? (
                 <button
                   type="button"
                   className="park-connectors-connect"
                   disabled={busy !== null}
                   onClick={() => connect(id)}
                 >
-                  {busy === id ? "Signing in" : "Connect"}
+                  {busy === id ? "Signing in" : read.label}
                 </button>
-              )}
+              ) : null}
+              {on ? (
+                <button
+                  type="button"
+                  className="park-connectors-connect park-connectors-disconnect-action"
+                  disabled={busy !== null}
+                  onClick={() => setConfirm(id)}
+                >
+                  Disconnect
+                </button>
+              ) : null}
             </div>
           );
         })}

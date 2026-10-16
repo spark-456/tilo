@@ -153,6 +153,20 @@ def _unit_building(building_id: str, group: list[dict[str, Any]]) -> dict[str, A
     }
 
 
+def _district_name(members: list[dict[str, Any]], n: int) -> str:
+    """A district named for the work it holds (its first unit's plan title + " team"), never "Workstream 1"; the
+    plain numbered name only when no title makes a plain one (ticket TILO-T-WORLD)."""
+    name = _plain_name(str(members[0].get("title", "")), "", room=19) if members else ""
+    return f"{name} team" if name else f"Workstream {n}"
+
+
+def _island_name(connector: str, n: int) -> str:
+    """An island named for its connector id ("google_calendar" -> "Google calendar"), else "Connector n"."""
+    words = connector.replace("_", " ").strip()
+    name = (words[:1].upper() + words[1:])[:24]
+    return name if len(name) >= 2 and name[0].isalnum() else f"Connector {n}"
+
+
 def build_layout(plan: dict[str, Any], *, world_id: str) -> dict[str, Any]:
     units = plan["units"]
     agents: list[dict[str, str]] = [{"id": "A_director", "rank": "director"}]
@@ -185,7 +199,7 @@ def build_layout(plan: dict[str, Any], *, world_id: str) -> dict[str, Any]:
         districts.append(
             {
                 "id": district_id,
-                "name": f"Workstream {n}",
+                "name": _district_name(members, n),
                 "icon": "inbox",
                 "lead": f"A_lead{n}",
                 "buildings": buildings,
@@ -195,8 +209,14 @@ def build_layout(plan: dict[str, Any], *, world_id: str) -> dict[str, Any]:
     connector_ids = sorted({c for unit in units for c in unit["connectors"]})
     island_of = {c: f"I{n}" for n, c in enumerate(connector_ids, start=1)}
     islands = [
-        {"id": island, "name": f"Connector {island[1:]}", "conn": "api", "bridge": "road", "state": "connected"}
-        for island in island_of.values()
+        {
+            "id": island,
+            "name": _island_name(conn, int(island[1:])),
+            "conn": "api",
+            "bridge": "road",
+            "state": "connected",
+        }
+        for conn, island in island_of.items()
     ]
     gates = []
     for gate in plan["gates"]:
