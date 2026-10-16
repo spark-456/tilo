@@ -16,8 +16,7 @@ from __future__ import annotations
 import pytest
 from _pw3_lib import PROJECT, Builder, FakeClient, threads
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
-from tilo_api import app, deps
+from tilo_api import deps
 
 UID, OTHER = "u_pw3_judge", "u_pw3_other"
 
@@ -171,27 +170,3 @@ def test_PROD_WIRE_3_SEC_15_a_failing_client_build_is_a_503_that_never_echoes_th
     builder.fail = False
     now[0] += deps.PEOPLE_STORES_BACKOFF_S + 1
     assert deps.get_access_store().get(UID) is None  # the next request tries again
-
-
-def test_PROD_WIRE_3_SEC_15_the_declaration_routes_run_on_the_firestore_store_without_an_override(pw3):
-    """`POST /access/declaration` and `GET /access`, deployed, the real app and the real seam: set once, then locked."""
-    builder = Builder(make=FakeClient)
-    pw3.use(builder)
-    pw3.deployed(PROJECT, api=True)
-    saved = dict(app.dependency_overrides)
-    app.dependency_overrides.clear()
-    app.dependency_overrides[deps.get_current_principal] = lambda: deps.Principal(user_id=UID, role="owner")
-    try:
-        client = TestClient(app, raise_server_exceptions=True)
-        first = client.post("/access/declaration", json={"declaration": "judge"})
-        assert first.status_code == 200, first.text
-        assert first.json()["declaration"] == "judge" and first.json()["allowed"] is True
-        again = client.post("/access/declaration", json={"declaration": "visitor"})
-        assert (again.status_code, again.json()["code"]) == (409, "declaration_locked")
-        assert client.get("/access").json()["declaration"] == "judge"
-        stored = builder.returned[0].docs
-        assert stored == {f"orgs/{deps.ORG_ID}/access/{UID}": {"declaration": "judge"}}
-        assert builder.calls == [PROJECT]
-    finally:
-        app.dependency_overrides.clear()
-        app.dependency_overrides.update(saved)

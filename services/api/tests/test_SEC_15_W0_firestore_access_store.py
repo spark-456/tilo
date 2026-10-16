@@ -180,8 +180,8 @@ def test_SEC_15_W0_with_the_config_the_seam_is_the_firestore_store_over_one_cach
     deps.get_people_stores.cache_clear()
 
 
-def test_SEC_15_W0_the_gate_lets_a_declared_judge_through_on_a_deployed_process(monkeypatch):
-    """End to end through the real gate: before W0 this was 503 for everybody."""
+def test_SEC_15_W0_the_gate_lets_a_signed_in_person_through_without_reading_the_store(monkeypatch):
+    """OPEN-ACCESS (16 Oct 2026): the stored declaration is no longer consulted; the sign-in alone is the gate."""
     from fastapi.testclient import TestClient
     from tilo_api import app, deps
 
@@ -194,11 +194,8 @@ def test_SEC_15_W0_the_gate_lets_a_declared_judge_through_on_a_deployed_process(
     try:
         client = TestClient(app)
         assert client.get("/access").status_code == 200
-        before = client.get("/costs")
-        assert before.status_code == 403 and before.json()["code"] == "declaration_required"
-        assert client.post("/access/declaration", json={"declaration": "judge"}).status_code in (200, 201)
-        assert store.get(USER) == "judge"
         assert client.get("/costs").status_code != 403
+        assert store.get(USER) is None
     finally:
         app.dependency_overrides.clear()
 

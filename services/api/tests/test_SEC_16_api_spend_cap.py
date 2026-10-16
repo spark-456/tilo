@@ -21,7 +21,7 @@ from __future__ import annotations
 import os
 
 import pytest
-from _sec15_lib import NEWCOMER, VISITOR, concrete, non_public
+from _sec15_lib import NEWCOMER, VISITOR, non_public
 from _sec16_lib import JUDGE_A, JUDGE_B, DeadFlags, DeadLedger, spend
 
 LIVE = "LIVE"  # spelled apart: the repo's guard hook looks for the literal switch
@@ -261,20 +261,17 @@ def test_SEC_16_no_route_exposes_the_ledger_a_cap_or_the_switch(sec16_factory):
             )
 
 
-def test_SEC_16_a_visitor_and_an_undeclared_person_never_reach_the_ledger(sec16_factory):
+def test_SEC_16_a_person_who_never_declared_is_capped_like_anyone_and_nobody_signed_out_reaches_the_ledger(
+    sec16_factory,
+):
+    """OPEN-ACCESS (16 Oct 2026): the cap is per uid, not per declaration."""
     h = sec16_factory(declarations=declared(), **BIG_LIMIT)
 
-    h.as_user(VISITOR)
-    assert h.intake().status_code == 403
-    assert h.me().status_code == 200
     h.as_user(NEWCOMER)
-    assert h.intake().status_code == 403
-    assert (
-        h.client.post(concrete("/tasks/{task_id}/approve"), json={"approach_id": "quick", "budget_cap": 1}).status_code
-        == 403
-    )
+    fill(h, NEWCOMER, h.caps.uid_lifetime_minor)
+    assert_cap_refusal(h.intake())
     h.sign_out()
+    h.ledger.calls.clear()
     assert h.intake().status_code == 401
 
     assert h.ledger.calls == []
-    assert h.limiter.checked == []

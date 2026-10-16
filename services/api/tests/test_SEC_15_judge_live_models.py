@@ -125,14 +125,16 @@ def test_SEC_15_a_judges_request_gets_a_live_router_on_a_deployment_that_permits
     assert os.environ.get(LIVE) is None, "a judge's request must never set the global switch"
 
 
-def test_SEC_15_the_judge_is_told_the_models_are_live_and_a_visitor_is_told_nothing(sec15_factory, monkeypatch):
+def test_SEC_15_everyone_signed_in_is_told_the_models_are_live_where_the_deployment_permits_it(
+    sec15_factory, monkeypatch
+):
     sec = sec15_factory(declarations={JUDGE: "judge", VISITOR: "visitor"})
     monkeypatch.setenv("TILO_JUDGE_LIVE", "1")
 
     sec.as_user(JUDGE)
     assert sec.me().json() == {"declaration": "judge", "allowed": True, "models": "live"}
-    sec.as_user(VISITOR)
-    assert sec.me().json() == {"declaration": "visitor", "allowed": False, "models": None}
+    sec.as_user(VISITOR)  # OPEN-ACCESS (16 Oct 2026): a "visitor" is a person like any other
+    assert sec.me().json() == {"declaration": "judge", "allowed": True, "models": "live"}
 
 
 def test_SEC_15_without_the_deployments_permission_a_judges_request_is_replay_and_says_so(sec15_factory):
@@ -172,10 +174,10 @@ def test_SEC_15_a_judge_declaration_never_makes_dev_or_ci_live(sec15_factory, mo
     assert os.environ.get(LIVE) is None
 
 
-def test_SEC_15_a_refused_visitor_never_causes_a_router_to_be_built(sec15_factory, monkeypatch):
+def test_SEC_15_a_person_with_a_visitor_record_gets_the_same_live_router_as_anyone(sec15_factory, monkeypatch):
     sec = sec15_factory(declarations={VISITOR: "visitor", NEWCOMER: "visitor"})
     monkeypatch.setenv("TILO_JUDGE_LIVE", "1")
     sec.as_user(VISITOR)
 
-    assert sec.intake().status_code == 403
-    assert sec.router_modes == []
+    assert sec.intake().status_code == 201
+    assert set(sec.router_modes) == {"live"}

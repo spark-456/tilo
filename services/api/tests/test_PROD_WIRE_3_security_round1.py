@@ -20,10 +20,9 @@ import logging
 import pytest
 from _pw3_lib import DEMO, EMULATOR, PROJECT, SENTINEL, Builder, FakeClient
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
 from google.api_core import exceptions as gexc
 from google.auth import exceptions as gauth_exc
-from tilo_api import app, deps
+from tilo_api import deps
 
 
 class FakeClock:
@@ -217,49 +216,6 @@ def test_PROD_WIRE_3_SEC_15_a_library_error_on_the_read_back_is_firestore_unavai
             store.declare("u_pw3", "visitor")
     assert SENTINEL not in caplog.text
     assert client.docs["orgs/org_tilo/access/u_pw3"] == {"declaration": "judge"}
-
-
-# -- the routes never answer 500 ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def routes(pw3):
-    """`routes(uid, client)` -> a TestClient on the real app with that principal and a Firestore access store over
-    `client` (not deployed, so the gate is off and only the route's own handling is under test)."""
-    saved = dict(app.dependency_overrides)
-
-    def make(uid, client):
-        store = pw3.use().FirestoreAccessStore(client)
-        app.dependency_overrides[deps.get_current_principal] = lambda: deps.Principal(user_id=uid, role="owner")
-        app.dependency_overrides[deps.get_access_store] = lambda: store
-        return TestClient(app, raise_server_exceptions=True)
-
-    yield make
-    app.dependency_overrides.clear()
-    app.dependency_overrides.update(saved)
-
-
-@pytest.mark.parametrize("uid", ["a/b", "..", "__x__"])
-def test_PROD_WIRE_3_SEC_15_a_uid_the_store_refuses_is_a_503_on_both_routes_never_a_500(routes, uid):
-    client = routes(uid, FakeClient())
-    read = client.get("/access")
-    write = client.post("/access/declaration", json={"declaration": "judge"})
-    for response in (read, write):
-        assert response.status_code == 503, response.text
-        assert uid not in response.text
-
-
-@pytest.mark.parametrize("error", LIBRARY_ERRORS, ids=LIBRARY_IDS)
-def test_PROD_WIRE_3_SEC_15_a_library_error_is_a_503_store_unavailable_on_both_routes_never_echoed(
-    routes, failing, error
-):
-    failing("get", error)
-    failing("create", error)
-    client = routes("u_pw3", FakeClient())
-    for response in (client.get("/access"), client.post("/access/declaration", json={"declaration": "judge"})):
-        assert response.status_code == 503, response.text
-        assert response.json()["detail"] == "store_unavailable"
-        assert SENTINEL not in response.text
 
 
 # -- the access door's build backoff ----------------------------------------------------------------------------------
