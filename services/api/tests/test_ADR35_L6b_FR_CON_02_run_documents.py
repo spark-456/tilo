@@ -295,7 +295,23 @@ def test_WORKSPACE_TOOLS_WT08_update_event_run_builds_approval_card_without_undo
         connector="google_calendar", actions=("update_event",), fields=EVENT, destination="event-1", recipients=()
     )
     lv.start()
-    card = lv.gate_card("update_event")
+
+    def ready():
+        failed = lv.rf.events("world.failed")
+        if failed:
+            return ("failed", failed)
+        response = lv.rf.cards()
+        if response.status_code != 200:
+            return ("http", response.status_code, response.text)
+        cards = response.json()
+        if not isinstance(cards, list):
+            return ("invalid_cards", cards)
+        found = next((c for c in cards if c["kind"] == "gate" and c["gate"]["action"]["type"] == "update_event"), None)
+        return ("card", found) if found else None
+
+    state = wait_for(ready, what="the update_event approval card")
+    assert state[0] == "card", state
+    card = state[1]
     assert "cannot be undone" in card["why_it_matters"]
     document = json.loads(lv.read(card["gate"]["action"]["item"]))
     assert document == {"kind": "calendar_event", **EVENT}
