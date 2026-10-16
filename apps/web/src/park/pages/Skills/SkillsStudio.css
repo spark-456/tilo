@@ -865,6 +865,17 @@
   font-size: 15px;
   overflow-wrap: anywhere;
 }
+[data-park] .park-teach__setup-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 600;
+}
 [data-park] .park-teach__row--step {
   min-height: 60px;
   box-sizing: border-box;

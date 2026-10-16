@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { displayApiError } from "../../api/errorMessage";
 import type { Api } from "../../api/index";
+import { teamsClient } from "../../api/selfServeTeams";
 import type { Skill, SkillCapture, SkillVersion, Source, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import type { CurrencyCode } from "../../app/ledgerKpis";
@@ -47,6 +48,9 @@ export interface Teach {
   ask: readonly boolean[];
   qAns: string | null;
   scope: Scope;
+  teamId: string | null;
+  teams: readonly string[] | null;
+  hosts: readonly string[];
   trig: Trigger;
   saved: boolean;
   /** The skill this session saved (kept after "Teach another"). */
@@ -60,6 +64,9 @@ export interface Teach {
   setName: (v: string) => void;
   setDesc: (v: string) => void;
   setScope: (s: Scope) => void;
+  loadTeams: () => void;
+  chooseTeam: (id: string) => void;
+  removeHost: (host: string) => void;
   setTrig: (t: Trigger) => void;
   setQAns: (a: string) => void;
   toggleAsk: (i: number) => void;
@@ -92,6 +99,9 @@ export function useTeach({
   const [qAns, setQAns] = useState<string | null>(null);
   // A live save takes only what POST /v1/skills accepts: a skill for the person that runs when they ask.
   const [scope, setScope] = useState<Scope>(isLive ? "me" : "team");
+  const [teamId, setTeamId] = useState<string | null>(null);
+  const [teams, setTeams] = useState<readonly string[] | null>(null);
+  const [hosts, setHosts] = useState<string[]>([]);
   const [trig, setTrig] = useState<Trigger>(isLive ? "ask" : "arrive");
   const [captured, setCaptured] = useState<SkillCapture | null>(null);
   const [version, setVersion] = useState<SkillVersion | null>(null);
@@ -139,6 +149,7 @@ export function useTeach({
     once(async () => {
       const r = await api.proposeVersion(captured.id);
       setVersion(r.data);
+      setHosts(r.data.hosts);
       setAsk(r.data.steps.map((s) => s.ask));
       setStage(1);
     }, failed);
@@ -153,9 +164,16 @@ export function useTeach({
       steps: steps.map((s) => s.text),
       draft: {
         scope,
+        teamId,
         trigger: trig,
         plan: steps.map((s) => ({ text: s.text, tool: `${s.tool} · ${s.action}`, ask: s.ask })),
-        server: { captured: captured.steps, question: version.question, steps },
+        server: {
+          captured: captured.steps,
+          question: version.question,
+          steps,
+          inputs: version.inputs,
+          hosts,
+        },
       },
     };
     // Saved only once the server says so (a 201): nothing shows as saved before that.
@@ -185,6 +203,9 @@ export function useTeach({
     setName(defaultName);
     setCaptured(null);
     setVersion(null);
+    setHosts([]);
+    setTeams(null);
+    setTeamId(null);
     setFailure(null);
     if (isLive) setDesc("");
   };
@@ -225,6 +246,9 @@ export function useTeach({
     ask,
     qAns,
     scope,
+    teamId,
+    teams,
+    hosts,
     trig,
     saved,
     taught,
@@ -236,6 +260,26 @@ export function useTeach({
     setName,
     setDesc,
     setScope,
+    loadTeams: () => {
+      const client = teamsClient();
+      if (!isLive || !client) return;
+      client.mine().then(
+        ({ teams: rows }) => {
+          if (mounted.current)
+            setTeams(rows.filter((row) => row.state === "member").map((row) => row.team));
+        },
+        (e: unknown) => {
+          if (mounted.current) setFailure(e);
+        },
+      );
+    },
+    chooseTeam: (id) => {
+      if (teams?.includes(id)) {
+        setTeamId(id);
+        setScope("team");
+      }
+    },
+    removeHost: (host) => setHosts((current) => current.filter((item) => item !== host)),
     setTrig,
     setQAns,
     toggleAsk: (i) => {

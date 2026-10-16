@@ -2,7 +2,14 @@
 // the body of POST /v1/skills. Nothing is invented: the server serves no runs, success rate, last run or
 // improvement yet, so those read as 0, null and "" (the page prints "—" or the empty text). A row that does not
 // match the shape is left out, never repaired.
-import type { Skill, SkillCapture, SkillDraft, SkillVersion } from "../types";
+import type {
+  Skill,
+  SkillCapture,
+  SkillDraft,
+  SkillInput,
+  SkillSetup,
+  SkillVersion,
+} from "../types";
 
 interface Step {
   text: string;
@@ -148,13 +155,20 @@ const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 /** The POST body for a draft, or null when the draft is something the server cannot take yet (a team without an
  * id, a timed trigger without a schedule): the caller refuses without a request. */
 export function saveBody(name: string, d: SkillDraft): Record<string, unknown> | null {
-  if (d.scope !== "me" || d.trigger !== "ask" || d.plan.length === 0) return null;
+  if (
+    d.trigger !== "ask" ||
+    d.plan.length === 0 ||
+    (d.scope === "team" && !/^tm_[0-9a-z_]{1,48}$/.test(d.teamId ?? ""))
+  )
+    return null;
   const { server } = d;
+  const scope =
+    d.scope === "team" ? { kind: "team", team: d.teamId } : { kind: "just_me", team: null };
   if (server) {
     // A taught version goes back as the server made it (SKILLS-5); only the person's "ask first" choices differ.
     return {
       name,
-      scope: { kind: "just_me", team: null },
+      scope,
       trigger: { kind: "on_demand" },
       plan_steps: server.steps.map((s) => ({
         text: s.text,
@@ -165,11 +179,13 @@ export function saveBody(name: string, d: SkillDraft): Record<string, unknown> |
       })),
       captured_steps: server.captured.map((text) => ({ text })),
       ...(server.question ? { clarifying_question: server.question } : {}),
+      ...(server.inputs?.length ? { inputs: server.inputs } : {}),
+      ...(server.hosts?.length ? { hosts: server.hosts } : {}),
     };
   }
   return {
     name,
-    scope: { kind: "just_me", team: null },
+    scope,
     trigger: { kind: "on_demand" },
     plan_steps: d.plan.map((p) => {
       const [label = "", level = ""] = p.tool.split(" · ");
@@ -217,9 +233,45 @@ export function versionOfBody(v: unknown): SkillVersion | null {
     isCount(e.asks_per_run)
       ? { credits: e.credits_per_run, seconds: e.seconds_per_run, asks: e.asks_per_run }
       : null;
+  const inputs: SkillInput[] = [];
+  if (v.inputs !== undefined && !Array.isArray(v.inputs)) return null;
+  for (const item of v.inputs ?? []) {
+    if (
+      !isObject(item) ||
+      !isText(item.name) ||
+      !isText(item.label) ||
+      !["text", "file", "date", "person", "url", "number"].includes(String(item.kind)) ||
+      typeof item.required !== "boolean"
+    )
+      return null;
+    inputs.push(item as unknown as SkillInput);
+  }
+  if (v.hosts !== undefined && (!Array.isArray(v.hosts) || !v.hosts.every(isText))) return null;
+  if (
+    v.cannot !== undefined &&
+    v.cannot !== null &&
+    (!Array.isArray(v.cannot) ||
+      !v.cannot.every((x) => isObject(x) && isText(x.text) && isText(x.reason)))
+  )
+    return null;
+  const needsSetup: SkillSetup[] = [];
+  if (v.needs_setup !== undefined && !Array.isArray(v.needs_setup)) return null;
+  for (const item of v.needs_setup ?? []) {
+    if (
+      !isObject(item) ||
+      !isText(item.tool) ||
+      (item.reason !== "not_connected" && item.reason !== "team_level")
+    )
+      return null;
+    needsSetup.push(item as unknown as SkillSetup);
+  }
   return {
     steps,
     question: q === null ? null : { text: q.text, options: [...q.options] },
     estimates,
+    inputs,
+    hosts: [...(v.hosts ?? [])],
+    cannot: v.cannot == null ? null : ([...v.cannot] as { text: string; reason: string }[]),
+    needsSetup,
   };
 }
