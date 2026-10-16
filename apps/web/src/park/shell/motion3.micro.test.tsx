@@ -87,7 +87,7 @@ describe("WEB-MOTION-3 spinner: a draft with no call behind it does not turn a r
     typeInto(taskInput(rig.el), "Order laptops");
     clickEl(control(rig.el, "Start task"));
     await settleHome();
-    expect(rig.el.querySelector(".park-home-drafting .park-home-spin")).not.toBeNull();
+    expect(rig.el.querySelector(".park-home-drafting .thinking-tilo--still")).not.toBeNull();
     expect(rig.el.querySelector(".park-shell__ring--page")).toBeNull();
   });
 });

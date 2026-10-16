@@ -6,6 +6,7 @@ import type { Ref } from "react";
 import type { Effort, QuickCost, SwitchReason } from "../../api/types";
 import { RECORDED_RUN_PATH } from "../../app/router";
 import { type SegmentOption, SegmentedControl } from "../../components";
+import { ThinkingTilo } from "../../shared/ThinkingTilo";
 import { Buddy, type BuddyMood } from "../../studio/Buddy";
 import { type IntakeClient, IntakeControl } from "./IntakeControl";
 import { RunCard, type RunCardProps } from "./RunCard";
@@ -217,7 +218,7 @@ export function ComposerPanel(p: ComposerProps) {
         // biome-ignore lint/a11y/useSemanticElements: the design's status line is a div with role="status"
         <div role="status" className="park-home-drafting">
           {/* a still ring: the draft is a fixed-timer stand-in with no call behind it, so it does not turn (HR-1) */}
-          <span className="park-home-spin" aria-hidden="true" />
+          <ThinkingTilo label="Tilo is drafting" size={20} still />
           <span className="park-home-drafting__text">
             {p.sample
               ? `Showing a sample plan for “${p.shown}”`

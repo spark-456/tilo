@@ -51,11 +51,6 @@
     transform: translateX(260%);
   }
 }
-@keyframes tiloSpin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 @keyframes tiloFade {
   to {
     opacity: 0;
@@ -801,17 +796,6 @@
   animation: tiloFade 0.28s ease forwards;
   pointer-events: none; /* a card on its way out takes no click */
 }
-/* The current step's ring spins (README Async actions: tiloSpin .7s). */
-[data-park] .park-shell__ring {
-  animation: tiloSpin 0.7s linear infinite;
-  display: block;
-  box-sizing: border-box;
-  width: 16px;
-  height: 16px;
-  border: 2.5px solid var(--track);
-  border-top-color: var(--hero);
-  border-radius: 99px;
-}
 [data-park] .park-shell__lbar {
   height: 4px;
   border-radius: 99px;
@@ -914,7 +898,7 @@
 /* ---- Micro-interactions (WEB-MOTION-3, FR-UX-12) ----
    Hover, press, slide and enter feedback from the handoff (README "Interactions and motion"; the inline styles of
    design_handoff_tilo_web_app/design/Tilo App *.dc.html). Every rule here is a transition on transform or opacity,
-   or tiloSpin on a ring, and starts from something a person did (a pointer over a control, a press, a click that
+   and starts from something a person did (a pointer over a control, a press, a click that
    opens a menu, an action in flight). Nothing shows or implies an agent, a run or a decision. Page and component
    stylesheets may not hold motion, so the page's controls are reached from the page outlet (.park-shell__main).
    Colour fades (user approved 8 Oct, BQ-WEB-MOTION-3a) are background-color and color only, on the exact list pinned
@@ -1051,7 +1035,7 @@
    is done. The person's 'still' (Profile > Appearance, data-motion on the root) is the same list. */
 /* ---- Run bar (RUN-INDICATOR): a pill at the bottom while a recorded run is in progress or held ----
    Fixed and only as wide as its text, so nothing around it is covered or blocked; above the page (z 1), below the
-   nav (30). It has no motion rule of its own: the moving ring is the loader's .park-shell__ring (tiloSpin), and
+   nav (30). It has no motion rule of its own: Thinking Tilo uses a saved image, and
    the still look (reduced motion, 'still', or a held run) is a dot. */
 [data-park] .park-shell__runbar {
   position: fixed;
@@ -1118,7 +1102,6 @@
   [data-park] .park-shell__barfill,
   [data-park] .park-shell__bootfill,
   [data-park] .park-shell__boot--out,
-  [data-park] .park-shell__ring,
   [data-park] .park-shell__tab,
   [data-park] .park-shell__iconbtn,
   [data-park] .park-shell__nrow,
@@ -1135,7 +1118,6 @@
 [data-park][data-motion="still"] .park-shell__barfill,
 [data-park][data-motion="still"] .park-shell__bootfill,
 [data-park][data-motion="still"] .park-shell__boot--out,
-[data-park][data-motion="still"] .park-shell__ring,
 [data-park][data-motion="still"] .park-shell__tab,
 [data-park][data-motion="still"] .park-shell__iconbtn,
 [data-park][data-motion="still"] .park-shell__nrow,

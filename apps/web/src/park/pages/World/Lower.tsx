@@ -1,6 +1,7 @@
 // The lower grid of the World page: Districts (a City), Run history (a Town) or Result (a Village), and Activity.
 import type { ActivityItem, World, WorldDistrict, WorldRun } from "../../api/types";
 import { Button } from "../../components";
+import { ThinkingTilo } from "../../shared/ThinkingTilo";
 import { icon } from "../../shell/kit";
 import { agentArt } from "./worldArt";
 import { ACTIVITY_DOT, DISTRICT_LOOK, keyed, recordedLine } from "./worldModel";
@@ -175,7 +176,7 @@ export function Result({
           </div>
         ) : (
           <div className="park-world-running">
-            <span className="park-world-spinner" />
+            <ThinkingTilo label="World running" size={20} />
             <span>{recorded && w.when ? recordedLine(w.when) : (w.when ?? "")}</span>
           </div>
         )}

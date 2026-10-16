@@ -12,7 +12,7 @@ import type { Api } from "../api/index";
 import type { World, WorldState } from "../api/types";
 
 const BAR = ".park-shell__runbar";
-const RING = ".park-shell__ring";
+const RING = ".thinking-tilo";
 
 afterEach(() => {
   vi.restoreAllMocks();

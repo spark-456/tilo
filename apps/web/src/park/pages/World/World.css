@@ -1101,16 +1101,6 @@
   font-weight: 700;
   color: var(--ink2);
 }
-[data-park] .park-world-spinner {
-  display: block;
-  flex: none;
-  width: 16px;
-  height: 16px;
-  box-sizing: border-box;
-  border-radius: 99px;
-  border: 2.5px solid var(--track);
-  border-top-color: var(--hero);
-}
 
 /* Activity */
 [data-park] .park-world-activity {

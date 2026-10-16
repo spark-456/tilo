@@ -77,7 +77,7 @@ function openTile(root: HTMLElement, name: string): HTMLElement {
   return dialogOf(root) as HTMLElement;
 }
 const banner = (root: HTMLElement) => root.querySelector<HTMLElement>(".park-connectors-banner");
-const spinners = (root: ParentNode) => root.querySelectorAll(".park-connectors-spin");
+const spinners = (root: ParentNode) => root.querySelectorAll(".thinking-tilo");
 
 describe("FR_ACC_03 Used by is derived from the skills and worlds that reference the tool", () => {
   it("FR_ACC_03_used_by_lists_a_skill_that_references_the_tool_in_its_tools", async () => {
