@@ -66,6 +66,9 @@ describe("WEB-MOTION-1 honesty: ambient city motion is allowed, agent motion is 
     );
     // LANDING-2 added the signed-out landing's one css-transition (landing.motion.css).
     expect(rest.sort()).toEqual([
+      "src/design/tilo-t/motion.css|css-animation", // TILO-T-FOUNDATION: the Tilo T design layer's motion.css
+      "src/design/tilo-t/motion.css|css-keyframes",
+      "src/design/tilo-t/motion.css|css-transition",
       "src/landing/landing.motion.css|css-transition",
       "src/stage/Stage.tsx|raf",
       "src/world/runWorld.ts|raf",
