@@ -142,3 +142,11 @@
 /* triggeredBy: artifact.delivered on a phone: the sheet rises, 420 ms */
 .tw-slide-up{animation:tSlideUp .42s var(--tt-ease-standard) both}
 @media (prefers-reduced-motion:reduce){.tw-pop,.tw-fade,.tw-slide-r,.tw-slide-up{animation:none!important}}
+
+/* triggeredBy: artifact.delivered: the parcel arcs from the Meeting Hall to the Delivery Dock along its offset-path, 1.6 s, walk easing */
+.tw-parcel{animation:tParcel 1.6s var(--tt-ease-walk) both}
+/* triggeredBy: world.completed: confetti bursts once (the pieces carry --cx/--cy), 1.8 s */
+.tw-confetti i{animation:tConfetti 1.8s var(--tt-ease-standard) both}
+/* triggeredBy: world.completed: the city goes from muted to full colour, 800 ms */
+.tw-light canvas{animation:tLight .8s var(--tt-ease-standard) both}
+@media (prefers-reduced-motion:reduce){.tw-parcel,.tw-confetti i,.tw-light canvas{animation:none!important}}

@@ -9,6 +9,7 @@ import { hash } from "./art/color";
 import { type Bridge, type GateLook, LEVEL_RISE, type Link, MARGIN, type Rect } from "./art/ground";
 import { P } from "./art/iso";
 import { styleOf } from "./art/style";
+import { districtLabel } from "./labels";
 import { type WorldState, standingAt } from "./reducer";
 import { agentNames } from "./runSummary";
 
@@ -165,7 +166,7 @@ export function frameOf(layout: Layout, state: WorldState): Frame {
   for (const level of layout.semantic.levels) {
     for (const district of level.districts) {
       districtLevel.set(district.id, level.id);
-      names.set(district.id, district.name);
+      names.set(district.id, districtLabel(district));
       leads.set(district.lead, district.id);
       for (const building of district.buildings) {
         buildingLevel.set(building.id, level.id);

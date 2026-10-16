@@ -8,6 +8,7 @@ import { openAgent, useSpotlight } from "../../world/spotlight";
 import { useWorldFacts } from "../../world/useWorldFacts";
 import { AgentCard } from "./AgentCard";
 import { AgentPanel } from "./AgentPanel";
+import { StageEvents } from "./StageEvents";
 import { TeamMeeting } from "./TeamMeeting";
 
 export function AgentLayer({ worldId, rooms }: { worldId: string; rooms: RoomClient | null }) {
@@ -18,6 +19,7 @@ export function AgentLayer({ worldId, rooms }: { worldId: string; rooms: RoomCli
   const opened = spot.opened ? facts.stats.get(spot.opened) : null;
   return (
     <>
+      <StageEvents worldId={worldId} layout={facts.layout} events={facts.events} />
       {facts.layout && !team && !opened ? (
         <button type="button" className="tw-convene" onClick={() => setTeam(true)}>
           <Icon name="people" size={18} /> Convene team

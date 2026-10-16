@@ -3,6 +3,7 @@
 // carry and the last things it said. Nothing is estimated and nothing is filled in; an agent with no events has zeros.
 import type { Event, Layout } from "@tilo/contracts";
 import { type Message, messageOf } from "./conversations";
+import { districtLabel } from "./labels";
 import {
   TALK_WINDOW,
   type WorldState,
@@ -64,7 +65,7 @@ export function agentStatsOf(layout: Layout, events: readonly Event[]): Map<stri
   for (const level of layout.semantic.levels) {
     labels.set(level.id, level.name);
     for (const district of level.districts) {
-      labels.set(district.id, district.name);
+      labels.set(district.id, districtLabel(district));
       ledBy.set(district.lead, district.id);
       for (const building of district.buildings) labels.set(building.id, building.name);
     }

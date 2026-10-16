@@ -59,6 +59,7 @@ export function openAgent(worldId: string, id: string | null): void {
 export function resetSpotlights(): void {
   held.clear();
   flyListeners.clear();
+  probes.clear();
   for (const listener of [...listeners]) listener();
 }
 

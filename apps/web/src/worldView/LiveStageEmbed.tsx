@@ -27,7 +27,11 @@ export default function LiveStageEmbed({ worldId }: { worldId: string }) {
   const world = useClientWorld(client, worldId, words);
   const status = useRunStatus(client, worldId);
   return (
-    <div className="park-world-livestage" data-testid="live-stage">
+    <div
+      className={`park-world-livestage${status === "completed" ? " tw-light" : ""}`}
+      data-testid="live-stage"
+      data-run-status={status}
+    >
       <Stage
         key={worldId}
         landmark={false}

@@ -482,3 +482,51 @@
   opacity: 0.5;
   cursor: default;
 }
+
+/* Stage moments: parcel, confetti, failure card, and the muted city that lights up on world.completed. */
+[data-park] .tw-parcel {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--lime, #c8f23a);
+  box-shadow: 0 0 0 2px var(--ink, #0b0b0c);
+  pointer-events: none;
+}
+[data-park] .tw-confetti {
+  position: absolute;
+  z-index: 5;
+  top: 40%;
+  left: 50%;
+  pointer-events: none;
+}
+[data-park] .tw-confetti i {
+  position: absolute;
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  opacity: 0;
+}
+[data-park] .tw-failed {
+  position: absolute;
+  z-index: 6;
+  top: 8px;
+  left: 50%;
+  display: grid;
+  width: min(420px, calc(100% - 32px));
+  gap: 2px;
+  padding: 10px 14px;
+  transform: translateX(-50%);
+  border: 1px solid var(--redInk, #a8202f);
+  border-radius: 14px;
+  background: var(--redSoft, #fde8e8);
+  color: var(--redInk, #a8202f);
+  font-size: 13px;
+}
+[data-park] .park-world-livestage[data-run-status="started"] .stage-frame canvas,
+[data-park] .park-world-livestage[data-run-status="paused"] .stage-frame canvas {
+  filter: var(--cityFx, none);
+}
