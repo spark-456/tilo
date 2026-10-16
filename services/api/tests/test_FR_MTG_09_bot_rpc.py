@@ -58,3 +58,96 @@ def test_FR_MTG_09_bot_rpc_invalid_capture_has_fixed_error_no_capability(monkeyp
         asyncio.run(rpc.attend("mt_demo", JOIN))
     assert raised.value.detail == "bot_unavailable"
     assert "meet.google.com" not in str(raised.value)
+
+
+# --- MEET-SIMPLE: a cold bot is woken and a launch it never started is asked again, never one it ran ---
+
+
+def quick(handler, pauses=None):
+    async def sleep(seconds):
+        if pauses is not None:
+            pauses.append(seconds)
+
+    return MeetingBotRpc(BASE, token_for=lambda _: "test-identity", transport=httpx.MockTransport(handler), sleep=sleep)
+
+
+def test_FR_MTG_09_MEET_SIMPLE_attend_repeats_while_the_bot_is_cold_then_succeeds(monkeypatch):
+    monkeypatch.setenv("LIVE", "1")
+    calls, pauses = [], []
+
+    def handle(request):
+        calls.append(request.url.path)
+        if len(calls) == 1:
+            return httpx.Response(502, text="<html>Bad Gateway</html>")
+        if len(calls) == 2:
+            return httpx.Response(503, text="upstream connect error")
+        return httpx.Response(200, json=TRANSCRIPT, headers={"X-Tilo-Meeting-End-Reason": "completed"})
+
+    result = asyncio.run(quick(handle, pauses).attend("mt_demo", JOIN))
+    assert result.reason == "completed"
+    assert calls == ["/internal/meetings/mt_demo/attend"] * 3
+    assert len(pauses) == 2 and pauses == sorted(pauses), "it backs off between tries"
+
+
+def test_FR_MTG_09_MEET_SIMPLE_attend_repeats_after_a_connection_error(monkeypatch):
+    monkeypatch.setenv("LIVE", "1")
+    calls = []
+
+    def handle(request):
+        calls.append(1)
+        if len(calls) < 3:
+            raise httpx.ConnectError("cold")
+        return httpx.Response(200, json=TRANSCRIPT, headers={"X-Tilo-Meeting-End-Reason": "removed"})
+
+    assert asyncio.run(quick(handle).attend("mt_demo", JOIN)).reason == "removed"
+    assert len(calls) == 3
+
+
+@pytest.mark.parametrize(
+    "status,detail", [(502, "Meeting bot failed"), (504, "Meeting duration exceeded"), (409, "x"), (422, "x")]
+)
+def test_FR_MTG_09_MEET_SIMPLE_attend_never_repeats_a_launch_the_bot_answered(monkeypatch, status, detail):
+    monkeypatch.setenv("LIVE", "1")
+    calls = []
+
+    def handle(request):
+        calls.append(1)
+        return httpx.Response(status, json={"detail": detail})
+
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(quick(handle).attend("mt_demo", JOIN))
+    assert raised.value.detail == "bot_unavailable" and len(calls) == 1
+
+
+def test_FR_MTG_09_MEET_SIMPLE_attend_gives_up_after_the_budget(monkeypatch):
+    monkeypatch.setenv("LIVE", "1")
+    calls, spent = [], []
+
+    def handle(request):
+        calls.append(1)
+        return httpx.Response(502, text="bad gateway")
+
+    rpc = quick(handle, spent)
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(rpc.attend("mt_demo", JOIN))
+    assert raised.value.detail == "bot_unavailable"
+    assert 2 <= len(calls) <= 20
+
+
+def test_FR_MTG_09_MEET_SIMPLE_wake_reads_health_until_it_answers(monkeypatch):
+    monkeypatch.setenv("LIVE", "1")
+    seen = []
+
+    def handle(request):
+        seen.append((request.method, request.url.path, request.headers["authorization"]))
+        return httpx.Response(502 if len(seen) < 3 else 200, json={"status": "ok"})
+
+    assert asyncio.run(quick(handle).wake()) is True
+    assert seen == [("GET", "/health", "Bearer test-identity")] * 3
+
+
+def test_FR_MTG_09_MEET_SIMPLE_wake_is_off_without_live_and_never_raises(monkeypatch):
+    monkeypatch.delenv("LIVE", raising=False)
+    assert asyncio.run(quick(lambda _: (_ for _ in ()).throw(AssertionError("called"))).wake()) is False
+    monkeypatch.setenv("LIVE", "1")
+    assert asyncio.run(quick(lambda r: httpx.Response(500)).wake(budget_s=0)) is False

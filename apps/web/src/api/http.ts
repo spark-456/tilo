@@ -155,6 +155,12 @@ export function displayApiError(error: unknown): string {
     version_conflict: "This changed while you were working. Reload and try again.",
     demo_read_only: "This is a sample. It cannot change your information.",
     invalid_recipients: "Choose people from this meeting before trying again.",
+    invitees_changed: "The people for this meeting changed. Check the list and try again.",
+    invitation_failed: "Tilo could not send the invitation. Try again.",
+    invitation_pending:
+      "The invitation is taking longer than expected. Check your calendar before trying again.",
+    not_approved: "That could not be confirmed. Try again.",
+    bot_unavailable: "Tilo could not join the meeting right now. Try again.",
     already_attending: "You are already attending this meeting.",
     already_hosted: "This meeting already has a host.",
     already_rated: "You have already rated this skill.",

@@ -15,8 +15,9 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException, Request
@@ -43,6 +44,7 @@ from tilo_memory.artifacts import ArtifactStore, NewVersion, Origin, Scope
 from tilo_api import deps, events, team_store
 from tilo_api.connector_rpc import PERSON_CONNECTORS
 from tilo_api.meeting_host_rpc import HostRpcError, MeetingHostRpc, MeetingHostStub
+from tilo_api.meeting_join import owned_receipt
 from tilo_api.people_writes import Refusal, Writer
 from tilo_api.runs import Run, Seams, _GateFailed
 
@@ -294,6 +296,14 @@ class HostRun(Run):
 def host_meeting(w: Writer, meeting_id: str, seams: HostSeams) -> dict[str, Any]:
     """404 for anyone but the owner (PE-05), 409 for a meeting that cannot be hosted or is hosted already, 422 with the
     MH rule for a draft the connector refuses; else the run starts and the owner gets the meeting's world id."""
+    return {"world_id": _begin_host(w, meeting_id, seams)[0]}
+
+
+def _begin_host(
+    w: Writer, meeting_id: str, seams: HostSeams, expect_invited: frozenset[str] | None = None
+) -> tuple[str, HostRun]:
+    """`host_meeting`'s work. `expect_invited` (the person's own click, `start_meeting`) is the exact set of people
+    the person saw before confirming: a draft that would invite anyone else is a 409 `invitees_changed`, no run."""
     found, me = w.stores.meetings.get(w.org, meeting_id), w.stores.persons.get(w.org, w.actor)
     if found is None or me is None or found.record.get("owner") != w.actor or found.record.get("status") == "deleted":
         raise Refusal(404, "not_found")  # the record itself is the connector's to refuse (MH-01): no schema gate here
@@ -319,6 +329,8 @@ def host_meeting(w: Writer, meeting_id: str, seams: HostSeams) -> dict[str, Any]
         draft = draft_meeting_event(meeting=meeting, persons=persons, actor=w.actor, now=w.now, config=config)
     except MeetingHostRefused as exc:
         raise Refusal(422, str(exc), rule=exc.rule) from None
+    if expect_invited is not None and frozenset(draft.invited) != expect_invited:
+        raise Refusal(409, "invitees_changed")
     try:  # ADR-0032 decision 8: no gate card is raised that could never send
         seams.host_client.status(w.actor)
     except HostRpcError:
@@ -348,7 +360,7 @@ def host_meeting(w: Writer, meeting_id: str, seams: HostSeams) -> dict[str, Any]
         with seams.store.runs_guard:  # a run that never started must not leave a permanent 409
             seams.store.runs.pop(world_id, None)
         raise
-    return {"world_id": world_id}
+    return world_id, run
 
 
 def abandon_unsent(user: str, outbox_store: Any, owner_of: Callable[[str], str | None] | None = None) -> int:
@@ -405,3 +417,49 @@ def on_connection_event(
         return 0
     except Exception:  # a malformed part or a store that cannot be read: nothing is abandoned, nothing is raised
         return 0
+
+
+_START_WAIT_S = 30.0
+_POLL_S = 0.25
+
+
+def start_meeting(
+    w: Writer, principal: deps.Principal, meeting_id: str, invited: frozenset[str], seams: HostSeams
+) -> dict[str, Any]:
+    """MEET-SIMPLE: the person's own click on "Meet with Tilo" (or Confirm in the schedule dialog) is the approval.
+    It does what `host_meeting` and the person's "Approve" on the gate card do, in one request: the same run raises
+    the same T3 gate card for the same draft, and this route answers it with `approve` as the signed-in owner, so the
+    card writes the same `approval.resolved` (authz by person, ref the owner) and the outbox sends the same
+    invitation. `invited` is the exact set of people the dialog showed; the draft must match it or nothing starts.
+    Only a full web sign-in session can do this (the card's own rule for a gate). Waits until the invitation is out."""
+    if not (deps.full_world_session(principal) and principal.role == "owner" and principal.user_id == w.actor):
+        raise Refusal(403, "forbidden")
+    world_id, run = _begin_host(w, meeting_id, seams, invited)
+    me = replace(principal, world_id=world_id, role="owner")
+    deadline = time.monotonic() + _START_WAIT_S
+    card_id: str | None = None
+    while card_id is None:
+        card_id = next((c for c in list(run.requested) if run.cards.is_open(world_id, c)), None)
+        if card_id is None:
+            _check_alive(run, deadline)
+            time.sleep(_POLL_S)
+    answered = run.cards.answer(world_id, card_id, option="approve", channel="web", principal=me)
+    if answered.outcome != "answered":
+        raise Refusal(409, "not_approved")
+    while True:
+        stopped = run._ended.is_set()  # read first: a run that ended well has already written its receipt
+        try:
+            owned_receipt(w, seams.store, seams.artifacts, meeting_id)
+            return {"world_id": world_id}
+        except Refusal:
+            if stopped:
+                raise Refusal(502, "invitation_failed") from None
+            _check_alive(run, deadline)
+            time.sleep(_POLL_S)
+
+
+def _check_alive(run: HostRun, deadline: float) -> None:
+    if run._ended.is_set():
+        raise Refusal(502, "invitation_failed")  # the run stopped; its own events say why, in the world
+    if time.monotonic() >= deadline:
+        raise Refusal(504, "invitation_pending")

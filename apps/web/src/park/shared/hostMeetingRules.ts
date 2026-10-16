@@ -43,18 +43,65 @@ export function hostFormError(f: HostForm, nowMs: number): string | null {
   return null;
 }
 
+/** A person picked from the people list: the id is what the API resolves (only themself or a teammate). */
+export interface Picked {
+  id: string;
+  name: string;
+}
+
 /** `POST /v1/meetings`: the attest step is explicit (`attest` true and the notice version shown). */
-export function meetingBody(f: HostForm) {
-  const start = new Date(startMs(f.start));
-  const end = new Date(start.getTime() + f.minutes * 60_000);
+export function meetingBodyAt(
+  title: string,
+  startAt: number,
+  minutes: number,
+  attendees: readonly Picked[] = [],
+) {
+  const start = new Date(startAt);
+  const end = new Date(start.getTime() + minutes * 60_000);
   return {
     attest: true,
     notice_version: NOTICE_VERSION,
-    title: f.title.trim(),
+    title,
     source: "bot",
     scheduled: { start: start.toISOString(), end: end.toISOString() },
-    attendees: [],
+    attendees: attendees.map((p) => ({ name: p.name, person: p.id })),
   };
+}
+
+export const meetingBody = (f: HostForm, attendees: readonly Picked[] = []) =>
+  meetingBodyAt(f.title.trim(), startMs(f.start), f.minutes, attendees);
+
+/** "Meet with Tilo now": a 45 minute meeting that starts two minutes from now (the host rule wants a start in the
+ * future; the person is in Meet well before it). Only the person who clicked is invited. */
+export const MEET_NOW_TITLE = "Meeting with Tilo";
+export const MEET_NOW_LEAD_MS = 2 * 60_000;
+export const MEET_NOW_MINUTES = 45;
+export const meetNowBody = (nowMs: number) =>
+  meetingBodyAt(MEET_NOW_TITLE, nowMs + MEET_NOW_LEAD_MS, MEET_NOW_MINUTES);
+
+/** The one line the person sees next to "Meet with Tilo now"; starting it is their own confirmation. */
+export const MEET_NOW_NOTICE =
+  "Starting this confirms you may record it. Tilo joins as an AI notetaker named Tilo notetaker and posts a notice in the meeting chat. Only you can see the transcript, kept for 30 days. Anyone can stop Tilo by typing Tilo leave.";
+
+/** A tab opened on the click itself (so a pop-up blocker allows it) and pointed at Meet once the link is known. */
+export interface MeetTab {
+  go(url: string): void;
+  close(): void;
+}
+export function openMeetTab(): MeetTab | null {
+  try {
+    const w = window.open("about:blank", "_blank");
+    if (!w) return null;
+    w.opener = null;
+    return {
+      go: (url) => {
+        w.location.href = url;
+      },
+      close: () => w.close(),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export interface HostableRow {

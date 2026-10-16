@@ -257,3 +257,21 @@
   height: 24px;
   flex: none;
 }
+
+[data-park][data-theme="studio"] .park-agenda-hostbox {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+[data-park][data-theme="studio"] .park-agenda-hostactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+[data-park][data-theme="studio"] .park-agenda-hostpeople {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 12px;
+  padding: 10px 12px;
+}

@@ -84,6 +84,7 @@ BODY_ROUTES = {
     "meeting brief": "/v1/meetings/mt_q4_plan/brief",
     "make morning brief": "/v1/me/brief",
     "host meeting": "/v1/meetings/mt_q4_plan/host",
+    "start meeting": "/v1/meetings/mt_q4_plan/start",
     "attend meeting": "/v1/meetings/mt_q4_plan/attend",
     "create pin": "/v1/pinboards",
     "delete pin": "/v1/pinboards/pb_priya_note/delete",
