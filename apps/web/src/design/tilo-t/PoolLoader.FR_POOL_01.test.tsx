@@ -24,9 +24,21 @@ it("FR_POOL_01_task_waits_for_world_started_and_names_world_planned", async () =
 });
 
 it("FR_POOL_01_site_waits_300ms_before_showing", async () => {
+  vi.useFakeTimers();
   const mounted = mount(createElement(PoolLoader, { kind: "site", loading: true, children: null }));
   await settle();
   expect(mounted.container.querySelector('[role="status"]')).toBeNull();
-  await act(async () => new Promise((resolve) => setTimeout(resolve, 310)));
+  await act(async () => vi.advanceTimersByTimeAsync(301));
   expect(mounted.container.querySelector('[role="status"]')).not.toBeNull();
+});
+
+it("FR_POOL_01_site_finishing_before_300ms_never_shows_overlay", async () => {
+  vi.useFakeTimers();
+  const mounted = mount(createElement(PoolLoader, { kind: "site", loading: true, children: null }));
+  await settle();
+  await act(async () => vi.advanceTimersByTimeAsync(299));
+  mounted.render(createElement(PoolLoader, { kind: "site", loading: false, children: null }));
+  await settle();
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(mounted.container.querySelector('[role="status"]')).toBeNull();
 });
