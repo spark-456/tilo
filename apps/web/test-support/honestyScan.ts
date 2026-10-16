@@ -178,6 +178,27 @@ export const ALLOWLIST: readonly AllowEntry[] = [
     reason:
       "Landing page chrome only, non-agent: sections and cards fade and rise into view as they scroll on, and cards lift a few pixels under a pointer. Opacity, translate and transform only, never a layout property. Reveal.tsx marks elements only when motion is welcome (none under reduced motion); no agent picture, world or run state moves here, and agents animate only from recorded events (HR-1).",
   },
+  // The Tilo T design layer (TILO-T-FOUNDATION, owner order 16 Oct): the design's own keyframes ported 1:1 so screen tickets can
+  // drive them from recorded events. src/design/tilo-t/motion.css holds names and values only; nothing starts one by itself
+  // except ambient decoration (Buddy idle blink and bob, the loading shimmer).
+  {
+    file: "src/design/tilo-t/motion.css",
+    rule: "css-keyframes",
+    reason:
+      "Tilo T design keyframes ported 1:1 (tsBob, tsBlink, tMarch, tRise, tParcel, tConfetti, the run-start and pool-loader storyboards and the rest). A keyframe only plays when a component applies its class: a work animation names its trigger event (recorded events, HR-1); ambient decoration is Buddy's idle loops and the loading shimmer. Transform, opacity and filter only.",
+  },
+  {
+    file: "src/design/tilo-t/motion.css",
+    rule: "css-animation",
+    reason:
+      "Class rules that start the Tilo T keyframes: Buddy's moods and ambient idle loops, the loading shimmer and dots (loading chrome, non-agent), and the animation-play-state pause for a hidden tab or off-screen section. Reduced motion and the still choice turn them off (static pose). Screen tickets start every other animation from a recorded event (HR-1).",
+  },
+  {
+    file: "src/design/tilo-t/motion.css",
+    rule: "css-transition",
+    reason:
+      "Only the global reduced-motion fallback from tilo-t.css: every walk, rise and flight becomes an opacity fade of 200 ms and loops stop (opacity only, never a layout property). It adds no motion for anyone who has not asked for less; it starts nothing, and agents still animate only from recorded events (HR-1).",
+  },
 ];
 
 export interface Violation {
