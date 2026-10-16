@@ -19,6 +19,7 @@ from typing import Annotated, Any
 
 import yaml
 from fastapi import APIRouter, Depends, Request
+from fastapi.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 from tilo_memory.artifacts import ArtifactRefused, ArtifactStore, NewVersion, Origin, Scope
 from tilo_metering.flags import FlagStore
@@ -29,7 +30,7 @@ from tilo_providers.media import MediaPart
 from tilo_api import deps
 from tilo_api.people import _PeopleRoute
 from tilo_api.people_events import _DESK_WORLD, WorkEvents, get_work_events
-from tilo_api.people_writes import Refusal
+from tilo_api.people_writes import Refusal, capped_bytes
 from tilo_api.skills_routes import _ROOT, _guarded
 
 logger = logging.getLogger("tilo_api.skills_media")
@@ -140,11 +141,10 @@ async def media_route(
     """Store one capture file in the owner's Desk world: 201 with its pinned ref and whether Tilo can read it."""
     deps.refuse_if_replay_only(flags)
     limits = load_capture_limits()
-    declared = request.headers.get("content-length", "")
-    if not declared.isdigit():
-        raise Refusal(411, "length_required")
-    if int(declared) > limits.max_file_bytes + _FORM_SLACK:  # before the form is read or spooled
-        raise Refusal(413, "file_too_large")
+    # the declared length first, then the bytes counted as they stream (this route has its own cap, like /v1/feedback)
+    request._body = await capped_bytes(  # noqa: SLF001 - Starlette's own cache: the form is parsed from what was counted
+        request, limits.max_file_bytes + _FORM_SLACK, too_large="file_too_large", length_required=True
+    )
     form = await request.form()
     uploads = form.getlist("file")
     if len(uploads) != 1 or len(form) != 1 or not isinstance(uploads[0], UploadFile):
@@ -152,12 +152,12 @@ async def media_route(
     data = await uploads[0].read(limits.max_file_bytes + 1)  # never hold more than the cap in memory
     if len(data) > limits.max_file_bytes:
         raise Refusal(413, "file_too_large")
-    media = sniff(data)
-    if media is None:
-        raise Refusal(415, "unsupported_type")
-    _check_audio(media, data)
 
     def store() -> dict[str, Any]:
+        media = sniff(data)
+        if media is None:
+            raise Refusal(415, "unsupported_type")
+        _check_audio(media, data)
         owner = principal.user_id
         world = we.desks.desk_world(deps.ORG_ID, owner)
         if type(world) is not str or _DESK_WORLD.fullmatch(world) is None or we.desks.desk_owner(world) != owner:
@@ -165,7 +165,9 @@ async def media_route(
         try:
             new = NewVersion(media, data, "r_cap_" + new_ulid(), Origin(kind="upload"))
             stored = artifacts.put(Scope(deps.ORG_ID, world, owner), new)
-        except ArtifactRefused:
+        except ArtifactRefused as refused:
+            if "200,000,000" in str(refused):  # the Desk world's cap (AR-04), not the file's type
+                raise Refusal(413, "storage_full") from None
             raise Refusal(422, "unsupported_type") from None
         readable = len(data) <= limits.max_read_bytes
         return {
@@ -174,7 +176,11 @@ async def media_route(
             "size_bytes": len(data),
             "readable": readable,
             "reason": None if readable else "too_long_to_read",
-            "limits": {"max_recording_seconds": limits.max_recording_seconds, "max_steps": limits.max_steps},
+            "limits": {
+                "max_recording_seconds": limits.max_recording_seconds,
+                "max_steps": limits.max_steps,
+                "max_file_bytes": limits.max_file_bytes,
+            },
         }
 
-    return _guarded(store)
+    return await run_in_threadpool(_guarded, store)
