@@ -1,11 +1,18 @@
 // @vitest-environment happy-dom
 import { act } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { byText, cleanup, click, mount, q } from "../../../../test-support/park/componentsHarness";
+import { cleanup, click, mount, q } from "../../../../test-support/park/componentsHarness";
 import { settle, typeInto } from "../../../../test-support/park/skillsHarness";
 import { AgendaNewMenu } from "./AgendaNewMenu";
 
 afterEach(cleanup);
+const menuButton = (container: HTMLElement, text: string) => {
+  const button = [...container.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]')].find(
+    (element) => element.textContent?.replace(/\s/g, "") === text.replace(/\s/g, ""),
+  );
+  if (!button) throw new Error(`no menu button matches ${text}`);
+  return button;
+};
 
 it("CX_T_AGENDA_new_menu_creates_a_pin_only_after_the_api_records_it", async () => {
   let release = () => {};
@@ -21,10 +28,10 @@ it("CX_T_AGENDA_new_menu_creates_a_pin_only_after_the_api_records_it", async () 
     <AgendaNewMenu createPin={createPin} onPinCreated={changed} canHost onSchedule={onSchedule} />,
   );
   click(q(container, "summary"));
-  click(byText(container, "button", "Schedule meetingChoose a time and invite people"));
+  click(menuButton(container, "Schedule meetingChoose a time and invite people"));
   expect(onSchedule).toHaveBeenCalledOnce();
   click(q(container, "summary"));
-  click(byText(container, "button", "PinA note for you"));
+  click(menuButton(container, "PinA note for you"));
   typeInto(q<HTMLInputElement>(container, 'input[name="pin-title"]'), "Call Lin back");
   click(q(container, 'button[type="submit"]'));
   expect(createPin).toHaveBeenCalledWith("Call Lin back", expect.any(String));
@@ -45,9 +52,7 @@ it("CX_T_AGENDA_new_menu_keeps_unavailable_actions_disabled", () => {
   );
   click(q(container, "summary"));
   expect(q(container, '[aria-label="Pin"]').getAttribute("aria-disabled")).toBe("true");
-  expect(
-    byText(container, "button", "Schedule meetingChoose a time and invite people"),
-  ).not.toBeNull();
+  expect(menuButton(container, "Schedule meetingChoose a time and invite people")).not.toBeNull();
   expect(q(container, '[aria-label="Meeting with Tilo"]').getAttribute("aria-disabled")).toBe(
     "true",
   );
@@ -64,7 +69,7 @@ it("CX_T_AGENDA_pin_error_does_not_claim_the_write_failed_or_refresh_the_list", 
     />,
   );
   click(q(container, "summary"));
-  click(byText(container, "button", "PinA note for you"));
+  click(menuButton(container, "PinA note for you"));
   typeInto(q<HTMLInputElement>(container, 'input[name="pin-title"]'), "Call Lin back");
   click(q(container, 'button[type="submit"]'));
   await settle();
