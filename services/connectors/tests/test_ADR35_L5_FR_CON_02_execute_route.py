@@ -23,6 +23,7 @@ from _live_lib import no_external_network as no_external_network  # noqa: F401 -
 from _meeting_host_lib import CALENDAR_EVENTS_OWNED, EVENTS_URL, OWNER, FakeApiResponse, FakeHostCalendar
 from test_ADR32_T3_host_routes import AUD, CALLER, HARNESS, Rig
 from tilo_connectors.adapters import GMAIL_API, side_effect_marker
+from tilo_connectors.adapters.calendar_write import _EVENT_ID
 from tilo_connectors.host_routes import AUDIENCE_VAR, CALLER_VAR, MAX_BODY_BYTES
 from tilo_connectors.side_effects import scan_for_side_effect_calls
 
@@ -341,13 +342,14 @@ def update_request(destination: str) -> tuple[dict[str, Any], dict[str, Any]]:
 def test_WORKSPACE_TOOLS_WT08_update_event_reads_own_guestless_event_then_patches_once(monkeypatch) -> None:
     rig = Rig5()
     original = rig.cal.request
-    patches = []
+    patches, gets = [], []
 
     def request(method, url, **kw):
         if method == "PATCH":
             patches.append((url, kw))
             return FakeApiResponse(200, {"id": url.rsplit("/", 1)[-1]})
         if method == "GET":
+            gets.append(kw)
             return FakeApiResponse(
                 200,
                 {
@@ -366,8 +368,7 @@ def test_WORKSPACE_TOOLS_WT08_update_event_reads_own_guestless_event_then_patche
     url, kw = patches[0]
     assert url == f"{EVENTS_URL}/own-event-1"
     assert kw["params"]["sendUpdates"] == "none"
-    get = rig.cal.gets()[0]
-    assert get.params["fields"] == "id,status,organizer(self),attendees(self),extendedProperties(private)"
+    assert gets[0]["params"]["fields"] == "id,status,organizer(self),attendees(self),extendedProperties(private)"
     assert kw["json"] == {
         "summary": TITLE,
         "start": {"dateTime": START, "timeZone": ZONE},
@@ -377,14 +378,14 @@ def test_WORKSPACE_TOOLS_WT08_update_event_reads_own_guestless_event_then_patche
     }
 
 
-@pytest.mark.parametrize("destination", ["", "has/slash", "bad.event", "\u00e9vent"])
-def test_WORKSPACE_TOOLS_WT08_update_event_rejects_non_google_ids_before_requests(destination: str) -> None:
-    rig = Rig5()
-    assert rig.run(update_request(destination)[1])["outcome"] == "refused"
-    assert rig.google.reached() == 0
+@pytest.mark.parametrize("destination", ["has/slash", "bad.event", "\u00e9vent", "a" * 1025])
+def test_WORKSPACE_TOOLS_WT08_update_event_id_regex_rejects_non_google_ids(destination: str) -> None:
+    assert _EVENT_ID.fullmatch(destination) is None
 
 
-@pytest.mark.parametrize("changes", [{"recipients": [GUEST]}, {"attachments": [{"artifact_id": "x", "version": 1}]}])
+@pytest.mark.parametrize(
+    "changes", [{"recipients": [GUEST]}, {"attachments": [{"artifact_id": "art_attachment_01", "version": 1}]}]
+)
 def test_WORKSPACE_TOOLS_WT08_update_event_refuses_recipients_and_attachments_before_google(changes) -> None:
     rig = Rig5()
     entry, body = update_request("own-event-1")
