@@ -6,6 +6,7 @@
 import { type ReactNode, useMemo, useRef, useState } from "react";
 import { API_URL, appCheckToken, authToken, sessionView } from "../../../api/ClientProvider";
 import { HttpClient } from "../../../api/http";
+import { EmptyState, ErrorState, LoadingState } from "../../../design/tilo-t";
 import type { Api } from "../../api/index";
 import { isCalendarEntry } from "../../api/live/agendaFromPlate";
 import { ORGANISATION_SETUP } from "../../api/organisationSetup";
@@ -114,23 +115,24 @@ function PersonalAgendaPage({ app }: AgendaPageProps) {
   if (state.status === "not-built" || state.status === "error") {
     return (
       <Frame>
-        <div className="park-agenda-state">
-          <h1 className="park-agenda-title">Agenda</h1>
-          <div className="park-agenda-state-title">
-            {state.status === "not-built"
-              ? "Agenda data is unavailable"
-              : "The Agenda could not load"}
-          </div>
-          <div className="park-agenda-state-line">
-            {state.status === "not-built"
-              ? "Pins and your week show here once the Agenda is connected."
-              : "Try again in a moment."}
-          </div>
-        </div>
+        <h1 className="park-agenda-title">Agenda</h1>
+        {state.status === "not-built" ? (
+          <EmptyState
+            title="Agenda data is unavailable"
+            body="Pins and your week show here once the Agenda is connected."
+          />
+        ) : (
+          <ErrorState title="The Agenda could not load" body="Try again in a moment." />
+        )}
       </Frame>
     );
   }
-  if (state.status === "loading") return <Frame />;
+  if (state.status === "loading")
+    return (
+      <Frame>
+        <LoadingState layout="calendar" caption="Loading your Agenda" />
+      </Frame>
+    );
   return (
     <Frame source={state.source}>
       {state.data.days === null ? (
