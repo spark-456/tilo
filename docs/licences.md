@@ -168,6 +168,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | @axe-core/playwright | MPL-2.0 | https://www.npmjs.com/package/@axe-core/playwright |
 | @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono (self-hosted fonts; each installed 5.3.0 package declares OFL-1.1 and includes `LICENSE`) | OFL-1.1 | https://github.com/fontsource/font-files |
 | @fontsource/geist-sans, @fontsource/geist-mono (UI-STUDIO-1: the Studio theme's Geist and Geist Mono, self-hosted; the installed 5.3.0 packages declare OFL-1.1 and include `LICENSE`, (C) 2023 Vercel with basement.studio) | OFL-1.1 | https://github.com/fontsource/font-files |
+| design/tilo-t (TILO-T-FOUNDATION: the Tilo T design export of 16 Oct, `tilo-studio.css`, `tilo-t.css`, `tilo-t.js` icons, `Tilo S Buddy`, `Tilo T State`, the doodle tiles; our own Claude Design export, ported as tokens, keyframes, icons, Buddy, states and a gutter in `apps/web/src/design/tilo-t/`, ADR-0003. `support.js`, Claude Design's runtime, is never ported) | Own work (not third-party) | design/tilo-t/ |
 | fast-check (property tests, ticket P0-08b-player, FR-WLD-04) | MIT | https://www.npmjs.com/package/fast-check |
 | happy-dom (DOM for React component unit tests, AGW-01; dev only) | MIT | https://www.npmjs.com/package/happy-dom |
 | ajv (JSON Schema validator for the PPL-40a plate reducer test; dev only) | MIT | https://www.npmjs.com/package/ajv |
