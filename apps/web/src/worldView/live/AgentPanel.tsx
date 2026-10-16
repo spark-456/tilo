@@ -7,11 +7,13 @@ import { useMemo } from "react";
 import { Buddy, Icon } from "../../design/tilo-t";
 import type { RoomClient } from "../../park/api/live/meetingHall";
 import { seatFor } from "../../park/api/live/roomTalk";
+import { agentRoleColor } from "../../world/agentRole";
 import type { AgentStats } from "../../world/agentStats";
 import type { WorldFacts } from "../../world/useWorldFacts";
 import { AgentFacts } from "./AgentCard";
 import { RoomThread } from "./RoomThread";
 import { MOOD_OF_STATUS, clock, roleOf } from "./agentLook";
+import { agentMessageText } from "./agentMessageText";
 import "./live.css";
 
 const REMEMBERED = 6;
@@ -69,13 +71,20 @@ export function AgentPanel({
         {mine.length === 0 ? (
           <p className="tw-card__quiet">Nothing recorded for it yet.</p>
         ) : (
-          <ul>
-            {mine.map((m) => (
-              <li key={m.seq}>
-                <time>{clock(first, m.ts)}</time> {m.from === stats.id ? "said to" : "heard from"}{" "}
-                {name(m.from === stats.id ? m.to : m.from)}: {m.text}
-              </li>
-            ))}
+          <ul className="tw-pair-chat">
+            {mine.map((m) => {
+              const speaker = facts.stats.get(m.from);
+              return (
+                <li
+                  key={m.seq}
+                  style={{ borderColor: agentRoleColor(speaker?.rank ?? "specialist") }}
+                >
+                  <strong>{name(m.from)}</strong>
+                  <time>{clock(first, m.ts)}</time>
+                  <p>{agentMessageText(m.text)}</p>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

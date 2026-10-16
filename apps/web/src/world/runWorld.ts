@@ -25,6 +25,7 @@ import { runEnded } from "./runSummary";
 import { getSelection, subscribeSelection } from "./selection";
 import { type Probe, getSpotlight, registerProbe, subscribeSpotlight } from "./spotlight";
 import { createWorldStore } from "./store";
+import { walkBob } from "./walkCycle";
 
 const MOVE_DURATION_MS = 600; // a plausible walk; HR-3 caps it at MAX_DURATION_MS regardless
 /** How long a handoff note's speech bubble is held, so it can be read before the speaker's next event (WORLD-LIVE). */
@@ -216,10 +217,23 @@ function createLive(
   let state = createInitialState(layout); // live playback folds events in one at a time
   // Professional density has no decorative motion: a walk is drawn as a jump, as under reduced motion.
   const calm = () => reducedMotion() || layer.density() === "professional";
-  const choreo = createChoreographer({ reducedMotion: calm });
+  const choreo = createChoreographer();
   // WORLD-LIVE: a handoff note is held for a readable time by a queue of its own (a bubble is not a walk, so reduced
   // motion does not cut it), one hold per speaker, in seq order, each starting no earlier than its event was received.
-  const talk = createChoreographer({ reducedMotion: false });
+  const talk = createChoreographer();
+  let hiddenAt: number | null = document.hidden ? performance.now() : null;
+  let hiddenTotal = 0;
+  const onVisibility = () => {
+    const now = performance.now();
+    if (document.hidden) hiddenAt ??= now;
+    else if (hiddenAt !== null) {
+      hiddenTotal += now - hiddenAt;
+      hiddenAt = null;
+    }
+  };
+  document.addEventListener("visibilitychange", onVisibility);
+  const playTime = (now = performance.now()) =>
+    now - hiddenTotal - (hiddenAt === null ? 0 : now - hiddenAt);
   // A room's bubbles stay while the room is open (it is a conversation, not a moment); meeting.adjourned ends them.
   const roomSay = new Map<string, FrameSay>();
   const spoken = new Map<
@@ -268,10 +282,14 @@ function createLive(
         walkFrom.set(id, walk);
       }
       const span = act.finish - act.start;
-      const t = span > 0 && !calm() ? Math.min(1, Math.max(0, (now - act.start) / span)) : 1;
+      const t =
+        span > 0 && layer.density() !== "professional"
+          ? Math.min(1, Math.max(0, (now - act.start) / span))
+          : 1;
+      const bob = walkBob(t, calm());
       display.set(id, {
         x: walk.from.x + (to.x - walk.from.x) * t,
-        y: walk.from.y + (to.y - walk.from.y) * t,
+        y: walk.from.y + (to.y - walk.from.y) * t + bob,
       });
     }
     lastDisplay = display;
@@ -318,7 +336,7 @@ function createLive(
     const now = performance.now();
     mobileQuality.sample(now, o.size().width);
     layer.shadows = mobileQuality.shadows;
-    if (drawAgents(now)) raf = requestAnimationFrame(tickAnim);
+    if (drawAgents(playTime(now))) raf = requestAnimationFrame(tickAnim);
     else mobileQuality.idle();
   }
 
@@ -335,7 +353,7 @@ function createLive(
     if (paused) {
       renderSelection(layer, lastFrame, lastDisplay, selected(), litOf(layout.world_id));
       requestRender();
-    } else drawAgents(performance.now());
+    } else drawAgents(playTime());
   };
   const unspot = subscribeSpotlight(spotlit);
   const unselect = subscribeSelection(() => {
@@ -344,7 +362,7 @@ function createLive(
     if (paused) {
       renderSelection(layer, lastFrame, lastDisplay, selected(), litOf(layout.world_id));
       requestRender();
-    } else drawAgents(performance.now());
+    } else drawAgents(playTime());
   });
   // FR-WLD-14: a density switch redraws the frame in place (a scrubbed run through its own view).
   const undensity = subscribeDensity(() => {
@@ -354,7 +372,7 @@ function createLive(
       renderAgents(layer, lastFrame, lastDisplay);
       renderSelection(layer, lastFrame, lastDisplay, selected(), litOf(layout.world_id));
       requestRender();
-    } else drawAgents(performance.now());
+    } else drawAgents(playTime());
   });
   // FR-WLD-08: a finished run can be scrubbed; the scrubber is disabled until then, so a live run
   // is never jumped around. From the first scrub the world shows stateAt(point) at once and
@@ -411,11 +429,12 @@ function createLive(
         choreo.enqueue({
           actor: a.id,
           seq: event.seq,
-          receivedAtMs,
+          receivedAtMs: playTime(receivedAtMs),
           // A settle (a finished agent going to its post once the talk window has passed) is a walk too: the event
           // that closed the window is its recorded cause (TILO-T-WORLD).
           durationMs:
-            WALKS.has(event.type) || (event.actor !== a.id && stood !== stands)
+            layer.density() !== "professional" &&
+            (WALKS.has(event.type) || (event.actor !== a.id && stood !== stands))
               ? Math.min(MOVE_DURATION_MS, MAX_DURATION_MS)
               : 0,
         });
@@ -436,7 +455,7 @@ function createLive(
               if (!text || stopped || scrubbed) return;
               const cut = text.length > SAY_MAX ? `${text.slice(0, SAY_MAX - 1).trimEnd()}…` : text;
               roomSay.set(who, { text: cut, to: "", head: asked ? "You asked" : "Replied to you" });
-              if (!paused) drawAgents(performance.now());
+              if (!paused) drawAgents(playTime());
             },
             () => undefined, // no words, no bubble: nothing is made up
           );
@@ -450,13 +469,14 @@ function createLive(
         const list = spoken.get(event.actor) ?? [];
         spoken.set(event.actor, [...list, { seq: event.seq, say, armed: false }]);
       }
-      if (drawAgents(receivedAtMs) && !raf) raf = requestAnimationFrame(tickAnim);
+      if (drawAgents(playTime(receivedAtMs)) && !raf) raf = requestAnimationFrame(tickAnim);
       onSeq(state.seq);
       onTrace(state.trace);
     },
     replay,
     stop() {
       stopped = true;
+      document.removeEventListener("visibilitychange", onVisibility);
       unselect();
       unspot();
       probe();

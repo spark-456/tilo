@@ -5,6 +5,9 @@
 // Honesty: the caller picks the mood from a recorded event and says which (for example work from building.constructing,
 // hand from approval.requested, happy from world.completed, sad from world.failed). The idle bob and blink are ambient.
 import type { CSSProperties } from "react";
+import { roleColor, type TiloRole } from "./role";
+
+export type { TiloRole } from "./role";
 
 export type TiloMood =
   | "idle"
@@ -27,29 +30,6 @@ export const TILO_MOODS: readonly TiloMood[] = [
   "work",
   "swim",
 ];
-
-export type TiloRole =
-  | "director"
-  | "research"
-  | "builder"
-  | "tester"
-  | "browser"
-  | "connector"
-  | "delivery"
-  | "designer"
-  | "finance";
-
-const ROLE: Readonly<Record<TiloRole, string>> = {
-  director: "#E8643F",
-  research: "#3F7FE0",
-  builder: "#E57F3E",
-  tester: "#C9982A",
-  browser: "#2BA3B8",
-  connector: "#D9588C",
-  delivery: "#76A035",
-  designer: "#A45DB8",
-  finance: "#3E9A7C",
-};
 
 const hx = (c: string): number[] => [1, 3, 5].map((i) => Number.parseInt(c.slice(i, i + 2), 16));
 const mix = (c: string, t: number[], f: number): string =>
@@ -123,7 +103,7 @@ export function Buddy({
   label?: string;
 }) {
   const k = size / 236;
-  const col = ROLE[role] ?? ROLE.director;
+  const col = roleColor(role);
   const white: number[] = [255, 255, 255];
   const black: number[] = [0, 0, 0];
   const lt = (f: number) => mix(col, white, f);
