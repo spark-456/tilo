@@ -1,0 +1,24 @@
+{
+  "url": "https://essential-wares-510320-f0.web.app/",
+  "status": 200,
+  "title": "Tilo",
+  "path": "/",
+  "longTasks": [
+    212,
+    132,
+    53,
+    138,
+    193
+  ],
+  "navigation": [
+    {
+      "duration": 1038.300000011921,
+      "domContentLoadedEventEnd": 803.3000000119209,
+      "loadEventEnd": 1038.300000011921
+    }
+  ],
+  "scrollFrames": 254,
+  "scrollOver50ms": 1,
+  "maxScrollGapMs": 152.90000000596046,
+  "medianScrollGapMs": 11.099999994039536
+}

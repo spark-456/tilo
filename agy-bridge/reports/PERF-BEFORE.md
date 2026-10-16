@@ -1,23 +1,14 @@
 # CX-PERF-1 baseline
 
-Measured 16 Oct 2026 IST against `https://essential-wares-510320-f0.web.app/`.
+Measured 16 Oct 2026 IST on the [live site](https://essential-wares-510320-f0.web.app/) with Chrome 156 at 1440 × 900. The trace script uses the Chrome DevTools Protocol Performance trace, a Long Tasks observer, and a three-second automated scroll. CPU rate 4 means Chrome's fourfold throttle. Lighthouse 13.5.0 used its desktop preset.
 
-## Live site
-
-| Surface | Desktop / 4x CPU trace | Lighthouse | Result |
+| Surface | Desktop trace | 4× CPU trace | Lighthouse desktop |
 | --- | --- | --- | --- |
-| Public Home | Not available | Not available | Landing page loaded, but the browser supplied for this run has no Chrome DevTools Performance panel or Lighthouse runner. CPU throttling was unavailable. |
-| Product Home | Not measured | Not measured | `Explore a demo session` and `Continue with Google` were disabled on the live page; its input and Try it button were disabled too. |
-| Worlds | Not measured | Not measured | The disabled live entry points above prevented reaching this product route. |
-| World | Not measured | Not measured | The disabled live entry points above prevented reaching a world route. |
-| Skills | Not measured | Not measured | The disabled live entry points above prevented reaching this product route. |
-| Chat | Not measured | Not measured | The disabled live entry points above prevented reaching this product route. |
+| Public Home `/` | 4 tasks ≥100 ms, maximum 212 ms; 254 scroll frames, 1 gap >50 ms, maximum gap 153 ms | 11 tasks ≥100 ms, maximum 2,178 ms; 26 scroll frames, 9 gaps >50 ms, maximum gap 1,354 ms | **77**; FCP 1.88 s, LCP 2.38 s, TBT 45 ms, CLS 0.006 |
+| Product Home, Worlds, a World, Skills, Chat | Not measured: the unauthenticated live entry points were disabled in this browser run | Not measured | Not measured |
 
-No live trace, Lighthouse score, frame rate, INP, or long-task duration was collected. No values are inferred for those measures.
+The 4× Lighthouse run produced **no score**: `NO_TTI_CPU_IDLE_PERIOD` after the page exceeded the load time limit. It reported FCP 4.51 s and LCP 6.22 s, but TBT was unavailable. The desktop Lighthouse score is below the 85 target. The trace observer runs from navigation through the scroll; its task counts do not isolate idle work. INP requires a real interaction and was not measured.
 
-## Confirmed code-level polling baseline
+Recorded artifacts: `CX-PERF-1/live-home-desktop.json.gz`, `live-home-4x.json.gz`, their `.metrics.json` summaries, and the two `live-home-lighthouse*.json.xz` reports. The trace script is `apps/web/perf-measure.mjs`. The trace starts before navigation, waits one second after DOM content is loaded, scrolls for three seconds, then waits one second; it records frame intervals from `requestAnimationFrame`.
 
-- `HttpClient` defaults to a 1,000 ms `pollMs` (`apps/web/src/api/http.ts`).
-- `subscribeEvents` scheduled another request after every successful response, including an empty response: one `/worlds/{id}/events` request per second for each open subscription while idle.
-- The focused regression test reproduced two requests within 1,000 ms with the tab hidden before the fix.
-- A completed or failed world already stops polling when its terminal event is received.
+Code baseline: `HttpClient.subscribeEvents` issued another `/worlds/{id}/events` request after every successful empty response at its 1,000 ms default interval, including while the tab was hidden. The focused regression test reproduced the hidden-tab requests before the polling fix.

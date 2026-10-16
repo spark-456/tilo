@@ -1,23 +1,14 @@
-# CX-PERF-1 after
+# CX-PERF-1 after the polling fix
 
-Measured 16 Oct 2026 IST against `https://essential-wares-510320-f0.web.app/` and the focused `CX-PERF-1` client test.
+Measured 16 Oct 2026 IST from a local **production build** of `cx/PERF-1` (`vite build` then `vite preview` at `127.0.0.1:5683`) with Chrome 156, 1440 × 900, and the same trace script and Lighthouse desktop preset as [PERF-BEFORE.md](PERF-BEFORE.md). These are diagnostic measurements, **not a controlled live before/after comparison**: the local host, code base, and machine load differ from the deployed site. The branch has not been deployed.
 
-## Live site
-
-| Surface | Desktop / 4x CPU trace | Lighthouse | Result |
+| Surface | Desktop trace | 4× CPU trace | Lighthouse desktop |
 | --- | --- | --- | --- |
-| Public Home | Not available | Not available | The browser supplied for this run has no Chrome DevTools Performance panel or Lighthouse runner. CPU throttling was unavailable. |
-| Product Home | Not measured | Not measured | `Explore a demo session` and `Continue with Google` were disabled on the live page; its input and Try it button were disabled too. |
-| Worlds | Not measured | Not measured | The disabled live entry points above prevented reaching this product route. |
-| World | Not measured | Not measured | The disabled live entry points above prevented reaching a world route. |
-| Skills | Not measured | Not measured | The disabled live entry points above prevented reaching this product route. |
-| Chat | Not measured | Not measured | The disabled live entry points above prevented reaching this product route. |
+| Public Home `/` | 2 tasks ≥100 ms, maximum 681 ms; 106 scroll frames, 4 gaps >50 ms, maximum gap 1,302 ms | 28 tasks ≥100 ms, maximum 6,965 ms; 23 scroll frames, 3 gaps >50 ms, maximum gap 7,524 ms | **53**; FCP 1.19 s, LCP 2.30 s, TBT 747 ms, CLS 0.001 |
+| Product Home, Worlds, a World, Skills, Chat | Not measured: the live authenticated product routes were inaccessible to this browser run | Not measured | Not measured |
 
-No live trace, Lighthouse score, frame rate, INP, or long-task duration was collected. No values are inferred for those measures.
+The production preview did **not** demonstrate the targets: desktop Lighthouse remained below 85 and traces contained long tasks and scroll gaps. These numbers cannot be used to claim a regression or improvement against the live site because the environments differ. The trace observer spans startup and scroll, so idle-only long tasks were not separately measured. INP was not measured. A development-server attempt was discarded because Vite's transform cost distorted the result; the first 4× navigation timed out.
 
-## Confirmed code-level polling result
+Recorded artifacts: `CX-PERF-1/prod-home-desktop.json.gz`, `prod-home-4x.json.gz`, their `.metrics.json` summaries, and `prod-home-lighthouse-desktop.json.xz`.
 
-- A subscription makes no request while the tab is hidden; becoming visible triggers an immediate request.
-- Successful empty responses back off from 2,000 ms to 4,000 ms, 8,000 ms, then a 10,000 ms cap. A newly received event resets the delay to the normal 1,000 ms active-run cadence.
-- Terminal-world stopping and error backoff remain in place.
-- The focused test covers the hidden-tab pause, immediate resume, and 2,000 ms idle backoff. This is deterministic client behavior, not a live-site timing measurement.
+The focused `CX-PERF-1` test confirms the code change: polling stops while hidden, resumes immediately when visible, and backs off on empty responses from 2,000 ms to 4,000 ms, 8,000 ms, then a 10,000 ms cap. A new event restores the 1,000 ms active-run cadence; terminal-world stopping remains intact. This fixes the confirmed idle request loop but does not establish smooth rendering on the measured surfaces.
