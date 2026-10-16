@@ -4,7 +4,8 @@ import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react"
 import tokens from "../design/tokens";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { agentNames, rankName } from "../world/runSummary";
-import { useSelection } from "../world/selection";
+import { select, useSelection } from "../world/selection";
+import { onFly, openAgent, registerProbe as probeOf, setHover } from "../world/spotlight";
 import { ViewLink } from "../worldView/ViewLink";
 import * as cam from "./camera";
 
@@ -129,6 +130,8 @@ export function Stage({
   msRef.current = cam.getCameraPanDurationMs(useMediaQuery("(prefers-reduced-motion: reduce)"));
   const seamRef = useRef(onWorld);
   seamRef.current = onWorld;
+  const worldIdRef = useRef(worldId);
+  worldIdRef.current = worldId;
 
   // Pixi is code-split off the landing route (NFR-01): the page is interactive without it. A world
   // to draw loads it at once; the bare grid is decoration, so it waits until the first keystroke
@@ -169,7 +172,7 @@ export function Stage({
     let ready = false;
     let cur = cam.INITIAL_CAMERA; // the camera drawn now
     let goal = cur; // where keyboard moves are heading
-    let ease: { from: cam.CameraState; t0: number } | null = null;
+    let ease: { from: cam.CameraState; t0: number; ms: number } | null = null;
     let raf = 0;
     let gridKey = ""; // the view the grid was last built for: world-content frames skip rebuilding it
 
@@ -195,7 +198,7 @@ export function Stage({
     const frame = () => {
       raf = 0;
       if (ease) {
-        const t = (performance.now() - ease.t0) / msRef.current;
+        const t = (performance.now() - ease.t0) / ease.ms;
         cur = cam.easeCamera(ease.from, goal, t);
         if (t >= 1) ease = null;
         else raf = requestAnimationFrame(frame);
@@ -211,9 +214,9 @@ export function Stage({
       cur = goal = next;
       draw();
     };
-    const glide = (next: cam.CameraState) => {
+    const glide = (next: cam.CameraState, ms = msRef.current) => {
       if (!msRef.current) return jump(next);
-      ease = { from: cur, t0: performance.now() };
+      ease = { from: cur, t0: performance.now(), ms };
       goal = next;
       requestRender();
     };
@@ -271,6 +274,50 @@ export function Stage({
     listen("pointerup", lift);
     listen("pointercancel", lift);
 
+    // TILO-T-WORLD: hover lights an agent and shows its stats card; a click or tap opens its panel. Display state
+    // only (never an event); the stage's own probe says which drawn agent is under the pointer.
+    const here = (e: PointerEvent) => {
+      const r = target.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+    let downAt: { x: number; y: number } | null = null;
+    listen("pointerdown", (e) => {
+      downAt = e.button === 0 ? { x: e.clientX, y: e.clientY } : null;
+    });
+    listen("pointermove", (e) => {
+      const wid = worldIdRef.current;
+      if (!wid || pts.size || e.pointerType === "touch") return;
+      const at = here(e);
+      const id = probeOf.get(wid)?.agentAt(at.x, at.y) ?? null;
+      target.style.cursor = id ? "pointer" : "";
+      setHover(wid, id, at);
+    });
+    listen("pointerleave", () => {
+      const wid = worldIdRef.current;
+      if (wid) setHover(wid, null, null);
+    });
+    listen("pointerup", (e) => {
+      const wid = worldIdRef.current;
+      const from = downAt;
+      downAt = null;
+      if (!wid || !from || Math.hypot(e.clientX - from.x, e.clientY - from.y) > 5) return; // a drag pans
+      if ((e.target as Element).closest(".stage-controls, .stage-outline")) return;
+      const at = here(e);
+      const id = probeOf.get(wid)?.agentAt(at.x, at.y) ?? null;
+      if (!id) return;
+      select(wid, id);
+      openAgent(wid, id);
+    });
+    // triggeredBy: a Story or chat click on a recorded event: the camera glides to where it happened (display only).
+    const unfly = worldIdRef.current
+      ? onFly(worldIdRef.current, (id, ms) => {
+          const p = probeOf.get(worldIdRef.current ?? "")?.locate(id);
+          if (!p) return;
+          const r = target.getBoundingClientRect();
+          glide(pan(cur, r.width / 2 - p.x, r.height / 2 - p.y), ms);
+        })
+      : undefined;
+
     listen("keydown", (e) => {
       const move = KEYS[e.key];
       if (!move || e.ctrlKey || e.metaKey || e.altKey) return; // browser shortcuts pass
@@ -317,6 +364,7 @@ export function Stage({
     });
     return () => {
       on.abort();
+      unfly?.();
       observer.disconnect();
       cancelAnimationFrame(raf);
       unplug?.();

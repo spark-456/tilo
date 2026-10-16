@@ -4,8 +4,8 @@
 // The words of a room turn are only in the redacted archive (MR-12); `withWords` fills them in from there, and a turn
 // with no words stays unworded: nothing is made up.
 import type { Event, Layout } from "@tilo/contracts";
-import { isKnownType } from "./registry";
 import { type WorldState, applyEvent, createInitialState, standingAt } from "./reducer";
+import { isKnownType } from "./registry";
 
 export type MessageKind =
   | "assigned"
