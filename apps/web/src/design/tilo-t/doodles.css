@@ -1,0 +1,13 @@
+/* z-index 1: above the Park backdrop (z 0), below the page (main, z 1, later in the tree) and the nav (30).
+   The side doodle wallpaper (design/tilo-t: tilo-doodles.svg, tilo-doodles-dark.svg; our own Claude Design export). A fixed,
+   decorative layer behind the app that shows only OUTSIDE the content column (--tt-column wide, centred) and only from
+   1200px up. Static: no motion. Pages that want it in the flow use `background-image: var(--doodle)` at 280px. */
+:root{--tt-column:1320px}
+[data-theme="studio"]{--doodle:url("./assets/tilo-doodles.svg")}
+[data-theme="studioDark"],[data-theme="studio"][data-time="night"]{--doodle:url("./assets/tilo-doodles-dark.svg")}
+.tt-doodles{display:none}
+@media (min-width:1200px){
+  .tt-doodles{display:block;position:fixed;inset:0;z-index:1;pointer-events:none;background-image:var(--doodle);background-size:280px 280px;
+    -webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(50% - var(--tt-column) / 2),transparent calc(50% - var(--tt-column) / 2),transparent calc(50% + var(--tt-column) / 2),#000 calc(50% + var(--tt-column) / 2));
+    mask-image:linear-gradient(to right,#000 0,#000 calc(50% - var(--tt-column) / 2),transparent calc(50% - var(--tt-column) / 2),transparent calc(50% + var(--tt-column) / 2),#000 calc(50% + var(--tt-column) / 2))}
+}

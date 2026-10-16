@@ -11,7 +11,7 @@ import { ALLOWLIST, RULES, scanSource } from "../../../test-support/honestyScan"
 
 // The Park city's ambient scenery (shell and engines) is decoration, not work: its animation entries are
 // pinned by src/honesty/park-ambient.allowlist.test.ts. Every other entry stays pinned exactly here.
-const AMBIENT = /^src\/(park\/(shell|engines)|landing)\//; // LANDING-2: the landing's own chrome motion
+const AMBIENT = /^src\/(park\/(shell|engines)|landing|design\/tilo-t)\//; // LANDING-2: the landing's own chrome motion; TILO-T-FOUNDATION: the design layer's keyframes
 import { COMPONENTS_DIR } from "../../../test-support/park/componentsCss";
 import { PARK_DIR } from "../../../test-support/park/prototype";
 
