@@ -28,7 +28,6 @@ import { takeDraft } from "../../chat/handoff";
 import { FirstRunOverview } from "../../sample/FirstRunOverview";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./ComposerPanel";
-import { HomeAssistant, type HomeContextChip } from "./HomeAssistant";
 import "./Home.css";
 import { HomeSkeleton } from "./HomeSkeleton";
 import { MorningBriefCard } from "./MorningBriefCard";
@@ -426,49 +425,6 @@ export function HomePage({ app }: { app: AppCtx }) {
         openServed,
       )
     : summaryLine(needs, night);
-  const assistantContexts: HomeContextChip[] = [];
-  if (ready) {
-    const prefix = worldsLive ? "" : "Sample data: ";
-    const recentWorlds = worlds.filter((w) => !w.isNew && !w.sample).slice(0, 5);
-    if (recentWorlds.length > 0) {
-      assistantContexts.push({
-        id: "worlds",
-        label: "Recent worlds",
-        prompt: "Summarize my recent worlds",
-        detail: `${prefix}${recentWorlds.map((w) => `${w.name} (${w.st})`).join("; ")}`,
-      });
-    }
-    if (base.agenda) {
-      const rows =
-        base.agenda.days !== null
-          ? base.agenda.events
-              .filter((e) => e.d === base.agenda?.today)
-              .slice(0, 6)
-              .map((e) => `${e.t} at ${e.s}`)
-          : base.agenda.plate.rows
-              .slice(0, 6)
-              .map((e) => e.title)
-              .filter((title): title is string => title !== null);
-      if (rows.length > 0) {
-        assistantContexts.push({
-          id: "agenda",
-          label: "Today’s agenda",
-          prompt: "Today’s agenda: summarize it",
-          detail: `${base.agendaServed ? "" : "Sample data: "}${rows.join("; ")}`,
-        });
-      }
-    }
-    const openDecisions = base.decisions.filter((d) => !dec[d.k]);
-    if (openDecisions.length > 0) {
-      assistantContexts.push({
-        id: "needs",
-        label: "Needs you",
-        prompt: "What needs my attention?",
-        detail: `${base.decisionsServed ? "" : "Sample data: "}${openDecisions.map((d) => d.title).join("; ")}`,
-      });
-    }
-  }
-
   const root = useRef<HTMLDivElement>(null);
   const composerShown = !failed || (worldsLive && worlds !== "failed");
   // The helper in the ask box shows the request state only: reading while a call is out, done once answered.
@@ -502,7 +458,6 @@ export function HomePage({ app }: { app: AppCtx }) {
         </div>
       ) : null}
       {!ready && !failed ? <HomeSkeleton /> : null}
-      {ready ? <HomeAssistant contexts={assistantContexts} /> : null}
       {base &&
       base !== "failed" &&
       base.agenda &&
@@ -531,7 +486,6 @@ export function HomePage({ app }: { app: AppCtx }) {
           </div>
         </div>
       ) : null}
-      {briefApi && !demo ? <MorningBriefCard api={briefApi} /> : null}
       {composerShown ? (
         <ComposerPanel
           sending={sending}
@@ -607,6 +561,7 @@ export function HomePage({ app }: { app: AppCtx }) {
               onWorld={open}
               onWorlds={() => go("worlds")}
             />
+            {briefApi && !demo ? <MorningBriefCard api={briefApi} compact /> : null}
             <ChatHistory onChat={() => go("chat")} />
           </div>
           <TodayPanel
