@@ -298,7 +298,7 @@ export function HomePage({ app }: { app: AppCtx }) {
         store.toast(
           `The run has started, but it was not set to repeat weekly. ${r.value.repeatRefused}`,
         );
-      markPendingWorld(r.value.worldId);
+      markPendingWorld(r.value.worldId, run.goal);
       go("world", { id: r.value.worldId });
     });
   };

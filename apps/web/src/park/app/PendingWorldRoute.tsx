@@ -3,12 +3,21 @@ import { Buddy, ErrorState, LoadingState, useLoopPaused } from "../../design/til
 
 /** An approval reply proves this id exists; it does not prove that planning has finished. */
 const pending = new Set<string>();
+const pendingGoals = new Map<string, string>();
 
-export function markPendingWorld(worldId: string): void {
-  if (worldId) pending.add(worldId);
+export function markPendingWorld(worldId: string, goal?: string): void {
+  if (!worldId) return;
+  pending.add(worldId);
+  if (goal) pendingGoals.set(worldId, goal);
 }
 
 export const pendingWorld = (worldId: string): boolean => pending.has(worldId);
+const pendingWorldGoal = (worldId: string): string | undefined => pendingGoals.get(worldId);
+
+function clearPendingWorld(worldId: string): void {
+  pending.delete(worldId);
+  pendingGoals.delete(worldId);
+}
 
 interface EventFeed {
   subscribeEvents(
@@ -31,6 +40,7 @@ export function PendingWorldRoute({
   const [phase, setPhase] = useState<"waiting" | "started" | "planned">(() =>
     pendingWorld(worldId) ? "waiting" : "planned",
   );
+  const goal = pendingWorldGoal(worldId);
   const [error, setError] = useState(false);
   const [worldFailed, setWorldFailed] = useState(false);
   const loopRef = useRef<HTMLDivElement>(null);
@@ -48,11 +58,11 @@ export function PendingWorldRoute({
         }
         if (event.type === "world.planned") {
           // triggeredBy: world.planned. Enter the actual World only after its plan is recorded.
-          pending.delete(worldId);
+          clearPendingWorld(worldId);
           setPhase("planned");
         }
         if (event.type === "world.failed") {
-          pending.delete(worldId);
+          clearPendingWorld(worldId);
           setWorldFailed(true);
         }
       },
@@ -71,6 +81,11 @@ export function PendingWorldRoute({
         />
       ) : (
         <div ref={loopRef} className={paused}>
+          {phase === "waiting" && goal ? (
+            <div className="park-pending-world__blueprint" data-testid="run-blueprint">
+              BLUEPRINT · {goal}
+            </div>
+          ) : null}
           {phase === "started" ? (
             <div className="park-pending-world__pool" aria-hidden="true">
               <Buddy mood="swim" size={96} />

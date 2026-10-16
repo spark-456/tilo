@@ -64,3 +64,25 @@ it("CX_T_RUN_failed_start_stops_the_loader_and_releases_the_pending_route", asyn
   expect(rig.container.querySelector("[data-testid='tt-loading']")).toBeNull();
   expect(pendingWorld("failed-start")).toBe(false);
 });
+
+it("CX_T_RUN_pending_blueprint_stays_until_the_recorded_world_started_event", async () => {
+  let receive: ((event: { type: string }) => void) | undefined;
+  const client = {
+    subscribeEvents: vi.fn((_id: string, onEvent: (event: { type: string }) => void) => {
+      receive = onEvent;
+      return vi.fn();
+    }),
+  };
+  markPendingWorld("pending-blueprint", "Prepare the team offsite");
+  const rig = mount(
+    <PendingWorldRoute worldId="pending-blueprint" client={client}>
+      <p>World is visible</p>
+    </PendingWorldRoute>,
+  );
+  expect(rig.container.querySelector("[data-testid='run-blueprint']")?.textContent).toContain("Prepare the team offsite");
+  expect(rig.container.textContent).toContain("Waiting for world.started");
+  await act(async () => receive?.({ type: "agent.spawned" }));
+  expect(rig.container.querySelector("[data-testid='run-blueprint']")).not.toBeNull();
+  await act(async () => receive?.({ type: "world.started" }));
+  expect(rig.container.querySelector("[data-testid='run-blueprint']")).toBeNull();
+});
