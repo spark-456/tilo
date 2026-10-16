@@ -508,10 +508,7 @@
   background: var(--bg);
   box-shadow: none;
 }
-[data-park] .park-chat-main .park-chat-log {
-  max-width: 800px;
-  margin: 0 auto;
-}
+[data-park] .park-chat-main .park-chat-log,
 [data-park] .park-chat-main .park-chat-compose {
   max-width: 800px;
   margin: 0 auto;
