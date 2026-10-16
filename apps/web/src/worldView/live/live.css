@@ -1,0 +1,114 @@
+/* TILO-T-WORLD: the live World's agent card, panel, chat and team meeting, in the Tilo T tokens (design/tilo-t:
+   --card --ink --ink2 --ink3 --line --lime --amber --red --sunk --sh2, Geist). No animation here: the classes in
+   design/tilo-t/motion.css (.tw-pop, .tw-fade, .tw-slide-*) start from recorded events. */
+[data-park] .tw-card {
+  position: absolute;
+  z-index: 6;
+  padding: 12px;
+  border: 1px solid var(--line, #e6e6e2);
+  border-radius: 16px;
+  background: var(--card, #fff);
+  color: var(--ink, #0b0b0c);
+  box-shadow: var(--sh2, 0 12px 32px -18px rgba(11, 11, 12, 0.25));
+  font-family: var(--fB, inherit);
+  font-size: 13px;
+  pointer-events: none;
+}
+[data-park] .tw-card__head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+[data-park] .tw-card__name {
+  margin: 0;
+  font-family: var(--fH, inherit);
+  font-size: 15px;
+  font-weight: 600;
+}
+[data-park] .tw-card__role {
+  margin: 0;
+  color: var(--ink3, #6b6b70);
+  font-size: 12px;
+}
+[data-park] .tw-facts__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+[data-park] .tw-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--sunk, #eeeeeb);
+  color: var(--ink2, #46464a);
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  text-transform: lowercase;
+}
+[data-park] .tw-chip[data-status="working"] {
+  background: var(--priSoft, #ecfbc2);
+  color: var(--priInk, #2f3d00);
+}
+[data-park] .tw-chip[data-status="in a meeting"] {
+  background: var(--skySoft, #e6eefb);
+  color: var(--skyInk, #24529e);
+}
+[data-park] .tw-facts__at {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--ink2, #46464a);
+  font-size: 12px;
+}
+[data-park] .tw-facts__task {
+  margin: 8px 0 0;
+  color: var(--ink, #0b0b0c);
+}
+[data-park] .tw-facts__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 10px 0 0;
+}
+[data-park] .tw-facts__grid dt {
+  color: var(--ink3, #6b6b70);
+  font-size: 11px;
+}
+[data-park] .tw-facts__grid dd {
+  margin: 0;
+  font-family: var(--mono, monospace);
+  font-size: 16px;
+}
+[data-park] .tw-facts__tools {
+  margin: 8px 0 0;
+  color: var(--ink2, #46464a);
+  font-size: 12px;
+}
+[data-park] .tw-facts__tools span {
+  display: block;
+  color: var(--ink3, #6b6b70);
+  font-size: 11px;
+}
+[data-park] .tw-card__said {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--line, #e6e6e2);
+  list-style: none;
+  color: var(--ink2, #46464a);
+  font-size: 12px;
+}
+[data-park] .tw-card__said li {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+[data-park] .tw-card__quiet,
+[data-park] .tw-card__hint {
+  margin: 8px 0 0;
+  color: var(--ink3, #6b6b70);
+  font-size: 11px;
+}

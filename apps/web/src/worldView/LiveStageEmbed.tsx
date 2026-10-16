@@ -8,6 +8,7 @@ import { createRoomClient, readRoom } from "../park/api/live/meetingHall";
 import { Stage } from "../stage/Stage";
 import { useRunStatus } from "../world/runLog";
 import { type RoomWords, useClientWorld } from "../world/useClientWorld";
+import { AgentLayer } from "./live/AgentLayer";
 
 export default function LiveStageEmbed({ worldId }: { worldId: string }) {
   const client = useClient();
@@ -36,6 +37,7 @@ export default function LiveStageEmbed({ worldId }: { worldId: string }) {
         worldId={world.worldId}
         paused={status === "paused"}
       />
+      <AgentLayer worldId={worldId} rooms={rooms} />
       {world.note ? (
         <div
           className="park-world-livenote"
