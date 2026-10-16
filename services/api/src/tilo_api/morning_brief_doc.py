@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
+import unicodedata
 from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -160,18 +161,17 @@ def read_latest(ctx_artifacts: ArtifactStore, desks: Any, org: str, user: str, d
 
 
 def purge_old(artifacts: ArtifactStore, desks: Any, org: str, user: str, day: str) -> None:
-    """MO-09: briefs older than `KEEP_DAYS` local days go (the week before that; the sweep runs this once a day)."""
+    """MO-09: every brief of the person's own Desk world older than `KEEP_DAYS` local days goes, however long ago it was
+    made (a person may not come back for weeks; the purge is lazy, once a day)."""
     world = desks.desk_world(org, user)
     if desks.desk_owner(world) != user:
         return
     scope = Scope(org, world, user)
-    for back in range(KEEP_DAYS + 1, KEEP_DAYS + 8):
-        try:
-            old = artifacts.versions(scope, artifact_id((date.fromisoformat(day) - timedelta(days=back)).isoformat()))
-        except ArtifactNotFound:
-            continue
-        for version in old:
-            _delete(artifacts, scope, version.ref)
+    cutoff = artifact_id((date.fromisoformat(day) - timedelta(days=KEEP_DAYS)).isoformat())
+    for aid in artifacts.artifact_ids(scope, "art_mbrief_"):
+        if len(aid) == len(cutoff) and aid[11:].isdigit() and aid < cutoff:  # a date older than the cutoff
+            for version in artifacts.versions(scope, aid):
+                _delete(artifacts, scope, version.ref)
 
 
 def purge_daily(briefs: BriefStore, artifacts: ArtifactStore, desks: Any, org: str, user: str, day: str) -> None:
@@ -258,4 +258,5 @@ def render_email(doc: dict[str, Any]) -> str:
     section("Deadlines", doc["deadlines"], lambda d: f"{d['title']} (due {d['due']})", "None.")
     if doc["suggestions"]:
         out += ["Suggestions", *(f"  - {s['text']}" for s in doc["suggestions"]), ""]
-    return DOMAIN.sub("[removed]", "\n".join(out).rstrip() + "\n")  # no link in the copy, not even a bare domain
+    text = unicodedata.normalize("NFKC", "\n".join(out).rstrip() + "\n")
+    return DOMAIN.sub("[removed]", text)  # no link in the copy, not even a bare domain

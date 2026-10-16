@@ -27,3 +27,17 @@ def test_MORNING_BRIEF_B1A_MO09_a_malformed_derived_id_is_refused(bad):
     rig = make_rig("memory", None)
     with pytest.raises(ArtifactError):
         rig.store.with_new_id(lambda: bad).put(rig.scope, rig.new(ARTICLE))
+
+
+def test_MORNING_BRIEF_B1A_MO09_artifact_ids_lists_the_owners_artifacts_of_the_scope_by_prefix():
+    rig = make_rig("memory", None)
+    for aid in ("art_mbrief_20260920", "art_mbrief_20261001", "art_other"):
+        rig.store.with_new_id(lambda aid=aid: aid).put(rig.scope, rig.new(ARTICLE))
+    first = rig.store.versions(rig.scope, "art_mbrief_20261001")[0].ref
+    rig.store.with_new_id(lambda: "art_unused").put(
+        rig.scope, dataclasses.replace(rig.new(ARTICLE + b"2"), parent=first)
+    )
+    assert rig.store.artifact_ids(rig.scope, "art_mbrief_") == ["art_mbrief_20260920", "art_mbrief_20261001"]
+    assert rig.store.artifact_ids(rig.scope) == ["art_mbrief_20260920", "art_mbrief_20261001", "art_other"]
+    other = dataclasses.replace(rig.scope, owner="u_someone_else")
+    assert rig.store.artifact_ids(other, "art_mbrief_") == []

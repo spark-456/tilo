@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
@@ -87,7 +88,7 @@ def _own_line(ctx: Ctx, value: Any, cap: int, kind: str) -> str | None:
     """A model-written line that is already exactly what cleaning leaves, and fits the contract; else None (dropped)."""
     if not isinstance(value, str):
         return None
-    if DOMAIN.search(value[:RAW_CAP]):
+    if DOMAIN.search(unicodedata.normalize("NFKC", value[:RAW_CAP])):
         return None  # a bare domain is a link a mail client may open: dropped, never repaired
     text = clean(ctx, value, cap)
     same = text == " ".join(_unhide(clean_line(value[:RAW_CAP])).split())

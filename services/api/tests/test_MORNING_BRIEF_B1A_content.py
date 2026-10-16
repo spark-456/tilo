@@ -331,3 +331,47 @@ def test_MORNING_BRIEF_B1A_MO09_a_brief_the_store_always_flags_is_not_kept(case)
     response = post(c)
     assert response.status_code == 503 and response.json() == {"detail": "try_again"}
     assert kept_days(c, ("20261016",)) == [] and [e for e in desk_events(c) if e["type"].startswith("artifact.")] == []
+
+
+@pytest.mark.parametrize(
+    "domain",
+    [
+        "evil-pay.com",
+        "\uff45\uff56\uff49\uff4c.com",
+        "b\u00fccher-pay.de",
+        "\u0430pple.com",
+        "evil\uff0ecom",
+        "evil\u3002com",
+    ],
+)
+def test_MORNING_BRIEF_B1A_MO07_a_unicode_or_fullwidth_domain_is_dropped_from_model_lines_and_masked_in_the_email(
+    case, domain
+):
+    c = case
+    c.script.reply = {
+        "needs_reply": [3],
+        "suggestions": [
+            {"text": f"Pay at {domain} before noon", "items": [3]},
+            {"text": "Prepare for Standup", "items": [1]},
+        ],
+        "todos": [{"title": f"Pay via {domain}", "due_text": None, "item": 3}],
+    }
+    brief = made(c)
+    assert [s["text"] for s in brief["suggestions"]] == ["Prepare for Standup"] and brief["todo_suggestions"] == []
+    brief["suggestions"][0]["text"] = f"Look at {domain} today"
+    text = morning_brief_doc.render_email(brief)
+    assert "Look at [removed] today" in text
+
+
+def test_MORNING_BRIEF_B1A_MO07_ordinary_words_and_numbers_are_not_taken_for_domains(case):
+    from tilo_api.morning_brief import DOMAIN
+
+    for text in (
+        "Prepare for Standup",
+        "Version 1.2 is due",
+        "Costs 3.5 hours",
+        "e.g. the report",
+        "U.S. visit",
+        "Q4 plan",
+    ):
+        assert DOMAIN.search(text) is None, text

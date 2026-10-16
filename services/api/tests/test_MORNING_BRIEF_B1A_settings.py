@@ -261,3 +261,17 @@ def test_MORNING_BRIEF_B1A_MO07_a_capped_person_or_an_unreadable_ledger_gets_no_
     c.monkeypatch.setattr(deps, "spend_mode", spend_mode)
     assert sweep(c) == 2 and c.script.calls == []
     assert get(c, OWNER).json()["model"] == "skipped" and get(c, PRIYA).json()["model"] == "skipped"
+
+
+def test_MORNING_BRIEF_B1A_MO09_a_brief_older_than_the_old_probe_window_goes_however_long_the_gap(case):
+    c = case
+    days = ("20260920", "20261001", "20261002", "20261008", "20261009", "20261016")
+    for stamp in (
+        "2026-09-20T02:30:00.000Z", "2026-10-01T02:30:00.000Z", "2026-10-02T02:30:00.000Z",
+        "2026-10-08T02:30:00.000Z", "2026-10-09T02:30:00.000Z",
+    ):  # fmt: skip
+        c.briefs.claim(deps.ORG_ID, OWNER, stamp[:10], "purge")  # no purge yet: they are made on those very days
+        make_on(c, stamp)  # the person is away for weeks: 26, 15, 14, 8 and 7 days before today
+    made(c)
+    assert kept_days(c, days) == ["20261009", "20261016"]
+    assert kept_days(c, days, PRIYA) == []
