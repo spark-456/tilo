@@ -10,7 +10,7 @@ import jsonschema
 import yaml
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
-from tilo_contracts import PlanMakeChoice
+from tilo_contracts import PlanMakeChoice, PlanMakeOption
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _CONFIG_DIR = _REPO_ROOT / "config"
@@ -130,13 +130,17 @@ def _large_reason(deliverable: dict[str, Any], brief: dict[str, Any], cfg: dict[
 def _options_for(
     fmt: str, deliverable: dict[str, Any], brief: dict[str, Any], owner: str, cfg: dict[str, Any], views: Any
 ) -> tuple[list[dict[str, Any]], str]:
-    options = [{"make_with": "native", "label": "Tilo", "status": "ready", "suggested": False, "note": None}]
+    options: list[dict[str, Any]] = [
+        {"make_with": "native", "label": "Tilo", "status": "ready", "suggested": False, "note": None}
+    ]
     for partner in cfg["formats"][fmt]["partners"]:
         make_with = partner["make_with"]
         if make_with.startswith("connector:"):
             connector_id = make_with.removeprefix("connector:")
             declared, canva = _declarations(cfg, connector_id)
             record = canva or declared
+            if record is None:
+                raise MakerConfigError("Maker choices are not configured correctly.")
             if canva and not declared:
                 status, note = "needs_setup", "Needs the workspace owner's Canva app."
             elif record.get("auth") == "none" or _state(views, owner, connector_id) == "connected":
@@ -158,7 +162,7 @@ def _options_for(
             if option["status"] == "ready":
                 option["suggested"], option["note"] = True, reason
                 break
-    selected = next((o["make_with"] for o in options[1:] if o["suggested"]), None)
+    selected: str | None = next((o["make_with"] for o in options[1:] if o["suggested"]), None)
     if not cfg["preselect_suggested"] or selected is None:
         selected = "native"
     return options, selected
@@ -190,7 +194,10 @@ def make_choices(brief: dict[str, Any], owner: str, *, views: Any = None) -> lis
         if fmt not in cfg["formats"]:
             continue
         options, selected = _options_for(fmt, deliverable, brief, owner, cfg, views)
-        choices.append(PlanMakeChoice(deliverable=index, options=options, selected=selected).model_dump(mode="json"))
+        typed_options = [PlanMakeOption.model_validate(option) for option in options]
+        choices.append(
+            PlanMakeChoice(deliverable=index, options=typed_options, selected=selected).model_dump(mode="json")
+        )
     return choices
 
 

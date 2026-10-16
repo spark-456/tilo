@@ -443,6 +443,7 @@ def _prefetch_approaches(
                 if error is None:
                     work.update(computed=version, result=result)
                     try:
+                        assert result is not None
                         _saved(store, writer, task_id, task, [result.event], {"approaches": result.approaches})
                     except Exception as exc:
                         log_caught(exc, __name__, locals())
