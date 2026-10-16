@@ -1,9 +1,9 @@
 .tt-pool-host{position:relative;min-height:100%}
 .tt-pool-page{position:relative;min-height:inherit}
-.tt-pool-page--covered{filter:blur(8px) saturate(.85);transform:scale(1.015)}
-.tt-pool-page--sink{filter:none;transform:none}
+.tt-pool-page--covered{opacity:.72}
+.tt-pool-page--sink{opacity:1}
 .tt-pool-overlay{position:fixed;z-index:1000;inset:0;display:grid;place-items:center;overflow:hidden;pointer-events:auto;color:var(--ink,#0b0b0c)}
-.tt-pool-scrim{position:absolute;inset:0;background:var(--bg,#fff);opacity:.35}
+.tt-pool-scrim{position:absolute;inset:0;background:var(--bg,#fff);opacity:.96}
 .tt-pool__stage{position:relative;width:380px;height:280px;transform:scale(1.25)}
 .tt-pool__water{position:absolute;top:38px;left:0;width:380px;height:130px;box-sizing:border-box;border:1px solid var(--line2,#d5d5d0);border-radius:50%;background:var(--card,#fff);transform-origin:center}
 .tt-pool__water::before,.tt-pool__lip{content:"";position:absolute;border-radius:50%;background:radial-gradient(ellipse at 50% 35%,#c9e8f1 0%,#9fcfe0 45%,#6fb2cb 100%)}
@@ -18,7 +18,7 @@
 .tt-pool__drops{position:absolute;z-index:4;top:103px;left:190px;width:0;height:0}
 .tt-pool__drop{position:absolute;border:1.5px solid #0b0b0c;border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;box-sizing:border-box;opacity:0}
 .tt-pool__splash{position:absolute;top:-46px;left:-150px;width:300px;height:92px;border:3px solid #fff;border-radius:50%;opacity:0}
-.tt-pool__swimmer{position:absolute;z-index:2;top:0;left:0;width:66px;height:52px;offset-path:path("M 68 103 A 122 32 0 1 1 312 103 A 122 32 0 1 1 68 103");offset-rotate:0deg;offset-anchor:50% 100%}
+.tt-pool__swimmer{position:absolute;z-index:2;top:103px;left:190px;width:66px;height:52px;will-change:transform}
 .tt-pool__swimmer-clip{position:absolute;top:0;left:4px;width:58px;height:44px;overflow:hidden}
 .tt-pool__swim-ring{bottom:2px;left:-6px;width:78px;height:16px;border-width:2.5px}
 .tt-pool__buddy--sink{top:29px;left:150px;width:80px;height:74px;overflow:hidden}
@@ -28,5 +28,4 @@
 .tt-pool__caption strong{font-size:18px;letter-spacing:-.3px}
 .tt-pool__caption span{color:var(--ink2,#46464a);font-family:var(--mono,monospace);font-size:12px}
 @media(max-width:560px){.tt-pool__stage{transform:scale(.8)}}
-@media(prefers-reduced-motion:reduce){.tt-pool-page--covered{filter:none;transform:none;opacity:.72}}
-[data-motion="still"] .tt-pool-page--covered{filter:none;transform:none}
+@media(prefers-reduced-motion:reduce){.tt-pool-page--covered{opacity:.72}}
