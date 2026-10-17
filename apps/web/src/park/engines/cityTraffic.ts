@@ -14,27 +14,36 @@ export interface Route extends Body {
 const TILE = 4;
 export const TRAFFIC_TICK = 1 / 60;
 class Grid {
-  private cells = new Map<string, Set<number>>();
-  private keys(p: Body): string[] {
-    const keys: string[] = [];
-    for (let x = Math.floor((p.x - p.halfX) / TILE); x <= Math.floor((p.x + p.halfX) / TILE); x++)
-      for (let y = Math.floor((p.y - p.halfY) / TILE); y <= Math.floor((p.y + p.halfY) / TILE); y++)
-        keys.push(`${x},${y}`);
-    return keys;
-  }
+  private cells = new Map<number, Map<number, Set<number>>>();
   add(p: Body, id: number): void {
-    for (const key of this.keys(p)) {
-      let ids = this.cells.get(key);
-      if (!ids) {
-        ids = new Set();
-        this.cells.set(key, ids);
+    const x0 = Math.floor((p.x - p.halfX) / TILE);
+    const x1 = Math.floor((p.x + p.halfX) / TILE);
+    const y0 = Math.floor((p.y - p.halfY) / TILE);
+    const y1 = Math.floor((p.y + p.halfY) / TILE);
+    for (let x = x0; x <= x1; x++) {
+      let row = this.cells.get(x);
+      if (!row) {
+        row = new Map();
+        this.cells.set(x, row);
       }
-      ids.add(id);
+      for (let y = y0; y <= y1; y++) {
+        let ids = row.get(y);
+        if (!ids) {
+          ids = new Set();
+          row.set(y, ids);
+        }
+        ids.add(id);
+      }
     }
   }
   free(p: Body, id: number): boolean {
-    for (const key of this.keys(p))
-      for (const other of this.cells.get(key) ?? []) if (other !== id) return false;
+    const x0 = Math.floor((p.x - p.halfX) / TILE);
+    const x1 = Math.floor((p.x + p.halfX) / TILE);
+    const y0 = Math.floor((p.y - p.halfY) / TILE);
+    const y1 = Math.floor((p.y + p.halfY) / TILE);
+    for (let x = x0; x <= x1; x++)
+      for (let y = y0; y <= y1; y++)
+        for (const other of this.cells.get(x)?.get(y) ?? []) if (other !== id) return false;
     return true;
   }
 }
@@ -157,4 +166,27 @@ export function compileTraffic(
     frames.push(traffic.positions.map((p) => ({ ...p })));
   }
   return [...frames, frames[0] as Body[]];
+}
+
+export interface TrafficBatch {
+  routes: Route[];
+  standing: Body[];
+  lanesOnly: boolean;
+}
+
+export function compileTrafficInWorker(batches: TrafficBatch[]): Promise<Body[][][]> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL("./cityTraffic.worker.ts", import.meta.url), {
+      type: "module",
+    });
+    worker.onmessage = (event: MessageEvent<Body[][][]>) => {
+      worker.terminate();
+      resolve(event.data);
+    };
+    worker.onerror = () => {
+      worker.terminate();
+      reject(new Error("City traffic worker failed"));
+    };
+    worker.postMessage(batches);
+  });
 }

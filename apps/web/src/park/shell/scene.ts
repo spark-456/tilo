@@ -11,6 +11,7 @@ import { parkKit } from "./kit";
 
 export interface BackdropScene {
   el: ReactNode;
+  ready: Promise<void>;
   /** The three map pins on the 1600x1000 scene (not yet scaled to the window). */
   pins: Pin[];
 }
@@ -61,7 +62,11 @@ export function backdropScene(time: "day" | "night", motion: CityMotion): Backdr
     avoid: true,
     traffic: true,
   });
-  const scene = { el: drawn.el as ReactNode, pins: pickPins(drawn.spots) };
+  const scene = {
+    el: drawn.el as ReactNode,
+    pins: pickPins(drawn.spots),
+    ready: drawn.ready?.catch(() => undefined) ?? Promise.resolve(),
+  };
   cache.set(key, scene);
   return scene;
 }

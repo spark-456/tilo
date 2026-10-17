@@ -40,7 +40,7 @@ import { useParkTour } from "./tour";
 import "./park.shell.css";
 import { themeFor } from "../tokens/themes";
 import { TiloBubble } from "./TiloBubble";
-import { backdropScene } from "./scene";
+import { type BackdropScene, backdropScene } from "./scene";
 
 const SIGN_OUT = "This is a prototype, so you stay signed in";
 const SIGNED_OUT = "You are signed out";
@@ -130,22 +130,26 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [api, store]);
 
-  // The first city is drawn after the boot splash has been committed and the design fonts have loaded
-  // (the shell stays hidden under the splash until then, so no text swaps face and moves the nav).
+  // The traffic schedule is solved in a worker; keep the HTML cover until it and the design fonts are ready.
+  const [scene, setScene] = useState<BackdropScene | null>(null);
   useEffect(() => {
     let live = true;
-    backdropScene(appearance.time, appearance.motion);
-    loadShellFonts().then(() => {
-      if (live) setReady(true);
-    });
+    const draw = () => {
+      const next = backdropScene(appearance.time, appearance.motion);
+      void Promise.all([next.ready, loadShellFonts()]).then(() => {
+        if (!live) return;
+        setScene(next);
+        setReady(true);
+      });
+    };
+    const cover = document.getElementById("tilo-boot-cover");
+    if (cover) window.addEventListener("tilo-boot-loop-complete", draw, { once: true });
+    else draw();
     return () => {
       live = false;
+      window.removeEventListener("tilo-boot-loop-complete", draw);
     };
   }, [appearance.time, appearance.motion]);
-  const scene = useMemo(
-    () => (ready ? backdropScene(appearance.time, appearance.motion) : null),
-    [ready, appearance.time, appearance.motion],
-  );
 
   const page = route?.page ?? null;
   // A tab or menu click fades the old page out and the new one in. Everything else (the browser's back button, a
@@ -219,7 +223,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       });
   };
   return (
-    <PoolLoader kind="site" loading={!ready}>
+    <PoolLoader kind="site" loading={!ready && !document.getElementById("tilo-boot-cover")}>
       <CityBackdrop
         scene={scene}
         vw={app.vw}
@@ -310,6 +314,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* The same elements on every page, so a page swap never remounts the outlet (focus stays). */}
       <main
         className={`park-shell__main ${ready ? "" : "park-shell__booting"}`}
+        data-boot-ready={ready ? "true" : undefined}
         data-phase={swap.phase === "in" ? undefined : swap.phase}
       >
         {/* QA-DEMO-1 M1: inside the column on a page (below the fixed nav's padding), pinned under the nav on Home */}
