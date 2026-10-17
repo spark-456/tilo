@@ -1,8 +1,10 @@
-import { type KeyboardEvent, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import type { HostState } from "../../../api/connect";
 import type { MeetingHostApi } from "../../api/live/meetingHost";
 import type { MeetingMinutesApi } from "../../api/live/meetingMinutes";
 import type { PeopleRow } from "../../api/live/peopleLists";
 import type { AgendaPlateRow } from "../../api/types";
+import { AppLink } from "../../shared/AppLink";
 import { openMeetTab } from "../../shared/hostMeetingRules";
 import { MeetingBrief } from "./MeetingBrief";
 import { MeetingAttend } from "./MeetingHost";
@@ -11,7 +13,7 @@ import { MeetingMinutes } from "./MeetingMinutes";
 const START_HOUR = 8;
 const END_HOUR = 20;
 const SLOTS_PER_DAY = (END_HOUR - START_HOUR) * 4;
-const SLOT_HEIGHT = 22;
+const SLOT_HEIGHT = 14;
 const localDate = (date: Date): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const human = (value: string): string => {
@@ -45,18 +47,24 @@ export function LiveWeek({
   meetings,
   onSchedule,
   host,
+  hostState,
   minutes,
   getJson,
+  onMeetHere,
+  onDeleted,
 }: {
   rows: AgendaPlateRow[];
   parked: AgendaPlateRow[];
   meetings: PeopleRow[];
   onSchedule: (start: string, minutes: number) => void;
   host: MeetingHostApi | null;
+  hostState?: () => Promise<HostState>;
   minutes: MeetingMinutesApi | null;
   getJson: ((path: string) => Promise<unknown>) | null;
+  onMeetHere?: (start: string, minutes: number) => Promise<void>;
+  onDeleted?: () => void;
 }) {
-  const start = useMemo(() => monday(new Date()), []);
+  const [start, setStart] = useState(() => monday(new Date()));
   const days = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(start);
     date.setDate(start.getDate() + index);
@@ -83,9 +91,28 @@ export function LiveWeek({
   ];
   const [selected, setSelected] = useState<Entry | null>(null);
   const [briefRequested, setBriefRequested] = useState(false);
+  const [attendeeNames, setAttendeeNames] = useState<string[] | null>(null);
   const drag = useRef<{ start: number; end: number } | null>(null);
   const suppressClick = useRef(false);
   const [joinError, setJoinError] = useState("");
+  const [slotPick, setSlotPick] = useState<{ day: number; slot: number; minutes: number } | null>(
+    null,
+  );
+  const [hostConnection, setHostConnection] = useState<HostState | null>(null);
+  const [actionError, setActionError] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!slotPick) return;
+    let live = true;
+    setHostConnection("unknown");
+    hostState?.().then(
+      (state) => live && setHostConnection(state),
+      () => live && setHostConnection("unknown"),
+    );
+    return () => {
+      live = false;
+    };
+  }, [hostState, slotPick]);
   const labelDate = (date: Date) => {
     const isToday = localDate(date) === localDate(new Date());
     const day = new Intl.DateTimeFormat(undefined, {
@@ -97,9 +124,14 @@ export function LiveWeek({
   };
   const schedule = (first: number, last: number) => {
     const low = Math.min(first, last);
-    const span = Math.min(45, Math.max(15, (Math.abs(last - first) + 1) * 15));
+    const span = Math.max(15, (Math.abs(last - first) + 1) * 15);
     const date = days[Math.floor(low / SLOTS_PER_DAY)];
-    if (date) onSchedule(slotStart(date, low % SLOTS_PER_DAY).toISOString(), span);
+    if (date)
+      setSlotPick({
+        day: Math.floor(low / SLOTS_PER_DAY),
+        slot: low % SLOTS_PER_DAY,
+        minutes: span,
+      });
   };
   const moveFocus = (button: HTMLButtonElement, delta: number) => {
     const all = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-week-slot]"));
@@ -125,6 +157,41 @@ export function LiveWeek({
     }
   };
   const selectedMeeting = selected?.meeting;
+  const selectedMeetingId = selectedMeeting?.id;
+  useEffect(() => {
+    if (!selectedMeetingId || !getJson) {
+      setAttendeeNames(null);
+      return;
+    }
+    let live = true;
+    setAttendeeNames(null);
+    getJson(`/v1/meetings/${encodeURIComponent(selectedMeetingId)}`).then(
+      (value) => {
+        if (!live) return;
+        const attendees =
+          value &&
+          typeof value === "object" &&
+          "attendees" in value &&
+          Array.isArray(value.attendees)
+            ? value.attendees
+            : [];
+        setAttendeeNames(
+          attendees.flatMap((attendee) =>
+            attendee &&
+            typeof attendee === "object" &&
+            "name" in attendee &&
+            typeof attendee.name === "string"
+              ? [attendee.name]
+              : [],
+          ),
+        );
+      },
+      () => live && setAttendeeNames([]),
+    );
+    return () => {
+      live = false;
+    };
+  }, [getJson, selectedMeetingId]);
   const selectedDate = selected ? human(selected.start) : "";
   const join = async (meeting: PeopleRow) => {
     if (!host) return;
@@ -142,19 +209,45 @@ export function LiveWeek({
     <section className="cx-agenda-liveweek" aria-label="Week calendar">
       <div className="cx-agenda-weektitle">
         <div>
-          <h2>This week</h2>
+          <h2>
+            Week of{" "}
+            {new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(start)}
+          </h2>
           <p>Choose an open time or drag across 15-minute slots to schedule.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            const now = new Date();
-            now.setMinutes(Math.ceil(now.getMinutes() / 15) * 15, 0, 0);
-            onSchedule(now.toISOString(), 15);
-          }}
-        >
-          + New
-        </button>
+        <div className="cx-agenda-weekactions">
+          <button
+            type="button"
+            aria-label="Previous week"
+            onClick={() =>
+              setStart((day) => new Date(day.getFullYear(), day.getMonth(), day.getDate() - 7))
+            }
+          >
+            ‹
+          </button>
+          <button type="button" aria-label="Today" onClick={() => setStart(monday(new Date()))}>
+            Today
+          </button>
+          <button
+            type="button"
+            aria-label="Next week"
+            onClick={() =>
+              setStart((day) => new Date(day.getFullYear(), day.getMonth(), day.getDate() + 7))
+            }
+          >
+            ›
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const now = new Date();
+              now.setMinutes(Math.ceil(now.getMinutes() / 15) * 15, 0, 0);
+              onSchedule(now.toISOString(), 15);
+            }}
+          >
+            + New
+          </button>
+        </div>
       </div>
       <section className="cx-agenda-scroll" aria-label="Week time slots">
         <div className="cx-agenda-headrow">
@@ -252,7 +345,7 @@ export function LiveWeek({
                     <button
                       key={entry.key}
                       type="button"
-                      className="cx-agenda-event"
+                      className={`cx-agenda-event${entry.meeting ? "" : " is-calendar-entry"}`}
                       style={{ top: offset * SLOT_HEIGHT, height }}
                       onClick={() => {
                         setSelected(entry);
@@ -265,6 +358,62 @@ export function LiveWeek({
                     </button>
                   );
                 })}
+                {slotPick?.day === dayIndex ? (
+                  <fieldset
+                    className="cx-agenda-slot-popover"
+                    style={{ top: slotPick.slot * SLOT_HEIGHT + SLOT_HEIGHT }}
+                    aria-label="Schedule at this time"
+                  >
+                    <strong>{human(slotStart(day, slotPick.slot).toISOString())}</strong>
+                    <p>Tilo will join at this time and prepare meeting notes.</p>
+                    {hostConnection === "connected" ? (
+                      <button
+                        type="button"
+                        disabled={busy || !onMeetHere}
+                        onClick={() => {
+                          setBusy(true);
+                          setActionError("");
+                          void onMeetHere?.(
+                            slotStart(day, slotPick.slot).toISOString(),
+                            slotPick.minutes,
+                          )
+                            .then(() => {
+                              setSlotPick(null);
+                              onDeleted?.();
+                            })
+                            .catch(() =>
+                              setActionError(
+                                "Tilo could not start that meeting. Try again or invite others.",
+                              ),
+                            )
+                            .finally(() => setBusy(false));
+                        }}
+                      >
+                        {busy ? "Starting…" : "Meet with Tilo here"}
+                      </button>
+                    ) : (
+                      <p>
+                        {hostConnection === "unknown"
+                          ? "Tilo could not confirm the meeting host. "
+                          : "Tilo's meeting host is not signed in. "}
+                        <AppLink to="/connectors">Sign in the meeting host</AppLink>
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSchedule(slotStart(day, slotPick.slot).toISOString(), slotPick.minutes);
+                        setSlotPick(null);
+                      }}
+                    >
+                      Invite others...
+                    </button>
+                    <button type="button" className="secondary" onClick={() => setSlotPick(null)}>
+                      Close
+                    </button>
+                    {actionError ? <p role="alert">{actionError}</p> : null}
+                  </fieldset>
+                ) : null}
                 {dayKey === localDate(now) &&
                 nowMinutes >= 0 &&
                 nowMinutes < (END_HOUR - START_HOUR) * 60 ? (
@@ -291,11 +440,15 @@ export function LiveWeek({
           </button>
           <h3>{selected.title}</h3>
           <p>{selectedDate}</p>
-          <p>
-            {selectedMeeting
-              ? "Attendees are not included in this meeting list."
-              : "People are not included in this calendar entry."}
-          </p>
+          {selectedMeeting ? (
+            attendeeNames === null ? (
+              <p>Loading people…</p>
+            ) : (
+              <p>
+                {attendeeNames.length ? attendeeNames.join(", ") : "No other people are listed."}
+              </p>
+            )
+          ) : null}
           {selectedMeeting && getJson ? (
             <button type="button" onClick={() => setBriefRequested(true)}>
               Tilo brief me
@@ -314,12 +467,29 @@ export function LiveWeek({
           ) : null}
           {selectedMeeting && host && selectedMeeting.status === "scheduled" ? (
             <button type="button" onClick={() => void join(selectedMeeting)}>
-              Join
+              Join now
             </button>
           ) : null}
           {joinError ? <p role="alert">{joinError}</p> : null}
           {selectedMeeting && minutes && ["ended", "minuted"].includes(selectedMeeting.status) ? (
             <MeetingMinutes id={selectedMeeting.id} status={selectedMeeting.status} api={minutes} />
+          ) : null}
+          {selectedMeeting && host && selectedMeeting.status === "scheduled" ? (
+            <button
+              type="button"
+              className="secondary"
+              onClick={() =>
+                void host
+                  .remove(selectedMeeting.id)
+                  .then(() => {
+                    setSelected(null);
+                    onDeleted?.();
+                  })
+                  .catch(() => setJoinError("Could not delete this meeting."))
+              }
+            >
+              Delete
+            </button>
           ) : null}
         </aside>
       ) : null}
