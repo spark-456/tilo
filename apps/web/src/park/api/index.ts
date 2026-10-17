@@ -1,6 +1,7 @@
 // The Park api (WEB-1a; plan section 6.1): every method returns a Promise of `{ data, source }`, so a
 // page can always say whether it shows sample data. One list of method names, one interface.
 import type { UserSettings, UserSettingsUpdate } from "@tilo/contracts";
+import type { SkillRef } from "../../api/skillRoute";
 import type { TeamOp, TeamView } from "./live/teamLive";
 import type {
   Ack,
@@ -115,12 +116,27 @@ export interface Api {
  * `types.test.ts` pins `startWorld`'s parameters and `keyof Api`; Thinking calls stay exactly two arguments.
  * `mode` is only the size on screen and never reaches the server. This one helper is the only caller.
  */
-export const askQuick = (api: Api, mode: TierKey, query: string): R<QuickReply> =>
-  (api.startWorld as unknown as (m: TierKey, q: string, effort: "quick") => R<QuickReply>)(
-    mode,
-    query,
-    "quick",
-  );
+export const askQuick = (
+  api: Api,
+  mode: TierKey,
+  query: string,
+  refs: readonly SkillRef[] = [],
+): R<QuickReply> =>
+  refs.length
+    ? (
+        api.startWorld as unknown as (
+          m: TierKey,
+          q: string,
+          effort: "quick",
+          files: readonly File[],
+          refs: readonly SkillRef[],
+        ) => R<QuickReply>
+      )(mode, query, "quick", [], refs)
+    : (api.startWorld as unknown as (m: TierKey, q: string, effort: "quick") => R<QuickReply>)(
+        mode,
+        query,
+        "quick",
+      );
 
 /**
  * WEB-W1: a Thinking start with attached files. Like `askQuick`, the files travel as a fourth run-time argument so
@@ -131,6 +147,7 @@ export const startWithFiles = (
   mode: TierKey,
   query: string,
   files: readonly File[],
+  refs: readonly SkillRef[] = [],
 ): R<StartAck> =>
   (
     api.startWorld as unknown as (
@@ -138,5 +155,6 @@ export const startWithFiles = (
       q: string,
       effort: undefined,
       files: readonly File[],
+      refs: readonly SkillRef[],
     ) => R<StartAck>
-  )(mode, query, undefined, files);
+  )(mode, query, undefined, files, refs);

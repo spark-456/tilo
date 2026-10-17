@@ -18,7 +18,7 @@ from typing import Any
 DEFAULT_PROMPTS_ROOT = Path(__file__).resolve().parents[4] / "prompts"
 
 
-_GAP = r"[\s\u200b-\u200f\u2060\ufeff]*"  # whitespace and zero-width characters
+_GAP = r"[\s\u00ad\u200b-\u200f\u2060\ufeff]*"  # whitespace, soft hyphens and zero-width characters
 
 
 def neutralise_marker(text: str, marker: str) -> str:

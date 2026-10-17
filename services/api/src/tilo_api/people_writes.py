@@ -214,23 +214,32 @@ class ItemIn(_Closed):
 MAX_BODY_BYTES = 32768  # BQ-PPL11C-1: a people POST body over this is a 413, whatever the route
 
 
-async def _capped_body(request: Request) -> bytes:
-    """The body, refused once it passes the cap: by the declared length before any read, else by counting as it
-    streams, so a client that keeps sending is cut after the cap (and one read-ahead chunk)."""
+async def capped_bytes(
+    request: Request, cap: int, *, too_large: str = "body_too_large", length_required: bool = False
+) -> bytes:
+    """The body, refused once it passes `cap`: by the declared length before any read, else by counting as it streams,
+    so a client that keeps sending is cut after the cap (and one read-ahead chunk). `length_required` makes a missing
+    length a 411 (an upload); an invalid one is always a 400."""
     if "content-length" in request.headers:
         raw_cl = request.headers["content-length"].strip()
         if len(raw_cl) > 10 or not (raw_cl.isascii() and raw_cl.isdigit()):  # `isdigit` alone admits '\xb2'
             raise Refusal(400, "invalid_content_length")
-        if int(raw_cl) > MAX_BODY_BYTES:
-            raise Refusal(413, "body_too_large")
+        if int(raw_cl) > cap:
+            raise Refusal(413, too_large)
+    elif length_required:
+        raise Refusal(411, "length_required")
     chunks: list[bytes] = []
     size = 0
     async for chunk in request.stream():
         size += len(chunk)
-        if size > MAX_BODY_BYTES:
-            raise Refusal(413, "body_too_large")
+        if size > cap:
+            raise Refusal(413, too_large)
         chunks.append(chunk)
     return b"".join(chunks)
+
+
+async def _capped_body(request: Request) -> bytes:
+    return await capped_bytes(request, MAX_BODY_BYTES)
 
 
 def json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaitable[Body]]:

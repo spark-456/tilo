@@ -35,6 +35,26 @@ function rig(status: number, body: unknown) {
 }
 
 describe("QUICK_THINKING_http: the mode field", () => {
+  it("FR_SKL_04_ROUTE_quick_answer_and_switch_keep_only_the_served_skill_offer", async () => {
+    const skill = {
+      id: "competitor-scan",
+      kind: "library",
+      scope: "library",
+      name: "Competitor scan",
+      version: "1.0.0",
+      score: 0.89,
+      source: "matched",
+    };
+    const answer = rig(200, { mode: "quick", outcome: "answered", text: "Done.", skill });
+    expect((await askQuick(answer.api, "quick", "Scan competitors")).data.skill).toEqual(skill);
+    const offer = rig(200, {
+      mode: "quick",
+      outcome: "switch_to_thinking",
+      reason: "needs_tools",
+      skill,
+    });
+    expect((await askQuick(offer.api, "quick", "Scan competitors")).data.skill).toEqual(skill);
+  });
   it("QUICK_THINKING_http_legacy_and_thinking_calls_send_no_quick_field", async () => {
     const r = rig(201, THINKING_201);
     const ack = await r.api.startWorld("quick", "Plan the offsite");

@@ -48,7 +48,16 @@ def test_FR_SKL_02_SKILLS_4_the_version_has_plan_steps_with_server_set_asks_and_
     response = skills4.version(capture_id)
     assert response.status_code == 200, response.text
     body = response.json()
-    assert set(body) == {"capture_id", "plan_steps", "clarifying_question", "estimates"}
+    assert set(body) == {
+        "capture_id",
+        "plan_steps",
+        "clarifying_question",
+        "estimates",
+        "inputs",
+        "hosts",
+        "cannot",
+        "needs_setup",
+    }  # the last four are ADR-0051 S1
     assert body["capture_id"] == capture_id and body["clarifying_question"] is None
     rows = body["plan_steps"]
     assert [(s["tool"], s["action"], s["verb"]) for s in rows] == [
@@ -194,7 +203,10 @@ def test_FR_SKL_02_SKILLS_4_a_second_call_answers_the_same_version_with_no_new_c
     first = skills4.version(capture_id)
     events, calls = len(skills4.all_events()), len(skills4.model.calls)
     second = skills4.version(capture_id)
-    assert second.status_code == 200 and second.json() == first.json()
+    assert second.status_code == 200 and second.json() == {
+        **first.json(),
+        "cannot": None,
+    }  # ADR-0051: a repeat cannot know
     assert len(skills4.all_events()) == events and len(skills4.model.calls) == calls
     assert [e["type"] for e in skills4.events()].count("skill.version_proposed") == 1
 
@@ -220,7 +232,7 @@ def test_FR_SKL_02_SKILLS_4_one_version_proposed_event_with_counts_only(skills4)
         "credits_per_run": 9,
         "source": "prior",
     }
-    assert event["trace"]["model_role"] == "specialist" and event["trace"]["tokens_out"] == 120
+    assert event["trace"]["model_role"] == "skill_capture" and event["trace"]["tokens_out"] == 120
     dumped = json.dumps(event)
     assert "mailbox" not in dumped and "reply" not in dumped
 
