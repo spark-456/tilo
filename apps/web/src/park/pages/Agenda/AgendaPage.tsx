@@ -3,7 +3,7 @@
 // Data comes only from the Park Api (fixture or live, with its `source`); the page reads approvals from
 // `app.dec` (the shell's `decide(key)` is the only way one changes); navigation only through `app.go`.
 // No motion until WEB-3 (BQ-WEB-3).
-import { type ReactNode, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { API_URL, appCheckToken, authToken, sessionView } from "../../../api/ClientProvider";
 import type { HostState } from "../../../api/connect";
 import { liveConnectFlow } from "../../../api/connectEnv";
@@ -13,7 +13,7 @@ import type { Api } from "../../api/index";
 import { isCalendarEntry } from "../../api/live/agendaFromPlate";
 import { meetingHostApi } from "../../api/live/meetingHost";
 import { meetingMinutesApi } from "../../api/live/meetingMinutes";
-import type { PeopleRow } from "../../api/live/peopleLists";
+import { type PeopleRow, peopleListsApi } from "../../api/live/peopleLists";
 import { ORGANISATION_SETUP } from "../../api/organisationSetup";
 import type { Agenda, AgendaPlateRow, Decision, LiveAgenda } from "../../api/types";
 import { useParkApi } from "../../app/context";
@@ -32,6 +32,7 @@ import {
 import { type HostForm, refusedBeforeSend } from "../../shared/hostMeetingRules";
 import { AgendaNewMenu } from "./AgendaNewMenu";
 import { Boards } from "./Boards";
+import { LivePinboards } from "./LivePinboards";
 import { LiveWeek } from "./LiveWeek";
 import { PeopleLists } from "./PeopleLists";
 import { ScheduleWithOthersDialog } from "./ScheduleWithOthersDialog";
@@ -150,7 +151,7 @@ function PersonalAgendaPage({ app }: AgendaPageProps) {
   return (
     <Frame source={state.source}>
       {state.data.days === null ? (
-        <Plate A={state.data} />
+        <Plate A={state.data} api={api} />
       ) : (
         <Ready
           A={state.data}
@@ -164,9 +165,10 @@ function PersonalAgendaPage({ app }: AgendaPageProps) {
   );
 }
 
-function Plate({ A }: { A: LiveAgenda }) {
+function Plate({ A, api }: { A: LiveAgenda; api: Api }) {
   const [peopleKey, setPeopleKey] = useState(0);
   const [meetings, setMeetings] = useState<PeopleRow[]>([]);
+  const [teamIds, setTeamIds] = useState<string[]>([]);
   const [schedule, setSchedule] = useState<{ start: string; minutes: number } | null>(null);
   const demo = sessionView.demo();
   const http = useMemo(() => {
@@ -180,7 +182,26 @@ function Plate({ A }: { A: LiveAgenda }) {
     [hostFlow],
   );
   const minutes = useMemo(() => (http ? meetingMinutesApi(http) : null), [http]);
+  const pinboards = useMemo(() => (http ? peopleListsApi(http) : null), [http]);
   const getJson = useMemo(() => (http ? (path: string) => http.getJson(path) : null), [http]);
+  useEffect(() => {
+    if (!http) {
+      setTeamIds([]);
+      return undefined;
+    }
+    let current = true;
+    api.getTeam().then(
+      ({ data }) => {
+        if (!current) return;
+        const me = data.people.find((person) => person.you);
+        setTeamIds(me?.memberships ?? []);
+      },
+      () => current && setTeamIds([]),
+    );
+    return () => {
+      current = false;
+    };
+  }, [api, http]);
   const meetHere = async (start: string, minutes: number) => {
     if (!host) throw new Error("Meeting host is unavailable");
     const { you } = await host.people();
@@ -199,13 +220,12 @@ function Plate({ A }: { A: LiveAgenda }) {
       throw error;
     }
   };
-  const createPin = http
-    ? async (title: string, idempotencyKey: string) => {
-        const answer = await http.postJson(
-          "/v1/pinboards",
-          { title },
-          { "Idempotency-Key": idempotencyKey },
-        );
+  const createBoardPin = http
+    ? async (title: string, teamId: string | null, idempotencyKey: string) => {
+        const body = teamId ? { title, team: teamId } : { title };
+        const answer = await http.postJson("/v1/pinboards", body, {
+          "Idempotency-Key": idempotencyKey,
+        });
         if (
           !answer ||
           typeof answer !== "object" ||
@@ -215,6 +235,9 @@ function Plate({ A }: { A: LiveAgenda }) {
         )
           throw new Error("Unreadable pin reply");
       }
+    : null;
+  const createPin = createBoardPin
+    ? (title: string, idempotencyKey: string) => createBoardPin(title, null, idempotencyKey)
     : null;
   if (A.setupRequired)
     return (
@@ -280,6 +303,13 @@ function Plate({ A }: { A: LiveAgenda }) {
         onMeetHere={meetHere}
         onDeleted={() => setPeopleKey((n) => n + 1)}
       />
+      <LivePinboards
+        key={peopleKey}
+        load={pinboards?.getPinboards ?? null}
+        teamIds={teamIds}
+        createPin={createBoardPin}
+        onPinCreated={() => setPeopleKey((n) => n + 1)}
+      />
       <div className="park-agenda-studio">
         <div className="park-agenda-studiomain">
           <section aria-label="Your plate" className="park-agenda-state">
@@ -307,10 +337,6 @@ function Plate({ A }: { A: LiveAgenda }) {
           <section aria-label="Available times" className="park-agenda-state park-agenda-sidecard">
             <h2>Tilo suggests</h2>
             <p>Suggested times will appear when Tilo has real availability to share.</p>
-          </section>
-          <section aria-label="Boards" className="park-agenda-state park-agenda-sidecard">
-            <h2>Boards</h2>
-            <p>Pinboards appear here when you have saved items.</p>
           </section>
         </aside>
       </div>

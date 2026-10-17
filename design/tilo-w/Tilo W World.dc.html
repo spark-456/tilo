@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<link rel="stylesheet" href="./tilo-w.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<script src="./tilo-t.js"></script>
+<script src="./tilo-w.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div ref="{{ rootRef }}" data-theme="{{ theme }}" data-reduced="{{ reducedA }}" data-screen-label="World" style="position:relative;width:{{ rootW }};height:{{ rootH }};overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:15px;line-height:1.5">
+
+<sc-if value="{{ desk }}" hint-placeholder-val="{{ true }}">
+  <div style="position:absolute;left:0;top:0;right:0;height:60px;box-sizing:border-box;padding:0 16px 0 14px;display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--line);background:var(--card);z-index:5">
+    <a href="#" aria-label="Back to worlds" style="width:40px;height:40px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink2);flex:none">{{ iBack }}</a>
+    <div style="display:flex;flex-direction:column;line-height:1.25;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px">
+        <h1 style="margin:0;font-weight:700;font-size:18px;letter-spacing:-.4px;white-space:nowrap">Plan our team offsite in Porto</h1>
+        <span style="height:24px;padding:0 9px 0 7px;border-radius:99px;border:1px solid var(--line2);box-sizing:border-box;font-size:12px;font-weight:600;color:var(--ink2);display:flex;align-items:center;gap:5px;white-space:nowrap">{{ iCity }}Town</span>
+        <span style="height:24px;padding:0 10px 0 8px;border-radius:99px;background:{{ st.bg }};color:{{ st.fg }};font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="width:7px;height:7px;border-radius:9px;background:{{ st.dot }}"></span>{{ st.t }}</span>
+      </div>
+      <span style="font-size:12.5px;color:var(--ink3);white-space:nowrap">{{ meta }}</span>
+    </div>
+    <div style="flex:1"></div>
+    <div style="width:150px;display:flex;flex-direction:column;gap:5px;flex:none">
+      <span style="font-size:12.5px;white-space:nowrap"><strong>{{ nDone }} of 7</strong> <span style="color:var(--ink3)">steps done</span></span>
+      <div style="height:6px;border-radius:9px;background:var(--sunk);overflow:hidden"><div style="height:100%;width:{{ progPct }};background:var(--ink);border-radius:9px;transition:width .6s ease"></div></div>
+    </div>
+    <div style="width:170px;display:flex;flex-direction:column;gap:5px;flex:none">
+      <span style="font-size:12.5px;white-space:nowrap"><strong>{{ cr }}</strong> <span style="color:var(--ink3)">of 120 credits</span></span>
+      <div style="height:6px;border-radius:9px;background:var(--sunk);overflow:hidden"><div style="height:100%;width:{{ crPct }};background:var(--ink);border-radius:9px;transition:width .6s ease"></div></div>
+    </div>
+    <sc-if value="{{ canPause }}" hint-placeholder-val="{{ true }}">
+      <span role="button" onClick="{{ toggleRun }}" style="height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;cursor:pointer;flex:none;white-space:nowrap">{{ runIc }}{{ runLabel }}</span>
+    </sc-if>
+    <span role="button" onClick="{{ openMore }}" style="height:40px;padding:0 12px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;gap:6px;font-weight:600;font-size:14px;cursor:pointer;flex:none">{{ iMore }}More</span>
+  </div>
+</sc-if>
+
+<div style="position:absolute;left:0;top:{{ stT }};width:{{ stW }};height:{{ stH }};overflow:hidden;background:var(--cityBg)">
+  <div style="position:absolute;left:0;top:0;width:1000px;height:720px;transform-origin:0 0;transform:{{ cam }};transition:transform .9s cubic-bezier(.2,.8,.2,1)">
+    {{ ground }}
+    <sc-for list="{{ isl }}" as="o" hint-placeholder-count="0">
+      <div style="position:absolute;left:{{ o.x }};top:{{ o.y }};z-index:4;transform:translate(-50%,-100%) scale({{ linv }});transform-origin:50% 100%;display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none">
+        <span aria-label="{{ o.aria }}" style="width:32px;height:32px;border-radius:10px;background:var(--card);border:1px solid {{ o.bd }};box-sizing:border-box;display:flex;align-items:center;justify-content:center;color:var(--ink)">{{ o.ic }}</span>
+        <span style="font-size:11px;font-weight:600;color:var(--ink2);white-space:nowrap">{{ o.n }}</span>
+      </div>
+    </sc-for>
+    <sc-for list="{{ blds }}" as="b" hint-placeholder-count="0">
+      <div style="position:absolute;left:{{ b.l }};top:{{ b.t }};width:{{ b.w }};height:{{ b.h }};z-index:{{ b.z }};pointer-events:none">
+        <sc-if value="{{ b.cons }}" hint-placeholder-val="{{ false }}"><div style="width:100%;height:100%;transform-origin:50% 100%;animation:{{ b.consA }};filter:{{ b.fx }}">{{ b.el }}</div></sc-if>
+        <sc-if value="{{ b.fin }}" hint-placeholder-val="{{ false }}"><div style="width:100%;height:100%;transform-origin:50% 90%;animation:{{ b.anim }};filter:{{ b.fx }}">{{ b.el }}</div></sc-if>
+      </div>
+    </sc-for>
+    <sc-if value="{{ planning }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:{{ planCard.l }};top:{{ planCard.t }};width:268px;z-index:900;transform:scale({{ inv }});transform-origin:0 0;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--sh2);display:flex;flex-direction:column;gap:8px">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">NOVA · DRAFTING THE PLAN</span>
+        <sc-for list="{{ planLines }}" as="q" hint-placeholder-count="3"><span style="display:flex;gap:8px;font-size:13.5px;line-height:1.35;animation:tPop .3s ease-out both;animation-delay:{{ q.d }}"><span style="font-family:var(--mono);font-size:11.5px;color:var(--ink3);flex:none;padding-top:1px">{{ q.n }}</span>{{ q.t }}</span></sc-for>
+        <span style="height:12px;width:70%;border-radius:9px;background-color:var(--bp);background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.6) 50%,transparent 70%);background-size:700px 100%;background-repeat:no-repeat;animation:tShim 1.4s linear infinite"></span>
+        <span style="font-size:12px;color:var(--ink3)">Plots appear as each step is planned.</span>
+      </div>
+    </sc-if>
+    <sc-for list="{{ agents }}" as="a" hint-placeholder-count="0">
+      <div role="button" aria-label="{{ a.aria }}" onMouseEnter="{{ a.enter }}" onMouseLeave="{{ leave }}" onClick="{{ a.click }}" style="position:absolute;left:0;top:0;width:32px;height:40px;z-index:{{ a.z }};transform-origin:0 0;transform:{{ a.tr }};transition:{{ a.tt }};opacity:{{ a.op }};cursor:pointer;animation:tFade .4s ease-out both">
+        <span style="position:absolute;left:{{ a.hx }};top:{{ a.hy }};right:{{ a.hx }};bottom:{{ a.hb }}"></span>
+        <dc-import name="Tilo W Sprite" col="{{ a.col }}" kind="{{ a.kind }}" mood="{{ a.mood }}" walk="{{ a.walk }}" n="{{ a.n }}" face="{{ a.face }}" lit="{{ a.lit }}" hint-size="32px,40px"></dc-import>
+        <sc-if value="{{ a.tool }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:16px;top:0;width:0;height:0;transform:scale({{ a.ti }})"><span style="position:absolute;left:-13px;top:-30px;width:26px;height:26px;border-radius:99px;background:var(--card);border:1px solid var(--line2);box-sizing:border-box;color:var(--ink);display:flex;align-items:center;justify-content:center;animation:tToolBob 1.6s ease-in-out infinite">{{ a.tool }}</span></span></sc-if>
+        <sc-if value="{{ a.hand }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:16px;top:-2px;width:0;height:0;transform:scale({{ a.ti }})"><span onClick="{{ a.needs }}" style="position:absolute;left:0;top:-34px;transform:translateX(-50%);height:28px;padding:0 10px;border-radius:99px;background:var(--amber);color:#1A1407;font-size:12px;font-weight:800;display:flex;align-items:center;gap:5px;white-space:nowrap"><span style="position:absolute;inset:0;border-radius:99px;border:2px solid var(--amber);animation:wPing 1.6s ease-out infinite"></span>{{ iHand }}Needs you</span></span></sc-if>
+      </div>
+    </sc-for>
+    <sc-for list="{{ dots }}" as="d" hint-placeholder-count="0">
+      <div role="button" aria-label="{{ d.aria }}" onClick="{{ d.open }}" style="position:absolute;left:{{ d.x }};top:{{ d.y }};z-index:960;transform:translate(-50%,-100%) scale({{ linv }});transform-origin:50% 100%;padding:10px;cursor:pointer;animation:tFade .3s ease-out both">
+        <div style="height:22px;padding:0 8px;border-radius:99px;background:var(--card);border:1px solid var(--line2);box-sizing:border-box;display:flex;align-items:center;gap:4px">
+          <span style="width:5px;height:5px;border-radius:99px;background:var(--ink);animation:wDot 1.2s ease-in-out infinite"></span>
+          <span style="width:5px;height:5px;border-radius:99px;background:var(--ink);animation:wDot 1.2s ease-in-out .16s infinite"></span>
+          <span style="width:5px;height:5px;border-radius:99px;background:var(--ink);animation:wDot 1.2s ease-in-out .32s infinite"></span>
+        </div>
+      </div>
+    </sc-for>
+    <sc-for list="{{ labels }}" as="b" hint-placeholder-count="0">
+      <div onClick="{{ b.focus }}" style="position:absolute;left:{{ b.x }};top:{{ b.y }};z-index:950;transform:translate(-50%,-100%) scale({{ linv }});transform-origin:50% 100%;cursor:pointer;animation:tFade .4s ease-out both">
+        <sc-if value="{{ b.full }}" hint-placeholder-val="{{ true }}">
+          <div style="height:30px;padding:0 4px;border-radius:99px;background:var(--card);border:1px solid var(--line);box-sizing:border-box;display:flex;align-items:center;gap:6px;white-space:nowrap">
+            <span style="width:22px;height:22px;border-radius:99px;background:var(--sunk);color:var(--ink);display:flex;align-items:center;justify-content:center">{{ b.ic }}</span>
+            <span style="font-size:12.5px;font-weight:600;padding-right:{{ b.pr }}">{{ b.name }}</span>
+            <sc-if value="{{ b.chip }}" hint-placeholder-val="{{ false }}"><span style="height:22px;padding:0 8px;border-radius:99px;background:{{ b.cbg }};color:{{ b.cfg }};border:1px {{ b.cbs }} {{ b.cbd }};box-sizing:border-box;font-size:11px;font-weight:700;display:flex;align-items:center">{{ b.chip }}</span></sc-if>
+          </div>
+        </sc-if>
+        <sc-if value="{{ b.mini }}" hint-placeholder-val="{{ false }}"><span style="width:16px;height:16px;border-radius:99px;background:var(--card);border:1px solid var(--line2);box-sizing:border-box;display:flex;align-items:center;justify-content:center"><span style="width:8px;height:8px;border-radius:99px;background:{{ b.dot }};border:1px {{ b.cbs }} var(--ink3);box-sizing:border-box"></span></span></sc-if>
+      </div>
+    </sc-for>
+    <sc-if value="{{ parcel }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:0;top:0;z-index:990;width:32px;height:32px;border-radius:10px;background:var(--lime);color:#0B0B0C;border:1px solid #0B0B0C;box-sizing:border-box;display:flex;align-items:center;justify-content:center;offset-path:{{ parcelPath }};offset-rotate:0deg;animation:tParcel 1.6s cubic-bezier(.45,0,.2,1) both">{{ iParcel }}</div>
+      <div style="position:absolute;left:{{ dockX }};top:{{ dockY }};z-index:995;width:0;height:0">
+        <sc-for list="{{ conf }}" as="c" hint-placeholder-count="0"><span style="position:absolute;left:0;top:0;width:{{ c.w }};height:{{ c.h }};border-radius:2px;background:{{ c.c }};--cx:{{ c.x }};--cy:{{ c.y }};animation:tConfetti 1.8s cubic-bezier(.2,.7,.3,1) {{ c.d }} both"></span></sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ hoverOn }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:{{ hc.x }};top:{{ hc.y }};z-index:1000;pointer-events:none;transform:translate({{ hc.tx }},-100%) scale({{ inv }});transform-origin:{{ hc.or }};animation:tFade .18s ease-out both">
+        <dc-import name="Tilo W Parts" part="hover" state="{{ fr }}" agent="{{ hc.id }}" hint-size="280px,300px"></dc-import>
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ desk }}" hint-placeholder-val="{{ true }}">
+    <div style="position:absolute;left:16px;top:16px;width:max-content;max-width:470px;min-height:44px;box-sizing:border-box;padding:6px 8px 6px 8px;border-radius:14px;background:{{ now.bg }};border:1px solid {{ now.bd }};display:flex;align-items:center;gap:10px;z-index:3">
+      <span style="height:28px;padding:0 10px 0 8px;border-radius:99px;background:var(--card);border:1px solid var(--line);box-sizing:border-box;display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;white-space:nowrap;flex:none"><span style="width:8px;height:8px;border-radius:9px;background:{{ st.dot }};animation:{{ liveDot }}"></span>{{ liveLabel }}</span>
+      <span style="font-size:13.5px;line-height:1.35;min-width:0;padding-right:6px;text-wrap:pretty">{{ now.t }}</span>
+      <sc-if value="{{ now.act }}" hint-placeholder-val="{{ false }}"><span role="button" onClick="{{ now.go }}" style="height:32px;padding:0 12px;border-radius:10px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;font-size:13px;font-weight:700;cursor:pointer;flex:none;white-space:nowrap">{{ now.act }}</span></sc-if>
+    </div>
+    <div style="position:absolute;right:16px;top:16px;display:flex;gap:8px;z-index:3">
+      <span role="button" onClick="{{ cycleFollow }}" style="height:44px;padding:0 12px;border-radius:14px;background:var(--card);border:1px solid {{ followBd }};box-sizing:border-box;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap"><sc-if value="{{ followOn }}" hint-placeholder-val="{{ false }}"><span style="width:12px;height:12px;border-radius:4px;background:{{ followCol }}"></span></sc-if>{{ iFollow }}{{ followLabel }}</span>
+      <div style="display:flex;border-radius:14px;background:var(--card);border:1px solid var(--line);overflow:hidden">
+        <span role="button" aria-label="Zoom out" onClick="{{ zoomOut }}" style="width:44px;height:42px;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--line);cursor:pointer">{{ iMinus }}</span>
+        <span role="button" aria-label="Zoom in" onClick="{{ zoomIn }}" style="width:44px;height:42px;display:flex;align-items:center;justify-content:center;cursor:pointer">{{ iPlus }}</span>
+      </div>
+      <span role="button" onClick="{{ fit }}" style="height:44px;padding:0 12px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-sizing:border-box;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer">{{ iFit }}Fit</span>
+    </div>
+    <div style="position:absolute;left:16px;bottom:16px;height:52px;box-sizing:border-box;padding:0 6px;border-radius:16px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:8px;z-index:3">
+      <span role="button" aria-label="{{ playLabel }}" onClick="{{ togglePlay }}" style="width:40px;height:40px;border-radius:11px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;cursor:pointer">{{ playIc }}</span>
+      <div role="radiogroup" aria-label="Replay speed" style="display:flex;gap:2px;padding:3px;border-radius:11px;background:var(--sunk)">
+        <sc-for list="{{ speeds }}" as="s" hint-placeholder-count="4"><span role="radio" aria-checked="{{ s.on }}" onClick="{{ s.pick }}" style="height:34px;padding:0 10px;border-radius:9px;display:flex;align-items:center;font-size:12.5px;font-weight:700;background:{{ s.bg }};color:{{ s.fg }};cursor:pointer;white-space:nowrap">{{ s.t }}</span></sc-for>
+      </div>
+      <div style="width:200px;display:flex;flex-direction:column;gap:4px;padding:0 8px">
+        <div style="position:relative;height:6px;border-radius:9px;background:var(--sunk);overflow:hidden"><div style="position:absolute;left:0;top:0;bottom:0;width:100%;border-radius:9px;background:var(--ink);transform-origin:0 50%;transform:scaleX({{ scrub }});transition:transform .4s ease"></div></div>
+        <span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);white-space:nowrap">event {{ evN }} of {{ evT }} · {{ evName }}</span>
+      </div>
+    </div>
+    <sc-if value="{{ ovChat }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;right:16px;bottom:16px;width:384px;height:600px;z-index:20">
+        <dc-import name="Tilo W Parts" part="chat" header="{{ true }}" h="600px" state="{{ fr }}" filter="{{ chatF }}" on-close="{{ closeOv }}" on-convene="{{ openConvene }}" hint-size="384px,600px"></dc-import>
+      </div>
+    </sc-if>
+    <sc-if value="{{ ovConvene }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ closeOv }}" style="position:absolute;inset:0;background:var(--scrim);z-index:30;animation:wScrim .2s ease-out both"></div>
+      <div style="position:absolute;left:50%;top:50%;width:440px;transform:translate(-50%,-50%);z-index:31">
+        <dc-import name="Tilo W Parts" part="convene" state="{{ fr }}" on-close="{{ closeOv }}" on-call="{{ callMeeting }}" hint-size="440px,620px"></dc-import>
+      </div>
+    </sc-if>
+  </sc-if>
+</div>
+
+<sc-if value="{{ desk }}" hint-placeholder-val="{{ true }}">
+  <aside style="position:absolute;left:940px;top:60px;width:500px;height:840px;box-sizing:border-box;border-left:1px solid var(--line);background:var(--card);display:flex;flex-direction:column">
+    <div role="tablist" style="flex:none;height:54px;padding:0 12px;display:flex;gap:2px;border-bottom:1px solid var(--line)">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4"><span role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="flex:1;height:54px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:14px;color:{{ t.fg }};border-bottom:2px solid {{ t.bd }};cursor:pointer">{{ t.ic }}{{ t.t }}<sc-if value="{{ t.badge }}" hint-placeholder-val="{{ false }}"><span style="height:18px;min-width:18px;padding:0 5px;box-sizing:border-box;border-radius:99px;background:{{ t.bbg }};color:{{ t.bfg }};border:1px solid {{ t.bbd }};font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ t.badge }}</span></sc-if></span></sc-for>
+    </div>
+    <div style="flex:1;min-height:0;position:relative">
+      <sc-if value="{{ tabStory }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;inset:0;overflow:auto;padding:18px 20px 24px;box-sizing:border-box"><dc-import name="Tilo W Parts" part="story" state="{{ fr }}" max="{{ 9 }}" on-approve="{{ approve }}" on-retry="{{ retry }}" hint-size="100%,640px"></dc-import></div></sc-if>
+      <sc-if value="{{ tabChat }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0"><dc-import name="Tilo W Parts" part="chat" h="786px" state="{{ fr }}" filter="{{ chatF }}" on-convene="{{ openConvene }}" hint-size="100%,786px"></dc-import></div></sc-if>
+      <sc-if value="{{ tabResult }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;overflow:auto;padding:18px 20px 24px;box-sizing:border-box"><dc-import name="Tilo W Parts" part="result" state="{{ fr }}" hint-size="100%,1400px"></dc-import></div></sc-if>
+      <sc-if value="{{ tabSteps }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;overflow:auto;padding:18px 20px 24px;box-sizing:border-box"><dc-import name="Tilo W Parts" part="steps" state="{{ fr }}" hint-size="100%,600px"></dc-import></div></sc-if>
+      <sc-if value="{{ ovAgent }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;overflow:auto;padding:18px 20px 24px;box-sizing:border-box;background:var(--card);z-index:4;animation:wDrawer .26s cubic-bezier(.2,.8,.2,1) both"><dc-import name="Tilo W Parts" part="panel" state="{{ fr }}" agent="{{ pick }}" on-close="{{ closeOv }}" on-talk="{{ talk }}" on-follow="{{ followAg }}" hint-size="100%,760px"></dc-import></div></sc-if>
+      <sc-if value="{{ ovMore }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;overflow:auto;padding:18px 20px 24px;box-sizing:border-box;background:var(--card);z-index:4;animation:wDrawer .26s cubic-bezier(.2,.8,.2,1) both"><dc-import name="Tilo W Parts" part="more" state="{{ fr }}" on-close="{{ closeOv }}" hint-size="100%,600px"></dc-import></div></sc-if>
+    </div>
+  </aside>
+</sc-if>
+
+<sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}">
+  <div style="position:absolute;left:0;right:0;top:0;z-index:6;padding:0 0 10px;background:linear-gradient(var(--bg) 72%,transparent)">
+    <div style="height:44px;padding:0 26px;display:flex;align-items:center;justify-content:space-between;font-size:15px;font-weight:600"><span>9:41</span><span style="width:24px;height:11px;border-radius:3px;border:1.5px solid var(--ink);box-sizing:border-box"></span></div>
+    <div style="padding:0 12px;display:flex;align-items:center;gap:8px">
+      <a href="#" aria-label="Back" style="width:44px;height:44px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-sizing:border-box;display:flex;align-items:center;justify-content:center;flex:none">{{ iBack }}</a>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25"><span style="font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Team offsite in Porto</span><span style="font-size:12px;color:var(--ink3);white-space:nowrap">Town · {{ agN }} · {{ cr }}/120 credits</span></div>
+      <span style="height:28px;padding:0 10px 0 8px;border-radius:99px;background:{{ st.bg }};color:{{ st.fg }};font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;flex:none;white-space:nowrap"><span style="width:7px;height:7px;border-radius:9px;background:{{ st.dot }}"></span>{{ st.t }}</span>
+      <span role="button" aria-label="More" onClick="{{ openMore }}" style="width:44px;height:44px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-sizing:border-box;display:flex;align-items:center;justify-content:center;flex:none">{{ iMore }}</span>
+    </div>
+    <div style="margin:10px 12px 0;height:4px;border-radius:9px;background:var(--sunk);overflow:hidden"><div style="height:100%;width:{{ progPct }};background:var(--ink);border-radius:9px"></div></div>
+    <sc-if value="{{ now.act }}" hint-placeholder-val="{{ false }}">
+      <div role="button" onClick="{{ now.go }}" style="margin:10px 12px 0;min-height:44px;box-sizing:border-box;padding:6px 6px 6px 12px;border-radius:14px;background:{{ now.bg }};border:1px solid {{ now.bd }};display:flex;align-items:center;gap:8px"><span style="flex:1;font-size:13px;font-weight:600;line-height:1.35">{{ now.t }}</span><span style="height:32px;padding:0 12px;border-radius:10px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;font-size:13px;font-weight:700;flex:none">{{ now.act }}</span></div>
+    </sc-if>
+  </div>
+  <sc-if value="{{ phoneCtl }}" hint-placeholder-val="{{ true }}">
+    <div style="position:absolute;right:12px;top:{{ pcT }};display:flex;flex-direction:column;gap:8px;z-index:5">
+      <span role="button" aria-label="Follow an agent" onClick="{{ cycleFollow }}" style="width:44px;height:44px;border-radius:14px;background:var(--card);border:1px solid {{ followBd }};box-sizing:border-box;display:flex;align-items:center;justify-content:center">{{ iFollow }}</span>
+      <span role="button" aria-label="Zoom in" onClick="{{ zoomIn }}" style="width:44px;height:44px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-sizing:border-box;display:flex;align-items:center;justify-content:center">{{ iPlus }}</span>
+      <span role="button" aria-label="Zoom out" onClick="{{ zoomOut }}" style="width:44px;height:44px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-sizing:border-box;display:flex;align-items:center;justify-content:center">{{ iMinus }}</span>
+      <span role="button" aria-label="Fit" onClick="{{ fit }}" style="width:44px;height:44px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-sizing:border-box;display:flex;align-items:center;justify-content:center">{{ iFit }}</span>
+    </div>
+    <div style="position:absolute;left:12px;bottom:{{ prB }};height:52px;box-sizing:border-box;padding:0 4px;border-radius:16px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:4px;z-index:5">
+      <span role="button" aria-label="{{ playLabel }}" onClick="{{ togglePlay }}" style="width:44px;height:44px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center">{{ playIc }}</span>
+      <div role="radiogroup" aria-label="Replay speed" style="display:flex;gap:1px;padding:2px;border-radius:12px;background:var(--sunk)">
+        <sc-for list="{{ speeds }}" as="s" hint-placeholder-count="4"><span role="radio" aria-checked="{{ s.on }}" onClick="{{ s.pick }}" style="height:40px;padding:0 8px;border-radius:10px;display:flex;align-items:center;font-size:12px;font-weight:700;background:{{ s.bg }};color:{{ s.fg }};white-space:nowrap">{{ s.t }}</span></sc-for>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ phoneHover }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;left:55px;bottom:{{ phB }};z-index:7;animation:wIn .2s ease-out both"><dc-import name="Tilo W Parts" part="hover" state="{{ fr }}" agent="{{ pick }}" hint-size="280px,300px"></dc-import></div>
+  </sc-if>
+  <div style="position:absolute;left:0;right:0;bottom:0;height:{{ sheetH }};box-sizing:border-box;background:var(--card);border-top:1px solid var(--line2);border-radius:24px 24px 0 0;display:flex;flex-direction:column;z-index:8">
+    <span style="width:40px;height:5px;border-radius:9px;background:var(--line2);margin:8px auto 6px;flex:none"></span>
+    <div role="tablist" style="flex:none;margin:0 12px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;padding:3px;border-radius:13px;background:var(--sunk)">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4"><span role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:13px;font-weight:700;background:{{ t.pbg }};color:{{ t.fg }}">{{ t.t }}<sc-if value="{{ t.badge }}" hint-placeholder-val="{{ false }}"><span style="height:16px;min-width:16px;padding:0 4px;box-sizing:border-box;border-radius:99px;background:{{ t.bbg }};color:{{ t.bfg }};border:1px solid {{ t.bbd }};font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ t.badge }}</span></sc-if></span></sc-for>
+    </div>
+    <div style="flex:1;min-height:0;position:relative;margin-top:8px">
+      <sc-if value="{{ pTabStory }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;overflow:auto;padding:8px 16px 28px;box-sizing:border-box;animation:tFade .25s ease-out both"><dc-import name="Tilo W Parts" part="story" state="{{ fr }}" max="{{ 4 }}" on-approve="{{ approve }}" on-retry="{{ retry }}" hint-size="100%,400px"></dc-import></div></sc-if>
+      <sc-if value="{{ pTabChat }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;animation:tFade .25s ease-out both"><dc-import name="Tilo W Parts" part="chat" h="{{ pChatH }}" state="{{ fr }}" filter="{{ chatF }}" on-convene="{{ openConvene }}" hint-size="100%,500px"></dc-import></div></sc-if>
+      <sc-if value="{{ pTabResult }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;overflow:auto;padding:8px 16px 28px;box-sizing:border-box;animation:tFade .25s ease-out both"><dc-import name="Tilo W Parts" part="result" state="{{ fr }}" hint-size="100%,1400px"></dc-import></div></sc-if>
+      <sc-if value="{{ pTabSteps }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;overflow:auto;padding:8px 16px 28px;box-sizing:border-box;animation:tFade .25s ease-out both"><dc-import name="Tilo W Parts" part="steps" state="{{ fr }}" hint-size="100%,600px"></dc-import></div></sc-if>
+      <sc-if value="{{ pOvAgent }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;overflow:auto;padding:8px 16px 28px;box-sizing:border-box;background:var(--card);animation:wSheet .32s cubic-bezier(.2,.8,.2,1) both"><dc-import name="Tilo W Parts" part="panel" state="{{ fr }}" agent="{{ pick }}" on-close="{{ closeOv }}" on-talk="{{ talk }}" on-follow="{{ followAg }}" hint-size="100%,760px"></dc-import></div></sc-if>
+      <sc-if value="{{ pOvMore }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;overflow:auto;padding:8px 16px 28px;box-sizing:border-box;background:var(--card);animation:wSheet .32s cubic-bezier(.2,.8,.2,1) both"><dc-import name="Tilo W Parts" part="more" state="{{ fr }}" on-close="{{ closeOv }}" hint-size="100%,600px"></dc-import></div></sc-if>
+      <sc-if value="{{ pOvConvene }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;overflow:auto;padding:0 8px 20px;box-sizing:border-box;background:var(--card);animation:wSheet .32s cubic-bezier(.2,.8,.2,1) both"><dc-import name="Tilo W Parts" part="convene" state="{{ fr }}" on-close="{{ closeOv }}" on-call="{{ callMeeting }}" hint-size="100%,600px"></dc-import></div></sc-if>
+    </div>
+  </div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;planning&quot;,&quot;working&quot;,&quot;needs&quot;,&quot;done&quot;,&quot;failed&quot;],&quot;default&quot;:&quot;working&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;overlay&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;hover&quot;,&quot;agent&quot;,&quot;chat&quot;,&quot;convene&quot;,&quot;meeting&quot;,&quot;more&quot;],&quot;default&quot;:&quot;none&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;story&quot;,&quot;chat&quot;,&quot;result&quot;,&quot;steps&quot;],&quot;default&quot;:&quot;story&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;agent&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;director&quot;,&quot;lead&quot;,&quot;research&quot;,&quot;travel&quot;,&quot;writer&quot;,&quot;designer&quot;,&quot;verifier&quot;],&quot;default&quot;:&quot;research&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;filter&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;all&quot;,&quot;pair:research,lead&quot;,&quot;pair:travel,lead&quot;,&quot;agent:lead&quot;,&quot;me&quot;,&quot;meeting&quot;],&quot;default&quot;:&quot;all&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;still&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;reduced&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = { fr: null, base: null, play: null, speed: null, tab: null, ov: null, pick: null, chatF: null, hov: null, follow: null, zoom: 0, run: true };
+  componentDidMount() {
+    this.w = setInterval(() => { if (window.TiloR && window.TiloCity && window.TiloT && window.TiloW) { clearInterval(this.w); this.forceUpdate(); } }, 60);
+    this.vis = true; this.inView = true;
+    this.onVis = () => this.setVis(!document.hidden && this.inView);
+    document.addEventListener('visibilitychange', this.onVis);
+    this.obsT = setTimeout(() => this.observe(), 200);
+    if ((this.props.overlay ?? 'none') === 'meeting' && !this.props.reduced) { this.state.fr = 'working1'; this.mt = setTimeout(() => this.setState({ fr: 'meeting' }), 1400); }
+    this.loop();
+  }
+  componentWillUnmount() { clearInterval(this.w); clearTimeout(this.tm); clearTimeout(this.mt); clearTimeout(this.obsT); Object.values(this.wt || {}).forEach(clearTimeout); if (this.io) this.io.disconnect(); document.removeEventListener('visibilitychange', this.onVis); }
+  observe() {
+    const el = this.rootRef && this.rootRef.current;
+    if (!el || !window.IntersectionObserver) { this.obsT = setTimeout(() => this.observe(), 300); return; }
+    this.io = new IntersectionObserver(es => { this.inView = es[0].isIntersecting; this.setVis(this.inView && !document.hidden); }, { threshold: 0.02 });
+    this.io.observe(el);
+  }
+  setVis(v) {
+    if (v === this.vis) return; this.vis = v;
+    const el = this.rootRef && this.rootRef.current; if (el) el.setAttribute('data-paused', v ? 'false' : 'true');
+    if (v) this.loop(); else clearTimeout(this.tm);
+  }
+  baseOf() { return this.state.base ?? (this.props.state ?? 'working'); }
+  frame() { if (this.state.fr) return this.state.fr; if ((this.props.overlay ?? 'none') === 'meeting') return 'meeting'; return this.baseOf(); }
+  playing() { return this.state.play ?? !this.props.still; }
+  loop() {
+    clearTimeout(this.tm);
+    if (!this.vis || !this.playing() || !this.state.run || this.props.reduced) return;
+    const sp = this.state.speed ?? '1x', k = sp === '2x' ? .5 : 1, fr = this.frame();
+    let next = null, wait = 0;
+    if (sp === 'whole') { const seq = ['planning', 'working', 'working1', 'working2', 'needs', 'done']; const j = seq.indexOf(fr); next = j < 0 || j === seq.length - 1 ? 'planning' : seq[j + 1]; wait = fr === 'done' ? 6500 : fr === 'working1' ? 2800 : 3800; }
+    else if (this.baseOf() === 'working' && ['working', 'working1', 'working2', 'workingX'].indexOf(fr) >= 0) { next = { working: 'working1', working1: 'working2', working2: 'workingX', workingX: 'working' }[fr]; wait = { working: 3200, working1: 2800, working2: 3400, workingX: 450 }[fr]; }
+    else return;
+    this.tm = setTimeout(() => this.setState({ fr: next }, () => this.loop()), wait * k);
+  }
+  renderVals() {
+    const h = React.createElement, R = window.TiloR ? window.TiloR(h) : null, T = window.TiloT, W = window.TiloW, ic = (n, s) => T ? T.ic(h, n, s) : null;
+    if (!this.rootRef) this.rootRef = React.createRef();
+    this.pos = this.pos || {}; this.mv = this.mv || {}; this.wi = this.wi || {}; this.face = this.face || {}; this.wt = this.wt || {};
+    const p = this.props, S = this.state, theme = p.theme ?? 'studio', desk = (p.device ?? 'desktop') === 'desktop', phone = !desk, reduced = !!p.reduced;
+    const base0 = { rootRef: this.rootRef, theme, desk, phone, reducedA: reduced ? 'true' : 'false', rootW: desk ? '1440px' : '390px', rootH: desk ? '900px' : '844px', stT: desk ? '60px' : '0px', stW: desk ? '940px' : '390px', stH: desk ? '840px' : '844px' };
+    if (!W) return Object.assign(base0, { st: {}, now: {}, tabs: [], speeds: [], agents: [], blds: [], labels: [], isl: [], dots: [], conf: [], planLines: [] });
+    const fr = this.frame(), stK = W.status(fr), ss = W.stepSt(fr), evs = W.evs(fr), AG = W.AG;
+    const ovRaw = S.ov ?? (p.overlay ?? 'none'), ov = ovRaw === 'meeting' || ovRaw === 'hover' ? 'none' : ovRaw;
+    const pick = S.pick ?? (p.agent ?? 'research');
+    const chatF = S.chatF ?? (p.filter ?? (fr === 'meeting' ? 'meeting' : 'all'));
+    const tab = S.tab ?? (p.tab ?? (fr === 'meeting' ? 'chat' : stK === 'done' ? 'result' : 'story'));
+    const K = 1.15, CELL = 48 * K, OX = 500, OY = 150;
+    const iso = (x, y) => [OX + (x - y) * .866 * CELL, OY + (x + y) * .5 * CELL];
+    const px = v => v.toFixed(1) + 'px', P2 = a => a.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ');
+    const rect = (x0, y0, x1, y1) => [iso(x0, y0), iso(x1, y0), iso(x1, y1), iso(x0, y1)];
+    const B = Object.assign({}, W.STEPS, W.PLACES);
+    const stand = k => [B[k].at[0] + B[k].fp[0] / 2, B[k].at[1] + B[k].fp[1] + .45];
+    const tall = phone && (ov === 'agent' || ov === 'more' || ov === 'convene' || tab === 'result' || tab === 'chat');
+    const sheetPx = tall ? 600 : 372;
+
+    // camera
+    const vw = desk ? 940 : 390, vh = desk ? 840 : 844;
+    const cx = vw / 2, cy = desk ? 420 : (tall ? 178 : 262);
+    const fitZ = desk ? .98 : (tall ? .36 : .5), MC = desk ? [500, 384] : [500, 367];
+    let z = fitZ * Math.pow(1.3, S.zoom), ctr = MC;
+    const P = this.posTable(fr, stand);
+    if (S.follow && P[S.follow]) { z = desk ? 1.5 : .95; ctr = iso(P[S.follow][0], P[S.follow][1]); ctr = [ctr[0], ctr[1] - 20]; }
+    const cam = [cx - ctr[0] * z, cy - ctr[1] * z, z];
+    const L = desk ? 1 : .78, inv = (1 / z).toFixed(3), linv = (L / z).toFixed(3);
+
+    // ground
+    const g = [], E0 = rect(-.6, -.6, 9.2, 9.2);
+    g.push(h('polygon', { key: 'sl', points: P2([E0[3], E0[2], [E0[2][0], E0[2][1] + 16], [E0[3][0], E0[3][1] + 16]]), style: { fill: 'var(--groundL)' } }));
+    g.push(h('polygon', { key: 'sr', points: P2([E0[2], E0[1], [E0[1][0], E0[1][1] + 16], [E0[2][0], E0[2][1] + 16]]), style: { fill: 'var(--groundR)' } }));
+    g.push(h('polygon', { key: 'tp', points: P2(E0), style: { fill: 'var(--ground)', stroke: 'var(--line2)', strokeWidth: 1 } }));
+    for (let k = 0; k <= 9; k++) { const a = iso(k, -.6), b = iso(k, 9.2), c = iso(-.6, k), d = iso(9.2, k); g.push(h('path', { key: 'g' + k, d: `M${a[0]} ${a[1]}L${b[0]} ${b[1]}M${c[0]} ${c[1]}L${d[0]} ${d[1]}`, style: { stroke: 'var(--line)', strokeWidth: .8 } })); }
+    [[-.6, 2.72, 9.2, 3.22], [4.72, 3.22, 5.22, 9.2], [5.22, 6.32, 9.2, 6.82]].forEach((r, k) => g.push(h('polygon', { key: 'r' + k, points: P2(rect(r[0], r[1], r[2], r[3])), style: { fill: 'var(--road)' } })));
+    const isl = [];
+    Object.keys(W.ISL).forEach(k => {
+      const o = W.ISL[k], c = iso(o.at[0], o.at[1]), s = W.STEPS[o.step], sc = iso(s.at[0] + s.fp[0] / 2, s.at[1] + s.fp[1] / 2), act = ss[o.step] === 'working' || ss[o.step] === 'needs';
+      g.push(h('line', { key: 'ln' + k, x1: sc[0], y1: sc[1], x2: c[0], y2: c[1], style: { stroke: act ? 'var(--ink)' : 'var(--ink3)', strokeWidth: act ? 1.6 : 1.2, strokeDasharray: '3 6', strokeLinecap: 'round', opacity: act ? .75 : .28 } }));
+      const d = rect(o.at[0] - .55, o.at[1] - .55, o.at[0] + .55, o.at[1] + .55);
+      g.push(h('polygon', { key: 'il' + k, points: P2([d[3], d[2], [d[2][0], d[2][1] + 10], [d[3][0], d[3][1] + 10]]), style: { fill: 'var(--islandL)' } }));
+      g.push(h('polygon', { key: 'ir' + k, points: P2([d[2], d[1], [d[1][0], d[1][1] + 10], [d[2][0], d[2][1] + 10]]), style: { fill: 'var(--islandR)' } }));
+      g.push(h('polygon', { key: 'it' + k, points: P2(d), style: { fill: 'var(--island)', stroke: 'var(--line2)', strokeWidth: 1 } }));
+      isl.push({ x: px(c[0]), y: px(c[1] + 14), n: o.n, aria: o.n + ' logo slot', ic: ic(o.ic, 16), bd: act ? 'var(--ink)' : 'var(--line2)' });
+    });
+    const planning = fr === 'planning';
+    let plotK = 0;
+    const plotted = k => { const s = ss[k]; return planning || (W.STEPS[k] && (s === 'planned' || s === 'waiting' || s === 'notStarted')); };
+    Object.keys(B).forEach(k => {
+      if (!plotted(k) || (planning && k === 'plan')) return;
+      const b = B[k];
+      g.push(h('polygon', { key: 'pl' + k, points: P2(rect(b.at[0] + .1, b.at[1] + .1, b.at[0] + b.fp[0] - .1, b.at[1] + b.fp[1] - .1)), style: { fill: 'var(--card)', fillOpacity: .55, stroke: 'var(--ink2)', strokeWidth: 1.4, strokeDasharray: '6 5', transformBox: 'fill-box', transformOrigin: 'center', animation: planning ? `wPlot .4s ease-out ${(.3 + plotK++ * .12).toFixed(2)}s both` : 'none' } }));
+    });
+    const ground = h('svg', { width: 1000, height: 720, viewBox: '0 0 1000 720', style: { position: 'absolute', left: 0, top: 0, overflow: 'visible' }, 'aria-hidden': true }, g);
+
+    // buildings + labels
+    const CH = { planned: ['Planned', 'transparent', 'var(--ink2)', 'dashed', 'var(--line2)', 'transparent'], waiting: ['Waiting', 'var(--sunk)', 'var(--ink2)', 'solid', 'transparent', 'var(--line2)'], notStarted: ['Not started', 'var(--sunk)', 'var(--ink2)', 'solid', 'transparent', 'var(--line2)'], working: ['Working', 'var(--lime)', '#0B0B0C', 'solid', 'var(--limeD)', 'var(--lime)'], done: ['Done', 'var(--mintSoft)', 'var(--mintInk)', 'solid', 'transparent', 'var(--mint)'], needs: ['Needs you', 'var(--amber)', '#1A1407', 'solid', 'transparent', 'var(--amber)'], failed: ['Failed', 'var(--redSoft)', 'var(--redInk)', 'solid', 'var(--redInk)', 'var(--red)'], session: ['In session', 'var(--lime)', '#0B0B0C', 'solid', 'var(--limeD)', 'var(--lime)'], delivered: ['Delivered', 'var(--mintSoft)', 'var(--mintInk)', 'solid', 'transparent', 'var(--mint)'] };
+    const done = stK === 'done';
+    const blds = [], labels = [], bpos = {};
+    Object.keys(B).forEach(k => {
+      const b = B[k], isStep = !!W.STEPS[k];
+      let s = isStep ? ss[k] : (planning ? 'planned' : k === 'dock' && done ? 'delivered' : k === 'meeting' && fr === 'meeting' ? 'session' : 'place');
+      const rs = { working: 'construction', done: 'complete', needs: 'needs', failed: 'construction', place: 'active', session: 'active', delivered: 'complete' }[s];
+      const ctr = iso(b.at[0] + b.fp[0] / 2, b.at[1] + b.fp[1] / 2);
+      let top = ctr[1] - 6;
+      if (rs && R) {
+        let el = R.bld(b.kit, rs, 100, b.d); const vb = String(el.props.viewBox).split(' ').map(Number), hh = Math.round(vb[3] * K * 10) / 10;
+        el = R.bld(b.kit, rs, hh, b.d);
+        const o = iso(b.at[0], b.at[1]), l = o[0] + vb[0] * K, t = o[1] + vb[1] * K;
+        top = t + (rs === 'complete' || rs === 'needs' ? 22 : 4);
+        const cons = s === 'working';
+        blds.push({ el, l: px(l), t: px(t), w: px(vb[2] * K), h: px(hh), z: Math.round((b.at[0] + b.fp[0] + b.at[1] + b.fp[1]) * 10), cons, fin: !cons, consA: 'tRise 2.4s cubic-bezier(.2,.8,.2,1) both', fx: done ? 'none' : 'var(--cityFx)', anim: rs === 'complete' ? 'wSettle .3s ease-out both' : done ? 'tLight .8s ease-out both' : 'tFade .4s ease-out both' });
+      }
+      bpos[k] = [ctr[0], top];
+      const c = CH[s];
+      const important = s === 'working' || s === 'needs' || s === 'failed' || s === 'session' || s === 'delivered';
+      labels.push({ x: px(ctr[0]), y: px(top), name: b.n, ic: ic(b.ic, 13), chip: c ? c[0] : '', cbg: c ? c[1] : '', cfg: c ? c[2] : '', cbs: c ? c[3] : 'solid', cbd: c ? c[4] : '', dot: c ? c[5] : 'var(--line2)', pr: c ? '0px' : '6px', full: desk || important, mini: phone && !important, focus: () => this.setState({ follow: null }) });
+    });
+
+    // agents
+    const MOOD = { planning: { director: 'think' }, working: { lead: 'talk', research: 'talk' }, working1: { lead: 'talk', research: 'talk' }, working2: { lead: 'talk', travel: 'talk' }, workingX: { lead: 'work' }, needs: { writer: 'hand', designer: 'work' }, failed: { travel: 'sad' }, meeting: { lead: 'talk', writer: 'talk', designer: 'talk' } }[fr] || {};
+    const PAIRS = { working: [['research', 'lead']], working1: [['research', 'lead']], working2: [['travel', 'lead']], meeting: [['lead', 'writer', 'designer']] }[fr] || [];
+    const TOOL = { planning: { director: 'pen' }, workingX: { lead: 'sheet' }, needs: { designer: 'palette' } }[fr] || {};
+    const prevFr = this.lastFr, now = Date.now();
+    const hov = S.hov ?? ((p.overlay === 'hover' || (p.hover && p.hover !== 'none')) ? (p.hover && p.hover !== 'none' ? p.hover : 'research') : null);
+    const spK = phone ? 1.35 : 1;
+    const agents = [], apos = {};
+    W.ORDER.forEach(id => {
+      const tgt = P[id];
+      if (!tgt) { delete this.pos[id]; return; }
+      const old = this.pos[id];
+      if (old && (old[0] !== tgt[0] || old[1] !== tgt[1])) {
+        const a = iso(old[0], old[1]), b = iso(tgt[0], tgt[1]), dist = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        const tele = prevFr === 'workingX' || reduced, dur = tele ? 0 : Math.min(3.4, Math.max(.6, dist / 130));
+        this.mv[id] = (this.mv[id] || 0) + 1;
+        this.wi[id] = { dur, walk: tele ? '' : (this.mv[id] % 2 ? 'A' : 'B'), n: Math.max(1, Math.round(dur / .56)), until: now + dur * 1000 };
+        if (!tele) { this.face[id] = b[0] < a[0] ? 'l' : 'r'; clearTimeout(this.wt[id]); this.wt[id] = setTimeout(() => this.forceUpdate(), dur * 1000 + 60); }
+      }
+      this.pos[id] = tgt;
+      const wi = this.wi[id] || { dur: 0, walk: '', n: 1, until: 0 }, walking = now < wi.until;
+      const s = iso(tgt[0], tgt[1]); apos[id] = s;
+      let mood = done ? 'happy' : (MOOD[id] || 'idle');
+      if (S.run === false && !done) mood = 'idle';
+      let face = this.face[id] || 'r';
+      const pr = PAIRS.find(q => q.indexOf(id) >= 0);
+      if (!walking && pr) { const other = pr.find(x => x !== id); if (other && P[other]) face = iso(P[other][0], P[other][1])[0] < s[0] ? 'l' : 'r'; }
+      const hidden = fr === 'workingX' && id === 'travel';
+      const A = AG[id];
+      agents.push({ col: A.col, kind: A.kind, mood: walking ? 'idle' : mood, walk: walking ? wi.walk : '', n: wi.n, face, lit: hov === id, aria: A.n + ', ' + A.role,
+        tr: `translate(${(s[0] - 16 * spK).toFixed(1)}px,${(s[1] - 38 * spK).toFixed(1)}px) scale(${spK})`, tt: `transform ${wi.dur.toFixed(2)}s cubic-bezier(.4,0,.6,1), opacity .3s ease`,
+        op: hidden ? '0' : (hov && hov !== id ? '.45' : '1'), z: Math.round((tgt[0] + tgt[1]) * 10) + 2, ti: (L / (z * spK)).toFixed(3),
+        hx: px(-Math.max(8, (44 / (z * spK) - 32) / 2)), hy: px(-Math.max(8, (44 / (z * spK) - 40) / 2 + 4)), hb: px(-Math.max(4, (44 / (z * spK) - 40) / 2 - 4)),
+        tool: !walking && TOOL[id] ? ic(TOOL[id], 14) : null, hand: !walking && mood === 'hand', needs: () => this.setState({ tab: 'story', ov: 'none' }),
+        enter: () => { if (desk && this.state.hov !== id) this.setState({ hov: id }); }, click: () => this.setState({ ov: 'agent', pick: id, hov: null }) });
+    });
+    const leave = () => { if (this.state.hov) this.setState({ hov: null }); };
+    const anyWalk = id => { const wi = this.wi[id]; return wi && now < wi.until; };
+    const dots = PAIRS.filter(q => q.every(id => apos[id] && !anyWalk(id))).map(q => {
+      const xs = q.map(id => apos[id][0]), ys = q.map(id => apos[id][1]);
+      const x = xs.reduce((a, b) => a + b, 0) / q.length, y = Math.min.apply(null, ys) - 40 * spK;
+      const meetQ = q.length > 2;
+      return { x: px(x), y: px(y), aria: meetQ ? 'Open the team meeting' : 'Open what ' + q.map(id => AG[id].n).join(' and ') + ' are saying', open: () => meetQ ? this.setState({ tab: 'chat', chatF: 'meeting', ov: 'none' }) : (desk ? this.setState({ ov: 'chat', chatF: 'pair:' + q.join(',') }) : this.setState({ tab: 'chat', ov: 'none', chatF: 'pair:' + q.join(',') })) };
+    });
+    let hc = null;
+    if (desk && hov && apos[hov]) { const s = apos[hov], right = s[0] > 520; hc = { id: hov, x: px(s[0] + (right ? -22 : 22)), y: px(s[1] - 30), tx: right ? '-100%' : '0px', or: right ? '100% 100%' : '0 100%' }; }
+
+    // delivery
+    const dk = W.PLACES.dock, dc = iso(dk.at[0] + 1, dk.at[1] + .5), hc0 = iso(4.5, 1.3);
+    const parcelPath = `path('M ${hc0[0].toFixed(0)} ${(hc0[1] - 50).toFixed(0)} Q ${((hc0[0] + dc[0]) / 2 + 90).toFixed(0)} ${(Math.min(hc0[1], dc[1]) - 120).toFixed(0)} ${(dc[0] - 16).toFixed(0)} ${(dc[1] - 56).toFixed(0)}')`;
+    const CC = ['#C8F23A', '#E8643F', '#3F7FE0', '#2BA3B8', '#A45DB8', '#D9588C', '#C9982A'];
+    const conf = Array.from({ length: 18 }, (_, k) => { const a = (k / 18) * Math.PI * 2, r = 70 + (k * 37) % 80; return { w: (5 + k % 3 * 2) + 'px', h: (k % 2 ? 5 : 9) + 'px', c: CC[k % 7], x: (Math.cos(a) * r).toFixed(0) + 'px', y: (Math.sin(a) * r * .6 - 80).toFixed(0) + 'px', d: (1.5 + k % 5 * .04).toFixed(2) + 's' }; });
+
+    // header + status
+    const runPaused = S.run === false && (stK === 'working' || stK === 'needs');
+    const STT = runPaused ? ['Paused', 'var(--sunk)', 'var(--ink2)', 'var(--ink3)'] : { planning: ['Planning', 'var(--bp)', 'var(--bpInk)', 'var(--bpInk)'], working: ['Working', 'var(--priSoft)', 'var(--priInk)', 'var(--limeD)'], needs: ['Needs you', 'var(--amberSoft)', 'var(--amberInk)', 'var(--amber)'], done: ['Done', 'var(--mintSoft)', 'var(--mintInk)', 'var(--mint)'], failed: ['Failed', 'var(--redSoft)', 'var(--redInk)', 'var(--red)'] }[stK];
+    const cr = W.credits(fr), nDone = W.SO.filter(k => ss[k] === 'done').length;
+    const lastS = evs.filter(e => e[5]).pop();
+    const sp = S.speed ?? '1x';
+    const loopy = sp === 'whole' || (this.baseOf() === 'working' && fr !== 'meeting');
+    const playing = this.playing() && !reduced && S.run !== false && loopy;
+    const now0 = stK === 'needs' ? { t: 'Wren wants to email the invite to 12 people.', act: 'Review', bg: 'var(--amberSoft)', bd: 'var(--amberLine)' } : stK === 'failed' ? { t: 'Stopped at Flights. Nothing was sent or paid.', act: 'See why', bg: 'var(--redSoft)', bd: 'var(--redInk)' } : { t: lastS ? lastS[5] : '', act: '', bg: 'var(--card)', bd: 'var(--line)' };
+    now0.go = () => this.setState({ tab: 'story', ov: 'none' });
+    const liveLabel = stK === 'done' ? 'Done' : stK === 'failed' ? 'Stopped' : stK === 'needs' && sp !== 'whole' ? 'Waiting for you' : runPaused ? 'Paused' : sp === 'whole' && playing ? 'Replay · whole run' : playing ? (sp === '2x' ? 'Live · 2×' : 'Live') : 'Replay paused';
+    const tabsDef = [['story', 'Story', 'note'], ['chat', 'Chat', 'chat'], ['result', 'Result', 'parcel'], ['steps', 'Steps', 'check']];
+    const tabs = tabsDef.map(([k, t, i]) => {
+      const on = tab === k && ov !== 'agent' && ov !== 'more';
+      const badge = k === 'chat' && tab !== 'chat' && (stK === 'working' || stK === 'needs') ? '2' : k === 'result' && done && tab !== 'result' ? 'New' : k === 'steps' ? nDone + '/7' : '';
+      const lime = k === 'result' || k === 'chat';
+      return { t, ic: ic(i, 16), on: on ? 'true' : 'false', fg: on ? 'var(--ink)' : (k === 'result' && !done ? 'var(--ink3)' : 'var(--ink2)'), bd: on ? 'var(--ink)' : 'transparent', pbg: on ? 'var(--card)' : 'transparent', badge, bbg: lime && badge ? 'var(--lime)' : 'var(--sunk)', bfg: lime && badge ? '#0B0B0C' : 'var(--ink2)', bbd: lime && badge ? '#0B0B0C' : 'transparent', pick: () => this.setState({ tab: k, ov: 'none' }) };
+    });
+    const speeds = [['1x', '1×'], ['2x', '2×'], ['catch', 'Catch up'], ['whole', 'Whole run']].map(([k, t]) => {
+      const on = sp === k;
+      return { t, on: on ? 'true' : 'false', bg: on ? 'var(--card)' : 'transparent', fg: on ? 'var(--ink)' : 'var(--ink2)', pick: () => { if (k === 'catch') this.setState({ fr: null, speed: '1x', play: true }, () => this.loop()); else this.setState({ speed: k, play: true, fr: k === 'whole' ? 'planning' : null }, () => this.loop()); } };
+    });
+    const present = W.ORDER.filter(id => P[id]);
+    const fIdx = present.indexOf(S.follow);
+    const planLines = [['1', 'Find a venue by the river for 12'], ['2', 'Flights from London, Berlin and Lisbon, none before 8 am'], ['3', 'A budget under €16,000'], ['4', 'The plan, the invite, slides and a site']].map(([n, t], k) => ({ n, t, d: (k * .35) + 's' }));
+    const hallC = iso(4.5, 1.3);
+    return Object.assign(base0, {
+      fr, cam: `translate(${cam[0].toFixed(1)}px,${cam[1].toFixed(1)}px) scale(${cam[2].toFixed(3)})`, inv, linv, ground, isl, blds, labels, agents, dots, leave,
+      planning, planCard: desk ? { l: px(hallC[0] + 70), t: px(hallC[1] - 150) } : { l: px(hallC[0] - 380), t: px(hallC[1] + 150) }, planLines,
+      parcel: done && !reduced, parcelPath, conf, dockX: px(dc[0]), dockY: px(dc[1] - 40),
+      hoverOn: !!hc, hc: hc || {}, phoneHover: phone && !!hov && ov === 'none', phB: (sheetPx + 76) + 'px',
+      st: { t: STT[0], bg: STT[1], fg: STT[2], dot: STT[3] }, meta: 'Started 3:54 pm · ' + (planning ? '1 agent so far' : '7 agents') + (done ? ' · finished 4:16 pm' : stK === 'failed' ? ' · stopped 4:02 pm' : ''), agN: planning ? '1 agent' : '7 agents',
+      nDone: String(nDone), progPct: Math.round(nDone / 7 * 100) + '%', cr: String(cr), crPct: Math.min(100, cr / 120 * 100).toFixed(0) + '%',
+      canPause: stK === 'working' || stK === 'needs' || stK === 'planning', runLabel: S.run === false ? 'Resume run' : 'Pause run', runIc: ic(S.run === false ? 'play' : 'pause', 16),
+      toggleRun: () => this.setState({ run: !(S.run !== false) }, () => this.loop()),
+      openMore: () => this.setState({ ov: 'more' }),
+      now: now0, liveLabel, liveDot: playing && (stK === 'working' || stK === 'planning') ? 'tGlow 1.4s ease-in-out infinite' : 'none',
+      followOn: !!S.follow, followCol: S.follow ? AG[S.follow].col : 'transparent', followLabel: S.follow ? 'Following ' + AG[S.follow].n : 'Follow agent', followBd: S.follow ? 'var(--ink)' : 'var(--line)',
+      cycleFollow: () => this.setState({ follow: fIdx + 1 >= present.length ? null : present[fIdx + 1] }),
+      zoomIn: () => this.setState({ zoom: Math.min(3, S.zoom + 1), follow: null }), zoomOut: () => this.setState({ zoom: Math.max(-1, S.zoom - 1), follow: null }), fit: () => this.setState({ zoom: 0, follow: null }),
+      togglePlay: () => loopy ? this.setState({ play: !playing }, () => this.loop()) : this.setState({ play: true, speed: 'whole', fr: 'planning' }, () => this.loop()), playIc: ic(playing ? 'pause' : 'play', 18), playLabel: playing ? 'Pause replay' : 'Play replay',
+      speeds, scrub: (evs.length / W.total(fr)).toFixed(3), evN: String(evs.length), evT: String(W.total(fr)), evName: evs[evs.length - 1][1],
+      ovChat: desk && ov === 'chat', ovConvene: desk && ov === 'convene', ovAgent: desk && ov === 'agent', ovMore: desk && ov === 'more', chatF, pick,
+      tabs, tabStory: tab === 'story', tabChat: tab === 'chat', tabResult: tab === 'result', tabSteps: tab === 'steps',
+      pTabStory: phone && tab === 'story' && ov === 'none', pTabChat: phone && (tab === 'chat' || ov === 'chat') && ov !== 'agent' && ov !== 'more' && ov !== 'convene', pTabResult: phone && tab === 'result' && ov === 'none', pTabSteps: phone && tab === 'steps' && ov === 'none',
+      pOvAgent: phone && ov === 'agent', pOvMore: phone && ov === 'more', pOvConvene: phone && ov === 'convene',
+      sheetH: sheetPx + 'px', pChatH: (sheetPx - 70) + 'px', phoneCtl: phone && !tall, pcT: (stK === 'needs' || stK === 'failed') ? '176px' : '124px', prB: (sheetPx + 12) + 'px',
+      closeOv: () => this.setState({ ov: 'none' }), openConvene: () => this.setState({ ov: 'convene' }),
+      callMeeting: () => this.setState({ fr: 'meeting', ov: 'none', tab: 'chat', chatF: 'meeting', speed: '1x' }),
+      talk: id => desk ? this.setState({ ov: 'chat', chatF: 'agent:' + id }) : this.setState({ ov: 'none', tab: 'chat', chatF: 'agent:' + id }),
+      followAg: id => this.setState({ follow: id, ov: 'none' }),
+      approve: () => this.setState({ base: 'done', fr: null, tab: 'result', speed: '1x' }),
+      retry: () => this.setState({ base: 'working', fr: null, tab: 'story', speed: '1x' }, () => this.loop()),
+      iBack: ic('back', 18), iCity: ic('city', 13), iMore: T ? T.ic(h, 'more', 18, 3.2) : null, iFollow: ic('follow', 18), iMinus: ic('minus', 18), iPlus: ic('plus', 18), iFit: ic('fit', 18), iHand: ic('hand', 13), iParcel: ic('parcel', 17)
+    });
+  }
+  posTable(fr, stand) {
+    const b = stand('budget');
+    const P0 = { director: stand('plan'), lead: b, research: [b[0] - .75, b[1] + .05], travel: stand('flights'), writer: stand('doc'), designer: stand('design'), verifier: stand('review') };
+    const W1 = Object.assign({}, P0, { travel: [b[0] + .75, b[1] + .05] });
+    return {
+      planning: { director: stand('plan') },
+      working: P0, working1: W1, working2: W1, workingX: W1,
+      needs: Object.assign({}, P0, { research: stand('venue') }),
+      failed: Object.assign({}, P0, { research: stand('venue') }),
+      meeting: Object.assign({}, W1, { lead: [.75, 2.2], writer: [1.45, 2.32], designer: [2.15, 2.2] }),
+      done: { director: [7.0, 8.75], lead: [6.3, 8.62], research: [7.7, 8.62], travel: [5.6, 8.4], writer: [8.4, 8.4], designer: [5.55, 7.65], verifier: [8.55, 7.6] }
+    }[fr] || P0;
+  }
+}
+</script>
+</body>
+</html>
