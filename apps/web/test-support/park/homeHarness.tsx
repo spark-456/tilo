@@ -3,6 +3,7 @@
 // is found by its public surface only: roles, labels and visible text. Nothing here is bundled.
 import { act } from "react";
 import { type Mock, vi } from "vitest";
+import type { HttpClient } from "../../src/api/http";
 import { API_METHODS, type Api } from "../../src/park/api/index";
 import type { Dec } from "../../src/park/api/types";
 import type { AppCtx } from "../../src/park/app/AppCtx";
@@ -63,6 +64,7 @@ export interface HomeRig {
 
 export interface RigOptions {
   api?: Api;
+  worldClient?: HttpClient | null;
   dec?: Dec;
   app?: Partial<AppCtx>;
 }
@@ -99,6 +101,7 @@ export async function mountHome(opts: RigOptions = {}): Promise<HomeRig> {
   const tree = (app: AppCtx) => (
     <ParkProvider
       api={api}
+      {...(opts.worldClient !== undefined ? { worldClient: opts.worldClient } : {})}
       navigate={navigate}
       schedule={sch.schedule}
       viewport={{ vw: app.vw, vh: app.vh }}

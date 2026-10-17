@@ -196,7 +196,8 @@
 }
 [data-park] .park-bubble__form {
   flex: none;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
   margin: 0 12px 12px;
@@ -222,6 +223,15 @@
   background: transparent;
   color: var(--ink);
   font-size: 14px;
+}
+[data-park] .park-bubble__form .park-skill-mention,
+[data-park] .park-bubble__form .park-skill-mention__selected,
+[data-park] .park-bubble__form .park-skill-mention__note {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+[data-park] .park-bubble__form .park-skill-mention {
+  max-height: 160px;
 }
 [data-park] .park-bubble__send {
   flex: none;

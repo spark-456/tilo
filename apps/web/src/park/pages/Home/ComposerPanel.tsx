@@ -6,7 +6,7 @@ import type { Ref } from "react";
 import type { Effort, QuickCost, SwitchReason } from "../../api/types";
 import { RECORDED_RUN_PATH } from "../../app/router";
 import { type SegmentOption, SegmentedControl } from "../../components";
-import { SkillMention } from "../../shared/SkillMention";
+import { type MentionInputProps, SkillMention } from "../../shared/SkillMention";
 import { ThinkingTilo } from "../../shared/ThinkingTilo";
 import type { CatalogSkill, HttpClient } from "../../shared/skillRoute";
 import { Buddy, type BuddyMood } from "../../studio/Buddy";
@@ -149,44 +149,47 @@ export function ComposerPanel(p: ComposerProps) {
     label: m.label,
     tone: "heroInk",
   }));
+  const renderInput = (mentionInput?: MentionInputProps) => (
+    <IntakeControl client={p.intakeClient} staging={p.staging}>
+      <div className="park-home-input-row">
+        <div className="park-home-logo">
+          <Buddy mood={p.mood ?? "idle"} size={50} />
+        </div>
+        <input
+          ref={p.inputRef}
+          className="park-home-input"
+          type="text"
+          maxLength={p.maxLength}
+          aria-label="Describe your task"
+          value={p.query}
+          placeholder={
+            quickMode ? "Ask a quick question" : p.compact ? mode.short : `e.g. ${mode.example}`
+          }
+          {...mentionInput}
+          onChange={(e) => p.onQuery(e.target.value)}
+          onKeyDown={(e) => {
+            mentionInput?.onKeyDown(e);
+            if (e.key === "Enter" && !e.defaultPrevented) p.onDraft();
+          }}
+        />
+      </div>
+    </IntakeControl>
+  );
   return (
     <div className="park-home-composer">
       <div className="park-home-panel">
-        <IntakeControl client={p.intakeClient} staging={p.staging}>
-          <div className="park-home-input-row">
-            <div className="park-home-logo">
-              <Buddy mood={p.mood ?? "idle"} size={50} />
-            </div>
-            <input
-              ref={p.inputRef}
-              className="park-home-input"
-              type="text"
-              maxLength={p.maxLength}
-              aria-label="Describe your task"
-              value={p.query}
-              placeholder={
-                quickMode
-                  ? "Ask a quick question"
-                  : p.compact
-                    ? mode.short // POLISH-1: no "e.g. " on a phone, so the whole example fits the 390px box
-                    : `e.g. ${mode.example}`
-              }
-              onChange={(e) => p.onQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") p.onDraft();
-              }}
-            />
-          </div>
-        </IntakeControl>
         {p.onSkill && p.onClearSkill ? (
           <SkillMention
             text={p.query}
             selected={p.selectedSkill ?? null}
             client={p.skillClient ?? null}
+            renderInput={renderInput}
             onChoose={p.onSkill}
             onClear={p.onClearSkill}
           />
-        ) : null}
+        ) : (
+          renderInput()
+        )}
         <div className="park-home-mode-row">
           <div className="park-home-effort">
             <SegmentedControl

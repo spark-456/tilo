@@ -1,4 +1,9 @@
-import type { Skill } from "../../api/types";
+type SkillIconInput = {
+  name: string;
+  tools: readonly (string | readonly [string, string | number])[];
+  role?: string;
+  purpose?: string;
+};
 
 export type SkillIconKind =
   | "mail"
@@ -23,12 +28,16 @@ const RULES: readonly [SkillIconKind, RegExp][] = [
 ];
 
 /** Pure display choice from served fields: what the skill does outranks its connectors. */
-export function skillIconKind(skill: Pick<Skill, "name" | "tools" | "role">): SkillIconKind {
+export function skillIconKind(skill: SkillIconInput): SkillIconKind {
   const toolWords = skill.tools
-    .map(([tool]) => tool.replace(/[_-]/g, " "))
+    .map((entry) => (typeof entry === "string" ? entry : entry[0]).replace(/[_-]/g, " "))
     .join(" ")
     .toLowerCase();
-  for (const words of [skill.name.toLowerCase(), skill.role.toLowerCase(), toolWords]) {
+  for (const words of [
+    skill.name.toLowerCase(),
+    (skill.role ?? skill.purpose ?? "").toLowerCase(),
+    toolWords,
+  ]) {
     for (const [kind, pattern] of RULES) if (pattern.test(words)) return kind;
   }
   return "default";
@@ -46,11 +55,15 @@ const ICONS: Record<SkillIconKind, string> = {
   default: "clipboard",
 };
 
-export function SkillIcon({ skill }: { skill: Pick<Skill, "name" | "tools" | "role"> }) {
+export function SkillIcon({
+  skill,
+  decorative = false,
+}: { skill: SkillIconInput; decorative?: boolean }) {
   return (
     <img
       src={`/park/skills/${ICONS[skillIconKind(skill)]}.svg`}
-      alt={`${skill.name} icon`}
+      alt={decorative ? "" : `${skill.name} icon`}
+      aria-hidden={decorative || undefined}
       width="25"
       height="25"
       loading="lazy"
