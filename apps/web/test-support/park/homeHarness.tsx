@@ -77,6 +77,28 @@ export async function settle(): Promise<void> {
   }
 }
 
+export const skillFixture = (id: string, scope: "mine" | "team" | "library", name: string) => ({
+  id,
+  kind: scope === "library" ? "library" : "taught",
+  scope,
+  name,
+  purpose: "Summarize and write",
+  inputs: [],
+  tools: [],
+  version: scope === "library" ? "1.0.0" : 1,
+});
+
+export async function chooseMention(input: HTMLInputElement, text: string): Promise<void> {
+  act(() => {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    set?.call(input, text);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await settle();
+  for (const key of ["ArrowDown", "Enter"])
+    act(() => input.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true })));
+}
+
 export async function mountHome(opts: RigOptions = {}): Promise<HomeRig> {
   const api = opts.api ?? spiedApi();
   const sch = fakeScheduler();

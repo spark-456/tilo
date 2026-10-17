@@ -112,15 +112,6 @@ export function SkillMention({
           </button>
         </div>
       ) : null}
-      {open && !client ? (
-        <p className="park-skill-mention__note">Skill picker needs a connected session.</p>
-      ) : null}
-      {open && client && (state === "loading" || state === "idle") ? (
-        <p className="park-skill-mention__note">Reading skills…</p>
-      ) : null}
-      {open && state === "failed" ? (
-        <p className="park-skill-mention__note">Skills could not be loaded.</p>
-      ) : null}
       {open && client && state === "ready" ? (
         <section className="park-skill-mention" aria-label="Mention a skill">
           <div
@@ -146,7 +137,6 @@ export function SkillMention({
                         aria-selected={index === current.index}
                         id={`${listId}-option-${index}`}
                         key={skill.id}
-                        onMouseEnter={() => setActive({ query, index, dismissed: false })}
                         onClick={() => onChoose(skill)}
                       >
                         <SkillIcon skill={skill} decorative />
@@ -159,7 +149,6 @@ export function SkillMention({
               ) : null;
             })}
           </div>
-          {filtered.length === 0 ? <output>No matching skills.</output> : null}
         </section>
       ) : null}
     </>

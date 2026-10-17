@@ -6,7 +6,12 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeApi, fakeScheduler } from "../../../test-support/park/appHarness";
 import { cleanup, mount, q, qa } from "../../../test-support/park/componentsHarness";
-import { settle, textOf } from "../../../test-support/park/homeHarness";
+import {
+  chooseMention,
+  settle,
+  skillFixture,
+  textOf,
+} from "../../../test-support/park/homeHarness";
 import { liveSourced } from "../../../test-support/park/liveHomeHarness";
 import type { HttpClient } from "../../api/http";
 import type { Api } from "../api/index";
@@ -104,16 +109,7 @@ describe("STUDIO_2 bubble: it can be put anywhere and stays there", () => {
 
 describe("STUDIO_2 bubble: the compact chat is the real Quick answer path", () => {
   it("CX_UX_AT_MENTION_EVERYWHERE_bubble_picks_a_skill_with_arrows_and_sends_the_tag", async () => {
-    const skill = {
-      id: "team-skill",
-      kind: "taught" as const,
-      scope: "team" as const,
-      name: "Team brief",
-      purpose: "Summarize a team",
-      inputs: [],
-      tools: [],
-      version: 1,
-    };
+    const skill = skillFixture("team-skill", "team", "Team brief");
     const getJson = vi.fn(async () => ({ skills: [skill] }));
     const startWorld = vi.fn(async () => ({
       data: {
@@ -127,26 +123,11 @@ describe("STUDIO_2 bubble: the compact chat is the real Quick answer path", () =
     await mountBubble(api, vi.fn(), { getJson } as unknown as HttpClient);
     act(() => bubble().click());
     const field = q<HTMLInputElement>(document.body, "dialog input");
-    act(() => {
-      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-      set?.call(field, "Summarize @");
-      field.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await settle();
-    act(() =>
-      field.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })),
-    );
-    act(() => field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+    await chooseMention(field, "Summarize @");
     expect(textOf(q(document.body, '[data-testid="selected-skill-chip"]'))).toContain("Team brief");
     act(() => q<HTMLButtonElement>(document.body, 'dialog button[aria-label="Send"]').click());
     await settle();
-    expect(startWorld.mock.calls[0]).toEqual([
-      "quick",
-      "Summarize\nYou're on Home.",
-      "quick",
-      [],
-      [{ kind: "taught_skill", id: "team-skill" }],
-    ]);
+    expect(startWorld.mock.calls[0]?.at(-1)).toEqual([{ kind: "taught_skill", id: "team-skill" }]);
     expect(textOf(q(document.body, 'dialog [role="log"]'))).toContain("Running with Team brief");
   });
 

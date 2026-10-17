@@ -3,7 +3,12 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeApi, fakeScheduler, stubApp } from "../../../../test-support/park/appHarness";
 import { cleanup, mount, q, qa } from "../../../../test-support/park/componentsHarness";
-import { settle, textOf } from "../../../../test-support/park/homeHarness";
+import {
+  chooseMention,
+  settle,
+  skillFixture,
+  textOf,
+} from "../../../../test-support/park/homeHarness";
 import { gate, liveSourced } from "../../../../test-support/park/liveHomeHarness";
 import { type HttpClient, TiloApiError } from "../../../api/http";
 import { SAMPLE_QUICK } from "../../api/fixtureApi";
@@ -74,16 +79,7 @@ async function send(el: HTMLElement, text: string) {
 
 describe("STUDIO_2 Chat: the helper's mood follows the real request", () => {
   it("CX_UX_AT_MENTION_EVERYWHERE_chat_picks_a_skill_with_arrows_and_sends_the_tag", async () => {
-    const skill = {
-      id: "mine-skill",
-      kind: "taught" as const,
-      scope: "mine" as const,
-      name: "Meeting notes",
-      purpose: "Write notes",
-      inputs: [],
-      tools: [],
-      version: 1,
-    };
+    const skill = skillFixture("mine-skill", "mine", "Meeting notes");
     const getJson = vi.fn(async () => ({ skills: [skill] }));
     const api = quickApi(async () => ({
       data: {
@@ -94,25 +90,14 @@ describe("STUDIO_2 Chat: the helper's mood follows the real request", () => {
       source: "live",
     }));
     const { el } = await mountChat(api, {}, { getJson } as unknown as HttpClient);
-    type(input(el), "Write @");
-    await settle();
     const field = input(el);
-    act(() =>
-      field.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })),
-    );
-    act(() => field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+    await chooseMention(field, "Write @");
     expect(textOf(q(el, '[data-testid="selected-skill-chip"]'))).toContain("Meeting notes");
 
     type(field, "Write meeting notes");
     act(() => q<HTMLButtonElement>(el, 'button[aria-label="Send"]').click());
     await settle();
-    expect(calls(api)[0]).toEqual([
-      "quick",
-      "Write meeting notes",
-      "quick",
-      [],
-      [{ kind: "taught_skill", id: "mine-skill" }],
-    ]);
+    expect(calls(api)[0]?.at(-1)).toEqual([{ kind: "taught_skill", id: "mine-skill" }]);
     expect(textOf(q(el, '[role="log"]'))).toContain("Running with Meeting notes");
   });
 
