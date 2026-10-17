@@ -159,7 +159,6 @@ export function PeopleLists({ onMeetings }: { onMeetings?: (rows: PeopleRow[]) =
         readBrief={readBrief}
         {...(onMeetings ? { onRows: onMeetings } : {})}
       />
-      <List kind="pinboards" api={api} minutes={null} host={null} readBrief={null} />
     </>
   );
 }
