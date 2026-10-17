@@ -361,6 +361,67 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
           );
         })}
       </ol>
+      {v?.inputs.length ? (
+        <section aria-label="Inputs" className="park-teach__read">
+          <h3>Inputs for each run</h3>
+          <ul className="park-teach__list">
+            {v.inputs.map((input) => (
+              <li key={input.name} className="park-teach__row">
+                {input.label} · {input.kind}
+                {input.required ? " · required" : ""}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {v?.hosts.length ? (
+        <section aria-label="Approved hosts" className="park-teach__read">
+          <h3>Hosts Tilo may open</h3>
+          <ul className="park-teach__list">
+            {t.hosts.map((host) => (
+              <li key={host} className="park-teach__row">
+                {host}{" "}
+                <button
+                  type="button"
+                  aria-label={`Remove ${host}`}
+                  onClick={() => t.removeHost(host)}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+          {t.hosts.length === 0 ? <p>No hosts approved.</p> : null}
+        </section>
+      ) : null}
+      {v?.needsSetup.length ? (
+        <section aria-label="Needs setup" className="park-teach__read">
+          <h3>Needs setup</h3>
+          <ul className="park-teach__list">
+            {v.needsSetup.map((item, i) => (
+              <li key={`${item.tool}:${i}`} className="park-teach__row">
+                {item.tool.charAt(0).toUpperCase() + item.tool.slice(1)} needs setup
+                {item.reason === "team_level" && item.needs ? ` · team level ${item.needs}` : ""}{" "}
+                <a className="park-teach__setup-link" href="/connectors">
+                  Connections
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {v?.cannot?.length ? (
+        <section aria-label="Unavailable steps" className="park-teach__read">
+          <h3>Tilo can't do this yet</h3>
+          <ul className="park-teach__list">
+            {v.cannot.map((item, i) => (
+              <li key={`${i}:${item.text}`} className="park-teach__row">
+                {item.text} · {item.reason}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {question ? (
         <div className="park-teach__question">
           <span className="park-teach__eyebrow">{QUESTION.eyebrow}</span>
@@ -404,7 +465,26 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
               {o.label}
             </button>
           ))}
+          {t.live ? (
+            <button type="button" className="park-teach__chip" onClick={t.loadTeams}>
+              Share with my team
+            </button>
+          ) : null}
+          {t.teams?.map((id) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={t.scope === "team" && t.teamId === id}
+              className={cx("park-teach__chip", t.teamId === id && "park-teach__chip--on")}
+              onClick={() => t.chooseTeam(id)}
+            >
+              Team {id}
+            </button>
+          ))}
         </div>
+        {t.teams?.length === 0 ? (
+          <span className="park-teach__hint">No current team is available.</span>
+        ) : null}
       </fieldset>
       <p className="park-teach__hint">It starts as Learning. {SAVE.note}</p>
       <div className="park-teach__foot">
@@ -417,7 +497,11 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
         <Button variant="secondary" disabled aria-describedby={`${nameId}-try`}>
           Try it once
         </Button>
-        <Button variant="primary" disabled={t.busy || !t.name.trim()} onClick={t.save}>
+        <Button
+          variant="primary"
+          disabled={t.busy || !t.name.trim() || (t.scope === "team" && !t.teamId)}
+          onClick={t.save}
+        >
           Save skill
         </Button>
         <span id={`${nameId}-try`} className="park-teach__hint park-teach__full">

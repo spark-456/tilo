@@ -302,6 +302,34 @@ describe("SKILLS_5_live_teach: a capture the server cannot make", () => {
 });
 
 describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
+  it("test_FR_SKL_02_S1w_reviews_inputs_hosts_setup_and_unavailable_steps_from_the_version", async () => {
+    const expanded = {
+      ...VERSION,
+      inputs: [{ name: "invoice", label: "Invoice file", kind: "file", required: true }],
+      hosts: ["example.com"],
+      cannot: [{ text: "Buy the item", reason: "unavailable_action" }],
+      needs_setup: [{ tool: "gmail", reason: "not_connected" }],
+    };
+    const { server, mount } = rig({
+      "POST /v1/skills/captures/tsk_C1/version": () => json(expanded),
+    });
+    const r = await mount();
+    await toVersion(r);
+    expect(text(r)).toContain("Invoice file");
+    expect(text(r)).toContain("example.com");
+    expect(text(r)).toContain("Tilo can't do this yet");
+    expect(text(r)).toContain("Buy the item");
+    expect(text(r)).toContain("Gmail needs setup");
+    expect(q(r.el, 'a[href="/connectors"]')).not.toBeNull();
+    clickEl(q(r.el, 'button[aria-label="Remove example.com"]'));
+    name(r, "Match invoices");
+    clickEl(control(r.el, "Save skill"));
+    await settle();
+    const [body] = server.posts("/v1/skills") as Record<string, unknown>[];
+    expect(body?.inputs).toEqual(expanded.inputs);
+    expect(body?.hosts).toBeUndefined();
+  });
+
   it("SKILLS_5_live_teach_version_posts_once_and_shows_the_steps_the_question_and_labelled_estimates", async () => {
     const { server, mount } = rig();
     const r = await mount();
@@ -397,13 +425,37 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
 });
 
 describe("SKILLS_5_live_teach: save (step 4)", () => {
+  it("test_FR_SKL_04_S1w_saves_to_a_current_team_selected_by_its_id", async () => {
+    const { server, mount } = rig({
+      "GET /v1/teams": () =>
+        json({
+          teams: [
+            { team: "tm_ops", lead: false, state: "member", invited_by: null },
+            { team: "tm_old", lead: false, state: "lapsed", invited_by: null },
+          ],
+          you: "u_me",
+        }),
+    });
+    const r = await mount();
+    await toSave(r);
+    clickEl(control(r.el, "Share with my team"));
+    await settle();
+    expect(hasControl(r.el, "Team tm_old")).toBe(false);
+    clickEl(control(r.el, "Team tm_ops"));
+    name(r, "Match invoices");
+    clickEl(control(r.el, "Save skill"));
+    await settle();
+    const [body] = server.posts("/v1/skills") as { scope: unknown }[];
+    expect(body?.scope).toEqual({ kind: "team", team: "tm_ops" });
+  });
+
   it("SKILLS_5_live_teach_save_offers_just_me_and_when_I_ask_only", async () => {
     const r = await rig().mount();
     const chips = () => qa(teachCard(r.el), "fieldset button").map((e) => pageText(e));
     expect(chips()).toEqual(["When I ask"]); // STUDIO-4: when it runs is asked on step 1
     await toSave(r);
     expect(hasControl(r.el, "Save skill")).toBe(true);
-    expect(chips()).toEqual(["Just me"]); // and who can use it on step 3
+    expect(chips()).toEqual(["Just me", "Share with my team"]); // team choices load only on request
   });
 
   it("SKILLS_5_live_teach_save_posts_the_servers_steps_and_shows_Saved_only_after_a_201", async () => {
