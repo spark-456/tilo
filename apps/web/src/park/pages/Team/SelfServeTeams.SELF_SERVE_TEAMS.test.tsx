@@ -117,15 +117,18 @@ it("TEAM_ACCESS_1 shows team names from their leads and only marks the viewer as
       { team: "tm_b", lead: true, state: "member", invitedBy: null },
     ],
     {
-      tm_a: [{ id: "u_lena", name: "Lena", lead: true }, { id: "u_me", name: "Me", lead: false }],
+      tm_a: [
+        { id: "u_lena", name: "Lena", lead: true },
+        { id: "u_me", name: "Me", lead: false },
+      ],
       tm_b: [{ id: "u_me", name: "Me", lead: true }],
     },
   );
   const el = await mount(client);
   const rows = [...el.querySelectorAll('[data-testid="team-row"]')];
-  expect(rows[0].textContent).toContain("Team led by Lena");
-  expect(rows[0].textContent).not.toContain("You lead it");
-  expect(rows[1].textContent).toContain("Team led by Me · You lead it");
+  expect(rows[0]?.textContent).toContain("Team led by Lena");
+  expect(rows[0]?.textContent).not.toContain("You lead it");
+  expect(rows[1]?.textContent).toContain("Team led by Me · You lead it");
   expect(el.textContent).not.toContain("tm_a");
   expect(el.textContent).not.toContain("tm_b");
 });
