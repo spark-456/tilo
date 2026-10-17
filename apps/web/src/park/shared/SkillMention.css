@@ -33,9 +33,22 @@
 }
 [data-park] .park-skill-mention__note,
 [data-park] .park-skill-mention__selected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 5px 8px 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--chip);
   color: var(--ink3);
   font-size: 12px;
 }
 [data-park] .park-skill-mention__selected button {
-  margin-left: 8px;
+  padding: 2px 7px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
 }

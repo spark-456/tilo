@@ -156,10 +156,10 @@ export function SkillDrawer({
                 app.go("home");
               }}
             >
-              Use this skill
+              Try it
             </Button>
             <p className="park-skill-drawer__p">
-              Opens Home with this skill selected. Describe your task before starting.
+              Opens Home with this skill tagged. Describe your task before starting.
             </p>
           </section>
           {skill.steps.length ? (
