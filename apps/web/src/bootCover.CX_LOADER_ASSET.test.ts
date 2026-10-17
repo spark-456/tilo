@@ -26,3 +26,20 @@ it("CX_LOADER_ASSET_keeps_first_paint_covered_until_app_and_full_loop_are_ready"
   expect(document.getElementById("tilo-boot-cover")?.className).toContain("leaving");
   expect(document.getElementById("root")?.hasAttribute("inert")).toBe(false);
 });
+
+it("CX_LOADER_ASSET_loads_app_code_even_when_image_decode_never_settles", async () => {
+  vi.useFakeTimers();
+  document.body.innerHTML =
+    '<div id="tilo-boot-cover"><img src="/loader/pool.webp"></div><div id="root" inert aria-hidden="true"></div>';
+  const img = document.querySelector("img") as HTMLImageElement;
+  img.decode = vi.fn(() => new Promise<void>(() => undefined));
+  vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  let released = false;
+  void installBootCover().then(() => {
+    released = true;
+  });
+  await vi.advanceTimersByTimeAsync(799);
+  expect(released).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(released).toBe(true);
+});

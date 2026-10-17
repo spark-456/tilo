@@ -26,7 +26,7 @@ it("FR_POOL_01_NO_REPLAY_a_world_that_ended_earlier_opens_with_no_loader", async
   expect(mounted.container.querySelector(".tt-pool-overlay")).toBeNull();
 });
 
-it("FR_POOL_01_NO_REPLAY_a_run_that_just_ended_plays_once_and_never_returns", async () => {
+it("FR_POOL_01_NO_REPLAY_a_run_that_just_ended_shows_no_card_and_no_overlay", async () => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
   const events = [
@@ -35,10 +35,7 @@ it("FR_POOL_01_NO_REPLAY_a_run_that_just_ended_plays_once_and_never_returns", as
   ];
   const mounted = mount(createElement(PoolLoader, { kind: "task", events, children: null }));
   await settle();
-  expect(mounted.container.querySelector(".tt-pool-overlay")).not.toBeNull();
-  await act(async () => vi.advanceTimersByTimeAsync(2_600));
-  await act(async () => vi.advanceTimersByTimeAsync(2_000));
-  expect(mounted.container.querySelector(".tt-pool-overlay")).toBeNull();
+  expect(mounted.container.querySelector(".tt-pool-overlay, [data-testid='tt-plan-card']")).toBeNull();
   await act(async () => vi.advanceTimersByTimeAsync(30_000));
-  expect(mounted.container.querySelector(".tt-pool-overlay")).toBeNull();
+  expect(mounted.container.querySelector(".tt-pool-overlay, [data-testid='tt-plan-card']")).toBeNull();
 });

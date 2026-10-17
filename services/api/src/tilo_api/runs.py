@@ -662,6 +662,28 @@ class Run:
         self.director = next((a["id"] for a in semantic["agents"] if a["rank"] == "director"), "system")
         return config
 
+    def _record_plan(self, cause: str | None) -> None:
+        """PRD 7.2: the compiled plan is recorded once, before the work starts (`world.planned`: tier, approach,
+        unit count, the approach's estimate). A page waiting on it ("Step n of m", the planning card) used to wait
+        for ever, because no run wrote it. Recording it is best effort: a missing record never stops the work."""
+        try:
+            agents = len(self.layout["semantic"]["agents"])
+            tier = "outpost" if agents <= 2 else "village" if agents <= 6 else "town" if agents <= 15 else "city"
+            units = len(self.plan["units"])
+            estimate = self.approach["credits"]
+            data = {
+                "tier": tier,
+                "approach": self.approach["id"],
+                "unit_count": max(1, units),
+                "credits": {"min": estimate["min"], "max": estimate["max"]},
+            }
+            summary = f"The Director planned {units} unit{'' if units == 1 else 's'}."
+            self.put("world.planned", self.director, self.world_id, summary, data, cause=cause)
+        except RunStopped:
+            raise
+        except Exception as exc:
+            log_caught(exc, __name__, locals())
+
     async def _execute(self) -> None:
         config = self._prepare()
         if config is None:
@@ -678,6 +700,7 @@ class Run:
         stream = self.store.events.get(self.world_id, [])
         granted = next((e["id"] for e in reversed(stream) if e["type"] == "budget.granted"), None)
         summary = f"Work started with a budget of {self.cap:g} credits."
+        self._record_plan(granted)
         self.put("world.started", self.director, self.world_id, summary, {"budget_cap": self.cap}, cause=granted)
         must_ask = self._must_ask(config)
         planned = asyncio.ensure_future(

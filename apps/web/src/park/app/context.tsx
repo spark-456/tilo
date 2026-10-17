@@ -27,6 +27,7 @@ import { carryResultReader } from "../api/results";
 import { withToday } from "../api/sampleDates";
 import { parkApi, withSession } from "../api/select";
 import { carrySkillFixer } from "../api/skillFixes";
+import { copyApi, withSwr } from "../api/swr";
 import type { ApiResult, Source } from "../api/types";
 import { type FirstRun, createFirstRun } from "../sample/firstRun";
 import type { AppCtx } from "./AppCtx";
@@ -60,6 +61,8 @@ interface Held {
   /** QA-DEMO-1: a demo session on a configured deployment (see `ParkProviderProps.demo`). */
   demo: boolean;
   firstRun: FirstRun;
+  /** Bumps when a background read found newer data than a page was shown (see `api/swr.ts`). */
+  fresh: { subscribe: (listener: () => void) => () => void; version: () => number };
 }
 
 interface Viewport {
@@ -128,7 +131,28 @@ export function ParkProvider({
     const built = api ?? parkApi({ VITE_TILO_API_URL: API_URL }, appCheckToken, authToken);
     const keyed = api === undefined && API_URL?.trim() ? withSession(built, sessionView) : built;
     // The sample company's dates follow today; an Api handed in by a test is left exactly as it is.
-    const raw = api === undefined ? withToday(keyed, civilToday) : keyed;
+    const today = api === undefined ? withToday(keyed, civilToday) : keyed;
+    // Page reads are stale-while-revalidate for a signed-in person on the live Api (a test's Api is left as it is).
+    const listeners = new Set<() => void>();
+    let version = 0;
+    const fresh = {
+      subscribe: (listener: () => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      version: () => version,
+    };
+    const raw =
+      api === undefined && API_URL?.trim()
+        ? withSwr(
+            today,
+            () => sessionView.identity()?.email ?? null,
+            () => {
+              version += 1;
+              for (const listener of [...listeners]) listener();
+            },
+          )
+        : today;
     let store: ParkStore | null = null;
     const wrapped = noting(raw, (source) => store?.noteSource(source));
     const timer = schedule ?? realSchedule;
@@ -168,6 +192,7 @@ export function ParkProvider({
       expectsSample,
       demo,
       firstRun,
+      fresh,
     };
   });
   const [win, setWin] = useState(windowSize);
@@ -214,7 +239,12 @@ function useHeld(): Held {
 }
 
 export const useParkStore = (): ParkStore => useHeld().store;
-export const useParkApi = (): Api => useHeld().api;
+export const useParkApi = (): Api => {
+  const held = useHeld();
+  const version = useSyncExternalStore(held.fresh.subscribe, held.fresh.version);
+  // A new object when fresh data arrived: a page's load effect lists the api, so it re-reads (from the cache, at once).
+  return useMemo(() => (version === 0 ? held.api : copyApi(held.api)), [held.api, version]);
+};
 export const useFirstRunController = (): FirstRun => useHeld().firstRun;
 /** World-specific routes share the existing authenticated client; demo sessions have none. */
 export const useWorldClient = (): HttpClient | null => useHeld().worldClient;

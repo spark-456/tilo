@@ -28,10 +28,14 @@ it("CX_T_RUN_starts_the_storyboard_only_from_recorded_world_events", async () =>
   await act(async () => receive?.({ type: "agent.spawned" }));
   expect(rig.container.textContent).toContain("Waiting for world.started");
   await act(async () => receive?.({ type: "world.started" }));
-  expect(rig.container.textContent).toContain("world.started");
-  expect(rig.container.textContent).not.toContain("World is visible");
+  // the World page is mounted from world.started, with a card on it until the plan is recorded
+  expect(rig.container.querySelector("[data-testid='tt-plan-card']")?.textContent).toContain(
+    "world.started",
+  );
+  expect(rig.container.textContent).toContain("World is visible");
   await act(async () => receive?.({ type: "world.planned" }));
   expect(rig.container.textContent).toContain("World is visible");
+  expect(rig.container.querySelector("[data-testid='tt-plan-card']")).toBeNull();
   expect(rig.container.textContent).not.toContain("Waiting for world.started");
 });
 
@@ -102,8 +106,7 @@ it("CX_T_RUN_pending_blueprint_stays_until_the_recorded_world_started_event", as
   expect(rig.container.querySelector("[data-testid='run-blueprint']")).toBeNull();
 });
 
-it("CX_T_RUN_pool_stays_mounted_while_the_recorded_plan_reveals_the_world", async () => {
-  vi.useFakeTimers();
+it("CX_T_RUN_planning_card_never_covers_a_live_world_and_goes_with_the_first_recorded_work", async () => {
   let receive: ((event: { type: string; ts?: string }) => void) | undefined;
   const client = {
     subscribeEvents: vi.fn(
@@ -121,11 +124,32 @@ it("CX_T_RUN_pool_stays_mounted_while_the_recorded_plan_reveals_the_world", asyn
   );
   await act(async () => receive?.({ type: "world.started", ts: "2026-10-16T10:00:00.000Z" }));
   const host = rig.container.querySelector("[data-testid='tt-pool-host']");
-  expect(host).not.toBeNull();
-  expect(host?.querySelector("[data-phase]")).toBeNull();
-  await act(async () => vi.advanceTimersByTimeAsync(300));
-  expect(host?.querySelector("[data-phase='leap']")).not.toBeNull();
-  await act(async () => receive?.({ type: "world.planned", ts: "2026-10-16T10:00:00.400Z" }));
-  expect(rig.container.querySelector("[data-testid='tt-pool-host']")).toBe(host);
+  expect(host?.querySelector("[data-testid='tt-plan-card']")).not.toBeNull();
+  expect(host?.querySelector(".tt-pool-overlay, .tt-pool-scrim")).toBeNull();
   expect(host?.textContent).toContain("World is visible");
+  // the live run records work (not world.planned): the pending flag clears and the card goes
+  await act(async () => receive?.({ type: "agent.spawned" }));
+  expect(rig.container.querySelector("[data-testid='tt-plan-card']")).toBeNull();
+  expect(rig.container.querySelector("[data-testid='tt-pool-host']")).toBe(host);
+  expect(pendingWorld("pool-handoff")).toBe(false);
+});
+
+it("CX_T_RUN_a_failure_after_world_started_keeps_the_world_page_to_name_the_stop", async () => {
+  let receive: ((event: { type: string }) => void) | undefined;
+  const client = {
+    subscribeEvents: vi.fn((_id: string, onEvent: (event: { type: string }) => void) => {
+      receive = onEvent;
+      return vi.fn();
+    }),
+  };
+  markPendingWorld("failed-after-start");
+  const rig = mount(
+    <PendingWorldRoute worldId="failed-after-start" client={client}>
+      <p>World is visible</p>
+    </PendingWorldRoute>,
+  );
+  await act(async () => receive?.({ type: "world.started" }));
+  await act(async () => receive?.({ type: "world.failed" }));
+  expect(rig.container.textContent).toContain("World is visible");
+  expect(rig.container.querySelector("[data-testid='tt-plan-card']")).toBeNull();
 });
