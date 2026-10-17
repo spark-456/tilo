@@ -54,7 +54,7 @@ def test_CP2_the_scripted_plans_are_valid_or_invalid_as_labelled():
         assert rule in found, (kind, found)
 
 
-def test_CP2_approve_starts_a_run_for_the_validated_plan(run_flow, monkeypatch):
+def test_FR_INT_09_CP2_approve_records_the_compiled_plan_before_starting(run_flow, monkeypatch):
     run_flow.spy_validate_plan(monkeypatch)
     intake = run_flow.start()
 
@@ -62,6 +62,7 @@ def test_CP2_approve_starts_a_run_for_the_validated_plan(run_flow, monkeypatch):
 
     assert response.status_code == 200, response.text
     assert response.json() == {"world_id": run_flow.world_id}
+    (planned,) = wait_for(lambda: run_flow.events("world.planned"), what="world.planned")
     (started,) = wait_for(lambda: run_flow.events("world.started"), what="world.started")
     assert started["data"]["budget_cap"] == CAP
     (call,) = run_flow.compile_calls
@@ -69,9 +70,22 @@ def test_CP2_approve_starts_a_run_for_the_validated_plan(run_flow, monkeypatch):
     assert call["brief"]["goal"] == intake["brief"]["goal"]
     assert [c for c in run_flow.validate_calls if c["plan"] == run_flow.last_plan and c["violations"] == []]
     timeline = run_flow.timeline
-    assert timeline.index("compile") < timeline.index("validate") < timeline.index("event:world.started")
+    assert planned["data"] == {
+        "tier": "village",
+        "approach": call["approach"]["id"],
+        "unit_count": len(run_flow.last_plan["units"]),
+        "credits": call["approach"]["credits"],
+    }
+    proposed = run_flow.events("plan.approaches_proposed")[0]
+    assert planned["cause"] == proposed["id"]
+    assert (
+        timeline.index("compile")
+        < timeline.index("validate")
+        < timeline.index("event:world.planned")
+        < timeline.index("event:world.started")
+    )
     stream = run_flow.stream()
-    assert index_of(stream, only(stream, "budget.granted")) < index_of(stream, started)
+    assert index_of(stream, only(stream, "budget.granted")) < index_of(stream, planned) < index_of(stream, started)
 
 
 @pytest.mark.parametrize("kind", sorted(BAD_PLANS))

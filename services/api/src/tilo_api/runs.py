@@ -664,6 +664,21 @@ class Run:
             self._fail("the run's item store could not be opened", None)
             return
         stream = self.store.events.get(self.world_id, [])
+        proposed = next((event for event in reversed(stream) if event["type"] == "plan.approaches_proposed"), None)
+        unit_count = len(self.plan["units"])
+        self.put(
+            "world.planned",
+            self.director,
+            self.world_id,
+            f"The Director planned {unit_count} units.",
+            {
+                "tier": self.plan["tier"],
+                "approach": self.approach["id"],
+                "unit_count": unit_count,
+                "credits": self.approach["credits"],
+            },
+            cause=proposed["id"] if proposed else None,
+        )
         granted = next((e["id"] for e in reversed(stream) if e["type"] == "budget.granted"), None)
         summary = f"Work started with a budget of {self.cap:g} credits."
         self.put("world.started", self.director, self.world_id, summary, {"budget_cap": self.cap}, cause=granted)
