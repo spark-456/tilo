@@ -115,13 +115,8 @@ export function createInitialState(layout: Layout): WorldState {
     .flatMap((l) => l.districts)
     .flatMap((d) => d.buildings);
   const hall =
-    allBuildings.find(
-      (b) =>
-        b.common_type === "meeting_hall" ||
-        b.name === "Meeting Hall" ||
-        b.id.toLowerCase().includes("hall"),
-    )?.id ??
-    allBuildings.find((b) => b.common_type === "town_hall")?.id ??
+    // Only a hall the layout names as one: never guessed from an id or another building type.
+    allBuildings.find((b) => b.common_type === "meeting_hall" || b.name === "Meeting Hall")?.id ??
     null;
   return {
     seq: 0,

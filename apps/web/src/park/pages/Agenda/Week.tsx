@@ -252,7 +252,12 @@ function Calendar({
               </button>
             ))}
             {d.today && weekOffset === 0 ? (
-              <div className="park-agenda-now" role="img" aria-label="Current time" style={{ top: nowPos }}>
+              <div
+                className="park-agenda-now"
+                role="img"
+                aria-label="Current time"
+                style={{ top: nowPos }}
+              >
                 <span className="park-agenda-nowdot" />
               </div>
             ) : null}
@@ -276,7 +281,7 @@ function MonthView({
 }) {
   const days = dayColumns(A, EV, ui.cals, true, false);
   return (
-    <div className="park-agenda-cal" role="group" aria-label="Month view">
+    <div className="park-agenda-cal">
       <div className="park-agenda-monthgrid">
         {days.map((d, index) => (
           <button
@@ -337,6 +342,7 @@ export function Week({ A, ui, app }: { A: Agenda; ui: AgendaUi; app: AppCtx }) {
           </div>
         </div>
         <div className="park-agenda-filters">
+          {/* biome-ignore lint/a11y/useSemanticElements: a labelled group of calendar controls, not a form fieldset */}
           <div className="park-agenda-nav" role="group" aria-label="Calendar navigation">
             <button
               type="button"

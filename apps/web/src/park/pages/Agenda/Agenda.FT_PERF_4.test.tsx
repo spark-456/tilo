@@ -59,7 +59,7 @@ describe("FT_PERF_4 Agenda calendar enhancements", () => {
     // Switch to Month view
     act(() => monthBtn.click());
     await settle();
-    expect(container.querySelector('[aria-label="Month view"]')).not.toBeNull();
+    expect(container.querySelector(".park-agenda-cal")).not.toBeNull();
 
     // Switch to Day view
     act(() => dayBtn.click());

@@ -21,7 +21,15 @@ afterEach(() => {
   resetSpotlights();
 });
 
-const layout = villageBasicLayout() as unknown as Layout;
+// The layout names its Meeting Hall (the reducer never guesses one): the fixture's town hall is marked as it.
+const layout = (() => {
+  const base = villageBasicLayout() as unknown as Layout;
+  const copy = JSON.parse(JSON.stringify(base)) as Layout;
+  const buildings = copy.semantic.levels.flatMap((l) => l.districts).flatMap((d) => d.buildings);
+  const hall = buildings.find((b) => b.common_type === "town_hall") ?? buildings[0];
+  if (hall) (hall as { common_type?: string }).common_type = "meeting_hall";
+  return copy;
+})();
 
 const runEvents = () => {
   resetEvents();
