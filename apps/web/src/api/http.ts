@@ -527,7 +527,7 @@ function quickOf(body: unknown): QuickIntakeResult | null {
   const saved = figure(c.saved_credits);
   if (credits !== undefined) cost.credits = credits;
   if (saved !== undefined) cost.savedCredits = saved;
-  const suggestion = b.memory_suggestion;
+  const suggestion = b.suggestion;
   const memorySuggestion =
     typeof suggestion === "object" &&
     suggestion !== null &&

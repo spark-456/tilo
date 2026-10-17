@@ -40,7 +40,7 @@ describe("QUICK_THINKING_http: the mode field", () => {
       mode: "quick",
       outcome: "answered",
       text: "Okay.",
-      memory_suggestion: { text: "I prefer mornings", kind: "preference" },
+      suggestion: { text: "I prefer mornings", kind: "preference" },
     });
     expect((await askQuick(r.api, "quick", "Remember that I prefer mornings")).data).toMatchObject({
       kind: "answered",
