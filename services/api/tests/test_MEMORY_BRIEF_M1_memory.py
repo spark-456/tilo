@@ -5,14 +5,16 @@ from fastapi import HTTPException
 from tilo_api.memory_store import FirestoreMemoryStore, InMemoryMemoryStore, MemoryErasureStore, MemoryFull
 
 
-def test_MI_01_MI_02_routes_hide_foreign_ids_and_preserve_source(monkeypatch):
+def test_MI_01_MI_02_routes_hide_foreign_ids_and_preserve_source(monkeypatch, people_rig):
     from fastapi.testclient import TestClient
     from tilo_api import app, deps, memory_routes
 
+    people = people_rig()
     monkeypatch.delenv("K_SERVICE", raising=False)
     store = InMemoryMemoryStore()
     user = ["u_alex"]
     app.dependency_overrides[deps.get_current_principal] = lambda: deps.Principal(user[0], "owner")
+    app.dependency_overrides[deps.get_people_stores] = lambda: people.real
     app.dependency_overrides[memory_routes.get_memory_store] = lambda: store
     app.dependency_overrides[deps.get_clock] = lambda: lambda: STAMP
     app.dependency_overrides[memory_routes.get_memory_safety] = lambda: type(
