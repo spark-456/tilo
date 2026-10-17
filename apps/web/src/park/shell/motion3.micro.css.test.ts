@@ -135,7 +135,6 @@ describe("WEB-MOTION-3 css: the limits of the earlier tickets still hold", () =>
       "@keyframes waddle",
       "@keyframes walkFrame",
       "@keyframes tiloSlide",
-      "@keyframes tiloSpin",
       "@keyframes tiloFade",
     ]);
   });

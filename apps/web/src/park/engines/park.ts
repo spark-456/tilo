@@ -84,12 +84,18 @@ interface SceneObj {
   el: El;
 }
 
+const sceneReadiness = new WeakMap<object, Promise<void>>();
+/** Resolves when a drawn scene's traffic schedule is solved (immediately when it was solved inline). */
+export function sceneReady(drawn: object): Promise<void> {
+  return sceneReadiness.get(drawn) ?? Promise.resolve();
+}
+
 export function createPark(
   h: H,
   makeWorld: (h: H) => World,
   env: ParkEnv = {},
 ): {
-  scene: (o?: SceneOpts) => { el: El; spots: Spot[]; lanes?: LaneRow[]; ready?: Promise<void> };
+  scene: (o?: SceneOpts) => { el: El; spots: Spot[]; lanes?: LaneRow[] };
   world: (
     plan: Plan,
     o?: Opt<{ night: boolean; seed: number; labels: boolean; tags: boolean }>,
@@ -372,12 +378,7 @@ export function createPark(
     return out;
   }
   /* o: {w,h} artboard px, night, k (slow-down), still (frozen movers), mute (0..1 pull towards paper) */
-  function scene(o0?: SceneOpts): {
-    el: El;
-    spots: Spot[];
-    lanes?: LaneRow[];
-    ready?: Promise<void>;
-  } {
+  function scene(o0?: SceneOpts): { el: El; spots: Spot[]; lanes?: LaneRow[] } {
     const o = Object.assign(
       {
         w: 1440,
@@ -961,7 +962,7 @@ export function createPark(
         const rj = rows[j];
         if (j < R && rj?.length) kids.push(sv(depthSort(rj).map((q) => q.el)));
       }
-      return {
+      const drawn = {
         el: h(
           "div",
           { style: { position: "absolute", inset: 0 } },
@@ -971,9 +972,10 @@ export function createPark(
           const q = toPx(c.top);
           return { x: q[0], y: q[1], area: c.area, st: c.st };
         }),
-        ready,
         ...(o.avoid ? { lanes: [...kerb, ...reported] } : {}),
       };
+      sceneReadiness.set(drawn, ready); // readiness is not part of the ported surface (it would add a key)
+      return drawn;
     } finally {
       cmap = prev;
     }

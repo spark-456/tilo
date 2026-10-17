@@ -1,9 +1,9 @@
 /** The HTML cover exists before the JavaScript bundle. Release it after the app and one saved loop are ready. */
-export function installBootCover(): void {
+export function installBootCover(): Promise<void> {
   const cover = document.getElementById("tilo-boot-cover");
   const root = document.getElementById("root");
   const image = cover?.querySelector("img");
-  if (!cover || !root || !image) return;
+  if (!cover || !root || !image) return Promise.resolve();
 
   let appReady = false;
   let loopReady = false;
@@ -28,21 +28,19 @@ export function installBootCover(): void {
   check();
 
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  void image
-    .decode()
-    .catch(() => undefined)
-    .then(() => {
-      window.setTimeout(
-        () => {
-          loopReady = true;
-          cover.dataset.loopComplete = "true";
-          image.src = "/loader/pool-9182ba9a51a9.png";
-          requestAnimationFrame(() => {
-            window.dispatchEvent(new Event("tilo-boot-loop-complete"));
-          });
-          reveal();
-        },
-        reduced ? 200 : 4600,
-      );
-    });
+  // Resolves once the cover artwork is decoded (the cover is drawn), so the caller can load app code after it.
+  const decoded = image.decode().catch(() => undefined);
+  void decoded.then(() => {
+    window.setTimeout(
+      () => {
+        loopReady = true;
+        cover.dataset.loopComplete = "true";
+        image.src = "/loader/pool-9182ba9a51a9.png";
+        window.dispatchEvent(new Event("tilo-boot-loop-complete"));
+        reveal();
+      },
+      reduced ? 200 : 4600,
+    );
+  });
+  return decoded;
 }

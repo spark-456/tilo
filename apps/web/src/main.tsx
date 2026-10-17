@@ -1,11 +1,8 @@
 import { installBootCover } from "./bootCover";
 
-installBootCover();
+// Let the HTML-only cover paint before loading app code, fonts, or the application stylesheet: the cover artwork
+// is decoded first, then one task yields to the browser. No frame loop is used (honesty rules, FR-WLD-09).
+const afterFirstPaint = (decoded: Promise<void>) =>
+  decoded.then(() => new Promise<void>((resolve) => window.setTimeout(resolve, 0)));
 
-// Let the HTML-only cover paint before loading app code, fonts, or the application stylesheet.
-const afterFirstPaint = () =>
-  new Promise<void>((resolve) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-  );
-
-void afterFirstPaint().then(() => import("./startApp"));
+void afterFirstPaint(installBootCover()).then(() => import("./startApp"));

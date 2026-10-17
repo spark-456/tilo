@@ -244,7 +244,7 @@ export function ChatPage({ app }: { app: AppCtx }) {
                     One helper answers right away. Past chats are not kept, so this page starts
                     empty each visit.
                   </p>
-                  <div className="park-chat-intro__prompts" aria-label="Starter prompts">
+                  <div className="park-chat-intro__prompts">
                     {[
                       "What should I focus on today?",
                       "Help me draft a short email",
