@@ -31,7 +31,7 @@ async function load(client: TeamsClient): Promise<Loaded> {
 
 function teamName(roster: RosterMember[] | undefined): string {
   const lead = roster?.find((m) => m.lead);
-  return lead ? `${lead.name}'s team` : "Team";
+  return lead ? `Team led by ${lead.name}` : "Team";
 }
 
 function Invite({
