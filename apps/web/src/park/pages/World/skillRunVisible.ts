@@ -25,9 +25,8 @@ export function loadedSkillNames(
 
 export function storySummary(event: RunEvent, skills: readonly Skill[]): string {
   if (event.type !== "skill.loaded") return event.summary;
-  const actor = /^(.*?)\s+loaded the skill\b/i.exec(event.summary)?.[1]?.trim();
   const name = skillNameForEvent(event, skills);
   return name
-    ? `${actor || "An agent"} loaded the skill ${name}.`
-    : `${actor || "An agent"} loaded a skill.`;
+    ? `The team loaded the skill ${name}.`
+    : "The team loaded a skill.";
 }
