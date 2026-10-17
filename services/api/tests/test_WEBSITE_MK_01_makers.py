@@ -49,6 +49,13 @@ def test_WEBSITE_MK_01_options_MK_02_config_MK_03_editable_text_MK_06_model_fiel
         validate_brief(invalid)
 
 
+def test_CX_WEB_ROUTE_1_exact_timezone_prompt_defaults_to_native() -> None:
+    brief = {**WEBSITE, "goal": "Make me a website with all the timezones ... live"}
+    choice = makers.make_choices(brief, OWNER, views=Views())[0]
+    assert choice["selected"] == "native"
+    assert not any(option["suggested"] for option in choice["options"])
+
+
 def test_WEBSITE_MK_06_approve_saves_events_after_grant_and_compiles_the_persons_pick(run_flow):
     from _clint2_lib import wait_for
 
