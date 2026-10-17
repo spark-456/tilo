@@ -72,6 +72,38 @@ test.describe("@cp2 CX-UX-JOURNEY-E2E the judge journey", () => {
     test.setTimeout(200_000);
     await page.setViewportSize(DESKTOP);
     const w = watch(page);
+    // The dev API has no generated brief for its fixture owner. Keep the smoke fixture in its empty state without
+    // treating the API's intentional `not_ready` 404 as a journey failure.
+    await page.route("**/v1/me/brief", (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          v: "1.0",
+          owner: "fixture-owner",
+          local_date: "2026-10-17",
+          time_zone: "Asia/Kolkata",
+          generated_at: "2026-10-17T00:00:00+05:30",
+          trigger: "schedule",
+          model: "skipped",
+          meetings: { status: "not_connected", items: [] },
+          mail_needing_reply: { status: "not_connected", items: [] },
+          deadlines: { status: "ok", items: [] },
+          suggestions: [],
+          todo_suggestions: [],
+        }),
+      });
+    });
+    // The result route fails closed for the dev runner's unscreened outputs. Use a fake result only in this UI smoke.
+    await page.route("**/worlds/*/result*", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "text/markdown; charset=utf-8",
+        headers: { "content-disposition": 'attachment; filename="tilo-result.md"' },
+        body: "# Supplier comparison\n\nThe three supplier quotes are ready to review.",
+      }),
+    );
 
     await step(page, "fixture sign-in", async () => {
       // CP2 installs one in-memory owner principal and fake providers; no Firebase or paid call.
@@ -181,16 +213,6 @@ test.describe("@cp2 CX-UX-JOURNEY-E2E the judge journey", () => {
       page,
       "result: the output is readable on the page, Open and Download work",
       async () => {
-        // Dev-run artifacts are intentionally unscreened, so the secure result route fails closed. Keep this
-        // browser journey on fixture data and exercise the result UI without weakening the API's screening rule.
-        await page.route(`**/worlds/${worldId}/result*`, (route) =>
-          route.fulfill({
-            status: 200,
-            contentType: "text/markdown; charset=utf-8",
-            headers: { "content-disposition": 'attachment; filename="tilo-result.md"' },
-            body: "# Supplier comparison\n\nThe three supplier quotes are ready to review.",
-          }),
-        );
         // WORLD-USEFUL: the page reads the delivered output itself as soon as the run is recorded as done
         const read = page.waitForResponse((r) => r.url().includes(`/worlds/${worldId}/result`), {
           timeout: 30_000,
