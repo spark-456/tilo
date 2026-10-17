@@ -38,6 +38,8 @@ export const islandTag = (name: string) =>
 // Dark text on the neutral policy fill: white on it would be under 4.5:1.
 export const policyTag = () =>
   makePill("Policy", { fill: tokens.color.policy, ink: PALETTE.ink, lip: true });
+/** TW-4: lime In session tag when a meeting is convened in the Hall. */
+export const sessionTag = (text: string) => makePill(text, { fill: "#c8f23a", ink: "#0b0b0c" });
 
 /** WORLD-LIVE: a speech bubble whose tail tip is at (0, 0) and which grows upward: the receiver's name in bold,
  * then the real note, wrapped at 170 px. Dark text on the white pill fill (same pair as the building tags). */
