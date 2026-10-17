@@ -219,6 +219,9 @@ export function displayApiError(error: unknown): string {
     invalid_query: "Check your search and try again.",
     invalid_record: "This record cannot be used. Reload before trying again.",
     invalid_request: "Check the information and try again.",
+    memory_full: "Your memory is full. Remove a note before adding another.",
+    safety_unavailable: "Tilo cannot check this note right now. Try again in a moment.",
+    event_unavailable: "We could not record this note, so it was not saved. Try again.",
     invalid_settings: "Check your settings and try again.",
     invalid_subscription: "This notification subscription cannot be used. Set it up again.",
     item_unavailable: "This item is unavailable right now.",
@@ -515,7 +518,13 @@ export interface QuickCost {
 
 /** A Quick ask's two answers (services/api COST-FAST-1): the model's text with its cost, or an offer to switch. */
 export type QuickIntakeResult =
-  | { kind: "answered"; text: string; cost: QuickCost | null; skill?: SkillMatch }
+  | {
+      kind: "answered";
+      text: string;
+      cost: QuickCost | null;
+      skill?: SkillMatch;
+      memorySuggestion?: { text: string; kind: "preference" | "fact" | "person" };
+    }
   | { kind: "switch"; reason: QuickReason; skill?: SkillMatch };
 
 const figure = (v: unknown): number | undefined =>
@@ -540,11 +549,23 @@ function quickOf(body: unknown): QuickIntakeResult | null {
   const saved = figure(c.saved_credits);
   if (credits !== undefined) cost.credits = credits;
   if (saved !== undefined) cost.savedCredits = saved;
+  const suggestion = b.suggestion;
+  const memorySuggestion =
+    typeof suggestion === "object" &&
+    suggestion !== null &&
+    !Array.isArray(suggestion) &&
+    typeof (suggestion as { text?: unknown }).text === "string" &&
+    (suggestion as { text: string }).text.length > 0 &&
+    (suggestion as { text: string }).text.length <= 280 &&
+    ["preference", "fact", "person"].includes(String((suggestion as { kind?: unknown }).kind))
+      ? (suggestion as { text: string; kind: "preference" | "fact" | "person" })
+      : undefined;
   return {
     kind: "answered",
     text: b.text,
     cost: Object.keys(cost).length > 0 ? cost : null,
     ...offered,
+    ...(memorySuggestion ? { memorySuggestion } : {}),
   };
 }
 

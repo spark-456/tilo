@@ -64,6 +64,7 @@ from tilo_metering.flags import InMemoryFlagStore
 
 KEY = {"Idempotency-Key": "retry-key-0001"}
 BODY_ROUTES = {
+    "create memory": "/v1/memory",
     "create meeting": "/v1/meetings",
     "create person": "/v1/people",
     "create work item": "/v1/work-items",
@@ -197,6 +198,7 @@ def test_PPL_11c_s4_BQ_PPL11C_1_team_put_routes_oversize_body_is_a_413(people_ri
 
 # `PATCH /v1/meetings/{id}` (ADR-0047, MB-10) is the owner's meeting edit under its second name: same cap.
 MEETING_PATCH_ROUTES = {"edit meeting": "/v1/meetings/mt_q4_plan"}
+MEMORY_PATCH_ROUTES = {"edit memory": "/v1/memory/{item_id}"}
 
 
 @pytest.mark.parametrize("path", list(MEETING_PATCH_ROUTES.values()), ids=list(MEETING_PATCH_ROUTES))
@@ -210,6 +212,22 @@ def test_PPL_11c_s4_BQ_PPL11C_1_meeting_patch_oversize_body_is_a_413(people_rig,
         rig.app, path, method="PATCH", total_bytes=10, declared_length=50_000_000
     )
     assert status == 413 and consumed <= 4096 and rig.snapshot() == before
+
+
+@pytest.mark.parametrize("path", list(MEMORY_PATCH_ROUTES.values()), ids=list(MEMORY_PATCH_ROUTES))
+def test_SEC_10_memory_patch_oversize_body_is_a_413(people_rig, path):
+    rig = meeting_rig(people_rig)
+    from tilo_api.memory_routes import _DEV_STORE
+
+    item, _ = _DEV_STORE.create(rig.org, "u_owner", "safe note", "fact", "user", "2026-10-17T00:00:00.000Z")
+    path = path.format(item_id=item["id"])
+    status, consumed, headers, text = stream_post(rig.app, path, method="PATCH", total_bytes=5_000_000)
+    assert status == 413 and json.loads(text) == {"detail": "body_too_large"}, (status, text[:120])
+    assert consumed <= MAX_BODY_BYTES + 64 * 1024
+    status, consumed, headers, text = stream_post(
+        rig.app, path, method="PATCH", total_bytes=10, declared_length=50_000_000
+    )
+    assert status == 413 and consumed <= 4096
 
 
 # `/v1/me/settings` (ADR-0039) has its own 16 KiB cap and a route-level `write_limit` (user_settings.py)
@@ -287,6 +305,7 @@ def test_PPL_11c_s4_BQ_PPL11C_1_every_put_and_patch_write_route_is_covered(peopl
         *SETTINGS_PUT_ROUTES.values(),
         *ORG_MODEL_KEY_WRITE_ROUTES.values(),
         *MEETING_PATCH_ROUTES.values(),
+        *MEMORY_PATCH_ROUTES.values(),
     ]
     uncovered = [t for t, p in patterns.items() if not any(p.match(path) for path in all_covered)]
     assert not uncovered, f"PUT/PATCH write routes with no body-cap case: {uncovered}"
@@ -576,6 +595,8 @@ def test_PPL_11c_s4_SEC_10_the_sixty_first_write_in_a_minute_is_a_429_and_reads_
     assert over.status_code == 429 and over.json()["code"] == "rate_limited", over.text[:200]
     assert 1 <= int(over.headers["retry-after"]) <= 60
     assert rig.post("/v1/meetings", MEETING_BODY).status_code == 429, "the cap is per principal, not per route"
+    assert rig.client.post("/v1/memory", content=b"{").status_code == 429, "memory create is limited before its body"
+    assert rig.client.patch("/v1/memory/mem_missing", content=b"{").status_code == 429, "memory patch is limited first"
     assert rig.client.post("/v1/work-items", json={"nonsense": 1}).status_code == 429, "decided before the body"
     assert rig.snapshot() == snapshot
     assert rig.plate().status_code == 200, "a read is never counted"

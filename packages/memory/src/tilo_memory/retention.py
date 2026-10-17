@@ -35,6 +35,7 @@ RETENTION_DAYS: Mapping[str, int | None] = MappingProxyType(
         "decision": 365,
         "archive_record": 30,
         "cache_entry": 30,  # "7-30 days by source": the upper bound; a source with a shorter window expires sooner
+        "memory_item": None,  # MI-09: kept until the person deletes the note or their account
     }
 )
 

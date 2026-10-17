@@ -1,4 +1,5 @@
 import { type FormEvent, useState } from "react";
+import { RememberChip } from "../../chat/RememberChip";
 import { useQuickChat } from "../../chat/useQuickChat";
 import { type TiloMood, TiloTBuddy } from "../../shared/tiloT";
 import { withQuickContext } from "./homeData";
@@ -98,6 +99,9 @@ export function HomeAssistant({ contexts }: { contexts: readonly HomeContextChip
                 <span className="park-home-assistant__answer">
                   {turn.state === "answered" && turn.sample ? <b>Sample answer · </b> : null}
                   {replyText(turn)}
+                  {turn.state === "answered" && !turn.sample ? (
+                    <RememberChip suggestion={turn.memorySuggestion} />
+                  ) : null}
                 </span>
               </div>
             ))}
