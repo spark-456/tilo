@@ -52,6 +52,7 @@ def test_WEB_2_WS_10_the_shell_headers_are_exact() -> None:
     assert "x-frame-options" not in response.headers and "set-cookie" not in response.headers
     policy = response.headers["permissions-policy"]
     assert all(f"{feature}=()" in policy for feature in ("camera", "microphone", "geolocation", "payment", "usb"))
+    assert "document-domain" not in policy and "web-share" not in policy
     assert "=(self)" not in policy and "*" not in policy
 
 

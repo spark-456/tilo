@@ -27,9 +27,9 @@ router = APIRouter()
 PATH = "/preview/website"
 MAX_HTML_BYTES = 524_288  # AR-10, WS-02
 _FEATURES = (
-    "accelerometer autoplay camera clipboard-read clipboard-write display-capture document-domain encrypted-media "
+    "accelerometer autoplay camera clipboard-read clipboard-write display-capture encrypted-media "
     "fullscreen gamepad geolocation gyroscope hid idle-detection local-fonts magnetometer microphone midi payment "
-    "picture-in-picture publickey-credentials-get screen-wake-lock serial sync-xhr usb web-share window-management "
+    "picture-in-picture publickey-credentials-get screen-wake-lock serial sync-xhr usb window-management "
     "xr-spatial-tracking"
 ).split()
 PERMISSIONS_POLICY = ", ".join(f"{feature}=()" for feature in _FEATURES)

@@ -32,17 +32,20 @@ export function WebsitePreview({
 }) {
   const [html, setHtml] = useState<string | null>(null);
   const [fileBytes, setFileBytes] = useState<ArrayBuffer | null>(null);
-  const [failure, setFailure] = useState<"load" | "hash" | "left" | null>(null);
+  const [failure, setFailure] = useState<"load" | "hash" | "timeout" | null>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const htmlRef = useRef<string | null>(null);
   const writtenRef = useRef(false);
   const sentRef = useRef(false);
+  const writtenTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     let active = true;
     setHtml(null);
     setFileBytes(null);
     setFailure(null);
+    if (writtenTimeoutRef.current !== null) window.clearTimeout(writtenTimeoutRef.current);
+    writtenTimeoutRef.current = null;
     writtenRef.current = false;
     sentRef.current = false;
     htmlRef.current = null;
@@ -52,7 +55,7 @@ export function WebsitePreview({
         const origin = API_URL?.replace(/\/+$/, "");
         if (!origin || !token) throw new Error("unavailable");
         const query = new URLSearchParams({
-          artifact_id: artifact.artifact_id,
+          artifact: artifact.artifact_id,
           version: String(artifact.version),
         });
         const response = await fetch(
@@ -78,6 +81,8 @@ export function WebsitePreview({
     void read();
     return () => {
       active = false;
+      if (writtenTimeoutRef.current !== null) window.clearTimeout(writtenTimeoutRef.current);
+      writtenTimeoutRef.current = null;
     };
   }, [worldId, artifact.artifact_id, artifact.version, artifact.content_sha256]);
 
@@ -87,6 +92,11 @@ export function WebsitePreview({
     if (sentRef.current || !target || text === null) return;
     sentRef.current = true;
     target.postMessage({ tilo: "preview", html: text }, "*");
+    writtenTimeoutRef.current = window.setTimeout(() => {
+      if (writtenRef.current) return;
+      setHtml(null);
+      setFailure("timeout");
+    }, 8_000);
   }, []);
 
   useEffect(() => {
@@ -99,13 +109,12 @@ export function WebsitePreview({
       )
         return;
       writtenRef.current = true;
+      if (writtenTimeoutRef.current !== null) window.clearTimeout(writtenTimeoutRef.current);
+      writtenTimeoutRef.current = null;
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, []);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: html is the state transition that makes the stored page available for this post.
-  useEffect(() => sendPreview(), [html, sendPreview]);
 
   const download = (): void => {
     if (fileBytes === null) return;
@@ -127,13 +136,6 @@ export function WebsitePreview({
   };
 
   const loaded = (): void => {
-    if (writtenRef.current) {
-      setHtml(null);
-      setFileBytes(null);
-      htmlRef.current = null;
-      setFailure("left");
-      return;
-    }
     sendPreview();
   };
 
@@ -142,12 +144,12 @@ export function WebsitePreview({
       <h2>{artifact.title}</h2>
       <p>Version {artifact.version}</p>
       {failure === "hash" ? <p role="alert">This file changed, so it is not shown</p> : null}
-      {failure === "left" ? (
-        <p role="alert">The preview tried to leave Tilo and was closed.</p>
-      ) : null}
       {failure === "load" ? <p role="alert">The website could not be loaded.</p> : null}
+      {failure === "timeout" ? (
+        <p role="alert">Preview unavailable, open the file instead.</p>
+      ) : null}
       {html === null && failure === null ? <p>Loading website…</p> : null}
-      {html !== null ? (
+      {html !== null && failure === null ? (
         <iframe
           ref={frameRef}
           title={`Website preview, Version ${artifact.version}`}

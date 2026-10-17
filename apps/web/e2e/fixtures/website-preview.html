@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Website preview test</title></head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import { createElement } from "react";
+      import { createRoot } from "react-dom/client";
+      import { WebsitePreview } from "/src/results/WebsitePreview.tsx";
+
+      const hash = new URLSearchParams(location.search).get("hash") ?? "";
+      createRoot(document.getElementById("root")).render(
+        createElement(WebsitePreview, {
+          worldId: "world_1",
+          artifact: {
+            artifact_id: "site_1",
+            version: 2,
+            title: "Browser preview",
+            content_sha256: hash,
+          },
+        }),
+      );
+    </script>
+  </body>
+</html>

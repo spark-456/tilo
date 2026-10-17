@@ -174,6 +174,11 @@ def css_problem(css: str, *, fragments: bool = False) -> int | None:
     An unterminated quote is refused. `fragments` also accepts a same-document `url(#id)` (SVG paint attributes
     only)."""
     css = _strip_css_comments(css)
+    structural = {ord(char) for char in "\"'()/\\"}
+    for escape in _CSS_ESCAPE.finditer(css):
+        code = int(escape.group(1), 16) if escape.group(1) else ord(escape.group(3) or "\0")
+        if code in structural:
+            return escape.start()
     css = _unescape_css(css)
     bad = _CSS_BAD.search(css)
     if bad:

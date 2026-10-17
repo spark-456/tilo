@@ -99,7 +99,7 @@ describe("WebsitePreview WEBSITE", () => {
     expect(frame().getAttribute("src")).toBe("https://api.example.test/preview/website");
     expect(container.textContent).toContain("Version 2");
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.example.test/worlds/world_1/result?artifact_id=site_1&version=2",
+      "https://api.example.test/worlds/world_1/result?artifact=site_1&version=2",
       { headers: { Authorization: "Bearer test-token" }, cache: "no-store" },
     );
   });
@@ -108,13 +108,14 @@ describe("WebsitePreview WEBSITE", () => {
     await mount();
     const shell = shellWindow();
     const post = vi.mocked(shell.postMessage);
+    expect(post).not.toHaveBeenCalled();
     await act(async () => frame().dispatchEvent(new Event("load")));
     await act(async () => frame().dispatchEvent(new Event("load")));
     expect(post).toHaveBeenCalledTimes(1);
     expect(post).toHaveBeenCalledWith({ tilo: "preview", html: bytes }, "*");
   });
 
-  it("CX_WEB_3_WS_12_ignores_loads_until_preview_written_and_closes_only_on_a_later_load", async () => {
+  it("CX_WEB_3_WS_12_keeps_the_preview_open_after_preview_written_and_later_resource_loads", async () => {
     await mount();
     const shell = shellWindow();
     await act(async () => frame().dispatchEvent(new Event("load")));
@@ -149,8 +150,18 @@ describe("WebsitePreview WEBSITE", () => {
     );
     expect(container.querySelector("iframe")).not.toBeNull();
     await act(async () => frame().dispatchEvent(new Event("load")));
+    expect(container.querySelector("iframe")).not.toBeNull();
+  });
+
+  it("CX_WEB_3_WS_12_closes_the_frame_when_preview_written_does_not_arrive_in_eight_seconds", async () => {
+    await mount();
+    shellWindow();
+    vi.useFakeTimers();
+    await act(async () => frame().dispatchEvent(new Event("load")));
+    await act(async () => vi.advanceTimersByTimeAsync(8_001));
     expect(container.querySelector("iframe")).toBeNull();
-    expect(container.textContent).toContain("tried to leave Tilo");
+    expect(container.textContent).toContain("Preview unavailable, open the file instead.");
+    vi.useRealTimers();
   });
 
   it("test_WEBSITE_WS_13_downloads_only_an_octet_stream_blob", async () => {

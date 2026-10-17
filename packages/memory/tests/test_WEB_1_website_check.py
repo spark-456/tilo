@@ -202,6 +202,24 @@ def test_CX_WEB_1_css_comment_tokens_cannot_hide_external_urls(html: bytes) -> N
     assert (result.ok, result.code) == (False, "ws_css")
 
 
+@pytest.mark.parametrize(
+    "html",
+    [
+        page(head=r"<style>p{x:\";background:url(//h/x);y:\"}</style>"),
+        page(head=r"<style>p{x:\';background:url(//h/x);y:\'}</style>"),
+        page(head=r"<style>p{x:\22 ;background:url(//h/x);y:\22 }</style>"),
+        page(head=r"<style>p{x:\27 ;background:url(//h/x);y:\27 }</style>"),
+        page(r"""<p style='x:\";background:url(//h/x);y:\"'>x</p>"""),
+        page(r"""<p style="x:\';background:url(//h/x);y:\'">x</p>"""),
+        page(r"""<p style='x:\22 ;background:url(//h/x);y:\22 '>x</p>"""),
+        page(r"""<p style="x:\27 ;background:url(//h/x);y:\27 ">x</p>"""),
+    ],
+)
+def test_WEB_1_WS_06_escaped_quotes_cannot_hide_external_urls(html: bytes) -> None:
+    result = check_website(html)
+    assert (result.ok, result.code) == (False, "ws_css")
+
+
 @pytest.mark.parametrize("name", sorted(BAD))
 def test_WEB_1_WS_09_one_bad_page_per_rule_is_refused_with_its_code(name: str) -> None:
     code, data = BAD[name]
