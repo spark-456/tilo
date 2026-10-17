@@ -194,3 +194,11 @@
 /* triggeredBy: world.completed: the city goes from muted to full colour, 800 ms */
 .tw-light canvas{animation:tLight .8s var(--tt-ease-standard) both}
 @media (prefers-reduced-motion:reduce){.tw-parcel,.tw-confetti i,.tw-light canvas{animation:none!important}}
+
+/* TW-4 World chat pop-up and Convene dialog (UI chrome opened by the person, not world motion): open 220 ms, close 160 ms. */
+@keyframes wChatIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes wChatOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(14px) scale(.97)}}
+@keyframes wScrim{from{opacity:0}to{opacity:1}}
+[data-park] .tw-chat-popup--open,[data-park] .tw-convene-dialog{animation:wChatIn .22s var(--tt-ease-standard) both}
+[data-park] .tw-chat-popup--closing{animation:wChatOut .16s var(--tt-ease-standard) both}
+[data-park] .tw-scrim{animation:wScrim .2s ease-out both}
