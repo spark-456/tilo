@@ -83,7 +83,16 @@ export function useSharedResult(
 ): SharedResult {
   const [attempt, setAttempt] = useState(0);
   const delivered = worldId !== null && events.length > 0 && runView(events).deliverable;
-  const view = useRunResult(api, worldId ?? "", delivered, attempt);
+  const firstDelivery = events.find((event) => event.type === "artifact.delivered");
+  const artifactId = (firstDelivery?.data as { artifact?: { artifact_id?: unknown } } | undefined)
+    ?.artifact?.artifact_id;
+  const view = useRunResult(
+    api,
+    worldId ?? "",
+    delivered,
+    attempt,
+    typeof artifactId === "string" ? artifactId : undefined,
+  );
   return { view, retry: () => setAttempt((n) => n + 1) };
 }
 
