@@ -14,8 +14,11 @@ const props = (onSchedule = vi.fn()) => ({
   meetings: [],
   onSchedule,
   host: null,
+  hostState: async () => "connected" as const,
   minutes: null,
   getJson: null,
+  onMeetHere: vi.fn(async (_start: string, _minutes: number) => undefined),
+  onDeleted: vi.fn(),
 });
 
 it("CX_PAGES_ENRICH_AGENDA_drag_prefills_schedule_dialog_with_snapped_time_and_length", async () => {
@@ -27,6 +30,12 @@ it("CX_PAGES_ENRICH_AGENDA_drag_prefills_schedule_dialog_with_snapped_time_and_l
     slots[2]?.dispatchEvent(new Event("pointermove", { bubbles: true }));
     slots[2]?.dispatchEvent(new Event("pointerup", { bubbles: true }));
   });
+  expect(onSchedule).not.toHaveBeenCalled();
+  expect(m.container.textContent).toContain("Invite others...");
+  const invite = [...m.container.querySelectorAll("button")].find((button) =>
+    button.textContent?.includes("Invite others"),
+  );
+  await act(async () => invite?.click());
   expect(onSchedule).toHaveBeenCalledTimes(1);
   const [start, length] = onSchedule.mock.calls[0] as [string, number];
   expect(new Date(start).getMinutes() % 15).toBe(0);
@@ -51,6 +60,34 @@ it("CX_PAGES_ENRICH_AGENDA_drag_prefills_schedule_dialog_with_snapped_time_and_l
   const dateField = dialog.container.querySelector<HTMLInputElement>('input[name="start"]');
   expect(dateField?.value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
   expect(dialog.container.querySelector("select")?.value).toBe("45");
+});
+
+it("CX_PAGES_ENRICH_AGENDA_live_calendar_shows_week_navigation_and_slot_actions", async () => {
+  const onMeetHere = vi.fn(async (_start: string, _minutes: number) => undefined);
+  const m = mount(<LiveWeek {...props()} onMeetHere={onMeetHere} />);
+  expect(m.container.querySelector('button[aria-label="Previous week"]')).not.toBeNull();
+  expect(m.container.querySelector('button[aria-label="Next week"]')).not.toBeNull();
+  expect(m.container.querySelector('button[aria-label="Today"]')).not.toBeNull();
+  const slot = m.container.querySelector<HTMLButtonElement>("[data-week-slot]");
+  await act(async () => slot?.click());
+  expect(m.container.textContent).toContain("Meet with Tilo here");
+  expect(m.container.textContent).toContain("Invite others...");
+  const button = [...m.container.querySelectorAll("button")].find((item) =>
+    item.textContent?.includes("Meet with Tilo here"),
+  );
+  await act(async () => button?.click());
+  expect(onMeetHere).toHaveBeenCalledTimes(1);
+  expect(onMeetHere.mock.calls[0]?.[0]).toMatch(/T/);
+  expect(onMeetHere.mock.calls[0]?.[1]).toBe(15);
+});
+
+it("CX_PAGES_ENRICH_AGENDA_unconnected_host_has_a_sign_in_action_in_the_slot_popover", async () => {
+  const m = mount(<LiveWeek {...props()} hostState={async () => "available"} />);
+  await act(async () => m.container.querySelector<HTMLButtonElement>("[data-week-slot]")?.click());
+  expect(m.container.textContent).toContain("Tilo's meeting host is not signed in.");
+  expect(m.container.querySelector('a[href="/connectors"]')?.textContent).toBe(
+    "Sign in the meeting host",
+  );
 });
 
 it("CX_PAGES_ENRICH_AGENDA_meeting_block_opens_details_and_recorded_brief", async () => {

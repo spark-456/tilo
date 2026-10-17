@@ -5,6 +5,8 @@
 // No motion until WEB-3 (BQ-WEB-3).
 import { type ReactNode, useMemo, useRef, useState } from "react";
 import { API_URL, appCheckToken, authToken, sessionView } from "../../../api/ClientProvider";
+import type { HostState } from "../../../api/connect";
+import { liveConnectFlow } from "../../../api/connectEnv";
 import { HttpClient } from "../../../api/http";
 import { EmptyState, ErrorState, LoadingState } from "../../../design/tilo-t";
 import type { Api } from "../../api/index";
@@ -22,6 +24,7 @@ import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { AppLink } from "../../shared/AppLink";
 import "../../components/park.components.css";
 import type { AppCtx } from "../../app/AppCtx";
+import { type HostForm, refusedBeforeSend } from "../../shared/hostMeetingRules";
 import { AgendaNewMenu } from "./AgendaNewMenu";
 import { Boards } from "./Boards";
 import { LiveWeek } from "./LiveWeek";
@@ -181,8 +184,28 @@ function Plate({ A }: { A: LiveAgenda }) {
     return baseUrl && !demo ? new HttpClient({ baseUrl, appCheckToken, authToken }) : null;
   }, [demo]);
   const host = useMemo(() => (http ? meetingHostApi(http) : null), [http]);
+  const hostFlow = useMemo(() => (http ? liveConnectFlow() : null), [http]);
+  const hostState = useMemo<(() => Promise<HostState>) | undefined>(
+    () => (hostFlow ? () => hostFlow.meetingHost() : undefined),
+    [hostFlow],
+  );
   const minutes = useMemo(() => (http ? meetingMinutesApi(http) : null), [http]);
   const getJson = useMemo(() => (http ? (path: string) => http.getJson(path) : null), [http]);
+  const meetHere = async (start: string, minutes: number) => {
+    if (!host) throw new Error("Meeting host is unavailable");
+    const { you } = await host.people();
+    const date = new Date(start);
+    const local = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+    const form: HostForm = { title: "Meet with Tilo", start: local, minutes, attested: true };
+    const id = await host.create(form, crypto.randomUUID());
+    try {
+      await host.world(id);
+      await host.start(id, [you]);
+    } catch (error) {
+      if (refusedBeforeSend(error)) await host.remove(id).catch(() => undefined);
+      throw error;
+    }
+  };
   const createPin = http
     ? async (title: string, idempotencyKey: string) => {
         const answer = await http.postJson(
@@ -229,7 +252,6 @@ function Plate({ A }: { A: LiveAgenda }) {
     ) : (
       <p>{empty}</p>
     );
-  const calendar = A.plate.rows.filter(isCalendarEntry);
   return (
     <>
       <div className="park-agenda-titles">
@@ -256,19 +278,20 @@ function Plate({ A }: { A: LiveAgenda }) {
           {A.plate.today ? humanAgendaDate(A.plate.today) : "This week"}
         </p>
       </div>
+      <LiveWeek
+        rows={A.plate.rows}
+        parked={A.plate.parked}
+        meetings={meetings}
+        onSchedule={(start, minutes) => setSchedule({ start, minutes })}
+        host={host}
+        {...(hostState ? { hostState } : {})}
+        minutes={minutes}
+        getJson={getJson}
+        onMeetHere={meetHere}
+        onDeleted={() => setPeopleKey((n) => n + 1)}
+      />
       <div className="park-agenda-studio">
         <div className="park-agenda-studiomain">
-          <section aria-label="Today's calendar" className="park-agenda-state park-agenda-daycard">
-            <h2>Today's calendar</h2>
-            {calendar.length ? (
-              list(calendar, "")
-            ) : (
-              <p>
-                No calendar entries for today.{" "}
-                <AppLink to="/connectors">Check Google Calendar</AppLink>
-              </p>
-            )}
-          </section>
           <section aria-label="Your plate" className="park-agenda-state">
             <h2>Your plate</h2>
             {list(
@@ -285,15 +308,6 @@ function Plate({ A }: { A: LiveAgenda }) {
           <div id="agenda-meetings">
             <PeopleLists key={peopleKey} onMeetings={setMeetings} />
           </div>
-          <LiveWeek
-            rows={A.plate.rows}
-            parked={A.plate.parked}
-            meetings={meetings}
-            onSchedule={(start, minutes) => setSchedule({ start, minutes })}
-            host={host}
-            minutes={minutes}
-            getJson={getJson}
-          />
         </div>
         <aside className="park-agenda-studioside">
           <section aria-label="Event details" className="park-agenda-state park-agenda-sidecard">

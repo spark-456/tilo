@@ -44,6 +44,21 @@
   font-weight: 800;
   cursor: pointer;
 }
+.cx-agenda-weekactions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cx-agenda-weekactions button {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 750;
+  cursor: pointer;
+}
 .cx-agenda-scroll {
   overflow-x: auto;
   overscroll-behavior-inline: contain;
@@ -99,9 +114,9 @@
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0,
-    transparent calc(22px - 1px),
-    var(--line) calc(22px - 1px),
-    var(--line) 22px
+    transparent calc(14px - 1px),
+    var(--line) calc(14px - 1px),
+    var(--line) 14px
   );
 }
 .cx-agenda-day.is-today {
@@ -143,6 +158,45 @@
   color: var(--ink);
   text-align: left;
   cursor: pointer;
+}
+.cx-agenda-event.is-calendar-entry {
+  border-left-color: #9199a6;
+  background: #e8ebef;
+  color: #303641;
+}
+.cx-agenda-slot-popover {
+  position: absolute;
+  z-index: 6;
+  left: 6px;
+  display: flex;
+  width: min(230px, calc(100% - 12px));
+  min-width: 0;
+  margin: 0;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+.cx-agenda-slot-popover button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--heroSoft);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+.cx-agenda-slot-popover button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.cx-agenda-slot-popover p {
+  margin: 0;
+  color: var(--ink2);
+  font-size: 12px;
 }
 .cx-agenda-event strong {
   overflow: hidden;
