@@ -46,6 +46,9 @@ TICK = "/internal/schedules/tick"
 # FR-PA-06b (the owner's decision, 13 Oct 2026): the plate digest's mail links are public to the gate, because a mail
 # click has no sign-in; the signed single-use token is the credential. Unconfigured (no signing key) the route is 503.
 LINK_ROUTES = {("GET", "/l/{token}"), ("POST", "/l/{token}")}
+# WEB-2 (ADR-0050 WS-10, the owner's decision): the website preview shell is the same fixed bytes for everyone, holds no
+# data and is served under a sandbox CSP; the web app writes the page into it. Public by design, never a person's data.
+PREVIEW_SHELL = ("GET", "/preview/website")
 
 
 def _refuses_anonymous(method: str, path: str, status: int) -> bool:
@@ -104,7 +107,12 @@ def test_SYS_SEC_05_tilo_api_without_dev_mode_serves_nothing_that_needs_a_person
     for method, path in sorted(LINK_ROUTES):  # no signing key here: closed, not open, and never a sign-in 401
         answer = httpx.request(method, prod_api.url + _fill(path), timeout=15)
         assert answer.status_code == 503, f"{method} {path} answered {answer.status_code}"
-    ops = [r for r in served if r not in LINK_ROUTES]
+    if PREVIEW_SHELL in served:  # public shell: answers its fixed page under a sandbox CSP, nothing else
+        shell = httpx.get(prod_api.url + PREVIEW_SHELL[1], timeout=15)
+        assert shell.status_code == 200 and "sandbox" in shell.headers.get("content-security-policy", ""), (
+            shell.status_code
+        )
+    ops = [r for r in served if r not in LINK_ROUTES and r != PREVIEW_SHELL]
     assert ("POST", "/intake") in ops and ("GET", "/worlds/{world_id}/events") in ops, "the route list was read"
     for method, path in ops:
         response = httpx.request(method, prod_api.url + _fill(path), json={} if method == "POST" else None, timeout=15)
