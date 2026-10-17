@@ -407,6 +407,29 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     if (!data) throw new TiloApiError(BAD_REPLY, 201, true, true);
     return { data, source: "live" };
   };
+  api.captureFile = async (file, onStored) => {
+    const media = await http.postFile("/v1/skills/captures/media", file);
+    if (!isObject(media) || media.readable !== true || !isObject(media.artifact))
+      throw new TiloApiError("This file could not be read as an example.", 422, false, true);
+    const { artifact_id: artifactId, version } = media.artifact;
+    if (
+      typeof artifactId !== "string" ||
+      !artifactId ||
+      typeof version !== "number" ||
+      !Number.isInteger(version) ||
+      version < 1
+    )
+      throw new TiloApiError(BAD_REPLY, 201, true, true);
+    onStored?.();
+    const data = captureOfBody(
+      await http.postJson("/v1/skills/captures", {
+        method: "upload",
+        artifact: { artifact_id: artifactId, version },
+      }),
+    );
+    if (!data) throw new TiloApiError(BAD_REPLY, 201, true, true);
+    return { data, source: "live" };
+  };
   api.proposeVersion = async (captureId) => {
     const path = `/v1/skills/captures/${encodeURIComponent(captureId)}/version`;
     // TEACH-COPY: this route's 422 is `not_understood` (no step matched an app the person can use); the page says what

@@ -772,6 +772,13 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     return this.post<unknown>(path, body, headers);
   }
 
+  /** Send one file with the same authentication and refusal handling as JSON writes. The browser sets the multipart boundary. */
+  postFile(path: string, file: File): Promise<unknown> {
+    const form = new FormData();
+    form.append("file", file);
+    return this.request<unknown>(path, { method: "POST", body: form }, true);
+  }
+
   /** A plain PUT of `body` as JSON, decoded as JSON, with the same typed failures and `write` true (FR-SET-01). */
   putJson(path: string, body: unknown): Promise<unknown> {
     const init = {

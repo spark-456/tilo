@@ -59,6 +59,7 @@ export const API_METHODS = [
   "startWorld",
   "saveSkill",
   "captureSkill",
+  "captureFile",
   "proposeVersion",
   "setToolLevel",
   "bookSlot",
@@ -98,6 +99,7 @@ export interface Api {
   startWorld(mode: TierKey, query: string): R<StartAck>;
   saveSkill(skill: Skill): R<Ack>;
   captureSkill(text: string): R<SkillCapture>;
+  captureFile(file: File, onStored?: () => void): R<SkillCapture>;
   proposeVersion(captureId: string): R<SkillVersion>;
   setToolLevel(tool: string, level: number): R<Ack>;
   bookSlot(slot: AgendaSlot): R<Ack>;

@@ -2,7 +2,7 @@
 // steps 1 and 2 (the description and what Tilo read from it), stage 1 is step 3 (Tilo's version and Save). Live, each
 // step is one request at a time (POST /v1/skills/captures, .../{id}/version, POST /v1/skills) and only the server's
 // answer moves the flow on. On sample data the description is read at once and Save is this page's only. There is no
-// practice run and no recording: neither has a route, and nothing here waits on a timer (HR-1..7).
+// practice run or screen recording yet; an uploaded example uses the two real capture routes (HR-1..7).
 import { useEffect, useRef, useState } from "react";
 import { displayApiError } from "../../api/errorMessage";
 import type { Api } from "../../api/index";
@@ -58,6 +58,10 @@ export interface Teach {
   live: boolean;
   busy: boolean;
   failure: unknown;
+  fileError: string | null;
+  uploading: boolean;
+  readingUploaded: boolean;
+  usedFile: boolean;
   /** Live: the steps the server read out of the description. */
   steps: readonly string[];
   version: SkillVersion | null;
@@ -71,6 +75,7 @@ export interface Teach {
   setQAns: (a: string) => void;
   toggleAsk: (i: number) => void;
   capture: () => void;
+  captureFiles: (files: FileList | readonly File[]) => boolean;
   next: () => void;
   back: () => void;
   save: () => void;
@@ -106,6 +111,10 @@ export function useTeach({
   const [captured, setCaptured] = useState<SkillCapture | null>(null);
   const [version, setVersion] = useState<SkillVersion | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [readingUploaded, setReadingUploaded] = useState(false);
+  const [usedFile, setUsedFile] = useState(false);
   const [busy, setBusy] = useState(false);
   const inflight = useRef(false);
   const [saved, setSaved] = useState(false);
@@ -142,6 +151,7 @@ export function useTeach({
     once(async () => {
       const r = await api.captureSkill(text);
       setCaptured(r.data);
+      setUsedFile(false);
     }, failed);
   };
   const proposeIt = () => {
@@ -195,6 +205,48 @@ export function useTeach({
     if (isLive) return describeIt();
     if (desc.trim()) setCap(CAPTURE_STEPS); // nothing to read: no steps from an empty box
   };
+  const captureFiles = (files: FileList | readonly File[]): boolean => {
+    if (!isLive || inflight.current) return false;
+    if (files.length !== 1) {
+      setFileError("Choose one file at a time.");
+      return false;
+    }
+    const file = files[0];
+    if (!file) return false;
+    const type = file.type.toLowerCase();
+    const allowed = [
+      "video/webm",
+      "video/mp4",
+      "application/pdf",
+      "image/png",
+      "image/jpeg",
+      "text/plain",
+      "text/markdown",
+    ];
+    if (!allowed.includes(type) && !(type === "" && /\.(txt|md)$/i.test(file.name))) {
+      setFileError("Choose a WebM, MP4, PDF, PNG, JPEG, or text file.");
+      return false;
+    }
+    if (file.size === 0 || file.size > 10_485_760) {
+      setFileError("Choose one nonempty file up to 10 MiB.");
+      return false;
+    }
+    setFileError(null);
+    setUploading(true);
+    setReadingUploaded(false);
+    once(async () => {
+      try {
+        const r = await api.captureFile(file, () => setReadingUploaded(true));
+        setCaptured(r.data);
+        setUsedFile(true);
+        setVersion(null);
+      } finally {
+        if (mounted.current) setUploading(false);
+        if (mounted.current) setReadingUploaded(false);
+      }
+    }, failed);
+    return true;
+  };
   const reset = () => {
     setStage(0);
     setCap(0);
@@ -207,6 +259,10 @@ export function useTeach({
     setTeams(null);
     setTeamId(null);
     setFailure(null);
+    setFileError(null);
+    setUploading(false);
+    setReadingUploaded(false);
+    setUsedFile(false);
     if (isLive) setDesc("");
   };
 
@@ -255,6 +311,10 @@ export function useTeach({
     live: isLive,
     busy,
     failure,
+    fileError,
+    uploading,
+    readingUploaded,
+    usedFile,
     steps: captured?.steps ?? [],
     version,
     setName,
@@ -287,6 +347,7 @@ export function useTeach({
       setAsk((a) => a.map((on, j) => (j === i ? !on : on)));
     },
     capture,
+    captureFiles,
     next: () => {
       if (isLive) return proposeIt();
       if (cap >= CAPTURE_STEPS) setStage(1);
