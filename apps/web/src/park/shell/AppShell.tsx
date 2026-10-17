@@ -142,14 +142,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         setReady(true);
       });
     };
-    const cover = document.getElementById("tilo-boot-cover");
-    // the loop may already be complete if the app code arrived after it
-    if (cover && cover.dataset.loopComplete !== "true")
-      window.addEventListener("tilo-boot-loop-complete", draw, { once: true });
-    else draw();
+    // FT-PERF-2: prepare scene and fonts concurrently during boot cover so app is ready at minimum 1.2 s
+    draw();
     return () => {
       live = false;
-      window.removeEventListener("tilo-boot-loop-complete", draw);
     };
   }, [appearance.time, appearance.motion]);
 
