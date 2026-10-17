@@ -167,6 +167,8 @@ export function displayApiError(error: unknown): string {
     already_resolved: "This card was already answered.",
     analysis_failed: "The analysis could not finish. Try again later.",
     analysis_inputs_unavailable: "The information needed for this analysis is unavailable.",
+    audio_not_supported:
+      "Tilo cannot read the sound in this recording. Record it again without narration.",
     app_check_required: "Reload this page to verify the app before trying again.",
     ask_first_required: "Ask for approval before making this change.",
     assignment_not_in_force: "This assignment is no longer active.",
@@ -189,7 +191,11 @@ export function displayApiError(error: unknown): string {
     feedback_limit_reached: "You have reached the feedback limit. Try again later.",
     followup_failed: "The follow-up could not finish. Try again later.",
     followup_unavailable: "The follow-up is unavailable right now.",
+    file_too_large: "This file is too large to keep. Use one under 30 MB.",
     forbidden: "You do not have access to do this.",
+    length_required: "This file could not be sent. Try again from a current browser.",
+    one_file: "Send one file at a time.",
+    storage_full: "Your storage is full. Delete something and try again.",
     full_session_required: "Sign in with a full account to do this.",
     hold_open: "The previous meeting activity is still being processed.",
     idempotency_key_reused:
@@ -252,6 +258,7 @@ export function displayApiError(error: unknown): string {
     pin_required: "This answer needs a PIN, which this page cannot take.",
     proposal_conflict: "This proposal changed. Reload before trying again.",
     quota: "The provider usage limit has been reached.",
+    ref_unavailable: "That tagged item is not available. Remove it and try again.",
     rate_limit_exceeded: "Too many requests. Wait a moment and try again.",
     rate_limiter_unavailable: "Usage checks are unavailable. Try again later.",
     reauth_required: "Sign in again before making this change.",
@@ -263,6 +270,8 @@ export function displayApiError(error: unknown): string {
     start_again: "Start the connection again.",
     teach_not_understood:
       "Tilo could not match your steps to the apps it can use. Name the app and the action in each step, for example Read the new mail in Gmail or Save the summary to Google Drive, then try again.",
+    too_long_to_read:
+      "This file is stored, but it is too long for Tilo to read. Use a shorter recording or file.",
     too_large: "This is too large to send. Reduce its size and try again.",
     transcript_unavailable: "The meeting transcript is unavailable right now.",
     try_again: "This could not finish. Try again in a moment.",
@@ -271,7 +280,9 @@ export function displayApiError(error: unknown): string {
       "The follow-up returned an unexpected reply. Reload before trying again.",
     unknown: "This feature could not answer. Try again later.",
     unknown_action: "This action is not available here.",
+    unreadable_file: "Tilo could not read this file. Check it opens, or use another file.",
     unreachable: "The provider could not be reached. Try again later.",
+    unsupported_type: "Use a WebM or MP4 recording, a PDF, a PNG or JPEG image, or a text file.",
     unverified: "Verify the model key before continuing.",
     world_paused: "This world is paused. Resume it before continuing.",
     write_failed: "We could not confirm the saved change. Reload before trying again.",
