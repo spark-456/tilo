@@ -69,6 +69,7 @@ import { ShareWithTeam } from "./TeamShare";
 import { MissingWorld, TeamItems, TeamWorld } from "./TeamWorld";
 import { runProgress } from "./runProgress";
 import { runView } from "./runView";
+import { loadedSkillNames } from "./skillRunVisible";
 import { useRunEvents } from "./useRunEvents";
 import "./World.css";
 import "./World.studio.css";
@@ -363,6 +364,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const open = mine.filter((d) => !dec[d.k]).length + (slackPending ? 1 : 0);
   const look = view?.phase === "failed" ? STOPPED : stateLook(w, isPaused);
   const { skills, tools } = skillsAndTools(w, loaded.skills, loaded.connectors);
+  const runSkillNames = trackRun ? loadedSkillNames(runEvents, loaded.skills) : [];
   const slackState = slackConnectorState(loaded.connectors);
   const wide = (app.vw || 1440) >= 1060;
   const id = encodeURIComponent(w.id);
@@ -545,6 +547,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
               ? `Recorded ${w.started}`
               : metaLine(w.owner, w.started, live ? live.agents : w.agents)}
           </p>
+          {runSkillNames.map((name) => (
+            <p key={name} className="park-world-meta">
+              Uses skill: {name}
+            </p>
+          ))}
           {w.sample ? <SampleNote /> : null}
           {demo && !w.sample ? (
             <span className="park-sample-note">
@@ -814,7 +821,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
                 ) : null}
                 {trackRun ? <RunProgressCard events={runEvents} steps={false} /> : null}
                 {trackRun ? (
-                  <RunStory events={runEvents} />
+                  <RunStory events={runEvents} skills={loaded.skills} />
                 ) : (
                   <Activity
                     items={
