@@ -485,16 +485,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-[data-park] .park-home-spin {
-  flex: none;
-  display: block;
-  box-sizing: border-box;
-  width: 18px;
-  height: 18px;
-  border: 2.5px solid var(--track);
-  border-top-color: var(--hero);
-  border-radius: 99px;
-}
 [data-park] .park-home-plan {
   box-sizing: border-box;
   display: grid;

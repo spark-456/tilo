@@ -104,7 +104,7 @@ export function Drawer({
                   : "park-connectors-band-dot"
               }
             />
-            {syncing ? <Spin /> : null}
+            {syncing ? <Spin still /> : null}
             <span>{syncing ? "Syncing now…" : drawerSync(c)}</span>
             {attn ? (
               <button
@@ -113,7 +113,7 @@ export function Drawer({
                 disabled={reconnecting}
                 onClick={onReconnect}
               >
-                {reconnecting ? <Spin /> : null}
+                {reconnecting ? <Spin still /> : null}
                 {reconnecting ? `Waiting for ${c.name}` : "Reconnect"}
               </button>
             ) : null}

@@ -904,19 +904,12 @@ function expectLoader(
     expect(goneAt - (fade?.t ?? 0), `${at}: the card lingers after its fade`).toBeLessThanOrEqual(
       450,
     );
-    // README Async actions: the current step's ring spins with tiloSpin .7 s.
+    // The current step uses saved Thinking Tilo frames, with no CSS rotation.
     const spins = ui.filter((r) => r.zone === "loader" && r.name === "tiloSpin");
-    expect(spins.length, `${at}: the ring does not spin`).toBeGreaterThan(0);
-    for (const s of spins) {
-      expect(s.dur).toBe(700);
-      expect(s.iterations).toBe(Number.POSITIVE_INFINITY);
-      expect(easingOf(s)).toBe("linear");
-      expect(s.props).toEqual(["transform"]);
-      expect(s.to.transform).toMatch(/360deg/);
-    }
+    expect(spins.length, `${at}: a rotating ring remains`).toBe(0);
     expectCompositorOnly(recs);
   }
-  expect(first.loader?.rings, `${at}: the first step shows one ring`).toBe(1);
+  expect(first.loader?.rings, `${at}: the first step shows Thinking Tilo`).toBe(1);
 
   // The card's own bar: one way, from about 30% to full.
   const bar = samples.filter((s) => s.loader).map((s) => s.loader?.ratio ?? 0);
@@ -951,7 +944,7 @@ async function openFromBell(page: Page, title: RegExp): Promise<void> {
 
 for (const [size, viewport] of SIZES) {
   test.describe(`WEB-MOTION-2 open a world at ${size}`, () => {
-    test(`FR_UX_12 WEB-MOTION-2 e2e: at ${size} a city's steps tick every 340 ms, the page swaps at step 3, the ring spins (tiloSpin .7 s), the card fades out over 280 ms, bars one way`, async ({
+    test(`CX_THINKING_TILO WEB-MOTION-2 e2e: at ${size} a city's steps tick every 340 ms, the page swaps at step 3, Thinking Tilo appears, the card fades out over 280 ms, bars one way`, async ({
       browser,
       baseURL,
     }) => {

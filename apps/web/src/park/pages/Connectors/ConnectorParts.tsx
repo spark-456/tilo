@@ -1,7 +1,7 @@
 // Connectors page-local parts (plan section 4 "ConnectorTile"): the attention banner, a Connected tile and an
-// Add-a-tool row. Built from the design's markup (Tilo App Connectors.dc.html). The design's spinner turns
-// and it is a still ring: connect and reconnect are page-local stand-ins with no call behind them, so it does not turn (HR-1).
+// Add-a-tool row. Local stand-ins with no call behind them show the saved still Tilo frame (HR-1).
 import type { Connector } from "../../api/types";
+import { ThinkingTilo } from "../../shared/ThinkingTilo";
 import { BrandIcon } from "./BrandIcon";
 import { icon } from "./icons";
 import { LEVEL_LABEL, type Merged, bannerText, syncLine, usedLine } from "./view";
@@ -13,13 +13,8 @@ export function monoColor(col: string | undefined): string {
   return col;
 }
 
-export function Spin({ onRed }: { onRed?: boolean }) {
-  return (
-    <span
-      className={onRed ? "park-connectors-spin park-connectors-spin--red" : "park-connectors-spin"}
-      aria-hidden="true"
-    />
-  );
+export function Spin({ still = false }: { still?: boolean }) {
+  return <ThinkingTilo label="Working on connector" size={20} still={still} />;
 }
 
 export function AttentionBanner({
@@ -44,7 +39,7 @@ export function AttentionBanner({
         <div className="park-connectors-banner-sub">{sub}</div>
       </div>
       <button type="button" className="park-connectors-reconnect" onClick={onReconnect}>
-        {waiting ? <Spin onRed /> : null}
+        {waiting ? <Spin still /> : null}
         {waiting ? `Waiting for ${c.name}` : "Reconnect"}
       </button>
     </div>
