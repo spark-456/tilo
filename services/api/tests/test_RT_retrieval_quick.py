@@ -8,7 +8,7 @@ import pytest
 from _clint1_lib import FLOW_USER, OTHER_USER
 from _costfast1_lib import ANSWER_KEYS, SIMPLE_TEXT
 from _rt_lib import WordEmbedder
-from tilo_api import deps, grounding, grounding_prompt
+from tilo_api import deps, grounding, grounding_prompt, skills_route
 from tilo_memory.chunks import ChunkConfig, ChunkStore, SourceDoc
 from tilo_memory.chunks_backends import MemoryChunkBackend
 from tilo_providers.prompts import load_prompt, neutralise_marker
@@ -46,6 +46,12 @@ class Opened:
         self.store.index(SourceDoc(ORG, owner, None, None, "pin", source_id, None, label, text))
 
 
+@pytest.fixture(autouse=True)
+def _no_skills_block(monkeypatch):
+    """SKILL-ROUTE adds a SKILLS block to the answer prompt; these tests pin the retrieval part of it alone."""
+    monkeypatch.setattr(skills_route.SkillContext, "block", lambda self: "")
+
+
 @pytest.fixture
 def wired(quick_rig, monkeypatch):
     opened = Opened()
@@ -66,7 +72,9 @@ def _answer_call(rig):
 
 
 def _baseline(question: str = QUESTION) -> str:
-    return load_prompt("assistant", "quick_answer_task.md", {"question": neutralise_marker(question, "QUESTION")})
+    return load_prompt(
+        "assistant", "quick_answer_task.md", {"question": neutralise_marker(question, "QUESTION"), "skills": ""}
+    )
 
 
 def test_RT_04_no_chunks_means_a_byte_identical_prompt_and_no_embedding(wired):

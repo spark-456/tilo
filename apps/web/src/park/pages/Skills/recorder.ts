@@ -19,7 +19,7 @@ export async function recordScreen(
     const stream = new MediaStream(tracks);
     const recorder = new MediaRecorder(stream, {
       mimeType: "video/webm",
-      videoBitsPerSecond: 200_000,
+      videoBitsPerSecond: 200 * 1000,
       audioBitsPerSecond: 24_000,
     });
     const chunks: Blob[] = [];
@@ -28,7 +28,7 @@ export async function recordScreen(
     const stop = () => {
       if (recorder.state !== "inactive") recorder.stop();
     };
-    const timer = window.setTimeout(stop, 300_000);
+    const timer = window.setTimeout(stop, 5 * 60 * 1000);
     const release = () => {
       window.clearTimeout(timer);
       for (const track of [...display.getTracks(), ...(mic?.getTracks() ?? [])]) track.stop();
