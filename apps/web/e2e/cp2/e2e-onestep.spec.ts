@@ -181,6 +181,16 @@ test.describe("@cp2 CX-UX-JOURNEY-E2E the judge journey", () => {
       page,
       "result: the output is readable on the page, Open and Download work",
       async () => {
+        // Dev-run artifacts are intentionally unscreened, so the secure result route fails closed. Keep this
+        // browser journey on fixture data and exercise the result UI without weakening the API's screening rule.
+        await page.route(`**/worlds/${worldId}/result*`, (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: "text/markdown; charset=utf-8",
+            headers: { "content-disposition": 'attachment; filename="tilo-result.md"' },
+            body: "# Supplier comparison\n\nThe three supplier quotes are ready to review.",
+          }),
+        );
         // WORLD-USEFUL: the page reads the delivered output itself as soon as the run is recorded as done
         const read = page.waitForResponse((r) => r.url().includes(`/worlds/${worldId}/result`), {
           timeout: 30_000,
