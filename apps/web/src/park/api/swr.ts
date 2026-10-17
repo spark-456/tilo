@@ -55,7 +55,7 @@ export function withSwr(
   api: Api,
   who: () => string | null,
   onChange: () => void,
-  now: () => number = Date.now,
+  now: () => number, // the caller's clock: the api layer reads none (WEB_1a_static)
 ): Api {
   const cache = new Map<string, Entry>();
   const revalidating = new Set<string>();

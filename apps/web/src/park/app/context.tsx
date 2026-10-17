@@ -151,6 +151,7 @@ export function ParkProvider({
               version += 1;
               for (const listener of [...listeners]) listener();
             },
+            () => Date.now(),
           )
         : today;
     let store: ParkStore | null = null;
