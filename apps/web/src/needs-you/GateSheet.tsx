@@ -1,5 +1,5 @@
 // S-07 gate sheet (PRD 18.3, 18.4, 10.4): the exact action, who receives it and whether it can be
-// undone, then the three fixed options Approve, Edit first and Hold (card rule CR-07). Everything
+// undone, then the three fixed options Approve, Edit and Decline. Everything
 // shown follows the gate's recorded events (HR-1): the gate counts as open only after an
 // approval.resolved that says approve (by a person or Team Lead), or a policy.applied (by a policy),
 // arrives. A person-approved gate and a policy-opened one look different and both link to the
@@ -15,7 +15,7 @@ import { DONE, type GateRecord, isOpen, openedBy, policyLine, policyName } from 
 import { RUNG, askedBy } from "./queue";
 import { field, numField } from "./reduce";
 
-const OPTION = { approve: "Approve", edit: "Edit first", hold: "Hold" } as const;
+const OPTION = { approve: "Approve", edit: "Edit", hold: "Decline" } as const;
 const TIER = { T1: 1, T2: 2, T3: 3 } as const;
 
 interface Facts {
@@ -102,19 +102,24 @@ function GateFacts({ f }: { f: Facts }) {
               ? "Once sent, it can't be unsent."
               : "Once done, it can't be undone.",
         ],
-    ["Risk tier", f.tier === "T3" ? "T3: a person always decides this." : f.tier],
   ];
   return (
-    <dl className="gate-facts" data-testid="gate-facts">
-      {rows.map((r) =>
-        r ? (
-          <div key={r[0]}>
-            <dt>{r[0]}</dt>
-            <dd>{r[1]}</dd>
-          </div>
-        ) : null,
-      )}
-    </dl>
+    <>
+      <dl className="gate-facts" data-testid="gate-facts">
+        {rows.map((r) =>
+          r ? (
+            <div key={r[0]}>
+              <dt>{r[0]}</dt>
+              <dd>{r[1]}</dd>
+            </div>
+          ) : null,
+        )}
+      </dl>
+      <p className="section-note" data-testid="gate-risk">
+        Risk: {f.tier}
+        {f.tier === "T3" ? " · A person always decides this." : ""}
+      </p>
+    </>
   );
 }
 
@@ -160,11 +165,17 @@ function Outcome({ record }: { record: GateRecord }) {
   if (out.state === "decided") {
     const who = out.event.authz ? authzText(out.event.authz) : "Someone";
     const when = out.event.authz ? ` at ${stamp(out.event.authz.at)}` : "";
-    return (
+    return isOpen(record) ? (
+      <div className="gate-status" data-testid="gate-outcome">
+        <p>
+          Opened. {who} approved this{when}.
+        </p>
+        <p>Tilo is continuing with the next step.</p>
+      </div>
+    ) : (
       <p className="gate-status" data-testid="gate-outcome">
-        {isOpen(record)
-          ? `Opened. ${who} approved this${when}.`
-          : `Kept closed. ${who} chose ${OPTION[out.option]}${when}.`}
+        Kept closed. {who} chose {OPTION[out.option]}
+        {when}.
       </p>
     );
   }
@@ -248,6 +259,7 @@ export function GateSheet({
             card={showMe ? { ...card, actions: card.actions.filter((a) => a !== "show_me") } : card}
             answer={answer}
             preselect={!needsDeliberateChoice(facts)}
+            optionLabels={OPTION}
           />
         ) : (
           <>

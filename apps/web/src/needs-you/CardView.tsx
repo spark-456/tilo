@@ -8,9 +8,9 @@ import type { Card, Layout } from "@tilo/contracts";
 import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 import type { TiloClient } from "../api/client";
 import type { FieldsApi } from "../api/fields";
+import { describeError } from "../park/shared/remote";
 import { Placeholder } from "../screens/Placeholder";
 import { Chip, Soon } from "../screens/kit";
-import { describeError } from "../park/shared/remote";
 import { findItem } from "../world/findItem";
 import { agentNames } from "../world/runSummary";
 import { FieldsForm } from "./FieldsForm";
@@ -112,7 +112,14 @@ export function CardOptions({
   answer,
   footer,
   preselect = true,
-}: { card: Card; answer: Answer | null; footer?: ReactNode; preselect?: boolean }) {
+  optionLabels,
+}: {
+  card: Card;
+  answer: Answer | null;
+  footer?: ReactNode;
+  preselect?: boolean;
+  optionLabels?: Readonly<Record<string, string>>;
+}) {
   const group = useId();
   // `preselect` false (a T3 or irreversible gate): nothing is chosen until the person chooses.
   const [choice, setChoice] = useState<string | undefined>(
@@ -121,7 +128,9 @@ export function CardOptions({
   const [context, setContext] = useState("");
   const chosen = card.options.find((o) => o.id === choice);
   const locked = !answer || answer.pending !== null;
-  const safe = card.options.find((o) => o.id === card.safe_default)?.label ?? "the safe option";
+  const safeOption = card.options.find((o) => o.id === card.safe_default);
+  const safe =
+    (safeOption && (optionLabels?.[safeOption.id] ?? safeOption.label)) ?? "the safe option";
   const gate = card.kind === "gate";
   return (
     <>
@@ -142,7 +151,7 @@ export function CardOptions({
             />
             <span className="need-option-text">
               <span>
-                <b>{o.label}</b>
+                <b>{optionLabels?.[o.id] ?? o.label}</b>
                 {o.suggested && <Chip tone="suggested">Suggested</Chip>}
               </span>
               {o.reason && <span className="bitem-sub">{o.reason}</span>}
@@ -177,7 +186,7 @@ export function CardOptions({
               aria-busy={answer.pending !== null ? "true" : undefined}
               onClick={() => chosen && answer.send(chosen.id, context)}
             >
-              {chosen?.label ?? "Choose an option"}
+              {(chosen && (optionLabels?.[chosen.id] ?? chosen.label)) ?? "Choose an option"}
             </button>
           ) : (
             (footer ?? (chosen && <Placeholder label={chosen.label} compact />))
