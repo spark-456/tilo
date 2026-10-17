@@ -599,8 +599,21 @@
   gap: 8px;
   padding-top: 4px;
 }
-/* Below the city and tabs: spend, facts, skills and tools side by side. */
+/* The quieter tools and reference cards stay closed until requested. */
 [data-park] .park-world-more {
+  margin-top: 18px;
+}
+[data-park] .park-world-more > summary {
+  width: fit-content;
+  color: var(--ink3);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-park] .park-world-more[open] > summary {
+  margin-bottom: 12px;
+}
+[data-park] .park-world-moregrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   align-items: start;

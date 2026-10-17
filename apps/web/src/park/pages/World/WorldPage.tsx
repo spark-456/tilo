@@ -683,16 +683,6 @@ export function WorldPage({ app }: { app: AppCtx }) {
         </div>
       ) : null}
 
-      <div className="park-world-tabrow">
-        <WorldTabs
-          on={shown}
-          onPick={setTab}
-          counts={steps ? { steps: `${steps.done}/${steps.of}` } : {}}
-          chat={chatOn}
-        />
-        {view ? <AssumedChips assumptions={view.assumptions} /> : null}
-      </div>
-
       <div
         className="park-world-top"
         style={{
@@ -782,6 +772,15 @@ export function WorldPage({ app }: { app: AppCtx }) {
         </div>
 
         <div className="park-world-panels">
+          <div className="park-world-tabrow">
+            <WorldTabs
+              on={shown}
+              onPick={setTab}
+              counts={steps ? { steps: `${steps.done}/${steps.of}` } : {}}
+              chat={chatOn}
+            />
+            {view ? <AssumedChips assumptions={view.assumptions} /> : null}
+          </div>
           <TabPanel tab="story" on={shown} title="Story" sub="What your team is doing, in order">
             {part(2) ? (
               <>
@@ -920,29 +919,33 @@ export function WorldPage({ app }: { app: AppCtx }) {
         </div>
       </div>
 
-      {loaded.live && worldClient ? <SkillProposals client={worldClient} worldId={w.id} /> : null}
-      {loaded.live && worldClient && !w.sample ? (
-        <TeamItems client={worldClient} worldId={w.id} auto={false} />
-      ) : null}
-
       {part(3) ? (
-        <div className="park-world-more">
-          <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
-          <FactsCard
-            w={w}
-            recorded={recorded}
-            skills={skills}
-            tools={tools}
-            onSkill={(skill) => app.go("skills", { id: skill })}
-            onTools={() => app.go("connectors")}
-          />
-          {loaded.connectors.some((c) => c.id === "meeting_host" && c.live?.notConfigured) ? (
-            <p>{HOST_NOT_CONNECTED_TEXT}</p>
-          ) : null}
-          {loaded.gaps.skills || loaded.gaps.connectors ? (
-            <NotYetCard title={loaded.gaps.skills ? "Skills" : "Tools"} />
-          ) : null}
-        </div>
+        <details className="park-world-more">
+          <summary>More</summary>
+          <div className="park-world-moregrid">
+            {loaded.live && worldClient ? (
+              <SkillProposals client={worldClient} worldId={w.id} />
+            ) : null}
+            {loaded.live && worldClient && !w.sample ? (
+              <TeamItems client={worldClient} worldId={w.id} auto={false} />
+            ) : null}
+            <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
+            <FactsCard
+              w={w}
+              recorded={recorded}
+              skills={skills}
+              tools={tools}
+              onSkill={(skill) => app.go("skills", { id: skill })}
+              onTools={() => app.go("connectors")}
+            />
+            {loaded.connectors.some((c) => c.id === "meeting_host" && c.live?.notConfigured) ? (
+              <p>{HOST_NOT_CONNECTED_TEXT}</p>
+            ) : null}
+            {loaded.gaps.skills || loaded.gaps.connectors ? (
+              <NotYetCard title={loaded.gaps.skills ? "Skills" : "Tools"} />
+            ) : null}
+          </div>
+        </details>
       ) : null}
       {hasStage && roomClient && !w.sample ? (
         <MeetingHall key={w.id} worldId={w.id} client={roomClient} />

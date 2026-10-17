@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { afterEach, expect, it, vi } from "vitest";
 import { join } from "node:path";
+import { afterEach, expect, it, vi } from "vitest";
 import { cleanup } from "../../../../test-support/park/componentsHarness";
 import { declared, rulesOf } from "../../../../test-support/park/pageCss";
 import { liveWorldsApi, mountWorld } from "../../../../test-support/park/worldHarness";
@@ -14,7 +14,7 @@ vi.mock("../../../worldView/LiveStageEmbed", () => ({
 
 afterEach(cleanup);
 
-it("CX_WORLD_LAYOUT_1_places_the_work_sections_after_the_world_stage", async () => {
+it("CX_WORLD_LAYOUT_1_puts_the_stage_before_tabs_and_work_tools_in_more", async () => {
   const rows = EVENTS_VILLAGE_BASIC.map((event) => ({ ...event, world_id: "k1" }));
   const client = new HttpClient({
     baseUrl: "https://api.test",
@@ -22,29 +22,25 @@ it("CX_WORLD_LAYOUT_1_places_the_work_sections_after_the_world_stage", async () 
     pollMs: 60_000,
   });
   const { el } = await mountWorld({ api: liveWorldsApi(), client });
-  const header = el.querySelector(".park-world-head");
   const stage = el.querySelector(".park-world-top");
+  const tabs = el.querySelector(".park-world-tabrow");
+  const more = el.querySelector("details.park-world-more");
   const proposals = el.querySelector('[aria-label="Skill proposals"]');
   const teamItems = el.querySelector('[aria-label="Team work items"]');
   const addItem = el.querySelector('[aria-label="Add a work item"]');
 
-  expect(header).not.toBeNull();
   expect(stage).not.toBeNull();
+  expect(tabs).not.toBeNull();
+  expect(more?.querySelector(":scope > summary")?.textContent).toBe("More");
   expect(proposals).not.toBeNull();
   expect(teamItems).not.toBeNull();
   expect(addItem).not.toBeNull();
   expect(
-    header?.compareDocumentPosition(stage as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
+    stage && tabs && stage.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
-  expect(
-    stage?.compareDocumentPosition(proposals as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
-  ).toBeTruthy();
-  expect(
-    stage?.compareDocumentPosition(teamItems as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
-  ).toBeTruthy();
-  expect(
-    stage?.compareDocumentPosition(addItem as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
-  ).toBeTruthy();
+  expect(more?.contains(proposals)).toBe(true);
+  expect(more?.contains(teamItems)).toBe(true);
+  expect(more?.contains(addItem)).toBe(true);
 });
 
 it.each([1440, 390])("CX_WORLD_LAYOUT_1_offsets_convene_from_the_agent_count_at_%i_px", (vw) => {
