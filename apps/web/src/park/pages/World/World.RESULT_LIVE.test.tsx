@@ -29,9 +29,9 @@ const ev = (type: string, summary: string, data: unknown = {}): RunEvent => ({
   summary,
   data,
 });
-const delivered = (id: string) =>
-  ev("artifact.delivered", "The item was delivered.", {
-    artifact: { artifact_id: id, version: 1 },
+const delivered = (id: string, label: string) =>
+  ev("artifact.delivered", `${label} is ready.`, {
+    artifact: { artifact_id: id, version: 1, label },
     format: "in_app",
     outbox_id: null,
   });
@@ -47,10 +47,11 @@ async function finishedRun(ids: string[]) {
     push = onEvent as unknown as (e: never) => void;
     return () => undefined;
   };
-  const read = vi.fn(async (_world: string, artifact?: string) =>
-    artifact === "art_note"
-      ? Promise.reject(new Error("404"))
-      : new Blob([artifact ? `# ${artifact}\n` : "# Trip plan\n"], { type: "text/markdown" }),
+  const read = vi.fn(
+    async (_world: string, artifact?: string) =>
+      new Blob([artifact === "art_note" ? "# Trip notes\n" : "# Trip plan\n"], {
+        type: "text/markdown",
+      }),
   );
   const api = liveWorldsApi();
   installResultReader(api, read);
@@ -66,7 +67,7 @@ async function finishedRun(ids: string[]) {
         credits: { min: 5, max: 20 },
       }),
       ev("world.started", "Started.", { budget_cap: 40 }),
-      ...ids.map(delivered),
+      ...ids.map((id, index) => delivered(id, index === 0 ? "Trip plan" : "Trip notes")),
       ev("world.completed", "Done.", { credits_used: 2, deliverable_count: ids.length }),
     ])
       push?.(e as never);
@@ -76,11 +77,20 @@ async function finishedRun(ids: string[]) {
 }
 
 describe("RESULT_LIVE: every delivered item can be opened", () => {
-  it("RESULT_LIVE_shows_the_main_item_and_reads_each_listed_item_by_its_id", async () => {
+  it("test_RESULT_TAB_main_named_deliverable_precedes_collapsed_named_working_files", async () => {
     const { rig, read } = await finishedRun(["art_plan", "art_note"]);
-    expect(read).toHaveBeenCalledWith("hires", undefined);
+    expect(read).toHaveBeenCalledWith("hires", "art_plan");
+    expect(rig.el.querySelector('[data-testid="run-result"]')?.textContent).toContain("Trip plan");
     expect(rig.el.querySelector('[data-testid="result-text"]')?.textContent).toContain("Trip plan");
-    expect(hasControl(rig.el, "Open item 2")).toBe(true);
+    const files = rig.el.querySelector<HTMLDetailsElement>("details[data-testid='working-files']");
+    expect(files?.open).toBe(false);
+    expect(files?.textContent).toContain("Trip notes");
+    expect(files?.textContent).not.toMatch(/Item\s*[1-9]/);
+    expect(rig.el.querySelector('[data-testid="run-result"]')?.textContent).not.toMatch(
+      /art_(?:plan|note)/,
+    );
+    expect(hasControl(rig.el, "Open result")).toBe(true);
+    if (files) files.open = true;
     const clicks: HTMLAnchorElement[] = [];
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:item");
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
@@ -90,22 +100,19 @@ describe("RESULT_LIVE: every delivered item can be opened", () => {
       clicks.push(this);
     });
 
-    click(control(rig.el, "Download item 1"));
-    await settle();
-    expect(read).toHaveBeenLastCalledWith("hires", "art_plan");
-    expect(clicks.at(-1)?.download).toBe("tilo-result-hires-1.md");
-
-    click(control(rig.el, "Open item 2"));
+    click(control(rig.el, "Download working file: Trip notes"));
     await settle();
     expect(read).toHaveBeenLastCalledWith("hires", "art_note");
-    expect(
-      rig.el.querySelector('[data-testid="delivered-items"] [role="alert"]')?.textContent,
-    ).toContain("could not be loaded");
+    expect(clicks.at(-1)?.download).toBe("tilo-result-Trip notes.md");
+
+    click(control(rig.el, "Open working file: Trip notes"));
+    await settle();
+    expect(read).toHaveBeenLastCalledWith("hires", "art_note");
   });
 
   it("RESULT_LIVE_a_single_delivery_shows_no_item_list", async () => {
     const { rig } = await finishedRun(["art_plan"]);
-    expect(rig.el.querySelector('[data-testid="delivered-items"]')).toBeNull();
+    expect(rig.el.querySelector("details[data-testid='working-files']")).toBeNull();
     expect(hasControl(rig.el, "Download")).toBe(true);
   });
 });
