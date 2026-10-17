@@ -1,4 +1,6 @@
 const DECODE_WAIT_MS = 800;
+/** FT-PERF-2: release when the app is ready, minimum 1.2 s */
+const MIN_BOOT_WAIT_MS = 1200;
 
 /** The HTML cover exists before the JavaScript bundle. Release it after the app and one saved loop are ready. */
 export function installBootCover(): Promise<void> {
@@ -54,7 +56,7 @@ export function installBootCover(): Promise<void> {
         window.dispatchEvent(new Event("tilo-boot-loop-complete"));
         reveal();
       },
-      reduced || seen ? 200 : 4600,
+      reduced || seen ? 200 : MIN_BOOT_WAIT_MS,
     );
   });
   return decoded;
