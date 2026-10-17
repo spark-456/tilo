@@ -76,6 +76,27 @@ const radio = (root: ParentNode, name: string) =>
 const sum = (xs: readonly number[]) => xs.reduce((a, v) => a + v, 0);
 const num = (s: string) => Number(s.replace(/[^0-9.]/g, ""));
 
+it("CX_PAGES_ENRICH_LEDGER_empty_cost_data_keeps_chart_group_and_table_frames", async () => {
+  const empty = {
+    ...fixtureLedger,
+    budget: 0,
+    daily: [],
+    runs: [],
+    recordedRuns: [],
+    by: {
+      world: { head: "By world", rows: [] },
+      tool: { head: "By tool", rows: [] },
+      role: { head: "By work", rows: [] },
+    },
+  } as Ledger;
+  const { container } = await mountLedger(empty, []);
+  expect(region(container, "Spend over the month").textContent).toContain(
+    "Daily costs will appear here",
+  );
+  expect(region(container, "Where it goes")).not.toBeNull();
+  expect(region(container, "Recorded run costs").textContent).toContain("Cost · status");
+});
+
 it("FR_SPD_04_recorded_runs_show_totals_and_completion_without_skill_navigation", async () => {
   const { container } = await mountLedger({
     ...fixtureLedger,
@@ -87,10 +108,11 @@ it("FR_SPD_04_recorded_runs_show_totals_and_completion_without_skill_navigation"
     currency: "USD",
   });
   const card = region(container, "Recorded run costs");
-  expect(text(card)).toContain("recorded-a");
+  expect(text(card)).toContain("Run 1");
+  expect(text(card)).not.toContain("recorded-a");
   expect(text(card)).toContain("$1.25");
   expect(text(card)).toContain("Completed");
-  expect(text(card)).toContain("Completion not recorded");
+  expect(text(card)).toContain("No finish event");
   expect(qa(card, "button")).toHaveLength(0);
 });
 
@@ -113,9 +135,7 @@ it("FR_SPD_05_06_07_live_history_shows_only_recorded_waits_and_honest_unavailabl
   });
   const { container, navigate } = await mountLedger(L);
   expect(text(region(container, "Approval wait times"))).toContain("2.0 min");
-  expect(text(container)).toContain(
-    "Memory savings by week and hours handed back are not available yet.",
-  );
+  expect(text(container)).not.toContain("not available yet");
   const activity = region(container, "Activity");
   expect(text(activity)).toContain("Held for edits");
   expect(text(activity)).toContain("Approval answered");
