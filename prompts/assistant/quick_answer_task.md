@@ -1,3 +1,4 @@
 <<<QUESTION
 $question
 QUESTION>>>
+$skills

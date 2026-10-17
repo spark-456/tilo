@@ -166,7 +166,9 @@ def _call(
     return reply, max(sent, 1)
 
 
-def _ask(rules: QuickRules, router: Router, question: str, tally: _Tally, *, vet: bool) -> dict[str, Any]:
+def _ask(
+    rules: QuickRules, router: Router, question: str, tally: _Tally, *, vet: bool, skills: str = ""
+) -> dict[str, Any]:
     """The classifier call (when `vet`: the rules left this text to the model) and then the answer call."""
     data = neutralise_marker(question, "QUESTION")
     calls = 0
@@ -185,7 +187,7 @@ def _ask(rules: QuickRules, router: Router, question: str, tally: _Tally, *, vet
             return {"offer": verdict.reason if verdict else "unclear", "calls": calls}
     request = GenerateRequest(
         system=load_prompt("assistant", "quick_answer_system.md"),
-        prompt=load_prompt("assistant", "quick_answer_task.md", {"question": data}),
+        prompt=load_prompt("assistant", "quick_answer_task.md", {"question": data, "skills": skills}),
         thinking_level=rules.thinking_level,
         max_output_tokens=rules.answer_max_output_tokens,
     )
@@ -198,7 +200,7 @@ def _plain(reply: str) -> str:
     return "".join(c for c in reply if c in ("\n", "\t") or unicodedata.category(c)[0] != "C")
 
 
-def _offer(reason: str | None) -> dict[str, Any]:
+def offer(reason: str | None) -> dict[str, Any]:
     return {"mode": "quick", "outcome": "switch_to_thinking", "reason": reason or "unclear"}
 
 
@@ -216,6 +218,7 @@ def respond(
     caps: Any,
     key: str | None,
     ledger: LedgerWriter | None = None,
+    skills: Any = None,
 ) -> dict[str, Any]:
     """The 200 body (answer or offer) of a Quick ask whose text, limits and file names intake has already screened;
     raises QuickRefusal (a fixed sentence), ReplayOnly, ModelUnavailable, SpendCapReached or HTTPException."""
@@ -239,8 +242,14 @@ def respond(
         logger.warning("quick config unusable: %s", exc)
         raise QuickRefusal(503, "not_configured") from None
     verdict = classify(rules, text, max_chars=max_chars, has_files=has_files, scenario=scenario is not None)
+
+    def tag(body: dict[str, Any]) -> dict[str, Any]:
+        """SKILL-ROUTE: the skill that fits, for a "Run with skill" chip; absent when none does (inside the hold)."""
+        found = None if skills is None else skills.match(question)
+        return body if found is None else {**body, "skill": found}
+
     if verdict.kind == "work":
-        return _offer(verdict.reason)  # decided by rules: no model, no cost, nothing stored
+        return offer(verdict.reason)  # decided by rules: no model, no cost, nothing stored; so no skill is looked for
     if rules.role not in deps.providers_config().roles:
         raise QuickRefusal(503, "not_configured")  # never a fallback to the Director
 
@@ -259,7 +268,14 @@ def respond(
         held = _hold(rules, uid, datetime.now(UTC), allowance, switches, mode, caps)
         tally = _Tally(rules.budget)
         try:
-            done = _ask(rules, router, question, tally, vet=verdict.kind == "model")
+            done = _ask(
+                rules,
+                router,
+                question,
+                tally,
+                vet=verdict.kind == "model",
+                skills="" if skills is None else skills.block(),
+            )
         except BaseException:
             held.commit(tally.spent) if tally.spent > 0 else held.release()  # billed stays charged
             record(tally)
@@ -267,9 +283,9 @@ def respond(
         held.commit(tally.spent)
         record(tally)
         if "offer" in done:
-            return _offer(done["offer"])
+            return tag(offer(done["offer"]))
         cost = {"model_calls": done["calls"], "credits": float(tally.spent), "saved_credits": 0.0}
-        return {"mode": "quick", "outcome": "answered", "text": done["text"], "cost": cost}
+        return tag({"mode": "quick", "outcome": "answered", "text": done["text"], "cost": cost})
 
     if key is None:
         return make()

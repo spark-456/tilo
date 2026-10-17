@@ -115,10 +115,11 @@ const BAD_REPLY = "Tilo sent a reply this page could not read.";
 async function quickAsk(
   http: HttpClient,
   query: string,
+  refs: readonly import("../../api/skillRoute").SkillRef[] = [],
 ): Promise<{ data: QuickReply; source: "live" }> {
   let r: QuickIntakeResult;
   try {
-    r = await http.submitIntake(query, [], "quick");
+    r = (await http.submitIntake(query, [], "quick", refs)) as QuickIntakeResult;
   } catch (e) {
     if (e instanceof TiloApiError) throw e;
     throw new TiloApiError(BAD_REPLY, 200, true, true);
@@ -501,12 +502,13 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
     query: string,
     effort?: Effort,
     files: readonly File[] = [],
+    refs: readonly import("../../api/skillRoute").SkillRef[] = [],
   ) => {
     // Quick (COST-FAST-1): a direct answer or an offer to switch. No world, no event, and nothing is remembered.
-    if (effort === "quick") return quickAsk(http, query);
+    if (effort === "quick") return quickAsk(http, query, refs);
     let intake: IntakeResult;
     try {
-      intake = await http.submitIntake(query, [...files]);
+      intake = (await http.submitIntake(query, [...files], undefined, refs)) as IntakeResult;
     } catch (e) {
       if (e instanceof TiloApiError) throw e;
       throw new TiloApiError(BAD_REPLY, 200, true, true);

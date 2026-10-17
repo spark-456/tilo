@@ -97,6 +97,38 @@ describe("STUDIO_2 bubble: it can be put anywhere and stays there", () => {
 });
 
 describe("STUDIO_2 bubble: the compact chat is the real Quick answer path", () => {
+  it("FR_SKL_04_ROUTE_bubble_shows_only_the_skill_in_the_quick_reply", async () => {
+    const startWorld = vi.fn(async () => ({
+      data: {
+        kind: "answered",
+        text: "I can help.",
+        cost: null,
+        skill: {
+          id: "exec_summary",
+          kind: "library",
+          scope: "library",
+          name: "Executive summary",
+          version: "1.0.0",
+          score: 0.9,
+          source: "matched",
+        },
+      },
+      source: "live",
+    }));
+    await mountBubble(liveSourced({ startWorld } as unknown as Partial<Api>));
+    act(() => bubble().click());
+    const input = q<HTMLInputElement>(document.body, "dialog input");
+    act(() => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      set?.call(input, "Summarise it");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      q<HTMLButtonElement>(document.body, 'dialog button[aria-label="Send"]').click();
+    });
+    await settle();
+    expect(textOf(q(document.body, 'dialog [role="log"]'))).toContain(
+      "Suggested skill: Executive summary",
+    );
+  });
   it("STUDIO_2 bubble asks over Quick and shows the served answer, Escape closes it", async () => {
     const startWorld = vi.fn(async () => ({
       data: { kind: "answered", text: "Three steps to go.", cost: null },

@@ -1,13 +1,15 @@
 import { type FormEvent, useId, useState } from "react";
 import type { AppCtx } from "../../app/AppCtx";
-import { useParkStore } from "../../app/context";
+import { useParkStore, useWorldClient } from "../../app/context";
 import { usePageTitle } from "../../app/pageTitle";
 import { SCENE_FLOOR, SCENE_SKY, SceneArt, SceneFront } from "../../chat/Scene";
 import { SCENES, SCENE_LABEL, type SceneId, readScene, writeScene } from "../../chat/displayPrefs";
 import { handDraft } from "../../chat/handoff";
 import { type Turn, useQuickChat } from "../../chat/useQuickChat";
 import { type SegmentOption, SegmentedControl } from "../../components";
+import { SkillMention } from "../../shared/SkillMention";
 import { TiloIcon as Icon, Buddy as TiloBuddy } from "../../shared/icons";
+import { type CatalogSkill, type SkillMatch, sendWithSkill } from "../../shared/skillRoute";
 import { Buddy, type BuddyMood } from "../../studio/Buddy";
 import { SWITCH_WORDS, quickCostLine } from "../Home/homeData";
 import "./Chat.css";
@@ -50,11 +52,11 @@ function Answer({
   mood,
 }: {
   turn: Turn;
-  onWorld: (question: string) => void;
+  onWorld: (question: string, skill?: SkillMatch) => void;
   onCopy: ((text: string) => void) | null;
   mood: BuddyMood;
 }) {
-  const makeWorld = () => onWorld(turn.question);
+  const makeWorld = () => onWorld(turn.question, "skill" in turn ? turn.skill : undefined);
   if (turn.state === "asking")
     return (
       <div className="park-chat-turn">
@@ -78,6 +80,9 @@ function Answer({
           <div className="park-chat-result-card">
             {cost ? <span className="park-chat-meta">{cost.toUpperCase()}</span> : null}
             <p className="park-chat-text">{turn.text}</p>
+            {turn.skill ? (
+              <span className="park-chat-tag">Suggested skill: {turn.skill.name}</span>
+            ) : null}
             <div className="park-chat-actions">
               {onCopy ? (
                 <button type="button" className="park-chat-quiet" onClick={() => onCopy(turn.text)}>
@@ -102,6 +107,9 @@ function Answer({
           <div className="park-chat-world-card">
             <strong>This needs a world.</strong>
             <p>{SWITCH_WORDS[turn.reason]}</p>
+            {turn.skill ? (
+              <span className="park-chat-tag">Suggested skill: {turn.skill.name}</span>
+            ) : null}
             <div className="park-chat-actions">
               <button type="button" className="park-chat-soft" onClick={makeWorld}>
                 Make it a world →
@@ -119,9 +127,12 @@ function Answer({
 export function ChatPage({ app }: { app: AppCtx }) {
   usePageTitle("Chat");
   const store = useParkStore();
+  const skillClient = useWorldClient();
   const chat = useQuickChat();
   const [scene, setScene] = useState<SceneId>(readScene);
   const [draft, setDraft] = useState("");
+  const [selectedSkill, setSelectedSkill] = useState<CatalogSkill | null>(null);
+  const [skillNote, setSkillNote] = useState<string | null>(null);
   const inputId = useId();
   const last = chat.turns[chat.turns.length - 1];
   const credits = totalCredits(chat.turns);
@@ -129,10 +140,15 @@ export function ChatPage({ app }: { app: AppCtx }) {
 
   const send = (e: FormEvent) => {
     e.preventDefault();
-    if (chat.ask(draft)) setDraft("");
+    const sent = sendWithSkill(draft, selectedSkill, chat.ask);
+    if (sent) {
+      setDraft("");
+      setSelectedSkill(null);
+      setSkillNote(null);
+    }
   };
-  const toWorld = (question: string) => {
-    handDraft(question);
+  const toWorld = (question: string, skill?: SkillMatch) => {
+    handDraft(question, skill ? { ...skill, purpose: "", inputs: [], tools: [] } : null);
     app.go("home");
   };
   const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
@@ -253,7 +269,10 @@ export function ChatPage({ app }: { app: AppCtx }) {
                   autoComplete="off"
                   value={draft}
                   placeholder={chat.turns.length ? "Ask a follow-up…" : "Ask a question…"}
-                  onChange={(e) => setDraft(e.target.value)}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    setSkillNote(null);
+                  }}
                 />
                 <span className="park-chat-mode">
                   <span className="park-chat-mode__dot" aria-hidden="true" />
@@ -268,6 +287,25 @@ export function ChatPage({ app }: { app: AppCtx }) {
                   <Icon name="send" size={20} />
                 </button>
               </div>
+              <SkillMention
+                text={draft}
+                selected={selectedSkill}
+                client={skillClient}
+                onChoose={(skill) => {
+                  setDraft(draft.replace(/(?:^|\s)@[^\s@]*$/, "").trimEnd());
+                  setSelectedSkill(skill);
+                  setSkillNote(null);
+                }}
+                onClear={() => {
+                  setSelectedSkill(null);
+                  setSkillNote(null);
+                }}
+              />
+              {skillNote ? (
+                <p role="alert" className="park-chat-note">
+                  {skillNote}
+                </p>
+              ) : null}
               {chat.note ? (
                 <p role="alert" className="park-chat-note">
                   {chat.note}

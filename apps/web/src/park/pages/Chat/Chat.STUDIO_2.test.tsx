@@ -68,6 +68,25 @@ async function send(el: HTMLElement, text: string) {
 }
 
 describe("STUDIO_2 Chat: the helper's mood follows the real request", () => {
+  it("FR_SKL_04_ROUTE_chat_names_a_served_skill_offer_without_starting_a_world", async () => {
+    const skill = {
+      id: "competitor-scan",
+      kind: "library" as const,
+      scope: "library" as const,
+      name: "Competitor scan",
+      version: "1.0.0",
+      score: 0.89,
+      source: "matched" as const,
+    };
+    const api = quickApi(async () => ({
+      data: { kind: "answered", text: "I can help.", cost: null, skill },
+      source: "live",
+    }));
+    const { el } = await mountChat(api);
+    await send(el, "Scan competitors");
+    expect(textOf(q(el, '[role="log"]'))).toContain("Suggested skill: Competitor scan");
+    expect(calls(api)).toHaveLength(1);
+  });
   it("STUDIO_2 chat mood is idle, then reading while the call is out, talking when the answer lands, done after", async () => {
     const reply = gate<unknown>();
     const api = quickApi(() => reply.promise);

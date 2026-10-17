@@ -3,12 +3,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { stubApp } from "../../../../test-support/park/appHarness";
 import { cleanup, click, mount } from "../../../../test-support/park/componentsHarness";
 import type { Skill } from "../../api/types";
-import { takeDraft } from "../../chat/handoff";
+import { takeDraft, takeDraftSkill } from "../../chat/handoff";
 import { SkillDrawer } from "./SkillDrawer";
 
 afterEach(() => {
   cleanup();
   takeDraft();
+  takeDraftSkill();
 });
 
 const skill = (over: Partial<Skill> = {}): Skill => ({
@@ -33,7 +34,7 @@ const skill = (over: Partial<Skill> = {}): Skill => ({
 });
 
 describe("CX_UX_SKILL_ICONS detail", () => {
-  it("CX_UX_SKILL_ICONS shows served context and prefills Home without a run", () => {
+  it("FR_PA_11 Use this skill opens a blank Home draft with the served skill tagged", () => {
     const app = stubApp("skills");
     const m = mount(
       <SkillDrawer
@@ -51,11 +52,12 @@ describe("CX_UX_SKILL_ICONS detail", () => {
     expect(m.container.textContent).toContain("Research public sources");
     expect(m.container.textContent).toContain("browser");
     const tryButton = [...m.container.querySelectorAll("button")].find(
-      (b) => b.textContent === "Try it",
+      (b) => b.textContent === "Use this skill",
     );
     if (!tryButton) throw new Error("Try it button missing");
     click(tryButton);
-    expect(takeDraft()).toContain("Web research");
+    expect(takeDraft()).toBe("");
+    expect(takeDraftSkill()).toMatchObject({ id: "web-research", kind: "library" });
     expect(app.go).toHaveBeenCalledWith("home");
   });
 

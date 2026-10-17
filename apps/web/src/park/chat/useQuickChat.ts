@@ -5,6 +5,7 @@
 // The conversation lives in this component only: the server keeps no Quick question or answer (quick.py), so there
 // is no history to list (docs/open-questions.md BQ-STUDIO-2).
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { SkillMatch, SkillRef } from "../../api/skillRoute";
 import { askQuick } from "../api/index";
 import type { QuickCost, SwitchReason } from "../api/types";
 import { useParkApi, useSchedule } from "../app/context";
@@ -24,8 +25,9 @@ export type Turn =
       sample: boolean;
       /** Seconds from send to answer, measured here. */
       seconds: number;
+      skill?: SkillMatch;
     }
-  | { id: number; question: string; state: "switch"; reason: SwitchReason }
+  | { id: number; question: string; state: "switch"; reason: SwitchReason; skill?: SkillMatch }
   | { id: number; question: string; state: "error"; message: string };
 
 /** How long the helper is shown talking after an answer lands: about a reading pace, 1.5 s to 6 s. */
@@ -58,7 +60,7 @@ export interface QuickChat {
   /** A line that was not sent (empty or too long); cleared by the next ask. */
   readonly note: string | null;
   /** Sends `text`; returns false when it was not sent (busy, empty or too long). */
-  ask(text: string): boolean;
+  ask(text: string, ref?: SkillRef | null): boolean;
   /** Starts a fresh local session when no request is in flight. */
   clear(): void;
 }
@@ -82,7 +84,7 @@ export function useQuickChat(now: () => number = Date.now): QuickChat {
   }, []);
 
   const ask = useCallback(
-    (raw: string): boolean => {
+    (raw: string, ref: SkillRef | null = null): boolean => {
       if (busyRef.current) return false;
       const question = raw.trim();
       const refused = refusal(question);
@@ -108,7 +110,7 @@ export function useQuickChat(now: () => number = Date.now): QuickChat {
         }
       };
       new Promise<Awaited<ReturnType<typeof askQuick>>>((resolve) =>
-        resolve(askQuick(api, "quick", question)),
+        resolve(askQuick(api, "quick", question, ref ? [ref] : [])),
       ).then(
         ({ data, source }) =>
           settle(
@@ -121,8 +123,15 @@ export function useQuickChat(now: () => number = Date.now): QuickChat {
                   cost: data.cost,
                   sample: source !== "live",
                   seconds: Math.max(0, Math.round((now() - started) / 1000)),
+                  ...(data.skill ? { skill: data.skill } : {}),
                 }
-              : { id, question, state: "switch", reason: data.reason },
+              : {
+                  id,
+                  question,
+                  state: "switch",
+                  reason: data.reason,
+                  ...(data.skill ? { skill: data.skill } : {}),
+                },
           ),
         (e: unknown) => settle({ id, question, state: "error", message: quickErrorMessage(e) }),
       );
