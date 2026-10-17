@@ -276,7 +276,7 @@ function MonthView({
 }) {
   const days = dayColumns(A, EV, ui.cals, true, false);
   return (
-    <div className="park-agenda-cal" aria-label="Month view">
+    <div className="park-agenda-cal" role="group" aria-label="Month view">
       <div className="park-agenda-monthgrid">
         {days.map((d, index) => (
           <button
@@ -337,7 +337,7 @@ export function Week({ A, ui, app }: { A: Agenda; ui: AgendaUi; app: AppCtx }) {
           </div>
         </div>
         <div className="park-agenda-filters">
-          <div className="park-agenda-nav" aria-label="Calendar navigation">
+          <div className="park-agenda-nav" role="group" aria-label="Calendar navigation">
             <button
               type="button"
               className="park-agenda-navbtn"
