@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { ASSET, CARD, STILL } from "./poolAssets";
 import "./PoolLoader.css";
 
 type PoolPhase = "leap" | "swim" | "sink";
@@ -13,76 +14,79 @@ export type PoolLoaderProps = {
 const MIN_LOAD_MS = 300;
 const LEAP_MS = 2600;
 const SINK_MS = 2000;
-const RECENT_END_MS = 10_000;
 const LOOP_MS = LEAP_MS + SINK_MS;
-const ASSET = "/loader/pool-46a6cd3d6b84.webp";
-const STILL = "/loader/pool-9182ba9a51a9.png";
+/** A task's planning card says so when it has waited this long (wall time only; it names no event). */
+const PLANNING_SLOW_MS = 45_000;
 const SITE_COPY = {
   leap: ["Loading Tilo", "Fetching your workspace"],
   swim: ["Still loading", "The request is still loading"],
   sink: ["Ready", "The request finished"],
 } as const;
-const TASK_COPY = {
-  leap: ["Starting your world", "world.started"],
-  swim: ["The Director is still planning", "Waiting for world.planned"],
-  sink: ["Your plan is ready", "world.planned"],
-} as const;
 /**
- * Shared Tilo T loader. Site and task loads wait 300 ms before appearing; task event timestamps preserve that gate
- * when world.started and world.planned arrive together. The leap finishes before a completed task sinks; active tasks
- * swim after the leap. The screen behind remains mounted and aria-busy while active.
+ * Shared Tilo T loader. A site load waits 300 ms before it appears and then plays one full leap; the screen behind
+ * remains mounted and aria-busy while active.
+ *
+ * A task never covers its page: the world stays mounted and clickable, and one compact card sits over its top edge
+ * from the recorded `world.started` until `world.planned` or `world.failed` (or the first recorded work).
  *
  * Task API: <PoolLoader kind="task" events={worldEvents}>…page…</PoolLoader>
  * Site API: <PoolLoader kind="site" loading={isLoading}>…page…</PoolLoader>
  */
 export function PoolLoader(props: PoolLoaderProps) {
+  return props.kind === "task" ? (
+    <TaskPlanning events={props.events}>{props.children}</TaskPlanning>
+  ) : (
+    <SitePool loading={props.loading}>{props.children}</SitePool>
+  );
+}
+
+function TaskPlanning({
+  events,
+  children,
+}: { events: readonly PoolLoaderEvent[]; children: ReactNode }) {
+  const has = (type: string) => events.some((event) => event.type === type);
+  // triggeredBy: world.started (shown) and world.planned / world.failed (hidden)
+  const active = has("world.started") && !has("world.planned") && !has("world.failed");
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setSlow(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setSlow(true), PLANNING_SLOW_MS);
+    return () => window.clearTimeout(timer);
+  }, [active]);
+  return (
+    <div className="tt-pool-host" data-testid="tt-pool-host">
+      <div className="tt-pool-page" aria-busy={active}>
+        {children}
+      </div>
+      {active ? (
+        <aside className="tt-plan-card" role="status" aria-live="polite" data-testid="tt-plan-card">
+          <img className="tt-plan-card__art" src={CARD} alt="" width="56" height="22" />
+          <div className="tt-plan-card__text">
+            <strong>Director is planning</strong>
+            <span>
+              {slow
+                ? "Taking longer than usual · waiting for world.planned"
+                : "world.started · waiting for world.planned"}
+            </span>
+          </div>
+        </aside>
+      ) : null}
+    </div>
+  );
+}
+
+function SitePool({ loading, children }: { loading: boolean; children: ReactNode }) {
   const shownAt = useRef(0);
-  const isTask = props.kind === "task";
-  const startedEvent = isTask ? props.events.find((event) => event.type === "world.started") : undefined;
-  const plannedEvent = isTask ? props.events.find((event) => event.type === "world.planned") : undefined;
-  const failedEvent = isTask ? props.events.find((event) => event.type === "world.failed") : undefined;
-  const started = startedEvent !== undefined;
-  const planned = plannedEvent !== undefined;
-  const failed = failedEvent !== undefined;
-  const terminalEvent = plannedEvent ?? failedEvent;
-  const recordedDuration =
-    startedEvent?.ts && terminalEvent?.ts
-      ? Date.parse(terminalEvent.ts) - Date.parse(startedEvent.ts)
-      : Number.NaN;
-  const active =
-    props.kind === "task" ? started && !planned && !failed : props.loading;
-  const activeRef = useRef(active);
-  activeRef.current = active;
+  const activeRef = useRef(loading);
+  activeRef.current = loading;
   const [visible, setVisible] = useState(false);
   const [phase, setPhase] = useState<PoolPhase>("leap");
-  // One play per mount: without it the buffered replay below re-opened the overlay every time it closed.
-  const playedRef = useRef(false);
 
   useEffect(() => {
-    if (isTask) {
-      if (!started || visible || playedRef.current) return;
-      if (!active) {
-        // Buffered world.started plus a terminal event plays only when their real event times exceed the 300 ms gate,
-        // and only for a run that ended just now; a world opened after it ended shows at once.
-        if (!Number.isFinite(recordedDuration) || recordedDuration < MIN_LOAD_MS) return;
-        const endedAt = terminalEvent?.ts ? Date.parse(terminalEvent.ts) : Number.NaN;
-        if (!Number.isFinite(endedAt) || Date.now() - endedAt > RECENT_END_MS) return;
-        playedRef.current = true;
-        shownAt.current = performance.now();
-        setPhase("leap");
-        setVisible(true);
-        return;
-      }
-      // triggeredBy: world.started (recorded event); short runs cancel this 300 ms reveal.
-      const timer = window.setTimeout(() => {
-        playedRef.current = true;
-        shownAt.current = performance.now();
-        setPhase("leap");
-        setVisible(true);
-      }, MIN_LOAD_MS);
-      return () => window.clearTimeout(timer);
-    }
-    if (!active) return;
+    if (!loading) return;
     // triggeredBy: a site request that remains pending for more than 300 ms
     const timer = window.setTimeout(() => {
       shownAt.current = performance.now();
@@ -90,7 +94,7 @@ export function PoolLoader(props: PoolLoaderProps) {
       setVisible(true);
     }, MIN_LOAD_MS);
     return () => window.clearTimeout(timer);
-  }, [active, isTask, recordedDuration, started, terminalEvent, visible]);
+  }, [loading]);
 
   useEffect(() => {
     if (!visible || phase !== "leap") return;
@@ -99,10 +103,10 @@ export function PoolLoader(props: PoolLoaderProps) {
   }, [visible, phase]);
 
   useEffect(() => {
-    if (!visible || phase !== "swim" || active) return;
-    // triggeredBy: world.planned/world.failed, or the site request finishing
+    if (!visible || phase !== "swim" || loading) return;
+    // triggeredBy: the site request finishing
     setPhase("sink");
-  }, [active, phase, visible]);
+  }, [loading, phase, visible]);
 
   useEffect(() => {
     if (!visible || phase !== "sink") return;
@@ -115,31 +119,22 @@ export function PoolLoader(props: PoolLoaderProps) {
     return () => window.clearTimeout(timer);
   }, [phase, visible]);
 
-  const busy = active;
-  const [title, subtitle] =
-    isTask && phase === "sink" && failed
-      ? ["The world stopped", "world.failed"]
-      : (isTask ? TASK_COPY : SITE_COPY)[phase];
+  const [title, subtitle] = SITE_COPY[phase];
   return (
     <div className="tt-pool-host" data-testid="tt-pool-host">
       <div
         className={`tt-pool-page${visible ? " tt-pool-page--covered" : ""}${phase === "sink" ? " tt-pool-page--sink" : ""}`}
-        aria-busy={busy}
+        aria-busy={loading}
       >
-        {props.children}
+        {children}
       </div>
       {visible ? (
         <div className="tt-pool-overlay" data-phase={phase}>
           <div className="tt-pool-scrim" aria-hidden="true" />
-          <div
-            className="tt-pool__stage"
-            role="status"
-            aria-live="polite"
-            aria-busy={busy}
-          >
+          <div className="tt-pool__stage" role="status" aria-live="polite" aria-busy={loading}>
             <picture aria-hidden="true">
               <source media="(prefers-reduced-motion: reduce)" srcSet={STILL} />
-              <img className="tt-pool__asset" src={ASSET} alt="" width="560" height="412" />
+              <img className="tt-pool__asset" src={ASSET} alt="" width="552" height="727" />
             </picture>
             <div className="tt-pool__caption" aria-atomic="true">
               <strong>{title}</strong>
