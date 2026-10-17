@@ -1,7 +1,7 @@
 .tt-pool-host{position:relative;min-height:100%}
 .tt-pool-page{position:relative;min-height:inherit}
-.tt-pool-page--covered{filter:blur(8px) saturate(.85);transform:scale(1.015)}
-.tt-pool-page--sink{filter:none;transform:none}
+.tt-pool-page--covered{opacity:.72}
+.tt-pool-page--sink{opacity:1}
 .tt-pool-overlay{position:fixed;z-index:1000;inset:0;display:grid;place-items:center;overflow:hidden;pointer-events:auto;color:var(--ink,#0b0b0c)}
 .tt-pool-scrim{position:absolute;inset:0;background:var(--bg,#fff);opacity:.35}
 /* the artwork canvas (460x606) is centred on the pool, so a centred stage is a centred pool; it shrinks to fit the viewport */
@@ -31,8 +31,8 @@
 .tt-pool__caption{position:absolute;top:63%;left:0;width:100%;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
 .tt-pool__caption strong{font-size:18px;letter-spacing:-.3px}
 .tt-pool__caption span{color:var(--ink2,#46464a);font-family:var(--mono,monospace);font-size:12px}
-@media(prefers-reduced-motion:reduce){.tt-pool-page--covered{filter:none;transform:none;opacity:.72}}
-[data-motion="still"] .tt-pool-page--covered{filter:none;transform:none}
+@media(prefers-reduced-motion:reduce){.tt-pool-page--covered{opacity:.72}}
+[data-motion="still"] .tt-pool-page--covered{opacity:.72}
 /* a task's planning card: compact, over the top edge of the page, never blocks it (the world stays clickable) */
 .tt-plan-card{position:fixed;z-index:50;top:72px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);padding:8px 16px 8px 10px;box-sizing:border-box;border:1px solid var(--line2,#d5d5d0);border-radius:14px;background:var(--card,#fff);color:var(--ink,#0b0b0c);box-shadow:0 6px 20px rgb(11 11 12 / 10%);pointer-events:none}
 .tt-plan-card__art{display:block;width:56px;height:auto;flex:none}

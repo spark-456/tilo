@@ -224,8 +224,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         signingOut.current = false;
       });
   };
+  // FT-SITE-BLUR: pool on first boot only (held by #tilo-boot-cover); in-place skeletons after sign-in / demo start
   return (
-    <PoolLoader kind="site" loading={!ready && !document.getElementById("tilo-boot-cover")}>
+    <PoolLoader kind="site" loading={false}>
       <CityBackdrop
         scene={scene}
         vw={app.vw}
