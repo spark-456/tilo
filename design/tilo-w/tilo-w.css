@@ -1,0 +1,27 @@
+/* Tilo W — World page additions on top of Tilo T: agent palette, island + chat surfaces, walk/talk keyframes. Layout stays inline. */
+[data-theme="studio"],[data-theme="studioDark"]{--ag1:#E8643F;--ag2:#3F7FE0;--ag3:#2BA3B8;--ag4:#3E9A7C;--ag5:#A45DB8;--ag6:#D9588C;--ag7:#C9982A;--wStep:.56s;--wEase:cubic-bezier(.2,.8,.2,1);--wWalk:cubic-bezier(.4,0,.6,1)}
+[data-theme="studio"]{--island:#F4F4F1;--islandL:#DADAD4;--islandR:#CFCFC8;--meBubble:#0B0B0C;--onMe:#FFFFFF}
+[data-theme="studioDark"]{--island:#26262A;--islandL:#1B1B1E;--islandR:#151517;--meBubble:#C8F23A;--onMe:#0A0A0B}
+[data-paused="true"] *{animation-play-state:paused!important}
+[data-reduced="true"] *{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-property:opacity!important;transition-duration:.2s!important}
+/* walk cycle: one stride = 560 ms; A/B twins restart the cycle on every new agent.moved */
+@keyframes wLegA{0%,50%,100%{transform:rotate(0)}25%{transform:rotate(26deg)}75%{transform:rotate(-26deg)}}
+@keyframes wLegB{0%,50%,100%{transform:rotate(0)}25%{transform:rotate(26deg)}75%{transform:rotate(-26deg)}}
+@keyframes wArmA{0%,50%,100%{transform:rotate(0)}25%{transform:rotate(-22deg)}75%{transform:rotate(22deg)}}
+@keyframes wArmB{0%,50%,100%{transform:rotate(0)}25%{transform:rotate(-22deg)}75%{transform:rotate(22deg)}}
+@keyframes wBobA{0%,100%{transform:none}25%,75%{transform:scale(1.04,.95)}50%{transform:translateY(-3px) scale(.97,1.03)}}
+@keyframes wBobB{0%,100%{transform:none}25%,75%{transform:scale(1.04,.95)}50%{transform:translateY(-3px) scale(.97,1.03)}}
+@keyframes wHop{0%,100%{transform:none}30%{transform:translateY(-7px) scale(.96,1.05)}62%{transform:scale(1.06,.93)}}
+@keyframes wDot{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-2px)}}
+@keyframes wRing{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+@keyframes wPing{0%{opacity:.7;transform:scale(.9)}100%{opacity:0;transform:scale(1.6)}}
+@keyframes wIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes wPlot{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
+@keyframes wSettle{0%{transform:scale(1.035)}100%{transform:none}}
+@keyframes wPin{0%{opacity:0;transform:scale(.4)}70%{opacity:1;transform:scale(1.15)}100%{opacity:1;transform:none}}
+@keyframes wChatIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes wDrawer{from{opacity:0;transform:translateX(32px)}to{opacity:1;transform:none}}
+@keyframes wSheet{from{opacity:0;transform:translateY(60px)}to{opacity:1;transform:none}}
+@keyframes wScrim{from{opacity:0}to{opacity:1}}
+@keyframes wLand{0%{opacity:0;transform:translateY(-10px)}60%{opacity:1;transform:translateY(1px) scale(1.08,.92)}100%{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-property:opacity!important;transition-duration:.2s!important}}

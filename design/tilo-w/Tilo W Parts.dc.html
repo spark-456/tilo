@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<link rel="stylesheet" href="./tilo-w.css">
+<script src="./tilo-t.js"></script>
+<script src="./tilo-w.js"></script>
+<style>body{margin:0}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div style="display:flex;flex-direction:column;gap:14px;font-family:var(--fB);color:var(--ink);font-size:14px;line-height:1.45;height:{{ rootH }};min-height:0;box-sizing:border-box">
+
+<sc-if value="{{ pStory }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:15px">What happened</span><span style="font-size:12.5px;color:var(--ink3)">{{ storySub }}</span></span>
+    <div style="flex:1"></div>
+    <div role="radiogroup" aria-label="Story view" style="display:flex;gap:2px;padding:3px;border-radius:11px;background:var(--sunk)">
+      <sc-for list="{{ views }}" as="v" hint-placeholder-count="2"><span role="radio" aria-checked="{{ v.on }}" onClick="{{ v.pick }}" style="height:32px;padding:0 12px;border-radius:8px;display:flex;align-items:center;font-size:12.5px;font-weight:700;background:{{ v.bg }};color:{{ v.fg }};cursor:pointer">{{ v.t }}</span></sc-for>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ showApr }}" hint-placeholder-val="{{ false }}">
+  <div role="region" aria-label="Needs you" style="border:1.5px solid var(--amber);background:var(--amberSoft);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;animation:wIn .3s cubic-bezier(.2,.8,.2,1) both">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="width:28px;height:28px;border-radius:9px;background:{{ apr.col }};display:flex;align-items:center;justify-content:center;flex:none"><span style="width:18px;height:10px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:4px"><span style="width:3px;height:4px;border-radius:2px;background:#1F1D2B"></span><span style="width:3px;height:4px;border-radius:2px;background:#1F1D2B"></span></span></span>
+      <span style="flex:1;display:flex;flex-direction:column;line-height:1.3;color:var(--amberInk)"><span style="font-weight:700;font-size:13.5px">{{ apr.who }} needs your yes</span><span style="font-family:var(--mono);font-size:11px">approval.requested · {{ apr.t }}</span></span>
+      <span style="color:var(--amberInk)">{{ iHand }}</span>
+    </div>
+    <span style="font-weight:700;font-size:18px;line-height:1.3;letter-spacing:-.3px;text-wrap:pretty">{{ apr.q }}</span>
+    <div style="background:var(--card);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:3px"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">EXACT ACTION</span><span style="font-size:13.5px;line-height:1.45;text-wrap:pretty">{{ apr.exact }}</span></div>
+    <div style="display:grid;grid-template-columns:40px minmax(0,1fr);gap:4px 10px;font-size:13.5px;line-height:1.4"><strong>Risk</strong><span>{{ apr.risk }}</span><strong>Cost</strong><span>{{ apr.cost }}</span></div>
+    <sc-if value="{{ aprOpen }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;gap:8px">
+        <span role="button" onClick="{{ approve }}" style="flex:1;height:44px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:14px;cursor:pointer">{{ iCheck }}Approve</span>
+        <span role="button" style="height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line2);background:var(--card);display:flex;align-items:center;font-weight:600;font-size:14px;cursor:pointer">Edit</span>
+        <span role="button" onClick="{{ decline }}" style="height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line2);background:var(--card);display:flex;align-items:center;font-weight:600;font-size:14px;cursor:pointer">Decline</span>
+      </div>
+    </sc-if>
+    <sc-if value="{{ aprDone }}" hint-placeholder-val="{{ false }}"><div style="height:44px;border-radius:12px;background:var(--card);display:flex;align-items:center;gap:8px;padding:0 12px;font-weight:700;font-size:14px">{{ iCheck }}{{ aprDoneT }}</div></sc-if>
+  </div>
+</sc-if>
+
+<sc-if value="{{ showFail }}" hint-placeholder-val="{{ false }}">
+  <div role="alert" style="border:1.5px solid var(--redInk);background:var(--card);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;animation:wIn .3s cubic-bezier(.2,.8,.2,1) both">
+    <div style="display:flex;align-items:center;gap:10px"><span style="width:36px;height:36px;border-radius:11px;background:var(--redSoft);color:var(--redInk);display:flex;align-items:center;justify-content:center;flex:none">{{ iAlert }}</span><span style="display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:16px">Stopped at {{ fail.step }}</span><span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">world.failed · {{ fail.t }}</span></span></div>
+    <span style="font-size:14.5px;line-height:1.45;text-wrap:pretty">{{ fail.what }}</span>
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:var(--mintSoft);color:var(--mintInk);font-weight:700;font-size:14px">{{ iShield }}{{ fail.safe }}</div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px">
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">DONE</span><sc-for list="{{ fail.done }}" as="d" hint-placeholder-count="2"><span style="display:flex;align-items:center;gap:6px;font-size:13.5px"><span style="color:var(--mintInk)">{{ iCheckS }}</span>{{ d.t }}</span></sc-for></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">NOT DONE</span><sc-for list="{{ fail.notDone }}" as="d" hint-placeholder-count="3"><span style="display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--ink2)"><span>{{ iMinusS }}</span>{{ d.t }}</span></sc-for></div>
+    </div>
+    <span style="font-size:13px;color:var(--ink2)">{{ fail.cr }} The venue shortlist is kept.</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><span role="button" onClick="{{ retry }}" style="height:44px;padding:0 16px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;cursor:pointer">{{ iRefresh }}Try again</span><span role="button" style="height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600;font-size:14px;cursor:pointer">Use a different flight site</span></div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ plainOn }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column">
+    <sc-if value="{{ earlier }}" hint-placeholder-val="{{ false }}"><span style="font-size:12.5px;font-weight:700;color:var(--ink2);padding:0 0 6px">{{ earlier }}</span></sc-if>
+    <sc-for list="{{ story }}" as="s" hint-placeholder-count="5">
+      <div style="display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;padding:9px 10px;margin:0 -10px;border-radius:14px;background:{{ s.bg }}">
+        <sc-if value="{{ s.ag }}" hint-placeholder-val="{{ true }}"><span style="width:28px;height:28px;border-radius:9px;background:{{ s.col }};display:flex;align-items:center;justify-content:center;flex:none"><span style="width:18px;height:10px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:4px"><span style="width:3px;height:4px;border-radius:2px;background:#1F1D2B"></span><span style="width:3px;height:4px;border-radius:2px;background:#1F1D2B"></span></span></span></sc-if>
+        <sc-if value="{{ s.me }}" hint-placeholder-val="{{ false }}"><span style="width:28px;height:28px;border-radius:99px;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">M</span></sc-if>
+        <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+          <span style="font-size:14px;line-height:1.45;text-wrap:pretty">{{ s.text }}</span>
+          <span style="display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--ink3);flex-wrap:wrap"><span style="font-family:var(--mono)">{{ s.t }}</span><sc-if value="{{ s.where }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:4px;font-weight:600;color:var(--ink2)">{{ iPin }}{{ s.where }}</span></sc-if><sc-if value="{{ s.now }}" hint-placeholder-val="{{ false }}"><span style="height:18px;padding:0 7px;border-radius:99px;background:var(--lime);color:#0B0B0C;font-weight:700;display:flex;align-items:center">Now</span></sc-if></span>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</sc-if>
+
+<sc-if value="{{ traceOn }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;font-family:var(--mono);font-size:12px">
+    <div style="display:grid;grid-template-columns:40px minmax(0,1fr) 36px;gap:10px;padding:0 0 8px;color:var(--ink3);font-size:10.5px;letter-spacing:.4px"><span>TIME</span><span>EVENT · DETAIL</span><span style="text-align:right">CR</span></div>
+    <sc-for list="{{ trace }}" as="r" hint-placeholder-count="8">
+      <div style="display:grid;grid-template-columns:40px minmax(0,1fr) 36px;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span style="color:var(--ink3)">{{ r.t }}</span><span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-weight:600">{{ r.ev }}</span><span style="color:var(--ink2);font-family:var(--fB);font-size:12.5px">{{ r.d }}</span></span><span style="text-align:right;color:var(--ink2)">{{ r.cr }}</span></div>
+    </sc-for>
+    <div style="display:grid;grid-template-columns:40px minmax(0,1fr) 36px;gap:10px;padding:10px 0;border-top:1.5px solid var(--ink);font-weight:700"><span></span><span>Total so far</span><span style="text-align:right">{{ crTotal }}</span></div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pSteps }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:baseline;gap:10px;white-space:nowrap"><span style="font-weight:700;font-size:15px">The plan</span><span style="font-size:12.5px;color:var(--ink3)">{{ stepsSub }}</span></div>
+      <div style="height:6px;border-radius:9px;background:var(--sunk);overflow:hidden"><div style="height:100%;width:{{ stepsPct }};background:var(--ink);border-radius:9px;transition:width .6s ease"></div></div>
+    </div>
+    <div style="display:flex;flex-direction:column">
+      <sc-for list="{{ steps }}" as="s" hint-placeholder-count="7">
+        <div style="display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 12px;margin:0 -12px;border-radius:14px;background:{{ s.bg }}">
+          <span style="width:34px;height:34px;border-radius:11px;background:{{ s.ibg }};color:{{ s.ifg }};display:flex;align-items:center;justify-content:center">{{ s.ic }}</span>
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-weight:700;font-size:14px">{{ s.n }}. {{ s.name }}</span><span style="display:flex;align-items:flex-start;gap:6px;font-size:12.5px;color:var(--ink2);min-width:0;line-height:1.35"><span style="width:10px;height:10px;border-radius:3px;background:{{ s.col }};flex:none;margin-top:3px"></span><span style="text-wrap:pretty">{{ s.who }} · {{ s.out }}</span></span></div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px"><span style="height:22px;padding:0 8px;border-radius:99px;background:{{ s.cbg }};color:{{ s.cfg }};border:1px {{ s.cbs }} {{ s.cbd }};box-sizing:border-box;font-size:11px;font-weight:700;display:flex;align-items:center;white-space:nowrap">{{ s.chip }}</span><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);white-space:nowrap">{{ s.time }}</span></div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pChat }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;height:{{ chatH }};min-height:0;background:var(--card);border-radius:{{ chatR }};border:{{ chatBd }};box-shadow:{{ chatSh }};overflow:hidden;animation:{{ chatA }};box-sizing:border-box">
+    <sc-if value="{{ chatHead }}" hint-placeholder-val="{{ false }}">
+      <div style="height:62px;flex:none;box-sizing:border-box;padding:0 10px 0 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)">
+        <div style="display:flex;padding-left:8px"><sc-for list="{{ headAv }}" as="a" hint-placeholder-count="2"><span style="width:32px;height:32px;margin-left:-8px;border-radius:10px;border:2px solid var(--card);background:{{ a.col }};display:flex;align-items:center;justify-content:center"><span style="width:18px;height:10px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:4px"><span style="width:3px;height:4px;border-radius:2px;background:#1F1D2B"></span><span style="width:3px;height:4px;border-radius:2px;background:#1F1D2B"></span></span></span></sc-for></div>
+        <span style="flex:1;display:flex;flex-direction:column;line-height:1.25;min-width:0"><span style="font-weight:700;font-size:15px">{{ chatTitle }}</span><span style="font-size:12px;color:var(--ink3)">{{ chatSub }}</span></span>
+        <span role="button" onClick="{{ convene }}" style="height:40px;padding:0 10px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">{{ iPeople }}Convene</span>
+        <span role="button" aria-label="Close chat" onClick="{{ close }}" style="width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--ink2);cursor:pointer">{{ iX }}</span>
+      </div>
+    </sc-if>
+    <sc-if value="{{ chatTop }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:none;padding:14px 16px 0;display:flex;align-items:center;gap:10px">
+        <span style="flex:1;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:15px">{{ chatTitle }}</span><span style="font-size:12.5px;color:var(--ink3)">{{ chatSub }}</span></span>
+        <span role="button" onClick="{{ convene }}" style="height:40px;padding:0 12px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">{{ iPeople }}Convene team</span>
+      </div>
+    </sc-if>
+    <div role="tablist" aria-label="Filter conversations" style="flex:none;display:flex;gap:6px;padding:12px 16px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line)">
+      <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4"><span role="tab" aria-selected="{{ f.on }}" onClick="{{ f.pick }}" style="height:34px;padding:0 12px;border-radius:99px;border:1px solid {{ f.bd }};background:{{ f.bg }};color:{{ f.fg }};font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer;flex:none"><sc-for list="{{ f.dots }}" as="d" hint-placeholder-count="0"><span style="width:9px;height:9px;border-radius:99px;background:{{ d.col }};margin-right:-2px"></span></sc-for>{{ f.t }}</span></sc-for>
+    </div>
+    <div ref="{{ thr }}" style="flex:1;min-height:0;overflow:auto;padding:12px 16px 14px;display:flex;flex-direction:column">
+      <div style="margin-top:auto;display:flex;flex-direction:column;gap:4px">
+        <span style="align-self:center;height:24px;padding:0 10px;border-radius:99px;background:var(--sunk);font-size:11.5px;font-weight:600;color:var(--ink2);display:flex;align-items:center;margin-bottom:4px">Today</span>
+        <sc-for list="{{ msgs }}" as="m" hint-placeholder-count="4">
+          <sc-if value="{{ m.sys }}" hint-placeholder-val="{{ false }}"><div style="align-self:center;margin:10px 0 2px;height:28px;padding:0 12px;border-radius:99px;background:var(--sunk);font-size:12px;font-weight:600;color:var(--ink2);display:flex;align-items:center;gap:6px">{{ iPeopleS }}{{ m.text }}</div></sc-if>
+          <sc-if value="{{ m.left }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;gap:8px;align-items:flex-start;max-width:90%;margin-top:{{ m.mt }}">
+              <span style="opacity:{{ m.avOp }};width:28px;height:28px;border-radius:9px;background:{{ m.col }};display:flex;align-items:center;justify-content:center;flex:none"><span style="width:18px;height:10px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:4px"><span style="width:3px;height:4px;border-radius:2px;background:#1F1D2B"></span><span style="width:3px;height:4px;border-radius:2px;background:#1F1D2B"></span></span></span>
+              <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                <sc-if value="{{ m.showName }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;font-weight:700;display:flex;gap:6px;align-items:center;padding-left:2px">{{ m.name }}<span style="font-weight:500;color:var(--ink3)">{{ m.toL }}</span></span></sc-if>
+                <div style="background:{{ m.tint }};border-radius:4px 16px 16px 16px;padding:8px 12px 6px;display:flex;flex-direction:column;gap:6px">
+                  <sc-if value="{{ m.txt }}" hint-placeholder-val="{{ false }}"><span style="font-size:14px;line-height:1.45;text-wrap:pretty">{{ m.text }}</span></sc-if>
+                  <sc-if value="{{ m.hand }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column;gap:5px"><span style="font-family:var(--mono);font-size:10.5px;letter-spacing:.4px;color:var(--ink2)">HAND-OVER · {{ m.hT }}</span><span style="font-size:14px;line-height:1.45;text-wrap:pretty">{{ m.hN }}</span><span style="align-self:flex-start;height:28px;padding:0 10px;border-radius:8px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600">{{ iFileS }}{{ m.hF }}</span></div></sc-if>
+                  <sc-if value="{{ m.ask }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:10.5px;letter-spacing:.4px;color:var(--amberInk)">NEEDS YOUR YES</span><span style="font-size:14px;line-height:1.45;font-weight:600">{{ m.text }}</span></div></sc-if>
+                  <span style="align-self:flex-end;font-family:var(--mono);font-size:10.5px;color:var(--ink3)">{{ m.t }}</span>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ m.right }}" hint-placeholder-val="{{ false }}">
+            <div style="align-self:flex-end;max-width:82%;display:flex;flex-direction:column;align-items:flex-end;gap:3px;margin-top:{{ m.mt }}">
+              <sc-if value="{{ m.showName }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;font-weight:700;display:flex;gap:6px">You<span style="font-weight:500;color:var(--ink3)">{{ m.toL }}</span></span></sc-if>
+              <div style="background:var(--meBubble);color:var(--onMe);border-radius:16px 4px 16px 16px;padding:8px 12px 6px;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;line-height:1.45;text-wrap:pretty">{{ m.text }}</span><span style="align-self:flex-end;font-family:var(--mono);font-size:10.5px">{{ m.t }} · seen</span></div>
+            </div>
+          </sc-if>
+        </sc-for>
+      </div>
+    </div>
+    <div style="flex:none;padding:10px 12px;border-top:1px solid var(--line);display:flex;align-items:center;gap:8px">
+      <span role="button" style="height:44px;padding:0 10px;border-radius:12px;background:var(--sunk);display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:700;white-space:nowrap;flex:none">To {{ toName }}{{ iChevD }}</span>
+      <span style="flex:1;min-width:0;height:44px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;padding:0 12px;color:var(--ink3);font-size:14px;white-space:nowrap;overflow:hidden">{{ msgPh }}</span>
+      <span role="button" aria-label="Send" style="width:44px;height:44px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;flex:none">{{ iSend }}</span>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pHover }}" hint-placeholder-val="{{ false }}">
+  <div style="width:280px;box-sizing:border-box;background:var(--card);border:1px solid var(--line2);border-radius:18px;box-shadow:var(--sh2);padding:14px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="width:44px;height:44px;border-radius:13px;background:var(--sunk);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none"><dc-import name="Tilo W Sprite" col="{{ ag.col }}" kind="{{ ag.kind }}" scale="{{ 1 }}" hint-size="32px,40px"></dc-import></span>
+      <span style="flex:1;display:flex;flex-direction:column;line-height:1.3;min-width:0"><span style="font-weight:700;font-size:15px">{{ ag.n }}</span><span style="font-size:12.5px;color:var(--ink3)">{{ ag.role }}</span></span>
+      <span style="height:26px;padding:0 9px;border-radius:99px;border:1px solid var(--line);display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--ink2)"><span style="width:10px;height:10px;border-radius:99px;background:{{ ag.col }}"></span>{{ ag.cname }}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 14px;font-size:13px;align-items:center">
+      <span style="color:var(--ink3)">Step</span><span style="font-weight:600">{{ ag.step }}</span>
+      <span style="color:var(--ink3)">Status</span><span style="display:flex"><span style="height:22px;padding:0 8px;border-radius:99px;background:{{ ag.cbg }};color:{{ ag.cfg }};border:1px {{ ag.cbs }} {{ ag.cbd }};box-sizing:border-box;font-size:11px;font-weight:700;display:flex;align-items:center">{{ ag.ct }}</span></span>
+      <span style="color:var(--ink3)">Units done</span><span style="font-weight:600">{{ ag.units }}</span>
+      <span style="color:var(--ink3)">Credits</span><span style="font-weight:600">{{ ag.cr }}</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ ag.tools }}" as="t" hint-placeholder-count="2"><span style="height:24px;padding:0 9px;border-radius:99px;background:var(--sunk);font-size:12px;font-weight:600;display:flex;align-items:center">{{ t.t }}</span></sc-for></div>
+    <span style="font-size:12px;color:var(--ink3)">Click to open {{ ag.n }}</span>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pPanel }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span role="button" aria-label="Back" onClick="{{ close }}" style="width:40px;height:40px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none">{{ iBack }}</span>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">AGENT · {{ ag.ct }}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <span style="width:68px;height:68px;border-radius:20px;background:var(--sunk);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none"><dc-import name="Tilo W Sprite" col="{{ ag.col }}" kind="{{ ag.kind }}" scale="{{ 1.5 }}" hint-size="48px,60px"></dc-import></span>
+      <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-weight:700;font-size:24px;letter-spacing:-.6px;line-height:1.1">{{ ag.n }}</span><span style="font-size:13.5px;color:var(--ink2)">{{ ag.role }} · {{ ag.job }}</span><span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink3);margin-top:3px"><span style="width:10px;height:10px;border-radius:99px;background:{{ ag.col }}"></span>{{ ag.cname }} on the map, in chat and on cards</span></span>
+    </div>
+    <div style="padding:12px 14px;border-radius:14px;background:var(--sunk);display:flex;flex-direction:column;gap:2px"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">NOW</span><span style="font-size:14.5px;line-height:1.45">{{ ag.now }}</span></div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+      <sc-for list="{{ ag.stats }}" as="x" hint-placeholder-count="3"><div style="border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:11.5px;color:var(--ink3)">{{ x.k }}</span><span style="font-size:14px;font-weight:700;line-height:1.3">{{ x.v }}</span></div></sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">WHAT {{ ag.nU }} DID</span>
+      <sc-for list="{{ ag.did }}" as="d" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:40px minmax(0,1fr);gap:10px;font-size:13.5px;line-height:1.45"><span style="font-family:var(--mono);font-size:11.5px;color:var(--ink3);padding-top:1px">{{ d.t }}</span><span>{{ d.s }}</span></div></sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">MEMORY</span>
+      <div style="border:1px solid var(--line);border-radius:14px;overflow:hidden">
+        <sc-for list="{{ ag.mem }}" as="m" hint-placeholder-count="2"><div style="display:flex;gap:10px;padding:10px 12px;border-top:1px solid {{ m.bt }};align-items:flex-start"><span style="color:var(--ink2);padding-top:1px">{{ iMem }}</span><span style="display:flex;flex-direction:column;line-height:1.35"><span style="font-size:13.5px">{{ m.t }}</span><span style="font-size:11.5px;color:var(--ink3)">{{ m.k }}</span></span></div></sc-for>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">TOOLS USED</span><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ ag.tools }}" as="t" hint-placeholder-count="2"><span style="height:28px;padding:0 10px;border-radius:99px;background:var(--sunk);font-size:12.5px;font-weight:600;display:flex;align-items:center">{{ t.t }}</span></sc-for></div></div>
+    <div style="display:flex;gap:8px">
+      <span role="button" onClick="{{ talk }}" style="flex:1;height:44px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:14px;cursor:pointer">{{ iChat }}Talk to {{ ag.n }}</span>
+      <span role="button" onClick="{{ follow }}" style="height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;cursor:pointer">{{ iFollow }}Follow on map</span>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pConvene }}" hint-placeholder-val="{{ false }}">
+  <div role="dialog" aria-label="Convene team" style="background:var(--card);border-radius:22px;border:1px solid var(--line2);box-shadow:var(--sh3);padding:20px;display:flex;flex-direction:column;gap:16px;animation:wChatIn .22s cubic-bezier(.2,.8,.2,1) both">
+    <div style="display:flex;align-items:flex-start;gap:10px"><span style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font-weight:700;font-size:20px;letter-spacing:-.4px">Convene team</span><span style="font-size:13.5px;color:var(--ink2);text-wrap:pretty">The agents you pick stop where they are and walk to the Meeting Hall to hear you out.</span></span><span role="button" aria-label="Close" onClick="{{ close }}" style="width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--ink2);cursor:pointer;flex:none">{{ iX }}</span></div>
+    <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px;padding-bottom:4px">WHO JOINS</span>
+      <sc-for list="{{ cv }}" as="c" hint-placeholder-count="6">
+        <div role="checkbox" aria-checked="{{ c.on }}" onClick="{{ c.toggle }}" style="min-height:48px;display:flex;align-items:center;gap:12px;padding:0 10px;border-radius:12px;background:{{ c.bg }};cursor:pointer">
+          <span style="width:28px;height:28px;border-radius:9px;background:{{ c.col }};display:flex;align-items:center;justify-content:center;flex:none"><span style="width:18px;height:10px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:4px"><span style="width:3px;height:4px;border-radius:2px;background:#1F1D2B"></span><span style="width:3px;height:4px;border-radius:2px;background:#1F1D2B"></span></span></span>
+          <span style="flex:1;display:flex;flex-direction:column;line-height:1.25"><span style="font-size:14px;font-weight:600">{{ c.n }}</span><span style="font-size:12px;color:var(--ink3)">{{ c.role }}</span></span>
+          <sc-if value="{{ c.lock }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--ink3)">Always joins</span></sc-if>
+          <span style="width:22px;height:22px;border-radius:7px;box-sizing:border-box;border:1.5px solid {{ c.bd }};background:{{ c.cb }};color:var(--card);display:flex;align-items:center;justify-content:center">{{ c.ck }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">WHAT SHOULD CHANGE?</span><div style="min-height:72px;box-sizing:border-box;border-radius:14px;border:1px solid var(--line2);padding:12px;font-size:14px;line-height:1.5">Swap the Saturday workshop for a boat trip on the Douro. Same budget.</div></div>
+    <div style="display:flex;gap:8px"><span role="button" onClick="{{ call }}" style="flex:1;height:44px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:14px;cursor:pointer">{{ iPeople }}Call meeting · {{ cvN }} agents</span><span role="button" onClick="{{ close }}" style="height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600;font-size:14px;cursor:pointer">Cancel</span></div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ pMore }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;gap:10px"><span style="display:flex;flex-direction:column;line-height:1.3;flex:1"><span style="font-weight:700;font-size:17px">More</span><span style="font-size:12.5px;color:var(--ink3)">Things that can wait until the run is done</span></span><span role="button" aria-label="Close" onClick="{{ close }}" style="width:40px;height:40px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer">{{ iX }}</span></div>
+    <div style="border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px">
+      <span style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">{{ iSparkleS }}SKILL PROPOSAL</span>
+      <span style="font-size:15.5px;font-weight:700;line-height:1.35">{{ more.skill.t }}</span>
+      <span style="font-size:13.5px;color:var(--ink2);line-height:1.45;text-wrap:pretty">{{ more.skill.d }}</span>
+      <div style="display:flex;gap:8px"><span role="button" style="height:44px;padding:0 16px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;font-weight:700;font-size:14px">Save as skill</span><span role="button" style="height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600;font-size:14px">Not now</span></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">TEAM WORK ITEMS</span>
+      <div style="border:1px solid var(--line);border-radius:18px;overflow:hidden">
+        <sc-for list="{{ more.items }}" as="it" hint-placeholder-count="3"><div style="min-height:54px;display:flex;align-items:center;gap:12px;padding:0 14px;border-top:1px solid {{ it.bt }}"><span style="width:20px;height:20px;border-radius:99px;box-sizing:border-box;border:1.5px solid {{ it.cbd }};background:{{ it.cbg }};color:#0B0B0C;display:flex;align-items:center;justify-content:center;flex:none">{{ it.ck }}</span><span style="flex:1;display:flex;flex-direction:column;line-height:1.3"><span style="font-size:14px;font-weight:600">{{ it.t }}</span><span style="font-size:12px;color:var(--ink3)">{{ it.who }}</span></span><span style="height:22px;padding:0 8px;border-radius:99px;background:var(--sunk);font-size:11px;font-weight:700;display:flex;align-items:center;color:var(--ink2)">{{ it.st }}</span></div></sc-for>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">ADD A WORK ITEM</span><div style="display:flex;gap:8px"><span style="flex:1;height:44px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;padding:0 12px;color:var(--ink3);font-size:14px">What needs doing, and who?</span><span role="button" style="height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px">{{ iPlus }}Add</span></div></div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ emptyRes }}" hint-placeholder-val="{{ false }}">
+  <div style="border:1px dashed var(--line2);border-radius:18px;padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center"><span style="width:44px;height:44px;border-radius:14px;background:var(--sunk);display:flex;align-items:center;justify-content:center;color:var(--ink2)">{{ iParcel }}</span><span style="font-weight:700;font-size:15px">Nothing delivered yet</span><span style="font-size:13.5px;color:var(--ink2);max-width:300px">Finished work lands at the Delivery Dock and opens here.</span></div>
+</sc-if>
+
+<sc-if value="{{ showDel }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;align-items:center;gap:10px;animation:tSlideR .42s cubic-bezier(.2,.8,.2,1) both">
+    <span style="width:36px;height:36px;border-radius:11px;background:var(--lime);color:#0B0B0C;display:flex;align-items:center;justify-content:center;flex:none">{{ iParcel }}</span>
+    <span style="flex:1;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:14px">Delivered to the Dock</span><span style="font-family:var(--mono);font-size:11.5px;color:var(--ink3)">artifact.delivered · 4:16 pm · 5 pieces</span></span>
+  </div>
+</sc-if>
+
+<sc-if value="{{ showMain }}" hint-placeholder-val="{{ false }}">
+  <div style="border:1px solid var(--line2);border-radius:20px;background:var(--card);overflow:hidden;animation:tSlideR .42s cubic-bezier(.2,.8,.2,1) .06s both">
+    <div style="height:196px;background:var(--sunk);display:flex;align-items:flex-end;justify-content:center;gap:12px;overflow:hidden">
+      <div style="width:132px;height:172px;background:#FFFFFF;border-radius:6px 6px 0 0;box-shadow:0 10px 24px -14px rgba(0,0,0,.35);padding:14px 12px;box-sizing:border-box;display:flex;flex-direction:column;gap:5px;color:#0B0B0C">
+        <span style="font-family:var(--mono);font-size:6px;letter-spacing:.4px;color:#6B6B70">TEAM RAO · OFFSITE PLAN</span>
+        <span style="font-weight:700;font-size:12px;line-height:1.1;letter-spacing:-.3px">Porto, 14–16 May</span>
+        <span style="height:3px;width:38px;background:#C8F23A;border-radius:2px"></span>
+        <span style="height:3px;border-radius:2px;background:#E6E6E2;width:100%;margin-top:4px"></span><span style="height:3px;border-radius:2px;background:#E6E6E2;width:92%"></span><span style="height:3px;border-radius:2px;background:#E6E6E2;width:80%"></span>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:6px"><span style="height:14px;border-radius:2px;background:#EEEEEB"></span><span style="height:14px;border-radius:2px;background:#EEEEEB"></span><span style="height:14px;border-radius:2px;background:#EEEEEB"></span><span style="height:14px;border-radius:2px;background:#EEEEEB"></span></div>
+        <span style="height:3px;border-radius:2px;background:#E6E6E2;width:96%;margin-top:4px"></span><span style="height:3px;border-radius:2px;background:#E6E6E2;width:70%"></span>
+      </div>
+      <div style="width:116px;height:150px;background:#FFFFFF;border-radius:6px 6px 0 0;box-shadow:0 10px 24px -14px rgba(0,0,0,.35);padding:12px 10px;box-sizing:border-box;display:flex;flex-direction:column;gap:5px;color:#0B0B0C">
+        <span style="font-weight:700;font-size:8px">Agenda</span>
+        <span style="display:flex;gap:4px;align-items:center"><span style="font-family:var(--mono);font-size:5.5px;color:#6B6B70;width:16px">THU</span><span style="height:3px;flex:1;border-radius:2px;background:#E6E6E2"></span></span>
+        <span style="display:flex;gap:4px;align-items:center"><span style="font-family:var(--mono);font-size:5.5px;color:#6B6B70;width:16px">FRI</span><span style="height:3px;flex:1;border-radius:2px;background:#E6E6E2"></span></span>
+        <span style="display:flex;gap:4px;align-items:center"><span style="font-family:var(--mono);font-size:5.5px;color:#6B6B70;width:16px">SAT</span><span style="height:3px;flex:1;border-radius:2px;background:#E6E6E2"></span></span>
+        <span style="height:30px;border-radius:3px;background:#EEEEEB;margin-top:4px"></span>
+        <span style="height:3px;border-radius:2px;background:#E6E6E2;width:90%"></span><span style="height:3px;border-radius:2px;background:#E6E6E2;width:64%"></span>
+      </div>
+    </div>
+    <div style="padding:16px 18px 18px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px"><span style="height:22px;padding:0 7px;border-radius:6px;background:var(--redSoft);color:var(--redInk);font-family:var(--mono);font-size:11px;font-weight:600;display:flex;align-items:center">PDF</span><span style="font-size:12.5px;color:var(--ink3)">{{ main.meta }} · made in Tilo by {{ main.who }}</span></div>
+      <span style="font-weight:700;font-size:22px;letter-spacing:-.6px;line-height:1.15">{{ main.title }}</span>
+      <span style="font-size:14px;color:var(--ink2);line-height:1.5;text-wrap:pretty">{{ main.summary }}</span>
+      <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:8px;margin-top:4px">
+        <span role="button" style="height:44px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:14px">{{ iEye }}Open</span>
+        <span role="button" style="height:44px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:14px">{{ iDownload }}Download</span>
+        <span role="button" style="height:44px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;gap:6px;font-weight:600;font-size:14px">{{ iLink }}Share</span>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ showAlso }}" hint-placeholder-val="{{ false }}"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px;padding-top:6px">ALSO DELIVERED</span></sc-if>
+
+<sc-if value="{{ showSheet }}" hint-placeholder-val="{{ false }}">
+  <div style="border:1px solid var(--line);border-radius:18px;background:var(--card);overflow:hidden;animation:tSlideR .42s cubic-bezier(.2,.8,.2,1) .1s both">
+    <div style="padding:14px 14px 12px 16px;display:flex;align-items:center;gap:10px"><span style="height:22px;padding:0 7px;border-radius:6px;background:var(--mintSoft);color:var(--mintInk);font-family:var(--mono);font-size:11px;font-weight:600;display:flex;align-items:center">XLSX</span><span style="flex:1;display:flex;flex-direction:column;line-height:1.3;min-width:0"><span style="font-weight:700;font-size:14.5px">{{ sheet.title }}</span><span style="font-size:12px;color:var(--ink3)">{{ sheet.meta }} · made in Tilo by {{ sheet.who }}</span></span><span role="button" aria-label="Download budget" style="width:40px;height:40px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:center">{{ iDownload }}</span></div>
+    <div style="margin:0 16px 16px;border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:12.5px">
+      <div style="display:grid;grid-template-columns:24px minmax(0,1.5fr) minmax(0,1.2fr) 72px;background:var(--sunk);color:var(--ink3);font-family:var(--mono);font-size:10px;letter-spacing:.3px;white-space:nowrap"><span style="padding:6px 0;text-align:center">1</span><span style="padding:6px 8px">A · ITEM</span><span style="padding:6px 8px">B · DETAIL</span><span style="padding:6px 8px;text-align:right">C · COST</span></div>
+      <sc-for list="{{ sheet.rows }}" as="r" hint-placeholder-count="5"><div style="display:grid;grid-template-columns:24px minmax(0,1.5fr) minmax(0,1.2fr) 72px;border-top:1px solid var(--line)"><span style="padding:7px 0;text-align:center;font-family:var(--mono);font-size:10px;color:var(--ink3);background:var(--sunk)">{{ r.n }}</span><span style="padding:7px 8px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.a }}</span><span style="padding:7px 8px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.b }}</span><span style="padding:7px 8px;text-align:right;font-family:var(--mono)">{{ r.c }}</span></div></sc-for>
+      <div style="display:grid;grid-template-columns:24px minmax(0,1fr) 80px;border-top:1.5px solid var(--ink);font-weight:700"><span style="padding:8px 0;text-align:center;font-family:var(--mono);font-size:10px;color:var(--ink3);background:var(--sunk)">7</span><span style="padding:8px">Total · €1,720 under the €16,000 cap</span><span style="padding:8px;text-align:right;font-family:var(--mono)">{{ sheet.total }}</span></div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ showSlides }}" hint-placeholder-val="{{ false }}">
+  <div style="border:1px solid var(--line);border-radius:18px;background:var(--card);overflow:hidden;animation:tSlideR .42s cubic-bezier(.2,.8,.2,1) .14s both">
+    <div style="padding:14px 14px 12px 16px;display:flex;align-items:center;gap:10px"><span style="height:22px;padding:0 7px;border-radius:6px;background:var(--amberSoft);color:var(--amberInk);font-family:var(--mono);font-size:11px;font-weight:600;display:flex;align-items:center">SLIDES</span><span style="flex:1;display:flex;flex-direction:column;line-height:1.3;min-width:0"><span style="font-weight:700;font-size:14.5px">{{ slides.title }}</span><span style="font-size:12px;color:var(--ink3)">{{ slides.meta }} · made in Canva by {{ slides.who }}</span></span><span role="button" style="height:40px;padding:0 12px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600;font-size:13px">Open in Canva</span></div>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) 40px;gap:6px;padding:0 16px 16px">
+      <sc-for list="{{ slides.th }}" as="s" hint-placeholder-count="4"><div style="aspect-ratio:16/9;border-radius:7px;background:{{ s.bg }};color:{{ s.fg }};border:1px solid var(--line);box-sizing:border-box;padding:6px 7px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-width:0"><span style="font-family:var(--mono);font-size:6.5px">{{ s.n }}</span><span style="font-weight:700;font-size:9px;line-height:1.15">{{ s.t }}</span></div></sc-for>
+      <div style="border-radius:7px;background:var(--sunk);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--ink2)">+4</div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ showWeb }}" hint-placeholder-val="{{ false }}">
+  <div style="border:1px solid var(--line);border-radius:18px;background:var(--card);overflow:hidden;animation:tSlideR .42s cubic-bezier(.2,.8,.2,1) .18s both">
+    <div style="padding:14px 14px 12px 16px;display:flex;align-items:center;gap:10px"><span style="height:22px;padding:0 7px;border-radius:6px;background:var(--skySoft);color:var(--skyInk);font-family:var(--mono);font-size:11px;font-weight:600;display:flex;align-items:center">WEB</span><span style="flex:1;display:flex;flex-direction:column;line-height:1.3;min-width:0"><span style="font-weight:700;font-size:14.5px">{{ web.title }}</span><span style="font-size:12px;color:var(--ink3)">{{ web.meta }} · made in Lovable by {{ web.who }}</span></span></div>
+    <div style="margin:0 16px 12px;border:1px solid var(--line2);border-radius:12px;overflow:hidden">
+      <div style="height:30px;background:var(--sunk);display:flex;align-items:center;gap:5px;padding:0 10px;border-bottom:1px solid var(--line)"><span style="width:8px;height:8px;border-radius:99px;background:#E5484D"></span><span style="width:8px;height:8px;border-radius:99px;background:#F5A524"></span><span style="width:8px;height:8px;border-radius:99px;background:#34C47C"></span><span style="flex:1;min-width:0;margin-left:6px;height:20px;padding:0 8px;border-radius:6px;background:var(--card);font-family:var(--mono);font-size:10.5px;color:var(--ink2);display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden">{{ web.url }}</span></div>
+      <div style="background:#F3EFE6;color:#1D1A16;padding:16px 16px 14px;display:flex;flex-direction:column;gap:7px">
+        <span style="font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;color:#5E574D">TEAM RAO · 14–16 MAY</span>
+        <span style="font-weight:700;font-size:22px;letter-spacing:-.6px;line-height:1.05">Porto by the river</span>
+        <span style="font-size:12px;color:#4A443C">Three days, twelve people, one free morning.</span>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:4px"><sc-for list="{{ web.days }}" as="d" hint-placeholder-count="3"><div style="background:#FFFFFF;border-radius:8px;padding:7px 8px;display:flex;flex-direction:column;gap:1px"><span style="font-family:var(--mono);font-size:9px;color:#5E574D">{{ d.d }}</span><span style="font-size:11.5px;font-weight:600;line-height:1.25">{{ d.t }}</span></div></sc-for></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;padding:0 16px 16px"><span role="button" style="flex:1;height:44px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:14px">{{ iGlobe }}Open site</span><span role="button" style="height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;gap:6px;font-weight:600;font-size:14px">{{ iCopy }}Copy link</span></div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ showText }}" hint-placeholder-val="{{ false }}">
+  <div style="border:1px solid var(--line);border-radius:18px;background:var(--card);overflow:hidden;animation:tSlideR .42s cubic-bezier(.2,.8,.2,1) .22s both">
+    <div style="padding:14px 14px 12px 16px;display:flex;align-items:center;gap:10px"><span style="height:22px;padding:0 7px;border-radius:6px;background:var(--sunk);color:var(--ink2);font-family:var(--mono);font-size:11px;font-weight:600;display:flex;align-items:center">MD</span><span style="flex:1;display:flex;flex-direction:column;line-height:1.3;min-width:0"><span style="font-weight:700;font-size:14.5px">{{ text.title }}</span><span style="font-size:12px;color:var(--ink3)">{{ text.meta }} · written by {{ text.who }}</span></span></div>
+    <div style="margin:0 16px 16px;padding:16px 18px;border-radius:12px;background:var(--sunk);display:flex;flex-direction:column;gap:8px;font-size:13.5px;line-height:1.55">
+      <span style="font-size:12.5px;color:var(--ink2)">To: {{ text.to }}</span>
+      <span style="font-size:16px;font-weight:700;letter-spacing:-.2px;line-height:1.3">{{ text.subj }}</span>
+      <p style="margin:0;text-wrap:pretty">{{ text.body }}</p>
+      <ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:2px"><sc-for list="{{ text.list }}" as="l" hint-placeholder-count="3"><li>{{ l.t }}</li></sc-for></ul>
+      <p style="margin:0">{{ text.sign }}</p>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ showFiles }}" hint-placeholder-val="{{ false }}">
+  <div style="border:1px solid var(--line);border-radius:18px;overflow:hidden">
+    <div role="button" aria-expanded="{{ filesAria }}" onClick="{{ toggleFiles }}" style="min-height:56px;display:flex;align-items:center;gap:10px;padding:8px 14px;box-sizing:border-box;cursor:pointer">
+      <span style="color:var(--ink2)">{{ iFile }}</span>
+      <span style="flex:1;display:flex;flex-direction:column;line-height:1.3;min-width:0"><span style="font-size:14px;font-weight:700">Working files · {{ filesN }}</span><span style="font-size:12px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ filesSub }}</span></span>
+      <span style="display:flex;transform:{{ chevR }};transition:transform .2s ease">{{ iChevD }}</span>
+    </div>
+    <sc-if value="{{ filesOpen }}" hint-placeholder-val="{{ false }}">
+      <sc-for list="{{ files }}" as="f" hint-placeholder-count="0"><div style="min-height:44px;display:flex;align-items:center;gap:10px;padding:0 14px;border-top:1px solid var(--line);font-size:13px"><span style="width:9px;height:9px;border-radius:99px;background:{{ f.col }};flex:none"></span><span style="font-family:var(--mono);font-size:12.5px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.n }}</span><span style="font-size:12px;color:var(--ink3);white-space:nowrap">{{ f.who }} · {{ f.sz }}</span></div></sc-for>
+    </sc-if>
+  </div>
+</sc-if>
+
+<sc-if value="{{ showMade }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">WHERE IT WAS MADE</span>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+      <sc-for list="{{ made }}" as="m" hint-placeholder-count="3"><div style="border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0"><span aria-label="{{ m.n }} logo slot" style="width:32px;height:32px;border-radius:10px;border:1px dashed var(--line2);background:var(--sunk);display:flex;align-items:center;justify-content:center;color:var(--ink2)">{{ m.ic }}</span><span style="font-size:14px;font-weight:700">{{ m.n }}</span><span style="font-size:12px;color:var(--ink2);line-height:1.35">{{ m.d }}</span></div></sc-for>
+    </div>
+  </div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:460,&quot;height&quot;:820},&quot;part&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;story&quot;,&quot;trace&quot;,&quot;steps&quot;,&quot;chat&quot;,&quot;hover&quot;,&quot;panel&quot;,&quot;convene&quot;,&quot;approval&quot;,&quot;failure&quot;,&quot;result&quot;,&quot;rMain&quot;,&quot;rSheet&quot;,&quot;rSlides&quot;,&quot;rWeb&quot;,&quot;rText&quot;,&quot;files&quot;,&quot;made&quot;,&quot;more&quot;],&quot;default&quot;:&quot;story&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;planning&quot;,&quot;working&quot;,&quot;working1&quot;,&quot;working2&quot;,&quot;needs&quot;,&quot;done&quot;,&quot;failed&quot;,&quot;meeting&quot;],&quot;default&quot;:&quot;working&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;agent&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;director&quot;,&quot;lead&quot;,&quot;research&quot;,&quot;travel&quot;,&quot;writer&quot;,&quot;designer&quot;,&quot;verifier&quot;],&quot;default&quot;:&quot;research&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;filter&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;all&quot;,&quot;pair:research,lead&quot;,&quot;pair:travel,lead&quot;,&quot;agent:lead&quot;,&quot;me&quot;,&quot;meeting&quot;],&quot;default&quot;:&quot;all&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;header&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;h&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;560px&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;filesOpen&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;max&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:8,&quot;tsType&quot;:&quot;number&quot;},&quot;onClose&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;},&quot;onApprove&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;},&quot;onRetry&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;},&quot;onTalk&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(id: string) =&gt; void&quot;},&quot;onFollow&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(id: string) =&gt; void&quot;},&quot;onConvene&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;},&quot;onCall&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;}}">
+class Component extends DCLogic {
+  state = { trace: null, chatF: null, sel: null, apr: null, files: null };
+  componentDidMount() { this.w = setInterval(() => { if (window.TiloW && window.TiloT) { clearInterval(this.w); this.forceUpdate(); } }, 60); this.scroll(); }
+  componentDidUpdate() { this.scroll(); }
+  componentWillUnmount() { clearInterval(this.w); }
+  scroll() { const el = this.thr && this.thr.current; if (el) el.scrollTop = el.scrollHeight; }
+  renderVals() {
+    const h = React.createElement, W = window.TiloW, T = window.TiloT, ic = (n, s) => T ? T.ic(h, n, s) : null;
+    if (!this.thr) this.thr = React.createRef();
+    const p = this.props, part = p.part ?? 'story', fr = p.state ?? 'working', S = this.state;
+    if (!W) return { rootH: 'auto', thr: this.thr };
+    const AG = W.AG, st = W.status(fr), evs = W.evs(fr), ss = W.stepSt(fr);
+    const CH = { planned: ['Planned', 'transparent', 'var(--ink2)', 'var(--line2)', 'dashed'], waiting: ['Waiting', 'var(--sunk)', 'var(--ink2)', 'transparent', 'solid'], working: ['Working', 'var(--lime)', '#0B0B0C', 'transparent', 'solid'], done: ['Done', 'var(--mintSoft)', 'var(--mintInk)', 'transparent', 'solid'], needs: ['Needs you', 'var(--amber)', '#1A1407', 'transparent', 'solid'], failed: ['Failed', 'var(--redSoft)', 'var(--redInk)', 'transparent', 'solid'], notStarted: ['Not started', 'var(--sunk)', 'var(--ink2)', 'transparent', 'solid'] };
+    const chip = k => { const c = CH[k] || CH.waiting; return { ct: c[0], cbg: c[1], cfg: c[2], cbd: c[3], cbs: c[4] }; };
+    const name = id => id === 'me' ? 'You' : id === 'team' ? 'the team' : id === 'meeting' ? 'Team meeting' : (AG[id] || {}).n;
+    const colOf = id => id === 'me' ? 'var(--ink)' : (AG[id] || {}).col;
+    const tint = c => 'color-mix(in srgb, ' + c + ' 13%, var(--card))';
+    const place = k => k ? ((W.STEPS[k] || W.PLACES[k] || {}).n || '') : '';
+    const live = st !== 'done' && st !== 'failed';
+    const close = () => p.onClose && p.onClose();
+
+    const traceOn = part === 'trace' || (part === 'story' && S.trace === true);
+    const sAll = evs.filter(e => e[5]), N = p.max ?? 8;
+    const story = sAll.slice(-N).map((e, j, a) => { const last = live && j === a.length - 1; return { t: e[0], text: e[5], me: e[2] === 'me', ag: e[2] !== 'me', col: colOf(e[2]), where: place(e[4]), now: last, bg: last ? 'var(--sunk)' : 'transparent' }; });
+    const views = [['plain', 'Plain'], ['trace', 'Trace']].map(([k, t]) => { const on = (k === 'trace') === traceOn; return { t, on: on ? 'true' : 'false', bg: on ? 'var(--card)' : 'transparent', fg: on ? 'var(--ink)' : 'var(--ink2)', pick: () => this.setState({ trace: k === 'trace' }) }; });
+    const trace = evs.slice().reverse().map(e => ({ t: e[0], ev: e[1], d: e[6], cr: e[7] ? String(e[7]) : '·' }));
+
+    const A0 = AG[W.APR.by];
+    const nDone = W.SO.filter(k => ss[k] === 'done').length;
+    const tOf = (k, names) => { const e = evs.filter(x => x[4] === k && names.indexOf(x[1]) >= 0).pop(); return e ? e[0] : ''; };
+    const SI = { planned: 'clock', waiting: 'clock', working: 'bolt', done: 'check', needs: 'hand', failed: 'alert', notStarted: 'minus' };
+    const steps = W.SO.map((k, i) => {
+      const s = W.STEPS[k], a = AG[s.by], x = ss[k], c = chip(x), hot = x === 'working' || x === 'needs';
+      const tm = x === 'done' ? 'done ' + tOf(k, ['building.completed', 'artifact.created', 'artifact.reviewed', 'world.planned']) : hot ? 'since ' + (tOf(k, ['building.constructing', 'agent.spawned']) || '3:54') : x === 'failed' ? 'stopped 4:02' : '';
+      return { n: String(i + 1), name: s.n, who: a.n, col: a.col, out: s.makes, chip: c.ct, cbg: c.cbg, cfg: c.cfg, cbd: c.cbd, cbs: c.cbs, ic: ic(SI[x], 16), ibg: x === 'done' ? 'var(--mintSoft)' : x === 'working' ? 'var(--lime)' : x === 'needs' ? 'var(--amber)' : x === 'failed' ? 'var(--redSoft)' : 'var(--sunk)', ifg: x === 'done' ? 'var(--mintInk)' : x === 'failed' ? 'var(--redInk)' : hot ? '#0B0B0C' : 'var(--ink2)', time: tm, bg: hot ? 'var(--sunk)' : 'transparent' };
+    });
+
+    const cut = fr === 'failed' ? 7 : (W.CUT[fr] ?? 10), meet = fr === 'meeting';
+    let src = W.CHAT.filter(m => m.at <= cut); if (meet) src = src.concat(W.MEET);
+    const f = S.chatF ?? p.filter ?? (meet ? 'meeting' : 'all');
+    let filt = src;
+    if (f === 'meeting') filt = W.MEET;
+    else if (f === 'me') filt = src.filter(m => m.sys || m.from === 'me' || m.to === 'me' || m.to === 'meeting');
+    else if (f.indexOf('pair:') === 0) { const pr = f.slice(5).split(','); filt = src.filter(m => !m.sys && pr.indexOf(m.from) >= 0 && pr.indexOf(m.to) >= 0); }
+    else if (f.indexOf('agent:') === 0) { const a = f.slice(6); filt = src.filter(m => m.from === a || m.to === a); }
+    let prev = null;
+    const msgs = filt.map(m => {
+      if (m.sys) { prev = null; return { sys: true, left: false, right: false, text: m.sys }; }
+      const me = m.from === 'me', first = prev !== m.from; prev = m.from;
+      const toL = m.to === 'meeting' ? '' : m.to === 'me' ? 'to you' : 'to ' + name(m.to);
+      return { sys: false, left: !me, right: me, showName: first, name: name(m.from), toL, col: colOf(m.from), tint: m.ask ? 'var(--amberSoft)' : tint(colOf(m.from)), avOp: first ? '1' : '0', mt: first ? '8px' : '0px', txt: !!m.text && !m.ask, text: m.text || m.ask || '', hand: !!m.hand, hT: m.hand ? m.hand.title.toUpperCase() : '', hN: m.hand ? m.hand.note : '', hF: m.hand ? m.hand.file : '', ask: !!m.ask, t: m.t };
+    });
+    const FL = [['all', 'All', []], ['pair:research,lead', 'Remy & Kai', ['research', 'lead']], ['pair:travel,lead', 'Juno & Kai', ['travel', 'lead']], ['agent:lead', 'Kai', ['lead']], ['me', 'You', []]];
+    if (meet) FL.splice(1, 0, ['meeting', 'Team meeting', []]);
+    const filters = FL.map(([k, t, d]) => { const on = f === k; return { t, on: on ? 'true' : 'false', bg: on ? 'var(--pri)' : 'var(--card)', fg: on ? 'var(--onPri)' : 'var(--ink)', bd: on ? 'var(--pri)' : 'var(--line2)', dots: d.map(id => ({ col: AG[id].col })), pick: () => this.setState({ chatF: k }) }; });
+    const pairIds = f.indexOf('pair:') === 0 ? f.slice(5).split(',') : null, agId = f.indexOf('agent:') === 0 ? f.slice(6) : null;
+    const chatTitle = f === 'meeting' ? 'Team meeting' : pairIds ? pairIds.map(name).join(' & ') : agId ? name(agId) : f === 'me' ? 'Your messages' : 'Team chat';
+    const chatSub = f === 'meeting' ? 'In the Meeting Hall · 3 agents listening' : pairIds ? 'Their conversation' : agId ? AG[agId].role + ' · everything to and from ' + name(agId) : f === 'me' ? 'Your 1:1s and meetings' : 'What the agents said, in plain words';
+    const headAv = (pairIds || (agId ? [agId] : f === 'meeting' ? ['lead', 'writer', 'designer'] : ['director', 'lead', 'research'])).map(id => ({ col: AG[id].col }));
+    const toName = f === 'meeting' ? 'the meeting' : agId ? name(agId) : pairIds ? name(pairIds[pairIds.length - 1]) : 'Kai';
+    const head = !!p.header;
+
+    const aid = p.agent ?? 'research', A = AG[aid] || AG.research, I = W.INFO[A.id], home = A.home;
+    const myEv = evs.filter(e => e[2] === A.id && e[5]), nowE = myEv[myEv.length - 1], acr = String(W.agentCr(fr, A.id));
+    const ag = Object.assign({}, A, chip(ss[home]), { nU: A.n.toUpperCase(), step: W.STEPS[home].n, units: I.units, cr: acr, tools: I.tools.map(t => ({ t })), now: nowE ? nowE[5] : 'Waiting for ' + W.STEPS[home].n + ' to start.', did: myEv.slice(-5).map(e => ({ t: e[0], s: e[5] })), mem: I.before.map(t => ({ t, k: 'Brought from before' })).concat(I.now.map(t => ({ t, k: 'Learned this run' }))).map((m, i) => Object.assign(m, { bt: i ? 'var(--line)' : 'transparent' })), stats: [{ k: 'Step', v: W.STEPS[home].n }, { k: 'Units done', v: I.units }, { k: 'Credits', v: acr }] });
+    if (!ag.did.length) ag.did = [{ t: '—', s: 'Nothing yet. ' + A.n + ' starts when ' + W.STEPS[home].n + ' opens.' }];
+
+    const sel = S.sel ?? { lead: true, writer: true, designer: true };
+    const cv = W.ORDER.filter(id => id !== 'director').map(id => { const on = id === 'lead' || !!sel[id]; return { n: AG[id].n, role: AG[id].role, col: AG[id].col, lock: id === 'lead', on: on ? 'true' : 'false', bg: on ? 'var(--sunk)' : 'transparent', bd: on ? 'var(--ink)' : 'var(--line2)', cb: on ? 'var(--ink)' : 'transparent', ck: on ? ic('check', 14) : null, toggle: () => { if (id === 'lead') return; this.setState({ sel: Object.assign({}, sel, { [id]: !sel[id] }) }); } }; });
+    const cvN = String(cv.filter(c => c.on === 'true').length);
+
+    const R = W.RES, delivered = st === 'done', full = part === 'result' && delivered;
+    const filesOpen = S.files ?? !!p.filesOpen;
+    const more = { skill: W.MORE.skill, items: W.MORE.items.map(([t, who, s], i) => ({ t, who, st: s, bt: i ? 'var(--line)' : 'transparent', cbd: s === 'Done' ? 'var(--limeD)' : 'var(--line2)', cbg: s === 'Done' ? 'var(--lime)' : 'transparent', ck: s === 'Done' ? ic('check', 12) : null })) };
+
+    return {
+      thr: this.thr, rootH: part === 'chat' ? (p.h ?? '560px') : 'auto',
+      pStory: part === 'story', plainOn: part === 'story' && !traceOn, traceOn, views, story, trace, crTotal: String(W.credits(fr)),
+      storySub: st === 'done' ? sAll.length + ' moments · in order' : st === 'failed' ? 'Up to where it stopped' : 'In order · newest at the bottom',
+      earlier: sAll.length > N ? 'Earlier · ' + (sAll.length - N) + ' more' : '',
+      showApr: part === 'approval' || (part === 'story' && st === 'needs' && !traceOn),
+      apr: Object.assign({}, W.APR, { who: A0.n, col: A0.col }), aprOpen: !S.apr, aprDone: !!S.apr, aprDoneT: S.apr === 'ok' ? 'Approved. Wren is sending it now.' : 'Declined. Nothing was sent.',
+      approve: () => { this.setState({ apr: 'ok' }); if (p.onApprove) setTimeout(() => p.onApprove(), 600); },
+      decline: () => this.setState({ apr: 'no' }),
+      showFail: part === 'failure' || (part === 'story' && st === 'failed' && !traceOn),
+      fail: Object.assign({}, W.FAIL, { done: W.FAIL.done.map(t => ({ t })), notDone: W.FAIL.notDone.map(t => ({ t })) }),
+      retry: () => p.onRetry && p.onRetry(),
+      pSteps: part === 'steps', steps, stepsSub: nDone + ' of 7 done' + (st === 'failed' ? ' · stopped' : ''), stepsPct: Math.round(nDone / 7 * 100) + '%',
+      pChat: part === 'chat', chatH: '100%', chatR: head ? '20px' : '0px', chatBd: head ? '1px solid var(--line2)' : '0', chatSh: head ? 'var(--sh3)' : 'none', chatA: head ? 'wChatIn .22s cubic-bezier(.2,.8,.2,1) both' : 'none',
+      chatHead: head, chatTop: !head, chatTitle, chatSub, headAv, filters, msgs, toName, msgPh: 'Message ' + toName + '…', convene: () => p.onConvene && p.onConvene(), close,
+      pHover: part === 'hover', pPanel: part === 'panel', ag,
+      talk: () => p.onTalk && p.onTalk(A.id), follow: () => p.onFollow && p.onFollow(A.id),
+      pConvene: part === 'convene', cv, cvN, call: () => p.onCall && p.onCall(),
+      pMore: part === 'more', more,
+      emptyRes: part === 'result' && !delivered,
+      showDel: full, showMain: full || part === 'rMain', showAlso: full, showSheet: full || part === 'rSheet', showSlides: full || part === 'rSlides', showWeb: full || part === 'rWeb', showText: full || part === 'rText', showFiles: full || part === 'files', showMade: full || part === 'made',
+      main: Object.assign({}, R.main, { who: AG[R.main.by].n }),
+      sheet: Object.assign({}, R.sheet, { who: AG[R.sheet.by].n, rows: R.sheet.rows.map((r, i) => ({ n: String(i + 2), a: r[0], b: r[1], c: r[2] })) }),
+      slides: Object.assign({}, R.slides, { who: AG[R.slides.by].n, th: R.slides.thumbs.map((t, i) => ({ n: '0' + (i + 1), t, bg: i ? '#FFFFFF' : '#0B0B0C', fg: i ? '#0B0B0C' : '#F4F4F2' })) }),
+      web: Object.assign({}, R.web, { who: AG[R.web.by].n, days: [{ d: 'THU 14', t: 'Arrive, river dinner' }, { d: 'FRI 15', t: 'Workshop day' }, { d: 'SAT 16', t: 'Free morning' }] }),
+      text: Object.assign({}, R.text, { who: AG[R.text.by].n, body: R.text.body[0], list: R.text.list.map(t => ({ t })) }),
+      files: R.files.map(([n, who, sz]) => ({ n, who: AG[who].n, col: AG[who].col, sz })), filesN: String(R.files.length), filesSub: filesOpen ? 'What the agents made along the way' : R.files[0][0] + ', ' + R.files[1][0] + ' and ' + (R.files.length - 2) + ' more',
+      filesOpen, filesAria: filesOpen ? 'true' : 'false', chevR: filesOpen ? 'rotate(180deg)' : 'none', toggleFiles: () => this.setState({ files: !filesOpen }),
+      made: R.made.map(([n, d, i]) => ({ n, d, ic: ic(i, 18) })),
+      iHand: ic('hand', 18), iCheck: ic('check', 16), iCheckS: ic('check', 14), iMinusS: ic('minus', 14), iShield: ic('shield', 18), iAlert: ic('alert', 18), iRefresh: ic('refresh', 18), iPin: ic('pin', 12), iFile: ic('file', 18), iFileS: ic('file', 14), iBack: ic('back', 18), iChat: ic('chat', 18), iFollow: ic('follow', 18), iMem: ic('memory', 16), iPeople: ic('people', 16), iPeopleS: ic('people', 14), iX: ic('x', 18), iSend: ic('send', 18), iChevD: ic('chevD', 16), iPlus: ic('plus', 16), iSparkleS: ic('sparkle', 13), iParcel: ic('parcel', 18), iDownload: ic('download', 16), iLink: ic('link', 16), iEye: ic('eye', 16), iGlobe: ic('globe', 16), iCopy: ic('copy', 16)
+    };
+  }
+}
+</script>
+</body>
+</html>
