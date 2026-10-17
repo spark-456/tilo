@@ -720,6 +720,10 @@ class Router:
                 # priced like a generate() call with no output tokens (BQ-61), with each candidate's tokenizer
                 estimate, _ = self._quote(run, profile_id, provider, "\n\n".join(_embed_inputs(request)), 0)
                 embedding = provider.embed(request)
+                # An embed reports no usage, so the attempt carries the over-counted input (one token per three bytes,
+                # no output) and a meter prices what was sent instead of booking its whole reserve (RT-06).
+                attempt.tokens_in = -(-sum(len(t.encode()) for t in _embed_inputs(request)) // 3)
+                attempt.tokens_out = 0
             if not attempt.error_type:
                 self._spend(run, profile_id, estimate, None)
                 return replace(run, embedding=embedding)

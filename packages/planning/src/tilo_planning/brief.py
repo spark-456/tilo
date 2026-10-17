@@ -258,6 +258,7 @@ def brief_request(
     today: date | None = None,
     source_text: str = "",
     parts: list[MediaPart] | None = None,
+    passages: str = "",
 ) -> GenerateRequest:
     """The Director's brief request as `extract_brief` sends it to the router; `just vertex-probe-schema` replays it
     (PL-02), so the probe cannot drift from the real request. `today` is the date the prompt states as a fact
@@ -284,6 +285,7 @@ def brief_request(
                 "sources": neutralise_marker(source_text, "UPLOADS"),
             },
         )
+    prompt += passages  # RT-04: tilo-api's fenced passage block (empty: the prompt is as it always was)
     return GenerateRequest(
         system=load_prompt(DIRECTOR_ROLE, "brief_system.md", variables),
         prompt=prompt,
@@ -305,6 +307,8 @@ def extract_brief(
     source_text: str = "",
     parts: list[MediaPart] | None = None,
     deadline: Deadline | None = None,
+    passages: str = "",
+    memory_ids: frozenset[str] = frozenset(),
 ) -> ExtractionResult:
     """PRD 16.3 item 1: the task text is passed only as delimited data, after the instructions. An out-of-policy
     category from the Director raises `TaskRefused` carrying the configured text (FR-INT-12), never a brief. Parts
@@ -318,6 +322,7 @@ def extract_brief(
         today=today,
         source_text=source_text,
         parts=parts,
+        passages=passages,
     )
     try:
         # NFR-03: only a caller that sets a limit passes one, so a router without the keyword is untouched
@@ -339,7 +344,7 @@ def extract_brief(
         raise NothingPossible(gaps, gap_config.nothing_possible)
     try:
         ambiguous = list(output["ambiguous_fields"])
-        brief = complete_brief({**output, "sources": vet_sources(output.get("sources"))})
+        brief = complete_brief({**output, "sources": vet_sources(output.get("sources"), memory_ids)})
     except (pydantic.ValidationError, KeyError, TypeError, BriefValidationError) as error:
         raise BriefExtractionError(f"FR-INT-03: the Director's reply is not a valid brief: {error}") from error
     return ExtractionResult(brief, ambiguous, run, gaps, questions=topic_questions(output.get("questions")))
@@ -356,16 +361,19 @@ def _connector_ids() -> frozenset[str]:
         return frozenset()
 
 
-def vet_sources(value: Any) -> list[Any]:
+def vet_sources(value: Any, memory_ids: frozenset[str] = frozenset()) -> list[Any]:
     """The Director's `sources` as code can stand behind them (SIMPLE-RUN-2). A file or memory source is something code
     applies (an upload it screened, a preference it looked up), so a model naming one is inventing it and it is
-    dropped; a url must be http(s); a connector must be one the registry ships. A web source (a search query) is
-    kept. Anything else the schema validates as before."""
+    dropped, except a memory source naming a passage id code itself sent (RT-04); a url must be http(s); a connector
+    must be one the registry ships. A web source (a search query) is kept. Anything else validates as before."""
     if not isinstance(value, list):
         return [] if value is None else value
     kept: list[Any] = []
     for item in value:
         kind, ref = (item.get("kind"), item.get("ref")) if isinstance(item, dict) else (None, None)
+        if kind == "memory" and isinstance(ref, str) and ref in memory_ids:
+            kept.append(item)
+            continue
         if kind in ("file", "memory"):
             continue
         if kind == "url" and not (isinstance(ref, str) and _URL.fullmatch(ref.strip())):

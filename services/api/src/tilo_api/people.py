@@ -18,7 +18,7 @@ from fastapi.routing import APIRoute
 from tilo_memory.artifacts import ArtifactStore
 from tilo_people.stores import PeopleStores
 
-from tilo_api import deps, people_items
+from tilo_api import deps, grounding, people_items
 from tilo_api.meeting_bot import attend_meeting
 from tilo_api.meeting_bot_rpc import MeetingBotRpc, get_meeting_bot_client
 from tilo_api.meeting_brief import read_brief
@@ -192,6 +192,7 @@ def _writer(
 
 @router.post("/v1/meetings/{meeting_id}/confirm")
 def confirm_meeting_route(
+    request: Request,
     meeting_id: str,
     _: Annotated[Empty, Depends(json_body(Empty))],
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
@@ -201,7 +202,9 @@ def confirm_meeting_route(
     """The meeting owner confirms the minutes: the stamp is the owner and the server clock (PE-05, PE-07)."""
     if _MEETING_ID.fullmatch(meeting_id) is None:
         raise _not_found()
-    return _answer(lambda: confirm_minutes(_writer(principal, stores, clock), meeting_id))
+    confirmed = _answer(lambda: confirm_minutes(_writer(principal, stores, clock), meeting_id))
+    grounding.after_minutes(request, meeting_id)  # RT-01: confirmed minutes only, best effort
+    return confirmed
 
 
 @router.get("/v1/meetings")
@@ -383,6 +386,7 @@ def start_meeting_route(
 
 @router.post("/v1/meetings/{meeting_id}/delete")
 def delete_meeting_route(
+    request: Request,
     meeting_id: str,
     _: Annotated[Empty, Depends(json_body(Empty))],
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
@@ -394,7 +398,9 @@ def delete_meeting_route(
     """The meeting owner deletes it and everything made from it (FR-MTG-10); needs the artifact store (503 without)."""
     if _MEETING_ID.fullmatch(meeting_id) is None:
         raise _not_found()
-    return _answer(lambda: remove_meeting(_writer(principal, stores, clock), artifacts, meeting_id, cleanup=cleanup))
+    deleted = _answer(lambda: remove_meeting(_writer(principal, stores, clock), artifacts, meeting_id, cleanup=cleanup))
+    grounding.forget_for(request, "minutes", meeting_id)  # RT-07: the minutes' passages die with the meeting
+    return deleted
 
 
 @router.post("/v1/work-items/{work_item_id}/confirm")
@@ -587,7 +593,7 @@ def create_pin_route(
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
     events: Annotated[WorkEvents, Depends(get_work_events)],
 ) -> dict[str, Any]:
-    return _answer(
+    made = _answer(
         lambda: idempotent(
             request,
             principal,
@@ -596,10 +602,13 @@ def create_pin_route(
             lambda: create_pin(_writer(principal, stores, clock, redact, events), body),
         )
     )
+    grounding.after_pin(request, made["id"])  # RT-01: best effort, off unless TILO_RETRIEVAL=1
+    return made
 
 
 @router.post("/v1/pinboards/{pin_id}/delete")
 def delete_pin_route(
+    request: Request,
     pin_id: str,
     body: Annotated[Empty, Depends(json_body(Empty))],
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
@@ -610,7 +619,9 @@ def delete_pin_route(
 ) -> dict[str, Any]:
     if re.fullmatch(r"pb_[0-9A-Za-z_]{1,48}", pin_id) is None:
         raise _not_found()
-    return _answer(lambda: delete_pin(_writer(principal, stores, clock, events=events), pin_id, owners))
+    removed = _answer(lambda: delete_pin(_writer(principal, stores, clock, events=events), pin_id, owners))
+    grounding.after_pin(request, pin_id)  # RT-07: the removed pin's chunks go with it
+    return removed
 
 
 @router.get("/v1/work-items")

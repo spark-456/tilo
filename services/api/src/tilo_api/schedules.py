@@ -81,6 +81,7 @@ from tilo_api import (
     ephemeral,
     events,
     followup_cleanup,
+    grounding,
     nudge_sweep,
     plate_links,
     runs,
@@ -897,6 +898,7 @@ def tick(
             request, _stamp(clock())
         )  # FR-PA-06b: off unless TILO_PLATE_DIGEST=1; never changes the answer
         brief_routes.sweep(request, _stamp(clock()))  # ADR-0049 MO-03: off unless TILO_MORNING_BRIEF=1; same
+        grounding.sweep_daily(request, _stamp(clock()))  # ADR-0049 RT-07: off unless TILO_RETRIEVAL=1; same
         return answer
     return _run_task(request, raw, schedule_store, seams_factory, clock, flags, store_factory)
 

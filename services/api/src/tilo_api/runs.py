@@ -34,7 +34,7 @@ from tilo_people.stores import PeopleStores
 from tilo_planning.compiler import DELIVER, PlanInputs
 from tilo_providers.diagnostics import failure_context, log_caught
 
-from tilo_api import deps, events, item_documents, side_effect_fields, team_access, team_store
+from tilo_api import deps, events, grounding, item_documents, side_effect_fields, team_access, team_store
 from tilo_api.access import Mode
 from tilo_api.cards import (
     OWNER_ONLY_ACTIONS,
@@ -104,6 +104,7 @@ class Seams:
         [], Any
     ]  # the team's settings (FR-ACC-01; team_store.team_reader): no default, every path passes one
     people: Callable[[], PeopleStores | None] | None = None  # owner time zone for code-stamped deliverable date
+    grounding: Callable[[], Any] | None = None  # RT-01: opens per-account grounding for this run's mode and meter
 
 
 _CLOCK_SEAMS = frozenset({"plan_compiler", "unit_runner"})  # the seams whose prompts state the date
@@ -155,13 +156,18 @@ def run_seams(
     try:
         built = dict(
             zip(
-                [f.name for f in dataclasses.fields(Seams) if f.name not in {"team", "people"}],
+                [f.name for f in dataclasses.fields(Seams) if f.name not in {"team", "people", "grounding"}],
                 map(build, names.split()),
                 strict=True,
             )
         )
         built["artifacts"] = screened_by_run(built["artifacts"], mode, meter)
-        return Seams(**built, team=team_store.team_reader(overrides), people=deps.get_people_provider(request))
+        return Seams(
+            **built,
+            team=team_store.team_reader(overrides),
+            people=deps.get_people_provider(request),
+            grounding=grounding.opener(request, mode=mode, meter=meter),
+        )
     except Exception as exc:
         logger.warning("the run seams are not wired, so no run starts: %s", type(exc).__name__)
         return None
@@ -707,7 +713,32 @@ class Run:
         credits = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))  # the meter (HR-1)
         data = {"credits_used": credits, "deliverable_count": len(self.delivered)}
         cause = self.delivered[-1] if self.delivered else None
+        await self._remember_deliverables()  # before world.completed: nothing is written to a finished world
         self.put("world.completed", self.director, self.world_id, "The work is done.", data, cause=cause)
+
+    async def _remember_deliverables(self) -> None:
+        """RT-01 / RT-09: the run's clean outputs become the owner's own passages (never a team's unless the world is
+        shared with one); one `memory.saved` says how many. Off unless TILO_RETRIEVAL=1; failures never end the run."""
+        if self.seams.grounding is None:
+            return
+        delivered = {
+            e["data"]["artifact"]["artifact_id"]
+            for e in self.store.events.get(self.world_id, [])
+            if e["type"] == "artifact.delivered"
+        }  # only what the run delivered, never a unit's intermediates
+
+        open_grounding = self.seams.grounding
+
+        def index() -> int:
+            opened = open_grounding()
+            return 0 if opened is None else int(opened.index_deliverables(self.world_id, delivered))
+
+        try:
+            if held := await asyncio.to_thread(index):  # embedding calls never block the event loop
+                item = {"layer": "artifact_memory", "item_count": held}
+                self.put("memory.saved", self.director, self.world_id, "Saved to your account memory.", item, vis=[])
+        except Exception as exc:
+            logger.warning("run %s: grounding event not written (%s)", self.run_id, type(exc).__name__)
 
     def _store_card(self, card: dict) -> None:
         """The question card goes to this run's CardStore with its unit's district, before anything

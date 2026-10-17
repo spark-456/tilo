@@ -10,6 +10,7 @@ answer closes intake with 503 before anything is stored or sent to a model.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -45,7 +46,7 @@ from tilo_providers.media import MediaPart
 from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Deadline, Router, RouterDeadlineError
 
-from tilo_api import deps, ephemeral, intake_requests, quick
+from tilo_api import deps, ephemeral, grounding, grounding_prompt, intake_requests, quick
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
 from tilo_api.intake_deadline import INTAKE_DEADLINE_DETAIL, load_intake_deadline
@@ -223,6 +224,7 @@ async def _thinking(
                 skill_context_for(
                     http, principal, getattr(model_router, "raw", model_router)
                 ),  # inside Quick's own hold
+                ground=grounding.enabled() and grounding_prompt.eligible(principal),
             )
         file_screen = None
         if request.files and isinstance(store, RunUploads):
@@ -241,6 +243,12 @@ async def _thinking(
         if prepared.screened and all(error == FILE_SCREEN_UNAVAILABLE for _, error, _, _ in prepared.screened):
             raise HTTPException(status_code=503, detail="The attached files could not be screened; retry.")
         # The Director receives only the stored verdict; failed pre-commit attempts clean their owned versions.
+        passages, memory_ids = "", frozenset[str]()
+        if grounding.enabled() and grounding_prompt.eligible(principal):  # RT-04: the person's own signed-in intake
+            opened = await run_in_threadpool(grounding.opener(http, mode=work_mode, router=model_router))
+            hits = await run_in_threadpool(grounding_prompt.recall, opened, principal.user_id, text)
+            passages = grounding_prompt.render(hits, "director", "brief_passages.md")
+            memory_ids = frozenset(h.id for h in hits)
         try:
             extraction = await run_in_threadpool(
                 extract_brief,
@@ -250,6 +258,8 @@ async def _thinking(
                 source_text=prepared.source_text,
                 parts=prepared.parts,
                 deadline=deadline,
+                passages=passages,
+                memory_ids=memory_ids,
             )
             extraction = replace(extraction, brief=safe_app_brief(extraction.brief, text, prepared.parts))
         except TaskRefused as refused:
@@ -328,6 +338,8 @@ async def _thinking(
         logger.warning("intake persistence failed: %s", type(exc).__name__)
         detail = "Upload storage is unavailable; retry." if request.files else "store_unavailable"
         raise HTTPException(status_code=503, detail=detail) from exc
+    if grounding.enabled():  # RT-01: each clean, readable upload becomes the owner's own passages, after the answer
+        _in_background(_remember_uploads_later(http, principal.user_id, result))
     body = asdict(result)  # per-file text and events stay server-side
     body["files"] = [{k: v for k, v in f.items() if k not in ("text", "events")} for f in body["files"]]
     questions = [
@@ -343,6 +355,33 @@ async def _thinking(
         "gaps": [g.as_dict() for g in task.gaps],
         **({"skill": task.skill} if task.skill is not None else {}),  # SKILL-TAG: the skill the person tagged
     }
+
+
+_BACKGROUND: set[asyncio.Task[None]] = set()
+_REMEMBER_UPLOADS_S = (
+    60.0  # indexing is best effort and never delays an answer; past this it is left for the next change
+)
+
+
+def _in_background(work: Any) -> None:
+    task = asyncio.ensure_future(work)
+    _BACKGROUND.add(task)  # a reference, so the task is not collected before it finishes
+    task.add_done_callback(_BACKGROUND.discard)
+
+
+async def _remember_uploads_later(http: Request, uid: str, result: Any) -> None:
+    try:
+        await asyncio.wait_for(run_in_threadpool(_remember_uploads, http, uid, result), _REMEMBER_UPLOADS_S)
+    except Exception as exc:  # TimeoutError included: the answer has already gone
+        logger.warning("grounding uploads not indexed (%s)", type(exc).__name__)
+
+
+def _remember_uploads(http: Request, uid: str, result: Any) -> None:
+    if (opened := grounding.opener(http)()) is None:
+        return
+    for f in result.files:
+        if f.status == "ok" and not f.safety_flagged:
+            opened.index_upload(uid, result.world_id, f.filename, f.artifact, f.text)
 
 
 async def _abort_uncommitted(store: InMemoryArtifactStore, tasks: deps.Store, ids: tuple[str, str, str]) -> None:
@@ -366,6 +405,8 @@ async def _quick(
     work_mode: deps.Mode,
     scenario: str | None,
     skills: SkillContext,
+    *,
+    ground: bool = False,
 ) -> JSONResponse:
     """COST-FAST-1: nothing is created or stored; the body is the answer or the offer to switch to Thinking. Quick holds
     its own SEC-16 unit around the whole ask, so it gets the Router unmetered (`raw`): one hold, not one per call."""
@@ -376,6 +417,7 @@ async def _quick(
             mode=work_mode,
             caps=deps.caps_for(http), key=http.headers.get("idempotency-key"), ledger=deps.ledger_writer_for(http),
             skills=skills,
+            grounding=(lambda r, b: grounding.opener(http, mode=work_mode, router=r, budget=b)()) if ground else None,
         )  # fmt: skip
     except quick.QuickRefusal as refusal:
         return JSONResponse(status_code=refusal.status, content={"error": refusal.message})
