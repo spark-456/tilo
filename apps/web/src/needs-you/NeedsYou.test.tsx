@@ -111,14 +111,18 @@ describe("FR-HIL-01 S-07: the gate sheet names the exact action, the recipient a
     expect(c.textContent).toContain("Yes, you can undo it afterwards.");
     expect(c.textContent).not.toContain("can't be unsent");
   });
-  it("FR-HIL-01 S-07: gate options are exactly Approve, Edit first, Hold", async () => {
-    expect(labels(await draw(view()))).toEqual(["Approve", "Edit first", "Hold"]);
+  it("test_CX_NEEDS_YOU_polish_names_approve_edit_and_decline_and_keeps_risk_on_one_line", async () => {
+    const c = await draw(view());
+    expect(labels(c)).toEqual(["Approve", "Edit", "Decline"]);
+    expect(c.querySelector('[data-testid="gate-risk"]')?.textContent).toMatch(/^Risk: T3\b/);
   });
   it("shows the stricter of the card's and the request's tier and irreversibility", async () => {
     const c = await draw(
       view(GATE_SAVE, [saveRequest(1, { risk_tier: "T3", irreversible: true })]),
     );
-    expect(c.textContent).toContain("T3: a person always decides this.");
+    expect(c.querySelector('[data-testid="gate-risk"]')?.textContent).toContain(
+      "Risk: T3 · A person always decides this.",
+    );
     expect(c.textContent).toContain("Once done, it can't be undone.");
   });
 });
@@ -195,10 +199,10 @@ describe("FR-WLD-09 HR-7: a policy-opened gate shows the policy stamp and colour
     expect(sheet(c)?.getAttribute("data-opened-by")).toBe("team_lead");
     expect(c.textContent).toContain("A Team Lead approved this");
   });
-  it("keeps a gate shut for Hold and Edit first", async () => {
+  it("keeps a gate shut for Decline and Edit", async () => {
     const c = await draw(view(GATE_REPLY, [requested(1), resolved(2, "hold")]));
     expect(sheet(c)?.getAttribute("data-opened-by")).toBe("none");
-    expect(c.textContent).toContain("Kept closed. You chose Hold");
+    expect(c.textContent).toContain("Kept closed. You chose Decline");
   });
   it("shows a gate as waiting when the answer carries the wrong authz", async () => {
     const byPolicy = {
@@ -243,6 +247,7 @@ describe("FR-WLD-09 HR-1: after Approve, the gate is not shown opened until appr
     expect(sheet(c)?.getAttribute("data-gate-state")).toBe("decided");
     expect(sheet(c)?.getAttribute("data-opened-by")).toBe("person");
     expect(c.textContent).toContain("Opened. You approved this");
+    expect(c.textContent).toContain("Tilo is continuing with the next step.");
     expect(c.textContent).not.toContain("Waiting for confirmation");
   });
 
@@ -259,7 +264,7 @@ describe("FR-WLD-09 HR-1: after Approve, the gate is not shown opened until appr
     expect(c.textContent).not.toContain("Waiting for confirmation…");
   });
 
-  it("FR-HIL-01 HR-1: after Edit first and a redraft, the new request can be answered again", async () => {
+  it("FR-HIL-01 HR-1: after Edit and a redraft, the new request can be answered again", async () => {
     const { sent, push, c } = await sheetPage([GATE_REPLY, { ...GATE_REPLY, id: SECOND }]);
     await push(requested(1));
     await choose(c, "edit");
@@ -268,7 +273,7 @@ describe("FR-WLD-09 HR-1: after Approve, the gate is not shown opened until appr
     expect(c.textContent).toContain("Waiting for confirmation…");
 
     await push(resolved(2, "edit"));
-    expect(c.textContent).toContain("Kept closed. You chose Edit first");
+    expect(c.textContent).toContain("Kept closed. You chose Edit");
 
     await push(requested(3, SECOND)); // the redraft: a new proposal with a new card
     expect(sheet(c)?.getAttribute("data-gate-state")).toBe("waiting");

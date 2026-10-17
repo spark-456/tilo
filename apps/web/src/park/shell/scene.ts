@@ -5,6 +5,7 @@
 // matter how often the shell mounts.
 import type { ReactNode } from "react";
 import { type Pin, SCENE_H, SCENE_W } from "../app/pins";
+import { sceneReady } from "../engines/park";
 import type { Spot } from "../engines/types";
 import type { CityMotion } from "./cityMotion";
 import { parkKit } from "./kit";
@@ -65,7 +66,7 @@ export function backdropScene(time: "day" | "night", motion: CityMotion): Backdr
   const scene = {
     el: drawn.el as ReactNode,
     pins: pickPins(drawn.spots),
-    ready: drawn.ready?.catch(() => undefined) ?? Promise.resolve(),
+    ready: sceneReady(drawn).catch(() => undefined),
   };
   cache.set(key, scene);
   return scene;

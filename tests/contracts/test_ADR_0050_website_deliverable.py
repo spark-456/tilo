@@ -141,3 +141,15 @@ def test_FR_AGT_16_rules_files_hold_every_rule_id(repo_root):
     assert "| AR-10 |" in texts["artifact"]
     assert "sandbox allow-scripts" in texts["website"] and "allow-same-origin" in texts["website"]
     assert "connect-src 'none'" in texts["website"] and "attachment" in texts["website"]
+
+
+def test_FR_AGT_16_owner_accepted_residual_and_the_preview_written_handshake_are_in_the_contract(repo_root):
+    rules = (repo_root / "contracts/website.rules.md").read_text(encoding="utf-8")
+    adr = (repo_root / "docs/adr/0050-website-deliverable-and-where-it-is-made.md").read_text(encoding="utf-8")
+    rows = {m.group(1): m.group(0) for m in re.finditer(r"^\| (WS-\d\d) .*$", rules, re.M)}
+    assert '"tilo":"preview-written"' in rows["WS-11"] and "AFTER `preview-written`" in rows["WS-12"]
+    assert "private data" in rows["WS-01"] and "never produces HTML" in rows["WS-01"]
+    assert "SEC-05" not in rows["WS-01"]
+    assert "go on accept website residual" in adr and "NON-private" in adr
+    questions = (repo_root / "docs/open-questions.md").read_text(encoding="utf-8")
+    assert "| BQ-WEBSITE-4a |" in questions and "go on accept website residual" in questions

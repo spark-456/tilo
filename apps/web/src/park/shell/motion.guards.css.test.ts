@@ -31,7 +31,8 @@ describe("WEB-MOTION-2 guards css: a layer on its way out takes no click", () =>
 
 describe("WEB-MOTION-2 guards main: font loads are handled on every path", () => {
   it("WEB-MOTION-2 guards main: each document.fonts.load promise has its own catch (a Park path renders without waiting)", () => {
-    const main = fs.readFileSync(path.join(__dirname, "..", "..", "main.tsx"), "utf8");
+    // the app entry moved from main.tsx to startApp.tsx (LOADER-SMOOTHNESS: main now only shows the boot cover)
+    const main = fs.readFileSync(path.join(__dirname, "..", "..", "startApp.tsx"), "utf8");
     expect(main).toMatch(/document\.fonts\.load\(f\)\s*\.catch\(/);
     expect(main).toMatch(/isParkPath\(/);
   });

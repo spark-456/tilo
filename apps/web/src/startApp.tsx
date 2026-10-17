@@ -7,6 +7,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Root } from "./Root";
 import { initDensity } from "./display/density";
+import { isParkPath } from "./park/app/router";
 
 initDensity();
 
@@ -18,11 +19,14 @@ const render = () =>
     </StrictMode>,
   );
 
+// The Park app renders at once: its boot cover waits for the fonts, and the shell stays hidden under it until they
+// are in. The landing pages wait for the faces so text never reflows (no layout shift).
 const fonts = [
   "900 1em 'Nunito'",
   "400 1em 'Nunito Sans'",
   "700 1em 'Nunito Sans'",
   "500 1em 'JetBrains Mono'",
-].map((face) => document.fonts.load(face).catch(() => undefined));
+].map((f) => document.fonts.load(f).catch(() => undefined)); // a face that fails to load must not be an uncaught rejection
 
-void Promise.all(fonts).then(render);
+if (isParkPath(window.location.pathname)) render();
+else void Promise.all(fonts).then(render); // each face has its own catch above

@@ -33,6 +33,7 @@ export function useRunResult(
   worldId: string,
   ready: boolean,
   attempt: number,
+  artifactId?: string,
 ): ResultView {
   const [view, setView] = useState<ResultView>({ status: "off" });
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is the caller's retry: a new value reads again
@@ -48,7 +49,7 @@ export function useRunResult(
     let live = true;
     setView({ status: "loading" });
     const gone = () => live && setView({ status: "error" });
-    readResult(api, worldId)
+    readResult(api, worldId, artifactId)
       .then(async (blob) => {
         const type = blob.type.split(";")[0]?.trim() ?? "";
         if (!live) return;
@@ -74,6 +75,6 @@ export function useRunResult(
     return () => {
       live = false;
     };
-  }, [api, worldId, ready, attempt]);
+  }, [api, worldId, ready, attempt, artifactId]);
   return view;
 }

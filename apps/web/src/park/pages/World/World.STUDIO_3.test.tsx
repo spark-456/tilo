@@ -201,7 +201,7 @@ describe("STUDIO_3 the World page of a live run", () => {
       clicks.push(this);
     });
     click(control(result, "Download"));
-    expect(clicks[0]?.download).toBe("tilo-result-hires.md");
+    expect(clicks[0]?.download).toBe("tilo-result-Road trip.md");
     // Share is the filled button here; Share to Slack and Share with team sit beside it
     const share = control(result, "Share") as HTMLButtonElement;
     expect(share.className).toContain("park-btn--primary");

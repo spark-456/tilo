@@ -82,10 +82,12 @@ def test_FR_WLD_04_WORLD_LIVE_names_are_plain_and_fit_the_schema(repo_root, titl
     assert buildings(layout)[0]["name"] == expected
 
 
-def test_FR_WLD_04_WORLD_LIVE_units_that_share_a_building_say_how_many_more(repo_root):
+def test_CX_WORLD_LAYOUT_1_shared_building_labels_are_plain_and_keep_the_unit_count(repo_root):
     layout = build_layout(plan_of(*[f"Step {n} of the job" for n in range(1, 9)]), world_id="w_x")
-    names = [b["name"] for b in buildings(layout) if b["plan_units"]]
-    assert names == ["Step 1 of the job +2", "Step 4 of the job +2", "Step 7 of the job +1"]
+    work = [b for b in buildings(layout) if b["plan_units"]]
+
+    assert [b["name"] for b in work] == ["Step 1 of the job", "Step 4 of the job", "Step 7 of the job"]
+    assert [len(b["plan_units"]) for b in work] == [3, 3, 2]
     assert schema_errors(repo_root, layout) == []
 
 

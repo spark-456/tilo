@@ -236,8 +236,11 @@ export function displayApiError(error: unknown): string {
     minutes_flagged: "These minutes need review before you continue.",
     minutes_unavailable: "These minutes are unavailable right now.",
     model_unavailable: "Live models are unavailable right now.",
+    no_host:
+      "A web step needs a website to open, so it was left out. Name the site and teach it again.",
     no_hold: "This meeting activity is no longer reserved.",
     no_key: "Add a model key before continuing.",
+    not_connected: "A tool this step needs is not connected yet, so the step was left out.",
     not_allowed: "You do not have permission to do this.",
     not_an_open_gate: "This approval card is no longer open.",
     not_an_original_gate: "A shared approval card cannot be shared again.",
@@ -272,6 +275,7 @@ export function displayApiError(error: unknown): string {
     source_not_found: "Tilo could not find the source for this.",
     stale: "This changed while you were working. Reload and try again.",
     start_again: "Start the connection again.",
+    team_level: "A step needs a team-level connection that is not set up, so it was left out.",
     teach_not_understood:
       "Tilo could not match your steps to the apps it can use. Name the app and the action in each step, for example Read the new mail in Gmail or Save the summary to Google Drive, then try again.",
     too_long_to_read:

@@ -268,7 +268,9 @@ def test_SEC_15_SIGNIN_hosting_csp_adds_exactly_the_sign_in_origins_and_nothing_
     assert off_origin["script-src"] <= APPCHECK_ORIGINS | SIGN_IN_SCRIPT, off_origin["script-src"]
     api = {"https://tilo-api-4qhkpsn5ga-as.a.run.app"}  # WEB-TO-API: the one tilo-dev API origin
     assert off_origin["connect-src"] <= APPCHECK_ORIGINS | SIGN_IN_CONNECT | api, off_origin["connect-src"]
-    assert off_origin["frame-src"] <= APPCHECK_ORIGINS | SIGN_IN_FRAME | OPTIONAL_FRAME, off_origin["frame-src"]
+    # WEB-2/WEB-3 (ADR-0050): the website preview frames the API's fixed /preview/website shell (its own origin,
+    # sandboxed, strict CSP); that one API origin and nothing wider
+    assert off_origin["frame-src"] <= APPCHECK_ORIGINS | SIGN_IN_FRAME | OPTIONAL_FRAME | api, off_origin["frame-src"]
     # no other directive grows an off-origin source (img, font, style, worker, form-action, base-uri, object-src)
     for name, sources in csp.items():
         if name in ("script-src", "connect-src", "frame-src"):

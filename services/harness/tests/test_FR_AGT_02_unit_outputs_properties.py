@@ -17,7 +17,7 @@ from hypothesis import strategies as st
 from tilo_harness.validator import repo_validator
 
 NO_SHRINK = (Phase.explicit, Phase.reuse, Phase.generate)  # a run of the executor is slow: report, do not shrink
-MEDIA = (*TEXT_TYPES, "application/pdf", "text/html")  # the last two are never a unit's output
+MEDIA = (*TEXT_TYPES, "application/pdf", "image/svg+xml")  # the last two are never a unit's output
 SIZES = (0, 1, 7, 64)
 
 output_spec = st.tuples(st.sampled_from(MEDIA), st.sampled_from(SIZES), st.integers(0, 255))

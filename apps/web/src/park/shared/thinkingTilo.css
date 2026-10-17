@@ -15,11 +15,8 @@
 .thinking-tilo .thinking-tilo__still {
   display: none;
 }
-.thinking-tilo--still picture,
-[data-motion="still"] .thinking-tilo picture {
-  display: none;
-}
-.thinking-tilo--still .thinking-tilo__still,
-[data-motion="still"] .thinking-tilo .thinking-tilo__still {
-  display: block;
-}
+.thinking-tilo--still picture{display:none}
+.thinking-tilo--still .thinking-tilo__still{display:block}
+/* Still motion freezes it on the saved static frame (FR-UX-12) */
+[data-motion="still"] .thinking-tilo picture{display:none}
+[data-motion="still"] .thinking-tilo .thinking-tilo__still{display:block}

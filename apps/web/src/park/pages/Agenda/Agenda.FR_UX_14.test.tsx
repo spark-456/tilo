@@ -63,9 +63,9 @@ it("CX_PAGES_ENRICH_AGENDA_empty_calendar_keeps_grid_and_new_action", async () =
   expect(container.querySelector('[aria-label="Week calendar"]')).not.toBeNull();
   expect(container.querySelector('[aria-label="Week time slots"]')).not.toBeNull();
   expect(container.textContent).toContain("+ New");
-  expect(container.querySelector('[aria-label="Today\'s calendar"] a')?.textContent).toBe(
-    "Check Google Calendar",
-  );
+  const today = container.querySelector('[aria-label="Today\'s calendar"]');
+  expect(today?.querySelector("h2")?.textContent).toBe("Today's calendar");
+  expect(today?.querySelector("a")?.textContent).toBe("Check Google Calendar");
 });
 it("FR_UX_14 a failed plate read shows the existing error instead of sample pins", async () => {
   const { container } = await mount({}, 503);
@@ -87,7 +87,9 @@ it("FR_PB calendar summaries and parked work retain supplied facts and truncatio
     parked: [{ ...body.rows[0], ref: { kind: "work_item", id: "work-a" }, title: null }],
   });
   const calendar = container.querySelector('[aria-label="Today\'s calendar"]');
+  expect(calendar?.querySelector("h2")?.textContent).toBe("Today's calendar");
   expect(calendar?.textContent).toContain("Design review");
+  expect(calendar?.querySelector("a")?.textContent).toBe("Check Google Calendar");
   expect(calendar?.querySelector('time[datetime="2026-10-09T05:00:00Z"]')).not.toBeNull();
   expect(container.querySelector('[aria-label="Parked work"]')?.textContent).toContain(
     "Untitled item",

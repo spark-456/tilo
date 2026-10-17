@@ -6,6 +6,7 @@ delivery breaks a tie. `?artifact=<id>` serves any other item the world delivere
 """
 
 import logging
+import re
 from collections.abc import Callable
 from typing import Annotated, Any
 
@@ -15,6 +16,7 @@ from tilo_memory.artifacts import ArtifactStore, Scope, StoredVersion
 from tilo_providers.diagnostics import log_caught
 
 from tilo_api import deps
+from tilo_api.preview import content_security_policy
 
 router = APIRouter()
 logger = logging.getLogger("tilo_api.results")
@@ -27,10 +29,18 @@ _SERVED = {  # the types the owner route names; DOCS-OUT: Office files keep thei
     "application/json": "",
     "text/plain": "",
     "text/markdown": "",
+    "text/html": ".html",  # WEB-2, WS-13: a native website, served as an attachment under the preview CSP
     _OFFICE + "wordprocessingml.document": ".docx",
     _OFFICE + "presentationml.presentation": ".pptx",
     _OFFICE + "spreadsheetml.sheet": ".xlsx",
 }
+
+
+def _safe_name(title: Any) -> str:
+    """WS-13: a download name from the delivering unit's title: letters, digits, space, dot, dash, underscore only."""
+    name = re.sub(r"[^A-Za-z0-9 ._-]+", "", title if isinstance(title, str) else "")
+    name = re.sub(r"\.{2,}", ".", name).strip(" ._-")[:80].strip(" ._-")
+    return name or "tilo-website"
 
 
 def result_store(request: Request, mode: Annotated[deps.Mode, Depends(deps.get_mode)]) -> Callable[[], ArtifactStore]:
@@ -68,6 +78,7 @@ def get_result(
     store: Annotated[deps.Store, Depends(deps.get_store)],
     artifacts: Annotated[Callable[[], ArtifactStore], Depends(result_store)],
     artifact: Annotated[str | None, Query(max_length=64)] = None,
+    named: Annotated[int | None, Query(alias="version", ge=1, le=1_000_000)] = None,
 ) -> Response:
     world = store.worlds.get(world_id)
     if (
@@ -93,6 +104,8 @@ def get_result(
             delivered.setdefault(ref, makers[ref] == event.get("actor"))
     if artifact is not None:
         delivered = {ref: own for ref, own in delivered.items() if ref[0] == artifact}
+    if named is not None:  # WS-14: the named delivered version, byte for byte
+        delivered = {ref: own for ref, own in delivered.items() if ref[1] == named}
     if not delivered:
         logger.warning("result of %s: no recorded, created and delivered item", world_id)
         raise HTTPException(status_code=404, detail="Tilo could not find that.")
@@ -113,12 +126,15 @@ def get_result(
     media = version.record["media_type"]
     if media not in _SERVED:
         media = "application/octet-stream"
-    return Response(
-        content,
-        media_type=media,
-        headers={
-            "Cache-Control": "no-store",
-            "X-Content-Type-Options": "nosniff",
-            "Content-Disposition": f'attachment; filename="tilo-result{_SERVED.get(media, "")}"',
-        },
-    )
+    headers = {
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": f'attachment; filename="tilo-result{_SERVED.get(media, "")}"',
+    }
+    if media == "text/html":  # WS-13: a browser that renders the download anyway runs it sandboxed and offline
+        run = store.runs.get(world_id)
+        title = getattr(run, "titles", {}).get(version.artifact_id, "")
+        headers["Content-Disposition"] = f'attachment; filename="{_safe_name(title)}.html"'
+        headers["Content-Security-Policy"] = content_security_policy()
+        media = "text/html; charset=utf-8"
+    return Response(content, media_type=media, headers=headers)

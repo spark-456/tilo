@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { Api } from "../../api";
 import { openResult, readResult, saveResult } from "../../api/results";
 import { Button } from "../../components";
-import type { SharedResult } from "./ResultPanel";
+import { type SharedResult, resultHeadline } from "./ResultPanel";
 import { Markdown } from "./markdown";
 import { isRestartStop, restartApproval } from "./runProgress";
 import type { RunView } from "./runView";
@@ -116,41 +116,90 @@ function ResultBody({ view, retry }: { view: ResultView; retry: () => void }) {
   );
 }
 
-/** RESULT-LIVE: the distinct items recorded as delivered, in delivery order. */
-function deliveredIds(events: readonly RunEvent[]): string[] {
-  const ids: string[] = [];
+interface DeliveredFile {
+  readonly id: string;
+  readonly name: string;
+}
+
+const FORMAT_NAMES: Readonly<Record<string, string>> = {
+  email: "Email",
+  google_docs: "Google Doc",
+  google_sheets: "Spreadsheet",
+  google_slides: "Slide deck",
+  website: "Website",
+};
+
+function safeDeliverableName(value: string): string | null {
+  const clean = value
+    .replace(/\p{Cc}/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (
+    !clean ||
+    /\b(?:art|world|run)_[a-z0-9_]+\b/i.test(clean) ||
+    /\b[0-7][0-9A-HJKMNP-TV-Z]{25}\b/.test(clean) ||
+    /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?\b/.test(clean)
+  )
+    return null;
+  return clean.slice(0, 80);
+}
+
+function deliveredName(event: RunEvent, id: string): string {
+  const data = event.data as { artifact?: { label?: unknown }; format?: unknown } | undefined;
+  const label = data?.artifact?.label;
+  const cleanLabel = typeof label === "string" ? safeDeliverableName(label) : null;
+  if (cleanLabel && cleanLabel !== id) return cleanLabel;
+  const fromSummary = event.summary.match(
+    /^(?:The |Your )?(.+?) (?:is ready|was delivered)(?: in Tilo)?\.?$/i,
+  );
+  const cleanSummary = fromSummary?.[1] ? safeDeliverableName(fromSummary[1]) : null;
+  if (cleanSummary && !/^item$/i.test(cleanSummary)) return cleanSummary;
+  return (typeof data?.format === "string" && FORMAT_NAMES[data.format]) || "Delivered file";
+}
+
+/** RESULT-LIVE: distinct, named items recorded as delivered, in delivery order. */
+function deliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
+  const items: DeliveredFile[] = [];
   for (const e of events) {
-    const id = (e.data as { artifact?: { artifact_id?: unknown } } | undefined)?.artifact
-      ?.artifact_id;
-    if (e.type === "artifact.delivered" && typeof id === "string" && !ids.includes(id))
-      ids.push(id);
+    const data = e.data as { artifact?: { artifact_id?: unknown } } | undefined;
+    const id = data?.artifact?.artifact_id;
+    if (
+      e.type === "artifact.delivered" &&
+      typeof id === "string" &&
+      !items.some((x) => x.id === id)
+    )
+      items.push({ id, name: deliveredName(e, id) });
   }
-  return ids;
+  return items;
 }
 
 /** Each delivered item, read only when asked for: the page shows the main one above. */
-function DeliveredItems({ api, worldId, ids }: { api: Api; worldId: string; ids: string[] }) {
+function DeliveredItems({
+  api,
+  worldId,
+  items,
+}: { api: Api; worldId: string; items: DeliveredFile[] }) {
   const [failed, setFailed] = useState(false);
   const readItem = (id: string, use: (blob: Blob) => void): void => {
     setFailed(false);
     readResult(api, worldId, id).then(use, () => setFailed(true));
   };
   return (
-    <div data-testid="delivered-items">
-      <h3 className="park-world-sub">{`All ${ids.length} delivered items`}</h3>
+    <details data-testid="working-files">
+      <summary>{`Working files (${items.length})`}</summary>
       <ul>
-        {ids.map((id, n) => (
+        {items.map(({ id, name }) => (
           <li key={id} className="park-world-resultactions">
-            <span className="park-world-sub">{`Item ${n + 1}`}</span>
+            <span className="park-world-sub">{name}</span>
             <Button variant="secondary" size="sm" onClick={() => readItem(id, openResult)}>
-              {`Open item ${n + 1}`}
+              {`Open working file: ${name}`}
             </Button>
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => readItem(id, (blob) => saveResult(blob, `${worldId}-${n + 1}`))}
+              onClick={() => readItem(id, (blob) => saveResult(blob, name))}
             >
-              {`Download item ${n + 1}`}
+              {`Download working file: ${name}`}
             </Button>
           </li>
         ))}
@@ -160,7 +209,7 @@ function DeliveredItems({ api, worldId, ids }: { api: Api; worldId: string; ids:
           That item could not be loaded. Nothing is lost.
         </p>
       ) : null}
-    </div>
+    </details>
   );
 }
 
@@ -179,15 +228,19 @@ export function RunResult({
   /** The page's one read of the result (WORLD-LIVE), also used by the Delivery Dock. */
   shared: SharedResult;
 }) {
-  const ids = deliveredIds(events);
+  const items = deliveredFiles(events);
+  const main = items[0];
   const view = shared.view;
   const blob = view.status === "text" || view.status === "file" ? view.blob : null;
+  const textHead = view.status === "text" ? resultHeadline(view.text, "Main deliverable") : null;
+  const mainName =
+    main?.name ?? (textHead ? safeDeliverableName(textHead.title) : null) ?? "Main deliverable";
   return (
     <section aria-label="Result" className="park-world-section" data-testid="run-result">
       {blob ? (
         <div className="park-world-resultactions">
-          <span className="park-world-sub">Delivered by this run</span>
-          <Button variant="secondary" size="sm" onClick={() => saveResult(blob, worldId)}>
+          <strong>{mainName}</strong>
+          <Button variant="secondary" size="sm" onClick={() => saveResult(blob, mainName)}>
             Download
           </Button>
           <Button variant="secondary" size="sm" onClick={() => openResult(blob)}>
@@ -195,10 +248,12 @@ export function RunResult({
           </Button>
         </div>
       ) : (
-        <span className="park-world-sub">Delivered by this run</span>
+        <strong>{mainName}</strong>
       )}
       <ResultBody view={view} retry={shared.retry} />
-      {ids.length > 1 ? <DeliveredItems api={api} worldId={worldId} ids={ids} /> : null}
+      {items.length > 1 ? (
+        <DeliveredItems api={api} worldId={worldId} items={items.slice(1)} />
+      ) : null}
     </section>
   );
 }

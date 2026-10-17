@@ -32,6 +32,14 @@ const OFFICE_EXTENSIONS: Readonly<Record<string, string>> = {
   [`${OFFICE}spreadsheetml.sheet`]: ".xlsx",
 };
 
+const filenamePart = (label: string): string =>
+  label
+    .replace(/[<>:"/\\|?*]/g, " ")
+    .replace(/\p{Cc}/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80) || "result";
+
 /** Saves a result already read; the file name follows its type. */
 export function saveResult(blob: Blob, world: string): void {
   const url = URL.createObjectURL(blob);
@@ -51,7 +59,7 @@ export function saveResult(blob: Blob, world: string): void {
               : blob.type.startsWith("text/")
                 ? ".txt"
                 : "");
-    link.download = `tilo-result-${world}${extension}`;
+    link.download = `tilo-result-${filenamePart(world)}${extension}`;
     document.body.append(link);
     try {
       link.click();

@@ -143,7 +143,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       });
     };
     const cover = document.getElementById("tilo-boot-cover");
-    if (cover) window.addEventListener("tilo-boot-loop-complete", draw, { once: true });
+    // the loop may already be complete if the app code arrived after it
+    if (cover && cover.dataset.loopComplete !== "true")
+      window.addEventListener("tilo-boot-loop-complete", draw, { once: true });
     else draw();
     return () => {
       live = false;

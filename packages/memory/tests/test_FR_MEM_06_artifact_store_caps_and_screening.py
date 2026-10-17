@@ -100,7 +100,6 @@ def test_FR_MEM_06_AR_04_an_upload_may_be_any_of_the_nine_media_types(rig, media
 @pytest.mark.parametrize(
     "media_type",
     [
-        "text/html",
         "image/svg+xml",
         "application/octet-stream",
         "text/plain",
