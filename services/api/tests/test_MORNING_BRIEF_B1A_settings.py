@@ -66,9 +66,9 @@ def test_MORNING_BRIEF_B1A_MO01_no_route_names_a_person_or_a_date_and_nobody_els
     paths = [p for p in c.rig.app.openapi()["paths"] if p.startswith("/v1/me/brief")]
     assert sorted(paths) == ["/v1/me/brief", "/v1/me/brief-settings"]
     made(c)
-    assert get(c, PRIYA).json() == {"detail": "not_ready"}
+    assert get(c, PRIYA).status_code == 200 and get(c, PRIYA).json() == {"brief": None}
     other = c.rig.client.get(f"/v1/me/brief?user={OWNER}&date={DAY}")  # a query names nobody
-    assert other.status_code == 404
+    assert other.status_code == 200 and other.json() == {"brief": None}
     c.rig.as_user(OWNER)
     assert c.rig.client.get("/v1/me/brief").json()["owner"] == OWNER
 
@@ -86,10 +86,19 @@ def test_MORNING_BRIEF_B1A_MO01_no_verified_principal_is_401_and_reads_nothing(c
     assert c.rpc.calls == []
 
 
-def test_MORNING_BRIEF_B1A_MO01_a_brief_that_is_not_yet_made_is_404_not_ready_and_get_never_makes_one(case):
+def test_MORNING_BRIEF_B1A_MO01_a_brief_that_is_not_yet_made_is_200_brief_none_and_get_never_makes_one(case):
+    # FT-SUP-3: answer 200 with brief: null for "none yet" (deliberately replaced 404 not_ready to
+    # eliminate Home load 404 noise)
     response = get(case)
-    assert response.status_code == 404 and response.json() == {"detail": "not_ready"}
+    assert response.status_code == 200 and response.json() == {"brief": None}
     assert case.rpc.calls == [] and desk_events(case) == []
+
+
+def test_FT_SUP_3_get_me_brief_none_yet_returns_200_with_brief_none(case):
+    """FT-SUP-3: GET /v1/me/brief answers 200 with {"brief": None} instead of 404 not_ready."""
+    response = get(case)
+    assert response.status_code == 200
+    assert response.json() == {"brief": None}
 
 
 # --- MO-03: the sweep ------------------------------------------------------------------------------
@@ -205,7 +214,8 @@ def test_MORNING_BRIEF_B1A_MO09_a_person_who_turned_the_schedule_off_loses_old_b
     turn_on(c, enabled=False)
     for stamp in ("2026-10-06T02:30:00.000Z", "2026-10-09T02:30:00.000Z"):
         make_on(c, stamp)
-    assert get(c).status_code == 404  # nothing today: but reading clears what has expired, only the own Desk world
+    # nothing today: but reading clears what has expired, only the own Desk world
+    assert get(c).status_code == 200 and get(c).json() == {"brief": None}
     assert kept_days(c, OLD) == ["20261009"]
 
 

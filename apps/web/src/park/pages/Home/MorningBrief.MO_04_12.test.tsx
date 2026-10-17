@@ -75,6 +75,16 @@ describe("MO-04/12 morning brief card", () => {
     expect(text(m.container)).not.toContain("needs a reply");
   });
 
+  it("test_FT_SUP_3_read_null_brief_shows_arrival_time", async () => {
+    const client = api({
+      read: vi.fn(async () => null),
+    });
+    const m = mount(<MorningBriefCard api={client} />);
+    await settle();
+    expect(text(m.container)).toContain("Your brief arrives at 07:30");
+    expect(text(m.container)).not.toContain("needs a reply");
+  });
+
   it("test_MO_12_sections_keep_unavailable_and_unsorted_distinct_and_show_source", async () => {
     const m = mount(<MorningBriefCard api={api()} />);
     await settle();

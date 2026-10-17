@@ -113,8 +113,12 @@ function settingsOf(v: unknown): BriefSettings {
 /** Auth and App Check are supplied by Park's existing HttpClient. */
 export function morningBriefApi(http: Pick<HttpClient, "getJson" | "postJson" | "putJson">) {
   return {
-    async read() {
-      return briefOf(await http.getJson("/v1/me/brief"));
+    async read(): Promise<MorningBrief | null> {
+      const res = await http.getJson("/v1/me/brief");
+      if (object(res) && "brief" in res && res.brief === null) {
+        return null;
+      }
+      return briefOf(res);
     },
     async make() {
       return briefOf(await http.postJson("/v1/me/brief", {}));

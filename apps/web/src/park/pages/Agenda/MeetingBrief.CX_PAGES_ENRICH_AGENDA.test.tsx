@@ -26,3 +26,11 @@ it("CX_PAGES_ENRICH_AGENDA_hides_an_unready_meeting_brief", async () => {
   await act(async () => undefined);
   expect(m.container.textContent).toBe("");
 });
+
+it("test_FT_SUP_3_hides_a_brief_when_api_answers_brief_null", async () => {
+  const getJson = vi.fn(async () => ({ brief: null }));
+  const m = mount(<MeetingBrief id="mt_a" getJson={getJson} />);
+  await act(async () => undefined);
+  expect(getJson).toHaveBeenCalledWith("/v1/meetings/mt_a/brief");
+  expect(m.container.textContent).toBe("");
+});

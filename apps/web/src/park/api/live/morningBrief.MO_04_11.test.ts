@@ -64,4 +64,10 @@ describe("MO-04/11 brief transport", () => {
     client.getJson.mockResolvedValueOnce({ meetings: [] });
     await expect(morningBriefApi(client).read()).rejects.toThrow("could not read");
   });
+
+  it("test_FT_SUP_3_read_returns_null_when_brief_is_null", async () => {
+    const client = http();
+    client.getJson.mockResolvedValueOnce({ brief: null });
+    expect(await morningBriefApi(client).read()).toBeNull();
+  });
 });

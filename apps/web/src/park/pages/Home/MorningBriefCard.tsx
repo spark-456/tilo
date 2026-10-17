@@ -40,7 +40,19 @@ export function MorningBriefCard({
     let active = true;
     setRead({ kind: "loading" });
     api.read().then(
-      (brief) => active && setRead({ kind: "ready", brief }),
+      async (brief) => {
+        if (!active) return;
+        if (!brief) {
+          try {
+            const settings = await api.settings();
+            if (active) setRead({ kind: "waiting", time: settings.time });
+          } catch {
+            if (active) setRead({ kind: "error" });
+          }
+        } else {
+          setRead({ kind: "ready", brief });
+        }
+      },
       async (reason: unknown) => {
         if (!active) return;
         if (reason instanceof TiloApiError && reason.status === 404) {
