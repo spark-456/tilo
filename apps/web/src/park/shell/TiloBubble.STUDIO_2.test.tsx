@@ -129,7 +129,7 @@ describe("STUDIO_2 bubble: the compact chat is the real Quick answer path", () =
       "Suggested skill: Executive summary",
     );
   });
-  it("STUDIO_2 bubble asks over Quick and shows the served answer, Escape closes it", async () => {
+  it("CX_SIDE_CHAT_1 bubble sends its visible page context with the Quick question", async () => {
     const startWorld = vi.fn(async () => ({
       data: { kind: "answered", text: "Three steps to go.", cost: null },
       source: "live",
@@ -144,7 +144,7 @@ describe("STUDIO_2 bubble: the compact chat is the real Quick answer path", () =
     });
     act(() => q<HTMLButtonElement>(document.body, 'dialog button[aria-label="Send"]').click());
     await settle();
-    expect(startWorld).toHaveBeenCalledWith("quick", "What is left?", "quick");
+    expect(startWorld).toHaveBeenCalledWith("quick", "What is left?\nYou're on Home.", "quick");
     expect(textOf(q(document.body, 'dialog [role="log"]'))).toContain("Three steps to go.");
     expect(textOf(q(document.body, "dialog"))).not.toContain("Sample answer");
     act(() => {
