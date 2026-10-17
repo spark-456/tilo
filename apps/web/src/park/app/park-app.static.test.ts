@@ -232,7 +232,9 @@ describe("WEB_3a_static: the mount point keeps the landing bundle free of the pa
   });
 
   it("WEB_3a_static_main_still_renders_through_Root_with_the_old_boot_steps", () => {
-    const src = text(join(SRC, "main.tsx"));
+    // LOADER-SMOOTHNESS: main.tsx shows the HTML boot cover and then imports startApp.tsx, which holds the boot steps.
+    expect(text(join(SRC, "main.tsx"))).toMatch(/import\(["']\.\/startApp["']\)/);
+    const src = text(join(SRC, "startApp.tsx"));
     expect(src).toMatch(/from\s*["']\.\/Root["']/);
     expect(src).toMatch(/<Root\s*\/>/);
     expect(src).toContain("initDensity()");

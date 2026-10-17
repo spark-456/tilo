@@ -42,7 +42,6 @@ describe("WEB_3b_css: park.shell.css", () => {
       "@keyframes waddle",
       "@keyframes walkFrame",
       "@keyframes tiloSlide",
-      "@keyframes tiloSpin",
       "@keyframes tiloFade",
     ]);
     // Compositor-only: a keyframe changes transform or opacity and nothing else.

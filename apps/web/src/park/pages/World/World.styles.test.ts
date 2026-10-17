@@ -429,17 +429,6 @@ const BUNDLES: readonly [string, Decls][] = [
     { gap: "10px", "font-size": "13.5px", "font-weight": "700", color: "var(--ink2)" },
   ],
   [
-    "spinner (still)",
-    {
-      width: "16px",
-      height: "16px",
-      "box-sizing": "border-box",
-      "border-radius": "99px",
-      border: "2.5px solid var(--track)",
-      "border-top-color": "var(--hero)",
-    },
-  ],
-  [
     "activity row",
     {
       "grid-template-columns": "36px minmax(0, 1fr) auto",
@@ -538,6 +527,17 @@ describe("WEB_6_world_styles: every block of the reference's inline styles", () 
       ok,
       `no single class carries ${JSON.stringify(want)}; closest: ${closest(rules, want)}`,
     ).toBe(true);
+  });
+});
+
+describe("WEB_6_world_styles: the running line", () => {
+  // THINKING-TILO replaced the reference's 16px ring spinner: the running line shows the saved Thinking Tilo loop.
+  it("WEB_6_world_styles_spinner_is_ThinkingTilo_not_a_ring", () => {
+    const lower = readFileSync(join(__dirname, "Lower.tsx"), "utf8");
+    expect(lower).toMatch(/<div className="park-world-running">\s*<ThinkingTilo/);
+    const shared = readFileSync(join(__dirname, "../../shared/thinkingTilo.css"), "utf8");
+    expect(shared).toMatch(/\.thinking-tilo\s*\{/);
+    expect(css()).not.toMatch(/border-top-color/);
   });
 });
 
