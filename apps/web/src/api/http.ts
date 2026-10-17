@@ -1153,6 +1153,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     onError?: (e: TiloApiError) => void,
   ): () => void {
     let stopped = false;
+    let paused = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let cursor = 0;
     let failures = 0;
@@ -1166,11 +1167,35 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       for (const wake of [...feed.waiters]) wake();
     };
 
+    const onVisibility = () => {
+      if (stopped) return;
+      if (typeof document !== "undefined" && !document.hidden) {
+        if (paused) {
+          paused = false;
+          clearTimeout(timer);
+          void poll();
+        }
+      } else if (typeof document !== "undefined" && document.hidden) {
+        paused = true;
+        clearTimeout(timer);
+      }
+    };
+
+    if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+      document.addEventListener("visibilitychange", onVisibility);
+    }
+
     const poll = async () => {
+      if (stopped) return;
+      if (typeof document !== "undefined" && document.hidden) {
+        paused = true;
+        return;
+      }
       let delay = this.pollMs;
       let fresh: EventView[] = [];
       try {
-        const body = await this.request<{ events?: unknown }>(path);
+        const query = cursor > 0 ? `?after_seq=${cursor}` : "";
+        const body = await this.request<{ events?: unknown }>(`${path}${query}`);
         const rows = Array.isArray(body.events) ? body.events.filter(isEventView) : [];
         fresh = rows.filter((e) => e.seq > cursor && !seen.has(e.id)).sort((a, b) => a.seq - b.seq);
         failures = 0;
@@ -1178,6 +1203,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
         if (this.missing.delete(worldId))
           for (const listener of [...this.missingListeners]) listener();
         note(null);
+        delay = fresh.length > 0 ? this.pollMs : this.pollMs >= 1000 ? 3000 : this.pollMs * 3;
       } catch (error) {
         const known =
           error instanceof TiloApiError ? error : new TiloApiError(UNREACHABLE, null, true);
@@ -1215,7 +1241,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
         if (TERMINAL.has(view.type)) stopped = true;
       }
       for (const [id, seq] of seen) if (seq < cursor) seen.delete(id);
-      if (!stopped) timer = setTimeout(poll, delay);
+      if (!stopped && !paused) timer = setTimeout(poll, delay);
     };
     void poll();
     return () => {
@@ -1223,6 +1249,9 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       open = false;
       stopped = true;
       clearTimeout(timer);
+      if (typeof document !== "undefined" && typeof document.removeEventListener === "function") {
+        document.removeEventListener("visibilitychange", onVisibility);
+      }
     };
   }
 

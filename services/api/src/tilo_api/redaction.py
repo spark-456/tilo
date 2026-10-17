@@ -12,7 +12,7 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from tilo_people.stores import PeopleStores
 
@@ -188,6 +188,7 @@ def _scoped_event_view(event: dict, seq: int, id_map: dict[str, str], safe_distr
 @router.get("/worlds/{world_id}/events")
 def get_world_events(
     world_id: str,
+    after_seq: int | None = Query(None, ge=0),
     principal: Principal = Depends(get_current_principal),
     store: Store = Depends(get_store),
     people: Callable[[], PeopleStores | None] = Depends(get_people_provider),
@@ -206,11 +207,16 @@ def get_world_events(
         # A JSONResponse (stdlib json, not FastAPI's pydantic-based response serialization,
         # which has its own much shallower recursion/depth guard): the owner's data is returned
         # exactly as stored, however deeply nested, and must not 500 either.
-        return JSONResponse(content={"events": [_owner_event_view(e) for e in visible]})
+        events = [_owner_event_view(e) for e in visible]
+        if after_seq is not None:
+            events = [e for e in events if e.get("seq", 0) > after_seq]
+        return JSONResponse(content={"events": events})
 
     surviving = [e for e in visible if not _event_hides_district(e, safe_districts)]
     id_map = {e["id"]: f"v{i + 1}" for i, e in enumerate(surviving)}
     events = [_scoped_event_view(e, i + 1, id_map, safe_districts) for i, e in enumerate(surviving)]
+    if after_seq is not None:
+        events = [e for e in events if e.get("seq", 0) > after_seq]
     return JSONResponse(content={"events": events})
 
 

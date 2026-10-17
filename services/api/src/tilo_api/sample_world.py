@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from importlib.resources.abc import Traversable
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from tilo_api.deps import SAMPLE_WORLD_ID, Principal, get_current_principal, refuse_reserved
@@ -88,8 +88,14 @@ def _read(principal: Principal = Depends(get_current_principal)) -> Sample:
 
 
 @router.get(f"/worlds/{SAMPLE_WORLD_ID}/events")
-def sample_events(sample: Sample = Depends(_read)) -> JSONResponse:
-    return JSONResponse(content={"events": copy.deepcopy(list(sample.events))})
+def sample_events(
+    after_seq: int | None = Query(None, ge=0),
+    sample: Sample = Depends(_read),
+) -> JSONResponse:
+    events = list(sample.events)
+    if after_seq is not None:
+        events = [e for e in events if e.get("seq", 0) > after_seq]
+    return JSONResponse(content={"events": copy.deepcopy(events)})
 
 
 @router.get(f"/worlds/{SAMPLE_WORLD_ID}/layout")
