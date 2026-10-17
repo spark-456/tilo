@@ -35,6 +35,11 @@ export function installBootCover(): void {
       window.setTimeout(
         () => {
           loopReady = true;
+          cover.dataset.loopComplete = "true";
+          image.src = "/loader/pool-9182ba9a51a9.png";
+          requestAnimationFrame(() => {
+            window.dispatchEvent(new Event("tilo-boot-loop-complete"));
+          });
           reveal();
         },
         reduced ? 200 : 4600,

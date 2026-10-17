@@ -1,4 +1,10 @@
-import { type Body, type Route, compileTraffic, staggerTraffic } from "./cityTraffic";
+import {
+  type Body,
+  type Route,
+  compileTraffic,
+  compileTrafficInWorker,
+  staggerTraffic,
+} from "./cityTraffic";
 // ported from design_handoff_tilo_web_app/design/tilo-park.js (user's prototype, ADR-0003a)
 // The Park City backdrop and glass-friendly world thumbnails. Static art is built as SVG strings and
 // shown as images; only the movers are separate layers. Faithful port: same names, numbers, rounding,
@@ -83,7 +89,7 @@ export function createPark(
   makeWorld: (h: H) => World,
   env: ParkEnv = {},
 ): {
-  scene: (o?: SceneOpts) => { el: El; spots: Spot[]; lanes?: LaneRow[] };
+  scene: (o?: SceneOpts) => { el: El; spots: Spot[]; lanes?: LaneRow[]; ready?: Promise<void> };
   world: (
     plan: Plan,
     o?: Opt<{ night: boolean; seed: number; labels: boolean; tags: boolean }>,
@@ -196,10 +202,8 @@ export function createPark(
   ): El {
     const sc = vb[4];
     const src = svgUrl(vb[2] * sc, vb[3] * sc, vb.slice(0, 4).join(" "), child, "xMidYMid meet");
-    return h(
-      "div",
-      {
-        style: {
+    const style: Props = schedule
+      ? Object.assign(schedule, {
           position: "absolute",
           left: `${x.toFixed(1)}px`,
           top: `${y.toFixed(1)}px`,
@@ -207,9 +211,20 @@ export function createPark(
           height: 0,
           willChange: "transform",
           pointerEvents: "none",
-          ...(schedule ?? motion(dx, dy, dur, f, still)),
-        },
-      },
+        })
+      : {
+          position: "absolute",
+          left: `${x.toFixed(1)}px`,
+          top: `${y.toFixed(1)}px`,
+          width: 0,
+          height: 0,
+          willChange: "transform",
+          pointerEvents: "none",
+          ...motion(dx, dy, dur, f, still),
+        };
+    return h(
+      "div",
+      { style },
       h("img", {
         src,
         alt: "",
@@ -269,10 +284,8 @@ export function createPark(
     const flip = (delay: number): Props => ({
       animation: `walkFrame ${cyc}s steps(1, end) ${delay.toFixed(2)}s infinite`,
     });
-    return h(
-      "div",
-      {
-        style: {
+    const style: Props = schedule
+      ? Object.assign(schedule, {
           position: "absolute",
           left: `${x.toFixed(1)}px`,
           top: `${y.toFixed(1)}px`,
@@ -280,9 +293,20 @@ export function createPark(
           height: 0,
           willChange: "transform",
           pointerEvents: "none",
-          ...(schedule ?? motion(dx, dy, dur, f, still)),
-        },
-      },
+        })
+      : {
+          position: "absolute",
+          left: `${x.toFixed(1)}px`,
+          top: `${y.toFixed(1)}px`,
+          width: 0,
+          height: 0,
+          willChange: "transform",
+          pointerEvents: "none",
+          ...motion(dx, dy, dur, f, still),
+        };
+    return h(
+      "div",
+      { style },
       h(
         "div",
         {
@@ -348,7 +372,12 @@ export function createPark(
     return out;
   }
   /* o: {w,h} artboard px, night, k (slow-down), still (frozen movers), mute (0..1 pull towards paper) */
-  function scene(o0?: SceneOpts): { el: El; spots: Spot[]; lanes?: LaneRow[] } {
+  function scene(o0?: SceneOpts): {
+    el: El;
+    spots: Spot[];
+    lanes?: LaneRow[];
+    ready?: Promise<void>;
+  } {
     const o = Object.assign(
       {
         w: 1440,
@@ -703,7 +732,12 @@ export function createPark(
       }
       const cyc = 0.56 * (k > 1 ? 1.4 : 1);
       const movers: (() => El)[][] = [];
-      const timed: { route: Route; setClock: (delay: number, edge: number) => void }[] = [];
+      const trafficBatches: {
+        routes: Route[];
+        standing: Body[];
+        schedules: Props[];
+        timed: { route: Route; setClock: (delay: number, edge: number, stops: string[]) => void }[];
+      }[] = [];
       const reported: LaneRow[] = [];
       for (let j = 0; j <= R; j++) {
         const y = j * PY;
@@ -835,43 +869,31 @@ export function createPark(
           CSS.supports("animation", "mvXY 1s linear(0,1)");
         if (o.traffic && o.avoid && !still && routes.length && supportsLinear) {
           // Existing free lanes route around standing tiles; walkers wait rather than cross lanes.
-          const frames = compileTraffic(routes, standing, true);
-          routes.forEach((route, id) => {
+          // The frame solver runs in a worker so generating the first city cannot block the loader.
+          const batchTimed: {
+            route: Route;
+            setClock: (delay: number, edge: number, stops: string[]) => void;
+          }[] = [];
+          for (const route of routes) {
             const span = route.end - route.start;
-            const progress = (frame: Body[]): string => {
-              const pos = frame[id];
-              if (!pos) throw new Error("Missing scheduled city mover");
-              return ((pos.x - route.start) / span).toFixed(8);
-            };
-            const stops = frames
-              .slice(0, 60)
-              .map((frame, i) => `${progress(frame)} ${((i * 100) / 60).toFixed(6)}%`);
-            // Duplicate 100% stops make the reset discrete (no sweep through the city).
-            stops.push(
-              `${progress(frames[59] as Body[])} 100%`,
-              `${progress(frames[0] as Body[])} 100%`,
-            );
             const schedule: Props = {
               "--dx": `${span * 0.866 * s2}px`,
               "--dy": `${span * 0.5 * s2}px`,
             };
             schedules.push(schedule);
-            timed.push({
+            batchTimed.push({
               route,
-              setClock: (delay, edge) => {
+              setClock: (delay, edge, stops) => {
                 const clock = `${delay.toFixed(8)}s infinite`;
                 // tiloFade supplies opacity 1 -> 0; hold transparency around the local reset.
                 schedule.animation = `mvXY 15s linear(${stops.join(",")}) ${clock}, tiloFade 15s linear(1 0%,1 ${edge * 0.6}%,0 ${edge}%,0 ${100 - edge}%,1 ${100 - edge * 0.6}%,1 100%) ${clock}`;
               },
             });
-          });
+          }
+          trafficBatches.push({ routes, standing, schedules, timed: batchTimed });
         }
         movers.push(list.sort((p, q) => p.ly - q.ly).map((o) => o.el));
       }
-      staggerTraffic(
-        timed.map((t) => t.route),
-        o.seed,
-      ).forEach((clock, id) => timed[id]?.setClock(clock.delay, clock.edge));
       const vbS = `${vx.toFixed(1)} ${vy.toFixed(1)} ${VW} ${VH.toFixed(1)}`;
       const sv = (els: unknown): El => cover(svgUrl(o.w, o.h, vbS, els));
       const defs = night
@@ -886,6 +908,53 @@ export function createPark(
             ),
           )
         : null;
+      const applyTrafficFrames = (frameGroups: Body[][][]): void => {
+        const allTimed = trafficBatches.flatMap((batch) => batch.timed);
+        const clocks = staggerTraffic(
+          allTimed.map((item) => item.route),
+          o.seed,
+        );
+        let clockIndex = 0;
+        trafficBatches.forEach((batch, batchIndex) => {
+          const frames = frameGroups[batchIndex] ?? [];
+          batch.timed.forEach((item, id) => {
+            const span = item.route.end - item.route.start;
+            const progress = (frame: Body[]): string => {
+              const pos = frame[id];
+              if (!pos) throw new Error("Missing scheduled city mover");
+              return ((pos.x - item.route.start) / span).toFixed(8);
+            };
+            const stops = frames
+              .slice(0, 60)
+              .map((frame, i) => `${progress(frame)} ${((i * 100) / 60).toFixed(6)}%`);
+            stops.push(
+              `${progress(frames[59] as Body[])} 100%`,
+              `${progress(frames[0] as Body[])} 100%`,
+            );
+            const clock = clocks[clockIndex++];
+            if (clock) item.setClock(clock.delay, clock.edge, stops);
+          });
+        });
+      };
+      const trafficInput = trafficBatches.map(({ routes, standing }) => ({
+        routes,
+        standing,
+        lanesOnly: true,
+      }));
+      const compiled =
+        trafficBatches.length === 0
+          ? []
+          : typeof Worker === "undefined" ||
+              (typeof process !== "undefined" && process.env.NODE_ENV === "test")
+            ? trafficBatches.map((batch) => compileTraffic(batch.routes, batch.standing, true))
+            : compileTrafficInWorker(trafficInput);
+      let ready: Promise<void>;
+      if (compiled instanceof Promise)
+        ready = compiled.then(applyTrafficFrames).catch(() => undefined);
+      else {
+        applyTrafficFrames(compiled);
+        ready = Promise.resolve();
+      }
       const kids: unknown[] = [sv([defs, ground, marks, plots, glows])];
       for (let j = 0; j <= R; j++) {
         kids.push(movers[j]?.map((el) => el()));
@@ -902,6 +971,7 @@ export function createPark(
           const q = toPx(c.top);
           return { x: q[0], y: q[1], area: c.area, st: c.st };
         }),
+        ready,
         ...(o.avoid ? { lanes: [...kerb, ...reported] } : {}),
       };
     } finally {
