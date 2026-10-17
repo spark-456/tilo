@@ -78,6 +78,9 @@ function Answer({
           <div className="park-chat-result-card">
             {cost ? <span className="park-chat-meta">{cost.toUpperCase()}</span> : null}
             <p className="park-chat-text">{turn.text}</p>
+            {turn.skill ? (
+              <span className="park-chat-tag">Suggested skill: {turn.skill.name}</span>
+            ) : null}
             <div className="park-chat-actions">
               {onCopy ? (
                 <button type="button" className="park-chat-quiet" onClick={() => onCopy(turn.text)}>
@@ -102,6 +105,9 @@ function Answer({
           <div className="park-chat-world-card">
             <strong>This needs a world.</strong>
             <p>{SWITCH_WORDS[turn.reason]}</p>
+            {turn.skill ? (
+              <span className="park-chat-tag">Suggested skill: {turn.skill.name}</span>
+            ) : null}
             <div className="park-chat-actions">
               <button type="button" className="park-chat-soft" onClick={makeWorld}>
                 Make it a world →

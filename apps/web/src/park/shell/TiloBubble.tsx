@@ -89,6 +89,9 @@ function Said({ turn }: { turn: Turn }) {
           <span className="park-bubble__sample">Sample answer</span>
         ) : null}
         {reply}
+        {(turn.state === "answered" || turn.state === "switch") && turn.skill ? (
+          <span className="park-bubble__sample">Suggested skill: {turn.skill.name}</span>
+        ) : null}
       </div>
     </>
   );

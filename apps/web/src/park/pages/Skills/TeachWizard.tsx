@@ -8,6 +8,7 @@ import type { User } from "../../api/types";
 import { Button } from "../../components";
 import { cx } from "../../components/cx";
 import { ApiReadState } from "../../shared/ApiReadState";
+import { type ScreenRecording, recordScreen } from "./recorder";
 import { icon, stepBuilding } from "./skillsKit";
 import {
   CAP,
@@ -172,6 +173,82 @@ function UploadExample({ t, onAccepted }: { t: Teach; onAccepted?: () => void })
   );
 }
 
+export function ScreenExample({ t, onAccepted }: { t: Teach; onAccepted?: () => void }) {
+  const [narrate, setNarrate] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const session = useRef<ScreenRecording | null>(null);
+  useEffect(() => {
+    if (!file) return;
+    const next = URL.createObjectURL(file);
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [file]);
+  useEffect(() => () => session.current?.discard(), []);
+  const start = async () => {
+    setError("");
+    setFile(null);
+    try {
+      session.current = await recordScreen(narrate, (recorded) => {
+        session.current = null;
+        setCapturing(false);
+        setFile(recorded);
+      });
+      setCapturing(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Screen recording could not start.");
+    }
+  };
+  return (
+    <section className="park-teach__drop" aria-label="Record your screen">
+      <strong>Record a tab or screen as an example</strong>
+      <p>
+        Video is captured locally for up to five minutes. Nothing is sent until you choose Use this
+        recording.
+      </p>
+      <label>
+        <input
+          type="checkbox"
+          checked={narrate}
+          disabled={capturing}
+          onChange={(e) => setNarrate(e.target.checked)}
+        />
+        Narrate with microphone
+      </label>
+      {capturing ? (
+        <Button variant="secondary" size="sm" onClick={() => session.current?.stop()}>
+          Stop recording
+        </Button>
+      ) : file ? (
+        <>
+          {/* biome-ignore lint/a11y/useMediaCaption: this is an unsent local preview of the person's own capture; no transcript exists yet. */}
+          {url ? <video src={url} controls aria-label="Recording preview" /> : null}
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={t.busy}
+            onClick={() => {
+              if (t.captureFiles([file], "record")) onAccepted?.();
+            }}
+          >
+            Use this recording
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setFile(null)}>
+            Discard recording
+          </Button>
+        </>
+      ) : (
+        <Button variant="secondary" size="sm" disabled={t.busy} onClick={() => void start()}>
+          Start recording
+        </Button>
+      )}
+      {error ? <span role="alert">{error}</span> : null}
+    </section>
+  );
+}
+
 function Describe({
   t,
   heading,
@@ -219,7 +296,12 @@ function Describe({
         />
         <span className="park-teach__hint">Tilo turns this into steps for you to check.</span>
       </div>
-      {t.live ? <UploadExample t={t} onAccepted={onNext} /> : null}
+      {t.live ? (
+        <>
+          <UploadExample t={t} onAccepted={onNext} />
+          <ScreenExample t={t} onAccepted={onNext} />
+        </>
+      ) : null}
       <fieldset className="park-teach__field park-teach__fieldset">
         <legend className="park-teach__label">When should Tilo use it?</legend>
         <div className="park-teach__chips">
@@ -295,7 +377,10 @@ function Example({ t, heading, onBack }: { t: Teach; onBack: () => void } & Head
         </ol>
       </div>
       {t.live ? (
-        <UploadExample t={t} />
+        <>
+          <UploadExample t={t} />
+          <ScreenExample t={t} />
+        </>
       ) : (
         <div className="park-teach__drop" aria-disabled="true">
           <span className="park-teach__dropic" aria-hidden="true">

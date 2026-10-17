@@ -63,6 +63,9 @@ export function SkillDrawer({
   const [busy, setBusy] = useState(false);
   const st = statusOf(skill, paused);
   const isPaused = paused || skill.paused === true;
+  const inputs = skill.details?.inputs.length
+    ? skill.details.inputs
+    : (skill.catalog?.inputs ?? []);
 
   useEffect(() => {
     close.current?.focus();
@@ -139,6 +142,11 @@ export function SkillDrawer({
                 <strong>What it needs:</strong> {skill.tools.map(([tool]) => tool).join(", ")}
               </p>
             ) : null}
+            {skill.catalog?.tools.length ? (
+              <p className="park-skill-drawer__p">
+                <strong>Connectors it uses:</strong> {skill.catalog.tools.join(", ")}
+              </p>
+            ) : null}
             <Button
               variant="secondary"
               onClick={() => {
@@ -161,6 +169,11 @@ export function SkillDrawer({
                   <li key={`${i + 1}-${s}`} className="park-skill-drawer__step">
                     <span className="park-skill-drawer__n">{i + 1}</span>
                     <span>{s}</span>
+                    {skill.details?.steps[i] ? (
+                      <span className="park-skill-chip">
+                        {skill.details.steps[i].tool} · {skill.details.steps[i].action}
+                      </span>
+                    ) : null}
                     {skill.fix?.asks[i] ? (
                       <span className="park-skill-chip park-skill-chip--amber">Asks you first</span>
                     ) : null}
@@ -168,6 +181,27 @@ export function SkillDrawer({
                 ))}
               </ol>
             </section>
+          ) : null}
+          {inputs.length ? (
+            <section className="park-skill-drawer__sec" aria-label="Inputs for this skill">
+              <h3 className="park-skill-drawer__h3">What you provide</h3>
+              <ul>
+                {inputs.map((input) => (
+                  <li key={input.name}>
+                    {input.label}
+                    {input.required ? " (required)" : " (optional)"}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          {skill.details?.hosts.length ? (
+            <p className="park-skill-drawer__p">Approved sites: {skill.details.hosts.join(", ")}</p>
+          ) : null}
+          {skill.details?.estimatedCredits != null ? (
+            <p className="park-skill-drawer__p">
+              Estimated cost: {skill.details.estimatedCredits} credits per run
+            </p>
           ) : null}
           {fix}
           {skill.builtin ? null : (

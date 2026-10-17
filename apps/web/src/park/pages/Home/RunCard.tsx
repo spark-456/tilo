@@ -71,6 +71,9 @@ export function RunCard({
             </span>
           </div>
           <BudgetBar min={plan.credits.min} max={plan.credits.max} cap={plan.cap} />
+          {plan.skill ? (
+            <p className="park-home-plan__sample">Uses skill: {plan.skill.name}</p>
+          ) : null}
           <p className="park-home-plan__sample" data-testid="budget-line">
             {`Start approves up to ${plan.cap} credits${plan.usd === null ? "" : ` (about US$${plan.usd.toFixed(2)})`}. You can pause it any time.`}
           </p>

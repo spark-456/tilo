@@ -242,6 +242,15 @@ export interface Skill {
   tools: [string, number][];
   used: string[];
   steps: string[];
+  /** Details supplied with a taught skill record; absent for catalogue entries with no detail API. */
+  details?: {
+    steps: { tool: string; action: string }[];
+    inputs: SkillInput[];
+    hosts: string[];
+    estimatedCredits: number | null;
+  };
+  /** Library catalog data; no run history, step sequence or access level is implied. */
+  catalog?: { inputs: SkillInput[]; tools: string[] };
   fix?: { version: number; asks: boolean[]; locked: boolean[] };
   ask?: { q: string; a: string[] };
   /** STUDIO-4: the served record says the skill is paused (live only; absent otherwise). */

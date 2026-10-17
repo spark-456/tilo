@@ -88,6 +88,30 @@ function server(over: Record<string, () => Response | Promise<Response>> = {}) {
 }
 
 describe("SIMPLE-RUN-1 one-step start over the live Api", () => {
+  it("FR_SKL_04_ROUTE_prepare_keeps_only_the_skill_served_with_the_plan", async () => {
+    const skill = {
+      id: "exec_summary",
+      kind: "library",
+      scope: "library",
+      name: "Executive summary",
+      version: "1.0.0",
+      score: 0.91,
+      source: "matched",
+    };
+    const r = server({
+      "GET /tasks/t_1/approaches": () =>
+        json({
+          task_id: "t_1",
+          approaches: [APPROACH],
+          recommended: "a_balanced",
+          credit_usd: 0.05,
+          skill,
+        }),
+    });
+    expect((await r.one.prepare("Summarise it", [])).skill).toEqual(skill);
+    const without = server();
+    expect((await without.one.prepare("Summarise it", [])).skill).toBeNull();
+  });
   it("QA-11 requests approaches immediately after saved answers, before the confirm plan resolves", async () => {
     let save!: (value: Response) => void;
     let price!: (value: Response) => void;

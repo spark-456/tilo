@@ -227,7 +227,7 @@ describe("WEB_1a_types: the Api interface returns typed envelopes", () => {
     expectTypeOf<ReturnType<Api["addBackup"]>>().toEqualTypeOf<R<Ack>>();
     expectTypeOf<Parameters<Api["captureSkill"]>>().toEqualTypeOf<[text: string]>();
     expectTypeOf<Parameters<Api["captureFile"]>>().toEqualTypeOf<
-      [file: File, onStored?: () => void]
+      [file: File, onStored?: () => void, method?: "upload" | "record"]
     >();
     expectTypeOf<Parameters<Api["proposeVersion"]>>().toEqualTypeOf<[captureId: string]>();
     expectTypeOf<ReturnType<Api["captureSkill"]>>().toEqualTypeOf<R<SkillCapture>>();
