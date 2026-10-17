@@ -1157,3 +1157,60 @@ def test_SEC_07_scoped_view_allowlists_trace_keys_and_drops_unknown_ones(client,
     as_principal(make_principal(user_id=OWNER, role="owner"))
     owner_events = client.get(f"/worlds/{WORLD}/events").json()["events"]
     assert owner_events[0]["trace"]["D2"] == "a district id or any other value that must never leak through trace"
+
+
+def test_FT_SUP_1_owner_events_cursor_filters_by_after_seq(client, store):
+    _two_district_world(store)
+    as_principal(make_principal(user_id=OWNER, role="owner"))
+
+    all_resp = client.get(f"/worlds/{WORLD}/events")
+    assert all_resp.status_code == 200
+    assert [e["seq"] for e in all_resp.json()["events"]] == [1, 2, 3]
+
+    after_1 = client.get(f"/worlds/{WORLD}/events?after_seq=1")
+    assert after_1.status_code == 200
+    assert [e["seq"] for e in after_1.json()["events"]] == [2, 3]
+
+    after_2 = client.get(f"/worlds/{WORLD}/events?after_seq=2")
+    assert after_2.status_code == 200
+    assert [e["seq"] for e in after_2.json()["events"]] == [3]
+
+    after_3 = client.get(f"/worlds/{WORLD}/events?after_seq=3")
+    assert after_3.status_code == 200
+    assert after_3.json()["events"] == []
+
+    after_0 = client.get(f"/worlds/{WORLD}/events?after_seq=0")
+    assert after_0.status_code == 200
+    assert [e["seq"] for e in after_0.json()["events"]] == [1, 2, 3]
+
+
+def test_FT_SUP_1_scoped_events_cursor_filters_by_after_seq(client, store):
+    _two_district_world(store)
+    as_principal(make_principal(user_id="u_viewer", role="viewer", districts=(D1,)))
+
+    # Surviving events for D1 are seq 1 (D1) and seq 3 (vis: all) -> remapped in scoped view as seq 1 and 2
+    all_scoped = client.get(f"/worlds/{WORLD}/events")
+    assert all_scoped.status_code == 200
+    assert [e["seq"] for e in all_scoped.json()["events"]] == [1, 2]
+
+    after_1 = client.get(f"/worlds/{WORLD}/events?after_seq=1")
+    assert after_1.status_code == 200
+    assert [e["seq"] for e in after_1.json()["events"]] == [2]
+
+    after_2 = client.get(f"/worlds/{WORLD}/events?after_seq=2")
+    assert after_2.status_code == 200
+    assert after_2.json()["events"] == []
+
+
+def test_FT_SUP_1_sample_world_events_cursor_filters_by_after_seq(client):
+    as_principal(make_principal(user_id=OWNER, role="owner"))
+    all_resp = client.get("/worlds/w_sample_village_basic/events")
+    assert all_resp.status_code == 200
+    all_events = all_resp.json()["events"]
+    assert len(all_events) > 2
+
+    cutoff = all_events[1]["seq"]
+    filtered_resp = client.get(f"/worlds/w_sample_village_basic/events?after_seq={cutoff}")
+    assert filtered_resp.status_code == 200
+    filtered_events = filtered_resp.json()["events"]
+    assert [e["seq"] for e in filtered_events] == [e["seq"] for e in all_events if e["seq"] > cutoff]
