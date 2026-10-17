@@ -1,0 +1,11 @@
+{
+  "tag": "a",
+  "role": "link",
+  "name": "Reviews",
+  "input_type": null,
+  "editable": false,
+  "secure": false,
+  "form_method": "none",
+  "link_host": "shop.example.com",
+  "download": false
+}

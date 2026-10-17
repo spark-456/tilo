@@ -34,7 +34,8 @@ describe("WEB_4_home_links: each control goes where the reference sends it", () 
 
   it("WEB_4_home_links_a_live_row_opens_its_world", async () => {
     const rig = await mountHome();
-    for (const w of LIVE_OPEN.slice(0, 3)) {
+    // CX-T-HOME: the two active sample worlds, then the recent finished one (Q3 audit prep) in the third card.
+    for (const w of [...LIVE_OPEN.slice(0, 2), { id: "audit", name: "Q3 audit prep" }]) {
       clickEl(controlWith(worldsOf(rig.el), w.name));
       expect(lastGo(rig.app), w.name).toEqual(["world", { id: w.id }]);
     }

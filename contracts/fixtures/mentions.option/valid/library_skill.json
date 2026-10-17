@@ -1,0 +1,10 @@
+{
+  "ref": {
+    "kind": "skill",
+    "id": "web-research"
+  },
+  "label": "Web research",
+  "detail": null,
+  "scope": "library",
+  "state": "ready"
+}

@@ -308,3 +308,12 @@ source is affected.
 | axe-core | MPL-2.0 | https://github.com/dequelabs/axe-core |
 | jsdom | MIT | https://github.com/jsdom/jsdom |
 | @types/jsdom | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/jsdom |
+
+## Park connector and skill artwork (CX-LOGOS-2)
+
+| Bundled files | Licence | Pinned source |
+| --- | --- | --- |
+| `apps/web/public/park/brands/*.svg` (Gmail, Google Calendar, Google Drive, Slack, Notion, Lovable, GitHub, HubSpot, Jira, Stripe, Xero, Google Meet and Microsoft) | CC0-1.0; brand names and marks remain the respective owners' trademarks | [gilbarbara/logos](https://github.com/gilbarbara/logos/tree/4a5b550414be64d5c007574cd395d910d50e8950/logos), [licence](https://github.com/gilbarbara/logos/blob/4a5b550414be64d5c007574cd395d910d50e8950/LICENSE.txt) |
+| `apps/web/public/park/skills/*.svg` (Calendar, Envelope, Magnifying glass, Clipboard, Globe, Bar chart, Memo, People and Laptop, Color/Flat variants) | MIT, copyright Microsoft Corporation; full notice in `apps/web/public/park/skills/LICENSE.txt` | [microsoft/fluentui-emoji](https://github.com/microsoft/fluentui-emoji/tree/1ffb34c752ecf5d402f04cfb4b392c77f57c54bc/assets), [licence](https://github.com/microsoft/fluentui-emoji/blob/1ffb34c752ecf5d402f04cfb4b392c77f57c54bc/LICENSE) |
+
+Google Docs, Sheets and Slides use the already listed Simple Icons CC0 marks in their brand colours because the selected full-colour set has no matching SVG. Canva keeps its existing monogram because neither of the selected sets contains a mark. The images are local and requested only when their card is visible.

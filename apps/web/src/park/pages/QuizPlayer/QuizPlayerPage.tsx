@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { EmptyState, ErrorState } from "../../../design/tilo-t";
 import { type QuizView, readQuizApp } from "../../api/quizApps";
 import type { AppCtx } from "../../app/AppCtx";
 import {
@@ -186,11 +187,14 @@ export function QuizPlayerPage({
               Back to world
             </button>
           </div>
+          <h1 className="visually-hidden" tabIndex={-1}>
+            This quiz is not available yet
+          </h1>
           <div data-testid="quiz-unavailable" className="park-quiz-error">
-            <h1 className="park-quiz-h1" tabIndex={-1}>
-              This quiz is not available yet
-            </h1>
-            <p className="park-quiz-scoresub">Quizzes are not connected to your workspace yet.</p>
+            <EmptyState
+              title="This quiz is not available yet"
+              body="Quizzes are not connected to your workspace yet."
+            />
           </div>
         </PageSheet>
       </div>
@@ -216,11 +220,11 @@ export function QuizPlayerPage({
               Back to world
             </button>
           </div>
-          <div role="alert" data-testid="quiz-error" className="park-quiz-error">
-            <h1 className="park-quiz-h1" tabIndex={-1}>
-              Quiz specification is invalid
-            </h1>
-            <p className="park-quiz-scoresub">{validation.reason}</p>
+          <h1 className="visually-hidden" tabIndex={-1}>
+            Quiz specification is invalid
+          </h1>
+          <div data-testid="quiz-error" className="park-quiz-error">
+            <ErrorState title="Quiz specification is invalid" body={validation.reason} />
           </div>
         </PageSheet>
       </div>

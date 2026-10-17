@@ -170,7 +170,21 @@ def purge_old(artifacts: ArtifactStore, desks: Any, org: str, user: str, day: st
     cutoff = artifact_id((date.fromisoformat(day) - timedelta(days=KEEP_DAYS)).isoformat())
     for aid in artifacts.artifact_ids(scope, "art_mbrief_"):
         if len(aid) == len(cutoff) and aid[11:].isdigit() and aid < cutoff:  # a date older than the cutoff
-            for version in artifacts.versions(scope, aid):
+            try:
+                versions = artifacts.versions(scope, aid)
+            except ArtifactNotFound:  # another purge may have removed it after the id listing
+                continue
+            for version in versions:
+                _delete(artifacts, scope, version.ref)
+    email_cutoff = date.fromisoformat(day) - timedelta(days=KEEP_DAYS)
+    for aid in artifacts.artifact_ids(scope, "art_morning_brief_"):
+        try:
+            versions = artifacts.versions(scope, aid)
+            created = max(datetime.fromisoformat(v.doc["created_at"].replace("Z", "+00:00")).date() for v in versions)
+        except (ArtifactError, KeyError, TypeError, ValueError):
+            continue
+        if created < email_cutoff:
+            for version in versions:
                 _delete(artifacts, scope, version.ref)
 
 

@@ -303,7 +303,7 @@ describe("LW_14 Quiz player for AppSpec", () => {
     );
 
     const errBox = must(
-      m.container.querySelector('[data-testid="quiz-error"]'),
+      m.container.querySelector('[data-testid="quiz-error"] [role="alert"]'),
       "quiz-error alert",
     );
     expect(errBox.getAttribute("role")).toBe("alert");

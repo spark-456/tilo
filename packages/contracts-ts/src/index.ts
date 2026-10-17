@@ -4,9 +4,10 @@
  * `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
  * agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
  * appspec.schema.json 1.0.0 sha256:e3638e1ae19f9b9b
- * artifact.schema.json 1.2.0 sha256:e840ce55967af231
+ * artifact.schema.json 1.3.0 sha256:dafce81fa75a5ed5
  * attention.schema.json 1.0.0 sha256:f35cff84728304af
  * brief.schema.json 1.0.0 sha256:be4e747f37e399b2
+ * browser.schema.json 1.0.0 sha256:196a0b328e45bf22
  * byok.schema.json 1.0.0 sha256:683d5d2b4fc8b0fe
  * calendar_entry.schema.json 1.1.0 sha256:291531543be88320
  * card.schema.json 1.0.0 sha256:2666292eb19087d0
@@ -46,6 +47,10 @@
  * events/data/artifact.versioned.schema.json 1.0.0 sha256:b6ceac1481d2595b
  * events/data/assistant.asked.schema.json 1.0.0 sha256:8775120b73c4ed38
  * events/data/assistant.replied.schema.json 1.0.0 sha256:48fb513dadef290d
+ * events/data/browser.acted.schema.json 1.0.0 sha256:3b55e5a09f00e387
+ * events/data/browser.controlled.schema.json 1.0.0 sha256:6b8442f6dbb88479
+ * events/data/browser.started.schema.json 1.0.0 sha256:1bed13c81c886df2
+ * events/data/browser.stopped.schema.json 1.0.0 sha256:8ae289ea75dfd6b5
  * events/data/budget.granted.schema.json 1.0.0 sha256:34e26044aeb0114d
  * events/data/budget.requested.schema.json 1.1.0 sha256:abda889558ab1c91
  * events/data/building.archived.schema.json 1.0.0 sha256:638f47ef89001f58
@@ -113,7 +118,7 @@
  * events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
  * events/data/world.share_changed.schema.json 1.0.0 sha256:7de879d9ec364699
  * events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
- * events/registry.schema.json 1.2.0 sha256:5a2b8514c1e7e2b1
+ * events/registry.schema.json 1.3.0 sha256:cb766a935af26fe5
  * handoff.schema.json 1.0.0 sha256:7ed882f92b634672
  * layout.schema.json 1.0.0 sha256:1db88b1e3b744add
  * makers.schema.json 1.0.0 sha256:311892161a9ac570
@@ -127,6 +132,7 @@
  * meeting_voice_meter.schema.json 1.0.0 sha256:fa317e43b3e785b6
  * memory_item.schema.json 1.0.0 sha256:d8c8bfb89ccd887f
  * mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
+ * mentions.schema.json 1.0.0 sha256:64fddceaa44cd28a
  * meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
  * metering.schema.json 1.0.0 sha256:91358a776e6c033a
  * minutes.schema.json 1.0.0 sha256:b8bbe5f69603a5a8
@@ -145,14 +151,14 @@
  * scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
  * skill.schema.json 1.1.0 sha256:9eeee7768b667afa
  * spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
- * taught_skill.schema.json 1.1.0 sha256:b23321ed0cd570d4
+ * taught_skill.schema.json 1.2.0 sha256:490514d3d4a1c92e
  * team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
  * transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
  * ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
  * user_settings.schema.json 1.0.0 sha256:dfc439371ba69131
  * work_item.schema.json 1.1.0 sha256:9ee739ef8bdb7579
  * world_share.schema.json 1.0.0 sha256:89d31e9968dc95cc
- * events/registry.yaml 1.6.0 sha256:73d1110f8751fe0b
+ * events/registry.yaml 1.7.0 sha256:5a3fdd74afaf7541
  */
 
 /**
@@ -335,6 +341,147 @@ export type DeliverableFormat =
  * via the `definition` "CalendarDate".
  */
 export type CalendarDate = string;
+/**
+ * One browser session: bs_ and a ULID, made by tilo-api.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigSessionId".
+ */
+export type BrowserConfigSessionId = string;
+/**
+ * A lower-case host name (letters, digits, hyphens, dots; punycode for others). Never a URL, a port or an address with credentials.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigHost".
+ */
+export type BrowserConfigHost = string;
+/**
+ * An allowlist entry: an exact host or *.parent (BQ-84 match rules, tilo_browser.egress).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigAllowHost".
+ */
+export type BrowserConfigAllowHost = string;
+/**
+ * An https URL with no user info, no backslash and no white space.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigHttpsUrl".
+ */
+export type BrowserConfigHttpsUrl = string;
+/**
+ * The input element's type attribute, lower case.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigInputType".
+ */
+export type BrowserConfigInputType = string;
+/**
+ * A PNG, base64 without a data: prefix.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigScreenshot".
+ */
+export type BrowserConfigScreenshot = string;
+/**
+ * An https origin and path only: no user info, query or fragment.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigResumeUrl".
+ */
+export type BrowserConfigResumeUrl = string;
+/**
+ * Characters typed in one step.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigTypedChars".
+ */
+export type BrowserConfigTypedChars = number;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigActionKind".
+ */
+export type BrowserConfigActionKind =
+  "navigate" | "click" | "type" | "scroll" | "key" | "back" | "wait" | "done" | "ask";
+/**
+ * BR-01: the only things a model may propose. A proposal that does not validate is refused as invalid_action and still counts as a step.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigAction".
+ */
+export type BrowserConfigAction =
+  | BrowserConfigNavigateAction
+  | BrowserConfigClickAction
+  | BrowserConfigTypeAction
+  | BrowserConfigScrollAction
+  | BrowserConfigKeyAction
+  | BrowserConfigBackAction
+  | BrowserConfigWaitAction
+  | BrowserConfigDoneAction
+  | BrowserConfigAskAction;
+/**
+ * Text to type, one line. Never a secret: BR-04 refuses it when the redactor would change it or the field is secure.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigTypedText".
+ */
+export type BrowserConfigTypedText = string;
+/**
+ * SHA-256 (lower-case hex) of the page URL and the facts, so an act runs only on the element that was inspected (BR-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigDigest".
+ */
+export type BrowserConfigDigest = string;
+/**
+ * Why code refused or stopped a step (BR-02 to BR-12).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigReason".
+ */
+export type BrowserConfigReason =
+  | "offsite_host"
+  | "secure_field"
+  | "secret_text"
+  | "download"
+  | "commit"
+  | "login_wall"
+  | "invalid_action"
+  | "target_changed"
+  | "step_cap"
+  | "credit_cap"
+  | "paused"
+  | "stopped"
+  | "timeout"
+  | "engine_error";
+/**
+ * done: code allowed it and the worker ran it. refused: code or the worker refused it (reason set). gated: a commit waiting at a T3 gate. committed: a commit the outbox ran after a person approved it.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigVerdict".
+ */
+export type BrowserConfigVerdict = "done" | "refused" | "gated" | "committed";
+/**
+ * How a session ended (BR-07, BR-08, BR-10, BR-12).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigOutcome".
+ */
+export type BrowserConfigOutcome =
+  | "done"
+  | "stopped"
+  | "taken_over"
+  | "needs_person"
+  | "login_wall"
+  | "cap_steps"
+  | "cap_credits"
+  | "session_lost"
+  | "error";
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigControlOp".
+ */
+export type BrowserConfigControlOp = "pause" | "resume" | "stop" | "take_over";
 /**
  * The id the owner picks a bundle by: lower-case words joined by hyphens, at most 64 characters.
  *
@@ -742,7 +889,7 @@ export type MeetingRoomCitedUnits = UnitId[];
  */
 export type TaughtSkillId = string;
 /**
- * How the person showed it (FR-SKL-01): describe (typed words), upload (a finished example file), guided (clicking through in Tilo's browser) or record (a screen recording, video only, no sound).
+ * How the person showed it (FR-SKL-01): describe (typed words), upload (a file the person brings: a past recording, a document or a finished example), guided (clicking through in Tilo's browser) or record (a screen recording made on the Skills page). A recording has sound only when the person turned narration on (ADR-0051, TS-20).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "TaughtSkillMethod".
@@ -794,7 +941,7 @@ export type TeamRuleChangedDataValue = "on" | "off" | "read" | "draft" | "act";
  */
 export type TeamRuleChangedDataSwitchKey = "spend" | "share" | "undo" | "tools" | "weekend";
 /**
- * Event families of PRD 9.5, plus work_item, pinboard, mention, calendar and assistant (CC-PEOPLE, registry 1.1.0) and team_rule (registry 1.2.0, ADR-0027).
+ * Event families of PRD 9.5, plus work_item, pinboard, mention, calendar and assistant (CC-PEOPLE, registry 1.1.0) team_rule (registry 1.2.0, ADR-0027) and browser (registry 1.7.0, ADR-0051).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "EventRegistryFamily".
@@ -824,7 +971,8 @@ export type EventRegistryFamily =
   | "mention"
   | "calendar"
   | "assistant"
-  | "team_rule";
+  | "team_rule"
+  | "browser";
 /**
  * One plain-language effect.
  *
@@ -1097,6 +1245,64 @@ export type MemoryItemKind = "preference" | "fact" | "person";
  * via the `definition` "MemoryItemSource".
  */
 export type MemoryItemSource = "user" | "tilo_suggested";
+/**
+ * One typed reference. A file pins the version the picker showed.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsRef".
+ */
+export type MentionsRef =
+  | MentionsSkillRef
+  | MentionsTaughtSkillRef
+  | MentionsFileRef
+  | MentionsDriveFileRef
+  | MentionsDriveFolderRef
+  | MentionsWorldRef
+  | MentionsPersonRef
+  | MentionsConnectorRef
+  | MentionsToolRef;
+/**
+ * Google Drive's opaque file or folder id.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsDriveId".
+ */
+export type MentionsDriveId = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsDetail".
+ */
+export type MentionsDetail = string;
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsCursor".
+ */
+export type MentionsCursor = string;
+/**
+ * skill: a library skill (skills/). taught_skill: one the person or a team taught (ADR-0034). file: a stored artifact version. drive_file and drive_folder: Drive items the person picked (drive.file, ADR-0048). world: a world (project). person: a teammate (id and display name only, PE-20). connector: a connected tool. tool: one action of a connector (a function).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsKind".
+ */
+export type MentionsKind =
+  | "skill"
+  | "taught_skill"
+  | "file"
+  | "drive_file"
+  | "drive_folder"
+  | "world"
+  | "person"
+  | "connector"
+  | "tool";
+/**
+ * The refs one message carries: the multipart field refs of POST /intake (a JSON array), in the order the chips appear (MN-01).
+ *
+ * @maxItems 10
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsRefs".
+ */
+export type MentionsRefs = MentionsRef[];
 /**
  * An https URL of host, optional port and path, with no user info, query or fragment. The not-pattern rejects a final line break, which a Python validator's $ lets through.
  *
@@ -1605,7 +1811,7 @@ export interface ArtifactRef {
   label?: string;
 }
 /**
- * One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-10 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser. 1.2.0 (ADR-0050) lets a writer unit store one self-contained HTML file for a website deliverable, at most 524,288 bytes; an upload never stores HTML (AR-10).
+ * One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-10 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser. 1.2.0 (ADR-0050) lets a writer unit store one self-contained HTML file for a website deliverable, at most 524,288 bytes; an upload never stores HTML (AR-10). 1.3.0 (ADR-0051) adds the browser origin: a masked screenshot (PNG) of an agentic browser step (AR-11).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ArtifactVersion".
@@ -1650,19 +1856,19 @@ export interface ArtifactVersion {
    */
   redacted: boolean;
   /**
-   * Set for unit, render and fetch outputs (AR-05); null for uploads and restores.
+   * Set for unit, render and fetch outputs (AR-05); null for uploads, restores and browser frames (AR-11).
    */
   idempotency_key: ArtifactVersionIdempotencyKey | null;
   created_at: Timestamp;
 }
 /**
- * What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither), a restore (FR-MEM-06; no unit) or, since 1.1.0 (ADR-0029), a fetch: a file a unit's worker agent downloaded through tilo-browser (unit and agent set). Set by the store from the run, never by a runner.
+ * What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither), a restore (FR-MEM-06; no unit) or, since 1.1.0 (ADR-0029), a fetch: a file a unit's worker agent downloaded through tilo-browser (unit and agent set), or, since 1.3.0 (ADR-0051), a browser frame: a masked screenshot of a unit's agentic browser step (unit and agent set). Set by the store from the run, never by a runner.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "ArtifactVersionOrigin".
  */
 export interface ArtifactVersionOrigin {
-  kind: "unit" | "render" | "upload" | "restore" | "fetch";
+  kind: "unit" | "render" | "upload" | "restore" | "fetch" | "browser";
   unit: UnitId | null;
   agent: AgentId | null;
 }
@@ -1897,6 +2103,259 @@ export interface BriefCitation {
   kind: "preference" | "decision";
   ref: string;
   recorded_at: Timestamp;
+}
+/**
+ * config/browser.yaml (ADR-0051; FR-CON-07, FR-CON-08, PRD 12.3): the caps of the agentic browser, where a model looks at a screenshot of one isolated tilo-browser session and proposes one action at a time, and code decides (BR-01 to BR-14, browser.rules.md). The $defs hold the closed action set, the element facts the worker reports, the tilo-api to tilo-browser session bodies and the person's control body. Every key is required and no other key is allowed; the maxima are the safety ceiling, so config can only lower them.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfig".
+ */
+export interface BrowserConfig {
+  v: "1.0";
+  /**
+   * PRD 12.3: at most 3 browser sessions per world at once.
+   */
+  max_sessions_per_world: number;
+  /**
+   * Proposals per session, refused ones included (BR-08).
+   */
+  max_steps: number;
+  /**
+   * Credits one session may spend on model calls; reserved before each call (BR-08). The run and daily caps still apply.
+   */
+  max_credits_per_session: number;
+  step_timeout_s: number;
+  /**
+   * tilo-browser closes a session with no request for this long (BR-12).
+   */
+  idle_timeout_s: number;
+  viewport: BrowserConfigViewport;
+  /**
+   * How many of the latest frames go to the model on each call; older steps go as the text history only (cost, PRD 6.6).
+   */
+  model_frames: number;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigViewport".
+ */
+export interface BrowserConfigViewport {
+  width: number;
+  height: number;
+}
+/**
+ * A point on the screenshot in a 1000 by 1000 grid (0 is the left or top edge, 999 the right or bottom), whatever the viewport.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigPoint".
+ */
+export interface BrowserConfigPoint {
+  x: number;
+  y: number;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigNavigateAction".
+ */
+export interface BrowserConfigNavigateAction {
+  kind: "navigate";
+  url: BrowserConfigHttpsUrl;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigClickAction".
+ */
+export interface BrowserConfigClickAction {
+  kind: "click";
+  at: BrowserConfigPoint;
+}
+/**
+ * Types text into the field at the point. submit true presses Enter after it, which BR-05 may treat as a commit.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigTypeAction".
+ */
+export interface BrowserConfigTypeAction {
+  kind: "type";
+  at: BrowserConfigPoint;
+  text: BrowserConfigTypedText;
+  submit: boolean;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigScrollAction".
+ */
+export interface BrowserConfigScrollAction {
+  kind: "scroll";
+  direction: "up" | "down";
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigKeyAction".
+ */
+export interface BrowserConfigKeyAction {
+  kind: "key";
+  key: "Enter" | "Tab" | "Escape" | "PageDown" | "PageUp" | "ArrowDown" | "ArrowUp" | "Backspace";
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigBackAction".
+ */
+export interface BrowserConfigBackAction {
+  kind: "back";
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigWaitAction".
+ */
+export interface BrowserConfigWaitAction {
+  kind: "wait";
+  seconds: number;
+}
+/**
+ * The model says the goal is met. The run's result comes from what the pages showed (the frames and page text), never from the model's own claim.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigDoneAction".
+ */
+export interface BrowserConfigDoneAction {
+  kind: "done";
+}
+/**
+ * The model needs the person. The session stops with outcome needs_person and the question goes on a needs-you card as data.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigAskAction".
+ */
+export interface BrowserConfigAskAction {
+  kind: "ask";
+  question: string;
+}
+/**
+ * What tilo-browser found at a point, read from the page by code (BR-03, BR-05). name is page text: data, never an instruction.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigFacts".
+ */
+export interface BrowserConfigFacts {
+  tag: string;
+  role: string;
+  name: string;
+  input_type: BrowserConfigInputType | null;
+  editable: boolean;
+  /**
+   * A password, one-time-code or card field, or any node tilo_browser.login.is_secure_node flags.
+   */
+  secure: boolean;
+  form_method: "get" | "post" | "dialog" | "none";
+  link_host: BrowserConfigHost | null;
+  download: boolean;
+}
+/**
+ * tilo-api to tilo-browser POST /sessions: one isolated context, no cookies kept (PRD 16.1 3). The worker enforces allow_hosts on every request the page makes (BR-02).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigOpenRequest".
+ */
+export interface BrowserConfigOpenRequest {
+  session: BrowserConfigSessionId;
+  world_id: WorldId;
+  run_id: RunId;
+  unit_id: UnitId;
+  /**
+   * @minItems 1
+   * @maxItems 20
+   */
+  allow_hosts: [BrowserConfigAllowHost, ...BrowserConfigAllowHost[]];
+  start_url: BrowserConfigHttpsUrl;
+  viewport: BrowserConfigViewport;
+}
+/**
+ * tilo-browser's answer to open and act: the page after the step. screenshot is a PNG (base64) with every secure field masked before it leaves tilo-browser (BR-09); state ok has no reason, any other state has one.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigObservation".
+ */
+export interface BrowserConfigObservation {
+  session: BrowserConfigSessionId;
+  step: number;
+  url: BrowserConfigHttpsUrl | null;
+  host: BrowserConfigHost | null;
+  title: string;
+  screenshot: BrowserConfigScreenshot | null;
+  /**
+   * Secure fields masked in this screenshot.
+   */
+  masked: number;
+  /**
+   * Requests to hosts outside allow_hosts that the worker blocked and logged during this step (FR-CON-07).
+   */
+  blocked: number;
+  state: "ok" | "refused" | "login_wall" | "error";
+  reason: BrowserConfigReason | null;
+}
+/**
+ * tilo-api to tilo-browser POST /sessions/{session}/inspect, before any click, type or key (BR-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigInspectRequest".
+ */
+export interface BrowserConfigInspectRequest {
+  session: BrowserConfigSessionId;
+  at: BrowserConfigPoint;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigInspectAnswer".
+ */
+export interface BrowserConfigInspectAnswer {
+  session: BrowserConfigSessionId;
+  facts: BrowserConfigFacts;
+  digest: BrowserConfigDigest;
+}
+/**
+ * tilo-api to tilo-browser POST /sessions/{session}/act: one action code allowed. A click or type names the digest of its inspect (BR-03). outbox_id is set only by the outbox dispatcher for a commit a person approved (BR-05); the worker refuses a commit-like target without one.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigActRequest".
+ */
+export interface BrowserConfigActRequest {
+  session: BrowserConfigSessionId;
+  step: number;
+  action: BrowserConfigAction;
+  digest: BrowserConfigDigest | null;
+  outbox_id: Ulid | null;
+}
+/**
+ * tilo-api to tilo-browser DELETE /sessions/{session}: closes the context and drops everything it held (BR-12).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigCloseRequest".
+ */
+export interface BrowserConfigCloseRequest {
+  session: BrowserConfigSessionId;
+  outcome: BrowserConfigOutcome;
+}
+/**
+ * web to tilo-api POST /worlds/{world_id}/browser/{session}/control: the world owner pauses, resumes, stops or takes over (BR-10).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigControlRequest".
+ */
+export interface BrowserConfigControlRequest {
+  op: BrowserConfigControlOp;
+}
+/**
+ * state after the op. resume_url is set only for take_over: the last page's origin and path, no query or fragment, so the person can carry on in their own browser.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigControlAnswer".
+ */
+export interface BrowserConfigControlAnswer {
+  session: BrowserConfigSessionId;
+  op: BrowserConfigControlOp;
+  state: "running" | "paused" | "ended";
+  resume_url: BrowserConfigResumeUrl | null;
 }
 /**
  * config/byok.yaml (ADR-0041 decisions 5 and 12, BK-12, BK-13, BK-16, BK-20; Proposed and inert: enabled is false in the shipped file, and while it is every route and Router ignores the file). The master flag, the most an org may set for its own key's daily spend, connectors' per-org rate cap on generate, the version of the consent line the owner confirms, and the bundles: an allow-list the owner picks from by id and never types a model id, a role or a URL into. A bundle names only roles that generate or verify work (never safety, search or speech), each with its own primary and fallback profile, and holds no key, secret name, URL or provider field: its profiles are ordinary entries of config/models*.yaml with credential org (providers.schema.json 1.4.0). The schema checks this file alone; the rules that compare it with config/models*.yaml and config/prices.yaml (BK-12, BK-13) are in byok.rules.md and the loader. Example values only: the user chooses the final models and the ceiling.
@@ -3031,6 +3490,62 @@ export interface UiActionUntag {
   kind: "untag";
   pin_id: PinId;
   user: UserId;
+}
+/**
+ * data of browser.acted (registry 1.7.0, ADR-0051): one step of an agentic browser session, written after the worker answered, so the Browser panel shows only what happened (HR-1, BR-09). verdict done: code allowed the action and the worker ran it; refused: reason says why and nothing ran; gated: a commit waiting at a T3 gate (its approval.requested follows); committed: the outbox ran a commit a person approved, after its data.transfer (BR-05). frame is the masked screenshot after the step (origin browser), null when none. host is the page's host after the step; chars counts typed characters (a type action only). Never typed text, a full URL or page text (BR-13). authz null: a commit's authorisation is on its approval.resolved and data.transfer.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserActedData".
+ */
+export interface BrowserActedData {
+  session: BrowserConfigSessionId;
+  step: number;
+  kind: BrowserConfigActionKind;
+  verdict: BrowserConfigVerdict;
+  reason: BrowserConfigReason | null;
+  host: BrowserConfigHost | null;
+  chars: BrowserConfigTypedChars | null;
+  masked: number;
+  blocked: number;
+  frame: ArtifactRef | null;
+}
+/**
+ * data of browser.controlled (registry 1.7.0, ADR-0051, BR-10): the world owner paused, resumed, stopped or took over a browser session from the Browser panel. actor is that person, target the Browser Station building, authz null (control never authorises a side effect; it only holds or ends one). The panel shows Paused only after this event (HR-1). stop and take_over are followed by browser.stopped.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserControlledData".
+ */
+export interface BrowserControlledData {
+  session: BrowserConfigSessionId;
+  op: BrowserConfigControlOp;
+  /**
+   * The last step recorded when the op took effect.
+   */
+  step: number;
+}
+/**
+ * data of browser.started (registry 1.7.0, ADR-0051, FR-CON-07): tilo-browser opened an isolated session for a unit and showed its first page. actor is the unit's agent, target the Browser Station building; authz null (browsing and reading are T1, BR-05). host is the start page's host; hosts counts the allowlist; frame is the first masked screenshot (an artifact of origin browser, BR-09), null when the page gave none. Never a full URL, query or page text (BR-13).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserStartedData".
+ */
+export interface BrowserStartedData {
+  session: BrowserConfigSessionId;
+  host: BrowserConfigHost;
+  hosts: number;
+  max_steps: number;
+  frame: ArtifactRef | null;
+}
+/**
+ * data of browser.stopped (registry 1.7.0, ADR-0051): a browser session ended and tilo-browser dropped its context (BR-12). outcome says how (BR-07, BR-08, BR-10); steps counts proposals, refused ones included. A login wall also raises the FR-CON-08 needs-you card, and needs_person a needs-you card with the model's question as data. actor is the unit's agent, or the person for stopped and taken_over; authz null.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserStoppedData".
+ */
+export interface BrowserStoppedData {
+  session: BrowserConfigSessionId;
+  outcome: BrowserConfigOutcome;
+  steps: number;
 }
 /**
  * data of budget.granted (PRD 9.5). A person, or a policy under its threshold, approved spending (FR-INT-08); spending credits is a T1 side effect (PRD 10.4), so the event carries authz.
@@ -5761,6 +6276,130 @@ export interface MentionRemoval {
   at: Timestamp;
 }
 /**
+ * The @ picker of the chat composer and the Home prompt box (ADR-0051, MN-01 to MN-10 in mentions.rules.md): one page of GET /v1/mentions. Each option names a typed reference (ref) the person may tag; a message carries only refs (ids), never content, and tilo-api resolves every ref again with the sender's own permissions before use (MN-02). Not the pinboard @mention of a teammate (mention.schema.json).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "Mentions".
+ */
+export interface Mentions {
+  /**
+   * @maxItems 50
+   */
+  items: MentionsOption[];
+  next_cursor: MentionsCursor | null;
+}
+/**
+ * One picker row. label and detail are written by tilo-api from the record (a teammate's display name only, PE-20) and are for display: the message sends back only ref (MN-08). scope: mine (the person's own), team (built or shared by one of the person's current teams) or library (Tilo's skill library). state: ready, needs_setup (the connector is not connected; the run will ask) or limited (a Drive folder: Tilo reads only files picked or made by Tilo in it).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsOption".
+ */
+export interface MentionsOption {
+  ref: MentionsRef;
+  label: string;
+  detail: MentionsDetail | null;
+  scope: "mine" | "team" | "library";
+  state: "ready" | "needs_setup" | "limited";
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsSkillRef".
+ */
+export interface MentionsSkillRef {
+  kind: "skill";
+  id: SkillId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsTaughtSkillRef".
+ */
+export interface MentionsTaughtSkillRef {
+  kind: "taught_skill";
+  id: TaughtSkillId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsFileRef".
+ */
+export interface MentionsFileRef {
+  kind: "file";
+  id: ArtifactId;
+  version: number;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsDriveFileRef".
+ */
+export interface MentionsDriveFileRef {
+  kind: "drive_file";
+  id: MentionsDriveId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsDriveFolderRef".
+ */
+export interface MentionsDriveFolderRef {
+  kind: "drive_folder";
+  id: MentionsDriveId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsWorldRef".
+ */
+export interface MentionsWorldRef {
+  kind: "world";
+  id: WorldId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsPersonRef".
+ */
+export interface MentionsPersonRef {
+  kind: "person";
+  id: UserId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsConnectorRef".
+ */
+export interface MentionsConnectorRef {
+  kind: "connector";
+  id: ConnectorId;
+}
+/**
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsToolRef".
+ */
+export interface MentionsToolRef {
+  kind: "tool";
+  id: ActionType;
+}
+/**
+ * The query of GET /v1/mentions. q matches labels case-insensitively by code (no model); kinds empty means all kinds.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsListRequest".
+ */
+export interface MentionsListRequest {
+  q: string;
+  /**
+   * @maxItems 9
+   */
+  kinds: MentionsKind[];
+  cursor: MentionsCursor | null;
+  limit: number;
+}
+/**
+ * The 422 body when a ref cannot be used. A ref the sender may not read gets exactly the same body as one that does not exist (MN-02).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "MentionsRefError".
+ */
+export interface MentionsRefError {
+  error: "ref_unavailable";
+  index: number;
+}
+/**
  * The HUD meter's state for one run (PRD 14.4, FR-MTR-07): credits used (the sum of the run's event credits), credits saved (origin cost minus lookup cost over accepted reuses, PRD 14.3), time saved (estimate) and the run's budget. packages/metering computes it from the run's events up to last_seq, and apps/web renders it. Rules MT-05 and MT-06 in contracts/metering.rules.md.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -7140,7 +7779,7 @@ export interface SpendCapsConfig {
   rate_limit_window_s: number;
 }
 /**
- * A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix, real_run, run_answer and helpers_report are the records and the report around it (real_run and run_answer are 1.1.0, ADR-0037). Rules TS-01 to TS-17 are in taught_skill.rules.md.
+ * A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix, real_run, run_answer and helpers_report are the records and the report around it (real_run and run_answer are 1.1.0, ADR-0037). 1.2.0 (ADR-0051) adds the optional inputs and hosts. Rules TS-01 to TS-21 are in taught_skill.rules.md.
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "TaughtSkill".
@@ -7173,6 +7812,19 @@ export interface TaughtSkill {
   trigger: TaughtSkillTrigger;
   estimates: TaughtSkillEstimates | null;
   tool_access: TaughtSkillToolAccess;
+  /**
+   * 1.2.0 (ADR-0051, TS-19): what the person gives each run, as named slots. Left out when the skill takes none. The values a run gets are data, never instructions.
+   *
+   * @maxItems 8
+   */
+  inputs?: TaughtSkillInput[];
+  /**
+   * 1.2.0 (ADR-0051, TS-18): the web hosts the person approved for the skill's browser steps, exact hosts only. Left out when the skill has no browser step; required when it has one (schema). A run's browser allowlist is these plus the hosts typed in its request (BR-02).
+   *
+   * @minItems 1
+   * @maxItems 10
+   */
+  hosts?: [BrowserConfigHost, ...BrowserConfigHost[]];
   /**
    * FR-SKL-06: runs of this skill rated up by the person whose run it was (TS-08); try runs never count.
    */
@@ -7275,6 +7927,18 @@ export interface TaughtSkillEstimates {
  */
 export interface TaughtSkillToolAccess {
   [k: string]: ToolAccessLevel;
+}
+/**
+ * One input slot: name is a code key, label the words the person sees, kind how the run form asks for it.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "TaughtSkillInput".
+ */
+export interface TaughtSkillInput {
+  name: string;
+  label: string;
+  kind: "text" | "file" | "date" | "person" | "url" | "number";
+  required: boolean;
 }
 /**
  * FR-SKL-03: one try run, at orgs/{org}/taught_skills/{skill}/try_runs/{id}. Reads are real, writes are recorded as intents in a dry-run outbox and sent nowhere, so side_effects is 0 by construction (TS-10). match = matched / total. Each step ends matched, skipped or not reached; asked counts the steps that paused to ask.
@@ -7782,6 +8446,10 @@ export const EVENT_TYPES = [
   "assistant.replied",
   "team_rule.changed",
   "world.share_changed",
+  "browser.started",
+  "browser.acted",
+  "browser.controlled",
+  "browser.stopped",
 ] as const;
 export type RegisteredEventType = (typeof EVENT_TYPES)[number];
 
@@ -7893,6 +8561,10 @@ export interface EventDataByType {
   "assistant.replied": AssistantRepliedData;
   "team_rule.changed": TeamRuleChangedData;
   "world.share_changed": WorldShareChangedData;
+  "browser.started": BrowserStartedData;
+  "browser.acted": BrowserActedData;
+  "browser.controlled": BrowserControlledData;
+  "browser.stopped": BrowserStoppedData;
 }
 
 /** A registered TiloEvent, discriminated on `type`. */
@@ -7903,7 +8575,7 @@ export type RegisteredEvent = {
 export const EVENT_REGISTRY: EventRegistry & {
   types: { readonly [T in RegisteredEventType]: EventRegistryEntry };
 } = {
-  "version": "1.6.0",
+  "version": "1.7.0",
   "unknown_types": "trace_only",
   "types": {
     "world.requested": {
@@ -9285,6 +9957,62 @@ export const EVENT_REGISTRY: EventRegistry & {
       "trace_row": "team={data.team} state={data.state}",
       "data_schema": "events/data/world.share_changed.schema.json",
       "fixture": "fixtures/events/valid/world.share_changed.json"
+    },
+    "browser.started": {
+      "family": "browser",
+      "verb": "started",
+      "priority": "should",
+      "pillar": "P6",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The Browser Station's screen lights up with the first page.",
+      "hud_effect": "The Browser panel opens with the first frame and the step count.",
+      "story_template": "{actor} opened a browser on {data.host}.",
+      "trace_row": "session={data.session} host={data.host} hosts={data.hosts} max_steps={data.max_steps}",
+      "data_schema": "events/data/browser.started.schema.json",
+      "fixture": "fixtures/events/valid/browser.started.json"
+    },
+    "browser.acted": {
+      "family": "browser",
+      "verb": "acted",
+      "priority": "should",
+      "pillar": "P6",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The Browser Station's screen shows the new frame.",
+      "hud_effect": "The Browser panel adds the step to its log and shows the frame.",
+      "story_template": "{actor} took browser step {data.step}: {data.kind} ({data.verdict}).",
+      "trace_row": "step={data.step} kind={data.kind} verdict={data.verdict} reason={data.reason} host={data.host} blocked={data.blocked}",
+      "data_schema": "events/data/browser.acted.schema.json",
+      "fixture": "fixtures/events/valid/browser.acted.json"
+    },
+    "browser.controlled": {
+      "family": "browser",
+      "verb": "controlled",
+      "priority": "should",
+      "pillar": "P4",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The Browser Station's screen dims while paused and brightens on resume.",
+      "hud_effect": "The Browser panel shows Paused, Running or Ended.",
+      "story_template": "{actor} chose {data.op} for the browser.",
+      "trace_row": "session={data.session} op={data.op} step={data.step}",
+      "data_schema": "events/data/browser.controlled.schema.json",
+      "fixture": "fixtures/events/valid/browser.controlled.json"
+    },
+    "browser.stopped": {
+      "family": "browser",
+      "verb": "stopped",
+      "priority": "should",
+      "pillar": "P6",
+      "default_severity": "info",
+      "side_effect": false,
+      "world_effect": "The Browser Station's screen goes dark.",
+      "hud_effect": "The Browser panel shows how the session ended.",
+      "story_template": "The browser session ended after {data.steps} steps ({data.outcome}).",
+      "trace_row": "session={data.session} outcome={data.outcome} steps={data.steps}",
+      "data_schema": "events/data/browser.stopped.schema.json",
+      "fixture": "fixtures/events/valid/browser.stopped.json"
     }
   }
 };

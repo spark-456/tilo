@@ -1,0 +1,122 @@
+{
+  "id": "tsk_01JB6Z0000000000000000INV",
+  "org_id": "org_example",
+  "owner": "u_priya",
+  "name": "Log supplier invoices",
+  "scope": {
+    "kind": "team",
+    "team": "tm_finance"
+  },
+  "status": "learning",
+  "paused": false,
+  "method": "record",
+  "captured": [
+    {
+      "text": "Opened the new invoice email in the Accounts inbox",
+      "artifact": {
+        "artifact_id": "art_capture_01",
+        "version": 1
+      }
+    },
+    {
+      "text": "Opened the attached PDF invoice",
+      "artifact": {
+        "artifact_id": "art_capture_01",
+        "version": 1
+      }
+    },
+    {
+      "text": "Copied supplier, amount and due date into the sheet",
+      "artifact": {
+        "artifact_id": "art_capture_01",
+        "version": 1
+      }
+    },
+    {
+      "text": "Replied to the supplier with a receipt note",
+      "artifact": null
+    }
+  ],
+  "plan": [
+    {
+      "text": "Check the Accounts inbox for new supplier invoices",
+      "tool": "gmail",
+      "action": "read_email",
+      "verb": "read",
+      "ask_first": false,
+      "must_ask": false
+    },
+    {
+      "text": "Read supplier, invoice number, amount and due date from the PDF",
+      "tool": "google_drive",
+      "action": "read_file",
+      "verb": "read",
+      "ask_first": false,
+      "must_ask": false
+    },
+    {
+      "text": "Save the row to the Invoices 2026 file in Drive",
+      "tool": "google_drive",
+      "action": "save_file",
+      "verb": "write",
+      "ask_first": true,
+      "must_ask": false
+    },
+    {
+      "text": "Send the supplier a short receipt note",
+      "tool": "gmail",
+      "action": "send_email",
+      "verb": "send",
+      "ask_first": true,
+      "must_ask": true
+    },
+    {
+      "text": "Look up the supplier's latest price list on their site",
+      "tool": "web",
+      "action": "browse_web",
+      "verb": "read",
+      "ask_first": false,
+      "must_ask": false
+    }
+  ],
+  "question": {
+    "text": "Some invoices arrive as a link, not a PDF. What should I do?",
+    "options": ["Open the link", "Ask me each time", "Skip and flag it"],
+    "answer": 1
+  },
+  "trigger": {
+    "kind": "schedule",
+    "schedule_id": "sched_0123456789abcdef01234567",
+    "event": null
+  },
+  "estimates": {
+    "credits_per_run": 76,
+    "seconds_per_run": 68,
+    "asks_per_run": 2,
+    "source": "prior",
+    "prices_as_of": "2026-10-08"
+  },
+  "tool_access": {
+    "gmail": "act",
+    "google_drive": "draft"
+  },
+  "good_runs": 2,
+  "version": 3,
+  "created_at": "2026-10-08T10:00:00.000Z",
+  "updated_at": "2026-10-09T09:00:00.000Z",
+  "hosts": ["*.example.com"],
+  "inputs": [
+    {
+      "name": "supplier",
+      "label": "Supplier name",
+      "kind": "text",
+      "required": true
+    },
+    {
+      "name": "invoice",
+      "label": "Invoice file",
+      "kind": "file",
+      "required": false
+    }
+  ]
+}

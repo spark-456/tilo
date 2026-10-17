@@ -23,7 +23,7 @@ from tilo_api.meeting_bot import attend_meeting
 from tilo_api.meeting_bot_rpc import MeetingBotRpc, get_meeting_bot_client
 from tilo_api.meeting_brief import read_brief
 from tilo_api.meeting_draft_cleanup import get_meeting_draft_cleanup
-from tilo_api.meeting_host import HostSeams, get_host_seams, host_meeting
+from tilo_api.meeting_host import HostSeams, get_host_seams, host_meeting, start_meeting
 from tilo_api.meeting_host_rpc import MeetingHostRpc
 from tilo_api.meeting_join import owner_join
 from tilo_api.meeting_voice_claims import AttendClaims, get_attend_claims
@@ -41,6 +41,7 @@ from tilo_api.people_writes import (
     PersonIn,
     Refusal,
     RoleIn,
+    StartIn,
     TeamIn,
     Writer,
     add_team,
@@ -359,6 +360,25 @@ def host_meeting_route(
     if _MEETING_ID.fullmatch(meeting_id) is None:
         raise _not_found()
     return _answer(lambda: host_meeting(_writer(principal, stores, clock), meeting_id, seams))
+
+
+@router.post("/v1/meetings/{meeting_id}/start")
+def start_meeting_route(
+    meeting_id: str,
+    body: Annotated[StartIn, Depends(json_body(StartIn))],
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    _new_work: Annotated[deps.Mode, Depends(deps.get_work_mode)],  # hosting starts a bot: refused at a cap
+    seams: Annotated[HostSeams, Depends(get_host_seams)],
+) -> dict[str, Any]:
+    """The owner's click is the approval (MEET-SIMPLE): host the meeting, answer its one gate card as the owner and
+    send the invitation to exactly `invited`, in one request. Same run, card, policy and outbox as `/host`."""
+    if _MEETING_ID.fullmatch(meeting_id) is None:
+        raise _not_found()
+    return _answer(
+        lambda: start_meeting(_writer(principal, stores, clock), principal, meeting_id, frozenset(body.invited), seams)
+    )
 
 
 @router.post("/v1/meetings/{meeting_id}/delete")

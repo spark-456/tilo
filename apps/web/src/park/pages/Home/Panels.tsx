@@ -86,9 +86,11 @@ function GoLink({ href, onGo, children }: { href: string; onGo: () => void; chil
   );
 }
 
-const PILL: Record<"needs" | "run" | "new", string> = {
+const PILL: Record<"needs" | "running" | "finished" | "scheduled" | "new", string> = {
   needs: "Needs you",
-  run: "Working",
+  running: "Working",
+  finished: "Done",
+  scheduled: "Scheduled",
   new: "Starting",
 };
 const RING = 2 * Math.PI * 19;
@@ -104,9 +106,9 @@ export interface WorldsProps {
   readonly onWorlds: () => void;
 }
 
-/** Your worlds: the worlds that run or need you, as cards (three at most; All worlds has the rest). */
+/** The newest served worlds, as cards; each state and progress line comes from the Api. */
 export function WorldsSection({ served, rows, sample, night, onWorld, onWorlds }: WorldsProps) {
-  const title = served ? "Your worlds" : "Sample worlds";
+  const title = served ? "Recent worlds" : "Sample worlds";
   return (
     <section aria-label={title} className="park-home-section">
       <div className="park-home-section__head">
@@ -122,8 +124,12 @@ export function WorldsSection({ served, rows, sample, night, onWorld, onWorlds }
       ) : (
         <div className="park-home-cards">
           {rows.slice(0, 3).map((r) => {
-            const state = r.needs ? "needs" : r.world.isNew ? "new" : "run";
-            const known = !(served && r.world.prog === undefined) && !r.world.isNew;
+            const state = r.needs ? "needs" : r.world.isNew ? "new" : r.world.st;
+            const variant = state === "running" ? "run" : state === "finished" ? "done" : state;
+            const known =
+              (state === "needs" || state === "running") &&
+              !(served && r.world.prog === undefined) &&
+              !r.world.isNew;
             return (
               <button
                 key={r.world.id}
@@ -133,7 +139,7 @@ export function WorldsSection({ served, rows, sample, night, onWorld, onWorlds }
               >
                 <span className="park-home-live__art">
                   <span className="park-home-live__pic">{worldArt(r.world, night, 84)}</span>
-                  <span className={`park-home-pill park-home-pill--${state}`}>
+                  <span className={`park-home-pill park-home-pill--${variant}`}>
                     <span className="park-home-pill__dot" aria-hidden="true" />
                     {PILL[state]}
                   </span>
@@ -161,7 +167,7 @@ export function WorldsSection({ served, rows, sample, night, onWorld, onWorlds }
                           cx="24"
                           cy="24"
                           r="19"
-                          className={`park-home-ring__fill park-home-ring__fill--${state}`}
+                          className={`park-home-ring__fill park-home-ring__fill--${variant}`}
                           strokeDasharray={RING.toFixed(1)}
                           strokeDashoffset={(RING * (1 - r.prog / 100)).toFixed(1)}
                         />

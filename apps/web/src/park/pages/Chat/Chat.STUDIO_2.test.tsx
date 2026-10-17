@@ -1,12 +1,7 @@
 // @vitest-environment happy-dom
-// UI-STUDIO-2 Chat (design/studio-v2 "Tilo S Chat"): a direct question goes to the real Quick answer path once, the
-// helper's pose follows the request state only (reading in flight, talking while a new answer shows, done after),
-// a fixture answer is labelled a sample, nothing is listed that the server did not keep, and the scene is display
-// state that survives blocked storage.
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fakeScheduler, stubApp } from "../../../../test-support/park/appHarness";
-import { fakeApi } from "../../../../test-support/park/appHarness";
+import { fakeApi, fakeScheduler, stubApp } from "../../../../test-support/park/appHarness";
 import { cleanup, mount, q, qa } from "../../../../test-support/park/componentsHarness";
 import { settle, textOf } from "../../../../test-support/park/homeHarness";
 import { gate, liveSourced } from "../../../../test-support/park/liveHomeHarness";
@@ -152,6 +147,43 @@ describe("STUDIO_2 Chat: the helper's mood follows the real request", () => {
 });
 
 describe("STUDIO_2 Chat: honest data", () => {
+  it("CX_T_CHAT renders each real turn as message bubbles with an inline answer card", async () => {
+    const api = quickApi(async () => ({
+      data: { kind: "answered", text: "The meeting is at 2 pm.", cost: { credits: 0.02 } },
+      source: "live",
+    }));
+    const { el } = await mountChat(api);
+    await send(el, "When is the meeting?");
+
+    expect(textOf(q(el, '[role="log"] .park-chat-you'))).toBe("When is the meeting?");
+    expect(textOf(q(el, '[role="log"] .park-chat-result-card'))).toContain(
+      "The meeting is at 2 pm.",
+    );
+    expect(textOf(q(el, '[role="log"] .park-chat-result-card'))).toMatch(/0\.02 credits/i);
+    expect(qa(el, '[role="log"] .park-chat-result-card')).toHaveLength(1);
+    expect(status(el)).toBe("Tilo is answering");
+  });
+
+  it("CX_T_CHAT lists only current-session questions and New chat clears them", async () => {
+    const api = quickApi(async () => ({
+      data: { kind: "answered", text: "A real answer.", cost: null },
+      source: "live",
+    }));
+    const { el } = await mountChat(api);
+    const history = q(el, 'nav[aria-label="Chat history"]');
+    expect(textOf(history)).toContain("Current chat");
+    expect(textOf(history)).not.toContain("Yesterday");
+    expect(qa(history, "a")).toHaveLength(0);
+    await send(el, "First live question");
+    await send(el, "Second live question");
+    expect(qa(el, ".park-chat-turn .tt-bd")).toHaveLength(2);
+    expect(qa(history, "a").map(textOf)).toEqual(["First live question", "Second live question"]);
+    expect(textOf(q(el, '[role="log"]'))).toContain("A real answer.");
+    act(() => q<HTMLButtonElement>(history, "button").click());
+    expect(qa(history, "a")).toHaveLength(0);
+    expect(textOf(q(el, '[role="log"]'))).toContain("Past chats are not kept");
+  });
+
   it("STUDIO_2 chat on the fixture Api the answer is labelled a sample and shows no cost", async () => {
     const { el } = await mountChat(fakeApi());
     await send(el, "Anything");
@@ -189,7 +221,7 @@ describe("STUDIO_2 Chat: honest data", () => {
     expect(window.location.search).not.toContain("Gokarna");
   });
 
-  it("STUDIO_2 chat a switch offer says why in words and offers Make it a world", async () => {
+  it("CX_T_CHAT switch card says why and offers Make it a world", async () => {
     const api = quickApi(async () => ({
       data: { kind: "switch", reason: "side_effect" },
       source: "live",
@@ -197,6 +229,10 @@ describe("STUDIO_2 Chat: honest data", () => {
     const { el } = await mountChat(api);
     await send(el, "Email my suppliers");
     expect(textOf(q(el, '[role="log"]'))).toContain("This needs a world.");
+    const card = q(el, ".park-chat-world-card");
+    expect(textOf(card)).toContain("It would send, post, delete or book something");
+    expect(textOf(card)).not.toMatch(/credits|workstreams|people|planned/i);
+    expect(textOf(q(card, "button"))).toBe("Make it a world →");
     expect(mood(el)).toBe("idle");
   });
 });

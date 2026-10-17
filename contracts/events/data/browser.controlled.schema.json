@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/browser.controlled.schema.json",
+  "x-version": "1.0.0",
+  "title": "BrowserControlledData",
+  "description": "data of browser.controlled (registry 1.7.0, ADR-0051, BR-10): the world owner paused, resumed, stopped or took over a browser session from the Browser panel. actor is that person, target the Browser Station building, authz null (control never authorises a side effect; it only holds or ends one). The panel shows Paused only after this event (HR-1). stop and take_over are followed by browser.stopped.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["session", "op", "step"],
+  "properties": {
+    "session": { "$ref": "../../browser.schema.json#/$defs/session_id" },
+    "op": { "$ref": "../../browser.schema.json#/$defs/control_op" },
+    "step": {
+      "description": "The last step recorded when the op took effect.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 60
+    }
+  }
+}

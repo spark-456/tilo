@@ -4,7 +4,7 @@ import { useLoopPaused } from "./loops";
 import "./PoolLoader.css";
 
 type PoolPhase = "leap" | "swim" | "sink";
-export type PoolLoaderEvent = { readonly type: string };
+export type PoolLoaderEvent = { readonly type: string; readonly ts?: string };
 export type PoolLoaderProps = {
   children: ReactNode;
 } & (
@@ -12,9 +12,10 @@ export type PoolLoaderProps = {
   | { kind: "task"; events: readonly PoolLoaderEvent[] }
 );
 
-const SITE_DELAY_MS = 300;
+const MIN_LOAD_MS = 300;
 const LEAP_MS = 2600;
 const SINK_MS = 2000;
+const RECENT_END_MS = 10_000;
 const SITE_COPY = {
   leap: ["Loading Tilo", "Fetching your workspace"],
   swim: ["Still loading", "The request is still loading"],
@@ -39,8 +40,9 @@ const DROPS = Array.from({ length: 12 }, (_, i) => {
 });
 
 /**
- * Shared Tilo T loader. Site loads wait 300 ms before appearing; task loaders begin only after world.started and
- * stay in swim until world.planned. The screen behind remains mounted and aria-busy while its request is active.
+ * Shared Tilo T loader. Site and task loads wait 300 ms before appearing; task event timestamps preserve that gate
+ * when world.started and world.planned arrive together. The leap finishes before a completed task sinks; active tasks
+ * swim after the leap. The screen behind remains mounted and aria-busy while active.
  *
  * Task API: <PoolLoader kind="task" events={worldEvents}>…page…</PoolLoader>
  * Site API: <PoolLoader kind="site" loading={isLoading}>…page…</PoolLoader>
@@ -49,31 +51,56 @@ export function PoolLoader(props: PoolLoaderProps) {
   const poolRef = useRef<HTMLDivElement>(null);
   const paused = useLoopPaused(poolRef);
   const isTask = props.kind === "task";
-  const started = isTask && props.events.some((event) => event.type === "world.started");
-  const planned = isTask && props.events.some((event) => event.type === "world.planned");
-  const failed = isTask && props.events.some((event) => event.type === "world.failed");
+  const startedEvent = isTask ? props.events.find((event) => event.type === "world.started") : undefined;
+  const plannedEvent = isTask ? props.events.find((event) => event.type === "world.planned") : undefined;
+  const failedEvent = isTask ? props.events.find((event) => event.type === "world.failed") : undefined;
+  const started = startedEvent !== undefined;
+  const planned = plannedEvent !== undefined;
+  const failed = failedEvent !== undefined;
+  const terminalEvent = plannedEvent ?? failedEvent;
+  const recordedDuration =
+    startedEvent?.ts && terminalEvent?.ts
+      ? Date.parse(terminalEvent.ts) - Date.parse(startedEvent.ts)
+      : Number.NaN;
   const active =
     props.kind === "task" ? started && !planned && !failed : props.loading;
   const activeRef = useRef(active);
   activeRef.current = active;
   const [visible, setVisible] = useState(false);
   const [phase, setPhase] = useState<PoolPhase>("leap");
+  // One play per mount: without it the buffered replay below re-opened the overlay every time it closed.
+  const playedRef = useRef(false);
 
   useEffect(() => {
-    if (!active) return;
     if (isTask) {
-      // triggeredBy: world.started (recorded event)
-      setPhase("leap");
-      setVisible(true);
-      return;
+      if (!started || visible || playedRef.current) return;
+      if (!active) {
+        // Buffered world.started plus a terminal event plays only when their real event times exceed the 300 ms gate,
+        // and only for a run that ended just now; a world opened after it ended shows at once.
+        if (!Number.isFinite(recordedDuration) || recordedDuration < MIN_LOAD_MS) return;
+        const endedAt = terminalEvent?.ts ? Date.parse(terminalEvent.ts) : Number.NaN;
+        if (!Number.isFinite(endedAt) || Date.now() - endedAt > RECENT_END_MS) return;
+        playedRef.current = true;
+        setPhase("leap");
+        setVisible(true);
+        return;
+      }
+      // triggeredBy: world.started (recorded event); short runs cancel this 300 ms reveal.
+      const timer = window.setTimeout(() => {
+        playedRef.current = true;
+        setPhase("leap");
+        setVisible(true);
+      }, MIN_LOAD_MS);
+      return () => window.clearTimeout(timer);
     }
+    if (!active) return;
     // triggeredBy: a site request that remains pending for more than 300 ms
     const timer = window.setTimeout(() => {
       setPhase("leap");
       setVisible(true);
-    }, SITE_DELAY_MS);
+    }, MIN_LOAD_MS);
     return () => window.clearTimeout(timer);
-  }, [active, isTask]);
+  }, [active, isTask, recordedDuration, started, terminalEvent, visible]);
 
   useEffect(() => {
     if (!visible || phase !== "leap") return;
@@ -143,6 +170,7 @@ export function PoolLoader(props: PoolLoaderProps) {
                 <div className="tt-pool__buddy tt-pool__buddy--leap tt-pool__leap">
                   <Buddy size={120} mood="happy" />
                 </div>
+                <span className="tt-pool__lip" aria-hidden="true" />
                 <div className="tt-pool__drops" aria-hidden="true">
                   {DROPS.map((drop, i) => (
                     <span

@@ -302,13 +302,14 @@ describe("WEB_9_agenda_honesty_and_states", () => {
     expect(text(container)).not.toMatch(/synced just now/i);
   });
 
-  it("WEB_9_agenda_not_built_shows_not_connected_yet_and_no_pins", async () => {
+  it("CX_T_AGENDA_not_built_uses_the_shared_empty_state_without_pins", async () => {
     const api = {
       ...createFixtureApi(),
       getAgenda: () => Promise.reject(new NotBuilt("getAgenda")),
     };
     const { container } = await renderAgenda({ api });
     expect(text(container)).toContain("Agenda data is unavailable");
+    expect(q(container, '[data-testid="tt-empty"]')).toBeTruthy();
     expect(text(container)).not.toContain("Book the K1 Level 3 gate review");
     expect(container.querySelector("[data-event]")).toBeNull();
   });

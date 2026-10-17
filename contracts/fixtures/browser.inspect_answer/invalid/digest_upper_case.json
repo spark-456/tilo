@@ -1,0 +1,15 @@
+{
+  "session": "bs_01JB7A0000000000000000BRW1",
+  "facts": {
+    "tag": "button",
+    "role": "button",
+    "name": "Place order",
+    "input_type": "submit",
+    "editable": false,
+    "secure": false,
+    "form_method": "post",
+    "link_host": null,
+    "download": false
+  },
+  "digest": "ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB"
+}

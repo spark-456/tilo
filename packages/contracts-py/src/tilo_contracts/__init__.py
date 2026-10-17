@@ -3,9 +3,10 @@
 # `just contracts-check` fails CI on drift (FR-WLD-02, FR-WLD-03).
 # agents.schema.json 1.0.0 sha256:f2ba3955260a80eb
 # appspec.schema.json 1.0.0 sha256:e3638e1ae19f9b9b
-# artifact.schema.json 1.2.0 sha256:e840ce55967af231
+# artifact.schema.json 1.3.0 sha256:dafce81fa75a5ed5
 # attention.schema.json 1.0.0 sha256:f35cff84728304af
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
+# browser.schema.json 1.0.0 sha256:196a0b328e45bf22
 # byok.schema.json 1.0.0 sha256:683d5d2b4fc8b0fe
 # calendar_entry.schema.json 1.1.0 sha256:291531543be88320
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
@@ -45,6 +46,10 @@
 # events/data/artifact.versioned.schema.json 1.0.0 sha256:b6ceac1481d2595b
 # events/data/assistant.asked.schema.json 1.0.0 sha256:8775120b73c4ed38
 # events/data/assistant.replied.schema.json 1.0.0 sha256:48fb513dadef290d
+# events/data/browser.acted.schema.json 1.0.0 sha256:3b55e5a09f00e387
+# events/data/browser.controlled.schema.json 1.0.0 sha256:6b8442f6dbb88479
+# events/data/browser.started.schema.json 1.0.0 sha256:1bed13c81c886df2
+# events/data/browser.stopped.schema.json 1.0.0 sha256:8ae289ea75dfd6b5
 # events/data/budget.granted.schema.json 1.0.0 sha256:34e26044aeb0114d
 # events/data/budget.requested.schema.json 1.1.0 sha256:abda889558ab1c91
 # events/data/building.archived.schema.json 1.0.0 sha256:638f47ef89001f58
@@ -112,7 +117,7 @@
 # events/data/world.resumed.schema.json 1.0.0 sha256:a3fd175fc848bf87
 # events/data/world.share_changed.schema.json 1.0.0 sha256:7de879d9ec364699
 # events/data/world.started.schema.json 1.0.0 sha256:e0daa70c85838c8f
-# events/registry.schema.json 1.2.0 sha256:5a2b8514c1e7e2b1
+# events/registry.schema.json 1.3.0 sha256:cb766a935af26fe5
 # handoff.schema.json 1.0.0 sha256:7ed882f92b634672
 # layout.schema.json 1.0.0 sha256:1db88b1e3b744add
 # makers.schema.json 1.0.0 sha256:311892161a9ac570
@@ -126,6 +131,7 @@
 # meeting_voice_meter.schema.json 1.0.0 sha256:fa317e43b3e785b6
 # memory_item.schema.json 1.0.0 sha256:d8c8bfb89ccd887f
 # mention.schema.json 1.0.0 sha256:ca9c1acbf81616f2
+# mentions.schema.json 1.0.0 sha256:64fddceaa44cd28a
 # meter.schema.json 1.0.0 sha256:ad596dcc70e45e09
 # metering.schema.json 1.0.0 sha256:91358a776e6c033a
 # minutes.schema.json 1.0.0 sha256:b8bbe5f69603a5a8
@@ -144,14 +150,14 @@
 # scenario.schema.json 1.0.0 sha256:b8e044d7e37b92a3
 # skill.schema.json 1.1.0 sha256:9eeee7768b667afa
 # spend_caps.schema.json 1.1.1 sha256:c04bc36ac17dc0ab
-# taught_skill.schema.json 1.1.0 sha256:b23321ed0cd570d4
+# taught_skill.schema.json 1.2.0 sha256:490514d3d4a1c92e
 # team_lead.schema.json 1.0.0 sha256:19413726e364ffdd
 # transcript.schema.json 1.0.0 sha256:08f934b8f0c9a40e
 # ui_action.schema.json 1.0.0 sha256:2ceb1e0b46368734
 # user_settings.schema.json 1.0.0 sha256:dfc439371ba69131
 # work_item.schema.json 1.1.0 sha256:9ee739ef8bdb7579
 # world_share.schema.json 1.0.0 sha256:89d31e9968dc95cc
-# events/registry.yaml 1.6.0 sha256:73d1110f8751fe0b
+# events/registry.yaml 1.7.0 sha256:5a3fdd74afaf7541
 
 from __future__ import annotations
 
@@ -323,6 +329,314 @@ class BriefAssumption(BaseModel):
     The clarifying question that was skipped, or null when nothing was asked.
     """
     assumed: Annotated[str, Field(max_length=300, min_length=1)]
+
+
+class BrowserConfigViewport(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    width: Annotated[int, Field(ge=800, le=1600)]
+    height: Annotated[int, Field(ge=600, le=1000)]
+
+
+type BrowserConfigSessionId = Annotated[
+    str, Field(pattern="^bs_[0-7][0-9A-HJKMNP-TV-Z]{25}$")
+]
+"""
+One browser session: bs_ and a ULID, made by tilo-api.
+"""
+
+
+type BrowserConfigHost = Annotated[
+    str,
+    Field(
+        max_length=253,
+        pattern="^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$",
+    ),
+]
+"""
+A lower-case host name (letters, digits, hyphens, dots; punycode for others). Never a URL, a port or an address with credentials.
+"""
+
+
+type BrowserConfigAllowHost = Annotated[
+    str,
+    Field(
+        max_length=255,
+        pattern="^(?:\\*\\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$",
+    ),
+]
+"""
+An allowlist entry: an exact host or *.parent (BQ-84 match rules, tilo_browser.egress).
+"""
+
+
+type BrowserConfigHttpsUrl = Annotated[
+    str,
+    Field(max_length=2048, pattern="^https://[^\\s/?#@\\\\]+(?:[/?#][^\\s\\\\]*)?$"),
+]
+"""
+An https URL with no user info, no backslash and no white space.
+"""
+
+
+type BrowserConfigInputType = Annotated[str, Field(pattern="^[a-z-]{1,24}$")]
+"""
+The input element's type attribute, lower case.
+"""
+
+
+type BrowserConfigScreenshot = Annotated[
+    str,
+    Field(
+        max_length=4000000, min_length=8, pattern="^iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$"
+    ),
+]
+"""
+A PNG, base64 without a data: prefix.
+"""
+
+
+type BrowserConfigResumeUrl = Annotated[
+    str, Field(max_length=2048, pattern="^https://[^\\s/?#@\\\\]+(?:/[^\\s?#\\\\]*)?$")
+]
+"""
+An https origin and path only: no user info, query or fragment.
+"""
+
+
+type BrowserConfigTypedChars = Annotated[int, Field(ge=1, le=500)]
+"""
+Characters typed in one step.
+"""
+
+
+class BrowserConfigPoint(BaseModel):
+    """
+    A point on the screenshot in a 1000 by 1000 grid (0 is the left or top edge, 999 the right or bottom), whatever the viewport.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    x: Annotated[int, Field(ge=0, le=999)]
+    y: Annotated[int, Field(ge=0, le=999)]
+
+
+type BrowserConfigActionKind = Literal["navigate", "click", "type", "scroll", "key", "back", "wait", "done", "ask"]
+
+
+class BrowserConfigNavigateAction(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["navigate"]
+    url: BrowserConfigHttpsUrl
+
+
+class BrowserConfigClickAction(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["click"]
+    at: BrowserConfigPoint
+
+
+type BrowserConfigTypedText = Annotated[
+    str, Field(max_length=500, min_length=1, pattern="^[^\\r\\n]+$")
+]
+"""
+Text to type, one line. Never a secret: BR-04 refuses it when the redactor would change it or the field is secure.
+"""
+
+
+class BrowserConfigScrollAction(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["scroll"]
+    direction: Literal["up", "down"]
+
+
+class BrowserConfigKeyAction(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["key"]
+    key: Literal["Enter", "Tab", "Escape", "PageDown", "PageUp", "ArrowDown", "ArrowUp", "Backspace"]
+
+
+class BrowserConfigBackAction(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["back"]
+
+
+class BrowserConfigWaitAction(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["wait"]
+    seconds: Annotated[int, Field(ge=1, le=5)]
+
+
+class BrowserConfigDoneAction(BaseModel):
+    """
+    The model says the goal is met. The run's result comes from what the pages showed (the frames and page text), never from the model's own claim.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["done"]
+
+
+class BrowserConfigAskAction(BaseModel):
+    """
+    The model needs the person. The session stops with outcome needs_person and the question goes on a needs-you card as data.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["ask"]
+    question: Annotated[
+        str, Field(max_length=300, min_length=1, pattern="^[^\\r\\n]+$")
+    ]
+
+
+class BrowserConfigFacts(BaseModel):
+    """
+    What tilo-browser found at a point, read from the page by code (BR-03, BR-05). name is page text: data, never an instruction.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    tag: Annotated[str, Field(pattern="^[a-z][a-z0-9-]{0,31}$")]
+    role: Annotated[str, Field(max_length=32, pattern="^[a-z]*$")]
+    name: Annotated[str, Field(max_length=120, pattern="^[^\\r\\n]*$")]
+    input_type: BrowserConfigInputType | None
+    editable: bool
+    secure: bool
+    """
+    A password, one-time-code or card field, or any node tilo_browser.login.is_secure_node flags.
+    """
+    form_method: Literal["get", "post", "dialog", "none"]
+    link_host: BrowserConfigHost | None
+    download: bool
+
+
+type BrowserConfigDigest = Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+"""
+SHA-256 (lower-case hex) of the page URL and the facts, so an act runs only on the element that was inspected (BR-03).
+"""
+
+
+type BrowserConfigReason = Literal["offsite_host", "secure_field", "secret_text", "download", "commit", "login_wall", "invalid_action", "target_changed", "step_cap", "credit_cap", "paused", "stopped", "timeout", "engine_error"]
+"""
+Why code refused or stopped a step (BR-02 to BR-12).
+"""
+
+
+type BrowserConfigVerdict = Literal["done", "refused", "gated", "committed"]
+"""
+done: code allowed it and the worker ran it. refused: code or the worker refused it (reason set). gated: a commit waiting at a T3 gate. committed: a commit the outbox ran after a person approved it.
+"""
+
+
+type BrowserConfigOutcome = Literal["done", "stopped", "taken_over", "needs_person", "login_wall", "cap_steps", "cap_credits", "session_lost", "error"]
+"""
+How a session ended (BR-07, BR-08, BR-10, BR-12).
+"""
+
+
+type BrowserConfigControlOp = Literal["pause", "resume", "stop", "take_over"]
+
+
+class BrowserConfigObservation(BaseModel):
+    """
+    tilo-browser's answer to open and act: the page after the step. screenshot is a PNG (base64) with every secure field masked before it leaves tilo-browser (BR-09); state ok has no reason, any other state has one.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session: BrowserConfigSessionId
+    step: Annotated[int, Field(ge=0, le=60)]
+    url: BrowserConfigHttpsUrl | None
+    host: BrowserConfigHost | None
+    title: Annotated[str, Field(max_length=200, pattern="^[^\\r\\n]*$")]
+    screenshot: BrowserConfigScreenshot | None
+    masked: Annotated[int, Field(ge=0, le=1000)]
+    """
+    Secure fields masked in this screenshot.
+    """
+    blocked: Annotated[int, Field(ge=0)]
+    """
+    Requests to hosts outside allow_hosts that the worker blocked and logged during this step (FR-CON-07).
+    """
+    state: Literal["ok", "refused", "login_wall", "error"]
+    reason: BrowserConfigReason | None
+
+
+class BrowserConfigInspectRequest(BaseModel):
+    """
+    tilo-api to tilo-browser POST /sessions/{session}/inspect, before any click, type or key (BR-03).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session: BrowserConfigSessionId
+    at: BrowserConfigPoint
+
+
+class BrowserConfigInspectAnswer(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session: BrowserConfigSessionId
+    facts: BrowserConfigFacts
+    digest: BrowserConfigDigest
+
+
+class BrowserConfigCloseRequest(BaseModel):
+    """
+    tilo-api to tilo-browser DELETE /sessions/{session}: closes the context and drops everything it held (BR-12).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session: BrowserConfigSessionId
+    outcome: BrowserConfigOutcome
+
+
+class BrowserConfigControlRequest(BaseModel):
+    """
+    web to tilo-api POST /worlds/{world_id}/browser/{session}/control: the world owner pauses, resumes, stops or takes over (BR-10).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    op: BrowserConfigControlOp
+
+
+class BrowserConfigControlAnswer(BaseModel):
+    """
+    state after the op. resume_url is set only for take_over: the last page's origin and path, no query or fragment, so the person can carry on in their own browser.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session: BrowserConfigSessionId
+    op: BrowserConfigControlOp
+    state: Literal["running", "paused", "ended"]
+    resume_url: BrowserConfigResumeUrl | None
 
 
 type ByokConfigBundleId = Annotated[str, Field(pattern="^[a-z][a-z0-9-]{0,63}$")]
@@ -1042,6 +1356,35 @@ class ApprovalResolvedData(BaseModel):
     pin_verified: bool
 
 
+class BrowserControlledData(BaseModel):
+    """
+    data of browser.controlled (registry 1.7.0, ADR-0051, BR-10): the world owner paused, resumed, stopped or took over a browser session from the Browser panel. actor is that person, target the Browser Station building, authz null (control never authorises a side effect; it only holds or ends one). The panel shows Paused only after this event (HR-1). stop and take_over are followed by browser.stopped.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session: BrowserConfigSessionId
+    op: BrowserConfigControlOp
+    step: Annotated[int, Field(ge=0, le=60)]
+    """
+    The last step recorded when the op took effect.
+    """
+
+
+class BrowserStoppedData(BaseModel):
+    """
+    data of browser.stopped (registry 1.7.0, ADR-0051): a browser session ended and tilo-browser dropped its context (BR-12). outcome says how (BR-07, BR-08, BR-10); steps counts proposals, refused ones included. A login wall also raises the FR-CON-08 needs-you card, and needs_person a needs-you card with the model's question as data. actor is the unit's agent, or the person for stopped and taken_over; authz null.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session: BrowserConfigSessionId
+    outcome: BrowserConfigOutcome
+    steps: Annotated[int, Field(ge=0, le=60)]
+
+
 class BudgetGrantedData(BaseModel):
     """
     data of budget.granted (PRD 9.5). A person, or a policy under its threshold, approved spending (FR-INT-08); spending credits is a T1 side effect (PRD 10.4), so the event carries authz.
@@ -1716,9 +2059,9 @@ class WorldStartedData(BaseModel):
     budget_cap: Credits
 
 
-type EventRegistryFamily = Literal["world", "plan", "budget", "level", "district", "building", "agent", "skill", "question", "meeting", "connection", "data", "channel", "artifact", "approval", "policy", "alert", "memory", "app", "work_item", "pinboard", "mention", "calendar", "assistant", "team_rule"]
+type EventRegistryFamily = Literal["world", "plan", "budget", "level", "district", "building", "agent", "skill", "question", "meeting", "connection", "data", "channel", "artifact", "approval", "policy", "alert", "memory", "app", "work_item", "pinboard", "mention", "calendar", "assistant", "team_rule", "browser"]
 """
-Event families of PRD 9.5, plus work_item, pinboard, mention, calendar and assistant (CC-PEOPLE, registry 1.1.0) and team_rule (registry 1.2.0, ADR-0027).
+Event families of PRD 9.5, plus work_item, pinboard, mention, calendar and assistant (CC-PEOPLE, registry 1.1.0) team_rule (registry 1.2.0, ADR-0027) and browser (registry 1.7.0, ADR-0051).
 """
 
 
@@ -2969,6 +3312,115 @@ class MentionRemoval(BaseModel):
     at: Timestamp
 
 
+type MentionsKind = Literal["skill", "taught_skill", "file", "drive_file", "drive_folder", "world", "person", "connector", "tool"]
+"""
+skill: a library skill (skills/). taught_skill: one the person or a team taught (ADR-0034). file: a stored artifact version. drive_file and drive_folder: Drive items the person picked (drive.file, ADR-0048). world: a world (project). person: a teammate (id and display name only, PE-20). connector: a connected tool. tool: one action of a connector (a function).
+"""
+
+
+type MentionsCursor = Annotated[str, Field(pattern="^[A-Za-z0-9_-]{1,200}$")]
+
+
+type MentionsDriveId = Annotated[str, Field(pattern="^[A-Za-z0-9_-]{10,128}$")]
+"""
+Google Drive's opaque file or folder id.
+"""
+
+
+class MentionsListRequest(BaseModel):
+    """
+    The query of GET /v1/mentions. q matches labels case-insensitively by code (no model); kinds empty means all kinds.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    q: Annotated[str, Field(max_length=64, pattern="^[^\\r\\n]*$")]
+    kinds: Annotated[list[MentionsKind], Field(max_length=9)]
+    cursor: MentionsCursor | None
+    limit: Annotated[int, Field(ge=1, le=50)]
+
+
+class MentionsSkillRef(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["skill"]
+    id: SkillId
+
+
+class MentionsFileRef(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["file"]
+    id: ArtifactId
+    version: Annotated[int, Field(ge=1)]
+
+
+class MentionsDriveFileRef(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["drive_file"]
+    id: MentionsDriveId
+
+
+class MentionsDriveFolderRef(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["drive_folder"]
+    id: MentionsDriveId
+
+
+class MentionsWorldRef(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["world"]
+    id: WorldId
+
+
+class MentionsPersonRef(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["person"]
+    id: UserId
+
+
+class MentionsConnectorRef(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["connector"]
+    id: ConnectorId
+
+
+class MentionsToolRef(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["tool"]
+    id: ActionType
+
+
+type MentionsDetail = Annotated[str, Field(max_length=120, pattern="^[^\\r\\n]*$")]
+
+
+class MentionsRefError(BaseModel):
+    """
+    The 422 body when a ref cannot be used. A ref the sender may not read gets exactly the same body as one that does not exist (MN-02).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    error: Literal["ref_unavailable"]
+    index: Annotated[int, Field(ge=0, le=9)]
+
+
 type MeterMethodUrl = Annotated[
     str,
     Field(
@@ -4176,6 +4628,20 @@ type TaughtSkillStepNumber = Annotated[int, Field(ge=1, le=20)]
 type TaughtSkillCount = Annotated[int, Field(ge=0, le=20)]
 
 
+class TaughtSkillInput(BaseModel):
+    """
+    One input slot: name is a code key, label the words the person sees, kind how the run form asks for it.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: Annotated[str, Field(pattern="^[a-z][a-z0-9_]{0,31}$")]
+    label: Annotated[str, Field(max_length=80, min_length=1, pattern="^[^\r\n]+$")]
+    kind: Literal["text", "file", "date", "person", "url", "number"]
+    required: bool
+
+
 type TaughtSkillStatus = Literal["draft", "learning", "trusted"]
 """
 draft until saved; a saved skill starts as learning (FR-SKL-04); only the owner marks it trusted, once good_runs reaches the configured threshold (TS-08), and may set it back to learning at any time.
@@ -4184,7 +4650,7 @@ draft until saved; a saved skill starts as learning (FR-SKL-04); only the owner 
 
 type TaughtSkillMethod = Literal["describe", "upload", "guided", "record"]
 """
-How the person showed it (FR-SKL-01): describe (typed words), upload (a finished example file), guided (clicking through in Tilo's browser) or record (a screen recording, video only, no sound).
+How the person showed it (FR-SKL-01): describe (typed words), upload (a file the person brings: a past recording, a document or a finished example), guided (clicking through in Tilo's browser) or record (a screen recording made on the Skills page). A recording has sound only when the person turned narration on (ADR-0051, TS-20).
 """
 
 
@@ -4729,13 +5195,13 @@ class AgentsConfig(BaseModel):
 
 class ArtifactVersionOrigin(BaseModel):
     """
-    What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither), a restore (FR-MEM-06; no unit) or, since 1.1.0 (ADR-0029), a fetch: a file a unit's worker agent downloaded through tilo-browser (unit and agent set). Set by the store from the run, never by a runner.
+    What made the version: a unit's runner (unit and the worker agent set), tilo-render (for a unit), an intake upload (neither), a restore (FR-MEM-06; no unit) or, since 1.1.0 (ADR-0029), a fetch: a file a unit's worker agent downloaded through tilo-browser (unit and agent set), or, since 1.3.0 (ADR-0051), a browser frame: a masked screenshot of a unit's agentic browser step (unit and agent set). Set by the store from the run, never by a runner.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    kind: Literal["unit", "render", "upload", "restore", "fetch"]
+    kind: Literal["unit", "render", "upload", "restore", "fetch", "browser"]
     unit: UnitId | None
     agent: AgentId | None
 
@@ -4792,6 +5258,72 @@ class BriefCitation(BaseModel):
     kind: Literal["preference", "decision"]
     ref: Annotated[str, Field(max_length=128, min_length=1)]
     recorded_at: Timestamp
+
+
+class BrowserConfig(BaseModel):
+    """
+    config/browser.yaml (ADR-0051; FR-CON-07, FR-CON-08, PRD 12.3): the caps of the agentic browser, where a model looks at a screenshot of one isolated tilo-browser session and proposes one action at a time, and code decides (BR-01 to BR-14, browser.rules.md). The $defs hold the closed action set, the element facts the worker reports, the tilo-api to tilo-browser session bodies and the person's control body. Every key is required and no other key is allowed; the maxima are the safety ceiling, so config can only lower them.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    v: Literal["1.0"]
+    max_sessions_per_world: Annotated[int, Field(ge=1, le=3)]
+    """
+    PRD 12.3: at most 3 browser sessions per world at once.
+    """
+    max_steps: Annotated[int, Field(ge=1, le=60)]
+    """
+    Proposals per session, refused ones included (BR-08).
+    """
+    max_credits_per_session: Annotated[int, Field(ge=1, le=2000)]
+    """
+    Credits one session may spend on model calls; reserved before each call (BR-08). The run and daily caps still apply.
+    """
+    step_timeout_s: Annotated[int, Field(ge=5, le=60)]
+    idle_timeout_s: Annotated[int, Field(ge=30, le=600)]
+    """
+    tilo-browser closes a session with no request for this long (BR-12).
+    """
+    viewport: BrowserConfigViewport
+    model_frames: Annotated[int, Field(ge=1, le=3)]
+    """
+    How many of the latest frames go to the model on each call; older steps go as the text history only (cost, PRD 6.6).
+    """
+
+
+class BrowserConfigTypeAction(BaseModel):
+    """
+    Types text into the field at the point. submit true presses Enter after it, which BR-05 may treat as a commit.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["type"]
+    at: BrowserConfigPoint
+    text: BrowserConfigTypedText
+    submit: bool
+
+
+class BrowserConfigOpenRequest(BaseModel):
+    """
+    tilo-api to tilo-browser POST /sessions: one isolated context, no cookies kept (PRD 16.1 3). The worker enforces allow_hosts on every request the page makes (BR-02).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session: BrowserConfigSessionId
+    world_id: WorldId
+    run_id: RunId
+    unit_id: UnitId
+    allow_hosts: Annotated[
+        list[BrowserConfigAllowHost], Field(max_length=20, min_length=1)
+    ]
+    start_url: BrowserConfigHttpsUrl
+    viewport: BrowserConfigViewport
 
 
 class ByokConfigRoleProfiles(BaseModel):
@@ -5237,6 +5769,41 @@ class AssistantAskedData(BaseModel):
     conversation_id: Ulid
     message_ref: EventArchiveRef
     screen: UiActionRoute | None
+
+
+class BrowserActedData(BaseModel):
+    """
+    data of browser.acted (registry 1.7.0, ADR-0051): one step of an agentic browser session, written after the worker answered, so the Browser panel shows only what happened (HR-1, BR-09). verdict done: code allowed the action and the worker ran it; refused: reason says why and nothing ran; gated: a commit waiting at a T3 gate (its approval.requested follows); committed: the outbox ran a commit a person approved, after its data.transfer (BR-05). frame is the masked screenshot after the step (origin browser), null when none. host is the page's host after the step; chars counts typed characters (a type action only). Never typed text, a full URL or page text (BR-13). authz null: a commit's authorisation is on its approval.resolved and data.transfer.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session: BrowserConfigSessionId
+    step: Annotated[int, Field(ge=1, le=60)]
+    kind: BrowserConfigActionKind
+    verdict: BrowserConfigVerdict
+    reason: BrowserConfigReason | None
+    host: BrowserConfigHost | None
+    chars: BrowserConfigTypedChars | None
+    masked: Annotated[int, Field(ge=0, le=1000)]
+    blocked: Annotated[int, Field(ge=0)]
+    frame: ArtifactRef | None
+
+
+class BrowserStartedData(BaseModel):
+    """
+    data of browser.started (registry 1.7.0, ADR-0051, FR-CON-07): tilo-browser opened an isolated session for a unit and showed its first page. actor is the unit's agent, target the Browser Station building; authz null (browsing and reading are T1, BR-05). host is the start page's host; hosts counts the allowlist; frame is the first masked screenshot (an artifact of origin browser, BR-09), null when the page gave none. Never a full URL, query or page text (BR-13).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session: BrowserConfigSessionId
+    host: BrowserConfigHost
+    hosts: Annotated[int, Field(ge=1, le=20)]
+    max_steps: Annotated[int, Field(ge=1, le=60)]
+    frame: ArtifactRef | None
 
 
 class BudgetRequestedData(BaseModel):
@@ -5934,6 +6501,14 @@ class Mention(BaseModel):
     user: UserId
     added_by: Maker
     removed: MentionRemoval | None
+
+
+class MentionsTaughtSkillRef(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["taught_skill"]
+    id: TaughtSkillId
 
 
 class MeterTimeSaved(BaseModel):
@@ -6658,7 +7233,7 @@ class AppSpecSource(BaseModel):
 
 class ArtifactVersion(BaseModel):
     """
-    One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-10 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser. 1.2.0 (ADR-0050) lets a writer unit store one self-contained HTML file for a website deliverable, at most 524,288 bytes; an upload never stores HTML (AR-10).
+    One immutable, hash-checked, owner-scoped version in the artifact store (ADR-0018, FR-MEM-12; PRD 13.2, 15.1): the metadata record at orgs/{org}/worlds/{world}/artifacts/{artifact_id}/versions/{version:06d}. The bytes live under a key derived from the ids, so the record holds no blob path. Read by the harness, tilo-api, tilo-render and erasure; only the store writes it. Rules the schema cannot express are AR-01 to AR-10 in artifact.rules.md. 1.1.0 (ADR-0029) adds the fetch origin: a file a unit downloaded through tilo-browser. 1.2.0 (ADR-0050) lets a writer unit store one self-contained HTML file for a website deliverable, at most 524,288 bytes; an upload never stores HTML (AR-10). 1.3.0 (ADR-0051) adds the browser origin: a masked screenshot (PNG) of an agentic browser step (AR-11).
     """
 
     model_config = ConfigDict(
@@ -6704,7 +7279,7 @@ class ArtifactVersion(BaseModel):
     """
     idempotency_key: ArtifactVersionIdempotencyKey | None
     """
-    Set for unit, render and fetch outputs (AR-05); null for uploads and restores.
+    Set for unit, render and fetch outputs (AR-05); null for uploads, restores and browser frames (AR-11).
     """
     created_at: Timestamp
 
@@ -6719,6 +7294,27 @@ class BriefAppliedPreference(BaseModel):
     """
     value: Annotated[str, Field(max_length=300, min_length=1)]
     citation: BriefCitation
+
+
+type BrowserConfigAction = BrowserConfigNavigateAction | BrowserConfigClickAction | BrowserConfigTypeAction | BrowserConfigScrollAction | BrowserConfigKeyAction | BrowserConfigBackAction | BrowserConfigWaitAction | BrowserConfigDoneAction | BrowserConfigAskAction
+"""
+BR-01: the only things a model may propose. A proposal that does not validate is refused as invalid_action and still counts as a step.
+"""
+
+
+class BrowserConfigActRequest(BaseModel):
+    """
+    tilo-api to tilo-browser POST /sessions/{session}/act: one action code allowed. A click or type names the digest of its inspect (BR-03). outbox_id is set only by the outbox dispatcher for a commit a person approved (BR-05); the worker refuses a commit-like target without one.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session: BrowserConfigSessionId
+    step: Annotated[int, Field(ge=1, le=60)]
+    action: BrowserConfigAction
+    digest: BrowserConfigDigest | None
+    outbox_id: Ulid | None
 
 
 class ByokConfigBundle(BaseModel):
@@ -7277,6 +7873,33 @@ class MeetingRoomTurn(BaseModel):
     change: MeetingRoomConfirmedChange | None
 
 
+type MentionsRef = MentionsSkillRef | MentionsTaughtSkillRef | MentionsFileRef | MentionsDriveFileRef | MentionsDriveFolderRef | MentionsWorldRef | MentionsPersonRef | MentionsConnectorRef | MentionsToolRef
+"""
+One typed reference. A file pins the version the picker showed.
+"""
+
+
+type MentionsRefs = Annotated[list[MentionsRef], Field(max_length=10)]
+"""
+The refs one message carries: the multipart field refs of POST /intake (a JSON array), in the order the chips appear (MN-01).
+"""
+
+
+class MentionsOption(BaseModel):
+    """
+    One picker row. label and detail are written by tilo-api from the record (a teammate's display name only, PE-20) and are for display: the message sends back only ref (MN-08). scope: mine (the person's own), team (built or shared by one of the person's current teams) or library (Tilo's skill library). state: ready, needs_setup (the connector is not connected; the run will ask) or limited (a Drive folder: Tilo reads only files picked or made by Tilo in it).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    ref: MentionsRef
+    label: Annotated[str, Field(max_length=80, min_length=1, pattern="^[^\\r\\n]+$")]
+    detail: MentionsDetail | None
+    scope: Literal["mine", "team", "library"]
+    state: Literal["ready", "needs_setup", "limited"]
+
+
 class Meter(BaseModel):
     """
     The HUD meter's state for one run (PRD 14.4, FR-MTR-07): credits used (the sum of the run's event credits), credits saved (origin cost minus lookup cost over accepted reuses, PRD 14.3), time saved (estimate) and the run's budget. packages/metering computes it from the run's events up to last_seq, and apps/web renders it. Rules MT-05 and MT-06 in contracts/metering.rules.md.
@@ -7490,7 +8113,7 @@ class ProvidersPrices(BaseModel):
 
 class TaughtSkill(BaseModel):
     """
-    A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix, real_run, run_answer and helpers_report are the records and the report around it (real_run and run_answer are 1.1.0, ADR-0037). Rules TS-01 to TS-17 are in taught_skill.rules.md.
+    A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix, real_run, run_answer and helpers_report are the records and the report around it (real_run and run_answer are 1.1.0, ADR-0037). 1.2.0 (ADR-0051) adds the optional inputs and hosts. Rules TS-01 to TS-21 are in taught_skill.rules.md.
     """
 
     model_config = ConfigDict(
@@ -7519,6 +8142,16 @@ class TaughtSkill(BaseModel):
     trigger: TaughtSkillTrigger
     estimates: TaughtSkillEstimates | None
     tool_access: TaughtSkillToolAccess
+    inputs: Annotated[list[TaughtSkillInput] | None, Field(max_length=8)] = None
+    """
+    1.2.0 (ADR-0051, TS-19): what the person gives each run, as named slots. Left out when the skill takes none. The values a run gets are data, never instructions.
+    """
+    hosts: Annotated[list[BrowserConfigHost] | None, Field(max_length=10, min_length=1)] = (
+        None
+    )
+    """
+    1.2.0 (ADR-0051, TS-18): the web hosts the person approved for the skill's browser steps, exact hosts only. Left out when the skill has no browser step; required when it has one (schema). A run's browser allowlist is these plus the hosts typed in its request (BR-02).
+    """
     good_runs: Annotated[int, Field(ge=0)]
     """
     FR-SKL-06: runs of this skill rated up by the person whose run it was (TS-08); try runs never count.
@@ -7743,6 +8376,18 @@ class MeetingRoom(BaseModel):
     credits_spent: Credits
     max_turns: MeetingRoomTurnNumber
     turns: Annotated[list[MeetingRoomTurn], Field(max_length=50)]
+
+
+class Mentions(BaseModel):
+    """
+    The @ picker of the chat composer and the Home prompt box (ADR-0051, MN-01 to MN-10 in mentions.rules.md): one page of GET /v1/mentions. Each option names a typed reference (ref) the person may tag; a message carries only refs (ids), never content, and tilo-api resolves every ref again with the sender's own permissions before use (MN-02). Not the pinboard @mention of a teammate (mention.schema.json).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    items: Annotated[list[MentionsOption], Field(max_length=50)]
+    next_cursor: MentionsCursor | None
 
 
 class Providers(BaseModel):
@@ -7973,6 +8618,10 @@ type RegisteredEventType = Literal[
     "assistant.replied",
     "team_rule.changed",
     "world.share_changed",
+    "browser.started",
+    "browser.acted",
+    "browser.controlled",
+    "browser.stopped",
 ]
 
 EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
@@ -8073,6 +8722,10 @@ EVENT_TYPES: Final[tuple[RegisteredEventType, ...]] = (
     "assistant.replied",
     "team_rule.changed",
     "world.share_changed",
+    "browser.started",
+    "browser.acted",
+    "browser.controlled",
+    "browser.stopped",
 )
 
 SIDE_EFFECT_EVENT_TYPES: Final[frozenset[RegisteredEventType]] = frozenset(
@@ -8184,10 +8837,14 @@ EVENT_DATA_MODELS: Final[dict[RegisteredEventType, type[BaseModel]]] = {
     "assistant.replied": AssistantRepliedData,
     "team_rule.changed": TeamRuleChangedData,
     "world.share_changed": WorldShareChangedData,
+    "browser.started": BrowserStartedData,
+    "browser.acted": BrowserActedData,
+    "browser.controlled": BrowserControlledData,
+    "browser.stopped": BrowserStoppedData,
 }
 
 EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
-    {'version': '1.6.0',
+    {'version': '1.7.0',
      'unknown_types': 'trace_only',
      'types': {'world.requested': {'family': 'world',
                                    'verb': 'requested',
@@ -9487,5 +10144,64 @@ EVENT_REGISTRY: Final[EventRegistry] = EventRegistry.model_validate(
                                                          'this world.',
                                        'trace_row': 'team={data.team} state={data.state}',
                                        'data_schema': 'events/data/world.share_changed.schema.json',
-                                       'fixture': 'fixtures/events/valid/world.share_changed.json'}}}
+                                       'fixture': 'fixtures/events/valid/world.share_changed.json'},
+               'browser.started': {'family': 'browser',
+                                   'verb': 'started',
+                                   'priority': 'should',
+                                   'pillar': 'P6',
+                                   'default_severity': 'info',
+                                   'side_effect': False,
+                                   'world_effect': "The Browser Station's screen lights up with the "
+                                                   'first page.',
+                                   'hud_effect': 'The Browser panel opens with the first frame and the '
+                                                 'step count.',
+                                   'story_template': '{actor} opened a browser on {data.host}.',
+                                   'trace_row': 'session={data.session} host={data.host} '
+                                                'hosts={data.hosts} max_steps={data.max_steps}',
+                                   'data_schema': 'events/data/browser.started.schema.json',
+                                   'fixture': 'fixtures/events/valid/browser.started.json'},
+               'browser.acted': {'family': 'browser',
+                                 'verb': 'acted',
+                                 'priority': 'should',
+                                 'pillar': 'P6',
+                                 'default_severity': 'info',
+                                 'side_effect': False,
+                                 'world_effect': "The Browser Station's screen shows the new frame.",
+                                 'hud_effect': 'The Browser panel adds the step to its log and shows '
+                                               'the frame.',
+                                 'story_template': '{actor} took browser step {data.step}: {data.kind} '
+                                                   '({data.verdict}).',
+                                 'trace_row': 'step={data.step} kind={data.kind} '
+                                              'verdict={data.verdict} reason={data.reason} '
+                                              'host={data.host} blocked={data.blocked}',
+                                 'data_schema': 'events/data/browser.acted.schema.json',
+                                 'fixture': 'fixtures/events/valid/browser.acted.json'},
+               'browser.controlled': {'family': 'browser',
+                                      'verb': 'controlled',
+                                      'priority': 'should',
+                                      'pillar': 'P4',
+                                      'default_severity': 'info',
+                                      'side_effect': False,
+                                      'world_effect': "The Browser Station's screen dims while paused "
+                                                      'and brightens on resume.',
+                                      'hud_effect': 'The Browser panel shows Paused, Running or Ended.',
+                                      'story_template': '{actor} chose {data.op} for the browser.',
+                                      'trace_row': 'session={data.session} op={data.op} '
+                                                   'step={data.step}',
+                                      'data_schema': 'events/data/browser.controlled.schema.json',
+                                      'fixture': 'fixtures/events/valid/browser.controlled.json'},
+               'browser.stopped': {'family': 'browser',
+                                   'verb': 'stopped',
+                                   'priority': 'should',
+                                   'pillar': 'P6',
+                                   'default_severity': 'info',
+                                   'side_effect': False,
+                                   'world_effect': "The Browser Station's screen goes dark.",
+                                   'hud_effect': 'The Browser panel shows how the session ended.',
+                                   'story_template': 'The browser session ended after {data.steps} '
+                                                     'steps ({data.outcome}).',
+                                   'trace_row': 'session={data.session} outcome={data.outcome} '
+                                                'steps={data.steps}',
+                                   'data_schema': 'events/data/browser.stopped.schema.json',
+                                   'fixture': 'fixtures/events/valid/browser.stopped.json'}}}
 )

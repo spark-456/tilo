@@ -88,7 +88,8 @@ def test_FR_MEM_12_media_type_is_a_closed_enum(repo_root):
 def test_FR_MEM_12_valid_records_cover_every_origin_and_both_caps(repo_root, registry):
     records = [load_json(p) for p in sorted((repo_root / "contracts/fixtures/artifact/valid").glob("*.json"))]
     assert all(not errors_for(_ref("artifact"), record, registry) for record in records)
-    assert {r["origin"]["kind"] for r in records} == {"unit", "render", "upload", "restore", "fetch"}
+    kinds = {"unit", "render", "upload", "restore", "fetch", "browser"}  # browser: ADR-0051
+    assert {r["origin"]["kind"] for r in records} == kinds
     caps = {("application/json", 2_000_000), ("application/pdf", 50_000_000)}
     assert {(r["media_type"], r["size_bytes"]) for r in records} >= caps, "the text and file caps are inclusive"
 

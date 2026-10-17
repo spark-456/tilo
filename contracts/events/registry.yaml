@@ -19,7 +19,7 @@
 # (PRD 10.4 Audit, HR-7). Such an event carries authz (EV-03) from one of authz_by (EV-04), and
 # event.schema.json lists the same types (contracts-check fails if the lists drift).
 
-version: 1.6.0
+version: 1.7.0
 unknown_types: trace_only
 types:
   world.requested:
@@ -1291,3 +1291,59 @@ types:
     trace_row: "team={data.team} state={data.state}"
     data_schema: events/data/world.share_changed.schema.json
     fixture: fixtures/events/valid/world.share_changed.json
+  # Agentic browser (1.7.0, ADR-0051, FR-CON-07, FR-CON-08): one isolated tilo-browser session per unit,
+  # a model proposes one action per screenshot and code decides (browser.rules.md). Hosts and counts
+  # only, never a full URL, typed text or page text (BR-13). None authorises anything: a commit goes
+  # through approval.requested, approval.resolved and the outbox's data.transfer (BR-05).
+  browser.started:
+    family: browser
+    verb: started
+    priority: should
+    pillar: P6
+    default_severity: info
+    side_effect: false
+    world_effect: "The Browser Station's screen lights up with the first page."
+    hud_effect: "The Browser panel opens with the first frame and the step count."
+    story_template: "{actor} opened a browser on {data.host}."
+    trace_row: "session={data.session} host={data.host} hosts={data.hosts} max_steps={data.max_steps}"
+    data_schema: events/data/browser.started.schema.json
+    fixture: fixtures/events/valid/browser.started.json
+  browser.acted:
+    family: browser
+    verb: acted
+    priority: should
+    pillar: P6
+    default_severity: info
+    side_effect: false
+    world_effect: "The Browser Station's screen shows the new frame."
+    hud_effect: "The Browser panel adds the step to its log and shows the frame."
+    story_template: "{actor} took browser step {data.step}: {data.kind} ({data.verdict})."
+    trace_row: "step={data.step} kind={data.kind} verdict={data.verdict} reason={data.reason} host={data.host} blocked={data.blocked}"
+    data_schema: events/data/browser.acted.schema.json
+    fixture: fixtures/events/valid/browser.acted.json
+  browser.controlled:
+    family: browser
+    verb: controlled
+    priority: should
+    pillar: P4
+    default_severity: info
+    side_effect: false
+    world_effect: "The Browser Station's screen dims while paused and brightens on resume."
+    hud_effect: "The Browser panel shows Paused, Running or Ended."
+    story_template: "{actor} chose {data.op} for the browser."
+    trace_row: "session={data.session} op={data.op} step={data.step}"
+    data_schema: events/data/browser.controlled.schema.json
+    fixture: fixtures/events/valid/browser.controlled.json
+  browser.stopped:
+    family: browser
+    verb: stopped
+    priority: should
+    pillar: P6
+    default_severity: info
+    side_effect: false
+    world_effect: "The Browser Station's screen goes dark."
+    hud_effect: "The Browser panel shows how the session ended."
+    story_template: "The browser session ended after {data.steps} steps ({data.outcome})."
+    trace_row: "session={data.session} outcome={data.outcome} steps={data.steps}"
+    data_schema: events/data/browser.stopped.schema.json
+    fixture: fixtures/events/valid/browser.stopped.json

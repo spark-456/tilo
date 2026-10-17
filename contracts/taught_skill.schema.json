@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/taught_skill.schema.json",
-  "x-version": "1.1.0",
+  "x-version": "1.2.0",
   "title": "TaughtSkill",
-  "description": "A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix, real_run, run_answer and helpers_report are the records and the report around it (real_run and run_answer are 1.1.0, ADR-0037). Rules TS-01 to TS-17 are in taught_skill.rules.md.",
+  "description": "A skill a person taught Tilo on the Skills page (FR-SKL-01 to FR-SKL-07, ADR-0034), stored at orgs/{org}/taught_skills/{id} and read only through tilo-api. A sibling of the expert-signed, version-pinned skill.yaml (skill.schema.json), never a change to it. One person owns it. Each fix makes a new integer version, and a run pins the version it started with. It acts only through its own tool_access, the team's levels and the policy engine. $defs try_run_result, rating, fix, real_run, run_answer and helpers_report are the records and the report around it (real_run and run_answer are 1.1.0, ADR-0037). 1.2.0 (ADR-0051) adds the optional inputs and hosts. Rules TS-01 to TS-21 are in taught_skill.rules.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -54,6 +54,20 @@
     "trigger": { "$ref": "#/$defs/trigger" },
     "estimates": { "anyOf": [{ "$ref": "#/$defs/estimates" }, { "type": "null" }] },
     "tool_access": { "$ref": "#/$defs/tool_access" },
+    "inputs": {
+      "description": "1.2.0 (ADR-0051, TS-19): what the person gives each run, as named slots. Left out when the skill takes none. The values a run gets are data, never instructions.",
+      "type": "array",
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/input" }
+    },
+    "hosts": {
+      "description": "1.2.0 (ADR-0051, TS-18): the web hosts the person approved for the skill's browser steps, exact hosts only. Left out when the skill has no browser step; required when it has one (schema). A run's browser allowlist is these plus the hosts typed in its request (BR-02).",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": { "$ref": "browser.schema.json#/$defs/host" }
+    },
     "good_runs": {
       "description": "FR-SKL-06: runs of this skill rated up by the person whose run it was (TS-08); try runs never count.",
       "type": "integer",
@@ -75,6 +89,21 @@
       "else": {
         "properties": { "plan": { "minItems": 1 }, "estimates": { "$ref": "#/$defs/estimates" } }
       }
+    },
+    "plan": {
+      "description": "TS-18: a plan with a browse_web step names the hosts it may browse.",
+      "if": {
+        "properties": {
+          "plan": {
+            "contains": {
+              "properties": { "action": { "const": "browse_web" } },
+              "required": ["action"]
+            }
+          }
+        },
+        "required": ["plan"]
+      },
+      "then": { "required": ["hosts"] }
     }
   },
   "$defs": {
@@ -100,13 +129,25 @@
       "maximum": 20
     },
     "count": { "type": "integer", "minimum": 0, "maximum": 20 },
+    "input": {
+      "description": "One input slot: name is a code key, label the words the person sees, kind how the run form asks for it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "label", "kind", "required"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^[^\r\n]+$" },
+        "kind": { "type": "string", "enum": ["text", "file", "date", "person", "url", "number"] },
+        "required": { "type": "boolean" }
+      }
+    },
     "status": {
       "description": "draft until saved; a saved skill starts as learning (FR-SKL-04); only the owner marks it trusted, once good_runs reaches the configured threshold (TS-08), and may set it back to learning at any time.",
       "type": "string",
       "enum": ["draft", "learning", "trusted"]
     },
     "method": {
-      "description": "How the person showed it (FR-SKL-01): describe (typed words), upload (a finished example file), guided (clicking through in Tilo's browser) or record (a screen recording, video only, no sound).",
+      "description": "How the person showed it (FR-SKL-01): describe (typed words), upload (a file the person brings: a past recording, a document or a finished example), guided (clicking through in Tilo's browser) or record (a screen recording made on the Skills page). A recording has sound only when the person turned narration on (ADR-0051, TS-20).",
       "type": "string",
       "enum": ["describe", "upload", "guided", "record"]
     },

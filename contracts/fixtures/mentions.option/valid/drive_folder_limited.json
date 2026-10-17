@@ -1,0 +1,10 @@
+{
+  "ref": {
+    "kind": "drive_folder",
+    "id": "0BxFolderExample_abcdefgh"
+  },
+  "label": "Invoices 2026",
+  "detail": "Tilo reads only files you picked here",
+  "scope": "mine",
+  "state": "limited"
+}

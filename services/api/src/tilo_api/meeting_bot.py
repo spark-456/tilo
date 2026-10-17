@@ -45,6 +45,9 @@ async def attend_meeting(
     meeting, version, _ = _mine(w, meeting_id, "read_full", ("deleted",))
     if meeting["status"] != "scheduled" or meeting["transcript"] is not None:
         raise Refusal(409, "already_attending")
+    wake = getattr(bot, "wake", None)
+    if wake is not None:  # a cold bot answers before the 60-second join link is made, never after (MEET-SIMPLE)
+        await wake()
     join = await asyncio.to_thread(host.join_link, receipt)
     if owned_receipt(w, store, artifacts, meeting_id) != receipt:
         raise Refusal(409, "not_joinable")

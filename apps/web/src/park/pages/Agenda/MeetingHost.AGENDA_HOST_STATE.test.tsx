@@ -71,7 +71,7 @@ describe("FR_MTG_09_AGENDA_HOST_STATE", () => {
     const m = mount(<PeopleLists />);
     await act(async () => undefined);
     await act(async () => undefined);
-    expect(m.container.textContent).toContain("Host a meeting with Tilo");
+    expect(m.container.textContent).toContain("Meet with Tilo now");
   });
   it("FR_MTG_09_AGENDA_c_connectors_page_flow_and_agenda_agree_on_the_same_session", async () => {
     wire("available");
