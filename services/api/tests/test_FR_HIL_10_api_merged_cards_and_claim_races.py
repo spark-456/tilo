@@ -256,3 +256,18 @@ def test_FR_HIL_10_a_card_tick_failure_after_the_harness_default_does_not_fail_t
         assert "world.failed" not in [e["type"] for e in events]
     finally:
         rf.close()
+
+
+def test_CX_WEB_ROUTE_1_decline_uses_existing_world_failed_event(repo_root):
+    rf = build_ask_flow(repo_root, tasks_provider(ASK, *CLEAR[1:]), independent=True)
+    try:
+        start_and_approve(rf)
+        wait_for(lambda: rf.events("question.routed"), what="question.routed")
+        run = rf.store.runs[rf.world_id]
+        run._fail("declined", "U1", summary="Stopped by you.")
+        (failed,) = rf.events("world.failed")
+        assert failed["summary"] == "Stopped by you."
+        assert failed["data"]["reason"] == "declined"
+        assert failed["data"]["unit"] == "U1"
+    finally:
+        rf.close()

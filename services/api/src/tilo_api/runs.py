@@ -489,7 +489,7 @@ class Run:
         if part["type"] == "approval.resolved":
             self.resolved[card_id] = committed
 
-    def _fail(self, reason: str, unit: str | None) -> None:
+    def _fail(self, reason: str, unit: str | None, *, summary: str | None = None) -> None:
         reason = _clip_reason(reason)
         try:
             if not (self._failed or self.paused()):
@@ -497,7 +497,11 @@ class Run:
                 # RUN-FAIL-1: every failure is one ERROR line with its plain, code-written reason (never silent)
                 logger.error("run %s failed (unit %s): %s", self.run_id, unit or "none", reason)
                 self.put(
-                    "world.failed", "system", self.world_id, f"Stopped: {reason}", {"reason": reason, "unit": unit}
+                    "world.failed",
+                    "system",
+                    self.world_id,
+                    summary or f"Stopped: {reason}",
+                    {"reason": reason, "unit": unit},
                 )
         except Exception as caught_error:
             log_caught(caught_error, __name__, locals())
@@ -697,10 +701,18 @@ class Run:
             return
         if stopped := result.failed + result.held + result.skipped:
             reason = "a step was held, so the work stopped" if result.held and not result.failed else None
+            answers = [e for e in self.store.events.get(self.world_id, []) if e["type"] == "question.answered"]
+            declined = bool(
+                result.held and answers and answers[-1]["data"].get("answered_by") in ("person", "team_lead")
+            )
             failed = result.outcomes.get(stopped[0])  # a unit's own plain stop line, if code wrote one (FR-AGT-12)
             ran = failed is not None and not failed.success and stopped[0] not in result.held
             own = _unit_reason(failed) if ran else None
-            self._fail(self.failure or own or reason or "a unit failed, so the work stopped", stopped[0])
+            self._fail(
+                "declined" if declined else self.failure or own or reason or "a unit failed, so the work stopped",
+                stopped[0],
+                summary="Stopped by you." if declined else None,
+            )
             return
         credits = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))  # the meter (HR-1)
         data = {"credits_used": credits, "deliverable_count": len(self.delivered)}
