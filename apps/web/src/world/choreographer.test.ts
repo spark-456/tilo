@@ -105,12 +105,15 @@ test("HR-3 choreographer: an animation never starts before its event was receive
   expect(c.isAnimating("A_s1")).toBe(true);
 });
 
-test("PRD-9.7/18.2 choreographer: reduced motion makes movement an instant change (0ms), not a timed animation", () => {
-  const c = createChoreographer({ reducedMotion: true });
+test("CX_WORLD_AGENTS_1 choreographer: recorded move duration is preserved for reduced-motion slides", () => {
+  const c = createChoreographer();
   c.enqueue({ actor: "A_s1", seq: 1, receivedAtMs: 0, durationMs: 800 });
 
   c.advance(0);
-  expect(c.isAnimating("A_s1"), "reduced motion must not run an 800ms animation").toBe(false);
+  expect(c.isAnimating("A_s1"), "reduced motion still slides over the recorded move window").toBe(
+    true,
+  );
+  c.advance(800);
   expect(c.completed("A_s1")).toEqual([1]);
 });
 
