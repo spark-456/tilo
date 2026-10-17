@@ -223,6 +223,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const [paused, setPaused] = useState<Record<string, boolean>>({});
   // STUDIO-3: the chosen tab; until a person picks one, Story (or Result once a run's result is delivered).
   const [tab, setTab] = useState<WorldTab | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [slackOpen, setSlackOpen] = useState(false);
   const [slackChannel, setSlackChannel] = useState("");
   const [slackNote, setSlackNote] = useState("");
@@ -469,6 +470,18 @@ export function WorldPage({ app }: { app: AppCtx }) {
       ? `${w.spend} spent so far${w.of ? ` · ${w.of}` : ""}`
       : "";
   const steps = trackRun ? stepsCount(runEvents) : null;
+  const stepsDoneCount = steps ? steps.done : Math.round(((w.prog ?? 0) * 7) / 100);
+  const stepsTotalCount = steps ? steps.of : 7;
+  const stepPct =
+    stepsTotalCount > 0
+      ? Math.min(100, Math.round((stepsDoneCount / stepsTotalCount) * 100))
+      : (w.prog ?? 0);
+  const creditsUsed = live
+    ? live.credits
+    : w.spendV || (w.spend ? Number.parseInt(w.spend.replace(/\D/g, "") || "0", 10) : 0);
+  const creditsCap = w.budget || 120;
+  const creditsPct =
+    creditsCap > 0 ? Math.min(100, Math.round((creditsUsed / creditsCap) * 100)) : 0;
   // WORLD-DESIGN: the artboard's card on the map says the newest recorded line, or nothing.
   const toastLine = latestLine(trackRun ? runEvents : null, w.activity);
   const shown: WorldTab = tab ?? (view?.deliverable ? "result" : "story");
@@ -518,12 +531,13 @@ export function WorldPage({ app }: { app: AppCtx }) {
     <Frame worldId={w.id}>
       <PageTitle title={w.name} />
       <div className="park-world-head">
+        <nav aria-label="Breadcrumb" className="park-world-crumb">
+          <GoLink className="park-world-back" href="/worlds" onGo={() => app.go("worlds")}>
+            {icon("arrowL", 15)}
+            <span className="park-world-backtext">All worlds</span>
+          </GoLink>
+        </nav>
         <div className="park-world-titles">
-          <nav aria-label="Breadcrumb" className="park-world-crumb">
-            <GoLink className="park-world-back" href="/worlds" onGo={() => app.go("worlds")}>
-              {icon("arrowL", 15)}All worlds
-            </GoLink>
-          </nav>
           <div className="park-world-eyebrowrow">
             <span className="park-world-eyebrow">
               {[w.tier, w.tool].filter(Boolean).join(" · ").toUpperCase()}
@@ -537,6 +551,10 @@ export function WorldPage({ app }: { app: AppCtx }) {
               {w.name}
               {w.sample || demo ? <SampleBadge /> : null}
             </h1>
+            <span className="park-world-sizechip">
+              {icon("city", 13)}
+              {w.tier}
+            </span>
             <span className="park-world-chip" style={{ background: look[1], color: look[2] }}>
               <span className="park-world-dot" style={{ background: look[3] }} />
               {chip}
@@ -562,6 +580,25 @@ export function WorldPage({ app }: { app: AppCtx }) {
             <ShareLine client={worldClient} worldId={w.id} />
           ) : null}
         </div>
+        <div className="park-world-headspacer" />
+        <div className="park-world-headstepbar">
+          <span className="park-world-headsteptext">
+            <strong>{`${stepsDoneCount} of ${stepsTotalCount}`}</strong>{" "}
+            <span className="park-world-headsub">steps done</span>
+          </span>
+          <div className="park-world-headbar-track">
+            <div className="park-world-headbar-fill" style={{ width: `${stepPct}%` }} />
+          </div>
+        </div>
+        <div className="park-world-headcreditsbar">
+          <span className="park-world-headsteptext">
+            <strong>{creditsUsed}</strong>{" "}
+            <span className="park-world-headsub">of {creditsCap} credits</span>
+          </span>
+          <div className="park-world-headbar-track">
+            <div className="park-world-headbar-fill" style={{ width: `${creditsPct}%` }} />
+          </div>
+        </div>
         <div className="park-world-headprog">
           <div className="park-world-proghead">
             <span className="park-world-progtitle">{progressHead}</span>
@@ -584,11 +621,21 @@ export function WorldPage({ app }: { app: AppCtx }) {
               variant="secondary"
               icon={icon(isPaused ? "play" : "pause", 14)}
               onClick={togglePause}
+              aria-label={isPaused ? "Resume run" : "Pause run"}
               {...(w.sample ? { disabled: true, title: "A recorded replay cannot be paused" } : {})}
             >
               {isPaused ? "Resume" : "Pause"}
             </Button>
           ) : null}
+          <Button
+            variant="secondary"
+            icon={icon("more", 14)}
+            onClick={() => setMoreOpen((o) => !o)}
+            aria-expanded={moreOpen}
+            aria-label="More"
+          >
+            More
+          </Button>
           {showRunViews && !sampleOnly ? (
             <StageLink className="park-world-live" href={stage(stagePath(w.id))} reason={noStage}>
               {icon("play", 14)}Open live view
@@ -778,11 +825,18 @@ export function WorldPage({ app }: { app: AppCtx }) {
           ) : null}
         </div>
 
-        <div className="park-world-panels">
+        <div
+          className="park-world-panels"
+          data-tall={shown === "result" || shown === "chat" || moreOpen ? "true" : "false"}
+        >
+          <span className="park-world-sheethandle" aria-hidden="true" />
           <div className="park-world-tabrow">
             <WorldTabs
               on={shown}
-              onPick={setTab}
+              onPick={(t) => {
+                setMoreOpen(false);
+                setTab(t);
+              }}
               counts={steps ? { steps: `${steps.done}/${steps.of}` } : {}}
               chat={chatOn}
             />
@@ -923,37 +977,61 @@ export function WorldPage({ app }: { app: AppCtx }) {
             ) : null}
             {shareRow}
           </TabPanel>
+
+          {part(3) ? (
+            <details
+              className={`park-world-more ${moreOpen ? "park-world-more--open" : "park-world-more--hidden"}`}
+              open={moreOpen}
+              onToggle={(e) => setMoreOpen(e.currentTarget.open)}
+            >
+              <summary className="park-world-more-summary">More</summary>
+              <div className="park-world-morepanel">
+                <div className="park-world-morehead">
+                  <div className="park-world-moretitles">
+                    <span className="park-world-moretitle">More</span>
+                    <span className="park-world-moresub">
+                      Things that can wait until the run is done
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="park-world-moreclose"
+                    aria-label="Close"
+                    onClick={() => setMoreOpen(false)}
+                  >
+                    {icon("x", 15)}
+                  </button>
+                </div>
+                <div className="park-world-moregrid">
+                  {loaded.live && worldClient ? (
+                    <SkillProposals client={worldClient} worldId={w.id} />
+                  ) : null}
+                  {loaded.live && worldClient && !w.sample ? (
+                    <TeamItems client={worldClient} worldId={w.id} auto={false} />
+                  ) : null}
+                  <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
+                  <FactsCard
+                    w={w}
+                    recorded={recorded}
+                    skills={skills}
+                    tools={tools}
+                    onSkill={(skill) => app.go("skills", { id: skill })}
+                    onTools={() => app.go("connectors")}
+                  />
+                  {loaded.connectors.some(
+                    (c) => c.id === "meeting_host" && c.live?.notConfigured,
+                  ) ? (
+                    <p>{HOST_NOT_CONNECTED_TEXT}</p>
+                  ) : null}
+                  {loaded.gaps.skills || loaded.gaps.connectors ? (
+                    <NotYetCard title={loaded.gaps.skills ? "Skills" : "Tools"} />
+                  ) : null}
+                </div>
+              </div>
+            </details>
+          ) : null}
         </div>
       </div>
-
-      {part(3) ? (
-        <details className="park-world-more">
-          <summary>More</summary>
-          <div className="park-world-moregrid">
-            {loaded.live && worldClient ? (
-              <SkillProposals client={worldClient} worldId={w.id} />
-            ) : null}
-            {loaded.live && worldClient && !w.sample ? (
-              <TeamItems client={worldClient} worldId={w.id} auto={false} />
-            ) : null}
-            <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
-            <FactsCard
-              w={w}
-              recorded={recorded}
-              skills={skills}
-              tools={tools}
-              onSkill={(skill) => app.go("skills", { id: skill })}
-              onTools={() => app.go("connectors")}
-            />
-            {loaded.connectors.some((c) => c.id === "meeting_host" && c.live?.notConfigured) ? (
-              <p>{HOST_NOT_CONNECTED_TEXT}</p>
-            ) : null}
-            {loaded.gaps.skills || loaded.gaps.connectors ? (
-              <NotYetCard title={loaded.gaps.skills ? "Skills" : "Tools"} />
-            ) : null}
-          </div>
-        </details>
-      ) : null}
       {hasStage && roomClient && !w.sample ? (
         <MeetingHall key={w.id} worldId={w.id} client={roomClient} />
       ) : null}

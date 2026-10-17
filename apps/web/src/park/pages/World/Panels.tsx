@@ -11,18 +11,29 @@ import {
 } from "react";
 import type { Skill } from "../../api/types";
 import { cx } from "../../components/cx";
+import { icon } from "../../shell/kit";
 import { type RunStep, clockOf, runSteps, storyOf } from "./runSteps";
 import { storySummary } from "./skillRunVisible";
 import type { RunEvent } from "./useRunEvents";
 
 export type WorldTab = "story" | "steps" | "result" | "chat";
-const TABS: readonly (readonly [WorldTab, string])[] = [
+const TABS_WITH_CHAT: readonly (readonly [WorldTab, string])[] = [
+  ["story", "Story"],
+  ["chat", "Chat"],
+  ["result", "Result"],
+  ["steps", "Steps"],
+];
+const TABS_WITHOUT_CHAT: readonly (readonly [WorldTab, string])[] = [
   ["story", "Story"],
   ["steps", "Steps"],
   ["result", "Result"],
 ];
-/** TILO-T-WORLD: a real run with a stage also has its Chat (the agents talking), after the three. */
-const CHAT: readonly [WorldTab, string] = ["chat", "Chat"];
+const TAB_ICONS: Record<WorldTab, string> = {
+  story: "file",
+  chat: "chat",
+  result: "parcel",
+  steps: "check",
+};
 export const tabId = (t: WorldTab): string => `park-world-tab-${t}`;
 export const panelId = (t: WorldTab): string => `park-world-panel-${t}`;
 
@@ -38,7 +49,7 @@ export function WorldTabs({
   counts: Partial<Record<WorldTab, string>>;
   chat?: boolean;
 }) {
-  const tabs = chat ? [...TABS, CHAT] : TABS;
+  const tabs = chat ? TABS_WITH_CHAT : TABS_WITHOUT_CHAT;
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   const move = (e: KeyboardEvent<HTMLButtonElement>, at: number) => {
     const to =
@@ -180,6 +191,7 @@ export function RunStory({
   events: readonly RunEvent[];
   skills?: readonly Skill[];
 }) {
+  const [view, setView] = useState<"plain" | "trace">("plain");
   const story = storyOf(events);
   if (story.length === 0)
     return (
@@ -188,20 +200,91 @@ export function RunStory({
         line="The story fills in as the run records what its agents do."
       />
     );
+  const totalCredits = events.reduce((sum, e) => sum + (e.credits ?? 0), 0);
   return (
-    <ol className="park-world-story" aria-label="What happened, newest first">
-      {story.map((e) => (
-        <li key={e.seq} className="park-world-storyrow">
-          <span className="park-world-storytext">{storySummary(e, skills)}</span>
-          <span className="park-world-storymeta">
-            {e.type === "building.completed" ? (
-              <span className="park-world-steptag park-world-steptag--done">Step done</span>
-            ) : null}
-            {clockOf(e.ts) ? <span>{`${clockOf(e.ts)} UTC`}</span> : null}
-          </span>
-        </li>
-      ))}
-    </ol>
+    <div className="park-world-storycontainer">
+      <div className="park-world-storyhead">
+        <div className="park-world-storytitlewrap">
+          <span className="park-world-storytitle">What happened</span>
+          <span className="park-world-storysub">In order · newest at the bottom</span>
+        </div>
+        <div role="radiogroup" aria-label="Story view" className="park-world-storyviews">
+          <button
+            type="button"
+            // biome-ignore lint/a11y/useSemanticElements: segmented radio button control
+            role="radio"
+            aria-checked={view === "plain"}
+            className={cx(
+              "park-world-storyviewbtn",
+              view === "plain" && "park-world-storyviewbtn--on",
+            )}
+            onClick={() => setView("plain")}
+          >
+            Plain
+          </button>
+          <button
+            type="button"
+            // biome-ignore lint/a11y/useSemanticElements: segmented radio button control
+            role="radio"
+            aria-checked={view === "trace"}
+            className={cx(
+              "park-world-storyviewbtn",
+              view === "trace" && "park-world-storyviewbtn--on",
+            )}
+            onClick={() => setView("trace")}
+          >
+            Trace
+          </button>
+        </div>
+      </div>
+      {view === "plain" ? (
+        <ol className="park-world-story" aria-label="What happened, newest first">
+          {story.map((e) => (
+            <li key={e.seq} className="park-world-storyrow">
+              <span className="park-world-storytext">{storySummary(e, skills)}</span>
+              <span className="park-world-storymeta">
+                {e.type === "building.completed" ? (
+                  <span className="park-world-steptag park-world-steptag--done">Step done</span>
+                ) : null}
+                {clockOf(e.ts) ? <span>{`${clockOf(e.ts)} UTC`}</span> : null}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <section className="park-world-trace" aria-label="Run trace">
+          <div className="park-world-tracehead">
+            <span className="park-world-tracecol park-world-tracecol--time">TIME</span>
+            <span className="park-world-tracecol park-world-tracecol--event">EVENT · DETAIL</span>
+            <span className="park-world-tracecol park-world-tracecol--cr">CR</span>
+          </div>
+          <div className="park-world-tracerows">
+            {events
+              .slice()
+              .reverse()
+              .map((e) => (
+                <div key={e.seq} className="park-world-tracerow">
+                  <span className="park-world-tracetime">
+                    {clockOf(e.ts) ? `${clockOf(e.ts)} UTC` : "—"}
+                  </span>
+                  <span className="park-world-traceinfo">
+                    <strong className="park-world-traceevent">{e.type}</strong>
+                    <span className="park-world-tracedetail">{storySummary(e, skills)}</span>
+                  </span>
+                  <span className="park-world-tracecr">
+                    {e.credits != null && e.credits > 0 ? e.credits : "·"}
+                  </span>
+                </div>
+              ))}
+          </div>
+          <div className="park-world-tracetotal">
+            <span className="park-world-tracecol park-world-tracecol--time" />
+            <span className="park-world-tracetotallabel">Total so far</span>
+            <span className="park-world-tracetotalcr">{totalCredits}</span>
+          </div>
+        </section>
+      )}
+    </div>
   );
 }
 
