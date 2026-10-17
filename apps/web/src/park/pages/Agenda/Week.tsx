@@ -252,7 +252,7 @@ function Calendar({
               </button>
             ))}
             {d.today && weekOffset === 0 ? (
-              <div className="park-agenda-now" aria-label="Current time" style={{ top: nowPos }}>
+              <div className="park-agenda-now" role="img" aria-label="Current time" style={{ top: nowPos }}>
                 <span className="park-agenda-nowdot" />
               </div>
             ) : null}

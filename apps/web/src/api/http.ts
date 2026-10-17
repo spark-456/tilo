@@ -1203,7 +1203,8 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
         if (this.missing.delete(worldId))
           for (const listener of [...this.missingListeners]) listener();
         note(null);
-        delay = fresh.length > 0 ? this.pollMs : this.pollMs >= 1000 ? 3000 : this.pollMs * 3;
+        // FT-PERF-1: back off only once a run has events; a world waiting to start keeps the fast poll.
+        delay = fresh.length > 0 || cursor === 0 ? this.pollMs : this.pollMs >= 1000 ? 3000 : this.pollMs * 3;
       } catch (error) {
         const known =
           error instanceof TiloApiError ? error : new TiloApiError(UNREACHABLE, null, true);
