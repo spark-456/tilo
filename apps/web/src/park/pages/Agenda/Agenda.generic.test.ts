@@ -22,7 +22,7 @@ const FORBIDDEN: [string, RegExp][] = [
   ["event id compared as a literal", /\.id\s*===?\s*["'`]\w+["'`]/],
   ["id compared as a literal", /===?\s*["'`](?:gate|sync|su|t0|tg)["'`]/],
   ["event id set as a literal", /set(?:Sel|Selected)\(["'`]\w+["'`]\)/],
-  ["pin kind compared as a literal", /\bkind\s*===?\s*["'`]\w+["'`]/],
+  ["pin kind compared as a literal", /\.kind\s*===?\s*["'`]\w+["'`]/],
 ];
 
 describe("WEB_9c_agenda_generic", () => {

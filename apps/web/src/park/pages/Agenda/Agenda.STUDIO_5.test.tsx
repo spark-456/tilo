@@ -48,10 +48,10 @@ it("STUDIO_5 agenda live: today and the recorded plate", async () => {
   expect(container.textContent).toContain(
     "Tilo prepares a brief before each meeting and takes notes in the ones you invite it to.",
   );
-  const main = container.querySelector(".park-agenda-studiomain");
-  expect(main?.querySelector('[aria-label="Today\'s calendar"]')?.textContent).toContain(
+  expect(container.querySelector('[aria-label="Today\'s calendar"]')?.textContent).toContain(
     "Supplier call",
   );
+  const main = container.querySelector(".park-agenda-studiomain");
   expect(main?.querySelector('[aria-label="Your plate"]')?.textContent).toContain("Send the quote");
   expect(container.querySelector('[aria-label="Week calendar"]')).not.toBeNull();
   expect(container.querySelector(".park-agenda-studioside")).not.toBeNull();

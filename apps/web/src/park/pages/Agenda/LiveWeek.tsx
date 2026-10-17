@@ -9,6 +9,7 @@ import { openMeetTab } from "../../shared/hostMeetingRules";
 import { MeetingBrief } from "./MeetingBrief";
 import { MeetingAttend } from "./MeetingHost";
 import { MeetingMinutes } from "./MeetingMinutes";
+import { CALENDAR_ENTRY_KIND } from "./model";
 
 const START_HOUR = 8;
 const END_HOUR = 20;
@@ -44,6 +45,7 @@ type Entry = { key: string; title: string; start: string; end: string | null; me
 export function LiveWeek({
   rows,
   parked,
+  today,
   meetings,
   onSchedule,
   host,
@@ -55,6 +57,7 @@ export function LiveWeek({
 }: {
   rows: AgendaPlateRow[];
   parked: AgendaPlateRow[];
+  today?: string | null;
   meetings: PeopleRow[];
   onSchedule: (start: string, minutes: number) => void;
   host: MeetingHostApi | null;
@@ -72,7 +75,7 @@ export function LiveWeek({
   });
   const entries: Entry[] = [
     ...rows
-      .filter((row) => row.ref.kind === "calendar_entry" && row.at && row.title)
+      .filter((row) => row.ref.kind === CALENDAR_ENTRY_KIND && row.at && row.title)
       .map((row) => ({
         key: row.ref.id,
         title: row.title ?? "Calendar event",
@@ -89,6 +92,8 @@ export function LiveWeek({
         meeting,
       })),
   ];
+  const todayKey = today?.slice(0, 10) ?? localDate(new Date());
+  const todayEntries = entries.filter((entry) => localDate(new Date(entry.start)) === todayKey);
   const [selected, setSelected] = useState<Entry | null>(null);
   const [briefRequested, setBriefRequested] = useState(false);
   const [attendeeNames, setAttendeeNames] = useState<string[] | null>(null);
@@ -207,6 +212,22 @@ export function LiveWeek({
 
   return (
     <section className="cx-agenda-liveweek" aria-label="Week calendar">
+      <section className="cx-agenda-today" aria-label="Today's calendar">
+        <h2>Today's calendar</h2>
+        {todayEntries.length ? (
+          <ul>
+            {todayEntries.map((entry) => (
+              <li key={entry.key}>
+                <strong>{entry.title}</strong>
+                <time dateTime={entry.start}>{human(entry.start)}</time>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No events today.</p>
+        )}
+        <AppLink to="/connectors">Check Google Calendar</AppLink>
+      </section>
       <div className="cx-agenda-weektitle">
         <div>
           <h2>

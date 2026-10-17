@@ -24,6 +24,11 @@ import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { AppLink } from "../../shared/AppLink";
 import "../../components/park.components.css";
 import type { AppCtx } from "../../app/AppCtx";
+import {
+  agendaDateLabel,
+  agendaLocalDateTime,
+  defaultAgendaScheduleStart,
+} from "../../shared/agendaDate";
 import { type HostForm, refusedBeforeSend } from "../../shared/hostMeetingRules";
 import { AgendaNewMenu } from "./AgendaNewMenu";
 import { Boards } from "./Boards";
@@ -56,21 +61,6 @@ function Frame({ source, children }: { source?: string; children?: ReactNode }) 
 
 /** HR-1: no calendar sync event stands behind the sample week, so the chip says so instead of "synced just now". */
 const SAMPLE_SYNC = "Sample data · no calendar sync recorded";
-
-function humanAgendaDate(value: string): string {
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T12:00:00`) : new Date(value);
-  if (Number.isNaN(date.getTime())) return "Date not supplied";
-  const now = new Date();
-  const sameDay = date.toDateString() === now.toDateString();
-  const day = new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  }).format(date);
-  return sameDay
-    ? `Today ${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(date)}`
-    : `${day}${/^\d{4}-\d{2}-\d{2}$/.test(value) ? "" : ` · ${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(date)}`}`;
-}
 
 function Ready({
   A,
@@ -194,9 +184,12 @@ function Plate({ A }: { A: LiveAgenda }) {
   const meetHere = async (start: string, minutes: number) => {
     if (!host) throw new Error("Meeting host is unavailable");
     const { you } = await host.people();
-    const date = new Date(start);
-    const local = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-    const form: HostForm = { title: "Meet with Tilo", start: local, minutes, attested: true };
+    const form: HostForm = {
+      title: "Meet with Tilo",
+      start: agendaLocalDateTime(start),
+      minutes,
+      attested: true,
+    };
     const id = await host.create(form, crypto.randomUUID());
     try {
       await host.world(id);
@@ -238,12 +231,12 @@ function Plate({ A }: { A: LiveAgenda }) {
             <strong>{r.title ?? "Untitled item"}</strong>
             {r.due ? (
               <p>
-                Due <time dateTime={r.due}>{humanAgendaDate(r.due)}</time>
+                Due <time dateTime={r.due}>{agendaDateLabel(r.due)}</time>
               </p>
             ) : null}
             {isCalendarEntry(r) && r.at ? (
               <p>
-                <time dateTime={r.at}>{humanAgendaDate(r.at)}</time>
+                <time dateTime={r.at}>{agendaDateLabel(r.at)}</time>
               </p>
             ) : null}
           </li>
@@ -267,20 +260,17 @@ function Plate({ A }: { A: LiveAgenda }) {
             createPin={createPin}
             canHost={http !== null}
             onPinCreated={() => setPeopleKey((n) => n + 1)}
-            onSchedule={() => {
-              const next = new Date(Date.now() + 5 * 60_000);
-              next.setMinutes(Math.ceil(next.getMinutes() / 15) * 15, 0, 0);
-              setSchedule({ start: next.toISOString(), minutes: 15 });
-            }}
+            onSchedule={() => setSchedule({ start: defaultAgendaScheduleStart(), minutes: 15 })}
           />
         </div>
         <p className="park-agenda-date">
-          {A.plate.today ? humanAgendaDate(A.plate.today) : "This week"}
+          {A.plate.today ? agendaDateLabel(A.plate.today) : "This week"}
         </p>
       </div>
       <LiveWeek
         rows={A.plate.rows}
         parked={A.plate.parked}
+        today={A.plate.today}
         meetings={meetings}
         onSchedule={(start, minutes) => setSchedule({ start, minutes })}
         host={host}

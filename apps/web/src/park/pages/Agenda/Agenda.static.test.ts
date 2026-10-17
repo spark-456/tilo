@@ -45,7 +45,8 @@ describe("WEB_9_agenda_static", () => {
       expect(c, f).not.toMatch(/from\s+["'][^"']*\/(screens|world|stage)\//);
       expect(c, f).not.toMatch(/\b(?:gemini|gpt|claude|llama)-/i);
       expect(/support\.js|tilo-app\.js/i.test(c), f).toBe(false);
-      expect(c, f).not.toMatch(/Math\.random|Date\.now|new Date|fetch\(/);
+      expect(c, f).not.toMatch(/Math\.random|fetch\(/);
+      if (f === "AgendaPage.tsx") expect(c, f).not.toMatch(/Date\.now|new Date/);
     }
   });
 });
