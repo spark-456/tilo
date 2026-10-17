@@ -1,16 +1,4 @@
 import type { Skill } from "../../api/types";
-import {
-  BookOpen,
-  Braces,
-  CalendarDays,
-  Globe2,
-  type LucideIcon,
-  Mail,
-  PenLine,
-  Shapes,
-  Table2,
-  UsersRound,
-} from "../../shared/icons";
 
 export type SkillIconKind =
   | "mail"
@@ -46,19 +34,27 @@ export function skillIconKind(skill: Pick<Skill, "name" | "tools" | "role">): Sk
   return "default";
 }
 
-const ICONS: Record<SkillIconKind, LucideIcon> = {
-  mail: Mail,
-  research: BookOpen,
-  calendar: CalendarDays,
-  table: Table2,
-  globe: Globe2,
-  writing: PenLine,
-  meeting: UsersRound,
-  code: Braces,
-  default: Shapes,
+const ICONS: Record<SkillIconKind, string> = {
+  mail: "envelope",
+  research: "magnifying-glass",
+  calendar: "calendar",
+  table: "bar-chart",
+  globe: "globe",
+  writing: "memo",
+  meeting: "people",
+  code: "laptop",
+  default: "clipboard",
 };
 
 export function SkillIcon({ skill }: { skill: Pick<Skill, "name" | "tools" | "role"> }) {
-  const Icon = ICONS[skillIconKind(skill)];
-  return <Icon aria-hidden="true" focusable="false" size={25} strokeWidth={1.9} />;
+  return (
+    <img
+      src={`/park/skills/${ICONS[skillIconKind(skill)]}.svg`}
+      alt={`${skill.name} icon`}
+      width="25"
+      height="25"
+      loading="lazy"
+      decoding="async"
+    />
+  );
 }

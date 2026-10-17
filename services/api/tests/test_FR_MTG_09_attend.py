@@ -165,3 +165,17 @@ def test_FR_MTG_09_concurrent_owner_clicks_launch_one_bot(rig):
         assert bot.attend.await_count == 1
 
     asyncio.run(check())
+
+
+def test_FR_MTG_09_MEET_SIMPLE_a_cold_bot_is_woken_before_the_join_link_is_made(rig):
+    h, w, bot = rig
+    order = []
+    bot.wake = AsyncMock(side_effect=lambda: order.append("wake"))
+    bot.attend = AsyncMock(side_effect=lambda *a, **k: order.append("attend") or bot.captured)
+    bot.captured = BotCapture(Transcript(v="1.0", meeting_id=MEETING, utterances=[]), "completed")
+    host = h.rig.app.dependency_overrides[h.deps.get_meeting_host_client]()
+    real_join = host.join_link
+    host.join_link = lambda receipt: order.append("join_link") or real_join(receipt)
+    result = asyncio.run(attend_meeting(w, h.store, h.art.store, host, bot, MEETING, lambda: h.rig.clock))
+    assert result["status"] == "ended"
+    assert order == ["wake", "join_link", "attend"], "the 60-second link is made after the bot is up"

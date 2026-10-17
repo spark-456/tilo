@@ -41,3 +41,25 @@ def test_MORNING_BRIEF_B1A_MO09_artifact_ids_lists_the_owners_artifacts_of_the_s
     assert rig.store.artifact_ids(rig.scope) == ["art_mbrief_20260920", "art_mbrief_20261001", "art_other"]
     other = dataclasses.replace(rig.scope, owner="u_someone_else")
     assert rig.store.artifact_ids(other, "art_mbrief_") == []
+
+
+def test_MORNING_BRIEF_B1A_MO09_artifact_ids_ignores_the_same_owners_other_world_even_if_paths_are_widened():
+    rig = make_rig("memory", None)
+    other_world = dataclasses.replace(rig.scope, world_id="w_other")
+    rig.store.with_new_id(lambda: "art_mbrief_20261016").put(rig.scope, rig.new(ARTICLE))
+    rig.store.with_new_id(lambda: "art_mbrief_20261017").put(other_world, rig.new(ARTICLE))
+    meta = rig.meta.inner
+    paths = meta.paths
+    meta.paths = lambda prefix="": paths("")
+    assert rig.store.artifact_ids(rig.scope, "art_mbrief_") == ["art_mbrief_20261016"]
+
+
+def test_MORNING_BRIEF_B1A_MO09_artifact_ids_checks_one_document_per_artifact_not_every_version():
+    rig = make_rig("memory", None)
+    first = rig.store.with_new_id(lambda: "art_mbrief_20261016").put(rig.scope, rig.new(ARTICLE))
+    rig.store.with_new_id(lambda: "art_unused").put(
+        rig.scope, dataclasses.replace(rig.new(ARTICLE + b" v2"), parent=first.ref)
+    )
+    rig.meta.calls.clear()
+    assert rig.store.artifact_ids(rig.scope, "art_mbrief_") == ["art_mbrief_20261016"]
+    assert len(rig.meta.called("get")) == 1

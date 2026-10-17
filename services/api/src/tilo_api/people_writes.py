@@ -94,6 +94,21 @@ class Empty(_Closed):
     """A confirm takes `{}`: the stamp is the actor and the clock."""
 
 
+class StartIn(_Closed):
+    """MEET-SIMPLE: the person's own confirmation of a hosted meeting. `approve` is JSON `true` (their click on
+    "Meet with Tilo" or on Confirm in the schedule dialog); `invited` the exact people shown, themself included."""
+
+    approve: StrictBool
+    invited: Annotated[list[Text], Field(min_length=1, max_length=51)]
+
+    @field_validator("approve")
+    @classmethod
+    def _clicked(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("approve")
+        return value
+
+
 class AgendaIn(_Closed):
     title: Text
     minutes: int | None = None
@@ -102,6 +117,7 @@ class AgendaIn(_Closed):
 class AttendeeIn(_Closed):
     name: Text  # `user` is never taken from a request: attendees[].user is not identity (PE-15, PPL-20)
     email: Text | None = None  # transient lookup input; never stored on the meeting
+    person: Text | None = None  # an id picked from the person's own list; resolved like an email (MEET-SIMPLE)
 
     @field_validator("email")
     @classmethod
@@ -488,6 +504,19 @@ def meeting_attendees(
         name = w.text(attendee.name)
         address = attendee.email if attendee.email is not None else attendee.name
         user = (known or {}).get(name) if attendee.email is None else None
+        if attendee.person is not None:  # picked from the person's own list: only themself or a teammate resolves
+            if directory is None:
+                directory = w.org_directory()
+            picked = directory.persons.get(attendee.person)
+            if (
+                picked is not None
+                and picked["org_id"] == w.org
+                and (picked["id"] == w.actor or directory.teammates(w.actor, picked["id"], w.now))
+            ):
+                result.append({"name": w.text(picked["display_name"]), "user": picked["id"]})
+            else:
+                result.append({"name": name, "user": None})
+            continue
         if valid_email(address):
             if directory is None:
                 directory = w.org_directory()
