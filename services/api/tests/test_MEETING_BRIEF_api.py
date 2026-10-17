@@ -142,20 +142,28 @@ def test_MEETING_BRIEF_MB01_a_demo_session_may_read_but_not_make(case):
     refused = post(c)
     assert refused.status_code == 403 and refused.json() == {"detail": "demo_read_only"}
     assert not c.script.calls and c.rig.snapshot() == before and c.rig.world_maker.calls == []
-    assert get(c).json() == {"detail": "not_ready"}
+    assert get(c).status_code == 200 and get(c).json() == {"brief": None}
 
 
 # --- MB-02: GET reads and never makes ------------------------------------------------------------------------------
 
 
 def test_MEETING_BRIEF_MB02_get_before_post_is_not_ready_and_changes_nothing(case):
+    # FT-SUP-3: answer 200 with brief: null for "none yet" (deliberately replaced 404 not_ready to eliminate 404 noise)
     c = case
     before = c.rig.snapshot()
     response = get(c)
-    assert response.status_code == 404 and response.json() == {"detail": "not_ready"}
+    assert response.status_code == 200 and response.json() == {"brief": None}
     assert response.headers["cache-control"] == "no-store"
     assert not c.script.calls and c.rig.snapshot() == before and c.rig.world_maker.calls == []
     assert c.ledger.spent(OWNER, DAY) == 0
+
+
+def test_FT_SUP_3_meeting_brief_none_yet_answers_200_brief_none(case):
+    """FT-SUP-3: GET /v1/meetings/{id}/brief answers 200 with {"brief": None} when no brief is ready."""
+    response = get(case)
+    assert response.status_code == 200
+    assert response.json() == {"brief": None}
 
 
 def test_MEETING_BRIEF_MB02_get_serves_what_post_stored_and_never_calls_a_model(case):
@@ -174,7 +182,7 @@ def test_MEETING_BRIEF_MB02_a_stored_document_that_fails_the_schema_is_not_ready
     bad = {"v": "1.0", "meeting_id": NEXT, "generated_at": NOW, "flagged": False, "agenda_points": [], "recipients": []}
     made = c.rig.put_doc(c.scope, "art_brief_bad", bad)
     c.rig.real.meetings.replace({**stored, "brief": made.ref}, expected_version=c.rig.version_of("meetings", NEXT))
-    assert get(c).json() == {"detail": "not_ready"}
+    assert get(c).status_code == 200 and get(c).json() == {"brief": None}
 
 
 # --- MB-03: POST makes one now ------------------------------------------------------------------------------------
@@ -252,7 +260,7 @@ def test_MEETING_BRIEF_MB03_a_discarded_meeting_is_not_found_for_post(case):
     stored = c.rig.stored("meetings", NEXT)
     c.rig.real.meetings.replace(gone_meeting(stored, "discarded"), expected_version=c.rig.version_of("meetings", NEXT))
     assert post(c).json() == {"detail": "not_found"} and not c.script.calls
-    assert get(c).json() == {"detail": "not_ready"}, "a discarded meeting keeps no brief"
+    assert get(c).status_code == 200 and get(c).json() == {"brief": None}, "a discarded meeting keeps no brief"
 
 
 def test_MEETING_BRIEF_MB03_a_meeting_with_no_agenda_makes_a_brief_without_a_model_call(case):
@@ -488,10 +496,10 @@ def test_MEETING_BRIEF_MB09_a_brief_is_not_served_once_a_cited_meetings_minutes_
     prior = c.rig.stored("meetings", PRIOR)
     expired = {**prior, "delete_minutes_after": "2026-10-06T09:00:00.000Z"}  # before NOW
     c.rig.real.meetings.replace(expired, expected_version=c.rig.version_of("meetings", PRIOR))
-    assert get(c).json() == {"detail": "not_ready"}
+    assert get(c).status_code == 200 and get(c).json() == {"brief": None}
     deleted = gone_meeting(prior, "deleted")
     c.rig.real.meetings.replace(deleted, expected_version=c.rig.version_of("meetings", PRIOR))
-    assert get(c).json() == {"detail": "not_ready"}
+    assert get(c).status_code == 200 and get(c).json() == {"brief": None}
     again = post(c).json()
     assert again["carry_over"] == [] and get(c).status_code == 200, "the owner may make a new one"
 

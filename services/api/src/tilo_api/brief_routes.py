@@ -158,14 +158,15 @@ def get_brief(
     desks: Annotated[deps.DeskWorlds, Depends(deps.get_desk_worlds)],
     clock: Clock,
 ) -> dict[str, Any]:
-    """Today's latest version in the person's zone, or 404 `not_ready` (MO-01); it never makes one."""
+    """Today's latest version in the person's zone, or 200 `brief: None` for 'none yet' (MO-01, FT-SUP-3). It never
+    makes one."""
     user, briefs = principal.user_id, _briefs(principal, stores)
     zone = (briefs.settings(deps.ORG_ID, user) or {}).get("time_zone") or _zone_of(stores, user)
     today = local_date(clock(), zone)
     purge_daily(briefs, artifacts, desks, deps.ORG_ID, user, today)  # MO-09: retention needs no sweep and no switch
     found = read_latest(artifacts, desks, deps.ORG_ID, user, today)
     if found is None:
-        raise Refusal(404, "not_ready")
+        return {"brief": None}
     return found
 
 

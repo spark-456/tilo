@@ -270,10 +270,16 @@ def meeting_brief_route(
     redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> dict[str, Any]:
-    """The owner reads the pinned meeting brief; it never makes one (MB-02). No brief yet is 404 `not_ready`."""
+    """The owner reads the pinned meeting brief; it never makes one (MB-02). No brief yet is 200 `brief: None`
+    (FT-SUP-3)."""
     if _MEETING_ID.fullmatch(meeting_id) is None:
         raise _not_found()
-    return _answer(lambda: read_brief(_writer(principal, stores, clock), artifacts, redact, meeting_id))
+    try:
+        return _answer(lambda: read_brief(_writer(principal, stores, clock), artifacts, redact, meeting_id))
+    except HTTPException as exc:
+        if exc.detail == "not_ready":
+            return {"brief": None}
+        raise
 
 
 @router.post("/v1/meetings/{meeting_id}/brief")
