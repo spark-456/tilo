@@ -255,7 +255,7 @@ describe("WORLD_USEFUL the World page of a live run", () => {
     });
     click(control(rig.el, "Download"));
     expect(clicks).toHaveLength(1);
-    expect(clicks[0]?.download).toBe("tilo-result-hires.md");
+    expect(clicks[0]?.download).toBe("tilo-result-Road trip.md");
     expect(revoke).toHaveBeenCalledWith("blob:result");
     click(control(rig.el, "Open result"));
     expect(clicks).toHaveLength(2);

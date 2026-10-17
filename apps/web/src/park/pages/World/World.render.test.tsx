@@ -246,9 +246,10 @@ describe("WEB_6_world_render: the map card (art, hero tag, progress, legend)", (
 
   it("WEB_6_world_render_a_world_without_a_progress_value_shows_its_next_value_and_an_empty_bar", async () => {
     const { el } = await mountWorld({ id: "invoice" });
-    const label = elWithText(el, "Mon 09:00");
-    expect(label).toBeTruthy();
-    expect(progressBeside(label as HTMLElement)).toBe(0);
+    expect(elWithText(el, "Mon 09:00")).toBeTruthy();
+    // WORLD-LAYOUT-1 also lists the next value inside the 'More' facts card; the map card's copy carries the empty bar
+    const labels = [...el.querySelectorAll("*")].filter((n) => n.children.length === 0 && n.textContent?.trim() === "Mon 09:00");
+    expect(labels.map((n) => progressBeside(n))).toContain(0);
   });
 
   it("WEB_6_world_render_no_overlay_while_the_world_is_not_paused", async () => {
