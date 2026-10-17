@@ -71,3 +71,30 @@ it("FR_SKL_04 catalog picker shows served mine, team and library groups and choo
   });
   expect(chosen).toHaveBeenCalledWith(expect.objectContaining({ id: "t", scope: "team" }));
 });
+
+it("FR_PA_11_SKILL_TAG a Try it skill is shown as a removable tagged chip on Home", () => {
+  const view = mount(
+    <div data-park>
+      <SkillMention
+        text=""
+        selected={{
+          id: "web-research",
+          kind: "library",
+          scope: "library",
+          name: "Web research",
+          purpose: "Research public sources",
+          inputs: [],
+          tools: ["browser"],
+          version: "1.0.0",
+        }}
+        client={null}
+        onChoose={() => {}}
+        onClear={() => {}}
+      />
+    </div>,
+  );
+  expect(
+    view.container.querySelector('[data-testid="selected-skill-chip"]')?.textContent,
+  ).toContain("Web research");
+  expect(view.container.querySelector('[aria-label="Remove Web research skill"]')).not.toBeNull();
+});

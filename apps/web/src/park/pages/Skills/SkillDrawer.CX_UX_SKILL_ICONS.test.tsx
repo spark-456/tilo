@@ -34,7 +34,7 @@ const skill = (over: Partial<Skill> = {}): Skill => ({
 });
 
 describe("CX_UX_SKILL_ICONS detail", () => {
-  it("FR_PA_11 Use this skill opens a blank Home draft with the served skill tagged", () => {
+  it("FR_PA_11 Try it opens a blank Home draft with the served skill tagged", () => {
     const app = stubApp("skills");
     const m = mount(
       <SkillDrawer
@@ -52,7 +52,7 @@ describe("CX_UX_SKILL_ICONS detail", () => {
     expect(m.container.textContent).toContain("Research public sources");
     expect(m.container.textContent).toContain("browser");
     const tryButton = [...m.container.querySelectorAll("button")].find(
-      (b) => b.textContent === "Use this skill",
+      (b) => b.textContent === "Try it",
     );
     if (!tryButton) throw new Error("Try it button missing");
     click(tryButton);
