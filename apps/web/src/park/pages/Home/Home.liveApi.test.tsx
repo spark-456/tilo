@@ -109,7 +109,9 @@ describe("FR_UX_13 live composer over the real live Api", () => {
       version: "1",
     });
     const rig = await mountLiveHome(api);
-    expect(rig.el.textContent).toContain("Skill selected: Competitor scan");
+    const chip = q(rig.el, '[data-testid="selected-skill-chip"]');
+    expect(chip?.textContent).toBe("Competitor scan");
+    expect(chip?.getAttribute("aria-label")).toBe("Skill tag: Competitor scan");
     clickEl(control(rig.el, "Start task"));
     await settle();
     expect((intakes()[0]?.[1]?.body as FormData).get("refs")).toBe(
