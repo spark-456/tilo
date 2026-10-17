@@ -198,13 +198,14 @@ test.describe("@cp2 CX-UX-JOURNEY-E2E the judge journey", () => {
         await page.goto(`/world/${worldId}`);
         expect((await read).status(), "GET /worlds/{id}/result").toBe(200);
         await expect(page.getByTestId("run-status")).toContainText("Done");
-        await expect(page.getByTestId("result-text")).toBeVisible({ timeout: 30_000 });
-        const open = page.getByRole("button", { name: "Open result" });
+        const result = page.getByTestId("run-result");
+        await expect(result.getByTestId("result-text")).toBeVisible({ timeout: 30_000 });
+        const open = result.getByRole("button", { name: "Open result" });
         await expect(open).toBeVisible();
         await expect(open).not.toHaveAttribute("aria-disabled", "true");
         const [download] = await Promise.all([
           page.waitForEvent("download", { timeout: 20_000 }),
-          page.getByRole("button", { name: "Download", exact: true }).click(),
+          result.getByRole("button", { name: "Download", exact: true }).click(),
         ]);
         expect(download.suggestedFilename()).toMatch(/^tilo-result-/);
       },
