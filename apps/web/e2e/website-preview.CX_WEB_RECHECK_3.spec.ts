@@ -30,6 +30,13 @@ const pages = [
     selector: "#clock",
     text: /^\d{2}:\d{2}:\d{2}$/,
   },
+  {
+    name: "page that navigates after writing",
+    html: '<!doctype html><h1>Leaving page</h1><script>setTimeout(()=>{location.href="https://leave.example.test/"},1500)</script>',
+    selector: "h1",
+    text: "Leaving page",
+    expectClosed: true,
+  },
 ];
 
 function previewShell(origin: string): string {
@@ -46,6 +53,7 @@ function previewShell(origin: string): string {
 }
 
 test("CX_WEB_RECHECK_3 renders real website previews in Chromium", async ({ page }) => {
+  test.setTimeout(90_000);
   const origin = new URL(String(test.info().project.use.baseURL)).origin;
   let current = "";
   await page.route("**/src/api/ClientProvider.tsx**", (route) =>
@@ -81,6 +89,9 @@ test("CX_WEB_RECHECK_3 renders real website previews in Chromium", async ({ page
     }
     return route.fulfill({ status: 404, body: "" });
   });
+  await page.route("https://leave.example.test/**", (route) =>
+    route.fulfill({ contentType: "text/html", body: "<h1>Outside</h1>" }),
+  );
 
   for (const item of pages) {
     current = item.html;
@@ -94,6 +105,16 @@ test("CX_WEB_RECHECK_3 renders real website previews in Chromium", async ({ page
       await expect(frame.locator(item.selector)).toHaveText(item.text);
     else if (item.text) await expect(frame.locator(item.selector)).toHaveText(item.text);
     else await expect(frame.locator("h1")).toBeVisible();
+    if (item.name === "benign page" || item.name === "live clock page") {
+      await page.waitForTimeout(10_000);
+      await expect(page.locator("iframe[title]")).toHaveCount(1);
+    }
+    if ("expectClosed" in item && item.expectClosed) {
+      await expect(page.getByRole("alert")).toHaveText(
+        "This website tried to leave Tilo. The preview was closed.",
+      );
+      await expect(page.locator("iframe[title]")).toHaveCount(0);
+    }
     if (item.name === "data image page")
       await expect(frame.locator("img")).toHaveJSProperty("naturalWidth", 1);
     if (item.name === "300 image page") {

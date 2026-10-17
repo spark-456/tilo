@@ -32,7 +32,7 @@ export function WebsitePreview({
 }) {
   const [html, setHtml] = useState<string | null>(null);
   const [fileBytes, setFileBytes] = useState<ArrayBuffer | null>(null);
-  const [failure, setFailure] = useState<"load" | "hash" | "timeout" | null>(null);
+  const [failure, setFailure] = useState<"load" | "hash" | "timeout" | "navigation" | null>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const htmlRef = useRef<string | null>(null);
   const writtenRef = useRef(false);
@@ -136,6 +136,11 @@ export function WebsitePreview({
   };
 
   const loaded = (): void => {
+    if (writtenRef.current) {
+      setHtml(null);
+      setFailure("navigation");
+      return;
+    }
     sendPreview();
   };
 
@@ -147,6 +152,9 @@ export function WebsitePreview({
       {failure === "load" ? <p role="alert">The website could not be loaded.</p> : null}
       {failure === "timeout" ? (
         <p role="alert">Preview unavailable, open the file instead.</p>
+      ) : null}
+      {failure === "navigation" ? (
+        <p role="alert">This website tried to leave Tilo. The preview was closed.</p>
       ) : null}
       {html === null && failure === null ? <p>Loading website…</p> : null}
       {html !== null && failure === null ? (

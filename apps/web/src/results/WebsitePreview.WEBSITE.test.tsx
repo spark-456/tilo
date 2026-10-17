@@ -115,7 +115,7 @@ describe("WebsitePreview WEBSITE", () => {
     expect(post).toHaveBeenCalledWith({ tilo: "preview", html: bytes }, "*");
   });
 
-  it("CX_WEB_3_WS_12_keeps_the_preview_open_after_preview_written_and_later_resource_loads", async () => {
+  it("CX_WEB_3_WS_12_ignores_untrusted_and_duplicate_preview_written_messages", async () => {
     await mount();
     const shell = shellWindow();
     await act(async () => frame().dispatchEvent(new Event("load")));
@@ -149,8 +149,27 @@ describe("WebsitePreview WEBSITE", () => {
       ),
     );
     expect(container.querySelector("iframe")).not.toBeNull();
+  });
+
+  it("test_CX_WEB_RECHECK_4_WS_12_closes_only_on_a_load_after_preview_written", async () => {
+    await mount();
+    const shell = shellWindow();
     await act(async () => frame().dispatchEvent(new Event("load")));
+    await act(async () =>
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { tilo: "preview-written" },
+          origin: "null",
+          source: shell,
+        }),
+      ),
+    );
     expect(container.querySelector("iframe")).not.toBeNull();
+    await act(async () => frame().dispatchEvent(new Event("load")));
+    expect(container.querySelector("iframe")).toBeNull();
+    expect(container.textContent).toContain(
+      "This website tried to leave Tilo. The preview was closed.",
+    );
   });
 
   it("CX_WEB_3_WS_12_closes_the_frame_when_preview_written_does_not_arrive_in_eight_seconds", async () => {
