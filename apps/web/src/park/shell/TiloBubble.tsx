@@ -12,10 +12,13 @@ import {
   useState,
 } from "react";
 import { PAGE_LABEL, type PageId } from "../app/AppCtx";
+import { useWorldClient } from "../app/context";
 import { RememberChip } from "../chat/RememberChip";
 import { type BubblePos, readBubblePos, writeBubblePos } from "../chat/displayPrefs";
 import { type Turn, useQuickChat } from "../chat/useQuickChat";
 import { SWITCH_WORDS } from "../pages/Home/homeData";
+import { SkillMention } from "../shared/SkillMention";
+import { type CatalogSkill, skillRefOf } from "../shared/skillRoute";
 import { Buddy } from "../studio/Buddy";
 import "./TiloBubble.css";
 
@@ -91,7 +94,11 @@ function Said({ turn }: { turn: Turn }) {
         ) : null}
         {reply}
         {(turn.state === "answered" || turn.state === "switch") && turn.skill ? (
-          <span className="park-bubble__sample">Suggested skill: {turn.skill.name}</span>
+          <span className="park-bubble__sample">
+            {turn.skill.source === "tagged"
+              ? `Running with ${turn.skill.name}`
+              : `Suggested skill: ${turn.skill.name}`}
+          </span>
         ) : null}
         {turn.state === "answered" && !turn.sample ? (
           <RememberChip suggestion={turn.memorySuggestion} />
@@ -113,9 +120,11 @@ export function TiloBubble({
   go: (page: PageId) => void;
 }) {
   const chat = useQuickChat(Date.now, page ? PAGE_LABEL[page] : undefined);
+  const skillClient = useWorldClient();
   const [saved, setSaved] = useState<BubblePos | null>(readBubblePos);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  const [selectedSkill, setSelectedSkill] = useState<CatalogSkill | null>(null);
   const drag = useRef<{ x: number; y: number; from: BubblePos; moved: boolean } | null>(null);
   const dragged = useRef(false);
   const button = useRef<HTMLButtonElement>(null);
@@ -212,7 +221,10 @@ export function TiloBubble({
   };
   const send = (e: FormEvent) => {
     e.preventDefault();
-    if (chat.ask(draft)) setDraft("");
+    if (chat.ask(draft, selectedSkill ? skillRefOf(selectedSkill) : null)) {
+      setDraft("");
+      setSelectedSkill(null);
+    }
   };
   const goTo = (p: PageId) => {
     setOpen(false);
@@ -311,27 +323,42 @@ export function TiloBubble({
             ) : null}
           </div>
           <form className="park-bubble__form" onSubmit={send}>
-            <label htmlFor={inputId} className="park-bubble__sr">
-              Ask a quick question
-            </label>
-            <input
-              ref={input}
-              id={inputId}
-              type="text"
-              autoComplete="off"
-              className="park-bubble__input"
-              placeholder="Ask a quick question…"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+            <SkillMention
+              text={draft}
+              selected={selectedSkill}
+              client={skillClient}
+              renderInput={(mentionInput) => (
+                <>
+                  <label htmlFor={inputId} className="park-bubble__sr">
+                    Ask a quick question
+                  </label>
+                  <input
+                    ref={input}
+                    id={inputId}
+                    type="text"
+                    autoComplete="off"
+                    className="park-bubble__input"
+                    placeholder="Ask a quick question…"
+                    value={draft}
+                    {...mentionInput}
+                    onChange={(e) => setDraft(e.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    className="park-bubble__send"
+                    aria-label="Send"
+                    aria-disabled={chat.busy || undefined}
+                  >
+                    ↑
+                  </button>
+                </>
+              )}
+              onChoose={(skill) => {
+                setDraft(draft.replace(/(?:^|\s)@[^\s@]*$/, "").trimEnd());
+                setSelectedSkill(skill);
+              }}
+              onClear={() => setSelectedSkill(null)}
             />
-            <button
-              type="submit"
-              className="park-bubble__send"
-              aria-label="Send"
-              aria-disabled={chat.busy || undefined}
-            >
-              ↑
-            </button>
           </form>
         </dialog>
       ) : null}

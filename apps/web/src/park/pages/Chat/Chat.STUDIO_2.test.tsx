@@ -5,7 +5,7 @@ import { fakeApi, fakeScheduler, stubApp } from "../../../../test-support/park/a
 import { cleanup, mount, q, qa } from "../../../../test-support/park/componentsHarness";
 import { settle, textOf } from "../../../../test-support/park/homeHarness";
 import { gate, liveSourced } from "../../../../test-support/park/liveHomeHarness";
-import { TiloApiError } from "../../../api/http";
+import { type HttpClient, TiloApiError } from "../../../api/http";
 import { SAMPLE_QUICK } from "../../api/fixtureApi";
 import type { Api } from "../../api/index";
 import type { AppCtx } from "../../app/AppCtx";
@@ -32,12 +32,17 @@ const quickApi = (reply: Reply): Api =>
 const calls = (api: Api): unknown[][] =>
   (api.startWorld as unknown as { mock: { calls: unknown[][] } }).mock.calls;
 
-async function mountChat(api: Api, over: Partial<AppCtx> = {}) {
+async function mountChat(
+  api: Api,
+  over: Partial<AppCtx> = {},
+  worldClient: HttpClient | null = null,
+) {
   const sch = fakeScheduler();
   const app = stubApp("chat", over);
   const m = mount(
     <ParkProvider
       api={api}
+      worldClient={worldClient}
       navigate={vi.fn()}
       schedule={sch.schedule}
       viewport={{ vw: 1440, vh: 900 }}
@@ -68,6 +73,49 @@ async function send(el: HTMLElement, text: string) {
 }
 
 describe("STUDIO_2 Chat: the helper's mood follows the real request", () => {
+  it("CX_UX_AT_MENTION_EVERYWHERE_chat_picks_a_skill_with_arrows_and_sends_the_tag", async () => {
+    const skill = {
+      id: "mine-skill",
+      kind: "taught" as const,
+      scope: "mine" as const,
+      name: "Meeting notes",
+      purpose: "Write notes",
+      inputs: [],
+      tools: [],
+      version: 1,
+    };
+    const getJson = vi.fn(async () => ({ skills: [skill] }));
+    const api = quickApi(async () => ({
+      data: {
+        kind: "switch_to_thinking",
+        reason: "refs",
+        skill: { ...skill, score: 1, source: "tagged" },
+      },
+      source: "live",
+    }));
+    const { el } = await mountChat(api, {}, { getJson } as unknown as HttpClient);
+    type(input(el), "Write @");
+    await settle();
+    const field = input(el);
+    act(() =>
+      field.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })),
+    );
+    act(() => field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+    expect(textOf(q(el, '[data-testid="selected-skill-chip"]'))).toContain("Meeting notes");
+
+    type(field, "Write meeting notes");
+    act(() => q<HTMLButtonElement>(el, 'button[aria-label="Send"]').click());
+    await settle();
+    expect(calls(api)[0]).toEqual([
+      "quick",
+      "Write meeting notes",
+      "quick",
+      [],
+      [{ kind: "taught_skill", id: "mine-skill" }],
+    ]);
+    expect(textOf(q(el, '[role="log"]'))).toContain("Running with Meeting notes");
+  });
+
   it("FR_SKL_04_ROUTE_chat_names_a_served_skill_offer_without_starting_a_world", async () => {
     const skill = {
       id: "competitor-scan",

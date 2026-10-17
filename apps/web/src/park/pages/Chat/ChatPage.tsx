@@ -46,6 +46,9 @@ function Face({ mood }: { mood: BuddyMood }) {
   );
 }
 
+const skillLine = (skill: SkillMatch): string =>
+  skill.source === "tagged" ? `Running with ${skill.name}` : `Suggested skill: ${skill.name}`;
+
 function Answer({
   turn,
   onWorld,
@@ -81,9 +84,7 @@ function Answer({
           <div className="park-chat-result-card">
             {cost ? <span className="park-chat-meta">{cost.toUpperCase()}</span> : null}
             <p className="park-chat-text">{turn.text}</p>
-            {turn.skill ? (
-              <span className="park-chat-tag">Suggested skill: {turn.skill.name}</span>
-            ) : null}
+            {turn.skill ? <span className="park-chat-tag">{skillLine(turn.skill)}</span> : null}
             {!turn.sample ? <RememberChip suggestion={turn.memorySuggestion} /> : null}
             <div className="park-chat-actions">
               {onCopy ? (
@@ -109,9 +110,7 @@ function Answer({
           <div className="park-chat-world-card">
             <strong>This needs a world.</strong>
             <p>{SWITCH_WORDS[turn.reason]}</p>
-            {turn.skill ? (
-              <span className="park-chat-tag">Suggested skill: {turn.skill.name}</span>
-            ) : null}
+            {turn.skill ? <span className="park-chat-tag">{skillLine(turn.skill)}</span> : null}
             <div className="park-chat-actions">
               <button type="button" className="park-chat-soft" onClick={makeWorld}>
                 Make it a world →
@@ -276,39 +275,42 @@ export function ChatPage({ app }: { app: AppCtx }) {
               )}
             </div>
             <form className="park-chat-compose" onSubmit={send}>
-              <div className="park-chat-box">
-                <label htmlFor={inputId} className="park-chat-sr">
-                  Ask a question
-                </label>
-                <input
-                  id={inputId}
-                  className="park-chat-input"
-                  type="text"
-                  autoComplete="off"
-                  value={draft}
-                  placeholder={chat.turns.length ? "Ask a follow-up…" : "Ask a question…"}
-                  onChange={(e) => {
-                    setDraft(e.target.value);
-                    setSkillNote(null);
-                  }}
-                />
-                <span className="park-chat-mode">
-                  <span className="park-chat-mode__dot" aria-hidden="true" />
-                  Quick answer
-                </span>
-                <button
-                  type="submit"
-                  className="park-chat-send"
-                  aria-label="Send"
-                  aria-disabled={chat.busy || undefined}
-                >
-                  <Icon name="send" size={20} />
-                </button>
-              </div>
               <SkillMention
                 text={draft}
                 selected={selectedSkill}
                 client={skillClient}
+                renderInput={(mentionInput) => (
+                  <div className="park-chat-box">
+                    <label htmlFor={inputId} className="park-chat-sr">
+                      Ask a question
+                    </label>
+                    <input
+                      id={inputId}
+                      className="park-chat-input"
+                      type="text"
+                      autoComplete="off"
+                      value={draft}
+                      placeholder={chat.turns.length ? "Ask a follow-up…" : "Ask a question…"}
+                      {...mentionInput}
+                      onChange={(e) => {
+                        setDraft(e.target.value);
+                        setSkillNote(null);
+                      }}
+                    />
+                    <span className="park-chat-mode">
+                      <span className="park-chat-mode__dot" aria-hidden="true" />
+                      Quick answer
+                    </span>
+                    <button
+                      type="submit"
+                      className="park-chat-send"
+                      aria-label="Send"
+                      aria-disabled={chat.busy || undefined}
+                    >
+                      <Icon name="send" size={20} />
+                    </button>
+                  </div>
+                )}
                 onChoose={(skill) => {
                   setDraft(draft.replace(/(?:^|\s)@[^\s@]*$/, "").trimEnd());
                   setSelectedSkill(skill);

@@ -12,14 +12,26 @@
 [data-park] .park-skill-mention__group {
   display: grid;
   gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
-[data-park] .park-skill-mention strong {
+[data-park] .park-skill-mention__list {
+  display: grid;
+  gap: 8px;
+}
+[data-park] .park-skill-mention legend {
+  padding: 0;
   font-size: 12px;
   color: var(--ink3);
 }
 [data-park] .park-skill-mention button {
   display: grid;
-  gap: 2px;
+  grid-template-columns: 25px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 2px;
   padding: 8px;
   border: 0;
   border-radius: 8px;
@@ -27,6 +39,17 @@
   color: var(--ink);
   text-align: left;
   cursor: pointer;
+}
+[data-park] .park-skill-mention button[aria-selected="true"] {
+  outline: 2px solid var(--iris);
+  outline-offset: 1px;
+}
+[data-park] .park-skill-mention button img {
+  grid-row: span 2;
+}
+[data-park] .park-skill-mention__selected img {
+  width: 20px;
+  height: 20px;
 }
 [data-park] .park-skill-mention small {
   color: var(--ink3);
