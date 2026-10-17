@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, renderAgenda, settle } from "../../../../test-support/park/agendaHarness";
 import { click, countPrimary, q, qa } from "../../../../test-support/park/componentsHarness";
 import { createFixtureApi } from "../../api/fixtureApi";
+import { agendaFromPlate } from "../../api/live/agendaFromPlate";
 import { NotBuilt } from "../../api/liveApi";
 
 afterEach(() => {
@@ -96,6 +97,35 @@ describe("WEB_9_agenda_copy: the designed text, verbatim", () => {
       qa(detail(container), '[role="switch"]').map((s) => s.getAttribute("aria-checked")),
     ).toEqual(["true", "true", "true"]);
   });
+});
+
+it("CX_PAGES_ENRICH_AGENDA_live_API_route_shows_calendar_entries_in_the_week_grid", async () => {
+  const api = createFixtureApi();
+  const today = new Date(new Date().setHours(10, 0, 0, 0));
+  api.getAgenda = vi.fn(async () => ({
+    data: agendaFromPlate({
+      today: today.toISOString(),
+      as_of: today.toISOString(),
+      truncated: false,
+      rows: [
+        {
+          ref: { kind: "calendar_entry", id: "calendar-internal-id" },
+          title: "Project review",
+          at: today.toISOString(),
+          due: null,
+          from: "Google Calendar",
+          group: "calendar",
+        },
+      ],
+      parked: [],
+    }),
+    source: "live",
+  })) as unknown as typeof api.getAgenda;
+  const { container } = await renderAgenda({ api });
+  expect(region(container, "Week calendar")).not.toBeNull();
+  const entry = q<HTMLButtonElement>(container, ".cx-agenda-event");
+  expect(entry?.className).toContain("is-calendar-entry");
+  expect(text(container)).not.toContain("calendar-internal-id");
 });
 
 describe("WEB_9_agenda_boards: pins", () => {

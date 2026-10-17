@@ -58,6 +58,38 @@ const failure = (p: Promise<unknown>) =>
   );
 
 describe("SKILLS_3_getSkills: GET /v1/skills as the Skills library", () => {
+  it("FR_SKL_04_catalog_adds_only_served_library_purpose_inputs_and_tools", async () => {
+    const spy = vi.fn(async (url: unknown) =>
+      String(url).endsWith("/v1/skills/catalog")
+        ? json({
+            skills: [
+              {
+                id: "exec_summary",
+                kind: "library",
+                scope: "library",
+                name: "Executive summary",
+                purpose: "Summarise a document",
+                inputs: [{ name: "document", label: "Document", kind: "file", required: true }],
+                tools: ["google_drive"],
+                version: "1.0.0",
+              },
+            ],
+          })
+        : json({
+            skills: [],
+            builtins: [{ id: "exec_summary", description: "Summarises", version: "1.0.0" }],
+          }),
+    );
+    const skill = (await live(spy).getSkills()).data[0];
+    expect(skill?.description).toBe("Summarise a document");
+    expect(skill?.catalog).toEqual({
+      inputs: [{ name: "document", label: "Document", kind: "file", required: true }],
+      tools: ["google_drive"],
+    });
+    expect(skill?.steps).toEqual([]);
+    expect(skill?.last).toBe("");
+    expect(skill?.now).toBeUndefined();
+  });
   it("SKILLS_3_getSkills_maps_a_record_to_a_Skill_and_says_live", async () => {
     const spy = vi.fn(async (_u: unknown) => json({ skills: [row()] }));
     const r = await live(spy).getSkills();
@@ -274,6 +306,58 @@ const sent = (spy: ReturnType<typeof vi.fn>, n = 0) => ({
 });
 
 describe("SKILLS_5_captureSkill: POST /v1/skills/captures", () => {
+  it("test_FR_SKL_01_S3_marks_a_confirmed_screen_capture_as_record", async () => {
+    const spy = vi.fn(async (_url: unknown, _init?: RequestInit) =>
+      String(_url).endsWith("/media")
+        ? json({ artifact: { artifact_id: "art_video", version: 1 }, readable: true }, 201)
+        : json({ capture_id: "tsk_record", captured_steps: [{ text: "Open page" }] }, 201),
+    );
+    await live(spy).captureFile(
+      new File(["video"], "screen-recording.webm", { type: "video/webm" }),
+      undefined,
+      "record",
+    );
+    expect(JSON.parse(String(spy.mock.calls[1]?.[1]?.body)).method).toBe("record");
+  });
+  it("test_FR_SKL_01_S2w_uploads_one_file_then_captures_its_pinned_artifact", async () => {
+    const file = new File(["an example"], "example.txt", { type: "text/plain" });
+    const spy = vi.fn(async (_url: unknown, init?: RequestInit) =>
+      String(_url).endsWith("/media")
+        ? json({ artifact: { artifact_id: "art_a", version: 1 }, readable: true }, 201)
+        : json({ capture_id: "tsk_C1", captured_steps: [{ text: "Read the example" }] }, 201),
+    );
+    const result = await live(spy).captureFile(file);
+    expect(result.data.steps).toEqual(["Read the example"]);
+    expect(spy.mock.calls.map(([url]) => String(url))).toEqual([
+      `${BASE}/v1/skills/captures/media`,
+      `${BASE}/v1/skills/captures`,
+    ]);
+    const upload = spy.mock.calls[0]?.[1] as RequestInit;
+    expect(upload.body).toBeInstanceOf(FormData);
+    expect((upload.body as FormData).get("file")).toBe(file);
+    expect(new Headers(upload.headers).has("content-type")).toBe(false);
+    expect(JSON.parse(String(spy.mock.calls[1]?.[1]?.body))).toEqual({
+      method: "upload",
+      artifact: { artifact_id: "art_a", version: 1 },
+    });
+  });
+
+  it("test_FR_SKL_01_S2w_does_not_capture_an_unreadable_upload", async () => {
+    const spy = vi.fn(async () =>
+      json(
+        {
+          artifact: { artifact_id: "art_a", version: 1 },
+          readable: false,
+          reason: "too_long_to_read",
+        },
+        201,
+      ),
+    );
+    await expect(
+      live(spy).captureFile(new File(["x"], "x.txt", { type: "text/plain" })),
+    ).rejects.toThrow();
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
   it("SKILLS_5_captureSkill_posts_method_describe_and_the_text_alone_and_reads_the_steps", async () => {
     const spy = vi.fn(async (_u: unknown, _i?: RequestInit) => json(CAPTURED, 201));
     const r = await live(spy).captureSkill("Check the inbox, then log the total");

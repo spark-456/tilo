@@ -21,9 +21,13 @@ const stops = (cls: string): boolean =>
     (r) => r.selector.includes(cls) && /^none\b/.test(r.decls.get("animation") ?? ""),
   );
 
-describe("FR-UX-12 still css: the loader ring and the boot bar stop under 'still'", () => {
-  it("FR-UX-12 still css: .park-shell__ring has animation none under [data-motion=still]", () => {
-    expect(stops(".park-shell__ring")).toBe(true);
+describe("FR-UX-12 still css: Thinking Tilo and the boot bar stop under 'still'", () => {
+  it("CX_THINKING_TILO_still_css_shows_the_saved_static_frame", () => {
+    const thinkingCss = fs.readFileSync(path.join(__dirname, "../shared/thinkingTilo.css"), "utf8");
+    expect(thinkingCss).toMatch(/\[data-motion="still"\] \.thinking-tilo picture\{display:none\}/);
+    expect(thinkingCss).toMatch(
+      /\[data-motion="still"\] \.thinking-tilo \.thinking-tilo__still\{display:block\}/,
+    );
   });
 
   it("FR-UX-12 still css: .park-shell__bootfill has animation none under [data-motion=still]", () => {

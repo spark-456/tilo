@@ -2,7 +2,14 @@
 // the body of POST /v1/skills. Nothing is invented: the server serves no runs, success rate, last run or
 // improvement yet, so those read as 0, null and "" (the page prints "—" or the empty text). A row that does not
 // match the shape is left out, never repaired.
-import type { Skill, SkillCapture, SkillDraft, SkillVersion } from "../types";
+import type {
+  Skill,
+  SkillCapture,
+  SkillDraft,
+  SkillInput,
+  SkillSetup,
+  SkillVersion,
+} from "../types";
 
 interface Step {
   text: string;
@@ -25,6 +32,9 @@ export interface SkillRow {
   paused: boolean;
   plan: Step[];
   question: Question | null;
+  inputs?: SkillInput[];
+  hosts?: string[];
+  estimates?: { credits_per_run?: number } | null;
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
@@ -86,6 +96,26 @@ export function skillFromRow(r: SkillRow): Skill {
     tools: toolsOf(r.plan),
     used: [],
     steps: r.plan.map((s) => s.text),
+    details: {
+      steps: r.plan.map((s) => ({ tool: s.tool, action: s.action })),
+      inputs: Array.isArray(r.inputs)
+        ? r.inputs.filter(
+            (i) =>
+              isObject(i) &&
+              isText(i.name) &&
+              isText(i.label) &&
+              ["text", "file", "date", "person", "url", "number"].includes(i.kind) &&
+              typeof i.required === "boolean",
+          )
+        : [],
+      hosts: Array.isArray(r.hosts) ? r.hosts.filter(isText) : [],
+      estimatedCredits:
+        typeof r.estimates?.credits_per_run === "number" &&
+        Number.isFinite(r.estimates.credits_per_run) &&
+        r.estimates.credits_per_run >= 0
+          ? r.estimates.credits_per_run
+          : null,
+    },
     ...(Number.isInteger(r.version) && (r.version ?? 0) > 0
       ? {
           fix: {
@@ -132,6 +162,38 @@ export function skillsOfBody(v: unknown): Skill[] | null {
   return [...builtins, ...v.skills.filter(isSkillRow).map(skillFromRow)];
 }
 
+/** Enrich only library entries with the caller-visible catalog's real purpose, inputs and connector ids. */
+export function withSkillCatalog(skills: Skill[], value: unknown): Skill[] {
+  if (!isObject(value) || !Array.isArray(value.skills)) return skills;
+  const catalog = new Map<string, { purpose: string; inputs: SkillInput[]; tools: string[] }>();
+  for (const raw of value.skills) {
+    if (!isObject(raw) || raw.kind !== "library" || !isText(raw.id) || !isText(raw.purpose))
+      continue;
+    const inputs = Array.isArray(raw.inputs)
+      ? raw.inputs.filter(
+          (input): input is SkillInput =>
+            isObject(input) &&
+            isText(input.name) &&
+            isText(input.label) &&
+            ["text", "file", "date", "person", "url", "number"].includes(String(input.kind)) &&
+            typeof input.required === "boolean",
+        )
+      : [];
+    const tools = Array.isArray(raw.tools) ? raw.tools.filter(isText) : [];
+    catalog.set(raw.id, { purpose: raw.purpose, inputs, tools });
+  }
+  return skills.map((skill) => {
+    const entry = skill.builtin ? catalog.get(skill.id) : undefined;
+    return entry
+      ? {
+          ...skill,
+          description: entry.purpose,
+          catalog: { inputs: entry.inputs, tools: entry.tools },
+        }
+      : skill;
+  });
+}
+
 /** A body that is a Learn answer (`learning` rows, `needs_rating`) the page can read. */
 export const isLearnBody = (v: unknown): boolean =>
   isObject(v) && Array.isArray(v.learning) && Array.isArray(v.needs_rating);
@@ -148,13 +210,20 @@ const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 /** The POST body for a draft, or null when the draft is something the server cannot take yet (a team without an
  * id, a timed trigger without a schedule): the caller refuses without a request. */
 export function saveBody(name: string, d: SkillDraft): Record<string, unknown> | null {
-  if (d.scope !== "me" || d.trigger !== "ask" || d.plan.length === 0) return null;
+  if (
+    d.trigger !== "ask" ||
+    d.plan.length === 0 ||
+    (d.scope === "team" && !/^tm_[0-9a-z_]{1,48}$/.test(d.teamId ?? ""))
+  )
+    return null;
   const { server } = d;
+  const scope =
+    d.scope === "team" ? { kind: "team", team: d.teamId } : { kind: "just_me", team: null };
   if (server) {
     // A taught version goes back as the server made it (SKILLS-5); only the person's "ask first" choices differ.
     return {
       name,
-      scope: { kind: "just_me", team: null },
+      scope,
       trigger: { kind: "on_demand" },
       plan_steps: server.steps.map((s) => ({
         text: s.text,
@@ -165,11 +234,13 @@ export function saveBody(name: string, d: SkillDraft): Record<string, unknown> |
       })),
       captured_steps: server.captured.map((text) => ({ text })),
       ...(server.question ? { clarifying_question: server.question } : {}),
+      ...(server.inputs?.length ? { inputs: server.inputs } : {}),
+      ...(server.hosts?.length ? { hosts: server.hosts } : {}),
     };
   }
   return {
     name,
-    scope: { kind: "just_me", team: null },
+    scope,
     trigger: { kind: "on_demand" },
     plan_steps: d.plan.map((p) => {
       const [label = "", level = ""] = p.tool.split(" · ");
@@ -217,9 +288,45 @@ export function versionOfBody(v: unknown): SkillVersion | null {
     isCount(e.asks_per_run)
       ? { credits: e.credits_per_run, seconds: e.seconds_per_run, asks: e.asks_per_run }
       : null;
+  const inputs: SkillInput[] = [];
+  if (v.inputs !== undefined && !Array.isArray(v.inputs)) return null;
+  for (const item of v.inputs ?? []) {
+    if (
+      !isObject(item) ||
+      !isText(item.name) ||
+      !isText(item.label) ||
+      !["text", "file", "date", "person", "url", "number"].includes(String(item.kind)) ||
+      typeof item.required !== "boolean"
+    )
+      return null;
+    inputs.push(item as unknown as SkillInput);
+  }
+  if (v.hosts !== undefined && (!Array.isArray(v.hosts) || !v.hosts.every(isText))) return null;
+  if (
+    v.cannot !== undefined &&
+    v.cannot !== null &&
+    (!Array.isArray(v.cannot) ||
+      !v.cannot.every((x) => isObject(x) && isText(x.text) && isText(x.reason)))
+  )
+    return null;
+  const needsSetup: SkillSetup[] = [];
+  if (v.needs_setup !== undefined && !Array.isArray(v.needs_setup)) return null;
+  for (const item of v.needs_setup ?? []) {
+    if (
+      !isObject(item) ||
+      !isText(item.tool) ||
+      (item.reason !== "not_connected" && item.reason !== "team_level")
+    )
+      return null;
+    needsSetup.push(item as unknown as SkillSetup);
+  }
   return {
     steps,
     question: q === null ? null : { text: q.text, options: [...q.options] },
     estimates,
+    inputs,
+    hosts: [...(v.hosts ?? [])],
+    cannot: v.cannot == null ? null : ([...v.cannot] as { text: string; reason: string }[]),
+    needsSetup,
   };
 }

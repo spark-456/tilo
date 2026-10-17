@@ -525,9 +525,10 @@ def _matched(
         found = _MATCHED[key]
     else:
         found = skills.best_for(goal)
-        _MATCHED[key] = found
-        while len(_MATCHED) > _MATCHED_MAX:
-            _MATCHED.popitem(last=False)
+        if not skills.failed:  # a transient failure or a refusal is not "nothing fits": it is asked again next time
+            _MATCHED[key] = found
+            while len(_MATCHED) > _MATCHED_MAX:
+                _MATCHED.popitem(last=False)
     if found == task.skill:
         return task
     try:

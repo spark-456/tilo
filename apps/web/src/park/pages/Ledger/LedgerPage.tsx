@@ -18,16 +18,7 @@ import { SpendChart } from "./SpendChart";
 import { downloadCsv } from "./downloadCsv";
 import { icon } from "./icons";
 import { ledgerCsv, ledgerCsvFileName } from "./ledgerCsv";
-import {
-  chartHeadline,
-  groupsWithRows,
-  hasChart,
-  hasWaits,
-  kpis,
-  money,
-  monthLeft,
-  periodOf,
-} from "./model";
+import { chartHeadline, hasChart, hasWaits, kpis, money, monthLeft, periodOf } from "./model";
 import { useLedger } from "./useLedger";
 import "./Ledger.css";
 
@@ -96,7 +87,6 @@ function PersonalLedgerPage({ app }: LedgerPageProps) {
   const wide = app.vw >= 1100;
   // What the Ledger holds no data for is left out, not shown as a sample or a zero (HR-1..HR-7).
   const chart = hasChart(L);
-  const where = groupsWithRows(L).length > 0;
   const lede = [monthLeft(L), L.budget > 0 ? `budget ${money(L, L.budget)}` : null].filter(Boolean);
   const month = monthLeft(L) !== null;
   return (
@@ -140,13 +130,12 @@ function PersonalLedgerPage({ app }: LedgerPageProps) {
         ))}
       </div>
 
-      {part(2) && (chart || where) ? (
+      {part(2) ? (
         <div
           className="park-ledger-chartrow"
           data-chart-row=""
           style={{
-            gridTemplateColumns:
-              wide && chart && where ? "minmax(0,1.65fr) minmax(320px,1fr)" : "minmax(0,1fr)",
+            gridTemplateColumns: wide ? "minmax(0,1.65fr) minmax(320px,1fr)" : "minmax(0,1fr)",
           }}
         >
           {chart ? (
@@ -179,29 +168,46 @@ function PersonalLedgerPage({ app }: LedgerPageProps) {
               </div>
               <SpendChart L={L} dec={app.dec} />
             </section>
-          ) : null}
-          {where ? <WhereItGoes L={L} /> : null}
+          ) : (
+            <section
+              aria-label="Spend over the month"
+              className="park-ledger-card park-ledger-card--chart"
+            >
+              <div className="park-ledger-eyebrow">SPEND OVER TIME</div>
+              <h2 className="park-ledger-h2">Daily spend</h2>
+              <div
+                className="park-ledger-chart"
+                aria-label="Spend chart axes; no daily costs recorded"
+              >
+                <svg
+                  className="park-ledger-svg"
+                  viewBox="0 0 720 270"
+                  role="img"
+                  aria-hidden="true"
+                >
+                  <path
+                    className="park-ledger-p-grid"
+                    d="M0 30 H720 M0 98 H720 M0 166 H720 M0 236 H720 M0 236 V24 H720"
+                  />
+                </svg>
+              </div>
+              <p className="park-ledger-sub">Daily costs will appear here when recorded.</p>
+            </section>
+          )}
+          <WhereItGoes L={L} />
         </div>
       ) : null}
 
-      {part(3) && (L.runs.length > 0 || hasWaits(L) || L.recordedRuns !== undefined) ? (
+      {part(3) ? (
         <div className="park-ledger-pair">
           {L.runs.length > 0 ? <CostPerRun L={L} go={app.go} /> : null}
-          {L.recordedRuns !== undefined ? <RecordedRuns L={L} /> : null}
+          <RecordedRuns L={L} />
           {hasWaits(L) ? <ApprovalWaits L={L} app={app} /> : null}
-          {L.recordedRuns !== undefined && !hasWaits(L) ? (
-            <p className="park-ledger-sub">No completed approval waits recorded yet.</p>
-          ) : null}
         </div>
       ) : null}
 
       {part(4) && (L.memory.length > 0 || L.hours.length > 0) ? <GaveBack L={L} /> : null}
-      {part(4) && L.recordedRuns !== undefined && !L.memory.length && !L.hours.length ? (
-        <p className="park-ledger-sub">
-          Memory savings by week and hours handed back are not available yet.
-        </p>
-      ) : null}
-      {part(5) && (L.activity.length > 0 || L.recordedRuns !== undefined) ? (
+      {part(5) && L.activity.length > 0 ? (
         <Activity L={L} decisions={state.decisions} app={app} />
       ) : null}
     </Frame>

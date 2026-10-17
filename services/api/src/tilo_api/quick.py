@@ -16,11 +16,13 @@ import threading
 import unicodedata
 import uuid
 import weakref
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel
+from tilo_memory.chunks import Hit
 from tilo_planning.intake import IntakeRejected
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import GenerateRequest, SafetyProvider
@@ -28,7 +30,7 @@ from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.replay import ReplayMissError
 from tilo_providers.router import Router, RouterError
 
-from tilo_api import deps, spend
+from tilo_api import deps, grounding_prompt, spend
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.people_limits import Limits
 from tilo_api.people_writes import Refusal
@@ -167,9 +169,19 @@ def _call(
 
 
 def _ask(
-    rules: QuickRules, router: Router, question: str, tally: _Tally, *, vet: bool, skills: str = ""
+    rules: QuickRules,
+    router: Router,
+    question: str,
+    tally: _Tally,
+    *,
+    vet: bool,
+    skills: str = "",
+    fit: Callable[[_Tally], dict[str, Any] | None] | None = None,
+    recall: Callable[[_Tally], list[Hit]] | None = None,
 ) -> dict[str, Any]:
-    """The classifier call (when `vet`: the rules left this text to the model) and then the answer call."""
+    """The classifier call (when `vet`: the rules left this text to the model) and then the answer call. `recall`
+    (RT-04) is asked only once the question is going to be answered; its passages follow the question in the user
+    turn, so with none the prompt is exactly what it was."""
     data = neutralise_marker(question, "QUESTION")
     calls = 0
     if vet:
@@ -185,14 +197,20 @@ def _ask(
         verdict = parse_verdict(reply)
         if verdict is None or verdict.kind == "work":  # no verdict is the offer `unclear`; a model never answers it
             return {"offer": verdict.reason if verdict else "unclear", "calls": calls}
+    found = fit(tally) if fit is not None else None  # SKILL-ROUTE: priced out of this ask's budget, before the answer
+    hits = recall(tally) if recall is not None else []
     request = GenerateRequest(
         system=load_prompt("assistant", "quick_answer_system.md"),
-        prompt=load_prompt("assistant", "quick_answer_task.md", {"question": data, "skills": skills}),
+        prompt=load_prompt("assistant", "quick_answer_task.md", {"question": data, "skills": skills})
+        + grounding_prompt.render(hits, "assistant", "quick_passages.md"),
         thinking_level=rules.thinking_level,
         max_output_tokens=rules.answer_max_output_tokens,
     )
     reply, made = _call(router, rules, request, tally)
-    return {"text": _plain(reply)[: rules.answer_max_chars], "calls": calls + made}
+    done: dict[str, Any] = {"text": _plain(reply)[: rules.answer_max_chars], "calls": calls + made, "skill": found}
+    if hits:
+        done["grounded_on"] = grounding_prompt.grounded_on(hits)
+    return done
 
 
 def _plain(reply: str) -> str:
@@ -219,6 +237,7 @@ def respond(
     key: str | None,
     ledger: LedgerWriter | None = None,
     skills: Any = None,
+    grounding: Callable[[Any, float], Any] | None = None,
 ) -> dict[str, Any]:
     """The 200 body (answer or offer) of a Quick ask whose text, limits and file names intake has already screened;
     raises QuickRefusal (a fixed sentence), ReplayOnly, ModelUnavailable, SpendCapReached or HTTPException."""
@@ -243,10 +262,15 @@ def respond(
         raise QuickRefusal(503, "not_configured") from None
     verdict = classify(rules, text, max_chars=max_chars, has_files=has_files, scenario=scenario is not None)
 
-    def tag(body: dict[str, Any]) -> dict[str, Any]:
-        """SKILL-ROUTE: the skill that fits, for a "Run with skill" chip; absent when none does (inside the hold)."""
-        found = None if skills is None else skills.match(question)
-        return body if found is None else {**body, "skill": found}
+    def fit(tally: _Tally) -> dict[str, Any] | None:
+        """SKILL-ROUTE: the skill that fits, for a "Run with skill" chip, found INSIDE this ask's hold: its embedding is
+        priced out of the ask's budget (`tally.left`) before the hold is committed, and a spent budget sends none."""
+        if skills is None:
+            return None
+        skills.budget = tally.left
+        found = skills.best_for(question)
+        tally.left = min(tally.left, skills.budget)
+        return found
 
     if verdict.kind == "work":
         return offer(verdict.reason)  # decided by rules: no model, no cost, nothing stored; so no skill is looked for
@@ -264,6 +288,18 @@ def respond(
         except Exception as exc:
             logger.warning("quick ledger write failed: %s", type(exc).__name__)
 
+    def recall(tally: _Tally) -> list[Hit]:
+        """RT-04 / RT-06: the nearest passages of this person's own records, the query embedding priced inside this
+        ask's budget. Any failure is an ask without grounding."""
+        if grounding is None:
+            return []
+        opened = grounding(router, tally.left)
+        hits = grounding_prompt.recall(opened, uid, question)
+        left = getattr(getattr(opened, "embedder", None), "budget", None)
+        if isinstance(left, float):
+            tally.left = min(tally.left, left)
+        return hits
+
     def make() -> dict[str, Any]:
         held = _hold(rules, uid, datetime.now(UTC), allowance, switches, mode, caps)
         tally = _Tally(rules.budget)
@@ -275,6 +311,8 @@ def respond(
                 tally,
                 vet=verdict.kind == "model",
                 skills="" if skills is None else skills.block(),
+                fit=fit,
+                recall=recall,
             )
         except BaseException:
             held.commit(tally.spent) if tally.spent > 0 else held.release()  # billed stays charged
@@ -283,9 +321,11 @@ def respond(
         held.commit(tally.spent)
         record(tally)
         if "offer" in done:
-            return tag(offer(done["offer"]))
+            return offer(done["offer"])
         cost = {"model_calls": done["calls"], "credits": float(tally.spent), "saved_credits": 0.0}
-        return tag({"mode": "quick", "outcome": "answered", "text": done["text"], "cost": cost})
+        answer = {"mode": "quick", "outcome": "answered", "text": done["text"], "cost": cost}
+        answer = answer if done.get("skill") is None else {**answer, "skill": done["skill"]}
+        return answer | ({"grounded_on": done["grounded_on"]} if "grounded_on" in done else {})
 
     if key is None:
         return make()

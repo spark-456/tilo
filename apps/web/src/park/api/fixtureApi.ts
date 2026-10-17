@@ -56,7 +56,17 @@ export function createFixtureApi(): Omit<Api, "getAgenda" | "getProfileSettings"
     saveSkill: ack,
     // The sample card runs on its own fixture steps and never calls these; they hold nothing to show.
     captureSkill: () => ok({ id: "sample", steps: [] }),
-    proposeVersion: () => ok({ steps: [], question: null, estimates: null }),
+    captureFile: () => ok({ id: "sample", steps: [] }),
+    proposeVersion: () =>
+      ok({
+        steps: [],
+        question: null,
+        estimates: null,
+        inputs: [],
+        hosts: [],
+        cannot: null,
+        needsSetup: [],
+      }),
     setToolLevel: ack,
     bookSlot: ack,
     addBackup: ack,

@@ -5,6 +5,7 @@
 // Pinned: the server sets "Ask me first" (a forced step is locked on), the offer is "Just me" and "When I ask"
 // only, the "Saved" toast comes after a 201 and not before, a failed capture or version shows an error and never
 // sample steps, one click is one request, and nothing in the live card is a made-up number.
+import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, q, qa } from "../../../../test-support/park/componentsHarness";
 import { CAP, PLAN } from "../../../../test-support/park/skillsCopy";
@@ -108,6 +109,8 @@ function rig(routes: Record<string, Handler> = {}): {
     "GET /v1/skills": () => json({ skills: [] }),
     "GET /v1/learn": () => json({ learning: [], needs_rating: [] }),
     "POST /v1/skills/captures": () => json(CAPTURED, 201),
+    "POST /v1/skills/captures/media": () =>
+      json({ artifact: { artifact_id: "art_a", version: 1 }, readable: true }, 201),
     "POST /v1/skills/captures/tsk_C1/version": () => json(VERSION),
     "POST /v1/skills": () => json(SAVED, 201),
     ...routes,
@@ -134,6 +137,7 @@ function rig(routes: Record<string, Handler> = {}): {
     getSkills: live.getSkills,
     getLearn: live.getLearn,
     captureSkill: live.captureSkill,
+    captureFile: live.captureFile,
     proposeVersion: live.proposeVersion,
     saveSkill: live.saveSkill,
   });
@@ -173,6 +177,71 @@ const gate = () => {
 };
 
 describe("SKILLS_5_live_teach: describe it (step 1)", () => {
+  it("test_FR_SKL_01_S2w_uploads_a_file_without_a_description_then_opens_the_review_path", async () => {
+    const gateMedia = gate();
+    const gateCapture = gate();
+    const { server, mount } = rig({
+      "POST /v1/skills/captures/media": () => gateMedia.waiting,
+      "POST /v1/skills/captures": () => gateCapture.waiting,
+    });
+    const r = await mount();
+    const picker = q(r.el, 'input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(picker, "files", {
+      value: [new File(["example"], "example.txt", { type: "text/plain" })],
+      configurable: true,
+    });
+    act(() => picker.dispatchEvent(new Event("change", { bubbles: true })));
+    await settle();
+    expect(text(r)).toContain("Uploading your example");
+    expect(server.posts("/v1/skills/captures")).toEqual([]);
+    gateMedia.release(
+      json({ artifact: { artifact_id: "art_a", version: 1 }, readable: true }, 201),
+    );
+    await settle();
+    expect(text(r)).toContain("Reading the uploaded example");
+    expect(server.posts("/v1/skills/captures")).toEqual([
+      { method: "upload", artifact: { artifact_id: "art_a", version: 1 } },
+    ]);
+    gateCapture.release(json(CAPTURED, 201));
+    await settle();
+    expect(text(r)).toContain("Note the total");
+    expect(text(r)).toContain("what Tilo read from your file");
+    clickEl(control(r.el, NEXT_REVIEW));
+    await settle();
+    expect(text(r)).toContain("Here’s how Tilo will do it");
+  });
+
+  it("test_FR_SKL_01_S2w_rejects_unsupported_and_oversized_files_before_upload", async () => {
+    const { server, mount } = rig();
+    const r = await mount();
+    const picker = q(r.el, 'input[type="file"]') as HTMLInputElement;
+    const huge = new File(["x"], "huge.pdf", { type: "application/pdf" });
+    Object.defineProperty(huge, "size", { value: 10_485_761 });
+    for (const [file, message] of [
+      [new File(["x"], "program.exe", { type: "application/octet-stream" }), "Choose a WebM"],
+      [huge, "10 MiB"],
+    ] as const) {
+      Object.defineProperty(picker, "files", { value: [file], configurable: true });
+      act(() => picker.dispatchEvent(new Event("change", { bubbles: true })));
+      await settle();
+      expect(text(r)).toContain(message);
+    }
+    expect(server.fetch.mock.calls.some(([url]) => String(url).endsWith("/media"))).toBe(false);
+  });
+
+  it("test_FR_SKL_01_S2w_drop_uploads_one_example", async () => {
+    const { server, mount } = rig();
+    const r = await mount();
+    const drop = q(r.el, ".park-teach__drop");
+    const event = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "dataTransfer", {
+      value: { files: [new File(["example"], "example.txt", { type: "text/plain" })] },
+    });
+    act(() => drop.dispatchEvent(event));
+    await settle();
+    expect(server.fetch.mock.calls.some(([url]) => String(url).endsWith("/media"))).toBe(true);
+    expect(text(r)).toContain("Note the total");
+  });
   it("FR_SKL_01_W11_describing_announces_loading_until_the_capture_finishes", async () => {
     const g = gate();
     const { mount } = rig({ "POST /v1/skills/captures": () => g.waiting });
@@ -302,6 +371,34 @@ describe("SKILLS_5_live_teach: a capture the server cannot make", () => {
 });
 
 describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
+  it("test_FR_SKL_02_S1w_reviews_inputs_hosts_setup_and_unavailable_steps_from_the_version", async () => {
+    const expanded = {
+      ...VERSION,
+      inputs: [{ name: "invoice", label: "Invoice file", kind: "file", required: true }],
+      hosts: ["example.com"],
+      cannot: [{ text: "Buy the item", reason: "unavailable_action" }],
+      needs_setup: [{ tool: "gmail", reason: "not_connected" }],
+    };
+    const { server, mount } = rig({
+      "POST /v1/skills/captures/tsk_C1/version": () => json(expanded),
+    });
+    const r = await mount();
+    await toVersion(r);
+    expect(text(r)).toContain("Invoice file");
+    expect(text(r)).toContain("example.com");
+    expect(text(r)).toContain("Tilo can't do this yet");
+    expect(text(r)).toContain("Buy the item");
+    expect(text(r)).toContain("Gmail needs setup");
+    expect(q(r.el, 'a[href="/connectors"]')).not.toBeNull();
+    clickEl(q(r.el, 'button[aria-label="Remove example.com"]'));
+    name(r, "Match invoices");
+    clickEl(control(r.el, "Save skill"));
+    await settle();
+    const [body] = server.posts("/v1/skills") as Record<string, unknown>[];
+    expect(body?.inputs).toEqual(expanded.inputs);
+    expect(body?.hosts).toBeUndefined();
+  });
+
   it("SKILLS_5_live_teach_version_posts_once_and_shows_the_steps_the_question_and_labelled_estimates", async () => {
     const { server, mount } = rig();
     const r = await mount();
@@ -397,13 +494,37 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
 });
 
 describe("SKILLS_5_live_teach: save (step 4)", () => {
+  it("test_FR_SKL_04_S1w_saves_to_a_current_team_selected_by_its_id", async () => {
+    const { server, mount } = rig({
+      "GET /v1/teams": () =>
+        json({
+          teams: [
+            { team: "tm_ops", lead: false, state: "member", invited_by: null },
+            { team: "tm_old", lead: false, state: "lapsed", invited_by: null },
+          ],
+          you: "u_me",
+        }),
+    });
+    const r = await mount();
+    await toSave(r);
+    clickEl(control(r.el, "Share with my team"));
+    await settle();
+    expect(hasControl(r.el, "Team tm_old")).toBe(false);
+    clickEl(control(r.el, "Team tm_ops"));
+    name(r, "Match invoices");
+    clickEl(control(r.el, "Save skill"));
+    await settle();
+    const [body] = server.posts("/v1/skills") as { scope: unknown }[];
+    expect(body?.scope).toEqual({ kind: "team", team: "tm_ops" });
+  });
+
   it("SKILLS_5_live_teach_save_offers_just_me_and_when_I_ask_only", async () => {
     const r = await rig().mount();
     const chips = () => qa(teachCard(r.el), "fieldset button").map((e) => pageText(e));
     expect(chips()).toEqual(["When I ask"]); // STUDIO-4: when it runs is asked on step 1
     await toSave(r);
     expect(hasControl(r.el, "Save skill")).toBe(true);
-    expect(chips()).toEqual(["Just me"]); // and who can use it on step 3
+    expect(chips()).toEqual(["Just me", "Share with my team"]); // team choices load only on request
   });
 
   it("SKILLS_5_live_teach_save_posts_the_servers_steps_and_shows_Saved_only_after_a_201", async () => {

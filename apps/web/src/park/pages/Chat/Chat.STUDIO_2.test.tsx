@@ -257,6 +257,17 @@ describe("STUDIO_2 Chat: honest data", () => {
 });
 
 describe("STUDIO_2 Chat: the scene is display state", () => {
+  it("test_FR_CHAT_ROOM_1_keeps_room_controls_below_the_picture_and_offers_three_starters", async () => {
+    const { el } = await mountChat(fakeApi());
+    const picture = q(el, 'section[aria-label="Your helper"]');
+    expect(picture.querySelector(".park-seg")).toBeNull();
+    expect(picture.querySelector(".park-chat-status")).toBeNull();
+    expect(qa(el, ".park-chat-intro__prompt")).toHaveLength(3);
+    const prompt = qa(el, ".park-chat-intro__prompt")[0] as HTMLButtonElement;
+    act(() => prompt.click());
+    expect((q(el, ".park-chat-input") as HTMLInputElement).value).toBe(prompt.textContent);
+  });
+
   it("STUDIO_2 chat the chosen scene is remembered and a blocked storage falls back to the office", async () => {
     const { el } = await mountChat(fakeApi());
     const beach = qa(el, '[role="radio"]').find((r) => textOf(r) === "Beach") as HTMLElement;

@@ -782,6 +782,7 @@ describe("WIRE_3_live_api: nothing else is connected", () => {
       "getLearn",
       "saveSkill",
       "captureSkill",
+      "captureFile",
       "proposeVersion",
       "setPref",
       "getUserSettings",

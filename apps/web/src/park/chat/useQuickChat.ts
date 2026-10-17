@@ -6,6 +6,7 @@
 // is no history to list (docs/open-questions.md BQ-STUDIO-2).
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SkillMatch, SkillRef } from "../../api/skillRoute";
+import type { QuickIntakeResult } from "../../api/http";
 import { askQuick } from "../api/index";
 import type { QuickCost, SwitchReason } from "../api/types";
 import { useParkApi, useSchedule } from "../app/context";
@@ -21,6 +22,7 @@ export type Turn =
       state: "answered";
       text: string;
       cost: QuickCost | null;
+      memorySuggestion?: Extract<QuickIntakeResult, { kind: "answered" }>["memorySuggestion"];
       /** The fixture Api answered: a labelled sample, never shown as a live answer. */
       sample: boolean;
       /** Seconds from send to answer, measured here. */
@@ -65,7 +67,7 @@ export interface QuickChat {
   clear(): void;
 }
 
-export function useQuickChat(now: () => number = Date.now): QuickChat {
+export function useQuickChat(now: () => number = Date.now, pageContext?: string): QuickChat {
   const api = useParkApi();
   const schedule = useSchedule();
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -110,7 +112,14 @@ export function useQuickChat(now: () => number = Date.now): QuickChat {
         }
       };
       new Promise<Awaited<ReturnType<typeof askQuick>>>((resolve) =>
-        resolve(askQuick(api, "quick", question, ref ? [ref] : [])),
+        resolve(
+          askQuick(
+            api,
+            "quick",
+            pageContext ? `${question}\nYou're on ${pageContext}.` : question,
+            ref ? [ref] : [],
+          ),
+        ),
       ).then(
         ({ data, source }) =>
           settle(
@@ -121,6 +130,7 @@ export function useQuickChat(now: () => number = Date.now): QuickChat {
                   state: "answered",
                   text: data.text,
                   cost: data.cost,
+                  ...(data.memorySuggestion ? { memorySuggestion: data.memorySuggestion } : {}),
                   sample: source !== "live",
                   seconds: Math.max(0, Math.round((now() - started) / 1000)),
                   ...(data.skill ? { skill: data.skill } : {}),
@@ -137,7 +147,7 @@ export function useQuickChat(now: () => number = Date.now): QuickChat {
       );
       return true;
     },
-    [api, schedule, now],
+    [api, schedule, now, pageContext],
   );
 
   const last = turns[turns.length - 1];

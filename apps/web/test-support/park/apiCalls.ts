@@ -50,6 +50,7 @@ export function callTable(): CallTable {
     startWorld: ["workspace", "Plan the offsite"],
     saveSkill: [skill],
     captureSkill: ["Check the inbox and log each invoice"],
+    captureFile: [new File(["example"], "example.txt", { type: "text/plain" })],
     proposeVersion: ["tsk_01"],
     setToolLevel: ["email", 2],
     bookSlot: [slot],

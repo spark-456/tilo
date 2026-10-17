@@ -4,8 +4,8 @@
 // renderer.ts; nothing in this file knows about Pixi.
 import type { Layout } from "@tilo/contracts";
 import tokens from "../design/tokens";
+import { agentRoleColor } from "./agentRole";
 import type { BuildingShown, Facade, Roof } from "./art/building";
-import { hash } from "./art/color";
 import { type Bridge, type GateLook, LEVEL_RISE, type Link, MARGIN, type Rect } from "./art/ground";
 import { P } from "./art/iso";
 import { styleOf } from "./art/style";
@@ -281,11 +281,7 @@ export function frameOf(layout: Layout, state: WorldState): Frame {
     const spot = agent.spawned && stands ? spots.get(stands) : undefined;
     const meta = rank.get(agent.id);
     if (!spot || !meta) return [];
-    const ledDistrict = leads.get(agent.id);
-    const tint =
-      (ledDistrict && tints.get(ledDistrict)) ||
-      DISTRICT_TINTS[hash(agent.id) % DISTRICT_TINTS.length] ||
-      tokens.color.ink["2"];
+    const tint = agentRoleColor(meta.rank);
     return [
       {
         id: agent.id,

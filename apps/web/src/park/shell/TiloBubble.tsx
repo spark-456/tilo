@@ -12,6 +12,7 @@ import {
   useState,
 } from "react";
 import { PAGE_LABEL, type PageId } from "../app/AppCtx";
+import { RememberChip } from "../chat/RememberChip";
 import { type BubblePos, readBubblePos, writeBubblePos } from "../chat/displayPrefs";
 import { type Turn, useQuickChat } from "../chat/useQuickChat";
 import { SWITCH_WORDS } from "../pages/Home/homeData";
@@ -92,6 +93,9 @@ function Said({ turn }: { turn: Turn }) {
         {(turn.state === "answered" || turn.state === "switch") && turn.skill ? (
           <span className="park-bubble__sample">Suggested skill: {turn.skill.name}</span>
         ) : null}
+        {turn.state === "answered" && !turn.sample ? (
+          <RememberChip suggestion={turn.memorySuggestion} />
+        ) : null}
       </div>
     </>
   );
@@ -108,7 +112,7 @@ export function TiloBubble({
   vh: number;
   go: (page: PageId) => void;
 }) {
-  const chat = useQuickChat();
+  const chat = useQuickChat(Date.now, page ? PAGE_LABEL[page] : undefined);
   const [saved, setSaved] = useState<BubblePos | null>(readBubblePos);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");

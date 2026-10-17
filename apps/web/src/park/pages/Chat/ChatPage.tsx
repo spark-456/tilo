@@ -2,6 +2,7 @@ import { type FormEvent, useId, useState } from "react";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkStore, useWorldClient } from "../../app/context";
 import { usePageTitle } from "../../app/pageTitle";
+import { RememberChip } from "../../chat/RememberChip";
 import { SCENE_FLOOR, SCENE_SKY, SceneArt, SceneFront } from "../../chat/Scene";
 import { SCENES, SCENE_LABEL, type SceneId, readScene, writeScene } from "../../chat/displayPrefs";
 import { handDraft } from "../../chat/handoff";
@@ -83,6 +84,7 @@ function Answer({
             {turn.skill ? (
               <span className="park-chat-tag">Suggested skill: {turn.skill.name}</span>
             ) : null}
+            {!turn.sample ? <RememberChip suggestion={turn.memorySuggestion} /> : null}
             <div className="park-chat-actions">
               {onCopy ? (
                 <button type="button" className="park-chat-quiet" onClick={() => onCopy(turn.text)}>
@@ -197,24 +199,24 @@ export function ChatPage({ app }: { app: AppCtx }) {
               <Buddy mood={chat.mood} size={140} />
             </div>
             <SceneFront scene={scene} />
-            <div className="park-chat-scene__top">
-              <SegmentedControl
-                label="Scene"
-                options={SCENE_OPTIONS}
-                value={scene}
-                onChange={(v) => {
-                  const next = SCENES.find((s) => s === v) ?? "office";
-                  setScene(next);
-                  writeScene(next);
-                }}
-              />
-            </div>
+          </section>
+          <div className="park-chat-scene-controls">
+            <SegmentedControl
+              label="Scene"
+              options={SCENE_OPTIONS}
+              value={scene}
+              onChange={(v) => {
+                const next = SCENES.find((s) => s === v) ?? "office";
+                setScene(next);
+                writeScene(next);
+              }}
+            />
             {/* biome-ignore lint/a11y/useSemanticElements: the helper's state line is a status, not a form output */}
             <div role="status" className="park-chat-status" data-mood={chat.mood}>
               <span className="park-chat-status__dot" aria-hidden="true" />
               <span>{statusLine(last, chat.mood)}</span>
             </div>
-          </section>
+          </div>
         </aside>
         <div className="park-chat-main">
           <div className="park-chat-head">
@@ -242,6 +244,22 @@ export function ChatPage({ app }: { app: AppCtx }) {
                     One helper answers right away. Past chats are not kept, so this page starts
                     empty each visit.
                   </p>
+                  <div className="park-chat-intro__prompts" aria-label="Starter prompts">
+                    {[
+                      "What should I focus on today?",
+                      "Help me draft a short email",
+                      "Explain a topic in simple terms",
+                    ].map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        className="park-chat-quiet park-chat-intro__prompt"
+                        onClick={() => setDraft(prompt)}
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 chat.turns.map((t) => (

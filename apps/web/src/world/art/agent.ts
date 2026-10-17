@@ -4,7 +4,6 @@
 // layout carries a rank, not a role). Rank is shown by SHAPE: a director wears a crest, a lead a
 // cap, a verifier carries a clipboard, a specialist is plain; colour is only identity.
 import type { Graphics } from "pixi.js";
-import tokens from "../../design/tokens";
 import { PALETTE, dk, lt, shade } from "./color";
 import { type Proj, box, poly } from "./iso";
 
@@ -20,7 +19,7 @@ export const AGENT_SCALE = 1.35;
 
 export function drawAgent(g: Graphics, rank: string, tint: string, shadows = true): void {
   const director = rank === "director";
-  const col = director ? tokens.color.brand.primary : tint;
+  const col = tint;
   const [cT, cR, limb] = [lt(col, 0.2), dk(col, 0.22), dk(col, 0.3)];
   const w = director ? 15 : 13;
   const hh = HEIGHT[rank] ?? 15;

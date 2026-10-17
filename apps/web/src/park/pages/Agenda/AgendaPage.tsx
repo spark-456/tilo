@@ -5,10 +5,15 @@
 // No motion until WEB-3 (BQ-WEB-3).
 import { type ReactNode, useMemo, useRef, useState } from "react";
 import { API_URL, appCheckToken, authToken, sessionView } from "../../../api/ClientProvider";
+import type { HostState } from "../../../api/connect";
+import { liveConnectFlow } from "../../../api/connectEnv";
 import { HttpClient } from "../../../api/http";
 import { EmptyState, ErrorState, LoadingState } from "../../../design/tilo-t";
 import type { Api } from "../../api/index";
 import { isCalendarEntry } from "../../api/live/agendaFromPlate";
+import { meetingHostApi } from "../../api/live/meetingHost";
+import { meetingMinutesApi } from "../../api/live/meetingMinutes";
+import type { PeopleRow } from "../../api/live/peopleLists";
 import { ORGANISATION_SETUP } from "../../api/organisationSetup";
 import type { Agenda, AgendaPlateRow, Decision, LiveAgenda } from "../../api/types";
 import { useParkApi } from "../../app/context";
@@ -16,11 +21,15 @@ import { useStagedCount } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
 import { FirstRunPanels } from "../../sample/FirstRunPanels";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
+import { AppLink } from "../../shared/AppLink";
 import "../../components/park.components.css";
 import type { AppCtx } from "../../app/AppCtx";
+import { type HostForm, refusedBeforeSend } from "../../shared/hostMeetingRules";
 import { AgendaNewMenu } from "./AgendaNewMenu";
 import { Boards } from "./Boards";
+import { LiveWeek } from "./LiveWeek";
 import { PeopleLists } from "./PeopleLists";
+import { ScheduleWithOthersDialog } from "./ScheduleWithOthersDialog";
 import { Week } from "./Week";
 import { icon } from "./icons";
 import { BOARDS, boardLimits } from "./model";
@@ -47,6 +56,21 @@ function Frame({ source, children }: { source?: string; children?: ReactNode }) 
 
 /** HR-1: no calendar sync event stands behind the sample week, so the chip says so instead of "synced just now". */
 const SAMPLE_SYNC = "Sample data · no calendar sync recorded";
+
+function humanAgendaDate(value: string): string {
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T12:00:00`) : new Date(value);
+  if (Number.isNaN(date.getTime())) return "Date not supplied";
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  const day = new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(date);
+  return sameDay
+    ? `Today ${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(date)}`
+    : `${day}${/^\d{4}-\d{2}-\d{2}$/.test(value) ? "" : ` · ${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(date)}`}`;
+}
 
 function Ready({
   A,
@@ -152,11 +176,36 @@ function PersonalAgendaPage({ app }: AgendaPageProps) {
 
 function Plate({ A }: { A: LiveAgenda }) {
   const [peopleKey, setPeopleKey] = useState(0);
+  const [meetings, setMeetings] = useState<PeopleRow[]>([]);
+  const [schedule, setSchedule] = useState<{ start: string; minutes: number } | null>(null);
   const demo = sessionView.demo();
   const http = useMemo(() => {
     const baseUrl = API_URL?.trim();
     return baseUrl && !demo ? new HttpClient({ baseUrl, appCheckToken, authToken }) : null;
   }, [demo]);
+  const host = useMemo(() => (http ? meetingHostApi(http) : null), [http]);
+  const hostFlow = useMemo(() => (http ? liveConnectFlow() : null), [http]);
+  const hostState = useMemo<(() => Promise<HostState>) | undefined>(
+    () => (hostFlow ? () => hostFlow.meetingHost() : undefined),
+    [hostFlow],
+  );
+  const minutes = useMemo(() => (http ? meetingMinutesApi(http) : null), [http]);
+  const getJson = useMemo(() => (http ? (path: string) => http.getJson(path) : null), [http]);
+  const meetHere = async (start: string, minutes: number) => {
+    if (!host) throw new Error("Meeting host is unavailable");
+    const { you } = await host.people();
+    const date = new Date(start);
+    const local = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+    const form: HostForm = { title: "Meet with Tilo", start: local, minutes, attested: true };
+    const id = await host.create(form, crypto.randomUUID());
+    try {
+      await host.world(id);
+      await host.start(id, [you]);
+    } catch (error) {
+      if (refusedBeforeSend(error)) await host.remove(id).catch(() => undefined);
+      throw error;
+    }
+  };
   const createPin = http
     ? async (title: string, idempotencyKey: string) => {
         const answer = await http.postJson(
@@ -189,12 +238,12 @@ function Plate({ A }: { A: LiveAgenda }) {
             <strong>{r.title ?? "Untitled item"}</strong>
             {r.due ? (
               <p>
-                Due <time dateTime={r.due}>{r.due}</time>
+                Due <time dateTime={r.due}>{humanAgendaDate(r.due)}</time>
               </p>
             ) : null}
             {isCalendarEntry(r) && r.at ? (
               <p>
-                <time dateTime={r.at}>{r.at}</time>
+                <time dateTime={r.at}>{humanAgendaDate(r.at)}</time>
               </p>
             ) : null}
           </li>
@@ -203,9 +252,6 @@ function Plate({ A }: { A: LiveAgenda }) {
     ) : (
       <p>{empty}</p>
     );
-  // UI-STUDIO-5 (design/studio-v2 "Tilo S Agenda"): today and the meetings on the left; the brief and Tilo's
-  // suggestions on the right. Only what the plate, meetings and pinboard reads send is shown; the parts with no
-  // read yet (a week grid, a prepared brief, suggested times, boards) say "Not available yet".
   return (
     <>
       <div className="park-agenda-titles">
@@ -221,67 +267,74 @@ function Plate({ A }: { A: LiveAgenda }) {
             createPin={createPin}
             canHost={http !== null}
             onPinCreated={() => setPeopleKey((n) => n + 1)}
+            onSchedule={() => {
+              const next = new Date(Date.now() + 5 * 60_000);
+              next.setMinutes(Math.ceil(next.getMinutes() / 15) * 15, 0, 0);
+              setSchedule({ start: next.toISOString(), minutes: 15 });
+            }}
           />
         </div>
-        <p className="park-agenda-date">{A.plate.today}</p>
+        <p className="park-agenda-date">
+          {A.plate.today ? humanAgendaDate(A.plate.today) : "This week"}
+        </p>
       </div>
+      <LiveWeek
+        rows={A.plate.rows}
+        parked={A.plate.parked}
+        meetings={meetings}
+        onSchedule={(start, minutes) => setSchedule({ start, minutes })}
+        host={host}
+        {...(hostState ? { hostState } : {})}
+        minutes={minutes}
+        getJson={getJson}
+        onMeetHere={meetHere}
+        onDeleted={() => setPeopleKey((n) => n + 1)}
+      />
       <div className="park-agenda-studio">
         <div className="park-agenda-studiomain">
-          <section aria-label="Today's calendar" className="park-agenda-state park-agenda-daycard">
-            <h2>Today's calendar</h2>
-            {list(A.plate.rows.filter(isCalendarEntry), "No calendar entries for today.")}
-            <section aria-label="Week view" className="park-agenda-weeknote">
-              <h3>Week view</h3>
-              <p>Not available yet</p>
-            </section>
-          </section>
           <section aria-label="Your plate" className="park-agenda-state">
             <h2>Your plate</h2>
             {list(
               A.plate.rows.filter((r) => !isCalendarEntry(r)),
               "Nothing on your plate",
             )}
+            <AppLink to="/home">Morning brief on Home</AppLink>
             {A.plate.truncated ? <p>Showing a limited list.</p> : null}
           </section>
           <section aria-label="Parked work" className="park-agenda-state">
             <h2>Parked work</h2>
             {list(A.plate.parked, "No parked work.")}
           </section>
+          <div id="agenda-meetings">
+            <PeopleLists key={peopleKey} onMeetings={setMeetings} />
+          </div>
         </div>
         <aside className="park-agenda-studioside">
-          <div id="agenda-meetings">
-            <PeopleLists key={peopleKey} />
-          </div>
-          {SIDE.filter(([label]) => http === null || label !== "Boards").map(
-            ([label, title, line]) => (
-              <section
-                key={label}
-                aria-label={label}
-                className="park-agenda-state park-agenda-sidecard"
-              >
-                <h2>{title}</h2>
-                <p className="park-agenda-sidena">Not available yet</p>
-                <p>{line}</p>
-              </section>
-            ),
-          )}
+          <section aria-label="Event details" className="park-agenda-state park-agenda-sidecard">
+            <h2>Event details</h2>
+            <p>Select a meeting to see its details and any prepared brief.</p>
+          </section>
+          <section aria-label="Available times" className="park-agenda-state park-agenda-sidecard">
+            <h2>Tilo suggests</h2>
+            <p>Suggested times will appear when Tilo has real availability to share.</p>
+          </section>
+          <section aria-label="Boards" className="park-agenda-state park-agenda-sidecard">
+            <h2>Boards</h2>
+            <p>Pinboards appear here when you have saved items.</p>
+          </section>
         </aside>
       </div>
+      {schedule ? (
+        <ScheduleWithOthersDialog
+          api={host}
+          start={schedule.start}
+          minutes={schedule.minutes}
+          onClose={() => setSchedule(null)}
+          onScheduled={() => setPeopleKey((n) => n + 1)}
+        />
+      ) : null}
     </>
   );
 }
 
-/** The design's side panels with no read behind them yet: `[region, heading, what it will hold]`. */
-const SIDE: readonly (readonly [string, string, string])[] = [
-  [
-    "Event details",
-    "Tilo’s brief",
-    "Before a meeting Tilo joins, its brief for that meeting shows here.",
-  ],
-  [
-    "Available times",
-    "Tilo suggests",
-    "Times and focus blocks Tilo suggests show here to accept or dismiss.",
-  ],
-  ["Boards", "Boards", "The pinboard view shows here. Pinboard items are listed under Pinboards."],
-];
+/** Keep the page structure visible while reads are empty; each line describes data the API can supply. */

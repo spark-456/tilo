@@ -1,15 +1,21 @@
+import { useMemo } from "react";
+import type { HttpClient } from "../../../api/http";
 import { type Density, useDensity } from "../../../display/density";
+import { memoryApi } from "../../api/live/memory";
 import type { AppCtx } from "../../app/AppCtx";
+import { useWorldClient } from "../../app/context";
 import { PageSheet } from "../../components";
 import { SettingsAppearance } from "../../shell/SettingsAppearance";
+import { MemoryPanel } from "./MemoryPanel";
 import { type RunSection, RunSectionView } from "./RunSections";
 import { Routines } from "./routines/Routines";
 import { Block } from "./shared";
 import "./Admin.css";
 
 const SECTIONS = ["settings", "autonomy", "channels", "estimate", "pilot"] as const;
-export function SettingsSection() {
+export function SettingsSection({ memoryClient = null }: { memoryClient?: HttpClient | null }) {
   const [density, setDensity] = useDensity();
+  const memories = useMemo(() => memoryClient && memoryApi(memoryClient), [memoryClient]);
   return (
     <div className="park-admin-sections">
       <Block title="Appearance">
@@ -33,6 +39,13 @@ export function SettingsSection() {
       <Block title="Routines">
         <Routines />
       </Block>
+      <Block title="Tilo remembers">
+        {memories ? (
+          <MemoryPanel api={memories} />
+        ) : (
+          <p>Sign in to manage the notes Tilo remembers.</p>
+        )}
+      </Block>
       <Block title="Consent">
         <p>Every opt-in is explicit and revocable.</p>
         <a href="/connectors">Review Gmail access</a> ·{" "}
@@ -49,6 +62,7 @@ export function SettingsSection() {
   );
 }
 export function AdminPage({ app }: { app: AppCtx }) {
+  const memoryClient = useWorldClient();
   const section = SECTIONS.find((s) => s === app.params.section) ?? "settings";
   return (
     <div data-testid="park-page-settings" className="park-admin">
@@ -72,7 +86,7 @@ export function AdminPage({ app }: { app: AppCtx }) {
           ))}
         </nav>
         {section === "settings" ? (
-          <SettingsSection />
+          <SettingsSection memoryClient={memoryClient} />
         ) : section === "pilot" ? (
           <Block title="Pilot diary">
             <p>The daily diary and exit survey are not available yet. Nothing is sent or stored.</p>

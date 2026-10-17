@@ -2,7 +2,7 @@
 vector:
   dimensions: 768
   k: 5
-  max_distance: null
+  max_distance: 0.4 # 1 - cosine: a passage less similar than 0.6 is not sent (BQ-MEMB-13; an eval may retune it)
   chunk_chars: 1200
   per_source: 200
   per_person: 2000

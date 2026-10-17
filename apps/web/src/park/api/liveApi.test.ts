@@ -36,6 +36,7 @@ const WRITES = [
   "startWorld",
   "saveSkill",
   "captureSkill",
+  "captureFile",
   "proposeVersion",
   "setToolLevel",
   "bookSlot",
@@ -54,7 +55,7 @@ describe("WEB_1a_api_methods: one list of methods", () => {
   it("WEB_1a_api_methods_const_lists_every_read_and_write_once", () => {
     expect([...API_METHODS].sort()).toEqual([...READS, ...WRITES].sort());
     expect(new Set(API_METHODS).size).toBe(API_METHODS.length);
-    expect(API_METHODS).toHaveLength(31);
+    expect(API_METHODS).toHaveLength(32);
   });
 
   it("WEB_1a_api_methods_the_test_call_table_covers_every_method", () => {

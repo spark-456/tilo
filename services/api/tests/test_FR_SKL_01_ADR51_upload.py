@@ -359,3 +359,9 @@ def test_FR_SKL_01_S2_only_a_file_the_person_uploaded_can_be_the_example(skills4
     response = skills4.rig.post(CAPTURE, {"method": "upload", "artifact": made.ref})
     assert response.status_code == 404 and response.json() == {"detail": "not_found"}  # a made item is not an upload
     assert skills4.model.calls == []
+
+
+def test_FR_SKL_01_S2_the_fallback_limits_match_the_shipped_ones(tmp_path):
+    from tilo_api import skills_media  # noqa: PLC0415
+
+    assert skills_media.load_capture_limits(tmp_path) == skills_media.CaptureLimits(**_BASE)  # no config file at all

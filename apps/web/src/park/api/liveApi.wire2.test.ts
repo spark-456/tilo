@@ -403,6 +403,7 @@ describe("WIRE_2_live_api: nothing else is connected", () => {
           "getLearn",
           "saveSkill",
           "captureSkill",
+          "captureFile",
           "proposeVersion",
           "setPref",
           "getUserSettings",

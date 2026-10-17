@@ -147,6 +147,8 @@ class SkillContext:
     registry: Any
     read_taught: Callable[[], list[dict[str, Any]]]
     router: Router | None
+    budget: float | None = None  # credits left to this caller's ask (Quick's hold): a call is priced out of it
+    failed: bool = False  # the last best_for ended on a failure or a refusal, not on "nothing fits"
 
     def catalog(self, limit: int | None = CATALOG_MAX) -> list[dict[str, Any]]:
         """The library skills and, if the stores can be read, the caller's taught ones. Advisory: a store that cannot
@@ -170,12 +172,17 @@ class SkillContext:
 
     def best_for(self, text: str) -> dict[str, Any] | None:
         """The skill that fits `text` by score alone (no tag): None below the threshold or on any failure."""
+        self.failed = False
         entries = self.catalog()
         if not entries or self.router is None or not text.strip():
             return None
+        if self.budget is not None and self.budget <= 0:  # a capped caller sends no embedding at all
+            self.failed = True
+            return None
         try:
-            return _match(self.router, text, entries, load_route_config())
+            return _match(self, text, entries, load_route_config())
         except Exception as exc:  # noqa: BLE001
+            self.failed = True
             logger.warning("skill match failed: %s", type(exc).__name__)
             return None
 
@@ -206,13 +213,26 @@ def _doc(entry: dict[str, Any]) -> str:
 
 
 def _embed(
-    model_router: Router, texts: list[str], task: Literal["document", "query"], dims: int
+    ctx: SkillContext, texts: list[str], task: Literal["document", "query"], dims: int
 ) -> tuple[str, list[list[float]]]:
     # a deployed router is a MeteredRouter: its embeddings are SEC-16 units, named `metered_embed`; a Router has `embed`
-    call = getattr(model_router, "metered_embed", None) or model_router.embed
-    result = call("embed", EmbedRequest(texts=texts, task=task, dimensions=dims))
+    if ctx.router is None:
+        raise ValueError("no router")
+    call = getattr(ctx.router, "metered_embed", None) or ctx.router.embed
+    result = call("embed", EmbedRequest(texts=texts, task=task, dimensions=dims), **_budgeted(ctx))
+    _spent(ctx, result)
     reply = result.embedding
     return reply.profile_id, [list(v) for v in reply.vectors]
+
+
+def _budgeted(ctx: SkillContext) -> dict[str, Any]:
+    return {} if ctx.budget is None else {"budget": ctx.budget}
+
+
+def _spent(ctx: SkillContext, result: Any) -> None:
+    """What the call cost comes out of the caller's budget (the Router prices an embedding by what was sent)."""
+    if ctx.budget is not None and result.budget is not None:
+        ctx.budget = result.budget
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -224,14 +244,14 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return dot / (na * nb) if na and nb else 0.0
 
 
-def _scores(model_router: Router, text: str, entries: list[dict[str, Any]], cfg: RouteConfig) -> dict[str, float]:
-    profile, (query,) = _embed(model_router, [neutralise_marker(text, "TASK")[:2000]], "query", cfg.dimensions)
+def _scores(ctx: SkillContext, text: str, entries: list[dict[str, Any]], cfg: RouteConfig) -> dict[str, float]:
+    profile, (query,) = _embed(ctx, [neutralise_marker(text, "TASK")[:2000]], "query", cfg.dimensions)
     keyed = {e["id"]: (profile, cfg.dimensions, hashlib.sha256(_doc(e).encode()).hexdigest()) for e in entries}
     with _lock:
         vectors = {i: _cache[k] for i, k in keyed.items() if k in _cache}
     missing = [e for e in entries if e["id"] not in vectors]
     if missing:
-        got_profile, fresh = _embed(model_router, [_doc(e) for e in missing], "document", cfg.dimensions)
+        got_profile, fresh = _embed(ctx, [_doc(e) for e in missing], "document", cfg.dimensions)
         if got_profile != profile:  # vectors of two profiles are never compared
             raise ValueError("embedding profile changed")
         with _lock:
@@ -248,7 +268,7 @@ def _fenced(entry: dict[str, Any]) -> str:
     return neutralise_marker(neutralise_marker(_doc(entry), "SKILLS"), "TASK")
 
 
-def _pick(model_router: Router, text: str, first: dict[str, Any], second: dict[str, Any]) -> str | None:
+def _pick(ctx: SkillContext, text: str, first: dict[str, Any], second: dict[str, Any]) -> str | None:
     """One cheap `assistant` call between two near-equal skills: 'a', 'b', 'none' or None when it cannot answer."""
     try:
         prompt = load_prompt(
@@ -261,10 +281,13 @@ def _pick(model_router: Router, text: str, first: dict[str, Any], second: dict[s
             },
         )
         system = load_prompt("assistant", "skill_route_system.md")
-        result = model_router.generate(
-            "assistant",
-            GenerateRequest(system=system, prompt=prompt, json_mode=True, response_schema=_PICK, max_output_tokens=64),
+        request = GenerateRequest(
+            system=system, prompt=prompt, json_mode=True, response_schema=_PICK, max_output_tokens=64
         )
+        if ctx.router is None:
+            raise ValueError("no router")
+        result = ctx.router.generate("assistant", request, **_budgeted(ctx))
+        _spent(ctx, result)
         reply = result.response.text if result.outcome == "ok" and result.response is not None else None
         doc = None if reply is None else json.loads(reply)
         return doc["pick"] if doc is not None and first_error(doc, _PICK) is None else None
@@ -273,14 +296,14 @@ def _pick(model_router: Router, text: str, first: dict[str, Any], second: dict[s
         return None
 
 
-def _match(model_router: Router, text: str, entries: list[dict[str, Any]], cfg: RouteConfig) -> dict[str, Any] | None:
+def _match(ctx: SkillContext, text: str, entries: list[dict[str, Any]], cfg: RouteConfig) -> dict[str, Any] | None:
     by_id = {e["id"]: e for e in entries}
-    ranked = sorted(_scores(model_router, text, entries, cfg).items(), key=lambda kv: (-kv[1], kv[0]))
+    ranked = sorted(_scores(ctx, text, entries, cfg).items(), key=lambda kv: (-kv[1], kv[0]))
     if not ranked or ranked[0][1] < cfg.min_score:
         return None
     (top, top_score), source = ranked[0], "matched"
     if len(ranked) > 1 and ranked[1][1] >= cfg.min_score and top_score - ranked[1][1] <= cfg.tie_margin:
-        choice = _pick(model_router, text, by_id[top], by_id[ranked[1][0]])
+        choice = _pick(ctx, text, by_id[top], by_id[ranked[1][0]])
         if choice == "none":
             return None
         if choice == "b":

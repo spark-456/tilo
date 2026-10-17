@@ -4,10 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="data:," />
+    <link rel="preload" as="image" type="image/webp" href="/loader/pool-46a6cd3d6b84.webp" />
+    <link rel="stylesheet" href="/loader/boot-cover.css" />
     <title>Tilo</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="tilo-boot-cover" role="status" aria-label="Tilo is preparing your space">
+      <picture>
+        <source media="(prefers-reduced-motion: reduce)" srcset="/loader/pool-9182ba9a51a9.png" />
+        <img src="/loader/pool-46a6cd3d6b84.webp" alt="" width="560" height="412" />
+      </picture>
+    </div>
+    <div id="root" inert aria-hidden="true"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -37,4 +37,4 @@ email-body result is reused when fresh and a fit check and the Verifier accept i
   `GRACE` (else `ArtifactBusy`); `retention()` is `gcs_artifacts`. Firestore/GCS backends: ticket T8.
 
 ## Requirement IDs
-FR-MEM-01, FR-MEM-02, FR-MEM-03, FR-MEM-06, FR-MEM-09, FR-MEM-12; FR-MEM-10 `import_version` (a bundle's version under the importer's Scope: ids and bytes kept, `sources` dropped, a `clean` claim screened again).
+FR-MEM-01, FR-MEM-02, FR-MEM-03, FR-MEM-06, FR-MEM-09, FR-MEM-12; RT-01..03, RT-06..08, RT-10 (`chunks.py`/`chunks_backends.py`, ADR-0049: per-account passages; `search(org, caller)` queries each readable scope with the filter inside it, then re-checks every hit via `SourceRules`; injected `Embedder`, no model call here); FR-MEM-10 `import_version` (a bundle's version under the importer's Scope: ids and bytes kept, `sources` dropped, a `clean` claim screened again).

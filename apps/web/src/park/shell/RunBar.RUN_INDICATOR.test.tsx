@@ -12,7 +12,7 @@ import type { Api } from "../api/index";
 import type { World, WorldState } from "../api/types";
 
 const BAR = ".park-shell__runbar";
-const RING = ".park-shell__ring";
+const THINKING_TILO = ".thinking-tilo";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -218,9 +218,9 @@ describe("RUN_INDICATOR bar: shown only while a recorded run is in progress", ()
 });
 
 describe("RUN_INDICATOR bar: moving versus static", () => {
-  it("RUN_INDICATOR_a_running_bar_has_the_spinning_ring_and_the_still_look_is_a_dot_that_never_moves", async () => {
+  it("test_CX_THINKING_TILO_a_running_bar_shows_saved_tilo_and_still_look_never_moves", async () => {
     await mountApp({ api: servedApi({ worlds: [w("a", "running")] }) });
-    expect(qa(bar() as HTMLElement, RING)).toHaveLength(1);
+    expect(qa(bar() as HTMLElement, THINKING_TILO)).toHaveLength(1);
     expect(bar()?.getAttribute("data-motion")).toBe("on");
   });
 
@@ -229,27 +229,27 @@ describe("RUN_INDICATOR bar: moving versus static", () => {
     const el = bar() as HTMLElement;
     expect(el.getAttribute("data-state")).toBe("held");
     expect(el.textContent).toContain("Waiting for your approval");
-    expect(qa(el, RING)).toHaveLength(0);
+    expect(qa(el, THINKING_TILO)).toHaveLength(0);
     expect(el.querySelector("[data-spin]")).toBeNull();
   });
 
-  it("RUN_INDICATOR_prefers_reduced_motion_removes_the_moving_ring_and_keeps_the_label", async () => {
+  it("RUN_INDICATOR_prefers_reduced_motion_shows_still_tilo_and_keeps_the_label", async () => {
     reduceMotion(true);
     await mountApp({ api: servedApi({ worlds: [w("a", "running", { agents: 2 })] }) });
     const el = bar() as HTMLElement;
     expect(el.getAttribute("data-motion")).toBe("off");
-    expect(qa(el, RING)).toHaveLength(0);
+    expect(qa(el, THINKING_TILO)).toHaveLength(0);
     expect(el.textContent).toContain("2 agents working");
   });
 
-  it("RUN_INDICATOR_the_still_motion_preference_removes_the_moving_ring_and_keeps_the_label", async () => {
+  it("RUN_INDICATOR_the_still_motion_preference_shows_still_tilo_and_keeps_the_label", async () => {
     await mountApp({ api: servedApi({ worlds: [w("a", "running", { agents: 2 })] }) });
-    expect(qa(bar() as HTMLElement, RING)).toHaveLength(1);
+    expect(qa(bar() as HTMLElement, THINKING_TILO)).toHaveLength(1);
     act(() => seen.app.setPref("motion", "still"));
     await settle();
     const el = bar() as HTMLElement;
     expect(el.getAttribute("data-motion")).toBe("off");
-    expect(qa(el, RING)).toHaveLength(0);
+    expect(qa(el, THINKING_TILO)).toHaveLength(0);
     expect(el.textContent).toContain("2 agents working");
   });
 });

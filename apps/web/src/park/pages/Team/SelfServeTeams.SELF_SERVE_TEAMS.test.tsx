@@ -74,7 +74,7 @@ it("SELF_SERVE_TEAMS Create a team asks the server and shows the team only from 
   await settle();
   expect(client.create).toHaveBeenCalledTimes(1);
   expect(client.mine).toHaveBeenCalledTimes(2);
-  expect(el.textContent).toContain("Me's team · You lead it");
+  expect(el.textContent).toContain("Team led by Me · You lead it");
   expect(el.querySelector('input[aria-label="Invite to your team by email"]')).not.toBeNull();
 });
 
@@ -106,8 +106,31 @@ it("SELF_SERVE_TEAMS a member who does not lead gets no invite field", async () 
     ],
   });
   const el = await mount(client);
-  expect(el.textContent).toContain("Lena's team");
+  expect(el.textContent).toContain("Team led by Lena");
   expect(el.querySelector('input[aria-label="Invite to your team by email"]')).toBeNull();
+});
+
+it("TEAM_ACCESS_1 shows team names from their leads and only marks the viewer as lead", async () => {
+  const client = fakeClient(
+    [
+      { team: "tm_a", lead: false, state: "member", invitedBy: null },
+      { team: "tm_b", lead: true, state: "member", invitedBy: null },
+    ],
+    {
+      tm_a: [
+        { id: "u_lena", name: "Lena", lead: true },
+        { id: "u_me", name: "Me", lead: false },
+      ],
+      tm_b: [{ id: "u_me", name: "Me", lead: true }],
+    },
+  );
+  const el = await mount(client);
+  const rows = [...el.querySelectorAll('[data-testid="team-row"]')];
+  expect(rows[0]?.textContent).toContain("Team led by Lena");
+  expect(rows[0]?.textContent).not.toContain("You lead it");
+  expect(rows[1]?.textContent).toContain("Team led by Me · You lead it");
+  expect(el.textContent).not.toContain("tm_a");
+  expect(el.textContent).not.toContain("tm_b");
 });
 
 it("SELF_SERVE_TEAMS an invitation is accepted by the invited person", async () => {
@@ -122,7 +145,7 @@ it("SELF_SERVE_TEAMS an invitation is accepted by the invited person", async () 
   await act(async () => button(el, "Accept").click());
   await settle();
   expect(client.accept).toHaveBeenCalledWith("tm_a");
-  expect(el.textContent).toContain("Lena's team");
+  expect(el.textContent).toContain("Team led by Lena");
   expect(el.textContent).toContain("You joined the team.");
 });
 
@@ -157,5 +180,5 @@ it("FR_TEAM_01 SELF_SERVE_TEAMS reports the person's teams after the first read 
   expect(seen.at(-1)).toEqual(["u_me", []]);
   await act(async () => button(host as HTMLElement, "Create a team").click());
   await settle();
-  expect(seen.at(-1)).toEqual(["u_me", [{ name: "Me's team", lead: true }]]);
+  expect(seen.at(-1)).toEqual(["u_me", [{ name: "Team led by Me", lead: true }]]);
 });

@@ -1,7 +1,7 @@
 // WEB-MOTION-2 (boot splash, page transitions, open-a-world steps): the stylesheet of the shell,
 // apps/web/src/park/shell/park.shell.css, read as text. Pinned to design_handoff_tilo_web_app/README.md
 // "Interactions and motion" and "Performance", and to the keyframes of the reference
-// (design_handoff_tilo_web_app/design/Tilo App.dc.html): tiloSlide (the boot bar), tiloSpin (the loader's ring).
+// (design_handoff_tilo_web_app/design/Tilo App.dc.html): tiloSlide (the boot bar).
 //
 // What the running page does with these rules (durations, easings, the bar's 35/78/100 steps, reduced motion)
 // is measured in a real browser in e2e/park-motion-transitions.spec.ts; this file pins what a stylesheet can
@@ -80,21 +80,8 @@ describe("WEB-MOTION-2 css: the boot splash's bar and the loader's ring use the 
     }
   });
 
-  it("WEB-MOTION-2 css: @keyframes tiloSpin is a full turn: to { transform: rotate(360deg) } (README Async actions)", () => {
-    const body = keyframes(stripComments(css()), "tiloSpin");
-    expect(body, "park.shell.css has no @keyframes tiloSpin").not.toBeNull();
-    expect(body).toMatch(/rotate\(\s*360deg\s*\)/);
-  });
-
-  it("FR_UX_12 WEB-MOTION-2 css: the loader's ring spins with tiloSpin .7s linear, forever (README Async actions: tiloSpin .7s)", () => {
-    const hits = animationOf(parseRules(css()).rules, "tiloSpin");
-    expect(hits.length, "no rule animates with tiloSpin").toBeGreaterThan(0);
-    for (const h of hits) {
-      expect(h.selector, "the spin belongs to the loader's ring").toMatch(/park-shell__ring/);
-      expect(h.value).toMatch(/(?:^|[\s,])0?\.7s|700ms/);
-      expect(h.value).toMatch(/linear/);
-      expect(h.value).toMatch(/infinite/);
-    }
+  it("CX_THINKING_TILO_css_removes_the_rotating_ring", () => {
+    expect(css()).not.toMatch(/@keyframes\s+tiloSpin|\.park-shell__ring\s*\{/);
   });
 });
 

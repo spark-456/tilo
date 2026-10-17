@@ -55,6 +55,18 @@ describe("QUICK_THINKING_http: the mode field", () => {
     });
     expect((await askQuick(offer.api, "quick", "Scan competitors")).data.skill).toEqual(skill);
   });
+  it("MI-04 keeps only a valid memory suggestion on a served Quick answer", async () => {
+    const r = rig(200, {
+      mode: "quick",
+      outcome: "answered",
+      text: "Okay.",
+      suggestion: { text: "I prefer mornings", kind: "preference" },
+    });
+    expect((await askQuick(r.api, "quick", "Remember that I prefer mornings")).data).toMatchObject({
+      kind: "answered",
+      memorySuggestion: { text: "I prefer mornings", kind: "preference" },
+    });
+  });
   it("QUICK_THINKING_http_legacy_and_thinking_calls_send_no_quick_field", async () => {
     const r = rig(201, THINKING_201);
     const ack = await r.api.startWorld("quick", "Plan the offsite");

@@ -34,7 +34,7 @@ from tilo_people.stores import PeopleStores
 from tilo_planning.compiler import DELIVER, PlanInputs
 from tilo_providers.diagnostics import failure_context, log_caught
 
-from tilo_api import deps, events, item_documents, side_effect_fields, team_access, team_store
+from tilo_api import deps, events, grounding, item_documents, side_effect_fields, team_access, team_store
 from tilo_api.access import Mode
 from tilo_api.cards import (
     OWNER_ONLY_ACTIONS,
@@ -104,6 +104,7 @@ class Seams:
         [], Any
     ]  # the team's settings (FR-ACC-01; team_store.team_reader): no default, every path passes one
     people: Callable[[], PeopleStores | None] | None = None  # owner time zone for code-stamped deliverable date
+    grounding: Callable[[], Any] | None = None  # RT-01: opens per-account grounding for this run's mode and meter
 
 
 _CLOCK_SEAMS = frozenset({"plan_compiler", "unit_runner"})  # the seams whose prompts state the date
@@ -155,13 +156,18 @@ def run_seams(
     try:
         built = dict(
             zip(
-                [f.name for f in dataclasses.fields(Seams) if f.name not in {"team", "people"}],
+                [f.name for f in dataclasses.fields(Seams) if f.name not in {"team", "people", "grounding"}],
                 map(build, names.split()),
                 strict=True,
             )
         )
         built["artifacts"] = screened_by_run(built["artifacts"], mode, meter)
-        return Seams(**built, team=team_store.team_reader(overrides), people=deps.get_people_provider(request))
+        return Seams(
+            **built,
+            team=team_store.team_reader(overrides),
+            people=deps.get_people_provider(request),
+            grounding=grounding.opener(request, mode=mode, meter=meter),
+        )
     except Exception as exc:
         logger.warning("the run seams are not wired, so no run starts: %s", type(exc).__name__)
         return None
@@ -491,7 +497,7 @@ class Run:
         if part["type"] == "approval.resolved":
             self.resolved[card_id] = committed
 
-    def _fail(self, reason: str, unit: str | None) -> None:
+    def _fail(self, reason: str, unit: str | None, *, summary: str | None = None) -> None:
         reason = _clip_reason(reason)
         try:
             if not (self._failed or self.paused()):
@@ -499,7 +505,11 @@ class Run:
                 # RUN-FAIL-1: every failure is one ERROR line with its plain, code-written reason (never silent)
                 logger.error("run %s failed (unit %s): %s", self.run_id, unit or "none", reason)
                 self.put(
-                    "world.failed", "system", self.world_id, f"Stopped: {reason}", {"reason": reason, "unit": unit}
+                    "world.failed",
+                    "system",
+                    self.world_id,
+                    summary or f"Stopped: {reason}",
+                    {"reason": reason, "unit": unit},
                 )
         except Exception as caught_error:
             log_caught(caught_error, __name__, locals())
@@ -699,15 +709,48 @@ class Run:
             return
         if stopped := result.failed + result.held + result.skipped:
             reason = "a step was held, so the work stopped" if result.held and not result.failed else None
+            answers = [e for e in self.store.events.get(self.world_id, []) if e["type"] == "question.answered"]
+            declined = bool(
+                result.held and answers and answers[-1]["data"].get("answered_by") in ("person", "team_lead")
+            )
             failed = result.outcomes.get(stopped[0])  # a unit's own plain stop line, if code wrote one (FR-AGT-12)
             ran = failed is not None and not failed.success and stopped[0] not in result.held
             own = _unit_reason(failed) if ran else None
-            self._fail(self.failure or own or reason or "a unit failed, so the work stopped", stopped[0])
+            self._fail(
+                "declined" if declined else self.failure or own or reason or "a unit failed, so the work stopped",
+                stopped[0],
+                summary="Stopped by you." if declined else None,
+            )
             return
         credits = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))  # the meter (HR-1)
         data = {"credits_used": credits, "deliverable_count": len(self.delivered)}
         cause = self.delivered[-1] if self.delivered else None
+        await self._remember_deliverables()  # before world.completed: nothing is written to a finished world
         self.put("world.completed", self.director, self.world_id, "The work is done.", data, cause=cause)
+
+    async def _remember_deliverables(self) -> None:
+        """RT-01 / RT-09: the run's clean outputs become the owner's own passages (never a team's unless the world is
+        shared with one); one `memory.saved` says how many. Off unless TILO_RETRIEVAL=1; failures never end the run."""
+        if self.seams.grounding is None:
+            return
+        delivered = {
+            e["data"]["artifact"]["artifact_id"]
+            for e in self.store.events.get(self.world_id, [])
+            if e["type"] == "artifact.delivered"
+        }  # only what the run delivered, never a unit's intermediates
+
+        open_grounding = self.seams.grounding
+
+        def index() -> int:
+            opened = open_grounding()
+            return 0 if opened is None else int(opened.index_deliverables(self.world_id, delivered))
+
+        try:
+            if held := await asyncio.to_thread(index):  # embedding calls never block the event loop
+                item = {"layer": "artifact_memory", "item_count": held}
+                self.put("memory.saved", self.director, self.world_id, "Saved to your account memory.", item, vis=[])
+        except Exception as exc:
+            logger.warning("run %s: grounding event not written (%s)", self.run_id, type(exc).__name__)
 
     def _store_card(self, card: dict) -> None:
         """The question card goes to this run's CardStore with its unit's district, before anything

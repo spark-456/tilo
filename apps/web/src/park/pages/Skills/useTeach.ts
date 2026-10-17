@@ -2,10 +2,11 @@
 // steps 1 and 2 (the description and what Tilo read from it), stage 1 is step 3 (Tilo's version and Save). Live, each
 // step is one request at a time (POST /v1/skills/captures, .../{id}/version, POST /v1/skills) and only the server's
 // answer moves the flow on. On sample data the description is read at once and Save is this page's only. There is no
-// practice run and no recording: neither has a route, and nothing here waits on a timer (HR-1..7).
+// practice run yet; uploaded examples and confirmed local recordings use the two real capture routes (HR-1..7).
 import { useEffect, useRef, useState } from "react";
 import { displayApiError } from "../../api/errorMessage";
 import type { Api } from "../../api/index";
+import { teamsClient } from "../../api/selfServeTeams";
 import type { Skill, SkillCapture, SkillVersion, Source, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import type { CurrencyCode } from "../../app/ledgerKpis";
@@ -47,6 +48,9 @@ export interface Teach {
   ask: readonly boolean[];
   qAns: string | null;
   scope: Scope;
+  teamId: string | null;
+  teams: readonly string[] | null;
+  hosts: readonly string[];
   trig: Trigger;
   saved: boolean;
   /** The skill this session saved (kept after "Teach another"). */
@@ -54,16 +58,24 @@ export interface Teach {
   live: boolean;
   busy: boolean;
   failure: unknown;
+  fileError: string | null;
+  uploading: boolean;
+  readingUploaded: boolean;
+  usedFile: boolean;
   /** Live: the steps the server read out of the description. */
   steps: readonly string[];
   version: SkillVersion | null;
   setName: (v: string) => void;
   setDesc: (v: string) => void;
   setScope: (s: Scope) => void;
+  loadTeams: () => void;
+  chooseTeam: (id: string) => void;
+  removeHost: (host: string) => void;
   setTrig: (t: Trigger) => void;
   setQAns: (a: string) => void;
   toggleAsk: (i: number) => void;
   capture: () => void;
+  captureFiles: (files: FileList | readonly File[], method?: "upload" | "record") => boolean;
   next: () => void;
   back: () => void;
   save: () => void;
@@ -92,10 +104,17 @@ export function useTeach({
   const [qAns, setQAns] = useState<string | null>(null);
   // A live save takes only what POST /v1/skills accepts: a skill for the person that runs when they ask.
   const [scope, setScope] = useState<Scope>(isLive ? "me" : "team");
+  const [teamId, setTeamId] = useState<string | null>(null);
+  const [teams, setTeams] = useState<readonly string[] | null>(null);
+  const [hosts, setHosts] = useState<string[]>([]);
   const [trig, setTrig] = useState<Trigger>(isLive ? "ask" : "arrive");
   const [captured, setCaptured] = useState<SkillCapture | null>(null);
   const [version, setVersion] = useState<SkillVersion | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [readingUploaded, setReadingUploaded] = useState(false);
+  const [usedFile, setUsedFile] = useState(false);
   const [busy, setBusy] = useState(false);
   const inflight = useRef(false);
   const [saved, setSaved] = useState(false);
@@ -132,6 +151,7 @@ export function useTeach({
     once(async () => {
       const r = await api.captureSkill(text);
       setCaptured(r.data);
+      setUsedFile(false);
     }, failed);
   };
   const proposeIt = () => {
@@ -139,6 +159,7 @@ export function useTeach({
     once(async () => {
       const r = await api.proposeVersion(captured.id);
       setVersion(r.data);
+      setHosts(r.data.hosts);
       setAsk(r.data.steps.map((s) => s.ask));
       setStage(1);
     }, failed);
@@ -153,9 +174,16 @@ export function useTeach({
       steps: steps.map((s) => s.text),
       draft: {
         scope,
+        teamId,
         trigger: trig,
         plan: steps.map((s) => ({ text: s.text, tool: `${s.tool} · ${s.action}`, ask: s.ask })),
-        server: { captured: captured.steps, question: version.question, steps },
+        server: {
+          captured: captured.steps,
+          question: version.question,
+          steps,
+          inputs: version.inputs,
+          hosts,
+        },
       },
     };
     // Saved only once the server says so (a 201): nothing shows as saved before that.
@@ -177,6 +205,51 @@ export function useTeach({
     if (isLive) return describeIt();
     if (desc.trim()) setCap(CAPTURE_STEPS); // nothing to read: no steps from an empty box
   };
+  const captureFiles = (
+    files: FileList | readonly File[],
+    method: "upload" | "record" = "upload",
+  ): boolean => {
+    if (!isLive || inflight.current) return false;
+    if (files.length !== 1) {
+      setFileError("Choose one file at a time.");
+      return false;
+    }
+    const file = files[0];
+    if (!file) return false;
+    const type = file.type.toLowerCase();
+    const allowed = [
+      "video/webm",
+      "video/mp4",
+      "application/pdf",
+      "image/png",
+      "image/jpeg",
+      "text/plain",
+      "text/markdown",
+    ];
+    if (!allowed.includes(type) && !(type === "" && /\.(txt|md)$/i.test(file.name))) {
+      setFileError("Choose a WebM, MP4, PDF, PNG, JPEG, or text file.");
+      return false;
+    }
+    if (file.size === 0 || file.size > 10_485_760) {
+      setFileError("Choose one nonempty file up to 10 MiB.");
+      return false;
+    }
+    setFileError(null);
+    setUploading(true);
+    setReadingUploaded(false);
+    once(async () => {
+      try {
+        const r = await api.captureFile(file, () => setReadingUploaded(true), method);
+        setCaptured(r.data);
+        setUsedFile(true);
+        setVersion(null);
+      } finally {
+        if (mounted.current) setUploading(false);
+        if (mounted.current) setReadingUploaded(false);
+      }
+    }, failed);
+    return true;
+  };
   const reset = () => {
     setStage(0);
     setCap(0);
@@ -185,7 +258,14 @@ export function useTeach({
     setName(defaultName);
     setCaptured(null);
     setVersion(null);
+    setHosts([]);
+    setTeams(null);
+    setTeamId(null);
     setFailure(null);
+    setFileError(null);
+    setUploading(false);
+    setReadingUploaded(false);
+    setUsedFile(false);
     if (isLive) setDesc("");
   };
 
@@ -225,17 +305,44 @@ export function useTeach({
     ask,
     qAns,
     scope,
+    teamId,
+    teams,
+    hosts,
     trig,
     saved,
     taught,
     live: isLive,
     busy,
     failure,
+    fileError,
+    uploading,
+    readingUploaded,
+    usedFile,
     steps: captured?.steps ?? [],
     version,
     setName,
     setDesc,
     setScope,
+    loadTeams: () => {
+      const client = teamsClient();
+      if (!isLive || !client) return;
+      client.mine().then(
+        ({ teams: rows }) => {
+          if (mounted.current)
+            setTeams(rows.filter((row) => row.state === "member").map((row) => row.team));
+        },
+        (e: unknown) => {
+          if (mounted.current) setFailure(e);
+        },
+      );
+    },
+    chooseTeam: (id) => {
+      if (teams?.includes(id)) {
+        setTeamId(id);
+        setScope("team");
+      }
+    },
+    removeHost: (host) => setHosts((current) => current.filter((item) => item !== host)),
     setTrig,
     setQAns,
     toggleAsk: (i) => {
@@ -243,6 +350,7 @@ export function useTeach({
       setAsk((a) => a.map((on, j) => (j === i ? !on : on)));
     },
     capture,
+    captureFiles,
     next: () => {
       if (isLive) return proposeIt();
       if (cap >= CAPTURE_STEPS) setStage(1);

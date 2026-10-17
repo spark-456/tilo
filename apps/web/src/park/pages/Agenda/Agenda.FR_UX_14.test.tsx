@@ -42,24 +42,29 @@ const mount = (reply: unknown = body, status = 200) =>
         ),
     }),
   });
-it("FR_UX_14 FR_PB live Agenda shows supplied work and honest unavailable panels", async () => {
+it("CX_PAGES_ENRICH_AGENDA_live_agenda_keeps_empty_structures_visible", async () => {
   const { container } = await mount();
   expect(container.querySelector('[data-source="live"]')).not.toBeNull();
   expect(container.textContent).toContain("Prepare notes");
-  expect(container.textContent).toContain("2026-10-10");
-  for (const label of ["Week view", "Event details", "Available times", "Boards"]) {
-    expect(container.querySelector(`[aria-label="${label}"]`)?.textContent).toContain(
-      "Not available yet",
-    );
-  }
+  expect(container.textContent).toContain("Sat");
+  expect(container.textContent).toContain("Oct");
+  expect(container.querySelector('[aria-label="Week calendar"]')).not.toBeNull();
+  expect(container.querySelectorAll(".cx-agenda-day")).toHaveLength(7);
+  for (const label of ["Event details", "Available times", "Boards"])
+    expect(container.querySelector(`[aria-label="${label}"]`)).not.toBeNull();
+  expect(container.querySelectorAll("[data-week-slot]")).toHaveLength(336);
+  expect(container.textContent).not.toContain("Not available yet");
+  expect(container.textContent).not.toContain("2026-10-10");
   expect(container.textContent).not.toContain("synced just now");
-  expect(container.querySelector("button")).toBeNull();
 });
-it("FR_PB empty live plate shows empty work without fabricating a week", async () => {
+it("CX_PAGES_ENRICH_AGENDA_empty_calendar_keeps_grid_and_new_action", async () => {
   const { container } = await mount({ ...body, rows: [] });
   expect(container.textContent).toContain("Nothing on your plate");
-  expect(container.querySelector('[aria-label="Week view"]')?.textContent).toContain(
-    "Not available yet",
+  expect(container.querySelector('[aria-label="Week calendar"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="Week time slots"]')).not.toBeNull();
+  expect(container.textContent).toContain("+ New");
+  expect(container.querySelector('[aria-label="Today\'s calendar"] a')?.textContent).toBe(
+    "Check Google Calendar",
   );
 });
 it("FR_UX_14 a failed plate read shows the existing error instead of sample pins", async () => {
@@ -88,7 +93,5 @@ it("FR_PB calendar summaries and parked work retain supplied facts and truncatio
     "Untitled item",
   );
   expect(container.textContent).toContain("Showing a limited list.");
-  expect(container.querySelector('[aria-label="Event details"]')?.textContent).toContain(
-    "Not available yet",
-  );
+  expect(container.querySelector('[aria-label="Event details"]')).not.toBeNull();
 });

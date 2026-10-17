@@ -52,6 +52,17 @@ const button = (el: HTMLElement, label: string) => {
 };
 
 describe("MO-04/12 morning brief card", () => {
+  it("test_FR_HOME_CLEAN_1_renders_a_compact_brief_row_with_a_tilo_secondary_action", async () => {
+    const m = mount(<MorningBriefCard api={api()} compact />);
+    await settle();
+    expect(m.container.querySelector("[aria-label='Morning brief']")?.className).toBe(
+      "park-home-brief-row",
+    );
+    expect(text(m.container)).toContain("Review the budget");
+    expect(text(m.container)).not.toContain("Meetings");
+    expect(button(m.container, "Make it now").className).toContain("park-btn--secondary");
+  });
+
   it("test_MO_12_not_ready_shows_arrival_time_and_never_claims_mail_needs_a_reply", async () => {
     const client = api({
       read: vi.fn(async () => {

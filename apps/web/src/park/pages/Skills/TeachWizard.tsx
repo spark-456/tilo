@@ -8,6 +8,7 @@ import type { User } from "../../api/types";
 import { Button } from "../../components";
 import { cx } from "../../components/cx";
 import { ApiReadState } from "../../shared/ApiReadState";
+import { type ScreenRecording, recordScreen } from "./recorder";
 import { icon, stepBuilding } from "./skillsKit";
 import {
   CAP,
@@ -33,7 +34,7 @@ export const WIZARD_STEPS = [
 /** Why "Try it once" is off: a practice run has no route yet (STUDIO-4; never a pretend run). */
 export const TRY_OFF =
   "Try it once is not available yet. Nothing runs until you save and use the skill.";
-/** Why the example box is off: captures read a description only for now. */
+/** The fixture example box is off; live sessions can upload an example file. */
 export const EXAMPLE_OFF =
   "Adding an example file or recording your screen is not available yet. Tilo learns from your description for now.";
 
@@ -132,6 +133,122 @@ export function TeachWizard({ t, user, night, onClose, onView, retryRead }: Wiza
 
 type Heading = { heading: RefObject<HTMLHeadingElement> };
 
+function UploadExample({ t, onAccepted }: { t: Teach; onAccepted?: () => void }) {
+  const choose = (files: FileList | readonly File[]) => {
+    if (t.captureFiles(files)) onAccepted?.();
+  };
+  return (
+    <div
+      className="park-teach__drop"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        choose(event.dataTransfer.files);
+      }}
+    >
+      <span className="park-teach__dropic" aria-hidden="true">
+        +
+      </span>
+      <span className="park-teach__droptext">
+        <strong>Drop one example here, or choose a file</strong>
+        <span>WebM, MP4, PDF, PNG, JPEG, or text · up to 10 MiB</span>
+        <input
+          type="file"
+          aria-label="Upload an example file"
+          accept="video/webm,video/mp4,application/pdf,image/png,image/jpeg,text/plain,text/markdown,.txt,.md"
+          disabled={t.busy}
+          onChange={(event) => {
+            choose(event.currentTarget.files ?? []);
+            event.currentTarget.value = "";
+          }}
+        />
+      </span>
+      {t.uploading ? (
+        <output>
+          {t.readingUploaded ? "Reading the uploaded example…" : "Uploading your example…"}
+        </output>
+      ) : null}
+      {t.fileError ? <span role="alert">{t.fileError}</span> : null}
+    </div>
+  );
+}
+
+export function ScreenExample({ t, onAccepted }: { t: Teach; onAccepted?: () => void }) {
+  const [narrate, setNarrate] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const session = useRef<ScreenRecording | null>(null);
+  useEffect(() => {
+    if (!file) return;
+    const next = URL.createObjectURL(file);
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [file]);
+  useEffect(() => () => session.current?.discard(), []);
+  const start = async () => {
+    setError("");
+    setFile(null);
+    try {
+      session.current = await recordScreen(narrate, (recorded) => {
+        session.current = null;
+        setCapturing(false);
+        setFile(recorded);
+      });
+      setCapturing(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Screen recording could not start.");
+    }
+  };
+  return (
+    <section className="park-teach__drop" aria-label="Record your screen">
+      <strong>Record a tab or screen as an example</strong>
+      <p>
+        Video is captured locally for up to five minutes. Nothing is sent until you choose Use this
+        recording.
+      </p>
+      <label>
+        <input
+          type="checkbox"
+          checked={narrate}
+          disabled={capturing}
+          onChange={(e) => setNarrate(e.target.checked)}
+        />
+        Narrate with microphone
+      </label>
+      {capturing ? (
+        <Button variant="secondary" size="sm" onClick={() => session.current?.stop()}>
+          Stop recording
+        </Button>
+      ) : file ? (
+        <>
+          {/* biome-ignore lint/a11y/useMediaCaption: this is an unsent local preview of the person's own capture; no transcript exists yet. */}
+          {url ? <video src={url} controls aria-label="Recording preview" /> : null}
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={t.busy}
+            onClick={() => {
+              if (t.captureFiles([file], "record")) onAccepted?.();
+            }}
+          >
+            Use this recording
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setFile(null)}>
+            Discard recording
+          </Button>
+        </>
+      ) : (
+        <Button variant="secondary" size="sm" disabled={t.busy} onClick={() => void start()}>
+          Start recording
+        </Button>
+      )}
+      {error ? <span role="alert">{error}</span> : null}
+    </section>
+  );
+}
+
 function Describe({
   t,
   heading,
@@ -140,8 +257,9 @@ function Describe({
 }: { t: Teach; onCancel: () => void; onNext: () => void } & Heading) {
   const nameId = useId();
   const descId = useId();
-  // The name can wait until Save (step 3 asks for it); the description cannot.
-  const missing = t.desc.trim() ? "" : "Write a sentence about the work first.";
+  // The name can wait until Save. The person can describe the skill or upload an example.
+  const missing =
+    t.desc.trim() || t.uploading || t.steps.length ? "" : "Write a sentence about the work first.";
   const triggers = t.live ? TRIGGERS.filter((o) => o.key === "ask") : TRIGGERS;
   return (
     <section className="park-teach__card" aria-labelledby={`${descId}-h`}>
@@ -178,6 +296,12 @@ function Describe({
         />
         <span className="park-teach__hint">Tilo turns this into steps for you to check.</span>
       </div>
+      {t.live ? (
+        <>
+          <UploadExample t={t} onAccepted={onNext} />
+          <ScreenExample t={t} onAccepted={onNext} />
+        </>
+      ) : null}
       <fieldset className="park-teach__field park-teach__fieldset">
         <legend className="park-teach__label">When should Tilo use it?</legend>
         <div className="park-teach__chips">
@@ -199,7 +323,7 @@ function Describe({
           </span>
         ) : null}
       </fieldset>
-      {t.live && t.busy ? (
+      {t.live && t.busy && !t.uploading ? (
         <output className="park-teach__hint">Reading your description…</output>
       ) : null}
       <div className="park-teach__foot">
@@ -231,7 +355,9 @@ function Example({ t, heading, onBack }: { t: Teach; onBack: () => void } & Head
           Show Tilo a good example
         </h2>
         <p className="park-teach__lede">
-          Here is what Tilo read from your description. Check it before Tilo writes its steps.
+          {t.usedFile
+            ? "Here is what Tilo read from your file. Check it before Tilo writes its steps."
+            : "Here is what Tilo read from your description. Check it before Tilo writes its steps."}
         </p>
       </div>
       <div className="park-teach__read">
@@ -250,19 +376,26 @@ function Example({ t, heading, onBack }: { t: Teach; onBack: () => void } & Head
           ))}
         </ol>
       </div>
-      <div className="park-teach__drop" aria-disabled="true">
-        <span className="park-teach__dropic" aria-hidden="true">
-          +
-        </span>
-        <span className="park-teach__droptext">
-          <strong>Drop a past example here, or record your screen once</strong>
-          <span>{EXAMPLE_OFF}</span>
-        </span>
-        <Button variant="secondary" size="sm" disabled title={EXAMPLE_OFF}>
-          Start recording
-        </Button>
-      </div>
-      {t.live && t.busy ? (
+      {t.live ? (
+        <>
+          <UploadExample t={t} />
+          <ScreenExample t={t} />
+        </>
+      ) : (
+        <div className="park-teach__drop" aria-disabled="true">
+          <span className="park-teach__dropic" aria-hidden="true">
+            +
+          </span>
+          <span className="park-teach__droptext">
+            <strong>Drop a past example here, or record your screen once</strong>
+            <span>{EXAMPLE_OFF}</span>
+          </span>
+          <Button variant="secondary" size="sm" disabled title={EXAMPLE_OFF}>
+            Start recording
+          </Button>
+        </div>
+      )}
+      {t.live && t.busy && !t.uploading ? (
         <output className="park-teach__hint">Writing Tilo’s steps…</output>
       ) : null}
       <div className="park-teach__foot">
@@ -361,6 +494,67 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
           );
         })}
       </ol>
+      {v?.inputs.length ? (
+        <section aria-label="Inputs" className="park-teach__read">
+          <h3>Inputs for each run</h3>
+          <ul className="park-teach__list">
+            {v.inputs.map((input) => (
+              <li key={input.name} className="park-teach__row">
+                {input.label} · {input.kind}
+                {input.required ? " · required" : ""}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {v?.hosts.length ? (
+        <section aria-label="Approved hosts" className="park-teach__read">
+          <h3>Hosts Tilo may open</h3>
+          <ul className="park-teach__list">
+            {t.hosts.map((host) => (
+              <li key={host} className="park-teach__row">
+                {host}{" "}
+                <button
+                  type="button"
+                  aria-label={`Remove ${host}`}
+                  onClick={() => t.removeHost(host)}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+          {t.hosts.length === 0 ? <p>No hosts approved.</p> : null}
+        </section>
+      ) : null}
+      {v?.needsSetup.length ? (
+        <section aria-label="Needs setup" className="park-teach__read">
+          <h3>Needs setup</h3>
+          <ul className="park-teach__list">
+            {v.needsSetup.map((item, i) => (
+              <li key={`${item.tool}:${i}`} className="park-teach__row">
+                {item.tool.charAt(0).toUpperCase() + item.tool.slice(1)} needs setup
+                {item.reason === "team_level" && item.needs ? ` · team level ${item.needs}` : ""}{" "}
+                <a className="park-teach__setup-link" href="/connectors">
+                  Connections
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {v?.cannot?.length ? (
+        <section aria-label="Unavailable steps" className="park-teach__read">
+          <h3>Tilo can't do this yet</h3>
+          <ul className="park-teach__list">
+            {v.cannot.map((item, i) => (
+              <li key={`${i}:${item.text}`} className="park-teach__row">
+                {item.text} · {item.reason}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {question ? (
         <div className="park-teach__question">
           <span className="park-teach__eyebrow">{QUESTION.eyebrow}</span>
@@ -404,7 +598,26 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
               {o.label}
             </button>
           ))}
+          {t.live ? (
+            <button type="button" className="park-teach__chip" onClick={t.loadTeams}>
+              Share with my team
+            </button>
+          ) : null}
+          {t.teams?.map((id) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={t.scope === "team" && t.teamId === id}
+              className={cx("park-teach__chip", t.teamId === id && "park-teach__chip--on")}
+              onClick={() => t.chooseTeam(id)}
+            >
+              Team {id}
+            </button>
+          ))}
         </div>
+        {t.teams?.length === 0 ? (
+          <span className="park-teach__hint">No current team is available.</span>
+        ) : null}
       </fieldset>
       <p className="park-teach__hint">It starts as Learning. {SAVE.note}</p>
       <div className="park-teach__foot">
@@ -417,7 +630,11 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
         <Button variant="secondary" disabled aria-describedby={`${nameId}-try`}>
           Try it once
         </Button>
-        <Button variant="primary" disabled={t.busy || !t.name.trim()} onClick={t.save}>
+        <Button
+          variant="primary"
+          disabled={t.busy || !t.name.trim() || (t.scope === "team" && !t.teamId)}
+          onClick={t.save}
+        >
           Save skill
         </Button>
         <span id={`${nameId}-try`} className="park-teach__hint park-teach__full">

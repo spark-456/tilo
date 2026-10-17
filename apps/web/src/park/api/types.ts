@@ -242,6 +242,15 @@ export interface Skill {
   tools: [string, number][];
   used: string[];
   steps: string[];
+  /** Details supplied with a taught skill record; absent for catalogue entries with no detail API. */
+  details?: {
+    steps: { tool: string; action: string }[];
+    inputs: SkillInput[];
+    hosts: string[];
+    estimatedCredits: number | null;
+  };
+  /** Library catalog data; no run history, step sequence or access level is implied. */
+  catalog?: { inputs: SkillInput[]; tools: string[] };
   fix?: { version: number; asks: boolean[]; locked: boolean[] };
   ask?: { q: string; a: string[] };
   /** STUDIO-4: the served record says the skill is paused (live only; absent otherwise). */
@@ -251,6 +260,7 @@ export interface Skill {
 }
 export interface SkillDraft {
   scope: "me" | "team";
+  teamId?: string | null;
   trigger: "ask" | "weekday" | "arrive";
   plan: { text: string; tool: string; ask: boolean }[];
   /** SKILLS-5: a taught version as the server made it; `saveSkill` posts these steps, not the labels above. */
@@ -258,7 +268,21 @@ export interface SkillDraft {
     captured: string[];
     question: { text: string; options: string[] } | null;
     steps: { text: string; tool: string; action: string; verb: string; ask: boolean }[];
+    inputs?: SkillInput[];
+    hosts?: string[];
   };
+}
+export interface SkillInput {
+  name: string;
+  label: string;
+  kind: "text" | "file" | "date" | "person" | "url" | "number";
+  required: boolean;
+}
+export interface SkillSetup {
+  tool: string;
+  reason: "not_connected" | "team_level";
+  needs?: string;
+  level?: string;
 }
 /** SKILLS-5 (FR-SKL-01): the steps the server read out of a described skill. */
 export interface SkillCapture {
@@ -277,6 +301,10 @@ export interface SkillVersion {
   }[];
   question: { text: string; options: string[] } | null;
   estimates: { credits: number; seconds: number; asks: number } | null;
+  inputs: SkillInput[];
+  hosts: string[];
+  cannot: { text: string; reason: string }[] | null;
+  needsSetup: SkillSetup[];
 }
 export interface Learn {
   rates: { id: string; name: string; meta: string; steps: string[] }[];
@@ -326,7 +354,9 @@ export interface Ledger {
   tx: LedgerTx[];
   runs: [string, number[], number, string][];
   /** Recorded task totals; these are not ordered repetitions of a skill. */
-  recordedRuns?: { id: string; usd: number; completed: boolean }[];
+  recordedRuns?: { id: string; usd: number; completed: boolean; credits?: number }[];
+  /** Credits reported by /costs; no conversion is inferred from US dollars. */
+  totalCredits?: number;
   waits: {
     buckets: [string, number][];
     types: [string, string, string][];

@@ -54,6 +54,13 @@ const WINDOW_ASSIGN: RegExp[] = [
 const MODEL_ID = /\b(?:gemini|gemma|gpt|claude|llama|mistral|nemotron)-/i;
 
 describe("WEB_4_static: the page folder", () => {
+  it("test_FR_HOME_CLEAN_1_puts_the_composer_first_and_brief_after_recent_worlds", () => {
+    const src = code(join(HOME, "HomePage.tsx"));
+    expect(src).not.toContain("<HomeAssistant");
+    expect(src.indexOf("<ComposerPanel")).toBeLessThan(src.indexOf("<WorldsSection"));
+    expect(src.indexOf("<WorldsSection")).toBeLessThan(src.indexOf("<MorningBriefCard"));
+  });
+
   it("WEB_4_static_the_folder_holds_HomePage_tsx_and_Home_css", () => {
     const names = files.map(rel);
     expect(names).toContain("HomePage.tsx");

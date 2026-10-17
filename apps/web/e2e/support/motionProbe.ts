@@ -195,7 +195,7 @@ export function installProbe(): void {
         op: effOp(lo),
         ticks: svgs - baseline,
         ratio: ratio(lbar, lbar?.firstElementChild ?? null),
-        rings: lo.querySelectorAll(".park-shell__ring").length,
+        rings: lo.querySelectorAll(".thinking-tilo").length,
       };
     } else baseline = -1;
     const header = document.querySelector("header");
