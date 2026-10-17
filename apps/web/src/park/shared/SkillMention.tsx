@@ -106,7 +106,9 @@ export function SkillMention({
         // biome-ignore lint/a11y/useSemanticElements: this removable selection chip is a labelled control group.
         <div className="park-skill-mention__selected" role="group" aria-label="Selected skill">
           <SkillIcon skill={selected} decorative />
-          <span data-testid="selected-skill-chip">{selected.name}</span>
+          <output data-testid="selected-skill-chip" aria-label={`Skill tag: ${selected.name}`}>
+            {selected.name}
+          </output>
           <button type="button" onClick={onClear} aria-label={`Remove ${selected.name} skill`}>
             Remove
           </button>

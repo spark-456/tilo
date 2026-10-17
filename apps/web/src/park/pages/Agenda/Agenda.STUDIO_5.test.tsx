@@ -63,6 +63,9 @@ it("STUDIO_5 agenda live: honest empty structures have no invented data", async 
   expect(container.querySelector('[aria-label="Available times"]')?.textContent).toContain(
     "Suggested times",
   );
-  expect(container.querySelector('[aria-label="Boards"]')?.textContent).toContain("Pinboards");
+  // AGENDA-BOARDS (owner, 17 Oct): the boards are permanent furniture, named My board and Team board.
+  const boards = container.querySelector('[aria-label="Boards"]')?.textContent;
+  expect(boards).toContain("My board");
+  expect(boards).toContain("Team board");
   expect(container.textContent).not.toMatch(/Voltway|Add to calendar|Dismiss|Open the full brief/);
 });
