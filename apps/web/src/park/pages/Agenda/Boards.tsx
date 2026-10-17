@@ -77,6 +77,14 @@ function CorkPin({ v, ui, app }: PinProps) {
       className={`park-agenda-pin${p.suggested ? " park-agenda-pin--suggested" : ""}`}
       data-pin={p.id}
       style={style}
+      draggable={!p.suggested}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(
+          "application/json",
+          JSON.stringify({ type: "pin", id: p.id, title: p.title }),
+        );
+        e.dataTransfer.setData("text/plain", p.title);
+      }}
     >
       <span className="park-agenda-tack" style={{ background: v.tilo ? "#5A3FE0" : "#E2483D" }} />
       {p.suggested ? <span className="park-agenda-suggests">TILO SUGGESTS</span> : null}
@@ -131,6 +139,14 @@ function SoftPin({ v, ui, app }: PinProps) {
       className="park-agenda-soft"
       data-pin={p.id}
       style={{ background: bg, border: bd, opacity: v.done ? 0.62 : 1 }}
+      draggable={!p.suggested}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(
+          "application/json",
+          JSON.stringify({ type: "pin", id: p.id, title: p.title }),
+        );
+        e.dataTransfer.setData("text/plain", p.title);
+      }}
     >
       <span className="park-agenda-accent" style={{ background: v.accent }} />
       <div className="park-agenda-softbody">

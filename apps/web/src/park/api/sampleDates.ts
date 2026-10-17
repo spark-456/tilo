@@ -183,11 +183,13 @@ function shiftAgenda(a: Agenda, today: CivilDate): Agenda {
   const base = walk(a, today) as Agenda;
   const n = daysFromCivil(today);
   const monday = n - mondayFirst(n);
-  const col = Math.min(mondayFirst(n), 4); // a weekend shows Friday as the day: the sample has no weekend "now"
+  const col = mondayFirst(n);
   const names = (i: number): string => dateLabel(monday + i, false, false, true);
   const dayName = (d: number): string => shortOf(WEEKDAYS[weekdayOf(monday + d)] as string);
   return {
     ...base,
+    start: 7,
+    end: 21,
     days: [0, 1, 2, 3, 4].map(names),
     wkend: [5, 6].map(names),
     today: col,

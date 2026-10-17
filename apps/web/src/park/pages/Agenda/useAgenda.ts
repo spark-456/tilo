@@ -56,7 +56,7 @@ export function useAgendaUi(A: Agenda, decisions: Decision[], app: AppCtx, api: 
     personal: true,
     tilo: true,
   });
-  const [weekend, setWeekend] = useState(false);
+  const [weekend, setWeekend] = useState(A.today >= 5);
   const [sel, setSel] = useState(defaultEventId(A));
   const [finding, setFinding] = useState(false);
   const [booked, setBooked] = useState<AgendaSlot | null>(null);

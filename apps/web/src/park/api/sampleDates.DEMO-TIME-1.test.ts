@@ -65,8 +65,8 @@ describe("DEMO-TIME-1 the Agenda follows the week of today", () => {
       expect(Boolean(e.past), `${e.id}`).toBe(past);
     }
   });
-  it("DEMO-TIME-1 a weekend shows Friday as the day of the week it is in", () => {
-    expect(dated(agenda, { y: 2026, m: 10, d: 10 }).today).toBe(4);
+  it("DEMO-TIME-1 a weekend shows Saturday as the day of the week it is in (FT-PERF-4)", () => {
+    expect(dated(agenda, { y: 2026, m: 10, d: 10 }).today).toBe(5);
   });
   it("DEMO-TIME-1 slot labels carry the weekday of their column", () => {
     const slot = a.slots[0];
