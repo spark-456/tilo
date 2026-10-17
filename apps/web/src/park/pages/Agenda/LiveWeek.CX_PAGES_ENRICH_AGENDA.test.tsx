@@ -85,9 +85,10 @@ it("CX_PAGES_ENRICH_AGENDA_unconnected_host_has_a_sign_in_action_in_the_slot_pop
   const m = mount(<LiveWeek {...props()} hostState={async () => "available"} />);
   await act(async () => m.container.querySelector<HTMLButtonElement>("[data-week-slot]")?.click());
   expect(m.container.textContent).toContain("Tilo's meeting host is not signed in.");
-  expect(m.container.querySelector('a[href="/connectors"]')?.textContent).toBe(
-    "Sign in the meeting host",
-  );
+  expect(
+    m.container.querySelector('[aria-label="Schedule at this time"] a[href="/connectors"]')
+      ?.textContent,
+  ).toBe("Sign in the meeting host");
 });
 
 it("CX_PAGES_ENRICH_AGENDA_meeting_block_opens_details_and_recorded_brief", async () => {

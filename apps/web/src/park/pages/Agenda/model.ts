@@ -20,6 +20,7 @@ import type { AgentSpec } from "../../engines/types";
 export type CalKey = AgendaEvent["cal"] | "booked";
 export type Ev = Omit<AgendaEvent, "cal"> & { cal: CalKey };
 export type BoardKey = AgendaPin["board"];
+export const CALENDAR_ENTRY_KIND = "calendar_entry";
 /** The decisions by key, as the Api serves them (`world` and `facts` are read from here). */
 export type DecisionIndex = Partial<Record<DecisionKey, Decision>>;
 
