@@ -23,9 +23,11 @@ const sourceLabel = (s: BriefSource) =>
 export function MorningBriefCard({
   api,
   onOpenSource,
+  compact = false,
 }: {
   api: MorningBriefApi;
   onOpenSource?: (source: BriefSource) => void;
+  compact?: boolean;
 }) {
   const [read, setRead] = useState<Read>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
@@ -99,6 +101,31 @@ export function MorningBriefCard({
         {sourceLabel(source)} · {source.id}
       </span>
     );
+
+  if (compact) {
+    const line =
+      read.kind === "loading"
+        ? "Loading your brief…"
+        : read.kind === "waiting"
+          ? `Your brief arrives at ${read.time}.`
+          : read.kind === "error"
+            ? "Could not load your brief."
+            : read.brief.suggestions[0]?.text || "Your morning brief is ready.";
+    return (
+      <section aria-label="Morning brief" className="park-home-brief-row">
+        <span>{line}</span>
+        <button
+          type="button"
+          className="park-btn park-btn--secondary park-btn--sm"
+          disabled={busy}
+          onClick={() => void make()}
+        >
+          {busy ? "Making your brief…" : "Make it now"}
+        </button>
+        {error ? <span role="alert">{error}</span> : null}
+      </section>
+    );
+  }
 
   return (
     <section aria-label="Morning brief" className="park-home-panel park-home-brief">
