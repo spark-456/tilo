@@ -68,7 +68,16 @@ sandboxed preview, no network, security review)."
      URL and no new secret or service is needed. The web app's CSP adds tilo-api's origin to `frame-src` only.
    - Residual risk: CSP cannot stop a frame from navigating itself, and a navigation can carry what the page shows
      in its URL. The checker refuses navigation APIs and external URLs (WS-05, WS-07) and the web app closes a frame
-     that loads a second time (WS-12). What could leak is only what the page shows the person (BQ-WEBSITE-4).
+     that loads after the shell's `preview-written` message (WS-12). A page made from NON-private run data may
+     still navigate itself, or open a WebRTC or other self-navigation channel, carrying what it displays.
+     The owner accepted this residual in chat on 16 Oct 2026, verbatim: "go on accept website residual" (BQ-WEBSITE-4).
+   - Private runs never produce HTML (WS-01, WT-04): a run whose upstream units or own tool calls read the
+     person's private data answers in Markdown with a plain note. Web research (outside content) alone does
+     not stop a page, which the timezone demo needs. So what a page could carry out is only what a non-private
+     run chose to display.
+   - Handshake (WS-11, WS-12): after the shell has rendered the page it posts one `{"tilo":"preview-written"}`
+     message to its parent. The web app ignores iframe `load` counts, and closes the frame only if a `load`
+     arrives after `preview-written`; messages after the first `preview-written` are ignored.
 5. **Download (WS-13).** The existing owner-scoped result route serves `text/html; charset=utf-8` with
    `Content-Disposition: attachment; filename="<title>.html"`, nosniff, `no-store` and the same CSP. The web app
    saves it from an `application/octet-stream` Blob and never makes a `text/html` blob URL (that would run in the

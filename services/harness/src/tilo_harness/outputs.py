@@ -35,6 +35,7 @@ from tilo_memory.artifacts import (
     Origin,
     StoredVersion,
 )
+from tilo_memory.website_check import check_website
 from tilo_providers.diagnostics import log_caught
 
 MAX_OUTPUTS = 10  # a unit's cap (BQ-257)
@@ -73,6 +74,17 @@ class RenderedPdf(UnitOutput):
             raise ValueError("a rendered PDF is application/pdf bytes")
         if not self.content.startswith(b"%PDF-") or len(self.content) > MAX_PDF:
             raise ValueError(f"a rendered PDF starts with %PDF- and is at most {MAX_PDF} bytes")
+
+
+@dataclass(frozen=True)
+class WebsiteHtml(UnitOutput):
+    """One website HTML file (WEB-1, WS-01). Only `website.website_output` builds one, from a writer's `deliver` unit
+    of a native website, after the static checker passed; `keep` stores exactly this type as `text/html` (origin
+    unit) and refuses any other output that claims HTML. The store runs the checker again on the bytes it keeps."""
+
+    def __post_init__(self) -> None:
+        if self.media_type != "text/html" or type(self.content) is not bytes:
+            raise ValueError("a website is text/html bytes")
 
 
 @dataclass(frozen=True)
@@ -138,6 +150,9 @@ def keep(
     """Stores every output and its manifest, or raises OutputRefused (see the module docstring)."""
     if not isinstance(outputs, list | tuple) or len(outputs) > MAX_OUTPUTS:
         raise OutputRefused(f"outputs must be a list of at most {MAX_OUTPUTS}")
+    pages = [out for out in outputs if type(out) is WebsiteHtml]
+    if pages and (len(pages) > 1 or unit.get("role") != "writer" or unit.get("unit_type") != "deliver"):
+        raise OutputRefused("only a writer's deliver unit may output one website HTML file")  # WS-01
     for out in outputs:
         if not isinstance(out, UnitOutput) or not isinstance(out.content, bytes):
             raise OutputRefused("an output is not a UnitOutput with bytes content")
@@ -203,6 +218,9 @@ def _preflight(
             RenderedOffice.__post_init__(out)
         except ValueError:
             raise OutputRefused("a rendered Office file is not bounded OOXML bytes") from None
+    elif type(out) is WebsiteHtml:
+        if not check_website(bytes(memoryview(out.content))).ok:  # WS-09: the store checks again after the redactor
+            raise OutputRefused("a website did not pass the static checks")
     elif out.media_type not in TEXT_TYPES or not 0 < memoryview(out.content).nbytes <= MAX_TEXT:
         raise OutputRefused("an output is not 1 byte to 2 MB of text or JSON")
     elif not bytes(memoryview(out.content)).decode("utf-8").strip():  # UnicodeDecodeError on bad UTF-8

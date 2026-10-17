@@ -29,3 +29,7 @@ kinds:
     label: Past-paper links
     format: markdown
     available: true
+  - id: website
+    label: Website
+    format: website
+    available: true
