@@ -116,7 +116,8 @@ def test_CP2_a_compiler_that_fails_never_starts_a_run_and_approve_still_answers(
 def _assert_nothing_started(rf):
     events = rf.quiet_stream()
     assert len(rf.events("budget.granted")) == 1
-    assert {e["type"] for e in rf.after_grant()} <= {"world.failed"}, [e["type"] for e in events]
+    assert rf.events("world.planned") == []
+    assert {e["type"] for e in rf.after_grant()} <= {"plan.maker_chosen", "world.failed"}, [e["type"] for e in events]
     assert len(rf.events("world.failed")) <= 1
     assert rf.runner.ran == []
     assert rf.outbox_store.all_entries() == []

@@ -672,7 +672,7 @@ class Run:
             self.world_id,
             f"The Director planned {unit_count} units.",
             {
-                "tier": self.plan["tier"],
+                "tier": self.layout["tier"],
                 "approach": self.approach["id"],
                 "unit_count": unit_count,
                 "credits": self.approach["credits"],
