@@ -9,8 +9,10 @@ import {
   useRef,
   useState,
 } from "react";
+import type { Skill } from "../../api/types";
 import { cx } from "../../components/cx";
 import { type RunStep, clockOf, runSteps, storyOf } from "./runSteps";
+import { storySummary } from "./skillRunVisible";
 import type { RunEvent } from "./useRunEvents";
 
 export type WorldTab = "story" | "steps" | "result" | "chat";
@@ -171,7 +173,13 @@ export function EmptyPanel({ title, line }: { title: string; line: string }) {
 }
 
 /** The Story of a real run: its recorded events in plain words, newest first, with their recorded time of day. */
-export function RunStory({ events }: { events: readonly RunEvent[] }) {
+export function RunStory({
+  events,
+  skills = [],
+}: {
+  events: readonly RunEvent[];
+  skills?: readonly Skill[];
+}) {
   const story = storyOf(events);
   if (story.length === 0)
     return (
@@ -184,7 +192,7 @@ export function RunStory({ events }: { events: readonly RunEvent[] }) {
     <ol className="park-world-story" aria-label="What happened, newest first">
       {story.map((e) => (
         <li key={e.seq} className="park-world-storyrow">
-          <span className="park-world-storytext">{e.summary}</span>
+          <span className="park-world-storytext">{storySummary(e, skills)}</span>
           <span className="park-world-storymeta">
             {e.type === "building.completed" ? (
               <span className="park-world-steptag park-world-steptag--done">Step done</span>
