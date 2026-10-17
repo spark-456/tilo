@@ -150,15 +150,24 @@ export function SkillDrawer({
             <Button
               variant="secondary"
               onClick={() => {
-                handDraft(`Help me with ${skill.name}.`);
+                handDraft("", {
+                  id: skill.id,
+                  kind: skill.builtin ? "library" : "taught",
+                  scope: skill.builtin ? "library" : skill.team ? "team" : "mine",
+                  name: skill.name,
+                  purpose: skill.description ?? "",
+                  inputs: [],
+                  tools: skill.tools.map(([tool]) => tool),
+                  version: skill.from,
+                });
                 onClose();
                 app.go("home");
               }}
             >
-              Try it
+              Use this skill
             </Button>
             <p className="park-skill-drawer__p">
-              Opens a draft on Home. Nothing starts until you choose.
+              Opens Home with this skill selected. Describe your task before starting.
             </p>
           </section>
           {skill.steps.length ? (

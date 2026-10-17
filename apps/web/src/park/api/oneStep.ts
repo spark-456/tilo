@@ -7,7 +7,7 @@ import type { IntakeResult } from "../../api/client";
 import type { HttpClient } from "../../api/http";
 import { TiloApiError } from "../../api/http";
 import type { Cadence } from "../../api/schedules";
-import { type SkillMatch, skillMatchOf } from "../../api/skillRoute";
+import { type SkillMatch, type SkillRef, skillMatchOf } from "../../api/skillRoute";
 
 // The weekly repeat's types and weekday names travel with the one-step start, so a page imports them from park/api.
 export { WEEKDAYS } from "../../api/schedules";
@@ -45,7 +45,7 @@ export interface RunPlan {
 
 export interface OneStepApi {
   /** Intake, skip every question, fetch the approaches. Throws a `TiloApiError` whose message is the reason. */
-  prepare(text: string, files: readonly File[]): Promise<RunPlan>;
+  prepare(text: string, files: readonly File[], refs?: readonly SkillRef[]): Promise<RunPlan>;
   /** The person changed one assumption: answer that question, then price the new brief again. */
   revise(taskId: string, field: string, answer: string): Promise<RunPlan>;
   /**
@@ -172,10 +172,10 @@ export function oneStepOver(http: HttpClient): OneStepApi {
     return planOf(taskId, brief, asked.get(taskId) ?? [], priced);
   };
   return {
-    async prepare(text, files) {
+    async prepare(text, files, refs = []) {
       let intake: IntakeResult;
       try {
-        intake = await http.submitIntake(text, [...files]);
+        intake = (await http.submitIntake(text, [...files], undefined, refs)) as IntakeResult;
       } catch (e) {
         throw said("read this task", e);
       }
