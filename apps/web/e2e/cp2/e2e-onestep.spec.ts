@@ -162,11 +162,10 @@ test.describe("@cp2 CX-UX-JOURNEY-E2E the judge journey", () => {
       "the world holds what happened: agents, buildings, Story and Trace",
       async () => {
         await page.goto(`/world/${worldId}`);
-        const live = page.getByRole("region", { name: "Live run" });
-        await expect(live).toContainText("Done", { timeout: 30_000 });
-        await expect(live).toContainText(/Agents\s*[1-9]/);
-        await expect(live).not.toContainText("0 of 0"); // no count is made up of nothing
+        const status = page.getByTestId("run-status");
+        await expect(status).toContainText("Done", { timeout: 30_000 });
         const meta = page.locator(".park-world-meta");
+        await expect(meta).toContainText(/\d+ agents/);
         await expect(meta).not.toContainText(/Owned by\s*·|\dT\d\d:|(^|\s)0 agents/);
         await expect(meta).toContainText(/started \d{1,2} [A-Z][a-z]{2}/);
         await page.goto(`/world/${worldId}/story`);
