@@ -43,7 +43,7 @@ describe("STUDIO_5 Team live layout", () => {
     const table = root.querySelector('[data-testid="live-team"] table');
     expect(table).not.toBeNull();
     const heads = [...(table?.querySelectorAll("th") ?? [])].map((th) => th.textContent);
-    expect(heads).toEqual(["Person", "Role", "Teams", "Department", "Active"]);
+    expect(heads).toEqual(["Person", "Role", "Teams"]);
     const rows = [...(table?.querySelectorAll("tbody tr") ?? [])].map((r) => r.textContent ?? "");
     expect(rows).toHaveLength(2);
     expect(rows[0]).toContain("Maya Rao");
@@ -68,7 +68,8 @@ describe("STUDIO_5 Team live layout", () => {
     const { root } = await renderTeam(makeApp(), liveApi());
     const side = root.querySelector('[aria-label="Who can say yes"]');
     expect(side?.textContent).toContain("Spending money");
-    expect(side?.textContent).toContain("not available yet");
+    expect(side?.textContent).not.toContain("not available yet");
+    expect(root.querySelector('[aria-label="Who helped Tilo learn"]')).toBeNull();
     const helpers = root.querySelectorAll('[aria-label="Your helpers"] li');
     expect(helpers).toHaveLength(6);
     expect(root.textContent).not.toMatch(/In \d+ worlds|Away ·|Ravi|Oskar/);

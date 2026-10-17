@@ -22,7 +22,7 @@ describe("FR_TEAM_01 live Team", () => {
     const { root } = await renderTeam(makeApp(), apiFor([{ id: "u_peer", display_name: "Peer" }]));
     expect(root.textContent).toContain("Peer");
     expect(root.querySelectorAll('[data-testid="live-team"]')).toHaveLength(1);
-    expect(root.textContent).toContain("Not available");
+    expect(root.textContent).not.toContain("Not available");
     expect(root.textContent).not.toMatch(/null|undefined|No answers or fixes yet/);
     expect(root.querySelector('input[aria-label="Invite by email"]')).toBeNull();
     expect(root.querySelector("select")).toBeNull();
@@ -43,7 +43,7 @@ describe("FR_TEAM_01 live Team", () => {
     );
     expect(root.textContent).toContain("Owner");
     expect(root.textContent).toContain("t_ops");
-    expect(root.textContent).toContain("None");
+    expect(root.textContent).not.toContain("Not available");
   });
   it("LIVE_GAPS_1A shows an honest error instead of a fixture list", async () => {
     const { root } = await renderTeam(makeApp(), apiFor([], 503));
