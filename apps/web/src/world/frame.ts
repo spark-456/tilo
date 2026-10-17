@@ -56,6 +56,7 @@ export interface FrameBuilding extends FrameRect {
   readonly roof: Roof;
   readonly facade: Facade;
   readonly lift: number;
+  readonly inSession?: boolean;
 }
 export interface FrameIsland extends FrameRect {
   readonly name: string;
@@ -200,6 +201,7 @@ export function frameOf(layout: Layout, state: WorldState): Frame {
     const status = state.buildings[b.id]?.status ?? "hidden";
     if (status === "hidden") return []; // nothing is drawn until building.planned
     const lift = liftOf(buildingLevel.get(b.id));
+    const inSession = b.id === state.hall && Object.keys(state.rooms).length > 0;
     return [
       {
         id: b.id,
@@ -213,6 +215,7 @@ export function frameOf(layout: Layout, state: WorldState): Frame {
         ...centreOf(b.footprint, lift),
         gw: b.footprint.w,
         gd: b.footprint.d,
+        inSession,
       },
     ];
   });

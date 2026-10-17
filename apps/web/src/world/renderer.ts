@@ -33,6 +33,7 @@ import {
   makeBubble,
   makePill,
   policyTag,
+  sessionTag,
 } from "./art/labels";
 import { type PinKind, drawPin } from "./art/pins";
 import { type Frame, type FrameBuilding, type FrameRect, standZone } from "./frame";
@@ -355,12 +356,17 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
     });
     const kind = PIN[b.status];
     if (kind) pinned.push(() => drawPin(layer.pins, it.top, kind, { tint: b.tint }));
+    const inSession = b.inSession;
     tag(
       layer,
       live,
       b.id,
-      named(b.name, word(BUILDING_STATE, b.status), mode, narrow),
-      buildingTag,
+      inSession
+        ? narrow
+          ? "In session"
+          : `${b.name} · In session`
+        : named(b.name, word(BUILDING_STATE, b.status), mode, narrow),
+      inSession ? sessionTag : buildingTag,
       [it.top[0], it.top[1] - (kind ? 50 : 14)],
       restZones,
     );

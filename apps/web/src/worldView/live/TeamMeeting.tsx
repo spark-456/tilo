@@ -19,12 +19,14 @@ export function TeamMeeting({
   events,
   rooms,
   onClose,
+  onConvene,
 }: {
   worldId: string;
   facts: WorldFacts;
   events: readonly Event[];
   rooms: RoomClient | null;
   onClose: () => void;
+  onConvene?: (seat: Seat) => void;
 }) {
   const layout = facts.layout;
   const heads = useMemo(
@@ -97,7 +99,9 @@ export function TeamMeeting({
           className="tw-team__form"
           onSubmit={(e) => {
             e.preventDefault();
-            setSeat({ lead, agents: chosen });
+            const s = { lead, agents: chosen };
+            setSeat(s);
+            onConvene?.(s);
           }}
         >
           <label>

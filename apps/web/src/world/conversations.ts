@@ -46,11 +46,13 @@ const KIND: Readonly<Record<string, MessageKind>> = {
   "question.routed": "question",
   "question.answered": "answer",
   "artifact.reviewed": "review",
+  "meeting.called": "convened",
   "meeting.convened": "convened",
   "meeting.asked": "asked",
   "meeting.replied": "replied",
   "meeting.change_requested": "change",
   "meeting.adjourned": "adjourned",
+  "meeting.ended": "adjourned",
 };
 
 const record = (v: unknown): Record<string, unknown> =>

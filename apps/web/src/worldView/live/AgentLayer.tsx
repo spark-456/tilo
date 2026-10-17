@@ -10,15 +10,15 @@ import { openAgent, registerProbe, useSpotlight } from "../../world/spotlight";
 import { useWorldFacts } from "../../world/useWorldFacts";
 import { AgentCard } from "./AgentCard";
 import { AgentPanel } from "./AgentPanel";
+import { ChatPopUp } from "./ChatPopUp";
 import { PlaybackBar } from "./PlaybackBar";
 import { StageEvents } from "./StageEvents";
 import { TeamMeeting } from "./TeamMeeting";
-import { agentMessageText } from "./agentMessageText";
 
 export function AgentLayer({ worldId, rooms }: { worldId: string; rooms: RoomClient | null }) {
   const facts = useWorldFacts(worldId, rooms);
   const [team, setTeam] = useState(false);
-  const [chat, setChat] = useState<Message | null>(null);
+  const [chat, setChat] = useState<{ open: boolean; filter: string } | null>(null);
   const spot = useSpotlight(worldId);
   const hovered = spot.hover && spot.opened !== spot.hover ? facts.stats.get(spot.hover) : null;
   const opened = spot.opened ? facts.stats.get(spot.opened) : null;
@@ -46,58 +46,29 @@ export function AgentLayer({ worldId, rooms }: { worldId: string; rooms: RoomCli
           style={{ left: talking.at.x, top: talking.at.y }}
           aria-label={`Open conversation between ${facts.names.get(talking.message.from) ?? "agents"} and ${facts.names.get(talking.message.to) ?? "agents"}`}
           data-testid="world-talk-dots"
-          onClick={() => setChat(talking.message)}
+          onClick={() => {
+            const pair = [talking.message.from, talking.message.to].sort().join(",");
+            setChat({ open: true, filter: `pair:${pair}` });
+          }}
         >
           <i />
           <i />
           <i />
         </button>
       ) : null}
-      {chat ? (
-        <aside
-          className="tw-talk-chat"
-          data-testid="world-talk-chat"
-          aria-label="Agent conversation"
-        >
-          <button
-            type="button"
-            className="tw-talk-chat__close"
-            aria-label="Close conversation"
-            onClick={() => setChat(null)}
-          >
-            ×
-          </button>
-          <strong>
-            {facts.names.get(chat.from) ?? "Agent"} ↔ {facts.names.get(chat.to) ?? "Agent"}
-          </strong>
-          <p
-            style={{
-              borderColor: agentRoleColor(facts.stats.get(chat.from)?.rank ?? "specialist"),
-            }}
-          >
-            {agentMessageText(chat.text)}
-          </p>
-          {chat.detail.map((item, index) => (
-            <p
-              key={`${chat.seq}-${index}`}
-              style={{
-                borderColor: agentRoleColor(facts.stats.get(chat.from)?.rank ?? "specialist"),
-              }}
-            >
-              {agentMessageText(item)}
-            </p>
-          ))}
-          <button
-            type="button"
-            className="tw-talk-chat__open"
-            onClick={() => {
-              openAgent(worldId, chat.from);
-              setChat(null);
-            }}
-          >
-            Open agent
-          </button>
-        </aside>
+      {chat?.open ? (
+        <ChatPopUp
+          worldId={worldId}
+          facts={facts}
+          events={facts.events}
+          rooms={rooms}
+          initialFilter={chat.filter}
+          onClose={() => setChat(null)}
+          onConvene={() => {
+            setChat(null);
+            setTeam(true);
+          }}
+        />
       ) : null}
       {facts.layout && !team && !opened ? (
         <button type="button" className="tw-convene" onClick={() => setTeam(true)}>
@@ -111,6 +82,9 @@ export function AgentLayer({ worldId, rooms }: { worldId: string; rooms: RoomCli
           events={facts.events}
           rooms={rooms}
           onClose={() => setTeam(false)}
+          onConvene={() => {
+            setChat({ open: true, filter: "meeting" });
+          }}
         />
       ) : null}
       {hovered && spot.point ? <AgentCard stats={hovered} at={spot.point} /> : null}

@@ -111,11 +111,18 @@ export function createInitialState(layout: Layout): WorldState {
   }
   const gates: Record<string, GateState> = {};
   for (const gate of layout.semantic.gates) gates[gate.id] = "closed";
+  const allBuildings = layout.semantic.levels
+    .flatMap((l) => l.districts)
+    .flatMap((d) => d.buildings);
   const hall =
-    layout.semantic.levels
-      .flatMap((l) => l.districts)
-      .flatMap((d) => d.buildings)
-      .find((b) => b.common_type === "meeting_hall")?.id ?? null;
+    allBuildings.find(
+      (b) =>
+        b.common_type === "meeting_hall" ||
+        b.name === "Meeting Hall" ||
+        b.id.toLowerCase().includes("hall"),
+    )?.id ??
+    allBuildings.find((b) => b.common_type === "town_hall")?.id ??
+    null;
   return {
     seq: 0,
     trace: [],
@@ -282,14 +289,26 @@ function applyKnown(state: WorldState, event: Event): WorldState {
       };
     }
     case "meeting": {
-      // WORLD-LIVE: a person's room (meeting.convened .. meeting.adjourned). Its agents gather in the layout's Meeting
-      // Hall and go back to where they stood when it closes; with no hall in the layout nobody moves (nothing guessed).
-      const data = (event.data ?? {}) as { room_id?: unknown; lead?: unknown; agents?: unknown };
-      const room = typeof data.room_id === "string" ? data.room_id : null;
-      if (room === null) return state;
-      if (verb === "convened") {
+      // WORLD-LIVE: a person's room (meeting.convened / meeting.called .. meeting.adjourned / meeting.ended).
+      // Its agents gather in the layout's Meeting Hall and go back to where they stood when it closes;
+      // with no hall in the layout nobody moves (nothing guessed).
+      const data = (event.data ?? {}) as {
+        room_id?: unknown;
+        card_id?: unknown;
+        lead?: unknown;
+        agents?: unknown;
+        attendees?: unknown;
+      };
+      const room =
+        typeof data.room_id === "string"
+          ? data.room_id
+          : typeof data.card_id === "string"
+            ? data.card_id
+            : "meeting";
+      if (verb === "convened" || verb === "called" || verb === "started") {
         if (state.hall === null || room in state.rooms) return state;
-        const named = [data.lead, ...(Array.isArray(data.agents) ? data.agents : [])];
+        const attendees = Array.isArray(data.attendees) ? data.attendees : [];
+        const named = [data.lead, ...(Array.isArray(data.agents) ? data.agents : []), ...attendees];
         const members = named.filter(
           (id): id is string => typeof id === "string" && id in state.agents,
         );
@@ -306,13 +325,22 @@ function applyKnown(state: WorldState, event: Event): WorldState {
         }
         return { ...state, agents, rooms: { ...state.rooms, [room]: members } };
       }
-      if (verb === "adjourned") {
-        const members = state.rooms[room];
+      if (verb === "adjourned" || verb === "ended") {
+        const members =
+          state.rooms[room] ??
+          (Object.keys(state.rooms).length === 1 ? Object.values(state.rooms)[0] : undefined);
         if (!members) return state;
         const agents = { ...state.agents };
         for (const id of members) {
           const agent = agents[id] as AgentState;
-          agents[id] = { ...agent, location: agent.back ?? agent.location, back: null, say: null };
+          if (agent) {
+            agents[id] = {
+              ...agent,
+              location: agent.back ?? agent.location,
+              back: null,
+              say: null,
+            };
+          }
         }
         const { [room]: _closed, ...rest } = state.rooms;
         return { ...state, agents, rooms: rest };
