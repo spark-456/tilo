@@ -573,25 +573,27 @@ export function WorldPage({ app }: { app: AppCtx }) {
               {chip}
             </span>
           </div>
-          <p className="park-world-meta">
-            {w.sample
-              ? `Recorded ${w.started}`
-              : metaLine(w.owner, w.started, live ? live.agents : w.agents)}
-          </p>
-          {runSkillNames.map((name) => (
-            <p key={name} className="park-world-meta">
-              Uses skill: {name}
+          <div className="park-world-metalist">
+            <p className="park-world-meta">
+              {w.sample
+                ? `Recorded ${w.started}`
+                : metaLine(w.owner, w.started, live ? live.agents : w.agents)}
             </p>
-          ))}
-          {w.sample ? <SampleNote /> : null}
-          {demo && !w.sample ? (
-            <span className="park-sample-note">
-              Sample data from a demo session. Approving here records nothing.
-            </span>
-          ) : null}
-          {loaded.live && worldClient && !w.sample ? (
-            <ShareLine client={worldClient} worldId={w.id} />
-          ) : null}
+            {runSkillNames.map((name) => (
+              <p key={name} className="park-world-meta">
+                Uses skill: {name}
+              </p>
+            ))}
+            {w.sample ? <SampleNote /> : null}
+            {demo && !w.sample ? (
+              <span className="park-sample-note">
+                Sample data from a demo session. Approving here records nothing.
+              </span>
+            ) : null}
+            {loaded.live && worldClient && !w.sample ? (
+              <ShareLine client={worldClient} worldId={w.id} />
+            ) : null}
+          </div>
         </div>
         <div className="park-world-headspacer" />
         <div className="park-world-headstepbar">

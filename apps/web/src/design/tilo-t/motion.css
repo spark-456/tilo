@@ -347,3 +347,4 @@
 /* triggeredBy: approval.requested -> approval.resolved (TW-6): amber chip ring pings opacity .7→0, scale .9→1.6 (tilo-w.css) */
 [data-park] .tw-needs-ping{animation:wPing 1.6s ease-out infinite}
 @media (prefers-reduced-motion:reduce){[data-park] .tw-needs-ping{animation:none!important}}
+/* triggeredBy: approval.requested -> approval.resolved (TW-6): amber chip ring pings opacity .7→0, scale .9→1.6 (tilo-w.css) */
