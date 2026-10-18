@@ -1,7 +1,15 @@
 // The Park app (README "Routes", "The `app` prop", "Focus"): the data-park root around the shell (shell/AppShell:
 // nav, backdrop, the one <main>, toast, world loader), the page for the route, the document title and the
 // focus move after a route change. Lazy-imported by src/Root.tsx, so a landing visit never loads it (NFR-01).
-import { type ReactNode, Suspense, lazy, useEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  Suspense,
+  lazy,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { AppShell } from "../shell/AppShell";
 import { ParkAuthProvider } from "../shell/auth";
 import { useParkTour } from "../shell/tour";
@@ -101,7 +109,7 @@ function Shell({ routed }: { routed?: RoutedView | undefined }) {
       : quizRoute
         ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
         : "none";
-  useEffect(() => {
+  useLayoutEffect(() => {
     const before = document.title;
     document.title = `${title} · Tilo`;
     return () => {

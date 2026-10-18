@@ -154,7 +154,7 @@ describe("WEB_5_worlds: header, search and New world", () => {
 describe("WEB_5_worlds: status tabs and sizes", () => {
   it.each([
     ["All", ALL],
-    ["Working", ["k1", "hires", "northline", "calls", "venues"]],
+    ["Working", ["hires", "northline", "calls", "venues"]],
     ["Needs you", ["k1"]],
     ["Scheduled", ["invoice", "inbox", "pricing"]],
     ["Done", ["audit", "comp", "reply"]],
@@ -162,7 +162,7 @@ describe("WEB_5_worlds: status tabs and sizes", () => {
     const { c } = await renderWorlds();
     expect(statusTabs(c).map((t) => t.getAttribute("role"))).toEqual(Array(5).fill("tab"));
     expect(statusTabs(c).map((t) => t.tagName)).toEqual(Array(5).fill("BUTTON"));
-    expect(tabCounts(c)).toEqual({ All: 11, Working: 5, "Needs you": 1, Scheduled: 3, Done: 3 });
+    expect(tabCounts(c)).toEqual({ All: 11, Working: 4, "Needs you": 1, Scheduled: 3, Done: 3 });
     expect(Object.keys(tabCounts(c))).toEqual(TABS);
     click(tab(c, label));
     expect(statusTabs(c).map((t) => t.getAttribute("aria-selected"))).toEqual(
@@ -171,7 +171,7 @@ describe("WEB_5_worlds: status tabs and sizes", () => {
     expect(shown(c)).toEqual(expected);
   });
 
-  it("WEB_5_worlds_working_also_counts_a_world_that_needs_you_and_its_count_follows_decisions", async () => {
+  it("FT_UX_3 the Working count includes a needs-world only after its decisions are made", async () => {
     const both = await renderWorlds({ dec: { depot: true, mail: true } });
     expect(tabCounts(both.c)).toEqual({
       All: 11,
@@ -185,7 +185,7 @@ describe("WEB_5_worlds: status tabs and sizes", () => {
   it.each([
     [
       "Cities",
-      { All: 3, Working: 2, "Needs you": 1, Scheduled: 0, Done: 1 },
+      { All: 3, Working: 1, "Needs you": 1, Scheduled: 0, Done: 1 },
       ["k1", "hires", "audit"],
     ],
     [
