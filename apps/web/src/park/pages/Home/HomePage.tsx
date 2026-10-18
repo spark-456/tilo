@@ -53,6 +53,7 @@ import {
   suggestedTask,
   summaryLine,
 } from "./homeData";
+import { homeTarget } from "./homeTargets";
 import { textLimitMessage } from "./uploadRules";
 
 interface Base {
@@ -611,7 +612,17 @@ export function HomePage({ app }: { app: AppCtx }) {
               onWorld={open}
               onWorlds={() => go("worlds")}
             />
-            {briefApi && !demo ? <MorningBriefCard api={briefApi} compact /> : null}
+            {briefApi && !demo ? (
+              <MorningBriefCard
+                api={briefApi}
+                compact
+                canOpenSource={(source) => homeTarget(source) !== null}
+                onOpenSource={(source) => {
+                  const target = homeTarget(source);
+                  if (target) go(target.page, target.params);
+                }}
+              />
+            ) : null}
             <ChatHistory onChat={() => go("chat")} />
           </div>
           <TodayPanel

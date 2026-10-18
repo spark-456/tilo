@@ -1589,8 +1589,25 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+[data-park] .park-home-brief-row .park-home-brief-row__link {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
 [data-park] .park-home-brief-row button {
   flex: none;
+}
+[data-park] .park-home-brief-row .park-home-brief-row__link {
+  flex: 1;
 }
 @media (max-width: 430px) {
   [data-park] .park-home-brief-row {

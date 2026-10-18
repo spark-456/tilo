@@ -76,3 +76,17 @@ it("STUDIO_5 agenda live: honest empty structures have no invented data", async 
   expect(boards).toContain("Team board");
   expect(container.textContent).not.toMatch(/Voltway|Add to calendar|Dismiss|Open the full brief/);
 });
+
+it("P0_HOME_BRIEF_PLATE opens a targeted plate row and never gives an unknown row a dead control", async () => {
+  const { container } = await mount();
+  const plateSection = container.querySelector('[aria-label="Your plate"]');
+  const item = [...(plateSection?.querySelectorAll("button") ?? [])].find((node) =>
+    node.textContent?.includes("Send the quote"),
+  );
+  expect(item).toBeTruthy();
+  act(() => item?.click());
+  expect(container.querySelector('[aria-label="Event details"]')?.textContent).toContain(
+    "Send the quote",
+  );
+  expect(container.querySelectorAll('a[href=""], a[href="#"]').length).toBe(0);
+});
