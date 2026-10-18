@@ -173,9 +173,18 @@ export function HomePage({ app }: { app: AppCtx }) {
     () => () => {
       pending.current?.();
       pending.current = null;
+      stepTimer.current?.();
+      stepTimer.current = null;
     },
     [],
   );
+  // FT-SUP-2: visible streamed progress steps during preparation
+  const [draftStep, setDraftStep] = useState<string | null>(null);
+  const stepTimer = useRef<(() => void) | null>(null);
+  const cancelStepTimer = () => {
+    stepTimer.current?.();
+    stepTimer.current = null;
+  };
   // SIMPLE-RUN-1: the one confirm card (live only): the priced plan, a call in flight on it, and why the last step stopped.
   const [run, setRun] = useState<RunPlan | null>(null);
   const [runBusy, setRunBusy] = useState(false);
@@ -183,6 +192,8 @@ export function HomePage({ app }: { app: AppCtx }) {
   const [runError, setRunError] = useState<string | null>(null);
   const toIdle = () => {
     cancelDraft();
+    cancelStepTimer();
+    setDraftStep(null);
     settle("idle");
     setRun(null);
     setRunError(null);
@@ -278,24 +289,36 @@ export function HomePage({ app }: { app: AppCtx }) {
       return;
     }
     cancelDraft();
+    cancelStepTimer();
     sendingNow.current = true;
     setSending(true);
     setQuick(QUICK_IDLE);
+    setDraftStep("Reading your task...");
     settle("drafting");
-    store.prepareRun(text, files, skillRefs(ref)).then((r) => {
-      sendingNow.current = false;
-      if (!alive.current) return;
-      setSending(false);
-      if (r.ok) {
-        setFiles([]); // the intake took them: a second Start must not upload them again
-        setSelectedSkill(null);
-        setRun(r.value);
-        settle("ready");
-        return;
-      }
-      settle("idle");
-      if (!r.capped) setQuick({ state: "error", message: r.message, retry: () => prepare() });
-    });
+    stepTimer.current = schedule(() => {
+      setDraftStep("Structuring brief...");
+    }, 1800);
+    store
+      .prepareRun(text, files, skillRefs(ref), (step) => {
+        cancelStepTimer();
+        setDraftStep(step);
+      })
+      .then((r) => {
+        cancelStepTimer();
+        sendingNow.current = false;
+        if (!alive.current) return;
+        setSending(false);
+        setDraftStep(null);
+        if (r.ok) {
+          setFiles([]); // the intake took them: a second Start must not upload them again
+          setSelectedSkill(null);
+          setRun(r.value);
+          settle("ready");
+          return;
+        }
+        settle("idle");
+        if (!r.capped) setQuick({ state: "error", message: r.message, retry: () => prepare() });
+      });
   };
   const startRun = (repeat: Cadence | null, makeChoices = run?.makeChoices ?? []) => {
     if (run === null || runBusy) return;
@@ -503,6 +526,7 @@ export function HomePage({ app }: { app: AppCtx }) {
       ) : null}
       {composerShown ? (
         <ComposerPanel
+          draftStep={draftStep}
           sending={sending}
           mood={mood}
           sample={demo}
