@@ -134,7 +134,9 @@ export function ChatPage({ app }: { app: AppCtx }) {
   const [draft, setDraft] = useState("");
   const [selectedSkill, setSelectedSkill] = useState<CatalogSkill | null>(null);
   const [skillNote, setSkillNote] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const inputId = useId();
+  const historyId = useId();
   const last = chat.turns[chat.turns.length - 1];
   const credits = totalCredits(chat.turns);
   const lastQuestion = last?.question ?? draft.trim();
@@ -165,7 +167,31 @@ export function ChatPage({ app }: { app: AppCtx }) {
   return (
     <div className="park-chat" data-testid="park-page-chat">
       <div className="park-chat-grid">
-        <aside className="park-chat-rail">
+        <button
+          type="button"
+          className="park-chat-drawer-scrim"
+          aria-label="Close chat history"
+          tabIndex={historyOpen ? 0 : -1}
+          data-open={historyOpen}
+          onClick={() => setHistoryOpen(false)}
+        />
+        <aside
+          id={historyId}
+          aria-label="Chat history drawer"
+          className="park-chat-rail"
+          data-open={historyOpen}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setHistoryOpen(false);
+          }}
+        >
+          <button
+            type="button"
+            className="park-chat-drawer-close"
+            aria-label="Close chat history"
+            onClick={() => setHistoryOpen(false)}
+          >
+            Close
+          </button>
           <nav aria-label="Chat history" className="park-chat-history">
             <button
               type="button"
@@ -174,13 +200,19 @@ export function ChatPage({ app }: { app: AppCtx }) {
               onClick={() => {
                 chat.clear();
                 setDraft("");
+                setHistoryOpen(false);
               }}
             >
               <Icon name="plus" size={18} /> New chat
             </button>
             <span className="park-chat-history__label">Current chat</span>
             {chat.turns.map((turn) => (
-              <a key={turn.id} href={`#chat-turn-${turn.id}`} className="park-chat-history__turn">
+              <a
+                key={turn.id}
+                href={`#chat-turn-${turn.id}`}
+                className="park-chat-history__turn"
+                onClick={() => setHistoryOpen(false)}
+              >
                 {turn.question}
               </a>
             ))}
@@ -219,6 +251,16 @@ export function ChatPage({ app }: { app: AppCtx }) {
         </aside>
         <div className="park-chat-main">
           <div className="park-chat-head">
+            <button
+              type="button"
+              className="park-chat-history-toggle"
+              aria-label="Open chat history"
+              aria-controls={historyId}
+              aria-expanded={historyOpen}
+              onClick={() => setHistoryOpen(true)}
+            >
+              History
+            </button>
             <h1 className="park-chat-h1">Chat with your Tilo</h1>
             <span className="park-chat-tag">QUICK ANSWER · 1 HELPER</span>
             <span className="park-chat-head__gap" />
@@ -263,7 +305,12 @@ export function ChatPage({ app }: { app: AppCtx }) {
               ) : (
                 chat.turns.map((t) => (
                   <div key={t.id} id={`chat-turn-${t.id}`} className="park-chat-pair">
-                    <div className="park-chat-you">{t.question}</div>
+                    <div className="park-chat-you-row">
+                      <div className="park-chat-you">{t.question}</div>
+                      <span className="park-chat-you-avatar" aria-hidden="true">
+                        You
+                      </span>
+                    </div>
                     <Answer
                       turn={t}
                       onWorld={toWorld}
