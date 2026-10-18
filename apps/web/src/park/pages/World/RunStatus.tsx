@@ -2,6 +2,7 @@
 // asking (chips), the recorded reason a run stopped with "Start it again", and the delivered result, readable here
 // with Open and Download. Every word comes from a recorded event (HR-1..HR-7); with no event it says so.
 import { useState } from "react";
+import { ResultTab } from "../../../worldView/LiveStageEmbed";
 import type { Api } from "../../api";
 import { openResult, readResult, saveResult } from "../../api/results";
 import { Button } from "../../components";
@@ -228,34 +229,7 @@ export function RunResult({
   /** The page's one read of the result (WORLD-LIVE), also used by the Delivery Dock. */
   shared: SharedResult;
 }) {
-  const items = deliveredFiles(events);
-  const main = items[0];
-  const view = shared.view;
-  const blob = view.status === "text" || view.status === "file" ? view.blob : null;
-  const textHead = view.status === "text" ? resultHeadline(view.text, "Main deliverable") : null;
-  const mainName =
-    main?.name ?? (textHead ? safeDeliverableName(textHead.title) : null) ?? "Main deliverable";
-  return (
-    <section aria-label="Result" className="park-world-section" data-testid="run-result">
-      {blob ? (
-        <div className="park-world-resultactions">
-          <strong>{mainName}</strong>
-          <Button variant="secondary" size="sm" onClick={() => saveResult(blob, mainName)}>
-            Download
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => openResult(blob)}>
-            Open result
-          </Button>
-        </div>
-      ) : (
-        <strong>{mainName}</strong>
-      )}
-      <ResultBody view={view} retry={shared.retry} />
-      {items.length > 1 ? (
-        <DeliveredItems api={api} worldId={worldId} items={items.slice(1)} />
-      ) : null}
-    </section>
-  );
+  return <ResultTab api={api} worldId={worldId} events={events} shared={shared} />;
 }
 
 /** What the run assumed instead of asking (FR-INT-04), as chips beside the tabs; nothing when none is recorded. */

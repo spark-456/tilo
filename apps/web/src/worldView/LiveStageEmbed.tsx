@@ -66,3 +66,6 @@ export function LiveChat({ worldId }: { worldId: string }) {
   const rooms = useMemo(createRoomClient, []);
   return <Conversations worldId={worldId} rooms={rooms} />;
 }
+
+export { ResultTab } from "./live/ResultTab";
+export { FailureCard } from "./live/FailureCard";

@@ -36,6 +36,7 @@ export const TALK_WINDOW = 2;
 /** Where an agent stands, from the record alone (TILO-T-WORLD): a room's hall while it is in one, its post once its
  * handoff is older than the talk window, else the place its last event put it. */
 export function standingAt(state: WorldState, agent: AgentState): string | null {
+  if (state.status === "completed" && state.dock) return state.dock;
   if (agent.back !== null || agent.doneAt === null || agent.post === null) return agent.location;
   return state.seq - agent.doneAt > TALK_WINDOW ? agent.post : agent.location;
 }
@@ -75,6 +76,8 @@ export interface WorldState {
   readonly gates: Readonly<Record<string, GateState>>;
   /** The layout's Meeting Hall building, where a convened room gathers (WORLD-LIVE), or null. */
   readonly hall: string | null;
+  /** The layout's Delivery Dock building, where agents gather on world.completed (TW-5), or null. */
+  readonly dock: string | null;
   /** Open meeting rooms: room id -> who sits in it, until meeting.adjourned (WORLD-LIVE). */
   readonly rooms: Readonly<Record<string, readonly string[]>>;
 }
@@ -118,6 +121,10 @@ export function createInitialState(layout: Layout): WorldState {
     // Only a hall the layout names as one: never guessed from an id or another building type.
     allBuildings.find((b) => b.common_type === "meeting_hall" || b.name === "Meeting Hall")?.id ??
     null;
+  const dock =
+    // Only a dock the layout names as one: never guessed from an id or another building type.
+    allBuildings.find((b) => b.common_type === "delivery_dock" || b.name === "Delivery Dock")?.id ??
+    null;
   return {
     seq: 0,
     trace: [],
@@ -128,6 +135,7 @@ export function createInitialState(layout: Layout): WorldState {
     agents,
     gates,
     hall,
+    dock,
     rooms: {},
   };
 }
@@ -182,6 +190,18 @@ function applyKnown(state: WorldState, event: Event): WorldState {
   if (!family || !verb) return state;
   switch (family) {
     case "world": {
+      if (verb === "completed") {
+        if (state.dock) {
+          const moved: Record<string, AgentState> = {};
+          for (const [id, ag] of Object.entries(state.agents)) {
+            moved[id] = ag.spawned
+              ? { ...ag, location: state.dock, working: false, say: null }
+              : ag;
+          }
+          return { ...state, status: "completed", agents: moved };
+        }
+        return { ...state, status: "completed" };
+      }
       const status: WorldStatus | undefined =
         verb === "started"
           ? "started"
@@ -189,11 +209,9 @@ function applyKnown(state: WorldState, event: Event): WorldState {
             ? "paused"
             : verb === "resumed"
               ? "started"
-              : verb === "completed"
-                ? "completed"
-                : verb === "failed"
-                  ? "failed"
-                  : undefined;
+              : verb === "failed"
+                ? "failed"
+                : undefined;
       return status ? { ...state, status } : state;
     }
     case "level": {

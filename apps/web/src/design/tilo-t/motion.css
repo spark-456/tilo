@@ -333,3 +333,14 @@
     animation: none !important;
   }
 }
+
+/* TW-5 Result tab, delivery parcel moment, dock hop, and failure card */
+[data-park] .tw-dock-celebration,[data-park] .tw-dock-hop{animation:wHop .56s ease-in-out 3}
+[data-park] .tw-res-slide-0{animation:tSlideR .42s cubic-bezier(.2,.8,.2,1) 0s both}
+[data-park] .tw-res-slide-1{animation:tSlideR .42s cubic-bezier(.2,.8,.2,1) .04s both}
+[data-park] .tw-res-slide-2{animation:tSlideR .42s cubic-bezier(.2,.8,.2,1) .08s both}
+[data-park] .tw-res-slide-3{animation:tSlideR .42s cubic-bezier(.2,.8,.2,1) .12s both}
+[data-park] .tw-res-slide-4{animation:tSlideR .42s cubic-bezier(.2,.8,.2,1) .16s both}
+[data-park] .tw-res-slide-5{animation:tSlideR .42s cubic-bezier(.2,.8,.2,1) .20s both}
+[data-park] .tw-fail-card{animation:wIn .3s cubic-bezier(.2,.8,.2,1) both}
+@media (prefers-reduced-motion:reduce){[data-park] .tw-dock-celebration,[data-park] .tw-dock-hop,[data-park] .tw-fail-card{animation:none!important}}
