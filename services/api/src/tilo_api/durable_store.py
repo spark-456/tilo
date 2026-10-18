@@ -54,6 +54,7 @@ _JSON_FIELDS = {"worlds": ("layout",), "tasks": ("draft", "brief", "edits", "app
 RESTARTED = "the service restarted, so the work stopped"
 STARTUP_RESTARTED = "Tilo restarted during this run; start it again"  # X-ORPHAN-1 / HR-1
 _CLOSE_BUDGET_S = 5.0  # shutdown, well under Cloud Run's 10 s SIGTERM grace
+_RUN_DRAIN_BUDGET_S = 4.0  # leave one second of the close budget for writer lease release
 
 
 class StaleRev(Exception):
@@ -624,16 +625,21 @@ def recover_deployed() -> None:
 
 
 def close_deployed() -> None:
-    """On shutdown (SIGTERM): every writer closes and releases its lease, so a new revision does not wait it out. The
-    whole call is bounded (`_CLOSE_BUDGET_S`): a busy world is skipped, and its lease lapses by itself."""
+    """On SIGTERM, let runs finish or fail them plainly, then release writer leases within one bounded budget."""
+    from tilo_api import runs  # noqa: PLC0415 (runs imports this module's store through deps)
+
     end = time.monotonic() + _CLOSE_BUDGET_S
     got = _opening.acquire(timeout=1.0)  # a client being built does not hold the shutdown up
     try:
-        writers = [writer for _, writer in _opened.values()]
+        opened = list(_opened.values())
     finally:
         if got:
             _opening.release()
-    for writer in writers:
+    runs.drain_for_shutdown(
+        [store for store, _ in opened],
+        timeout_s=min(_RUN_DRAIN_BUDGET_S, max(0.0, end - time.monotonic())),
+    )
+    for _, writer in opened:
         reopen = getattr(writer, "reopen", None)
         if callable(reopen) and (left := end - time.monotonic()) > 0:
             reopen(left)

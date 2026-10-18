@@ -13,7 +13,7 @@ import math
 import threading
 import time
 import unicodedata
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -79,6 +79,9 @@ class MeteredOutcome(UnitOutcome):
 
 class RunStopped(Exception):
     """The world is paused: the run writes nothing more."""
+
+
+SHUTDOWN_REASON = "Tilo restarted during this run; start it again"
 
 
 class _GateFailed(Exception):
@@ -209,6 +212,21 @@ def start_run(store: deps.Store, task: deps.TaskRecord, *, approach: dict, budge
     threading.Thread(target=run.main, name=f"run-{task.world_id}", daemon=True).start()
 
 
+def drain_for_shutdown(stores: Iterable[deps.Store | None], timeout_s: float) -> None:
+    """Let active runs finish within one shared grace period, then durably fail every run still in progress."""
+    deadline = time.monotonic() + max(0.0, timeout_s)
+    active = [
+        run for store in stores if store is not None for run in list(store.runs.values()) if not run._ended.is_set()
+    ]
+    for run in active:
+        if (left := deadline - time.monotonic()) <= 0:
+            break
+        run._ended.wait(left)
+    for run in active:
+        if not run._ended.is_set():
+            run.fail_for_shutdown()
+
+
 def _clip_reason(reason: str) -> str:
     """world.failed data.reason: one line, at most 140 characters."""
     line = " ".join(str(reason).split()) or "the work stopped"
@@ -297,6 +315,7 @@ class Run:
         self._built: dict[str, dict] = {}  # event id -> the event as first built, resent as is on an exact retry
         self.failure: str | None = None
         self._failed = False
+        self._shutting_down = threading.Event()
         # What `wait_until_parked_or_done` looks at (FR-AGT-14e). Written from the run's thread, read from any thread.
         self._ended = threading.Event()  # the run's thread has finished, whichever way out
         self._seen = threading.Lock()
@@ -325,7 +344,7 @@ class Run:
 
     def paused(self) -> bool:
         world = self.store.worlds.get(self.world_id)
-        return world is None or world.paused
+        return world is None or world.paused or self._shutting_down.is_set()
 
     def put(self, type_: str, actor: str, target: str, summary: str, data: dict, **kw: Any) -> dict:
         """Builds the event once, with its own id, and appends it through the single writer. A paused world gets
@@ -513,6 +532,13 @@ class Run:
                 )
         except Exception as caught_error:
             log_caught(caught_error, __name__, locals())
+
+    def fail_for_shutdown(self) -> None:
+        """Write the process-drain terminal event unless this run reached a terminal event during the grace period."""
+        terminal = {"world.completed", "world.failed"}
+        if not any(event["type"] in terminal for event in self.store.events.get(self.world_id, [])):
+            self._fail(SHUTDOWN_REASON, None)
+            self._shutting_down.set()
 
     def main(self) -> None:
         """Every way out ends in a terminal event (or the pause) and leaves no entry of the run waiting to send."""
