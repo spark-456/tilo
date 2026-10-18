@@ -5,6 +5,14 @@ import { ORGANISATION_SETUP } from "../../api/organisationSetup";
 import type { Team } from "../../api/types";
 import { initialsOf } from "./teamModel";
 
+const cleanMembership = (m: string): string => {
+  if (m.startsWith("tm_")) {
+    const raw = m.slice(3).replace(/[_-]/g, " ").trim();
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
+  return m;
+};
+
 /** A read-only directory: the people endpoint does not provide activity, policy or write actions. */
 export function LiveMembers({ team }: { team: Team }) {
   const ownName = team.people.find((person) => person.you)?.name;
@@ -49,7 +57,7 @@ export function LiveMembers({ team }: { team: Team }) {
                   </span>
                 </td>
                 {role ? <td className="park-team-strong">{p.role}</td> : null}
-                {teams ? <td>{p.memberships?.join(", ")}</td> : null}
+                {teams ? <td>{p.memberships?.map(cleanMembership).join(", ")}</td> : null}
                 {department ? <td>{p.dept}</td> : null}
                 {active ? <td>{p.active}</td> : null}
               </tr>

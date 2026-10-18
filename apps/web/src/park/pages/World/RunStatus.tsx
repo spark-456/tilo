@@ -211,7 +211,7 @@ function DeliveredItems({
       </ul>
       {failed ? (
         <p className="park-world-noruns" role="alert">
-          That item could not be loaded. Nothing is lost.
+          That item could not be loaded. Nothing is lost. Try opening or downloading it again.
         </p>
       ) : null}
     </details>

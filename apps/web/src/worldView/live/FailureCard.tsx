@@ -81,8 +81,12 @@ export function FailureCard({
     "Review",
   ];
 
-  const creditsUsed = typeof failedData.credits_used === "number" ? failedData.credits_used : 28;
-  const creditsCap = typeof failedData.credits_cap === "number" ? failedData.credits_cap : 120;
+  const creditsUsed =
+    typeof failedData.credits_used === "number"
+      ? Math.round(failedData.credits_used * 10) / 10
+      : 28;
+  const creditsCap =
+    typeof failedData.credits_cap === "number" ? Math.round(failedData.credits_cap * 10) / 10 : 120;
   const creditsNote =
     propCredits ?? `${creditsUsed} of ${creditsCap} credits used. The venue shortlist is kept.`;
 

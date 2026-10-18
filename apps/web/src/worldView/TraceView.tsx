@@ -76,7 +76,8 @@ export function TraceView({ worldId }: { worldId: string }) {
                     </span>
                     {call.length > 0 ? <span>{call.join(" · ")}</span> : null}
                     <span>
-                      {e.credits} {e.credits === 1 ? "credit" : "credits"}
+                      {Math.round(e.credits * 10) / 10}{" "}
+                      {Math.round(e.credits * 10) / 10 === 1 ? "credit" : "credits"}
                     </span>
                     {t.archive_ref === null ? (
                       <span>No record</span>

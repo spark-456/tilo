@@ -34,7 +34,11 @@ export function AgentFacts({ stats }: { stats: AgentStats }) {
         </div>
         <div>
           <dt>Credits</dt>
-          <dd>{stats.credits}</dd>
+          <dd>
+            {typeof stats.credits === "number"
+              ? Math.round(stats.credits * 10) / 10
+              : stats.credits}
+          </dd>
         </div>
       </dl>
       <p className="tw-facts__tools">

@@ -28,6 +28,16 @@
   color: var(--ink2);
 }
 
+/* Base links: clear hero ink, no plain browser blue underline */
+[data-park] a {
+  color: var(--heroInk, #4a31cc);
+  text-decoration: none;
+}
+
+[data-park] a:hover {
+  text-decoration: underline;
+}
+
 /* Focus ring (README "Interactions and motion"): 3px #5A3FE0, offset 2px. */
 [data-park] a:focus-visible {
   outline: 3px solid #5a3fe0;

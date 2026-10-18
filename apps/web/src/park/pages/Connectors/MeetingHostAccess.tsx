@@ -13,12 +13,12 @@ import {
   MEETING_HOST_CAPABILITIES,
 } from "../../../api/connect";
 
-const STATE_TEXT: Record<HostState, string> = {
+export const STATE_TEXT: Record<HostState, string> = {
   not_configured: HOST_NOT_CONNECTED_TEXT,
   connected: "Connected",
   attention: "Needs attention: the sign-in has expired or is about to",
   available: "Not connected",
-  unknown: "Tilo could not confirm the connection, so none is shown",
+  unknown: "Tilo could not confirm the connection. Check again below.",
 };
 const WHO =
   "Sign in as the meeting bot's own Google account, not your own. Tilo never sees its password. It asks for one permission: to create calendar events that account owns, with a Google Meet link.";

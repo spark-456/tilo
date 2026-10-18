@@ -12,9 +12,7 @@ import type { ResultView } from "../../park/pages/World/useRunResult";
 import { DirectionForm } from "./DirectionForm";
 
 const readableMath = (text: string): string =>
-  text
-    .replace(/\$\\to\$/g, "→")
-    .replace(/\$([^$\n]+)\$/g, "$1");
+  text.replace(/\$\\to\$/g, "→").replace(/\$([^$\n]+)\$/g, "$1");
 
 function ResultBody({ view, retry }: { view: ResultView; retry?: () => void }) {
   if (view.status === "loading") return <p className="park-world-noruns">Loading the result…</p>;
@@ -95,7 +93,9 @@ function deliveredName(event: RunEvent, id: string): string {
   const cleanSummary = fromSummary?.[1] ? safeDeliverableName(fromSummary[1]) : null;
   if (cleanSummary && !/^item$/i.test(cleanSummary)) return cleanSummary;
   const summary = safeDeliverableName(event.summary.replace(/[.!]+$/, ""));
-  return (typeof data?.format === "string" && FORMAT_NAMES[data.format]) || summary || "Working file";
+  return (
+    (typeof data?.format === "string" && FORMAT_NAMES[data.format]) || summary || "Working file"
+  );
 }
 
 function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
@@ -203,7 +203,7 @@ function WorkingFiles({
       </ul>
       {loadError ? (
         <p className="park-world-noruns" role="alert">
-          That item could not be loaded. Nothing is lost.
+          That item could not be loaded. Nothing is lost. Try opening or downloading it again.
         </p>
       ) : null}
     </details>
@@ -237,8 +237,7 @@ export function ResultTab({
       : "Porto offsite plan");
   const mainEvent = events.find((event) => event.type === "artifact.delivered");
   const mainData = mainEvent?.data as { format?: unknown } | undefined;
-  const mainFormat =
-    typeof mainData?.format === "string" ? mainData.format.toUpperCase() : "FILE";
+  const mainFormat = typeof mainData?.format === "string" ? mainData.format.toUpperCase() : "FILE";
   const mainSummary = mainEvent?.summary || "Ready to open or download.";
 
   const handleOpen = () => {
@@ -387,188 +386,192 @@ export function ResultTab({
 
       {events.length === 0 ? (
         <>
-      {/* 3. ALSO DELIVERED Header */}
-      <div className="tw-res-also tw-res-slide-2">ALSO DELIVERED</div>
+          {/* 3. ALSO DELIVERED Header */}
+          <div className="tw-res-also tw-res-slide-2">ALSO DELIVERED</div>
 
-      {/* Sheet preview */}
-      <div className="tw-res-sheet-card tw-res-slide-2">
-        <div className="tw-res-card-head">
-          <span className="tw-res-type-pill" data-type="XLSX">
-            XLSX
-          </span>
-          <div className="tw-res-card-head__text">
-            <span className="tw-res-card-head__title">Offsite budget.xlsx</span>
-            <span className="tw-res-card-head__meta">Sheet · 5 lines · made in Tilo by Kai</span>
-          </div>
-          <button
-            type="button"
-            className="tw-res-icon-btn"
-            aria-label="Download budget"
-            onClick={handleDownload}
-          >
-            <Icon name="download" size={16} />
-          </button>
-        </div>
-        <div className="tw-res-table-wrap">
-          <div className="tw-res-table-head">
-            <span className="tw-res-cell--center">1</span>
-            <span className="tw-res-cell--pad">A · ITEM</span>
-            <span className="tw-res-cell--pad">B · DETAIL</span>
-            <span className="tw-res-cell--right">C · COST</span>
-          </div>
-          <div className="tw-res-table-row">
-            <span className="tw-res-cell--center tw-res-cell--sunk">2</span>
-            <span className="tw-res-cell--pad tw-res-cell--bold">Casa do Rio, 2 nights</span>
-            <span className="tw-res-cell--pad tw-res-cell--sub">12 rooms × €168</span>
-            <span className="tw-res-cell--right tw-res-cell--mono">€4,032</span>
-          </div>
-          <div className="tw-res-table-row">
-            <span className="tw-res-cell--center tw-res-cell--sunk">3</span>
-            <span className="tw-res-cell--pad tw-res-cell--bold">Flights</span>
-            <span className="tw-res-cell--pad tw-res-cell--sub">12 people, 3 cities</span>
-            <span className="tw-res-cell--right tw-res-cell--mono">€2,140</span>
-          </div>
-          <div className="tw-res-table-row">
-            <span className="tw-res-cell--center tw-res-cell--sunk">4</span>
-            <span className="tw-res-cell--pad tw-res-cell--bold">Food and dinners</span>
-            <span className="tw-res-cell--pad tw-res-cell--sub">3 days</span>
-            <span className="tw-res-cell--right tw-res-cell--mono">€3,960</span>
-          </div>
-          <div className="tw-res-table-row">
-            <span className="tw-res-cell--center tw-res-cell--sunk">5</span>
-            <span className="tw-res-cell--pad tw-res-cell--bold">Workshop space</span>
-            <span className="tw-res-cell--pad tw-res-cell--sub">Friday</span>
-            <span className="tw-res-cell--right tw-res-cell--mono">€1,850</span>
-          </div>
-          <div className="tw-res-table-row">
-            <span className="tw-res-cell--center tw-res-cell--sunk">6</span>
-            <span className="tw-res-cell--pad tw-res-cell--bold">
-              Local transport and activities
-            </span>
-            <span className="tw-res-cell--pad tw-res-cell--sub">Boats, trams, tickets</span>
-            <span className="tw-res-cell--right tw-res-cell--mono">€2,298</span>
-          </div>
-          <div className="tw-res-table-total">
-            <span className="tw-res-cell--center tw-res-cell--sunk">7</span>
-            <span className="tw-res-cell--pad">Total · €1,720 under the €16,000 cap</span>
-            <span className="tw-res-cell--right tw-res-cell--mono">€14,280</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Slides preview */}
-      <div className="tw-res-slides-card tw-res-slide-3">
-        <div className="tw-res-card-head">
-          <span className="tw-res-type-pill" data-type="SLIDES">
-            SLIDES
-          </span>
-          <div className="tw-res-card-head__text">
-            <span className="tw-res-card-head__title">Kickoff deck</span>
-            <span className="tw-res-card-head__meta">8 slides · made in Canva by Pia</span>
-          </div>
-          <button type="button" className="tw-res-action-btn">
-            Open in Canva
-          </button>
-        </div>
-        <div className="tw-res-slides-grid">
-          <div className="tw-res-slide-thumb" data-first="true">
-            <span className="tw-res-slide-num">01</span>
-            <span className="tw-res-slide-title">Porto · 14–16 May</span>
-          </div>
-          <div className="tw-res-slide-thumb" data-first="false">
-            <span className="tw-res-slide-num">02</span>
-            <span className="tw-res-slide-title">Why Porto</span>
-          </div>
-          <div className="tw-res-slide-thumb" data-first="false">
-            <span className="tw-res-slide-num">03</span>
-            <span className="tw-res-slide-title">Where we stay</span>
-          </div>
-          <div className="tw-res-slide-thumb" data-first="false">
-            <span className="tw-res-slide-num">04</span>
-            <span className="tw-res-slide-title">Getting there</span>
-          </div>
-          <div className="tw-res-slide-badge">+4</div>
-        </div>
-      </div>
-
-      {/* Web preview */}
-      <div className="tw-res-web-card tw-res-slide-3">
-        <div className="tw-res-card-head">
-          <span className="tw-res-type-pill" data-type="WEB">
-            WEB
-          </span>
-          <div className="tw-res-card-head__text">
-            <span className="tw-res-card-head__title">Event site</span>
-            <span className="tw-res-card-head__meta">Live · 3 pages · made in Lovable by Pia</span>
-          </div>
-        </div>
-        <div className="tw-res-browser">
-          <div className="tw-res-browser-bar">
-            <span className="tw-res-browser-dot tw-res-browser-dot--red" />
-            <span className="tw-res-browser-dot tw-res-browser-dot--yellow" />
-            <span className="tw-res-browser-dot tw-res-browser-dot--green" />
-            <span className="tw-res-browser-url">porto-offsite.lovable.app</span>
-          </div>
-          <div className="tw-res-browser-content">
-            <span className="tw-res-web-kicker">TEAM RAO · 14–16 MAY</span>
-            <span className="tw-res-web-h1">Porto by the river</span>
-            <span className="tw-res-web-sub">Three days, twelve people, one free morning.</span>
-            <div className="tw-res-web-days">
-              <div className="tw-res-web-day-card">
-                <span className="tw-res-web-day-tag">THU 14</span>
-                <span className="tw-res-web-day-text">Arrive, river dinner</span>
+          {/* Sheet preview */}
+          <div className="tw-res-sheet-card tw-res-slide-2">
+            <div className="tw-res-card-head">
+              <span className="tw-res-type-pill" data-type="XLSX">
+                XLSX
+              </span>
+              <div className="tw-res-card-head__text">
+                <span className="tw-res-card-head__title">Offsite budget.xlsx</span>
+                <span className="tw-res-card-head__meta">
+                  Sheet · 5 lines · made in Tilo by Kai
+                </span>
               </div>
-              <div className="tw-res-web-day-card">
-                <span className="tw-res-web-day-tag">FRI 15</span>
-                <span className="tw-res-web-day-text">Workshop day</span>
+              <button
+                type="button"
+                className="tw-res-icon-btn"
+                aria-label="Download budget"
+                onClick={handleDownload}
+              >
+                <Icon name="download" size={16} />
+              </button>
+            </div>
+            <div className="tw-res-table-wrap">
+              <div className="tw-res-table-head">
+                <span className="tw-res-cell--center">1</span>
+                <span className="tw-res-cell--pad">A · ITEM</span>
+                <span className="tw-res-cell--pad">B · DETAIL</span>
+                <span className="tw-res-cell--right">C · COST</span>
               </div>
-              <div className="tw-res-web-day-card">
-                <span className="tw-res-web-day-tag">SAT 16</span>
-                <span className="tw-res-web-day-text">Free morning</span>
+              <div className="tw-res-table-row">
+                <span className="tw-res-cell--center tw-res-cell--sunk">2</span>
+                <span className="tw-res-cell--pad tw-res-cell--bold">Casa do Rio, 2 nights</span>
+                <span className="tw-res-cell--pad tw-res-cell--sub">12 rooms × €168</span>
+                <span className="tw-res-cell--right tw-res-cell--mono">€4,032</span>
+              </div>
+              <div className="tw-res-table-row">
+                <span className="tw-res-cell--center tw-res-cell--sunk">3</span>
+                <span className="tw-res-cell--pad tw-res-cell--bold">Flights</span>
+                <span className="tw-res-cell--pad tw-res-cell--sub">12 people, 3 cities</span>
+                <span className="tw-res-cell--right tw-res-cell--mono">€2,140</span>
+              </div>
+              <div className="tw-res-table-row">
+                <span className="tw-res-cell--center tw-res-cell--sunk">4</span>
+                <span className="tw-res-cell--pad tw-res-cell--bold">Food and dinners</span>
+                <span className="tw-res-cell--pad tw-res-cell--sub">3 days</span>
+                <span className="tw-res-cell--right tw-res-cell--mono">€3,960</span>
+              </div>
+              <div className="tw-res-table-row">
+                <span className="tw-res-cell--center tw-res-cell--sunk">5</span>
+                <span className="tw-res-cell--pad tw-res-cell--bold">Workshop space</span>
+                <span className="tw-res-cell--pad tw-res-cell--sub">Friday</span>
+                <span className="tw-res-cell--right tw-res-cell--mono">€1,850</span>
+              </div>
+              <div className="tw-res-table-row">
+                <span className="tw-res-cell--center tw-res-cell--sunk">6</span>
+                <span className="tw-res-cell--pad tw-res-cell--bold">
+                  Local transport and activities
+                </span>
+                <span className="tw-res-cell--pad tw-res-cell--sub">Boats, trams, tickets</span>
+                <span className="tw-res-cell--right tw-res-cell--mono">€2,298</span>
+              </div>
+              <div className="tw-res-table-total">
+                <span className="tw-res-cell--center tw-res-cell--sunk">7</span>
+                <span className="tw-res-cell--pad">Total · €1,720 under the €16,000 cap</span>
+                <span className="tw-res-cell--right tw-res-cell--mono">€14,280</span>
               </div>
             </div>
           </div>
-        </div>
-        <div className="tw-res-web-actions">
-          <button type="button" className="tw-res-btn tw-res-btn--pri">
-            <Icon name="globe" size={16} />
-            Open site
-          </button>
-          <button type="button" className="tw-res-btn tw-res-btn--sec">
-            <Icon name="copy" size={16} />
-            Copy link
-          </button>
-        </div>
-      </div>
 
-      {/* Text preview */}
-      <div className="tw-res-text-card tw-res-slide-4">
-        <div className="tw-res-card-head">
-          <span className="tw-res-type-pill" data-type="MD">
-            MD
-          </span>
-          <div className="tw-res-card-head__text">
-            <span className="tw-res-card-head__title">Invite email</span>
-            <span className="tw-res-card-head__meta">
-              Sent from Gmail · 4:11 pm · written by Wren
-            </span>
+          {/* Slides preview */}
+          <div className="tw-res-slides-card tw-res-slide-3">
+            <div className="tw-res-card-head">
+              <span className="tw-res-type-pill" data-type="SLIDES">
+                SLIDES
+              </span>
+              <div className="tw-res-card-head__text">
+                <span className="tw-res-card-head__title">Kickoff deck</span>
+                <span className="tw-res-card-head__meta">8 slides · made in Canva by Pia</span>
+              </div>
+              <button type="button" className="tw-res-action-btn">
+                Open in Canva
+              </button>
+            </div>
+            <div className="tw-res-slides-grid">
+              <div className="tw-res-slide-thumb" data-first="true">
+                <span className="tw-res-slide-num">01</span>
+                <span className="tw-res-slide-title">Porto · 14–16 May</span>
+              </div>
+              <div className="tw-res-slide-thumb" data-first="false">
+                <span className="tw-res-slide-num">02</span>
+                <span className="tw-res-slide-title">Why Porto</span>
+              </div>
+              <div className="tw-res-slide-thumb" data-first="false">
+                <span className="tw-res-slide-num">03</span>
+                <span className="tw-res-slide-title">Where we stay</span>
+              </div>
+              <div className="tw-res-slide-thumb" data-first="false">
+                <span className="tw-res-slide-num">04</span>
+                <span className="tw-res-slide-title">Getting there</span>
+              </div>
+              <div className="tw-res-slide-badge">+4</div>
+            </div>
           </div>
-        </div>
-        <div className="tw-res-text-box">
-          <span className="tw-res-text-to">To: 12 people on Team Rao</span>
-          <span className="tw-res-text-subj">Porto, 14–16 May: you’re in</span>
-          <p className="tw-res-text-p">
-            Hi all, we’re off to Porto. Rooms are booked at Casa do Rio and flights are held until
-            Friday.
-          </p>
-          <ul className="tw-res-text-list">
-            <li>Thu 14: arrive, dinner by the river at 8</li>
-            <li>Fri 15: workshop day</li>
-            <li>Sat 16: free morning, flights home after 3 pm</li>
-          </ul>
-          <p className="tw-res-text-p">Reply with any food needs by Wednesday. M</p>
-        </div>
-      </div>
+
+          {/* Web preview */}
+          <div className="tw-res-web-card tw-res-slide-3">
+            <div className="tw-res-card-head">
+              <span className="tw-res-type-pill" data-type="WEB">
+                WEB
+              </span>
+              <div className="tw-res-card-head__text">
+                <span className="tw-res-card-head__title">Event site</span>
+                <span className="tw-res-card-head__meta">
+                  Live · 3 pages · made in Lovable by Pia
+                </span>
+              </div>
+            </div>
+            <div className="tw-res-browser">
+              <div className="tw-res-browser-bar">
+                <span className="tw-res-browser-dot tw-res-browser-dot--red" />
+                <span className="tw-res-browser-dot tw-res-browser-dot--yellow" />
+                <span className="tw-res-browser-dot tw-res-browser-dot--green" />
+                <span className="tw-res-browser-url">porto-offsite.lovable.app</span>
+              </div>
+              <div className="tw-res-browser-content">
+                <span className="tw-res-web-kicker">TEAM RAO · 14–16 MAY</span>
+                <span className="tw-res-web-h1">Porto by the river</span>
+                <span className="tw-res-web-sub">Three days, twelve people, one free morning.</span>
+                <div className="tw-res-web-days">
+                  <div className="tw-res-web-day-card">
+                    <span className="tw-res-web-day-tag">THU 14</span>
+                    <span className="tw-res-web-day-text">Arrive, river dinner</span>
+                  </div>
+                  <div className="tw-res-web-day-card">
+                    <span className="tw-res-web-day-tag">FRI 15</span>
+                    <span className="tw-res-web-day-text">Workshop day</span>
+                  </div>
+                  <div className="tw-res-web-day-card">
+                    <span className="tw-res-web-day-tag">SAT 16</span>
+                    <span className="tw-res-web-day-text">Free morning</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="tw-res-web-actions">
+              <button type="button" className="tw-res-btn tw-res-btn--pri">
+                <Icon name="globe" size={16} />
+                Open site
+              </button>
+              <button type="button" className="tw-res-btn tw-res-btn--sec">
+                <Icon name="copy" size={16} />
+                Copy link
+              </button>
+            </div>
+          </div>
+
+          {/* Text preview */}
+          <div className="tw-res-text-card tw-res-slide-4">
+            <div className="tw-res-card-head">
+              <span className="tw-res-type-pill" data-type="MD">
+                MD
+              </span>
+              <div className="tw-res-card-head__text">
+                <span className="tw-res-card-head__title">Invite email</span>
+                <span className="tw-res-card-head__meta">
+                  Sent from Gmail · 4:11 pm · written by Wren
+                </span>
+              </div>
+            </div>
+            <div className="tw-res-text-box">
+              <span className="tw-res-text-to">To: 12 people on Team Rao</span>
+              <span className="tw-res-text-subj">Porto, 14–16 May: you’re in</span>
+              <p className="tw-res-text-p">
+                Hi all, we’re off to Porto. Rooms are booked at Casa do Rio and flights are held
+                until Friday.
+              </p>
+              <ul className="tw-res-text-list">
+                <li>Thu 14: arrive, dinner by the river at 8</li>
+                <li>Fri 15: workshop day</li>
+                <li>Sat 16: free morning, flights home after 3 pm</li>
+              </ul>
+              <p className="tw-res-text-p">Reply with any food needs by Wednesday. M</p>
+            </div>
+          </div>
         </>
       ) : null}
 
