@@ -34,7 +34,10 @@ describe("R-PREVIEW static world card thumbnails", () => {
     const root = createRoot(host);
     act(() => root.render(<WorldThumbnail world={world("Town")} client={null} night={false} />));
     expect(host.querySelector('[data-world-thumbnail="placeholder-town"]')).not.toBeNull();
-    expect(host.querySelectorAll(".park-worldthumb__block")).toHaveLength(3);
+    // P0-WORLDS-CARDS: replaced black cubes with soft gradient tile with initial and kind icon
+    expect(host.querySelector(".park-worldthumb__tile")).not.toBeNull();
+    expect(host.querySelector(".park-worldthumb__initial")?.textContent).toBe("T");
+    expect(host.querySelector(".park-worldthumb__kind")).not.toBeNull();
     act(() => root.unmount());
   });
 

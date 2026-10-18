@@ -103,4 +103,6 @@ export function townCounts(all: readonly World[]): TownCounts {
 
 /** The line under a card's name: the list's own "when", else its subtitle and what comes next; never invented. */
 export const lastLine = (w: World): string =>
-  w.when || [w.meta, [w.nextL, w.nextV].filter(Boolean).join(" ")].filter(Boolean).join(" · ");
+  w.when ||
+  [w.meta, [w.nextL, w.nextV].filter(Boolean).join(" ")].filter(Boolean).join(" · ") ||
+  (w.started ? `Started ${w.started.includes("T") ? w.started.slice(0, 10) : w.started}` : "");

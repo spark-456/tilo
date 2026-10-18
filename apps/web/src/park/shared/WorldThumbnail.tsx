@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import type { Plan, World } from "../api/types";
 import type { Plan as EnginePlan } from "../engines/types";
 import { cachedCity } from "../shell/cityCache";
-import { parkKit } from "../shell/kit";
+import { icon, parkKit } from "../shell/kit";
 import "./WorldThumbnail.css";
 type Tier = World["tier"];
 type Look = readonly [roof: string, facade: string];
@@ -36,7 +36,7 @@ const size = (value: number | undefined): number =>
 
 function buildingPlan(
   building: LayoutBuilding,
-  icon: string,
+  iconName: string,
   geometry: Layout["geometry"],
 ): ThumbnailBuilding {
   const placed = geometry?.buildings.find((item) => item.id === building.id);
@@ -51,7 +51,7 @@ function buildingPlan(
       fl: Math.max(1, placed?.floors ?? 1),
       roof: look[0],
       fa: look[1],
-      i: building.kit?.icon ?? icon,
+      i: building.kit?.icon ?? iconName,
     },
   };
 }
@@ -135,44 +135,45 @@ function useLayout(client: WorldThumbnailClient | null, worldId: string): Layout
   }, [client, worldId]);
   return layout;
 }
-const BLOCKS: Readonly<Record<Tier, ReadonlyArray<readonly [number, number]>>> = {
-  Village: [[60, 45]],
-  Town: [
-    [32, 55],
-    [74, 40],
-    [116, 58],
-  ],
-  City: [
-    [25, 58],
-    [58, 34],
-    [91, 58],
-    [124, 34],
-    [157, 58],
-    [190, 34],
-  ],
+
+const KIND_ICONS: Readonly<Record<string, string>> = {
+  City: "grid",
+  Town: "clock",
+  Village: "bolt",
+  Workspace: "grid",
+  Routine: "clock",
+  "Quick task": "bolt",
 };
-function Placeholder({ tier }: { tier: Tier }) {
+
+export function kindIconOf(world: World): string {
+  return KIND_ICONS[world.tier] || KIND_ICONS[world.tool] || "bolt";
+}
+
+export function initialOf(world: World): string {
+  const label = world.name?.trim() || world.short?.trim() || world.tier || "W";
+  return (label[0] || "W").toUpperCase();
+}
+
+// P0-WORLDS-CARDS: clean soft gradient tile with world's initial and kind icon (no black cubes)
+function SoftGradientTile({ world }: { world: World }) {
+  const initial = initialOf(world);
+  const iconName = kindIconOf(world);
+  const tierClass = (world.tier || "Village").toLowerCase();
   return (
-    <svg
-      className={`park-worldthumb__placeholder park-worldthumb__placeholder--${tier.toLowerCase()}`}
-      viewBox="0 0 240 132"
-      aria-hidden="true"
-      focusable="false"
+    <div
+      className={`park-worldthumb__tile park-worldthumb__tile--${tierClass}`}
+      data-testid="world-gradient-tile"
     >
-      <path className="park-worldthumb__ground" d="M18 86 120 28l102 58-102 38Z" />
-      {BLOCKS[tier].map(([x, y], index) => (
-        <g className="park-worldthumb__block" key={`${x}-${y}`}>
-          <path d={`M${x} ${y}l16-9 16 9-16 9Z`} />
-          <path d={`M${x} ${y}v22l16 9V${y + 9}Z`} />
-          <path d={`M${x + 32} ${y}v22l-16 9V${y + 9}Z`} />
-          {index === 0 ? (
-            <path className="park-worldthumb__door" d={`M${x + 20} ${y + 18}v9l7-4v-9Z`} />
-          ) : null}
-        </g>
-      ))}
-    </svg>
+      <div className="park-worldthumb__tile-inner">
+        <span className="park-worldthumb__initial">{initial}</span>
+        <span className="park-worldthumb__kind" aria-hidden="true" title={world.tier}>
+          {icon(iconName, 18)}
+        </span>
+      </div>
+    </div>
   );
 }
+
 function layoutArt(layout: Layout, night: boolean): ReactNode {
   const plan = layoutPlan(layout);
   return cachedCity(
@@ -193,7 +194,9 @@ export function WorldThumbnail({
   fallback?: ReactNode;
 }) {
   const layout = useLayout(client, world.id);
-  const content = layout ? layoutArt(layout, night) : fallback || <Placeholder tier={world.tier} />;
+  const content = layout
+    ? layoutArt(layout, night)
+    : fallback || <SoftGradientTile world={world} />;
   const kind = layout
     ? "layout"
     : fallback

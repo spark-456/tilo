@@ -5,7 +5,6 @@
 import { type MouseEvent, memo } from "react";
 import type { World } from "../../api/types";
 import { parkPath } from "../../app/router";
-import { useAfterTask } from "../../app/useStaged";
 import { cx } from "../../components/cx";
 import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import { WorldThumbnail, type WorldThumbnailClient } from "../../shared/WorldThumbnail";
@@ -34,33 +33,7 @@ function linkProps(w: World, onOpen: CardProps["onOpen"]) {
   };
 }
 
-/** The picture by size: a city's plan, a town's building row or a village's one building (frozen frames). */
-function Picture({
-  w,
-  art,
-  client,
-  night,
-}: {
-  w: World;
-  art: Art;
-  client: WorldThumbnailClient | null;
-  night: boolean;
-}) {
-  const artOn = useAfterTask(); // a city's picture is the heavy part: drawn a task after the card (WEB-MOTION-2)
-  const fallback =
-    w.tier === "City"
-      ? artOn
-        ? art.city(w)
-        : null
-      : w.tier === "Town"
-        ? art.strip(w, 104)
-        : art.single(w, 96);
-  return (
-    <WorldThumbnail world={w} client={w.sample ? null : client} night={night} fallback={fallback} />
-  );
-}
-
-function WorldCardView({ w, art, status, client, night, onOpen }: CardProps) {
+function WorldCardView({ w, status, client, night, onOpen }: CardProps) {
   const pct = w.prog != null ? `${w.prog}%` : "—";
   return (
     <a
@@ -73,7 +46,7 @@ function WorldCardView({ w, art, status, client, night, onOpen }: CardProps) {
     >
       <div className="park-worlds-card__art">
         <div className="park-worlds-card__pic">
-          <Picture w={w} art={art} client={client} night={night} />
+          <WorldThumbnail world={w} client={w.sample ? null : client} night={night} />
         </div>
         <span className={cx("park-worlds-chip", `park-worlds-chip--${status.tone}`)}>
           <span className={`park-worlds-dot park-worlds-dot--${status.tone}`} />
@@ -83,11 +56,11 @@ function WorldCardView({ w, art, status, client, night, onOpen }: CardProps) {
       </div>
       <div className="park-worlds-card__body">
         <div className="park-worlds-card__titles">
-          <span className="park-worlds-card__name">
-            {w.name}
+          <div className="park-worlds-card__name-row">
+            <span className="park-worlds-card__name">{w.name}</span>
             {w.sample ? <SampleBadge /> : null}
             {w.access === "team" ? <span className="park-worlds-team">Team</span> : null}
-          </span>
+          </div>
           <span className="park-worlds-card__last">{w.sample ? <SampleNote /> : lastLine(w)}</span>
         </div>
         <div className="park-worlds-track">
@@ -97,10 +70,14 @@ function WorldCardView({ w, art, status, client, night, onOpen }: CardProps) {
           />
         </div>
         <div className="park-worlds-card__foot">
-          {/* The live list serves no agent count or spend: nothing is printed rather than a zero (HR-1). */}
-          <span>
-            {w.agents > 0 ? `${w.tier} · ${plural(w.agents, "helper", "helpers")}` : w.tier}
-          </span>
+          {/* The list API omits agents; use a dash instead of inventing zero. */}
+          {w.agents > 0 ? (
+            <span className="park-worlds-card__agents">
+              {`${w.tier} · ${plural(w.agents, "helper", "helpers")}`}
+            </span>
+          ) : (
+            <span className="park-worlds-card__agents">Helpers —</span>
+          )}
           {w.spend ? (
             <span className="park-worlds-card__cost">
               {[w.spend, w.of].filter(Boolean).join(" ")}

@@ -327,7 +327,10 @@ describe("WEB_5_worlds: cards", () => {
     const { c } = await renderWorlds();
     const t = text(card(c, id));
     for (const w of wanted) has(t, w);
-    expect(card(c, id).querySelector(art), "the world's own picture").not.toBeNull();
+    expect(
+      card(c, id).querySelector(art === "img" ? ".park-worldthumb__tile" : art),
+      "the world's thumbnail",
+    ).not.toBeNull();
   });
 
   it.each([
