@@ -167,8 +167,12 @@
 
 /* ---- members table (scrolls sideways inside its card) ---- */
 [data-park] .park-team-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   /* QA-DEMO-1 M5: edge shadows that show there is more to the side (they follow the scroll position) */
   background:
     linear-gradient(to right, var(--card) 30%, transparent) left center / 32px 100% no-repeat local,
@@ -553,6 +557,18 @@
 
 /* UI-10 W9: keep the dense tables scrollable inside their card, and stack coverage on phones. */
 @media (max-width: 600px) {
+  [data-park] [data-testid="park-page-team"] .park-team-card {
+    max-width: 100%;
+    overflow: hidden;
+  }
+  [data-park] [data-testid="park-page-team"] .park-team-scroll {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
   [data-park] [data-testid="park-page-team"] .park-team-cover {
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
@@ -561,7 +577,9 @@
     justify-content: flex-start;
   }
   [data-park] [data-testid="park-page-team"] .park-team-matrix {
+    max-width: 100%;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
   [data-park] [data-testid="park-page-team"] .park-team-mrow {
     min-width: 360px;
@@ -575,10 +593,32 @@
   }
 }
 
-/* UI-10 W19: the invite is the page's primary phone action. */
+/* UI-10 W19 and FT-UX-1: phone controls and primary actions meet 44px minimum tap targets. */
 @media (max-width: 600px) {
   [data-park] .park-team-invite button {
     min-width: 44px;
+    min-height: 44px;
+  }
+  [data-park] .park-team-link {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  [data-park] .park-switch {
+    min-height: 44px;
+    min-width: 44px;
+    align-items: center;
+  }
+  [data-park] .park-team-more {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  [data-park] .park-team-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  [data-park] .park-team-select {
     min-height: 44px;
   }
 }

@@ -1647,4 +1647,31 @@
   [data-park] .park-agenda-act {
     min-height: 44px;
   }
+  /* FT-UX-1: all phone tap targets meet 44px minimum */
+  [data-park] .park-agenda-check {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  [data-park] .park-agenda-accept--soft,
+  [data-park] .park-agenda-notnow--soft,
+  [data-park] .park-agenda-act--soft {
+    min-height: 44px;
+  }
+  [data-park] .park-agenda-addbtn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  [data-park] .park-agenda-pinit {
+    min-height: 44px;
+  }
+  [data-park] .park-agenda-root .cx-agenda-close {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  [data-park] .park-agenda-root .cx-agenda-slot-popover button {
+    min-height: 44px;
+  }
 }

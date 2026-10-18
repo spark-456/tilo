@@ -591,6 +591,11 @@
   [data-park] .park-worlds-scale__btn {
     min-height: 44px;
   }
+  [data-park] .park-worlds-routines a,
+  [data-park] .park-worlds-routines button {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 /* ---- Waiting for you (kept from WEB-5, Studio colours) ---- */

@@ -176,6 +176,8 @@
   [data-park][data-theme="studio"] [data-testid="park-page-team"] > .park-sheet {
     padding: 0 0 48px;
     gap: 20px;
+    max-width: 100%;
+    overflow-x: hidden;
   }
   [data-park][data-theme="studio"] .park-team-h1 {
     font-size: 36px;
@@ -184,5 +186,27 @@
   [data-park][data-theme="studio"] [data-testid="self-serve-teams"],
   [data-park][data-theme="studio"] .park-team-side {
     padding: 18px 16px;
+  }
+  [data-park][data-theme="studio"] .park-team-directory,
+  [data-park][data-theme="studio"] .park-team-card {
+    max-width: 100%;
+    overflow: hidden;
+  }
+  [data-park][data-theme="studio"] .park-team-scroll {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  [data-park][data-theme="studio"] .park-team-dirtable {
+    min-width: 560px;
+  }
+  [data-park][data-theme="studio"] .park-team-link {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
   }
 }

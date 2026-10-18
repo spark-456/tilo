@@ -849,4 +849,16 @@
     flex-wrap: wrap;
     margin-left: 0;
   }
+  /* FT-UX-1: phone controls meet 44px minimum tap targets */
+  [data-park] .park-ledger-method {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  [data-park] .park-ledger-open .park-btn,
+  [data-park] .park-ledger-approve .park-btn,
+  [data-park] .park-ledger-actions .park-btn {
+    min-height: 44px;
+  }
 }
