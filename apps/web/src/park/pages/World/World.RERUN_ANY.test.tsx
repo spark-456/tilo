@@ -50,9 +50,10 @@ function clientWith(startAgain: HttpClient["startAgain"], events = UNIT_FAILED):
 
 describe("RERUN_ANY Start it again for any stopped run", () => {
   it("test_R_RUN_pause_calls_the_api_before_showing_paused", async () => {
-    const client = clientWith(vi.fn(async () => ({ world_id: "w_new", task_id: "t_new" })), [
-      ev(1, "budget.granted", { cap: 40 }), ev(2, "world.started"),
-    ]);
+    const client = clientWith(
+      vi.fn(async () => ({ world_id: "w_new", task_id: "t_new" })),
+      [ev(1, "budget.granted", { cap: 40 }), ev(2, "world.started")],
+    );
     const pause = vi.fn(async () => undefined);
     client.pauseWorld = pause;
     const rig = await mountWorld({ id: "hires", api: liveWorldsApi(), client });
@@ -62,8 +63,16 @@ describe("RERUN_ANY Start it again for any stopped run", () => {
   });
   it("test_R_RUN_paused_world_offers_continue_into_new_run_in_the_same_world", async () => {
     const start = vi.fn(async () => ({ world_id: "hires", task_id: "t_continued" }));
-    const events = [ev(1, "budget.granted", { cap: 40 }), ev(2, "world.started"), ev(3, "world.paused", { reason: "pause_all" })];
-    const rig = await mountWorld({ id: "hires", api: liveWorldsApi(), client: clientWith(start, events) });
+    const events = [
+      ev(1, "budget.granted", { cap: 40 }),
+      ev(2, "world.started"),
+      ev(3, "world.paused", { reason: "pause_all" }),
+    ];
+    const rig = await mountWorld({
+      id: "hires",
+      api: liveWorldsApi(),
+      client: clientWith(start, events),
+    });
     click(control(rig.el, "Continue"));
     await settle();
     expect(start).toHaveBeenCalledWith("hires");

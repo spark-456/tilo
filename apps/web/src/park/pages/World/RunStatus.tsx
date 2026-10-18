@@ -28,7 +28,11 @@ const refused = (error: unknown): boolean => {
 
 /** The one honest action for any stopped run (RERUN-1, RERUN-ANY): it always asks `/rerun` first; only a server
  * refusal points to a new task, and any other failure says so and leaves the button for another try. */
-function StartItAgain({ again, events, paused = false }: { again: StartAgain; events: readonly RunEvent[]; paused?: boolean }) {
+function StartItAgain({
+  again,
+  events,
+  paused = false,
+}: { again: StartAgain; events: readonly RunEvent[]; paused?: boolean }) {
   const { cap, sent } = restartApproval(events);
   const restart = isRestartStop(events);
   const [state, setState] = useState<"idle" | "busy" | "error" | "refused">("idle");
@@ -281,7 +285,9 @@ export function RunStatus({
       {view.phase === "paused" && again ? (
         <div className="park-world-failed" data-testid="run-paused">
           <h2 className="park-world-h2">This run is paused</h2>
-          <p className="park-world-noruns">Continue starts a new run using this task and its recorded progress.</p>
+          <p className="park-world-noruns">
+            Continue starts a new run using this task and its recorded progress.
+          </p>
           <StartItAgain again={again} events={events} paused />
         </div>
       ) : null}
