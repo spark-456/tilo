@@ -313,16 +313,24 @@ function Plate({ A, api }: { A: LiveAgenda; api: Api }) {
       <div className="park-agenda-studio">
         <div className="park-agenda-studiomain">
           <section aria-label="Your plate" className="park-agenda-state">
-            <h2>Your plate</h2>
+            <h2 className="park-agenda-cardtitle">
+              <span aria-hidden="true">{icon("check", 16)}</span>
+              Your plate
+            </h2>
             {list(
               A.plate.rows.filter((r) => !isCalendarEntry(r)),
               "Nothing on your plate",
             )}
-            <AppLink to="/home">Morning brief on Home</AppLink>
+            <AppLink className="park-agenda-cardlink" to="/home">
+              Morning brief on Home
+            </AppLink>
             {A.plate.truncated ? <p>Showing a limited list.</p> : null}
           </section>
           <section aria-label="Parked work" className="park-agenda-state">
-            <h2>Parked work</h2>
+            <h2 className="park-agenda-cardtitle">
+              <span aria-hidden="true">{icon("plus", 16)}</span>
+              Parked work
+            </h2>
             {list(A.plate.parked, "No parked work.")}
           </section>
           <div id="agenda-meetings">
@@ -331,11 +339,17 @@ function Plate({ A, api }: { A: LiveAgenda; api: Api }) {
         </div>
         <aside className="park-agenda-studioside">
           <section aria-label="Event details" className="park-agenda-state park-agenda-sidecard">
-            <h2>Event details</h2>
+            <h2 className="park-agenda-cardtitle">
+              <span aria-hidden="true">{icon("calendar", 16)}</span>
+              Event details
+            </h2>
             <p>Select a meeting to see its details and any prepared brief.</p>
           </section>
           <section aria-label="Available times" className="park-agenda-state park-agenda-sidecard">
-            <h2>Tilo suggests</h2>
+            <h2 className="park-agenda-cardtitle">
+              <span aria-hidden="true">{icon("check", 16)}</span>
+              Tilo suggests
+            </h2>
             <p>Suggested times will appear when Tilo has real availability to share.</p>
           </section>
         </aside>

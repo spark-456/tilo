@@ -2,7 +2,7 @@ import { act } from "react";
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, renderAgenda, settle } from "../../../../test-support/park/agendaHarness";
-import { q } from "../../../../test-support/park/componentsHarness";
+import { click, q } from "../../../../test-support/park/componentsHarness";
 import { typeInto } from "../../../../test-support/park/skillsHarness";
 import { createLiveApi } from "../../api/liveApi";
 
@@ -89,6 +89,8 @@ it("AGENDA_BOARDS_live_plate_keeps_both_cork_boards_and_routes_each_add_to_its_s
   expect(container.querySelector('[aria-label="Week calendar"]')).not.toBeNull();
   if (!myBoard || !teamBoard) throw new Error("Both boards should render");
 
+  click(q<HTMLButtonElement>(myBoard, ".park-agenda-liveboard__addnote"));
+  click(q<HTMLButtonElement>(teamBoard, ".park-agenda-liveboard__addnote"));
   typeInto(q(myBoard, 'input[aria-label="Pin to My board"]'), "Personal note");
   typeInto(q(teamBoard, 'input[aria-label="Pin to Team board"]'), "Team note");
   const addPin = (board: HTMLElement) => q<HTMLButtonElement>(board, 'button[type="submit"]');

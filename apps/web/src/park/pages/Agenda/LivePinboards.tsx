@@ -33,6 +33,7 @@ function Board({
   onPinCreated: () => void;
 }) {
   const [draft, setDraft] = useState("");
+  const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const idempotencyKey = useRef<string | null>(null);
@@ -52,6 +53,7 @@ function Board({
       await createPin(titleText, targetTeam, idempotencyKey.current);
       idempotencyKey.current = null;
       setDraft("");
+      setAdding(false);
       setMessage("Pin saved");
       onPinCreated();
     } catch {
@@ -89,31 +91,45 @@ function Board({
         {rows.map((pin, index) => (
           <PinCard key={pin.id} pin={pin} tone={index % 4} />
         ))}
-        <form className="park-agenda-liveboard__add" onSubmit={(event) => void save(event)}>
-          <label className="park-agenda-sr" htmlFor={`agenda-pin-${personal ? "me" : "team"}`}>
-            {`Pin to ${title}`}
-          </label>
-          <input
-            id={`agenda-pin-${personal ? "me" : "team"}`}
-            aria-label={`Pin to ${title}`}
-            value={draft}
-            maxLength={120}
-            placeholder="Write a note…"
-            onChange={(event) => {
-              idempotencyKey.current = null;
-              setDraft(event.target.value);
-              setMessage("");
-            }}
-            disabled={!canAdd || busy}
-          />
+        {adding ? (
+          <form className="park-agenda-liveboard__add" onSubmit={(event) => void save(event)}>
+            <label className="park-agenda-sr" htmlFor={`agenda-pin-${personal ? "me" : "team"}`}>
+              {`Pin to ${title}`}
+            </label>
+            <input
+              id={`agenda-pin-${personal ? "me" : "team"}`}
+              aria-label={`Pin to ${title}`}
+              value={draft}
+              maxLength={120}
+              placeholder="Write a note…"
+              onChange={(event) => {
+                idempotencyKey.current = null;
+                setDraft(event.target.value);
+                setMessage("");
+              }}
+              disabled={!canAdd || busy}
+            />
+            <div className="park-agenda-liveboard__addactions">
+              <button type="submit" disabled={!canAdd || !draft.trim() || busy}>
+                {busy ? "Saving…" : "Pin it"}
+              </button>
+              <button type="button" onClick={() => setAdding(false)} disabled={busy}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
           <button
-            type="submit"
-            disabled={!canAdd || !draft.trim() || busy}
+            type="button"
+            className="park-agenda-liveboard__addnote"
+            onClick={() => setAdding(true)}
+            disabled={!canAdd}
             aria-describedby={!personal && !teamId ? hintId : undefined}
           >
-            {busy ? "Saving…" : "Add a pin"}
+            <span aria-hidden="true">+</span>
+            Add a pin
           </button>
-        </form>
+        )}
         {!personal && !teamId ? (
           <p id={hintId} className="park-agenda-liveboard__hint">
             Join a team to add a team pin.
