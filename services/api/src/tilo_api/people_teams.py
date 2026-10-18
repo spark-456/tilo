@@ -17,6 +17,7 @@ from __future__ import annotations
 import re
 import secrets
 from collections.abc import Callable, Mapping
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
@@ -32,11 +33,13 @@ from tilo_policy.schemas import conforms
 from tilo_api import deps
 from tilo_api.people import _PeopleRoute
 from tilo_api.people_writes import Empty, Refusal, _Closed, json_body, valid_email
+from tilo_api.team_store import TeamRepository, get_team_store
 
 router = APIRouter(route_class=_PeopleRoute)
 
 Principal = Annotated[deps.Principal, Depends(deps.get_current_principal)]
 Stores = Annotated[PeopleStores, Depends(deps.get_people_stores)]
+TeamSettings = Annotated[TeamRepository, Depends(get_team_store)]
 Clock = Annotated[Callable[[], str], Depends(deps.get_clock)]
 _TEAM = re.compile(r"tm_[0-9a-z_]{1,48}")
 _PERSON = re.compile(r"u_[0-9A-Za-z_]{1,48}")
@@ -116,26 +119,40 @@ def _change(
     raise Refusal(409, "version_conflict", code="version_conflict")
 
 
-def _entry_view(d: Directory, actor: str, m: Mapping[str, Any], now: str) -> dict[str, Any] | None:
+def _default_name(d: Directory, team: str, now: str) -> str:
+    leads = sorted(p["display_name"] for uid, p in d.persons.items() if d.is_lead(uid, team, now))
+    return f"{leads[0]}'s team" if leads else "Team"
+
+
+def _entry_view(
+    d: Directory, actor: str, m: Mapping[str, Any], now: str, names: Mapping[str, str]
+) -> dict[str, Any] | None:
     me = d.record(actor)
     if me is None:
         return None
     if d.counts(me, m, now):
         return {
             "team": m["team"],
+            "name": names.get(m["team"]) or _default_name(d, m["team"], now),
             "lead": m.get("lead") is True and d.is_lead(actor, m["team"], now),
             "state": "member",
         }
     if pending(d, m, now):  # PE-20: the invited person reads the inviter's directory view while it is pending
         inviter = project("person", "directory", d.record(m["assigned_by"]["by"]) or {})
-        return {"team": m["team"], "lead": False, "state": "pending", "invited_by": inviter}
+        return {
+            "team": m["team"],
+            "name": names.get(m["team"]) or _default_name(d, m["team"], now),
+            "lead": False,
+            "state": "pending",
+            "invited_by": inviter,
+        }
     # An entry that counts for nothing (an invitation whose lead left, a stray lead flag): shown with no inviter, so
     # its person can remove it and free the slot (the 8-membership limit counts every stored entry).
-    return {"team": m["team"], "lead": False, "state": "lapsed"}
+    return {"team": m["team"], "name": names.get(m["team"]) or "Former team", "lead": False, "state": "lapsed"}
 
 
 @router.get("/v1/teams")
-def my_teams(principal: Principal, stores: Stores, clock: Clock) -> dict[str, Any]:
+def my_teams(principal: Principal, stores: Stores, clock: Clock, settings: TeamSettings) -> dict[str, Any]:
     """The signed-in person's own teams and pending invitations; no record is the one 404."""
     _session(principal)
     now = clock()
@@ -143,7 +160,8 @@ def my_teams(principal: Principal, stores: Stores, clock: Clock) -> dict[str, An
     me = d.record(principal.user_id)
     if me is None:
         raise _not_found()
-    rows = [_entry_view(d, principal.user_id, m, now) for m in me["memberships"]]
+    names = settings.read().names
+    rows = [_entry_view(d, principal.user_id, m, now, names) for m in me["memberships"]]
     return {"teams": [r for r in rows if r is not None], "you": principal.user_id}
 
 
@@ -168,7 +186,11 @@ def _after_the_team(d: Directory, team: str, now: str) -> str:
 
 @router.post("/v1/teams", status_code=201)
 def create_team(
-    _: Annotated[Empty, Depends(json_body(Empty))], principal: Principal, stores: Stores, clock: Clock
+    _: Annotated[Empty, Depends(json_body(Empty))],
+    principal: Principal,
+    stores: Stores,
+    clock: Clock,
+    settings: TeamSettings,
 ) -> dict[str, Any]:
     """Any person of the org creates a team: the id is minted here (96 random bits), the creator's founding entry is
     `{team, lead: true, assigned_by: creator at now}` (PE-37). The body is `{}`: nothing in it names a team."""
@@ -182,11 +204,17 @@ def create_team(
     asked = TeamRequest(principal.user_id, "create_team", deps.ORG_ID, now, team=team)
     if not _change(stores, lambda d: asked, add):
         raise _forbidden()
-    return {"team": team, "lead": True, "state": "member"}
+    d, _ = _snapshot(stores)
+    name = _default_name(d, team, now)
+    for _ in range(_ATTEMPTS):
+        state = settings.read()
+        if settings.compare_and_set(state.version, replace(state, names={**state.names, team: name})):
+            return {"team": team, "name": name, "lead": True, "state": "member"}
+    raise Refusal(409, "version_conflict", code="version_conflict")
 
 
 @router.get("/v1/teams/{team}")
-def roster(team: str, principal: Principal, stores: Stores, clock: Clock) -> dict[str, Any]:
+def roster(team: str, principal: Principal, stores: Stores, clock: Clock, settings: TeamSettings) -> dict[str, Any]:
     """`read_roster`: a member of the team reads every member's id, display name and `lead` (PE-37); nothing of a
     pending invitation. Everyone else gets the one 404."""
     _session(principal)
@@ -200,7 +228,8 @@ def roster(team: str, principal: Principal, stores: Stores, clock: Clock) -> dic
         if d.is_member(uid, team, now)
     ]
     members.sort(key=lambda row: (not row["lead"], row["display_name"], row["id"]))
-    return {"team": team, "members": members, "you": principal.user_id}
+    name = settings.read().names.get(team) or _default_name(d, team, now)
+    return {"team": team, "name": name, "members": members, "you": principal.user_id}
 
 
 @router.post("/v1/teams/{team}/invites")

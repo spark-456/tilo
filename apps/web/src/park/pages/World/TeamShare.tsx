@@ -53,13 +53,13 @@ export const CONSENT =
 const MAX_TEAMS = 8;
 
 function Row({
-  team,
+  teamName,
   share,
   member,
   busy,
   onChange,
 }: {
-  team: string;
+  teamName: string;
   share: TeamShare | undefined;
   member: boolean;
   busy: boolean;
@@ -72,14 +72,14 @@ function Row({
       : "Not shared.";
   return (
     <li className="park-world-teamrow">
-      <span className="park-world-teamname">{team}</span>
+      <span className="park-world-teamname">{teamName}</span>
       <span className="park-world-teamnote">{words}</span>
       {share?.inForce || (share && !member) ? (
         <Button
           variant="secondary"
           size="sm"
           disabled={busy}
-          aria-label={`Stop sharing with ${team}`}
+          aria-label={`Stop sharing with ${teamName}`}
           onClick={() => onChange(false)}
         >
           Stop sharing
@@ -89,7 +89,7 @@ function Row({
           variant="secondary"
           size="sm"
           disabled={busy}
-          aria-label={`Share this world with ${team}`}
+          aria-label={`Share this world with ${teamName}`}
           onClick={() => onChange(true)}
         >
           Share with this team
@@ -111,11 +111,13 @@ function ShareDialog({
   const [failure, setFailure] = useState("");
   const [view, reload] = useRead(async () => {
     const team = await api.getTeam();
+    const controls = await api.getTeamLive().catch(() => ({ data: null }));
     const shares = team.data.setupRequired ? [] : await readShares(client, worldId);
     return {
       shares,
       setupRequired: team.data.setupRequired,
       teams: team.data.people.find((p) => p.you)?.memberships ?? null,
+      names: new Map(controls.data?.teams?.map((t) => [t.id, t.name]) ?? []),
     };
   }, [client, worldId, api]);
   useEffect(() => {
@@ -130,7 +132,7 @@ function ShareDialog({
       await setShare(client, worldId, team, on);
     } catch (e) {
       setFailure(
-        `${on ? "Could not share" : "Could not stop sharing"} with ${team}. ${failureWords(e)}`,
+        `${on ? "Could not share" : "Could not stop sharing"} with ${view.status === "ready" ? (view.value.names.get(team) ?? "that team") : "that team"}. ${failureWords(e)}`,
       );
     } finally {
       setBusy(null);
@@ -184,10 +186,10 @@ function ShareDialog({
               <p>You are not in a team yet, so there is nobody to share this world with.</p>
             ) : null}
             <ul className="park-world-teamlist" aria-label="Teams">
-              {teams.map((t) => (
+              {teams.map((t, index) => (
                 <Row
                   key={t}
-                  team={t}
+                  teamName={view.value.names.get(t) ?? `Team ${index + 1}`}
                   share={view.value.shares.find((s) => s.team === t)}
                   member={mine.includes(t)}
                   busy={busy !== null}

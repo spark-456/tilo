@@ -26,6 +26,10 @@ def _rig(people_rig, monkeypatch):
     rig.unwire("founder_gate")
     monkeypatch.setenv(ENV_UID, FOUNDER)
     rig.set_now(NOW)
+    from tilo_api.team_store import InMemoryTeamStore, get_team_store
+
+    team_settings = InMemoryTeamStore()
+    rig.app.dependency_overrides[get_team_store] = lambda: team_settings
     return rig
 
 
@@ -143,7 +147,16 @@ def test_SELF_SERVE_TEAMS_a_member_creates_a_team_and_becomes_its_lead(people_ri
     assert roster.json()["members"] == [{"id": "u_mia", "display_name": "Mia", "lead": True}]
     rig.as_user("u_mia")
     mine = rig.client.get("/v1/teams").json()["teams"]
-    assert mine == [{"team": team, "lead": True, "state": "member"}]
+    assert mine == [{"team": team, "name": "Mia's team", "lead": True, "state": "member"}]
+
+
+def test_R_TEAM_names_are_returned_instead_of_exposing_a_team_id(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    team = _three(rig)
+    rig.as_user("u_mia")
+    mine = rig.client.get("/v1/teams").json()["teams"]
+    assert mine == [{"team": team, "name": "Mia's team", "lead": True, "state": "member"}]
+    assert _roster(rig, "u_mia", team).json()["name"] == "Mia's team"
 
 
 def test_SELF_SERVE_TEAMS_a_lead_invites_the_invitee_accepts_and_reads_the_roster(people_rig, monkeypatch):
@@ -157,7 +170,13 @@ def test_SELF_SERVE_TEAMS_a_lead_invites_the_invitee_accepts_and_reads_the_roste
     rig.as_user("u_ben")
     pending = rig.client.get("/v1/teams").json()["teams"]
     assert pending == [
-        {"team": team, "lead": False, "state": "pending", "invited_by": {"id": "u_mia", "display_name": "Mia"}}
+        {
+            "team": team,
+            "name": "Mia's team",
+            "lead": False,
+            "state": "pending",
+            "invited_by": {"id": "u_mia", "display_name": "Mia"},
+        }
     ]
     _tick(rig, 3)
     accepted = rig.post(f"/v1/teams/{team}/accept", {})

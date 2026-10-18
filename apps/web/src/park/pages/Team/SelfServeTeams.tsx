@@ -29,7 +29,8 @@ async function load(client: TeamsClient): Promise<Loaded> {
   return { teams, you, rosters };
 }
 
-function teamName(roster: RosterMember[] | undefined): string {
+function teamName(team: MyTeam, roster: RosterMember[] | undefined): string {
+  if (team.name) return team.name;
   const lead = roster?.find((m) => m.lead);
   return lead ? `Team led by ${lead.name}` : "Team";
 }
@@ -82,7 +83,7 @@ export function SelfServeTeams(props: {
       onLoaded?.(
         next.you,
         next.teams.flatMap((t) =>
-          t.state === "member" ? [{ name: teamName(next.rosters[t.team]), lead: t.lead }] : [],
+          t.state === "member" ? [{ name: teamName(t, next.rosters[t.team]), lead: t.lead }] : [],
         ),
       );
     } catch {
@@ -156,7 +157,7 @@ export function SelfServeTeams(props: {
         ) : (
           <div className="park-team-details" key={t.team} data-testid="team-row">
             <h3 className="park-team-h2">
-              {teamName(data.rosters[t.team])}
+              {teamName(t, data.rosters[t.team])}
               {t.lead ? " · You lead it" : ""}
             </h3>
             <ul>

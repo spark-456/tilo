@@ -107,6 +107,22 @@ async function liveApi(
     source: "live",
   });
   api.getTeam = async () => teamOf(memberships);
+  api.getTeamLive = async () => ({
+    data: {
+      version: 1,
+      me: { id: "u_asha", role: "Owner" },
+      members: [{ id: "u_asha", role: "Owner", limit_minor: null }],
+      switches: [],
+      tools: [],
+      capabilities: [],
+      invites: [],
+      teams: memberships.map((id, index) => ({
+        id,
+        name: index === 0 ? "Launch team" : "Operations team",
+      })),
+    },
+    source: "live",
+  });
   return api;
 }
 
@@ -142,7 +158,7 @@ const press = async (b: Element | undefined) => {
 };
 
 describe("BQ_CTX_TEAMWORLD the owner's Share with team dialog", () => {
-  it("FR_TEAM_01 states what sharing does before anything changes, then lists each team's live state", async () => {
+  it("R_TEAM names every team in the share dialog without exposing tm ids", async () => {
     const server = newServer({
       shares: [
         { team: "tm_launch", in_force: true, reason: null, granted_at: "2026-10-10T09:00:00.000Z" },
@@ -159,12 +175,12 @@ describe("BQ_CTX_TEAMWORLD the owner's Share with team dialog", () => {
     expect(text).toContain("They cannot answer, approve, pause or share it");
     const rows = [...(dialog?.querySelectorAll("li") ?? [])].map((li) => li.textContent ?? "");
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toContain("tm_launch");
+    expect(rows[0]).toContain("Launch team");
     expect(rows[0]).toContain("Shared. Every member of this team can read this world.");
-    expect(rows[1]).toContain("tm_ops");
+    expect(rows[1]).toContain("Operations team");
     expect(rows[1]).toContain("Not shared.");
-    expect(named(el, "Stop sharing with tm_launch")).toBeDefined();
-    expect(named(el, "Share this world with tm_ops")).toBeDefined();
+    expect(named(el, "Stop sharing with Launch team")).toBeDefined();
+    expect(named(el, "Share this world with Operations team")).toBeDefined();
     expect(calls().some((c) => c.startsWith("PUT") || c.startsWith("DELETE"))).toBe(false);
   });
 
@@ -172,27 +188,27 @@ describe("BQ_CTX_TEAMWORLD the owner's Share with team dialog", () => {
     const server = newServer();
     const { el, calls } = await page(server, await liveApi());
     await press(named(el, "Share with team"));
-    await press(named(el, "Share this world with tm_ops"));
+    await press(named(el, "Share this world with Operations team"));
     expect(calls().slice(-3)).toEqual([
       `GET /worlds/${W}/team-shares`,
       "PUT /worlds/w_launch/team-shares/tm_ops",
       `GET /worlds/${W}/team-shares`,
     ]);
     const row = [...el.querySelectorAll('[role="dialog"] li')].find((li) =>
-      li.textContent?.includes("tm_ops"),
+      li.textContent?.includes("Operations team"),
     );
     expect(row?.textContent).toContain("Shared. Every member");
-    expect(named(el, "Stop sharing with tm_ops")).toBeDefined();
+    expect(named(el, "Stop sharing with Operations team")).toBeDefined();
   });
 
   it("FR_TEAM_01 a refused grant says so, shows no Shared row and changes nothing", async () => {
     const server = newServer({ putStatus: 403 });
     const { el } = await page(server, await liveApi());
     await press(named(el, "Share with team"));
-    await press(named(el, "Share this world with tm_ops"));
+    await press(named(el, "Share this world with Operations team"));
     const dialog = el.querySelector('[role="dialog"]');
     expect(dialog?.querySelector('[role="alert"]')?.textContent).toContain(
-      "Could not share with tm_ops",
+      "Could not share with Operations team",
     );
     expect(dialog?.textContent).not.toContain("Shared. Every member");
     expect(server.shares).toEqual([]);
@@ -206,10 +222,10 @@ describe("BQ_CTX_TEAMWORLD the owner's Share with team dialog", () => {
     });
     const { el, calls } = await page(server, await liveApi());
     await press(named(el, "Share with team"));
-    await press(named(el, "Stop sharing with tm_launch"));
+    await press(named(el, "Stop sharing with Launch team"));
     expect(calls()).toContain("DELETE /worlds/w_launch/team-shares/tm_launch");
     const row = [...el.querySelectorAll('[role="dialog"] li')].find((li) =>
-      li.textContent?.includes("tm_launch"),
+      li.textContent?.includes("Launch team"),
     );
     expect(row?.textContent).toContain("Not shared.");
   });
@@ -229,7 +245,7 @@ describe("BQ_CTX_TEAMWORLD the owner's Share with team dialog", () => {
     await press(named(el, "Share with team"));
     const row = el.querySelector('[role="dialog"] li');
     expect(row?.textContent).toContain("Not in force. You left this team, so this share stopped.");
-    expect(named(el, "Share this world with tm_launch")).toBeDefined();
+    expect(named(el, "Share this world with Launch team")).toBeDefined();
   });
 
   it("FR_TEAM_01 a read that fails says so and offers Try again; 401 and 404 are said plainly", async () => {
@@ -241,7 +257,7 @@ describe("BQ_CTX_TEAMWORLD the owner's Share with team dialog", () => {
     );
     server.sharesStatus = 200;
     await press(named(el, "Try again"));
-    expect(el.querySelector('[role="dialog"] li')?.textContent).toContain("tm_launch");
+    expect(el.querySelector('[role="dialog"] li')?.textContent).toContain("Launch team");
 
     const unsigned = await page(newServer({ sharesStatus: 401 }), await liveApi());
     await press(named(unsigned.el, "Share with team"));
