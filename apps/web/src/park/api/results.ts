@@ -46,21 +46,22 @@ export function saveResult(blob: Blob, world: string): void {
   try {
     const link = document.createElement("a");
     link.href = url;
+    const mediaType = blob.type.split(";", 1)[0]?.trim() ?? "";
     const extension =
-      OFFICE_EXTENSIONS[blob.type] ??
-      (blob.type === "application/pdf"
+      OFFICE_EXTENSIONS[mediaType] ??
+      (mediaType === "application/pdf"
         ? ".pdf"
-        : blob.type.startsWith("text/html")
+        : mediaType === "text/html"
           ? ".html"
-        : blob.type === "application/json"
-          ? ".json"
-          : blob.type === "text/markdown"
-            ? ".md"
-            : blob.type === "text/csv"
-              ? ".csv"
-              : blob.type.startsWith("text/")
-                ? ".txt"
-                : "");
+          : mediaType === "application/json"
+            ? ".json"
+            : mediaType === "text/markdown"
+              ? ".md"
+              : mediaType === "text/csv"
+                ? ".csv"
+                : mediaType.startsWith("text/")
+                  ? ".txt"
+                  : "");
     link.download = `tilo-result-${filenamePart(world)}${extension}`;
     document.body.append(link);
     try {

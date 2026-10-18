@@ -28,20 +28,20 @@ export function AppPage({ artifactId }: { artifactId: string }) {
   }, [artifactId]);
   if (status === "loading")
     return (
-      <main>
+      <section>
         <h1>Loading app…</h1>
-      </main>
+      </section>
     );
   if (status === "missing" || !data)
     return (
-      <main>
+      <section>
         <h1>This app is not available</h1>
-      </main>
+      </section>
     );
   return (
-    <main>
+    <section>
       <h1>{data.title}</h1>
       <AppPanel artifactId={artifactId} title={data.title} html={data.html} />
-    </main>
+    </section>
   );
 }

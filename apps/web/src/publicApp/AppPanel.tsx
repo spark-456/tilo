@@ -59,6 +59,14 @@ export function AppPanel({
           const data = (await response.json()) as { count: number };
           setCount(data.count);
           setNotice("Thank you! Your response was saved.");
+          void signedAppFetch(`${base}/responses`)
+            .then(async (listing) => {
+              if (!listing.ok) return;
+              const updated = (await listing.json()) as { responses: Row[]; count: number };
+              setRows(updated.responses);
+              setCount(updated.count);
+            })
+            .catch(() => undefined);
         })
         .catch(() => setNotice("Your response could not be saved. Please try again."));
     };

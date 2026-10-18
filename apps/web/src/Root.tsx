@@ -87,11 +87,15 @@ export function Root() {
   // ADR-0035 LC-02: Google's redirect lands here. The code and state leave the address bar before anything else renders.
   const oauth = isOAuthCallback(pathname) ? takeCallbackParams() : undefined;
   const view = parseViewPath(pathname);
+  const publicPath = useMemo(
+    () => /^\/u\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/.exec(pathname),
+    [pathname],
+  );
   // ONBOARD-1: the first-run welcome and tour register themselves with the Park shell (park/shell/tour.ts): a chunk of
   // its own, started beside the Park app's and never awaited by it. The legal pages and the OAuth callback never load it.
   useEffect(() => {
-    if (!legal && oauth === undefined) void import("./onboarding/register");
-  }, [legal, oauth]);
+    if (!legal && oauth === undefined && !publicPath) void import("./onboarding/register");
+  }, [legal, oauth, publicPath]);
   if (redirect) return null;
   if (oauth !== undefined) {
     return (
@@ -107,7 +111,6 @@ export function Root() {
       </Suspense>
     );
   }
-  const publicPath = /^\/u\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/.exec(pathname);
   if (publicPath?.[1] && publicPath[2])
     return (
       <Suspense fallback={null}>
