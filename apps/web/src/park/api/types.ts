@@ -266,7 +266,7 @@ export interface SkillDraft {
   /** SKILLS-5: a taught version as the server made it; `saveSkill` posts these steps, not the labels above. */
   server?: {
     captured: string[];
-    question: { text: string; options: string[] } | null;
+    question: { text: string; options: string[]; answer?: number | null } | null;
     steps: { text: string; tool: string; action: string; verb: string; ask: boolean }[];
     inputs?: SkillInput[];
     hosts?: string[];

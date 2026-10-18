@@ -663,14 +663,18 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     decode?: (response: Response) => Promise<T>,
   ): Promise<T> {
     let res: Response;
-    // A8: the intake is the one call a person waits on in front of a spinner, so it has an end.
-    const stop = path === "/intake" ? new AbortController() : null;
+    // A capture can wait on a provider. End the visible wait so the person can retry or use words.
+    const capture = path.startsWith("/v1/skills/captures");
+    const stop = path === "/intake" || capture ? new AbortController() : null;
     let late = false;
     const timer = stop
-      ? setTimeout(() => {
-          late = true;
-          stop.abort();
-        }, INTAKE_TIMEOUT_MS)
+      ? setTimeout(
+          () => {
+            late = true;
+            stop.abort();
+          },
+          capture ? 45_000 : INTAKE_TIMEOUT_MS,
+        )
       : null;
     try {
       const sent = await this.withAuth(await this.withAppCheck(init));
