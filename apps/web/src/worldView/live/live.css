@@ -1082,6 +1082,41 @@
   cursor: pointer;
 }
 
+@media (max-width: 760px) {
+  [data-park] .tw-chat-popup {
+    position: fixed;
+    inset: 72px 8px 8px;
+    z-index: 110;
+    width: auto;
+    height: auto;
+    border-radius: 18px;
+  }
+  [data-park] .tw-chat-popup__head {
+    padding-left: 10px;
+  }
+  [data-park] .tw-chat-popup__convene span {
+    display: none;
+  }
+  [data-park] .tw-chat-popup__convene,
+  [data-park] .tw-chat-popup__close {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    justify-content: center;
+    flex: none;
+  }
+  [data-park] .tw-chat-bottom {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+  [data-park] .tw-chat-to-badge {
+    grid-column: 1 / -1;
+    height: 32px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 /* Convene dialog */
 [data-park] .tw-scrim {
   position: absolute;
@@ -2232,6 +2267,7 @@
   background: var(--card, #ffffff);
   color: var(--ink, #0b0b0c);
   font-weight: 600;
+}
 /* ---- TW-6: Needs-you chip above agent on stage ---- */
 [data-park] .tw-needs-chip {
   position: absolute;

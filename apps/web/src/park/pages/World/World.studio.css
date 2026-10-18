@@ -227,7 +227,7 @@
     border-left: 1px solid var(--line);
   }
   [data-park] .park-world-root > .park-sheet {
-    padding: 0 0 128px;
+    padding: 0 0 32px;
   }
 }
 
@@ -859,17 +859,15 @@
   color: var(--okInk);
 }
 
-/* Phone bottom sheet: 372px peek, 600px tall */
+/* Phone detail panel follows the stage so it can never cover the live view. */
 [data-park] .park-world-sheethandle {
   display: none;
 }
 @media (max-width: 760px) {
   [data-park] .park-world-panels {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 372px;
+    position: relative;
+    width: 100%;
+    height: auto;
     background: var(--card);
     border-top: 1px solid var(--line);
     border-radius: 24px 24px 0 0;
@@ -882,8 +880,8 @@
     box-sizing: border-box;
   }
   [data-park] .park-world-panels[data-tall="true"] {
-    height: 600px;
-    max-height: 85vh;
+    height: auto;
+    max-height: none;
   }
   [data-park] .park-world-sheethandle {
     display: block;
