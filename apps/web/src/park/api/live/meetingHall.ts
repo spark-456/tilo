@@ -26,16 +26,26 @@ export function roomOf(v: unknown, worldId: string): Room {
 export async function attendees(client: RoomClient, worldId: string): Promise<Attendee[]> {
   const path = `/worlds/${encodeURIComponent(worldId)}`;
   const missing = Symbol("layout not yet available");
-  const [layout, feed] = await Promise.all([
-    client.getJson(`${path}/layout`).catch((error: unknown) => {
-      if (error instanceof TiloApiError && error.status === 404) return missing;
-      throw error;
-    }),
-    client.getJson(`${path}/events`),
-  ]);
+  const feed = await client.getJson(`${path}/events`);
+  if (!record(feed) || !Array.isArray(feed.events)) throw bad();
+  // FR-WLD-05: layout only exists after the world has started or recorded events.
+  const events = feed.events;
+  const started = events.some(
+    (e) =>
+      record(e) &&
+      (e.type === "world.started" ||
+        e.type === "world.planned" ||
+        typeof e.district === "string" ||
+        typeof e.actor === "string"),
+  );
+  if (!started) return [];
+  const layout = await client.getJson(`${path}/layout`).catch((error: unknown) => {
+    if (error instanceof TiloApiError && error.status === 404) return missing;
+    throw error;
+  });
   // LIVE-LAYOUT / FR-WLD-05: only a successful events read establishes a readable world.
   // Missing layout cannot supply attendees; never invent agents or suppress an access error.
-  if (layout === missing && record(feed) && Array.isArray(feed.events)) return [];
+  if (layout === missing) return [];
   if (
     !record(layout) ||
     !record(layout.semantic) ||
@@ -45,7 +55,6 @@ export async function attendees(client: RoomClient, worldId: string): Promise<At
     !Array.isArray(feed.events)
   )
     throw bad();
-  const events = feed.events;
   const districts = new Map<string, string>();
   for (const level of layout.semantic.levels) {
     if (!record(level) || !Array.isArray(level.districts)) throw bad();

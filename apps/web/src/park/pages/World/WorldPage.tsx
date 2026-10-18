@@ -31,6 +31,7 @@ import type {
 } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { NotFound } from "../../app/NotFound";
+import { markPendingWorld } from "../../app/PendingWorldRoute";
 import { useDemoSession, useParkApi, useWorldClient } from "../../app/context";
 import { PageTitle } from "../../app/pageTitle";
 import { RECORDED_RUN_PATH, stagePath } from "../../app/router";
@@ -671,7 +672,10 @@ export function WorldPage({ app }: { app: AppCtx }) {
             ? {
                 again: {
                   start: () => worldClient.startAgain(w.id).then((r) => ({ worldId: r.world_id })),
-                  open: (id: string) => app.go("world", { id }),
+                  open: (id: string) => {
+                    markPendingWorld(id);
+                    app.go("world", { id });
+                  },
                   newTask: () => app.go("home"),
                 },
               }
