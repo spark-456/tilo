@@ -4,6 +4,7 @@
 // answer moves the flow on. On sample data the description is read at once and Save is this page's only. There is no
 // practice run yet; uploaded examples and confirmed local recordings use the two real capture routes (HR-1..7).
 import { useEffect, useRef, useState } from "react";
+import { TiloApiError } from "../../../api/http";
 import { displayApiError } from "../../api/errorMessage";
 import type { Api } from "../../api/index";
 import { teamsClient } from "../../api/selfServeTeams";
@@ -67,6 +68,7 @@ export interface Teach {
   version: SkillVersion | null;
   setName: (v: string) => void;
   setDesc: (v: string) => void;
+  setStepText: (index: number, text: string) => void;
   setScope: (s: Scope) => void;
   loadTeams: () => void;
   chooseTeam: (id: string) => void;
@@ -157,15 +159,40 @@ export function useTeach({
   const proposeIt = () => {
     if (!captured) return;
     once(async () => {
-      const r = await api.proposeVersion(captured.id);
-      setVersion(r.data);
-      setHosts(r.data.hosts);
-      setAsk(r.data.steps.map((s) => s.ask));
+      let next: SkillVersion;
+      try {
+        next = (await api.proposeVersion(captured.id)).data;
+      } catch (e) {
+        if (!(e instanceof TiloApiError) || e.status !== 502) throw e;
+        next = {
+          fallback: true,
+          steps: [
+            {
+              text: "Describe this step",
+              tool: "writer",
+              action: "compose",
+              verb: "draft",
+              ask: false,
+              locked: false,
+            },
+          ],
+          question: null,
+          estimates: null,
+          inputs: [],
+          hosts: [],
+          cannot: null,
+          needsSetup: [],
+        };
+      }
+      setVersion(next);
+      setHosts(next.hosts);
+      setAsk(next.steps.map((s) => s.ask));
       setStage(1);
     }, failed);
   };
   const saveLive = (nm: string) => {
     if (!version || !captured) return;
+    if (version.fallback && !version.steps[0]?.text.trim()) return;
     const steps = version.steps.map((s, i) => ({ ...s, ask: s.locked || ask[i] === true }));
     const skill: Skill = {
       ...blankSkill(user.name),
@@ -322,6 +349,14 @@ export function useTeach({
     version,
     setName,
     setDesc,
+    setStepText: (index, text) =>
+      setVersion(
+        (current) =>
+          current && {
+            ...current,
+            steps: current.steps.map((step, i) => (i === index ? { ...step, text } : step)),
+          },
+      ),
     setScope,
     loadTeams: () => {
       const client = teamsClient();

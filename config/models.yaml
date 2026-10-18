@@ -74,7 +74,7 @@ roles:
   # reads typed words, documents and (S2) a recording as delimited data, so both profiles declare json, vision, video and
   # documents; lite-31 carries an audio_input price, flash-37 does not (a recording with sound is read only by a profile
   # that has one). max_output_tokens fits thinking plus the JSON reply. The user picks the final models and prices.
-  skill_capture: { primary: lite-31, fallback: flash-37, thinking: low, max_output_tokens: 8192 }
+  skill_capture: { primary: lite-31, fallback: flash-37, thinking: low, max_output_tokens: 16384 }
   verifier: { primary: flash-38, fallback: flash-37, thinking: high, max_input_tokens: 100000, max_output_tokens: 16384 }
   writer: { primary: flash-38, fallback: flash-37, thinking: low, max_output_tokens: 16384 }
   narrator: { primary: lite-31, fallback: flash-37, max_output_tokens: 4096 } # fallback added for NFR-25 (BQ-18)

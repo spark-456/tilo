@@ -371,6 +371,39 @@ describe("SKILLS_5_live_teach: a capture the server cannot make", () => {
 });
 
 describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
+  it("test_R_SKILL_TEACH_502_keeps_capture_and_opens_one_editable_step", async () => {
+    const { server, mount } = rig({
+      "POST /v1/skills/captures/tsk_C1/version": () => json({ detail: "draft_failed" }, 502),
+    });
+    const r = await mount();
+    await toVersion(r);
+    expect(currentStep(r.el)).toBe("Review the steps");
+    const step = r.el.querySelector<HTMLInputElement>('input[aria-label="Edit step 1"]');
+    expect(step?.value).toBe("Describe this step");
+    expect(text(r)).toContain("Open the invoice mail");
+    typeInto(step as HTMLInputElement, "Draft an invoice summary");
+    expect(step?.value).toBe("Draft an invoice summary");
+    name(r, "Invoice summary");
+    clickEl(control(r.el, "Save skill"));
+    await settle();
+    const [saved] = server.posts("/v1/skills") as {
+      plan_steps: unknown[];
+      captured_steps: unknown[];
+    }[];
+    expect(saved.plan_steps).toEqual([
+      {
+        text: "Draft an invoice summary",
+        tool: "writer",
+        action: "compose",
+        verb: "draft",
+        ask_first: false,
+      },
+    ]);
+    expect(saved.captured_steps).toEqual([
+      { text: "Open the invoice mail" },
+      { text: "Note the total" },
+    ]);
+  });
   it("test_FR_SKL_02_S1w_reviews_inputs_hosts_setup_and_unavailable_steps_from_the_version", async () => {
     const expanded = {
       ...VERSION,
@@ -459,7 +492,6 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
 
   it.each([
     [503, NOT_CONNECTED],
-    [502, ERR_TRY],
     [422, ERR_TEACH_UNDERSTOOD],
   ])("SKILLS_5_live_teach_version_http_%i_says_so_and_stays_on_step_1", async (status, line) => {
     const r = await rig({
