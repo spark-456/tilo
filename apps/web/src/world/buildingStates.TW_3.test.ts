@@ -129,17 +129,17 @@ describe("TW-3 Building states and Hall/Dock lifecycle", () => {
     expect(state.dock).toBeNull();
   });
 
-  it("activates Meeting Hall and Delivery Dock to operational on world.planned", () => {
+  it("activates Meeting Hall and Delivery Dock to operational on building.planned", () => {
     const layout = makeLayout(true, true);
-    const initial = createInitialState(layout);
+    let state = createInitialState(layout);
 
-    const plannedEv = baseEvent(1, "world.planned", "w_test");
-    const next = applyEvent(initial, plannedEv, layout);
+    state = applyEvent(state, baseEvent(1, "building.planned", "b-hall"), layout);
+    state = applyEvent(state, baseEvent(2, "building.planned", "b-dock"), layout);
 
-    expect(next.buildings["b-hall"]?.status).toBe("operational");
-    expect(next.buildings["b-dock"]?.status).toBe("operational");
+    expect(state.buildings["b-hall"]?.status).toBe("operational");
+    expect(state.buildings["b-dock"]?.status).toBe("operational");
     // Normal building remains hidden until its own lifecycle event
-    expect(next.buildings["b-step"]?.status).toBe("hidden");
+    expect(state.buildings["b-step"]?.status).toBe("hidden");
   });
 
   it("transitions building through planned -> constructing -> completed", () => {
@@ -159,7 +159,7 @@ describe("TW-3 Building states and Hall/Dock lifecycle", () => {
   it("transitions building to needs on approval.requested and restores to operational on approval.resolved", () => {
     const layout = makeLayout(true, true);
     let state = createInitialState(layout);
-    state = applyEvent(state, baseEvent(1, "world.planned", "w_test"), layout);
+    state = applyEvent(state, baseEvent(1, "building.planned", "b-step"), layout);
 
     state = applyEvent(state, baseEvent(2, "approval.requested", "b-step"), layout);
     expect(state.buildings["b-step"]?.status).toBe("needs");
@@ -177,22 +177,8 @@ describe("TW-3 Building states and Hall/Dock lifecycle", () => {
     expect(state.buildings["b-step"]?.status).toBe("failed");
 
     // agent.blocked targeting building
-    state = applyEvent(
-      state,
-      baseEvent(2, "agent.blocked", "b-step", "system"),
-      layout,
-    );
+    state = applyEvent(state, baseEvent(2, "agent.blocked", "b-step", "system"), layout);
     expect(state.buildings["b-step"]?.status).toBe("failed");
-  });
-
-  it("completes Delivery Dock on artifact.delivered", () => {
-    const layout = makeLayout(true, true);
-    let state = createInitialState(layout);
-    state = applyEvent(state, baseEvent(1, "world.planned", "w_test"), layout);
-    expect(state.buildings["b-dock"]?.status).toBe("operational");
-
-    state = applyEvent(state, baseEvent(2, "artifact.delivered", "art-1"), layout);
-    expect(state.buildings["b-dock"]?.status).toBe("completed");
   });
 
   it("provides correct labels in BUILDING_STATE dictionary", () => {

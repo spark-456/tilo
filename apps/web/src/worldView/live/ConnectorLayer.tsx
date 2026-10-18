@@ -54,8 +54,7 @@ export function ConnectorLayer({
             : [];
           const lastEvent = buildingEvents[buildingEvents.length - 1];
           const isActive =
-            lastEvent?.type === "building.constructing" ||
-            lastEvent?.type === "approval.requested";
+            lastEvent?.type === "building.constructing" || lastEvent?.type === "approval.requested";
 
           return (
             <div
@@ -74,6 +73,29 @@ export function ConnectorLayer({
               >
                 <BrandIcon id={brandMeta.brand} mono={brandMeta.mono} />
               </span>
+            </div>
+          );
+        })}
+      {islands
+        .filter((i) => !isSupportedConnector(i.id) && !isSupportedConnector(i.name))
+        .filter((i) => {
+          const norm = `${i.id} ${i.name}`.toLowerCase();
+          return !norm.includes("canva");
+        })
+        .map((island) => {
+          const pos = probe?.locate(island.id);
+          if (!pos) return null;
+          return (
+            <div
+              key={island.id}
+              className="tw-island-logo tw-island-logo--later"
+              data-testid={`island-later-${island.id}`}
+              style={{
+                left: pos.x,
+                top: pos.y,
+              }}
+            >
+              <span className="tw-island-later__line">Coming later</span>
             </div>
           );
         })}

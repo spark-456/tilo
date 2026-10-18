@@ -1,12 +1,16 @@
+// @vitest-environment happy-dom
 import type { Layout } from "@tilo/contracts";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { cleanup, mount } from "../../test-support/park/componentsHarness";
 import { villageBasicLayout } from "../../test-support/worldFixtures";
-import { frameOf } from "./frame";
-import { createInitialState } from "./reducer";
 import {
+  ConnectorLayer,
   connectorBrand,
   isSupportedConnector,
 } from "../worldView/live/ConnectorLayer";
+import { frameOf } from "./frame";
+import { createInitialState } from "./reducer";
+import { registerProbe } from "./spotlight";
 
 describe("TW-3 Connector islands and real logos", () => {
   describe("isSupportedConnector", () => {
@@ -57,8 +61,9 @@ describe("TW-3 Connector islands and real logos", () => {
       const state = createInitialState(layout);
 
       // In villageBasicLayout, bridge 0 is from B1 to I1
-      const bridge0 = layout.geometry.bridges[0];
+      const bridge0 = layout.geometry?.bridges[0];
       expect(bridge0).toBeDefined();
+      if (!bridge0) throw new Error("bridge0 missing");
       const connectedBuildingId = bridge0.from;
 
       // Initially B1 is hidden, active should be false
@@ -97,6 +102,73 @@ describe("TW-3 Connector islands and real logos", () => {
       };
       const frame4 = frameOf(layout, doneState);
       expect(frame4.bridges[0]?.active).toBe(false);
+    });
+  });
+
+  describe("ConnectorLayer DOM rendering", () => {
+    const worldId = "w_test_connectors";
+    let unregisterProbe: () => void;
+
+    beforeEach(() => {
+      unregisterProbe = registerProbe(worldId, {
+        agentAt: () => null,
+        locate: (id: string) => {
+          if (id === "isl_gmail") return { x: 100, y: 150 };
+          if (id === "isl_drive") return { x: 200, y: 250 };
+          if (id === "isl_calendar") return { x: 300, y: 350 };
+          if (id === "isl_slack") return { x: 400, y: 450 };
+          if (id === "isl_canva") return { x: 500, y: 550 };
+          return null;
+        },
+      });
+    });
+
+    afterEach(() => {
+      unregisterProbe();
+      cleanup();
+    });
+
+    it("draws only Gmail, Google Drive, and Google Calendar with real logo slots, other services with coming later, and never Canva", () => {
+      const mockLayout = {
+        semantic: {
+          islands: [
+            { id: "isl_gmail", name: "Gmail Island" },
+            { id: "isl_drive", name: "Google Drive" },
+            { id: "isl_calendar", name: "Google Calendar" },
+            { id: "isl_slack", name: "Slack Island" },
+            { id: "isl_canva", name: "Canva Island" },
+          ],
+        },
+        geometry: {
+          bridges: [],
+        },
+      } as unknown as Layout;
+
+      const m = mount(<ConnectorLayer worldId={worldId} layout={mockLayout} events={[]} />);
+
+      // Gmail, Drive, Calendar logo slots rendered
+      const gmail = m.container.querySelector("[data-testid='island-logo-isl_gmail']");
+      expect(gmail).not.toBeNull();
+      expect(gmail?.querySelector(".tw-island-logo__tile")).not.toBeNull();
+
+      const drive = m.container.querySelector("[data-testid='island-logo-isl_drive']");
+      expect(drive).not.toBeNull();
+      expect(drive?.querySelector(".tw-island-logo__tile")).not.toBeNull();
+
+      const cal = m.container.querySelector("[data-testid='island-logo-isl_calendar']");
+      expect(cal).not.toBeNull();
+      expect(cal?.querySelector(".tw-island-logo__tile")).not.toBeNull();
+
+      // Slack island rendered as calm "Coming later" line
+      const slack = m.container.querySelector("[data-testid='island-later-isl_slack']");
+      expect(slack).not.toBeNull();
+      expect(slack?.textContent).toContain("Coming later");
+
+      // Canva is NEVER drawn (neither as logo nor as coming later)
+      const canvaLogo = m.container.querySelector("[data-testid='island-logo-isl_canva']");
+      const canvaLater = m.container.querySelector("[data-testid='island-later-isl_canva']");
+      expect(canvaLogo).toBeNull();
+      expect(canvaLater).toBeNull();
     });
   });
 });

@@ -21,6 +21,8 @@ const QuizPage = lazy(() =>
     default: module.QuizPlayerPage,
   })),
 );
+// Preload large WorldPage module so Vite esbuild transform is ready
+const _preloadWorld = import("../pages/World/WorldPage");
 const AUDIT_PAGES = [...REAL_PAGES, "quiz"] as const;
 for (const width of [390, 1440]) {
   for (const page of AUDIT_PAGES) {

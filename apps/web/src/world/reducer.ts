@@ -229,14 +229,6 @@ function applyKnown(state: WorldState, event: Event): WorldState {
                   ? "failed"
                   : undefined;
       const buildings = { ...state.buildings };
-      if (verb === "planned") {
-        if (state.hall && state.hall in buildings) {
-          buildings[state.hall] = { id: state.hall, status: "operational" };
-        }
-        if (state.dock && state.dock in buildings) {
-          buildings[state.dock] = { id: state.dock, status: "operational" };
-        }
-      }
       if (verb === "failed" && event.target in state.buildings) {
         buildings[event.target] = { id: event.target, status: "failed" };
       }
@@ -263,7 +255,10 @@ function applyKnown(state: WorldState, event: Event): WorldState {
     }
     case "building": {
       const building = state.buildings[event.target];
-      const status = BUILDING_STATUS_BY_VERB[verb];
+      const status =
+        (event.target === state.hall || event.target === state.dock) && verb === "planned"
+          ? "operational"
+          : BUILDING_STATUS_BY_VERB[verb];
       if (!building || !status) return state;
       return {
         ...state,
@@ -411,26 +406,15 @@ function applyKnown(state: WorldState, event: Event): WorldState {
       }
       return state;
     }
-    case "artifact": {
-      if (verb === "delivered" && state.dock && state.buildings[state.dock]) {
-        return {
-          ...state,
-          buildings: {
-            ...state.buildings,
-            [state.dock]: { ...state.buildings[state.dock], status: "completed" },
-          },
-        };
-      }
-      return state;
-    }
     case "approval":
     case "policy": {
       const buildings = { ...state.buildings };
-      if (event.target in buildings) {
+      const bld = buildings[event.target];
+      if (bld) {
         if (verb === "requested") {
-          buildings[event.target] = { ...buildings[event.target], status: "needs" };
+          buildings[event.target] = { ...bld, status: "needs" };
         } else if (verb === "resolved") {
-          buildings[event.target] = { ...buildings[event.target], status: "operational" };
+          buildings[event.target] = { ...bld, status: "operational" };
         }
       }
       let nextState = buildings !== state.buildings ? { ...state, buildings } : state;
