@@ -307,6 +307,7 @@
 [data-park] .tw-phone-sheet { animation: wSheet .28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 [data-park] .tw-building-pin { animation: wPin .3s ease-out both; }
 [data-park] .tw-building-settle { animation: wSettle .3s ease-out both; }
+[data-park] .tw-building-rise { animation: tRise 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 [data-park] .tw-plot-in { animation: wPlot .4s ease-out both; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -329,6 +330,7 @@
   [data-park] .tw-phone-sheet,
   [data-park] .tw-building-pin,
   [data-park] .tw-building-settle,
+  [data-park] .tw-building-rise,
   [data-park] .tw-plot-in {
     animation: none !important;
   }

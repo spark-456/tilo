@@ -84,7 +84,7 @@ export function Stage({
   // biome-ignore lint/correctness/useExhaustiveDependencies: `seq` (the last drawn event) is the trigger to re-centre.
   useEffect(() => {
     // triggeredBy: agent.moved (any recorded event that moves the followed agent): the camera glides to it.
-    if (follow && worldId && selectedId) flyTo(worldId, selectedId, 320);
+    if (follow && worldId && selectedId) flyTo(worldId, selectedId, cam.CAMERA_TRANSITION_MS);
   }, [follow, seq, selectedId, worldId]);
   const outlineItems = useMemo(() => {
     if (!layout) return [];
@@ -331,7 +331,9 @@ export function Stage({
       if (!move || e.ctrlKey || e.metaKey || e.altKey) return; // browser shortcuts pass
       if ((e.target as Element).closest(".stage-outline")) return; // arrows belong to the list
       e.preventDefault();
-      if (!pts.size) glide(move(goal)); // a drag or pinch in progress owns the camera
+      const isInteraction = e.key === "Home" || e.key === "+" || e.key === "=" || e.key === "-";
+      const dur = isInteraction ? cam.CAMERA_TRANSITION_MS : msRef.current;
+      if (!pts.size) glide(move(goal), dur); // a drag or pinch in progress owns the camera
     });
     // Native and non-passive, so preventDefault() works without a console error.
     listen(
@@ -417,6 +419,37 @@ export function Stage({
         // The wheel and pinch have a pointer alternative (WCAG 2.5.7). A press sends the same "+"
         // or "-" key the stage already handles, so the camera has one path (HR-3, PRD 9.7).
         <div className="stage-controls">
+          <button
+            type="button"
+            className="secondary"
+            data-lens-control
+            aria-label="Fit"
+            onClick={() => {
+              setFollow(false);
+              frameRef.current?.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Home", bubbles: true, cancelable: true }),
+              );
+            }}
+          >
+            Fit
+          </button>
+          <button
+            type="button"
+            className={`secondary${follow ? " is-active" : ""}`}
+            data-lens-control
+            aria-label={follow ? "Stop following" : "Follow agent"}
+            aria-pressed={follow}
+            onClick={() => {
+              const next = !follow;
+              setFollow(next);
+              if (next && worldId) {
+                const target = selectedId ?? layout?.semantic.agents[0]?.id;
+                if (target) flyTo(worldId, target, cam.CAMERA_TRANSITION_MS);
+              }
+            }}
+          >
+            {follow ? "Following" : "Follow"}
+          </button>
           {(["+", "-"] as const).map((key) => (
             <button
               key={key}
@@ -424,11 +457,12 @@ export function Stage({
               className="secondary"
               data-lens-control
               aria-label={key === "+" ? "Zoom in" : "Zoom out"}
-              onClick={() =>
+              onClick={() => {
+                setFollow(false);
                 frameRef.current?.dispatchEvent(
                   new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
-                )
-              }
+                );
+              }}
             >
               <span aria-hidden="true">{key === "+" ? "+" : "−"}</span>
             </button>

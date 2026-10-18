@@ -3,6 +3,8 @@
 
 // PRD 18.2 "Motion": 320 ms camera (BQ-10: PRD wins over the exports' 650 ms).
 export const CAMERA_PAN_MS = 320;
+/** Tilo W interaction motion: 900 ms camera (Fit, Follow, zoom). */
+export const CAMERA_TRANSITION_MS = 900;
 export const PAN_STEP_PX = 48;
 export const ZOOM_STEP = 0.1;
 export const ZOOM_MIN = 0.5;
@@ -64,11 +66,26 @@ export function normalizeWheel(e: WheelInput): WheelNormalized {
   return { panDx: 0, panDy: 0, zoomDelta: steps * ZOOM_STEP };
 }
 
-/** Eased keyboard moves (PRD 18.2): the camera `t` of the way (0..1) from `a` to `b`, ease-out
- * cubic; t >= 1 returns `b` exactly so a move always settles on its target. */
+/** Cubic bezier easing for (0.2, 0.8, 0.2, 1.0) per Tilo W spec (--wEase). */
+export function easeW(t: number): number {
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  let u = t;
+  for (let i = 0; i < 5; i++) {
+    const f = 0.6 * u - 0.6 * u * u + u * u * u - t;
+    const df = 0.6 - 1.2 * u + 3 * u * u;
+    if (Math.abs(df) < 1e-6) break;
+    u -= f / df;
+  }
+  u = Math.max(0, Math.min(1, u));
+  return 2.4 * u * (1 - u) * (1 - u) + 3 * u * u * (1 - u) + u * u * u;
+}
+
+/** Eased keyboard/interaction moves: the camera `t` of the way (0..1) from `a` to `b`,
+ * using Tilo W cubic-bezier(0.2, 0.8, 0.2, 1); t >= 1 returns `b` exactly. */
 export function easeCamera(a: CameraState, b: CameraState, t: number): CameraState {
   if (t >= 1) return b;
-  const e = 1 - (1 - Math.max(0, t)) ** 3;
+  const e = easeW(Math.max(0, t));
   return {
     x: a.x + (b.x - a.x) * e,
     y: a.y + (b.y - a.y) * e,

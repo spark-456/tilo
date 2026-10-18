@@ -11,6 +11,7 @@ import { useWorldFacts } from "../../world/useWorldFacts";
 import { AgentCard } from "./AgentCard";
 import { AgentPanel } from "./AgentPanel";
 import { ChatPopUp } from "./ChatPopUp";
+import { ConnectorLayer } from "./ConnectorLayer";
 import { PlaybackBar } from "./PlaybackBar";
 import { StageEvents } from "./StageEvents";
 import { TeamMeeting } from "./TeamMeeting";
@@ -86,6 +87,7 @@ export function AgentLayer({
     <>
       <PlaybackBar worldId={worldId} />
       <StageEvents worldId={worldId} layout={facts.layout} events={facts.events} />
+      <ConnectorLayer worldId={worldId} layout={facts.layout} events={facts.events} />
       {pendingApproval?.loc ? (
         <span
           className="tw-needs-chip-anchor"
