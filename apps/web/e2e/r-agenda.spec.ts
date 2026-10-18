@@ -2,7 +2,10 @@ import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
 
-const evidence = resolve(process.cwd(), "../../agy-bridge/evidence/R-AGENDA");
+const evidence = resolve(
+  process.env.TILO_EVIDENCE_DIR ?? resolve(process.cwd(), "../../agy-bridge/evidence"),
+  "R-AGENDA",
+);
 
 for (const width of [1440, 390] as const) {
   for (const theme of ["light", "dark"] as const) {
