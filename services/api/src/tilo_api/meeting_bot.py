@@ -54,7 +54,7 @@ async def attend_meeting(
     try:
         join = await asyncio.to_thread(host.join_link, receipt)
     except HostRpcError as error:
-        if error.kind == "rejected" and error.code == "host_not_connected":
+        if error.kind == "unknown" or (error.kind == "rejected" and error.code == "host_not_connected"):
             raise Refusal(409, "Tilo's meeting host needs to be signed in") from None
         if error.kind == "rejected" and error.code in ("not_joinable", "no_join_link"):
             raise Refusal(409, error.code) from None

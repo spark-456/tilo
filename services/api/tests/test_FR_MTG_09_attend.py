@@ -124,6 +124,20 @@ def test_R_MEET_unconnected_host_asks_owner_to_sign_in(rig):
     bot.attend.assert_not_awaited()
 
 
+def test_R_MEET_host_timeout_asks_owner_to_sign_in(rig):
+    from tilo_api.meeting_bot_rpc import get_meeting_bot_client
+
+    h, _, bot = rig
+    host = h.rig.app.dependency_overrides[h.deps.get_meeting_host_client]()
+    host.join_link = lambda _receipt: (_ for _ in ()).throw(HostRpcError("unknown"))
+    h.rig.app.dependency_overrides[get_meeting_bot_client] = lambda: bot
+
+    response = h.rig.client.post(f"/v1/meetings/{MEETING}/attend", json={})
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Tilo's meeting host needs to be signed in"
+    bot.attend.assert_not_awaited()
+
+
 def test_FR_MTG_09_failed_bot_releases_claim_without_notes(rig):
     h, w, bot = rig
     bot.attend.side_effect = RuntimeError("failed")
