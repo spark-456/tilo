@@ -152,3 +152,13 @@ class WorldWriterAdapter:
                 lock.release()
         if skipped:
             logger.warning("reopen skipped %d world(s) whose writer was busy", skipped)
+
+    def release_world(self, world_id: str) -> None:
+        """Release one idle world's lease after a request-scoped append.
+
+        Desk events can be handled by different service instances on consecutive requests. Keeping
+        their lease until process shutdown makes the next instance answer ``WriterBusy`` for the
+        whole lease TTL even though the first writer is idle.
+        """
+        with self._lock(world_id):
+            self._close(world_id)

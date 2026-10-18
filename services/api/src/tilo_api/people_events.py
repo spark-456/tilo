@@ -82,6 +82,9 @@ class WorkEvents:
         for attempt in range(MAX_ATTEMPTS):  # the writer is idempotent by part id: a resend of an append that landed
             try:  # and lost its answer commits nothing twice (FS-2 (b), EV-10)
                 self.writer.append(world, part)
+                release = getattr(self.writer, "release_world", None)
+                if callable(release):
+                    release(world)
                 return
             except Exception as exc:
                 # Same optional seam as dispatch.py; tilo-api does not import the harness.
