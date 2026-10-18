@@ -37,6 +37,11 @@ function fakeClient(teams: MyTeam[], rosters: Record<string, RosterMember[]> = {
       );
     }),
     leave: vi.fn(async () => undefined),
+    changeRole: vi.fn(async (team: string, person: string, role: "viewer" | "editor" | "admin") => {
+      rosters[team] = (rosters[team] ?? []).map((member) =>
+        member.id === person ? { ...member, role } : member,
+      );
+    }),
   } satisfies TeamsClient;
   return client;
 }
@@ -116,6 +121,28 @@ it("SELF_SERVE_TEAMS a member who does not lead gets no invite field", async () 
   const el = await mount(client);
   expect(el.textContent).toContain("Team led by Lena");
   expect(el.querySelector('input[aria-label="Invite to your team by email"]')).toBeNull();
+});
+
+it("R_TEAM a lead changes a member between Viewer Editor and Admin", async () => {
+  const client = fakeClient(
+    [{ team: "tm_a", name: "Launch crew", lead: true, state: "member", invitedBy: null }],
+    {
+      tm_a: [
+        { id: "u_me", name: "Me", lead: true, role: "owner" },
+        { id: "u_ben", name: "Ben", lead: false, role: "viewer" },
+      ],
+    },
+  );
+  const el = await mount(client);
+  const role = el.querySelector<HTMLSelectElement>('select[aria-label="Role for Ben"]');
+  if (!role) throw new Error("no role picker");
+  await act(async () => {
+    role.value = "editor";
+    role.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await settle();
+  expect(client.changeRole).toHaveBeenCalledWith("tm_a", "u_ben", "editor");
+  expect(el.textContent).toContain("Ben is now Editor.");
 });
 
 it("TEAM_ACCESS_1 shows team names from their leads and only marks the viewer as lead", async () => {

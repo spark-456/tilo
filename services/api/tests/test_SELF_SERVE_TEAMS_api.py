@@ -200,6 +200,28 @@ def test_SELF_SERVE_TEAMS_a_lead_invites_the_invitee_accepts_and_reads_the_roste
     assert names == [("u_mia", True), ("u_ben", False)]
 
 
+def test_R_TEAM_a_lead_changes_a_members_viewer_editor_or_admin_role(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    team = _three(rig)
+    _tick(rig, 2)
+    assert _invite(rig, "u_mia", team, "ben@example.com").status_code == 200
+    rig.as_user("u_ben")
+    assert rig.post(f"/v1/teams/{team}/accept", {}).status_code == 200
+    roster = _roster(rig, "u_ben", team).json()["members"]
+    assert [(m["id"], m["role"]) for m in roster] == [("u_mia", "owner"), ("u_ben", "viewer")]
+
+    rig.as_user("u_mia")
+    changed = rig.post(f"/v1/teams/{team}/members/u_ben/role", {"role": "editor"})
+    assert changed.status_code == 200, changed.text[:300]
+    assert next(m for m in changed.json()["members"] if m["id"] == "u_ben")["role"] == "editor"
+    assert rig.post(f"/v1/teams/{team}/members/u_ben/role", {"role": "admin"}).status_code == 200
+
+    rig.as_user("u_ben")
+    before = _roster(rig, "u_ben", team).json()
+    assert rig.post(f"/v1/teams/{team}/members/u_mia/role", {"role": "viewer"}).status_code == 403
+    assert _roster(rig, "u_ben", team).json() == before
+
+
 def test_SELF_SERVE_TEAMS_an_invitation_has_one_answer_whatever_the_address(people_rig, monkeypatch):
     rig = _rig(people_rig, monkeypatch)
     team = _three(rig)

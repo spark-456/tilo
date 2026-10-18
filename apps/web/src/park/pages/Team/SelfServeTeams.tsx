@@ -13,6 +13,7 @@ import { type MyTeamName, isValidEmail } from "./teamModel";
 
 export const INVITE_SENT =
   "Invitation saved. If that address belongs to someone who has signed in, they will see it on their Team page.";
+const MEMBER_ROLES = ["viewer", "editor", "admin"] as const;
 
 interface Loaded {
   teams: MyTeam[];
@@ -245,9 +246,36 @@ export function SelfServeTeams(props: {
               </div>
               <ul className="park-team-ownpeople">
                 {(data.rosters[t.team] ?? []).map((m) => (
-                  <li key={m.id}>
-                    {m.name}
-                    {m.lead ? " (lead)" : ""}
+                  <li className="park-team-ownperson" key={m.id}>
+                    <span>
+                      {m.name}
+                      {m.lead ? " · Owner" : ""}
+                    </span>
+                    {t.lead && !m.lead ? (
+                      <select
+                        className="park-team-select"
+                        aria-label={`Role for ${m.name}`}
+                        value={m.role ?? "viewer"}
+                        disabled={busy}
+                        onChange={(e) => {
+                          const role = e.target.value as (typeof MEMBER_ROLES)[number];
+                          void act(
+                            () => client.changeRole(t.team, m.id, role),
+                            `${m.name} is now ${role[0]?.toUpperCase()}${role.slice(1)}.`,
+                          );
+                        }}
+                      >
+                        {MEMBER_ROLES.map((role) => (
+                          <option key={role} value={role}>
+                            {`${role[0]?.toUpperCase()}${role.slice(1)}`}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      !m.lead && (
+                        <span>{`${(m.role ?? "viewer")[0]?.toUpperCase()}${(m.role ?? "viewer").slice(1)}`}</span>
+                      )
+                    )}
                   </li>
                 ))}
               </ul>

@@ -20,6 +20,7 @@ export interface RosterMember {
   id: string;
   name: string;
   lead: boolean;
+  role?: "owner" | "viewer" | "editor" | "admin";
 }
 
 let transport: TeamsTransport | null = null;
@@ -53,6 +54,7 @@ export interface TeamsClient {
   invite(team: string, email: string): Promise<void>;
   accept(team: string): Promise<void>;
   leave(team: string, me: string): Promise<void>;
+  changeRole(team: string, person: string, role: "viewer" | "editor" | "admin"): Promise<void>;
 }
 
 /** The installed client, or null (no live api: nothing is shown and nothing is sent). */
@@ -71,7 +73,19 @@ export function teamsClient(): TeamsClient | null {
       if (!isObject(body) || !Array.isArray(body.members)) throw new Error("Roster is unavailable");
       return body.members.flatMap((m) =>
         isObject(m) && typeof m.id === "string" && typeof m.display_name === "string"
-          ? [{ id: m.id, name: m.display_name, lead: m.lead === true }]
+          ? [
+              {
+                id: m.id,
+                name: m.display_name,
+                lead: m.lead === true,
+                ...(m.role === "owner" ||
+                m.role === "viewer" ||
+                m.role === "editor" ||
+                m.role === "admin"
+                  ? { role: m.role }
+                  : {}),
+              },
+            ]
           : [],
       );
     },
@@ -86,6 +100,9 @@ export function teamsClient(): TeamsClient | null {
     },
     leave: async (team, me) => {
       await t.postJson(`${path(team)}/members/${encodeURIComponent(me)}/remove`, {});
+    },
+    changeRole: async (team, person, role) => {
+      await t.postJson(`${path(team)}/members/${encodeURIComponent(person)}/role`, { role });
     },
   };
 }

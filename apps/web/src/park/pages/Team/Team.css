@@ -967,6 +967,16 @@
   color: var(--ink2);
   font-size: 12px;
 }
+[data-park] .park-team-ownperson {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-park] .park-team-ownperson .park-team-select {
+  min-height: 32px;
+  padding: 4px 28px 4px 8px;
+  font-size: 12px;
+}
 [data-park] .park-team-ownnote:empty {
   display: none;
 }

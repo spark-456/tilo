@@ -74,6 +74,10 @@ class CreateTeamIn(_Closed):
         return trimmed
 
 
+class MemberRoleIn(_Closed):
+    role: str
+
+
 def _forbidden() -> Refusal:
     return Refusal(403, "forbidden")
 
@@ -237,14 +241,51 @@ def roster(team: str, principal: Principal, stores: Stores, clock: Clock, settin
     d, _ = _snapshot(stores)
     if not decide_team(TeamRequest(principal.user_id, "read_roster", deps.ORG_ID, now, team=team), d):
         raise _not_found()
+    team_roles = settings.read().member_roles.get(team, {})
     members = [
-        {"id": uid, "display_name": p["display_name"], "lead": d.is_lead(uid, team, now)}
+        {
+            "id": uid,
+            "display_name": p["display_name"],
+            "lead": d.is_lead(uid, team, now),
+            "role": "owner" if d.is_lead(uid, team, now) else team_roles.get(uid, "viewer"),
+        }
         for uid, p in d.persons.items()
         if d.is_member(uid, team, now)
     ]
     members.sort(key=lambda row: (not row["lead"], row["display_name"], row["id"]))
     name = settings.read().names.get(team) or _default_name(d, team, now)
     return {"team": team, "name": name, "members": members, "you": principal.user_id}
+
+
+@router.post("/v1/teams/{team}/members/{person_id}/role")
+def change_member_role(
+    team: str,
+    person_id: str,
+    body: Annotated[MemberRoleIn, Depends(json_body(MemberRoleIn))],
+    principal: Principal,
+    stores: Stores,
+    clock: Clock,
+    settings: TeamSettings,
+) -> dict[str, Any]:
+    """A lead or org owner changes a current non-lead member's access role in the service-owned team record."""
+    _session(principal)
+    team, now = _team(team), clock()
+    if body.role not in {"viewer", "editor", "admin"} or _PERSON.fullmatch(person_id) is None:
+        raise Refusal(422, "Pick Viewer, Editor or Admin.")
+    d, _ = _snapshot(stores)
+    me = d.record(principal.user_id)
+    manages = me is not None and (me["org_role"] == "owner" or d.is_lead(principal.user_id, team, now))
+    if not manages:
+        raise _forbidden()
+    if not d.is_member(person_id, team, now) or d.is_lead(person_id, team, now):
+        raise _not_found()
+    for _ in range(_ATTEMPTS):
+        state = settings.read()
+        rows = {**state.member_roles.get(team, {}), person_id: body.role}
+        after = replace(state, member_roles={**state.member_roles, team: rows})
+        if settings.compare_and_set(state.version, after):
+            return roster(team, principal, stores, clock, settings)
+    raise Refusal(409, "version_conflict", code="version_conflict")
 
 
 @router.post("/v1/teams/{team}/invites")
