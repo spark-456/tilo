@@ -169,6 +169,7 @@ function Plate({ A, api }: { A: LiveAgenda; api: Api }) {
   const [peopleKey, setPeopleKey] = useState(0);
   const [meetings, setMeetings] = useState<PeopleRow[]>([]);
   const [teamIds, setTeamIds] = useState<string[]>([]);
+  const [personId, setPersonId] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<{ start: string; minutes: number } | null>(null);
   const demo = sessionView.demo();
   const http = useMemo(() => {
@@ -195,6 +196,7 @@ function Plate({ A, api }: { A: LiveAgenda; api: Api }) {
         if (!current) return;
         const me = data.people.find((person) => person.you);
         setTeamIds(me?.memberships ?? []);
+        setPersonId(me?.id ?? null);
       },
       () => current && setTeamIds([]),
     );
@@ -307,6 +309,7 @@ function Plate({ A, api }: { A: LiveAgenda; api: Api }) {
         key={peopleKey}
         load={pinboards?.getPinboards ?? null}
         teamIds={teamIds}
+        personId={personId}
         createPin={createBoardPin}
         onPinCreated={() => setPeopleKey((n) => n + 1)}
       />

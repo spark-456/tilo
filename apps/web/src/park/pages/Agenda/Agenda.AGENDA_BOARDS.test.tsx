@@ -15,6 +15,7 @@ vi.mock("../../../api/ClientProvider", () => ({
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -87,6 +88,10 @@ it("AGENDA_BOARDS_live_plate_keeps_both_cork_boards_and_routes_each_add_to_its_s
   expect(container.textContent).toContain("Tilo suggests");
   expect(container.textContent).toContain("Event details");
   expect(container.querySelector('[aria-label="Week calendar"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="Mini month"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="Calendar view"]')).not.toBeNull();
+  expect(container.textContent).toContain("07:00");
+  expect(container.textContent).toContain("21:00");
   if (!myBoard || !teamBoard) throw new Error("Both boards should render");
 
   click(q<HTMLButtonElement>(myBoard, ".park-agenda-liveboard__addnote"));
@@ -105,4 +110,36 @@ it("AGENDA_BOARDS_live_plate_keeps_both_cork_boards_and_routes_each_add_to_its_s
     { title: "Team note", team: "tm_launch" },
   ]);
   expect(writes.every((write) => write.headers.get("Idempotency-Key"))).toBe(true);
+});
+
+it("P0_AGENDA_REDO_keeps_a_failed_pin_visible_with_honest_device_state", async () => {
+  const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const path = new URL(String(input)).pathname;
+    if (path === "/v1/plate") return new Response(JSON.stringify(plate));
+    if (path === "/v1/people")
+      return new Response(
+        JSON.stringify({
+          you: "ps_ari",
+          people: [{ id: "ps_ari", display_name: "Ari", memberships: [] }],
+        }),
+      );
+    if (path === "/v1/pinboards" && init?.method === "POST")
+      return new Response("Unavailable", { status: 503 });
+    if (path === "/v1/pinboards")
+      return new Response(JSON.stringify({ items: [], truncated: false }));
+    if (path === "/v1/meetings")
+      return new Response(JSON.stringify({ items: [], truncated: false }));
+    return new Response(JSON.stringify({ cards: [], next_cursor: null }));
+  });
+  vi.stubGlobal("fetch", fetcher);
+  const api = createLiveApi({ baseUrl: "https://api.example.test", fetch: fetcher });
+  const { container } = await renderAgenda({ api });
+  const board = q<HTMLElement>(container, '[aria-label="My board"]');
+  click(q<HTMLButtonElement>(board, ".park-agenda-liveboard__addnote"));
+  typeInto(q(board, 'input[aria-label="Pin to My board"]'), "Keep this note");
+  click(q<HTMLButtonElement>(board, 'button[type="submit"]'));
+  await settle();
+  expect(board.textContent).toContain("Keep this note");
+  expect(board.textContent).toContain("Saved on this device");
+  expect(localStorage.getItem("tilo.agenda.pins.ps_ari.personal")).toContain("Keep this note");
 });
