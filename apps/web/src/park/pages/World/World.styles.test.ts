@@ -519,7 +519,8 @@ describe("WEB_6_world_styles: World.css exists and follows the Park conventions"
 
 describe("WEB_6_world_styles: every block of the reference's inline styles", () => {
   it.each(BUNDLES)("WEB_6_world_styles_%s", (_what, want) => {
-    const rules = parsed().rules;
+    // Reference bundles describe desktop. TW-1b/FT-UX-1 add phone touch sizes below.
+    const rules = parseRules(css().split("@media (max-width: 560px)")[0] ?? "").rules;
     const ok = [...groups(rules).values()].some((g) =>
       Object.entries(want).every(([p, v]) => value(g, p) === norm(v)),
     );

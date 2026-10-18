@@ -2,7 +2,7 @@
 // asking (chips), the recorded reason a run stopped with "Start it again", and the delivered result, readable here
 // with Open and Download. Every word comes from a recorded event (HR-1..HR-7); with no event it says so.
 import { useState } from "react";
-import { ResultTab } from "../../../worldView/live/ResultTab";
+import { ResultTab } from "../../../worldView/LiveStageEmbed";
 import type { Api } from "../../api";
 import { openResult, readResult, saveResult } from "../../api/results";
 import { Button } from "../../components";

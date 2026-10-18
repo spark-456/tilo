@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { declsFor, parseRules } from "../../test-support/park/componentsCss";
 
 const teamCss = fs.readFileSync(path.join(__dirname, "pages/Team/Team.css"), "utf8");
+const componentsCss = fs.readFileSync(path.join(__dirname, "components/park.components.css"), "utf8");
 const teamStudioCss = fs.readFileSync(path.join(__dirname, "pages/Team/Team.studio.css"), "utf8");
 const ledgerCss = fs.readFileSync(path.join(__dirname, "pages/Ledger/Ledger.css"), "utf8");
 const worldCss = fs.readFileSync(path.join(__dirname, "pages/World/World.css"), "utf8");
@@ -33,7 +34,6 @@ describe("FT_UX_1 phone tap targets and team table scroll", () => {
     const parsed = parseRules(teamCss).rules;
     const targets = [
       "park-team-link",
-      "park-switch",
       "park-team-more",
       "park-team-btn",
       "park-team-select",
@@ -44,6 +44,8 @@ describe("FT_UX_1 phone tap targets and team table scroll", () => {
       const h = Math.max(px("height"), px("min-height"));
       expect(h, `${target} height`).toBeGreaterThanOrEqual(44);
     }
+    const sharedSwitch = declsFor(parseRules(componentsCss).rules, ["park-switch"]);
+    expect(Number.parseFloat(sharedSwitch.get("min-height") ?? "0")).toBeGreaterThanOrEqual(44);
   });
 
   it("FT_UX_1 Ledger phone tap targets are at least 44px", () => {

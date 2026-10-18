@@ -2,7 +2,7 @@
 import { act } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, mount } from "../../../../test-support/park/componentsHarness";
-import { HttpClient } from "../../../api/http";
+import { HttpClient, TiloApiError } from "../../../api/http";
 import { attendees, roomOf } from "../../api/live/meetingHall";
 import { MeetingHall } from "./MeetingHall";
 
@@ -120,20 +120,20 @@ it("MR-12/HR-1 rejects foreign rooms and unreadable replies without fixture fall
   expect(client.postJson).not.toHaveBeenCalled();
 });
 
-it("FT_SUP_4 attendees does not request layout when world has not started", async () => {
+it("LIVE-LAYOUT FR-WLD-05 attendees without events accept a missing layout", async () => {
   const calls: string[] = [];
   const client = {
     getJson: vi.fn(async (path: string) => {
       calls.push(path);
       if (path.includes("/events")) return { events: [] };
-      throw new Error("layout should not be called");
+      throw new TiloApiError("Not Found", 404, true);
     }),
     postJson: vi.fn(),
   };
   const result = await attendees(client, "w_new");
   expect(result).toEqual([]);
-  expect(calls).toEqual(["/worlds/w_new/events"]);
-  expect(client.getJson).toHaveBeenCalledOnce();
+  expect(calls).toEqual(["/worlds/w_new/events", "/worlds/w_new/layout"]);
+  expect(client.getJson).toHaveBeenCalledTimes(2);
 });
 
 async function tap(text: string) {
