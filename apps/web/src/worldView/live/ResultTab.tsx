@@ -1,7 +1,7 @@
 // TILO-W: Result tab with rich previews, working files accordion, and where it was made
 // (design/tilo-w PROMPT.md, Tilo W Parts.dc.html lines 253-365).
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "../../design/tilo-t";
 import type { Api } from "../../park/api";
 import { openResult, readResult, saveResult } from "../../park/api/results";
@@ -9,6 +9,17 @@ import { Markdown } from "../../park/pages/World/markdown";
 import type { SharedResult } from "../../park/pages/World/ResultPanel";
 import type { RunEvent } from "../../park/pages/World/useRunEvents";
 import type { ResultView } from "../../park/pages/World/useRunResult";
+import { AppPanel } from "../../publicApp/AppPanel";
+
+function HtmlDeliverable({ blob, artifactId, title }: { blob: Blob; artifactId: string; title: string }) {
+  const [html, setHtml] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    void blob.text().then((value) => { if (active) setHtml(value); });
+    return () => { active = false; };
+  }, [blob]);
+  return html === null ? <p>Loading website…</p> : <AppPanel artifactId={artifactId} title={title} html={html} />;
+}
 
 const readableMath = (text: string): string =>
   text
@@ -256,6 +267,10 @@ export function ResultTab({
         .toLowerCase()
     : "4:16 pm";
   const piecesCount = rawDelivered.length > 0 ? rawDelivered.length : 5;
+
+  if (blob?.type.startsWith("text/html") && mainItem?.id) {
+    return <HtmlDeliverable blob={blob} artifactId={mainItem.id} title={mainName} />;
+  }
 
   return (
     <div className="tw-res-container" data-testid="result-tab">

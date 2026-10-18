@@ -51,6 +51,11 @@ class InMemoryAppStore:
             held["published"] = False
             return dict(held)
 
+    def publication(self, artifact_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            held = self._apps.get(artifact_id)
+            return dict(held) if held else None
+
     def public(self, handle: str, slug: str) -> dict[str, Any] | None:
         with self._lock:
             return next(
@@ -148,6 +153,10 @@ class FirestoreAppStore:
         ref.set(record)
         self._path(record["handle"], record["slug"]).set(record)
         return record
+
+    def publication(self, artifact_id: str) -> dict[str, Any] | None:
+        snap = self._app(artifact_id).get()
+        return dict(snap.to_dict()) if snap.exists else None
 
     def public(self, handle: str, slug: str) -> dict[str, Any] | None:
         snap = self._path(handle, slug).get()

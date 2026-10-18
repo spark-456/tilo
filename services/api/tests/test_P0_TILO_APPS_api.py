@@ -112,6 +112,16 @@ def test_P0_TILO_APPS_signed_artifact_reader_requires_access(app_case):
         assert client.get(f"/v1/artifacts/{artifact}").status_code == 404
 
 
+def test_P0_TILO_APPS_owner_can_reload_publication_status(app_case):
+    api, _, artifact = app_case
+    with TestClient(api) as client:
+        assert client.get(f"/v1/artifacts/{artifact}/publish").status_code == 404
+        published = client.post(f"/v1/artifacts/{artifact}/publish", json={}).json()["app"]
+        assert client.get(f"/v1/artifacts/{artifact}/publish").json()["app"]["path"] == published["path"]
+        client.delete(f"/v1/artifacts/{artifact}/publish")
+        assert client.get(f"/v1/artifacts/{artifact}/publish").json()["app"]["published"] is False
+
+
 def test_P0_TILO_APPS_signed_in_editor_capture_and_owner_delete(app_case):
     api, _, artifact = app_case
     with TestClient(api) as client:

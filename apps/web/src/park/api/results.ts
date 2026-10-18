@@ -50,6 +50,8 @@ export function saveResult(blob: Blob, world: string): void {
       OFFICE_EXTENSIONS[blob.type] ??
       (blob.type === "application/pdf"
         ? ".pdf"
+        : blob.type.startsWith("text/html")
+          ? ".html"
         : blob.type === "application/json"
           ? ".json"
           : blob.type === "text/markdown"

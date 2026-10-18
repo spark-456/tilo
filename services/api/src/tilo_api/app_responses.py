@@ -151,6 +151,17 @@ def publish(
     return {"app": record | {"path": f"/u/{record['handle']}/{record['slug']}"}}
 
 
+@router.get("/v1/artifacts/{artifact_id}/publish")
+def publication(
+    artifact_id: str, principal: Principal, store: State, artifacts: Artifacts, apps: Apps
+) -> dict[str, Any]:
+    _owned(artifact_id, principal, store, artifacts, "owner")
+    record = apps.publication(artifact_id)
+    if record is None:
+        raise HTTPException(404, "not_found")
+    return {"app": record | {"path": f"/u/{record['handle']}/{record['slug']}"}}
+
+
 @router.delete("/v1/artifacts/{artifact_id}/publish")
 def unpublish(artifact_id: str, principal: Principal, store: State, artifacts: Artifacts, apps: Apps) -> dict[str, Any]:
     _owned(artifact_id, principal, store, artifacts, "owner")

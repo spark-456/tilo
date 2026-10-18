@@ -1,0 +1,29 @@
+.tilo-public-app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, sans-serif;
+  background: #fff;
+  color: #15202b;
+}
+.tilo-public-app__header {
+  padding: 12px 24px;
+  border-bottom: 1px solid #d5dce2;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.tilo-public-app__frame {
+  width: 100%;
+  flex: 1;
+  min-height: 75vh;
+  border: 0;
+}
+.tilo-app-preview {
+  width: 100%;
+  min-height: 460px;
+  border: 1px solid #d5dce2;
+}
+.tilo-app-response-scroll {
+  overflow-x: auto;
+}
