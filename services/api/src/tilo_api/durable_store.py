@@ -111,6 +111,7 @@ def _task_from(d: Mapping[str, Any]) -> deps.TaskRecord:
     t.maker_picks = d.get("maker_picks", [])
     t.gaps = tuple(Gap(**g) for g in d["gaps"])
     t.skill = d.get("skill")
+    t.skill_plan = d.get("skill_plan")
     return t
 
 

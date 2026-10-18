@@ -140,6 +140,7 @@ async def intake(
     try:  # MN-02, MN-09: before any world, upload or model call; a ref the person cannot use is one 422
         parsed = parse_refs(refs)
         tagged = tagged_skill(parsed, skills) if parsed else None
+        tagged_plan = skills.taught_plan(tagged)
     except RefsRefused as refused:
         return refused.response()
     if tagged is not None and chosen and chosen[0] == "quick":  # MN-06: Quick keeps no record; refs make it Thinking
@@ -174,6 +175,7 @@ async def intake(
             scenario,
             key,
             tagged,
+            tagged_plan,
         )
 
     if key is None or (chosen and chosen[0] == "quick"):
@@ -198,6 +200,7 @@ async def _thinking(
     scenario: str | None,
     key: str | None,
     tagged: dict[str, Any] | None = None,
+    tagged_plan: list[dict[str, Any]] | None = None,
 ) -> Any:
     text = request.text
     limit = load_intake_deadline()
@@ -339,6 +342,7 @@ async def _thinking(
             scenario=scenario,
             kinds=kinds,
             skill=tagged,
+            skill_plan=tagged_plan,
         )
     except WriterBusy:
         raise  # the existing app handler preserves store_unavailable; retain sources after any ambiguous write
