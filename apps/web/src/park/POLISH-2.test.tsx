@@ -206,7 +206,7 @@ describe("UI_POLISH_2 sample world: no greyed-out live view", () => {
   });
 });
 
-describe("UI_POLISH_2 Connectors category chips", () => {
+describe("UI_POLISH_2 Connectors category buckets (the chips row was replaced by CONNECT-UX)", () => {
   it("UI_POLISH_2 chipOf buckets a tool's own category", () => {
     expect(chipOf("Email")).toBe("Email");
     expect(chipOf("Email and files")).toBe("Email");
@@ -215,28 +215,5 @@ describe("UI_POLISH_2 Connectors category chips", () => {
     expect(chipOf("Code")).toBe("Build");
     expect(chipOf("Accounting")).toBe("Other");
     expect(chipOf("")).toBe("Other");
-  });
-
-  it("UI_POLISH_2 the chips filter the list client-side and All brings everything back", async () => {
-    const m = await renderPage(makeApp(), spyApi());
-    await waitFor(() => connectedTiles(m.container).length > 0, "the Connected tiles");
-    const group = q(m.container, ".park-connectors-chips");
-    const names = qa<HTMLButtonElement>(group, "button").map(textOf);
-    expect(names[0]).toBe("All");
-    expect(names).toContain("Email");
-    expect(names).not.toContain("Meetings"); // no tool of that category in this list: no empty chip
-    const all = textOf(m.container);
-    const press = async (name: string) => {
-      act(() => buttonText(group, name)?.click());
-      await flush(4);
-    };
-    await press("Calendar");
-    expect(buttonText(group, "Calendar")?.getAttribute("aria-pressed")).toBe("true");
-    const shown = textOf(m.container);
-    expect(shown).toContain("Google Calendar");
-    expect(shown).not.toContain("Slack");
-    expect(shown.length).toBeLessThan(all.length);
-    await press("All");
-    expect(textOf(m.container)).toContain("Slack");
   });
 });
