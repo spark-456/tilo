@@ -151,7 +151,15 @@ def test_PPL_11c_s4_BQ_PPL11C_1_every_people_post_route_is_in_the_body_cap_list(
     rig = minutes_body_rig(people_rig())
     # /v1/feedback has its own 65536-byte cap (SEC-16, test_SEC_16_FEEDBACK_hardening); the capture upload has its own
     # file cap, counted as it streams (S2, test_FR_SKL_01_ADR51_upload)
-    not_people_writes = {"/v1/assistant/ask", "/v1/feedback", "/v1/skills/captures/media"}
+    not_people_writes = {
+        "/v1/assistant/ask",
+        "/v1/feedback",
+        "/v1/skills/captures/media",
+        # P0-TILO-APPS: the published-app routes are not people writes; the response route streams under its own cap
+        # (app_responses._body) and publish takes a title only.
+        "/v1/artifacts/{artifact_id}/publish",
+        "/v1/artifacts/{artifact_id}/responses",
+    }
     templates = [
         t
         for t, methods in rig.app.openapi()["paths"].items()
