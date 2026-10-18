@@ -25,6 +25,7 @@ MAX_LINES, MAX_LINE, MAX_TEXT, MAX_UNITS, MAX_ARTIFACTS = 60, 300, 4000, 20, 10
 _UNIT = re.compile(r"U[0-9]{1,4}")
 _ARTIFACT_ID = re.compile(r"art_[0-9A-Za-z_]{1,48}")
 _ARTIFACT_EVENTS = ("artifact.created", "artifact.versioned")
+_STORY_EVENTS = ("world.requested", "world.planned", "plan.revised")
 
 
 class RoomModelUnavailable(Exception):
@@ -106,10 +107,54 @@ def _unit_of(event: Mapping[str, Any]) -> str | None:
 
 def _summary(event: Mapping[str, Any]) -> str:
     text = str(event.get("summary") or "")
-    envelope = (event.get("data") or {}).get("envelope")
+    data = event.get("data") or {}
+    envelope = data.get("envelope")
     if event["type"] == "agent.handoff" and isinstance(envelope, dict):
         text += f" | {envelope.get('summary')} | {'; '.join(map(str, envelope.get('acceptance_criteria') or []))}"
-    return text
+    units = data.get("plan_units") if isinstance(data, dict) else None
+    unit = data.get("unit") if isinstance(data, dict) else None
+    if isinstance(unit, str) and _UNIT.fullmatch(unit):
+        text += f" | step {unit}"
+    elif isinstance(units, list):
+        named = [value for value in units if isinstance(value, str) and _UNIT.fullmatch(value)]
+        if named:
+            text += f" | steps {', '.join(named)}"
+    item = event.get("item")
+    if isinstance(item, dict) and isinstance(item.get("artifact_id"), str) and isinstance(item.get("label"), str):
+        text += f" | artifact {item['label']}"
+    return text[:MAX_LINE]
+
+
+def _event_units(event: Mapping[str, Any]) -> set[str]:
+    data = event.get("data") or {}
+    if not isinstance(data, dict):
+        return set()
+    values = data.get("plan_units")
+    found = (
+        {value for value in values if isinstance(value, str) and _UNIT.fullmatch(value)}
+        if isinstance(values, list)
+        else set()
+    )
+    unit = data.get("unit")
+    if isinstance(unit, str) and _UNIT.fullmatch(unit):
+        found.add(unit)
+    return found
+
+
+def _capped_story(events: list[dict]) -> list[dict]:
+    """Keep the opening story and current plan when a long event stream reaches the room context cap."""
+    if len(events) <= MAX_LINES:
+        return events
+    anchors: dict[str, dict] = {}
+    for event in events:
+        if event["type"] in _STORY_EVENTS:
+            anchors[event["type"]] = event
+    keep = {event["seq"]: event for event in anchors.values()}
+    for event in reversed(events):
+        if len(keep) >= MAX_LINES:
+            break
+        keep[event["seq"]] = event
+    return [event for event in events if event["seq"] in keep]
 
 
 def ground(layout: Mapping[str, Any] | None, events: list[dict], agent: str) -> Grounding | None:
@@ -120,14 +165,8 @@ def ground(layout: Mapping[str, Any] | None, events: list[dict], agent: str) -> 
     if where is None:
         return None
     rank, district = where
-    if rank == "director":
-        mine = [e for e in events if not e["type"].startswith("meeting.")]
-    elif rank == "lead":
-        mine = [e for e in events if e.get("district") == district and not e["type"].startswith("meeting.")]
-    else:
-        mine = [e for e in events if agent in (e["actor"], e["target"]) and not e["type"].startswith("meeting.")]
     semantic = (layout or {}).get("semantic") or {}
-    planned = {
+    district_units = {
         u
         for lv in semantic.get("levels", [])
         for d in lv.get("districts", [])
@@ -135,14 +174,30 @@ def ground(layout: Mapping[str, Any] | None, events: list[dict], agent: str) -> 
         for b in d.get("buildings", [])
         for u in b.get("plan_units", [])
     }
-    units = planned | {u for e in mine if (u := _unit_of(e))}
+    own = [e for e in events if agent in (e["actor"], e["target"]) and not e["type"].startswith("meeting.")]
+    units = district_units | {u for e in own for u in _event_units(e)}
+    if rank == "director":
+        mine = [e for e in events if not e["type"].startswith("meeting.")]
+    elif rank == "lead":
+        mine = [
+            e
+            for e in events
+            if (e.get("district") == district or e["type"] in _STORY_EVENTS) and not e["type"].startswith("meeting.")
+        ]
+    else:
+        mine = [
+            e
+            for e in events
+            if (agent in (e["actor"], e["target"]) or e["type"] in _STORY_EVENTS or bool(_event_units(e) & units))
+            and not e["type"].startswith("meeting.")
+        ]
     artifacts = set()
     for e in mine:
         art = (e.get("data") or {}).get("artifact")
         if e["type"] in _ARTIFACT_EVENTS and isinstance(art, dict) and type(art.get("version")) is int:
             if isinstance(art.get("artifact_id"), str) and _ARTIFACT_ID.fullmatch(art["artifact_id"]):
                 artifacts.add((art["artifact_id"], art["version"]))
-    lines = tuple((e["seq"], e["type"], _unit_of(e) or "-", _summary(e)) for e in mine[-MAX_LINES:])
+    lines = tuple((e["seq"], e["type"], _unit_of(e) or "-", _summary(e)) for e in _capped_story(mine))
     return Grounding(agent, rank, district, frozenset(units), frozenset(artifacts), lines)
 
 

@@ -5,10 +5,13 @@ import type { Event } from "@tilo/contracts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../../design/tilo-t";
 import type { RoomClient } from "../../park/api/live/meetingHall";
+import { seatFor } from "../../park/api/live/roomTalk";
 import type { Message } from "../../world/conversations";
 import type { WorldFacts } from "../../world/useWorldFacts";
 import { clock } from "./agentLook";
 import { agentMessageText } from "./agentMessageText";
+import { useRoomTalk } from "./useRoomTalk";
+import "./ChatPopUp.css";
 import "./live.css";
 
 const AGENT_COLORS = ["ag1", "ag2", "ag3", "ag4", "ag5", "ag6", "ag7"] as const;
@@ -31,17 +34,11 @@ interface ChatPopUpProps {
   onConvene: () => void;
 }
 
-interface LocalMsg {
-  readonly id: string;
-  readonly from: string;
-  readonly to: string;
-  readonly text: string;
-  readonly ts: string;
-}
-
 export function ChatPopUp({
+  worldId,
   facts,
   events,
+  rooms,
   initialFilter = "all",
   onClose,
   onConvene,
@@ -49,13 +46,28 @@ export function ChatPopUp({
   const [filter, setFilter] = useState(initialFilter);
   const [closing, setClosing] = useState(false);
   const [inputVal, setInputVal] = useState("");
-  const [sent, setSent] = useState<LocalMsg[]>([]);
+  const [pending, setPending] = useState("");
   const logRef = useRef<HTMLDivElement>(null);
 
   const agentIds = useMemo(
     () => (facts.layout?.semantic.agents ?? []).map((a) => a.id),
     [facts.layout],
   );
+  const talkTarget = useMemo(() => {
+    if (filter.startsWith("agent:")) return filter.slice(6);
+    if (filter.startsWith("pair:")) return filter.slice(5).split(",")[1] ?? "";
+    const agents = facts.layout?.semantic.agents ?? [];
+    return (
+      agents.find((agent) => agent.rank === "director")?.id ??
+      agents.find((agent) => agent.rank === "lead")?.id ??
+      ""
+    );
+  }, [facts.layout, filter]);
+  const talkSeat = useMemo(
+    () => (facts.layout && talkTarget ? seatFor(facts.layout, events, talkTarget) : null),
+    [events, facts.layout, talkTarget],
+  );
+  const talk = useRoomTalk(rooms, worldId, talkSeat, events);
 
   const handleClose = () => {
     if (closing) return;
@@ -208,23 +220,14 @@ export function ChatPopUp({
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll down on message change
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [shownMessages.length, sent.length, filter]);
+  }, [shownMessages.length, talk.room?.turns.length, pending, filter]);
 
   const handleSend = () => {
     const text = inputVal.trim();
-    if (!text) return;
-    const now = new Date().toISOString();
-    setSent((prev) => [
-      ...prev,
-      {
-        id: `sent-${Date.now()}`,
-        from: "me",
-        to: headerMeta.toName,
-        text,
-        ts: now,
-      },
-    ]);
+    if (!text || !rooms || !talkSeat || !talkTarget || talk.busy) return;
+    setPending(text);
     setInputVal("");
+    void talk.send(talkTarget, "quick", text).finally(() => setPending(""));
   };
 
   return (
@@ -293,7 +296,7 @@ export function ChatPopUp({
       <div ref={logRef} className="tw-chat-thread" aria-live="polite">
         <span className="tw-chat-today">Today</span>
 
-        {shownMessages.length === 0 && sent.length === 0 ? (
+        {shownMessages.length === 0 && !talk.room?.turns.length && !pending ? (
           <p className="tw-chat-empty">No messages in this view yet.</p>
         ) : null}
 
@@ -392,17 +395,56 @@ export function ChatPopUp({
           );
         })}
 
-        {sent.map((s) => (
-          <div key={s.id} className="tw-chat-row tw-chat-row--me">
-            <span className="tw-chat-sender">
-              <strong>You</strong> <span className="tw-chat-to">to {s.to}</span>
-            </span>
-            <div className="tw-chat-bubble tw-chat-bubble--me">
-              <span className="tw-chat-text">{s.text}</span>
-              <time className="tw-chat-time">{clock(firstTs, s.ts)} · seen</time>
+        {talk.room?.turns.map((turn) => (
+          <div key={`room-${turn.turn}`} className="tw-chat-room-turn">
+            <div className="tw-chat-row tw-chat-row--me">
+              <span className="tw-chat-sender">
+                <strong>You</strong> <span className="tw-chat-to">to {nameOf(turn.to)}</span>
+              </span>
+              <div className="tw-chat-bubble tw-chat-bubble--me">
+                <span className="tw-chat-text">{turn.text ?? "Question unavailable"}</span>
+              </div>
             </div>
+            {turn.reply ? (
+              <div className="tw-chat-row tw-chat-row--agent">
+                <div className="tw-chat-bubble" data-outcome={turn.reply.outcome}>
+                  <span className="tw-chat-sender">
+                    <strong>{nameOf(turn.reply.from)}</strong>
+                  </span>
+                  <span className="tw-chat-text">
+                    {turn.reply.text ?? "No reply was produced. Nothing was made up."}
+                  </span>
+                  {turn.reply.artifacts.length > 0 ? (
+                    <span className="tw-chat-to">
+                      Artifacts {turn.reply.artifacts.map((item) => item.artifact_id).join(", ")}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </div>
         ))}
+
+        {pending ? (
+          <>
+            <div className="tw-chat-row tw-chat-row--me">
+              <span className="tw-chat-sender">
+                <strong>You</strong> <span className="tw-chat-to">to {headerMeta.toName}</span>
+              </span>
+              <div className="tw-chat-bubble tw-chat-bubble--me tw-chat-bubble--pending">
+                <span className="tw-chat-text">{pending}</span>
+              </div>
+            </div>
+            <output className="tw-chat-typing">
+              <span aria-hidden="true">•••</span> {nameOf(talkTarget)} is answering…
+            </output>
+          </>
+        ) : null}
+        {talk.error ? (
+          <p className="tw-room__err" role="alert">
+            {talk.error}
+          </p>
+        ) : null}
       </div>
 
       <div className="tw-chat-bottom">
@@ -412,6 +454,7 @@ export function ChatPopUp({
           className="tw-chat-input"
           placeholder={`Message ${headerMeta.toName}…`}
           value={inputVal}
+          disabled={!rooms || !talkSeat || talk.busy}
           onChange={(e) => setInputVal(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -420,7 +463,13 @@ export function ChatPopUp({
             }
           }}
         />
-        <button type="button" className="tw-chat-send" aria-label="Send" onClick={handleSend}>
+        <button
+          type="button"
+          className="tw-chat-send"
+          aria-label="Send"
+          disabled={!inputVal.trim() || !rooms || !talkSeat || talk.busy}
+          onClick={handleSend}
+        >
           <Icon name="send" size={16} />
         </button>
       </div>

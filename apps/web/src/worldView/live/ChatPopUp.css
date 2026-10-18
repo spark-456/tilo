@@ -1,0 +1,23 @@
+[data-park] .tw-chat-room-turn {
+  display: contents;
+}
+
+[data-park] .tw-chat-typing {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  align-self: flex-start;
+  margin: 0 0 0 42px;
+  color: var(--ink3, #6b6b70);
+  font-size: 12px;
+}
+
+[data-park] .tw-chat-typing span {
+  color: var(--pri, #0b0b0c);
+  letter-spacing: 2px;
+}
+
+[data-park] .tw-chat-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
