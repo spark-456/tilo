@@ -154,7 +154,10 @@ class FirestoreAppStore:
         ref, snap = self._app(artifact_id), self._app(artifact_id).get()
         if not snap.exists:
             return None
-        record = {**(snap.to_dict() or {}), "published": False}
+        held = snap.to_dict() or {}
+        if not held.get("handle") or not held.get("slug"):
+            return None
+        record = {**held, "published": False}
         ref.set(record)
         self._path(record["handle"], record["slug"]).set(record)
         return record

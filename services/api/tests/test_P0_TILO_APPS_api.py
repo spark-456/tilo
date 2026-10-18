@@ -141,6 +141,13 @@ def test_P0_TILO_APPS_artifact_routes_hydrate_owner_on_fresh_store(app_case):
         assert client.get(f"/v1/artifacts/{artifact}/responses").status_code == 200
 
 
+def test_P0_TILO_APPS_unpublished_response_shell_has_no_public_path(app_case):
+    api, apps, artifact = app_case
+    apps.publication = lambda _: {"artifact_id": artifact, "published": False, "response_count": 1}
+    with TestClient(api) as client:
+        assert client.get(f"/v1/artifacts/{artifact}/publish").status_code == 404
+
+
 def test_P0_TILO_APPS_signed_in_editor_capture_and_owner_delete(app_case):
     api, _, artifact = app_case
     with TestClient(api) as client:

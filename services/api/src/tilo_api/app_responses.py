@@ -163,7 +163,7 @@ def publication(
 ) -> dict[str, Any]:
     _owned(artifact_id, principal, store, artifacts, "owner")
     record = apps.publication(artifact_id)
-    if record is None:
+    if not record or not record.get("handle") or not record.get("slug"):
         raise HTTPException(404, "not_found")
     return {"app": record | {"path": f"/u/{record['handle']}/{record['slug']}"}}
 
