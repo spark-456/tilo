@@ -68,19 +68,21 @@ export function Coverage({ rows, owner, flash, onBackup, onLedger }: CoveragePro
               </td>
               <td className="park-team-act">
                 {r.single ? (
-                  <select
-                    className="park-team-select park-team-select--backup"
-                    aria-label={`Add a backup for ${r.what}`}
-                    value=""
-                    onChange={(e) => e.target.value && onBackup(r, e.target.value)}
-                  >
-                    <option value="">Add a backup…</option>
-                    {r.opts.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="park-team-selectwrap">
+                    <select
+                      className="park-team-select park-team-select--backup"
+                      aria-label={`Add a backup for ${r.what}`}
+                      value=""
+                      onChange={(e) => e.target.value && onBackup(r, e.target.value)}
+                    >
+                      <option value="">Add a backup…</option>
+                      {r.opts.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
                 ) : (
                   <span className="park-team-covered">
                     {icon("check", 12)}
