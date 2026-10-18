@@ -127,16 +127,18 @@ export function ScheduleWithOthersDialog({
           </label>
           <label className="park-agenda-hostfield">
             <span>Length</span>
-            <select
-              value={form.minutes}
-              onChange={(e) => setForm({ ...form, minutes: Number(e.target.value) })}
-            >
-              {LENGTHS.map((length) => (
-                <option key={length} value={length}>
-                  {length} minutes
-                </option>
-              ))}
-            </select>
+            <span className="park-agenda-hostselect">
+              <select
+                value={form.minutes}
+                onChange={(e) => setForm({ ...form, minutes: Number(e.target.value) })}
+              >
+                {LENGTHS.map((length) => (
+                  <option key={length} value={length}>
+                    {length} minutes
+                  </option>
+                ))}
+              </select>
+            </span>
           </label>
           <fieldset>
             <legend>Invite people</legend>

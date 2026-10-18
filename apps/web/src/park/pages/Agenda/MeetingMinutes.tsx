@@ -34,7 +34,7 @@ export function MeetingMinutes({
     setConfirmed(result.confirmed);
   };
   return (
-    <div aria-label="Meeting minutes">
+    <div className="park-agenda-minutes" aria-label="Meeting minutes">
       {!minutes && (
         <button
           type="button"

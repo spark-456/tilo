@@ -289,13 +289,18 @@ function ScheduleDialog({
       )}
       {field(
         "Length",
-        <select value={f.minutes} onChange={(e) => setF({ ...f, minutes: Number(e.target.value) })}>
-          {LENGTHS.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>,
+        <span className="park-agenda-hostselect">
+          <select
+            value={f.minutes}
+            onChange={(e) => setF({ ...f, minutes: Number(e.target.value) })}
+          >
+            {LENGTHS.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </span>,
       )}
       <fieldset className="park-agenda-hostpeople">
         <legend>Invite</legend>
