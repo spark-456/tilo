@@ -291,6 +291,7 @@ export interface SkillCapture {
 }
 /** SKILLS-5 (FR-SKL-02): Tilo's version; `locked` steps were forced to ask first by the server and cannot be switched off. */
 export interface SkillVersion {
+  fallback?: boolean;
   steps: {
     text: string;
     tool: string;

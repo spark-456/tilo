@@ -189,6 +189,13 @@ export function ScreenExample({ t, onAccepted }: { t: Teach; onAccepted?: () => 
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
   const session = useRef<ScreenRecording | null>(null);
+  const awaitingUpload = useRef(false);
+  useEffect(() => {
+    if (awaitingUpload.current && t.usedFile) {
+      awaitingUpload.current = false;
+      onAccepted?.();
+    }
+  }, [t.usedFile, onAccepted]);
   useEffect(() => {
     if (!file) return;
     const next = URL.createObjectURL(file);
@@ -239,7 +246,7 @@ export function ScreenExample({ t, onAccepted }: { t: Teach; onAccepted?: () => 
             size="sm"
             disabled={t.busy}
             onClick={() => {
-              if (t.captureFiles([file], "record")) onAccepted?.();
+              awaitingUpload.current = t.captureFiles([file], "record");
             }}
           >
             Use this recording
@@ -458,6 +465,15 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
           Switch on “Ask me first” wherever Tilo should stop and check with you.
         </p>
       </div>
+      {v?.fallback ? (
+        <div className="park-teach__read">
+          <p>
+            Tilo could not draft steps from your example. Your example is still here; describe the
+            step below.
+          </p>
+          <p>{t.steps.join(" · ")}</p>
+        </div>
+      ) : null}
       <div className="park-teach__name">
         <span className="park-teach__nameic" aria-hidden="true">
           {icon("people", 22)}
@@ -482,7 +498,17 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
             <li key={`${i}:${p.text}`} className="park-teach__row park-teach__row--step">
               <span className="park-teach__num">{i + 1}</span>
               <span className="park-teach__steptext">
-                <span>{p.text}</span>
+                {v?.fallback ? (
+                  <input
+                    aria-label={`Edit step ${i + 1}`}
+                    className="park-teach__input"
+                    value={p.text}
+                    maxLength={200}
+                    onChange={(event) => t.setStepText(i, event.target.value)}
+                  />
+                ) : (
+                  <span>{p.text}</span>
+                )}
                 <span className="park-teach__tool">{p.tool}</span>
               </span>
               <button
