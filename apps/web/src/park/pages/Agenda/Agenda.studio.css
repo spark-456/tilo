@@ -254,6 +254,7 @@
 [data-park][data-theme="studio"] .park-agenda-hostselect select {
   appearance: none;
   -webkit-appearance: none;
+  min-height: 44px;
   width: 100%;
   padding-right: 38px;
 }

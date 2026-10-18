@@ -18,6 +18,7 @@
   flex-direction: column;
   gap: 36px;
   color: var(--ink);
+  overflow-x: hidden;
 }
 /* the sample banner is pinned under the nav on Home (sample.css): the column starts below it */
 [data-park] .park-shell__main:has(.park-first-run-banner--home) .park-home-root {
@@ -1366,6 +1367,10 @@
 }
 
 /* ---- focus: a 3px ring on every control of the page ---- */
+[data-park] .park-home-root button:focus-visible,
+[data-park] .park-home-root a:focus-visible,
+[data-park] .park-home-root input:focus-visible,
+[data-park] .park-home-root select:focus-visible,
 [data-park] .park-home-needs:focus-visible,
 [data-park] .park-home-link:focus-visible,
 [data-park] .park-home-live:focus-visible,
@@ -1456,6 +1461,9 @@
   [data-park] .park-home-root {
     padding: 96px 16px 112px;
     gap: 24px;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
   }
   [data-park] .park-home-crew {
     display: none;
@@ -1560,7 +1568,8 @@
   margin: 5px 0;
 }
 [data-park] .park-home-brief button {
-  min-height: 36px;
+  min-height: 44px;
+  min-width: 44px;
   cursor: pointer;
 }
 [data-park] .park-home-brief__cites {
@@ -1592,6 +1601,9 @@
 [data-park] .park-home-brief-row .park-home-brief-row__link {
   flex: 1;
   min-width: 0;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1604,6 +1616,8 @@
   cursor: pointer;
 }
 [data-park] .park-home-brief-row button {
+  min-height: 44px;
+  min-width: 44px;
   flex: none;
 }
 [data-park] .park-home-brief-row .park-home-brief-row__link {

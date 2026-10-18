@@ -172,7 +172,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
   };
 
   return (
-    <div data-testid="park-page-worlds">
+    <div data-testid="park-page-worlds" className="park-worlds-root">
       <PageSheet>
         <div className="park-worlds-stack">
           <Header

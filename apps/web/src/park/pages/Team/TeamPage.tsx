@@ -69,7 +69,7 @@ function Top({ count, children }: { count?: string | undefined; children?: React
 /** The shell's page frame: the `park-page-<id>` marker WEB-3a's Placeholder carries, then the 22px sheet. */
 function Frame({ children }: { children: ReactNode }) {
   return (
-    <div data-testid="park-page-team">
+    <div data-testid="park-page-team" className="park-team-root">
       <PageSheet gap={22}>{children}</PageSheet>
     </div>
   );

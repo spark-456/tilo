@@ -3,6 +3,13 @@
    the design's cityBg, --priFill/--onPri/--priLip its primary, --ok its mint); no motion (the card lift lives in the
    shell's motion sheet, which restores it only where motion is allowed). */
 
+[data-park] .park-worlds-root,
+[data-park] [data-testid="park-page-worlds"] {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 [data-park] .park-worlds-stack {
   display: flex;
   flex-direction: column;
@@ -260,13 +267,21 @@
   background: var(--sunk);
   color: var(--ink);
 }
+[data-park] .park-worlds-root button:focus-visible,
+[data-park] .park-worlds-root a:focus-visible,
+[data-park] .park-worlds-root input:focus-visible,
+[data-park] .park-worlds-root select:focus-visible,
+[data-park] [data-testid="park-page-worlds"] button:focus-visible,
+[data-park] [data-testid="park-page-worlds"] a:focus-visible,
+[data-park] [data-testid="park-page-worlds"] input:focus-visible,
+[data-park] [data-testid="park-page-worlds"] select:focus-visible,
 [data-park] .park-worlds-tab:focus-visible,
 [data-park] .park-worlds-scale__btn:focus-visible,
 [data-park] .park-worlds-new:focus-visible,
 [data-park] .park-worlds-card:focus-visible,
 [data-park] .park-worlds-dec__yes:focus-visible,
 [data-park] .park-worlds-dec__open:focus-visible {
-  outline: 3px solid var(--focus);
+  outline: 3px solid var(--focus, #5a3fe0);
   outline-offset: 2px;
 }
 
@@ -563,6 +578,12 @@
   }
 }
 @media (max-width: 600px) {
+  [data-park] .park-worlds-root,
+  [data-park] [data-testid="park-page-worlds"] {
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
   [data-park] .park-worlds-h1 {
     font-size: 36px;
   }
@@ -798,7 +819,7 @@
 [data-park] .park-worlds-slack {
   display: flex;
   align-items: center;
-  height: 42px;
+  min-height: 44px;
   padding: 0 16px 0 14px;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -835,7 +856,7 @@
 [data-park] .park-worlds-dec__pending {
   display: inline-flex;
   align-items: center;
-  height: 36px;
+  min-height: 44px;
   padding: 0 12px;
   border-radius: 10px;
   background: var(--amberTile);
