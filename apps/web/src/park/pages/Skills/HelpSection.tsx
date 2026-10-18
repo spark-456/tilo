@@ -364,7 +364,10 @@ export function HelpSection({
                   </div>
                 </div>
               ) : (
-                <p className="park-skills-help-hint" data-testid="skills-who-empty">
+                <p
+                  className="park-skills-help-hint park-skills-who-empty"
+                  data-testid="skills-who-empty"
+                >
                   No answers or fixes yet this month
                 </p>
               )

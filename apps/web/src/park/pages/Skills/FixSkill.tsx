@@ -43,26 +43,28 @@ export function FixSkill({
       <h3 className="park-skills-h3">Fix a skill step</h3>
       <p>Only the owner can fix this skill. Running taught skills is not available yet.</p>
       <fieldset disabled={pending}>
-        <label>
+        <label className="park-skills-fix-label">
           Step{" "}
-          <select
-            className="park-skills-save-name"
-            value={step}
-            onChange={(e) => {
-              const n = Number(e.target.value);
-              setStep(n);
-              setText(skill.steps[n] ?? "");
-              setAsk(fix.asks[n] ?? true);
-            }}
-          >
-            {skill.steps.map((s, i) => (
-              <option key={`${i}:${s}`} value={i}>
-                {i + 1}. {s}
-              </option>
-            ))}
-          </select>
+          <span className="park-skills-fix-selectwrap">
+            <select
+              className="park-skills-save-name park-skills-fix-select"
+              value={step}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                setStep(n);
+                setText(skill.steps[n] ?? "");
+                setAsk(fix.asks[n] ?? true);
+              }}
+            >
+              {skill.steps.map((s, i) => (
+                <option key={`${i}:${s}`} value={i}>
+                  {i + 1}. {s}
+                </option>
+              ))}
+            </select>
+          </span>
         </label>
-        <label>
+        <label className="park-skills-fix-label">
           Instruction{" "}
           <input
             className="park-skills-save-name"
@@ -72,7 +74,7 @@ export function FixSkill({
             onChange={(e) => setText(e.target.value)}
           />
         </label>
-        <label>
+        <label className="park-skills-fix-checkbox-label">
           <input
             type="checkbox"
             checked={locked || ask}

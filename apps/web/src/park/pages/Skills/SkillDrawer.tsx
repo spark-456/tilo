@@ -294,7 +294,9 @@ export function SkillDrawer({
                   ))}
                 </div>
               ) : (
-                <p className="park-skill-drawer__p">Not used in any world yet.</p>
+                <p className="park-skill-drawer__p park-skills-drawer__empty">
+                  Not used in any world yet.
+                </p>
               )}
             </section>
           )}
