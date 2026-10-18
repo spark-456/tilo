@@ -621,7 +621,8 @@
 }
 [data-park] .park-home-maker__option a {
   color: var(--link, var(--ink));
-  text-decoration: underline;
+  font-weight: 700;
+  text-decoration: none;
 }
 [data-park] .park-home-step {
   display: flex;
@@ -718,7 +719,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 700;
-  text-decoration: underline;
+  text-decoration: none;
   cursor: pointer;
 }
 [data-park] .park-home-run__link:focus-visible,
@@ -759,8 +760,41 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 24px;
+  min-height: 44px;
   cursor: pointer;
+}
+[data-park] .park-home-repeat__toggle input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  border: 1px solid var(--lineStrong, var(--line));
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--onPri, #1f1d2b);
+}
+[data-park] .park-home-repeat__toggle input[type="checkbox"]::before {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+}
+[data-park] .park-home-repeat__toggle input[type="checkbox"]:checked {
+  border-color: var(--heroFill);
+  background: var(--heroFill);
+}
+[data-park] .park-home-repeat__toggle input[type="checkbox"]:checked::before {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+[data-park] .park-home-repeat__toggle input[type="checkbox"]:focus-visible {
+  outline: 3px solid var(--focus, var(--heroInk));
+  outline-offset: 2px;
 }
 [data-park] .park-home-repeat__fields {
   display: flex;
@@ -773,13 +807,32 @@
 }
 [data-park] .park-home-repeat__fields select,
 [data-park] .park-home-repeat__fields input[type="time"] {
-  height: 32px;
+  min-height: 44px;
   padding: 0 8px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--card);
   color: var(--ink);
   font: inherit;
+}
+[data-park] .park-home-repeat__fields select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 132px;
+  padding-right: 34px;
+}
+[data-park] .park-home-repeat__select {
+  position: relative;
+  display: inline-flex;
+}
+[data-park] .park-home-repeat__select::after {
+  content: "⌄";
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  color: var(--ink2);
+  font-size: 16px;
+  pointer-events: none;
 }
 [data-park] .park-home-repeat__hint {
   color: var(--ink3);
@@ -828,20 +881,28 @@
 [data-park] .park-home-link {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
+  gap: 5px;
+  min-height: 44px;
   color: var(--ink);
   font-size: 15px;
   font-weight: 600;
-  text-decoration: underline;
-  text-decoration-color: var(--lineStrong, var(--line));
-  text-underline-offset: 3px;
+  text-decoration: none;
+}
+[data-park] .park-home-link::after {
+  content: "→";
+  color: var(--heroInk);
 }
 [data-park] .park-home-link:hover {
   color: var(--ink2);
 }
 [data-park] .park-home-none {
   margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 14px;
+  background: var(--sunk);
   font-size: 15px;
+  line-height: 1.45;
   color: var(--ink3);
 }
 [data-park] .park-home-cards {
@@ -1247,8 +1308,11 @@
 [data-park] .park-home-spend__link {
   font-size: 14px;
   font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration: none;
+}
+[data-park] .park-home-spend__link::after {
+  content: " →";
+  color: var(--heroInk);
 }
 [data-park] .park-home-spend__figures {
   display: flex;
@@ -1354,6 +1418,7 @@
   align-items: center;
   min-height: 24px;
   color: var(--ink2);
+  text-decoration: none;
 }
 
 /* ---- under 1180px: one column, the side column under Your worlds ---- */

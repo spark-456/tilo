@@ -49,19 +49,21 @@ export function useRepeatWeekly(disabled: boolean): Repeat {
       {on ? (
         <fieldset className="park-home-repeat__fields" aria-label="Repeat weekly">
           <label htmlFor={`${id}-day`}>Day</label>
-          <select
-            id={`${id}-day`}
-            data-testid="repeat-weekday"
-            value={weekday}
-            disabled={disabled}
-            onChange={(e) => setWeekday(e.target.value)}
-          >
-            {WEEKDAYS.map((name, i) => (
-              <option key={name} value={String(i)}>
-                {name}
-              </option>
-            ))}
-          </select>
+          <span className="park-home-repeat__select">
+            <select
+              id={`${id}-day`}
+              data-testid="repeat-weekday"
+              value={weekday}
+              disabled={disabled}
+              onChange={(e) => setWeekday(e.target.value)}
+            >
+              {WEEKDAYS.map((name, i) => (
+                <option key={name} value={String(i)}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </span>
           <label htmlFor={`${id}-time`}>Time</label>
           <input
             id={`${id}-time`}
