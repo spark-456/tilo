@@ -564,8 +564,7 @@ describe("WEB_1c_invariants: properties of the kit", () => {
       props: Record<string, unknown>;
     };
     const src = String(img.props.src);
-    expect(src).toMatch(/^blob:/);
-    URL.revokeObjectURL(src);
+    expect(src).toMatch(/^data:image\/svg\+xml,/);
   });
 
   it("WEB_1c_invariants_the_reference_data_is_the_ports_data", () => {

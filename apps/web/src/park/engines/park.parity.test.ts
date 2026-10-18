@@ -435,15 +435,12 @@ describe("WEB_1b_park_env: browser calls go through the injectable env, never a 
 
   it("WEB_1b_park_env_defaults_work_in_plain_node_without_a_window", () => {
     expect(typeof (globalThis as { window?: unknown }).window).toBe("undefined");
-    const made: string[] = [];
     const park = (createPark as unknown as MakePark)(serialiseH, createWorld);
     const img = canon(call(park, "building", "library", "active", "research", 100, false)) as {
       props: Record<string, Json>;
     };
     const src = String(img.props.src);
-    made.push(src);
-    expect(src).toMatch(/^blob:/);
-    URL.revokeObjectURL(src);
+    expect(src).toMatch(/^data:image\/svg\+xml,/);
   });
 
   it("WEB_1b_park_env_creating_and_using_the_park_sets_no_global", () => {

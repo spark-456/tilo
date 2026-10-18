@@ -27,7 +27,7 @@ export interface Faces {
 
 /**
  * The browser calls tilo-park.js makes, injectable so the engine never names a window global.
- * Defaults are the platform's own `Blob` and `URL.createObjectURL`.
+ * Production uses data URLs for generated SVGs; tests may inject Blob/object URL fakes.
  */
 export interface ParkEnv {
   Blob?: (new (parts: BlobPart[], options?: BlobPropertyBag) => Blob) | undefined;

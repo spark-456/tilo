@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // WEB-1b: in a DOM environment (the repo's tests use happy-dom) createPark works with no injected env:
-// the defaults are the platform's own Blob and URL.createObjectURL. Injecting an env bypasses them. The
+// the defaults are request-free SVG data URLs. Injecting an env supplies an object URL factory. The
 // port sets no window global (the prototype's `window.TiloWorld` / `window.TiloPark` are not carried over).
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { plan, richPlan } from "../../../test-support/park/engineCases";
@@ -32,15 +32,12 @@ describe("WEB_1b_park_env_dom: default env in happy-dom", () => {
     expect(typeof document).toBe("object");
   });
 
-  it("WEB_1b_park_env_dom_defaults_work_without_injection_and_use_URL_createObjectURL", () => {
+  it("WEB_1b_park_env_dom_defaults_work_without_injection_and_avoid_URL_createObjectURL", () => {
     const spy = vi.spyOn(URL, "createObjectURL");
     const park = make();
     const src = srcOf(call(park, "building", "library", "active", "research", 100, false));
-    expect(src).toMatch(/^blob:/);
-    expect(spy).toHaveBeenCalledTimes(1);
-    const blob = spy.mock.calls[0]?.[0] as Blob;
-    expect(blob.type).toBe("image/svg+xml");
-    expect(blob.size).toBeGreaterThan(100);
+    expect(src).toMatch(/^data:image\/svg\+xml,/);
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it(
@@ -49,10 +46,12 @@ describe("WEB_1b_park_env_dom: default env in happy-dom", () => {
     () => {
       const park = make();
       const scene = call(park, "scene", { w: 600, h: 400 }) as { el: unknown; spots: unknown[] };
-      expect(JSON.stringify(canon(scene.el))).toContain("blob:");
-      expect(srcOf(call(park, "world", richPlan(), { night: true }))).toMatch(/^blob:/);
+      expect(JSON.stringify(canon(scene.el))).not.toContain("blob:");
+      expect(srcOf(call(park, "world", richPlan(), { night: true }))).toMatch(
+        /^data:image\/svg\+xml,/,
+      );
       expect(srcOf(call(park, "agent", { role: "builder", expr: "focused" }, 90, false))).toMatch(
-        /^blob:/,
+        /^data:image\/svg\+xml,/,
       );
     },
   );

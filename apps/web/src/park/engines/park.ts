@@ -141,18 +141,18 @@ export function createPark(
       cmap = p;
     }
   };
-  // The browser calls come in through env (the platform's own Blob and URL.createObjectURL by default).
-  // LIVE-QA row 28: one URL per distinct picture for the whole session. A page that draws the same sprite again (a
-  // route change, a revisit) gets the URL it already has, so the browser reuses the loaded image and nothing is
-  // fetched or made again. Bounded: past the cap a picture is made as before, never kept.
+  // Tests and non-browser hosts may inject an object URL factory. In the browser, generated SVG is already in
+  // memory, so a data URL avoids registering every agent, building and scene layer as a separate blob request.
+  // One URL is kept per distinct picture for the session so repeat renders reuse the same string.
   const urlOf = new Map<string, string>();
   const URL_CAP = 1500;
   const blob = (s: string): string => {
     const kept = urlOf.get(s);
     if (kept !== undefined) return kept;
-    const B = env.Blob ?? Blob;
-    const make = env.createObjectURL ?? ((b: Blob) => URL.createObjectURL(b));
-    const url = make(new B([s], { type: "image/svg+xml" }));
+    const make = env.createObjectURL;
+    const url = make
+      ? make(new (env.Blob ?? Blob)([s], { type: "image/svg+xml" }))
+      : `data:image/svg+xml,${encodeURIComponent(s)}`;
     if (urlOf.size < URL_CAP) urlOf.set(s, url);
     return url;
   };
