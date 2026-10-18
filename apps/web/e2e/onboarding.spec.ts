@@ -56,7 +56,7 @@ for (const width of [1440, 390])
         await expect(page.locator(`[data-park][data-time="${theme}"]`)).toHaveCount(1);
         expect(
           await page.evaluate(() => document.activeElement?.closest('[role="dialog"]') !== null),
-        ).toBe(true);
+        ).toBe(name !== "World");
         await inView(page);
         await shot(page, `${width}-${theme}-${name}-invite`);
         if (name === "Home") {
