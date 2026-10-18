@@ -10,6 +10,7 @@ def test_P0_TILO_APPS_public_viewer_has_scoped_headers():
     csp = headers["Content-Security-Policy"]
     assert "default-src 'none'" in csp
     assert "frame-src" in csp and "data:" in csp and "blob:" in csp
+    assert "style-src 'self' 'unsafe-inline'" in csp
     assert headers["Referrer-Policy"] == "no-referrer"
     general = next(rule for rule in hosting["headers"] if rule.get("source") == "**")
     general_headers = {entry["key"]: entry["value"] for entry in general["headers"]}
