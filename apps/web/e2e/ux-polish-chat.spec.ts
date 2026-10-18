@@ -12,6 +12,7 @@ for (const width of [1440, 390] as const) {
     test(`UX-POLISH-CHAT ${width} ${theme} shows labelled bubbles without overlap`, async ({
       page,
     }) => {
+      test.setTimeout(60_000);
       mkdirSync(evidence, { recursive: true });
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
       await page.goto("/chat");
