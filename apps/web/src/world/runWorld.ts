@@ -96,6 +96,7 @@ function probeOf(
   layer: WorldLayer,
   frame: () => Frame | undefined,
   places: () => ReadonlyMap<string, Vec>,
+  isWalking?: (id: string) => boolean,
 ): Probe {
   return {
     agentAt(x, y) {
@@ -127,6 +128,9 @@ function probeOf(
       } catch {
         return null;
       }
+    },
+    isWalking(id) {
+      return isWalking ? isWalking(id) : false;
     },
   };
 }
@@ -163,7 +167,7 @@ function staticView(layer: WorldLayer, o: WorldOptions, events: readonly Event[]
   const offDensity = subscribeDensity(() => {
     if (!frame) return;
     renderStatic(layer, frame);
-    renderAgents(layer, frame, places);
+    renderAgents(layer, frame, places, litOf(o.layout.world_id));
     ring();
   });
   return {
@@ -179,7 +183,7 @@ function staticView(layer: WorldLayer, o: WorldOptions, events: readonly Event[]
       };
       renderStatic(layer, frame);
       places = new Map(frame.agents.map((a) => [a.id, { x: a.cx, y: a.cy }]));
-      renderAgents(layer, frame, places);
+      renderAgents(layer, frame, places, litOf(o.layout.world_id));
       ring();
       o.onSeq(state.seq);
       o.onTrace(state.trace);
@@ -321,7 +325,7 @@ function createLive(
         say: speaking.get(a.id) ?? (arrived(a.id) ? (roomSay.get(a.id) ?? null) : null),
       })),
     };
-    renderAgents(layer, shown, display);
+    renderAgents(layer, shown, display, litOf(layout.world_id));
     renderSelection(layer, lastFrame, display, selected(), litOf(layout.world_id));
     requestRender();
     return busy;
@@ -346,11 +350,13 @@ function createLive(
       layer,
       () => lastFrame,
       () => lastDisplay,
+      (id) => choreo.isAnimating(id),
     ),
   );
   const spotlit = () => {
     if (stopped || scrubbed) return; // a scrubbed run lights through its own static view
     if (paused) {
+      renderAgents(layer, lastFrame, lastDisplay, litOf(layout.world_id));
       renderSelection(layer, lastFrame, lastDisplay, selected(), litOf(layout.world_id));
       requestRender();
     } else drawAgents(playTime());

@@ -3,6 +3,7 @@
 // look follows only what the reducer has recorded (status), never a guess. Drawing is art/ and
 // renderer.ts; nothing in this file knows about Pixi.
 import type { Layout } from "@tilo/contracts";
+import { agentColorByOrder } from "../design/tilo-w/palette";
 import tokens from "../design/tokens";
 import { agentRoleColor } from "./agentRole";
 import type { BuildingShown, Facade, Roof } from "./art/building";
@@ -126,29 +127,39 @@ const centreOf = (r: Rect, lift: number): { cx: number; cy: number } => {
   return { cx, cy };
 };
 
-/** Where an agent stands at a building, district or level: on the ground in front of a building, on the plot's front
- * lane, on the plate's front edge. `slot` (its place in the layout's roster) fans out agents that share a spot by the
- * golden ratio, so any number of them spread across the frontage in a fixed pattern that never changes when another
- * arrives (TILO-T-WORLD: nobody huddles, nobody shifts). */
-function standAt(r: Rect, kind: "building" | "district" | "level", lift: number, slot: number) {
-  const across = (slot * 0.618034) % 1; // 0..1 along the frontage
-  const row = slot % 2; // two lanes deep
+/**
+ * 3 standing slots per building (0.75 cells apart), rows at Dock and Hall (TW-2, PROMPT.md).
+ * Slot 0: center (0 offset).
+ * Slot 1: left (-0.75 cells).
+ * Slot 2: right (+0.75 cells).
+ * Subsequent slots fan out 0.75 cells apart for the rows at Dock and Meeting Hall.
+ */
+export function standSlotOffset(slot: number): number {
+  if (slot <= 0) return 0;
+  const dir = slot % 2 === 1 ? -1 : 1;
+  const step = Math.ceil(slot / 2);
+  return dir * step * 0.75;
+}
+
+export function standAt(
+  r: Rect,
+  kind: "building" | "district" | "level",
+  lift: number,
+  slot: number,
+) {
+  const offset = standSlotOffset(slot);
   const [sx, sy] =
     kind === "building"
-      ? [r.x + r.w * (0.1 + 0.8 * across), r.y + r.d + 0.5 + row * 0.45]
-      : [
-          r.x + r.w * (0.1 + 0.8 * across),
-          r.y + r.d - (kind === "district" ? 0.6 : 0.5) - row * 0.35,
-        ];
+      ? [r.x + r.w / 2 + offset, r.y + r.d + 0.5]
+      : [r.x + r.w / 2 + offset, r.y + r.d - (kind === "district" ? 0.6 : 0.5)];
   const [x, y] = P(sx, sy, lift);
   return { cx: x, cy: y };
 }
 
-/** The ground in front of a building where agents rest (the whole frontage `standAt` fans over),
- * in world px: feet only, so a caller pads it by a figure's size. From the layout alone, so a
- * building's tag can keep clear of it whoever is standing there (nothing here moves). */
+/** The ground in front of a building where agents rest (covering the 3 standing slots),
+ * in world px: feet only. From the layout alone. */
 export function standZone(r: Rect, lift: number) {
-  const feet = [0, 1, 2, 3, 4, 5, 6, 7, 8].map((slot) => standAt(r, "building", lift, slot));
+  const feet = [0, 1, 2].map((slot) => standAt(r, "building", lift, slot));
   const xs = feet.map((f) => f.cx);
   const ys = feet.map((f) => f.cy);
   return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
@@ -278,13 +289,15 @@ export function frameOf(layout: Layout, state: WorldState): Frame {
   }
   for (const l of geometry?.levels ?? [])
     spots.set(l.id, { r: l.plate, kind: "level", lift: liftOf(l.id), level: l.index });
-  const rank = new Map(layout.semantic.agents.map((a, i) => [a.id, { rank: a.rank, slot: i }]));
+  const rank = new Map(
+    layout.semantic.agents.map((a, i) => [a.id, { rank: a.rank, slot: i, order: i }]),
+  );
   const agents: FrameAgent[] = Object.values(state.agents).flatMap((agent) => {
     const stands = standingAt(state, agent);
     const spot = agent.spawned && stands ? spots.get(stands) : undefined;
     const meta = rank.get(agent.id);
     if (!spot || !meta) return [];
-    const tint = agentRoleColor(meta.rank);
+    const tint = agentColorByOrder(meta.order);
     return [
       {
         id: agent.id,

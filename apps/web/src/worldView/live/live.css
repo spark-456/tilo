@@ -585,7 +585,8 @@
   transform: translate(-50%, -50%);
   cursor: pointer;
 }
-[data-park] .tw-talk-dots i {
+[data-park] .tw-talk-dots i,
+[data-park] .tw-talk-dots span {
   width: 4px;
   height: 4px;
   border-radius: 50%;
