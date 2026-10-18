@@ -3,8 +3,7 @@
    No transition, animation or keyframes: the details fade, the hover fades and the 1.8 s flash timer
    arrive with WEB-3b (BQ-WEB-3). */
 
-[data-park] .park-team-root,
-[data-park] [data-testid="park-page-team"] {
+[data-park] .park-team-root {
   box-sizing: border-box;
   max-width: 100%;
   overflow-x: hidden;
@@ -402,10 +401,6 @@
 [data-park] .park-team-root a:focus-visible,
 [data-park] .park-team-root input:focus-visible,
 [data-park] .park-team-root select:focus-visible,
-[data-park] [data-testid="park-page-team"] button:focus-visible,
-[data-park] [data-testid="park-page-team"] a:focus-visible,
-[data-park] [data-testid="park-page-team"] input:focus-visible,
-[data-park] [data-testid="park-page-team"] select:focus-visible,
 [data-park] .park-team-matrix:focus-visible,
 [data-park] .park-team-select:focus-visible,
 [data-park] .park-team-more:focus-visible,
@@ -605,8 +600,7 @@
 
 /* UI-10 W9: keep the dense tables scrollable inside their card, and stack coverage on phones. */
 @media (max-width: 600px) {
-  [data-park] .park-team-root,
-  [data-park] [data-testid="park-page-team"] {
+  [data-park] .park-team-root {
     max-width: 100%;
     overflow-x: hidden;
     box-sizing: border-box;
