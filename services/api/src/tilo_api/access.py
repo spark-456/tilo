@@ -64,9 +64,12 @@ PUBLIC_ROUTES: frozenset[tuple[str, str]] = frozenset(
 # of `/l/<token>` (one path segment of token characters, no query); the route itself verifies the signed single-use
 # token, and a GET consumes nothing. A new public path is an owner decision (the test pins this).
 _LINK_PATH = re.compile(r"/l/[A-Za-z0-9_.-]{1,512}")
+_PUBLIC_APP = re.compile(r"/public/apps/[a-z0-9-]{1,64}/[a-z0-9-]{1,64}(?:/responses)?")
 
 
 def public_link(method: str, path: str) -> bool:
+    if _PUBLIC_APP.fullmatch(path):
+        return (method == "POST") == path.endswith("/responses")
     return method in ("GET", "POST") and _LINK_PATH.fullmatch(path) is not None
 
 

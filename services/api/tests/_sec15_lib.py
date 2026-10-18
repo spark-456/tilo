@@ -58,9 +58,17 @@ PINNED_PUBLIC_ROUTES = frozenset(
 # Done and Snooze links open in a mail client with no session. The signed single-use token in the path is the only
 # credential and the route verifies it itself (forged, expired and replayed cases: test_FR_PA_06b). Nothing else
 # joins this set without the owner.
-PINNED_PUBLIC_LINK_ROUTES = frozenset({("GET", "/l/{token}"), ("POST", "/l/{token}")})
+PINNED_PUBLIC_LINK_ROUTES = frozenset(
+    {
+        ("GET", "/l/{token}"),
+        ("POST", "/l/{token}"),
+        ("GET", "/public/apps/{handle}/{slug}"),
+        ("POST", "/public/apps/{handle}/{slug}/responses"),
+    }
+)
 
 PROBE_PARAMS = {"world_id": "w_probe", "task_id": "t_probe", "policy_id": "pol_probe", "card_id": "c_probe"}
+PROBE_PARAMS |= {"handle": "app-probe", "slug": "form-probe"}
 _PARAM = re.compile(r"\{([a-z_]+)(?::[a-z]+)?\}")
 
 
