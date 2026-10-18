@@ -125,6 +125,35 @@ def test_FR_MTG_09_worker_exception_never_exposes_capability(setup):
     assert "meet.google.com" not in response.text
 
 
+def test_P0_MEET_JOIN_failure_log_has_type_and_redacted_one_line_reason(setup, caplog):
+    client, attend, _ = setup
+    attend.side_effect = RuntimeError(
+        "launch failed\njoin=https://meet.google.com/abc-defg-hij cookie=SID=private Bearer secret-token"
+    )
+    with caplog.at_level("WARNING", logger="bot.cloud_run"):
+        response = client.post("/internal/meetings/mt_demo/attend", json=body(), headers=headers())
+    assert response.status_code == 502
+    line = caplog.records[-1].getMessage()
+    assert "RuntimeError" in line and "launch failed" in line and "\n" not in line
+    assert "meet.google.com" not in line and "private" not in line and "secret-token" not in line
+
+
+@pytest.mark.parametrize("kind", ["missing_identity", "wrong_caller", "bad_capability"])
+def test_P0_MEET_JOIN_401_403_422_refusals_are_logged(setup, caplog, kind):
+    client, _, claims = setup
+    sent_headers, payload = headers(), body()
+    if kind == "missing_identity":
+        sent_headers = {}
+    elif kind == "wrong_caller":
+        claims["email"] = "other@example.test"
+    else:
+        payload["join_url"] += "?token=private"
+    with caplog.at_level("WARNING", logger="bot.cloud_run"):
+        response = client.post("/internal/meetings/mt_demo/attend", json=payload, headers=sent_headers)
+    assert response.status_code in {401, 403, 422}
+    assert f"status={response.status_code}" in caplog.records[-1].getMessage()
+
+
 def test_FR_MTG_09_worker_result_strips_pasted_meet_capabilities(setup):
     client, attend, _ = setup
     attend.return_value["utterances"][0]["text"] = body()["join_url"]
