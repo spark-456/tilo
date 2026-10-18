@@ -61,7 +61,7 @@ it("P0-TILO-APPS ignores other frames and thanks only after public POST succeeds
     window.dispatchEvent(
       new MessageEvent("message", {
         data: { type: "tilo-form-submit", fields: { name: "Ada" } },
-        source: frame?.contentWindow,
+        source: frame?.contentWindow ?? null,
       }),
     ),
   );
