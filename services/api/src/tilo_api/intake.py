@@ -61,19 +61,25 @@ _QUIZ_INTENT = re.compile(
     r"\b(?:quiz|interactive\s+(?:test|exam|assessment)|practice\s+test|mock\s+test|self[- ]?test)\b", re.I
 )
 _QUIZ_SOURCES = {"application/pdf", "image/png", "image/jpeg"}
+_WEBSITE_INTENT = re.compile(r"\b(?:website|web\s*app|app|questionnaire)\b", re.I)
 
 
 def safe_app_brief(brief: dict[str, Any], task_text: str, parts: list[MediaPart]) -> dict[str, Any]:
-    """An AppSpec is possible only for an explicit quiz with a screened native source."""
+    """Keep sourced quizzes as AppSpecs and route requested sites to the native website writer."""
     if _QUIZ_INTENT.search(task_text) and any(part.mime_type in _QUIZ_SOURCES for part in parts):
         return brief
     deliverables = brief.get("deliverables")
     if not isinstance(deliverables, list):
         return brief
+    wants_website = not parts and _WEBSITE_INTENT.search(task_text) is not None
     return {
         **brief,
         "deliverables": [
-            {**item, "format": "markdown"} if isinstance(item, dict) and item.get("format") == "app" else item
+            {**item, "format": "website"}
+            if isinstance(item, dict) and wants_website and item.get("format") in {"app", "markdown"}
+            else {**item, "format": "markdown"}
+            if isinstance(item, dict) and item.get("format") == "app"
+            else item
             for item in deliverables
         ],
     }
