@@ -25,3 +25,12 @@ def test_P0_TILO_APPS_live_store_uses_firestore_door(monkeypatch):
     client = object()
     monkeypatch.setattr(app_response_store.store_door, "open_api_store", lambda: SimpleNamespace(client=client))
     assert app_response_store.get_app_store()._client is client
+
+
+def test_P0_REGRESSION_SMOKE_public_app_limit_survives_ip_rotation():
+    apps = InMemoryAppStore()
+    for index in range(300):
+        apps.add("art_public", {"id": str(index)}, f"ip-{index}")
+    with pytest.raises(HTTPException) as limited:
+        apps.add("art_public", {"id": "blocked"}, "fresh-ip")
+    assert limited.value.status_code == 429

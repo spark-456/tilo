@@ -14,6 +14,7 @@ from tilo_api import store_door
 
 MAX_RESPONSES = 5000
 RATE_PER_HOUR = 60
+RATE_PER_APP_HOUR = 300
 
 
 def _alternate(base: str, identity: str) -> str:
@@ -26,6 +27,7 @@ class InMemoryAppStore:
         self._apps: dict[str, dict[str, Any]] = {}
         self._rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self._rates: dict[tuple[str, str], list[float]] = defaultdict(list)
+        self._app_rates: dict[str, list[float]] = defaultdict(list)
 
     def publish(self, record: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
@@ -73,9 +75,11 @@ class InMemoryAppStore:
                 raise HTTPException(409, "response_limit_reached")
             now = time.monotonic()
             recent = [stamp for stamp in self._rates[(artifact_id, rate_key)] if now - stamp < 3600]
-            if len(recent) >= RATE_PER_HOUR:
+            app_recent = [stamp for stamp in self._app_rates[artifact_id] if now - stamp < 3600]
+            if len(recent) >= RATE_PER_HOUR or len(app_recent) >= RATE_PER_APP_HOUR:
                 raise HTTPException(429, "rate_limited")
             self._rates[(artifact_id, rate_key)] = [*recent, now]
+            self._app_rates[artifact_id] = [*app_recent, now]
             self._rows[artifact_id].append(dict(row))
             return len(self._rows[artifact_id])
 
@@ -137,6 +141,7 @@ class FirestoreAppStore:
                 "slug": slug,
                 "response_count": old.get("response_count", 0),
                 "rates": old.get("rates", {}),
+                "app_rates": old.get("app_rates", []),
             }
             tx.set(handle_ref, {"owner": record["owner"]})
             tx.set(app, saved)
@@ -174,13 +179,14 @@ class FirestoreAppStore:
             record = snap.to_dict() or {}
             count, rates = int(record.get("response_count", 0)), record.get("rates", {})
             hits = [stamp for stamp in rates.get(rate_key, []) if row["epoch"] - stamp < 3600]
+            app_hits = [stamp for stamp in record.get("app_rates", []) if row["epoch"] - stamp < 3600]
             if count >= MAX_RESPONSES:
                 raise HTTPException(409, "response_limit_reached")
-            if len(hits) >= RATE_PER_HOUR:
+            if len(hits) >= RATE_PER_HOUR or len(app_hits) >= RATE_PER_APP_HOUR:
                 raise HTTPException(429, "rate_limited")
             tx.create(item, row)
             rates[rate_key] = [*hits, row["epoch"]]
-            values = {"response_count": count + 1, "rates": rates}
+            values = {"response_count": count + 1, "rates": rates, "app_rates": [*app_hits, row["epoch"]]}
             tx.update(app, values) if snap.exists else tx.set(
                 app, {"artifact_id": artifact_id, "published": False, **values}
             )
