@@ -14,6 +14,7 @@ export interface ParkRoute {
 // The query names each page keeps (README "Routes"); anything else is dropped. The world id is a path
 // segment, not a query value.
 const QUERY: Partial<Record<PageId, string>> = {
+  chat: "id",
   skills: "id",
   agenda: "item",
   needs: "id",

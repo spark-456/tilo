@@ -5,14 +5,22 @@
 // The conversation lives in this component only: the server keeps no Quick question or answer (quick.py), so there
 // is no history to list (docs/open-questions.md BQ-STUDIO-2).
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { SkillMatch, SkillRef } from "../../api/skillRoute";
+import { sessionView } from "../../api/ClientProvider";
 import type { QuickIntakeResult } from "../../api/http";
+import type { SkillMatch, SkillRef } from "../../api/skillRoute";
 import { askQuick } from "../api/index";
 import type { QuickCost, SwitchReason } from "../api/types";
 import { useParkApi, useSchedule } from "../app/context";
 import { quickErrorMessage } from "../app/store";
 import { QUICK_MAX_CHARS } from "../pages/Home/homeData";
 import type { BuddyMood } from "../studio/Buddy";
+import {
+  type SavedChat,
+  loadServerChats,
+  readChats,
+  saveChats,
+  saveServerChat,
+} from "./chatHistory";
 
 export type Turn =
   | { id: number; question: string; state: "asking" }
@@ -65,18 +73,28 @@ export interface QuickChat {
   ask(text: string, ref?: SkillRef | null): boolean;
   /** Starts a fresh local session when no request is in flight. */
   clear(): void;
+  readonly history: readonly SavedChat[];
+  select(id: string): void;
 }
 
-export function useQuickChat(now: () => number = Date.now, pageContext?: string): QuickChat {
+export function useQuickChat(
+  now: () => number = Date.now,
+  pageContext?: string,
+  persist = false,
+): QuickChat {
   const api = useParkApi();
   const schedule = useSchedule();
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const owner = persist ? (sessionView.identity()?.email ?? null) : null;
+  const [history, setHistory] = useState<SavedChat[]>(() => readChats(owner));
+  const [activeId, setActiveId] = useState(() => readChats(owner)[0]?.id ?? crypto.randomUUID());
+  const [turns, setTurns] = useState<Turn[]>(() => [...(readChats(owner)[0]?.turns ?? [])]);
   const [talkingId, setTalkingId] = useState<number | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const busyRef = useRef(false);
-  const nextId = useRef(1);
+  const nextId = useRef(Math.max(0, ...turns.map((turn) => turn.id)) + 1);
   const alive = useRef(true);
   const cancelTalk = useRef<(() => void) | null>(null);
+  const saving = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -84,6 +102,53 @@ export function useQuickChat(now: () => number = Date.now, pageContext?: string)
       cancelTalk.current?.();
     };
   }, []);
+  useEffect(() => {
+    if (!persist || !owner) return;
+    let live = true;
+    loadServerChats()
+      .then((remote) => {
+        const latest = remote[0];
+        if (!live || !latest) return;
+        setHistory((current) => {
+          const merged = new Map(current.map((entry) => [entry.id, entry]));
+          for (const entry of remote) {
+            const local = merged.get(entry.id);
+            if (!local || local.updatedAt < entry.updatedAt) merged.set(entry.id, entry);
+          }
+          const next = [...merged.values()].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 100);
+          saveChats(owner, next);
+          return next;
+        });
+        setTurns((current) => {
+          if (current.length) return current;
+          setActiveId(latest.id);
+          nextId.current = Math.max(0, ...latest.turns.map((turn) => turn.id)) + 1;
+          return [...latest.turns];
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [owner, persist]);
+  useEffect(() => {
+    const first = turns[0];
+    if (!persist || !owner || !first || turns.some((turn) => turn.state === "asking")) return;
+    setHistory((current) => {
+      const chat: SavedChat = {
+        id: activeId,
+        title: first.question.slice(0, 60),
+        updatedAt: now(),
+        turns,
+      };
+      const next = [chat, ...current.filter((entry) => entry.id !== activeId)]
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, 100);
+      saveChats(owner, next);
+      saving.current = saving.current.catch(() => undefined).then(() => saveServerChat(chat));
+      return next;
+    });
+  }, [activeId, now, owner, persist, turns]);
 
   const ask = useCallback(
     (raw: string, ref: SkillRef | null = null): boolean => {
@@ -164,6 +229,19 @@ export function useQuickChat(now: () => number = Date.now, pageContext?: string)
       setTalkingId(null);
       setNote(null);
       setTurns([]);
+      setActiveId(crypto.randomUUID());
+    },
+    history,
+    select: (id: string) => {
+      if (busyRef.current) return;
+      const chosen = history.find((entry) => entry.id === id);
+      if (!chosen) return;
+      cancelTalk.current?.();
+      setTalkingId(null);
+      setNote(null);
+      setActiveId(id);
+      setTurns([...chosen.turns]);
+      nextId.current = Math.max(0, ...chosen.turns.map((turn) => turn.id)) + 1;
     },
   };
 }

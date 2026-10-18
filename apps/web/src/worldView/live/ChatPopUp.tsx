@@ -18,6 +18,13 @@ import "./live.css";
 
 const AGENT_COLORS = ["ag1", "ag2", "ag3", "ag4", "ag5", "ag6", "ag7"] as const;
 
+/** The event feed is the transcript; a fresh room reply fills only the gap until those events arrive. */
+export function unrecordedRoomParts(room: string, turn: number, messages: readonly Message[]) {
+  const has = (kind: Message["kind"]) =>
+    messages.some((m) => m.room === room && m.turn === turn && m.kind === kind);
+  return { asked: !has("asked"), replied: !has("replied") };
+}
+
 function usePhonePopup(): boolean {
   const query = "(max-width: 760px)";
   const [phone, setPhone] = useState(
@@ -418,48 +425,55 @@ export function ChatPopUp({
           );
         })}
 
-        {talk.room?.turns.map((turn) => (
-          <div key={`room-${turn.turn}`} className="tw-chat-room-turn">
-            <div className="tw-chat-row tw-chat-row--me">
-              <span className="tw-chat-sender">
-                <strong>You</strong> <span className="tw-chat-to">to {nameOf(turn.to)}</span>
-              </span>
-              <div className="tw-chat-bubble tw-chat-bubble--me">
-                <span className="tw-chat-text">{turn.text ?? "Question unavailable"}</span>
-              </div>
-            </div>
-            {turn.reply ? (
-              <div className="tw-chat-row tw-chat-row--agent">
-                <span
-                  className="tw-chat-av"
-                  data-ag-color={agentColorKey(turn.reply.from, agentIds)}
-                  aria-hidden="true"
-                >
-                  <span className="tw-chat-visor">
-                    <span className="tw-chat-eye" />
-                    <span className="tw-chat-eye" />
-                  </span>
-                </span>
-                <div className="tw-chat-bubble-wrap">
+        {talk.room?.turns.map((turn) => {
+          const visible = unrecordedRoomParts(talk.room?.room_id ?? "", turn.turn, facts.messages);
+          if (!visible.asked && (!turn.reply || !visible.replied)) return null;
+          return (
+            <div key={`room-${turn.turn}`} className="tw-chat-room-turn">
+              {visible.asked ? (
+                <div className="tw-chat-row tw-chat-row--me">
                   <span className="tw-chat-sender">
-                    <strong>{nameOf(turn.reply.from)}</strong>
-                    <span className="tw-chat-role">{roleOf(turn.reply.from)}</span>
+                    <strong>You</strong> <span className="tw-chat-to">to {nameOf(turn.to)}</span>
                   </span>
-                  <div className="tw-chat-bubble" data-outcome={turn.reply.outcome}>
-                    <span className="tw-chat-text">
-                      {turn.reply.text ?? "No reply was produced. Nothing was made up."}
-                    </span>
-                    {turn.reply.artifacts.length > 0 ? (
-                      <span className="tw-chat-to">
-                        Artifacts {turn.reply.artifacts.map((item) => item.artifact_id).join(", ")}
-                      </span>
-                    ) : null}
+                  <div className="tw-chat-bubble tw-chat-bubble--me">
+                    <span className="tw-chat-text">{turn.text ?? "Question unavailable"}</span>
                   </div>
                 </div>
-              </div>
-            ) : null}
-          </div>
-        ))}
+              ) : null}
+              {turn.reply && visible.replied ? (
+                <div className="tw-chat-row tw-chat-row--agent">
+                  <span
+                    className="tw-chat-av"
+                    data-ag-color={agentColorKey(turn.reply.from, agentIds)}
+                    aria-hidden="true"
+                  >
+                    <span className="tw-chat-visor">
+                      <span className="tw-chat-eye" />
+                      <span className="tw-chat-eye" />
+                    </span>
+                  </span>
+                  <div className="tw-chat-bubble-wrap">
+                    <span className="tw-chat-sender">
+                      <strong>{nameOf(turn.reply.from)}</strong>
+                      <span className="tw-chat-role">{roleOf(turn.reply.from)}</span>
+                    </span>
+                    <div className="tw-chat-bubble" data-outcome={turn.reply.outcome}>
+                      <span className="tw-chat-text">
+                        {turn.reply.text ?? "No reply was produced. Nothing was made up."}
+                      </span>
+                      {turn.reply.artifacts.length > 0 ? (
+                        <span className="tw-chat-to">
+                          Artifacts{" "}
+                          {turn.reply.artifacts.map((item) => item.artifact_id).join(", ")}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
 
         {pending ? (
           <>
