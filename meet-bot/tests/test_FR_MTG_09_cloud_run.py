@@ -138,6 +138,30 @@ def test_P0_MEET_JOIN_failure_log_has_type_and_redacted_one_line_reason(setup, c
     assert "meet.google.com" not in line and "private" not in line and "secret-token" not in line
 
 
+@pytest.mark.parametrize(
+    "error,status,detail",
+    [
+        ("browser", 502, "browser_unavailable"),
+        ("sign_in", 409, "meeting_requires_sign_in"),
+        ("join", 409, "meeting_join_failed"),
+    ],
+)
+def test_P0_MEET_JOIN_known_failures_return_fixed_reason_codes(setup, error, status, detail):
+    from bot.browser import BrowserStartFailed, JoinFailed, NotLoggedIn
+
+    client, attend, _ = setup
+    kinds = {
+        "browser": BrowserStartFailed("private launch output"),
+        "sign_in": NotLoggedIn("private account label"),
+        "join": JoinFailed("private Meet page text"),
+    }
+    attend.side_effect = kinds[error]
+    response = client.post("/internal/meetings/mt_demo/attend", json=body(), headers=headers())
+    assert response.status_code == status
+    assert response.json() == {"detail": detail}
+    assert "private" not in response.text
+
+
 @pytest.mark.parametrize("kind", ["missing_identity", "wrong_caller", "bad_capability"])
 def test_P0_MEET_JOIN_401_403_422_refusals_are_logged(setup, caplog, kind):
     client, _, claims = setup

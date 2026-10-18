@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from tilo_connectors.host_auth import GOOGLE_ISSUERS, CertsUnavailable, GoogleOidcVerifier
 from tilo_contracts import MeetingJoin, Transcript
 
+from .browser import BrowserStartFailed, JoinFailed, NotLoggedIn
 from .events import remove_meet_links
 from .voice_meter import CLAIM_HEADER, CLAIM_RE
 
@@ -151,6 +152,15 @@ def create_app(*, attend=None, verifier=None, clock=None) -> FastAPI:
                 )
             except TimeoutError:
                 return reply(504, "Meeting duration exceeded")
+            except BrowserStartFailed as exc:
+                _log_refusal(502, "browser_unavailable", exc)
+                return reply(502, "browser_unavailable")
+            except NotLoggedIn as exc:
+                _log_refusal(409, "meeting_requires_sign_in", exc)
+                return reply(409, "meeting_requires_sign_in")
+            except JoinFailed as exc:
+                _log_refusal(409, "meeting_join_failed", exc)
+                return reply(409, "meeting_join_failed")
             except Exception as exc:
                 _log_refusal(502, "worker_failed", exc)
                 return reply(502, "Meeting bot failed")
