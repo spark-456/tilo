@@ -89,6 +89,12 @@
   border-top: 1px solid var(--line);
   border-left: 1px solid var(--line);
 }
+[data-park] .park-agenda-root .cx-agenda-month[hidden] {
+  display: none;
+}
+[data-park] .park-agenda-root .cx-agenda-scroll[hidden] {
+  display: none;
+}
 [data-park] .park-agenda-root .cx-agenda-monthday {
   min-width: 0;
   min-height: 100px;

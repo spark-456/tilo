@@ -54,9 +54,10 @@ it("STUDIO_5 agenda live: today and the recorded plate", async () => {
     container.querySelector<HTMLButtonElement>(".cx-agenda-views button:nth-child(3)")?.click(),
   );
   await settle();
-  expect(container.querySelector('[aria-label="Month calendar"]')?.textContent).toContain(
-    "Supplier call",
-  );
+  const month = container.querySelector<HTMLElement>('[aria-label="Month calendar"]');
+  expect(month?.hidden).toBe(false);
+  expect(container.querySelector<HTMLElement>('[aria-label="Week time slots"]')?.hidden).toBe(true);
+  expect(month?.textContent).toContain("Supplier call");
   const main = container.querySelector(".park-agenda-studiomain");
   expect(main?.querySelector('[aria-label="Your plate"]')?.textContent).toContain("Send the quote");
   expect(container.querySelector('[aria-label="Week calendar"]')).not.toBeNull();
