@@ -68,6 +68,8 @@ class TeamApi:
         self.user = OWNER
         self.full_session, self.channel = True, "web"  # a full web sign-in (BQ-XWORLD-10); tests narrow it
         self.now = "2026-10-08T10:00:00.000Z"
+        self.outbox = None
+        self.sent: list[dict[str, Any]] = []
 
     def advance_clock(self, seconds: int = 61) -> None:
         from datetime import datetime, timedelta  # noqa: PLC0415
@@ -94,14 +96,24 @@ class TeamApi:
 
 @contextmanager
 def team_api(snapshot: Any = None, *, store: Any = None) -> Iterator[TeamApi]:
+    from _clint2_lib import ArtifactRig  # noqa: PLC0415
     from fastapi.testclient import TestClient  # noqa: PLC0415
     from tilo_api import app, deps  # noqa: PLC0415
     from tilo_api.team_store import InMemoryTeamStore, get_team_store  # noqa: PLC0415
+    from tilo_connectors.store import InMemoryOutboxStore  # noqa: PLC0415
 
     team = store if store is not None else InMemoryTeamStore(snapshot if snapshot is not None else state())
     flags = Flags()
     saved = dict(app.dependency_overrides)
     api = TeamApi(None, team, flags)
+    artifacts = ArtifactRig()
+    api.outbox = InMemoryOutboxStore()
+
+    class Gmail:
+        def execute_side_effect(self, entry: dict[str, Any], grant: Any) -> None:
+            grant.verify(entry["idempotency_key"])
+            api.sent.append(entry)
+
     app.dependency_overrides[deps.get_current_principal] = lambda: deps.Principal(
         user_id=api.user,
         role="owner",
@@ -117,9 +129,13 @@ def team_api(snapshot: Any = None, *, store: Any = None) -> Iterator[TeamApi]:
     app.dependency_overrides[deps.get_event_writer] = lambda: api.writer
     app.dependency_overrides[deps.get_desk_worlds] = lambda: api.desks
     app.dependency_overrides[deps.get_clock] = lambda: lambda: api.now
+    app.dependency_overrides[deps.get_outbox_store] = lambda: api.outbox
+    app.dependency_overrides[deps.get_artifact_store] = lambda: artifacts.store
+    app.dependency_overrides[deps.get_connector_adapters] = lambda: {"gmail": Gmail()}
     try:
         api.client = TestClient(app)
         yield api
     finally:
+        artifacts.close()
         app.dependency_overrides.clear()
         app.dependency_overrides.update(saved)

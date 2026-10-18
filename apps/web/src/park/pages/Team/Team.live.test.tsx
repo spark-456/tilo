@@ -179,7 +179,7 @@ describe("TEAM_WEB_team_page_live: Owner writes", () => {
     expect(statusLine(root)).toBe("Team controls are not set up on this install yet.");
   });
 
-  it("TEAM_WEB_live_invite_sends_email_and_role_member_and_shows_the_servers_invite", async () => {
+  it("R_TEAM_live_invite_requires_explicit_approval_then_sends_email_and_role_member", async () => {
     const after = view({
       invites: [...view().invites, { id: "inv_2", email: "x@acme.co", role: "Member" }],
     });
@@ -190,6 +190,9 @@ describe("TEAM_WEB_team_page_live: Owner writes", () => {
     const { root } = await renderTeam(makeApp(), api);
     await typeInto(inputNamed(root, "Invite by email"), "x@acme.co");
     await clickAndSettle(buttonNamed(root, "Invite"));
+    expect(write).not.toHaveBeenCalled();
+    expect(root.textContent).toContain("Send an invitation email to x@acme.co?");
+    await clickAndSettle(buttonNamed(root, "Approve and send"));
     expect(write).toHaveBeenCalledWith({ kind: "invite", email: "x@acme.co", role: "Member" });
     expect(strings(root).has("x@acme.co")).toBe(true);
   });
@@ -234,6 +237,7 @@ describe("TEAM_WEB_team_page_live: honest copy", () => {
     const { root } = await renderTeam(makeApp(), api);
     await typeInto(inputNamed(root, "Invite by email"), "x@acme.co");
     await clickAndSettle(buttonNamed(root, "Invite"));
+    await clickAndSettle(buttonNamed(root, "Approve and send"));
     expect(root.textContent).toContain("Saved; could not refresh");
     expect(strings(root).has("Saved; could not refresh")).toBe(true); // a success, not a rollback message
     expect(root.textContent).not.toMatch(/could not do that/i);

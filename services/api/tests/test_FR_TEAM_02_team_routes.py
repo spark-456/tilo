@@ -214,6 +214,21 @@ def test_FR_TEAM_02_the_owner_invites_and_no_one_else_can() -> None:
         assert api.post("/v1/team/invites", {"email": "x@b.co", "role": "Owner"}).status_code == 422
 
 
+def test_R_TEAM_email_invite_uses_the_person_approved_T2_outbox() -> None:
+    with team_api(state(names={"tm_main": "Product studio"})) as api:
+        response = api.post("/v1/team/invites", {"email": "new@b.co", "role": "Member"})
+
+        assert response.status_code == 201, response.text
+        assert len(api.sent) == 1
+        entry = api.sent[0]
+        assert entry["action_type"] == "send_email"
+        assert entry["connector"] == "gmail"
+        assert entry["recipients"] == ["new@b.co"]
+        assert entry["risk_tier"] == "T2"
+        assert entry["authz"] == {"by": "person", "ref": OWNER, "at": api.now}
+        assert api.outbox.get(entry["id"])["state"] == "sent"
+
+
 # --- route hygiene -----------------------------------------------------------------------------------------------
 
 

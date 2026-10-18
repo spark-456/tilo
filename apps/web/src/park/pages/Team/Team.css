@@ -50,6 +50,39 @@
   align-items: center;
   flex-wrap: wrap;
 }
+
+[data-park] .park-team-invite-wrap {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+[data-park] .park-team-invite-confirm {
+  position: static;
+  display: grid;
+  gap: 10px;
+  width: min(100%, 420px);
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-park] .park-team-invite-confirm p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+[data-park] .park-team-invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
 [data-park] .park-team-field {
   display: flex;
   align-items: center;
