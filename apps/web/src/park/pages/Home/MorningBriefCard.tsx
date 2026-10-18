@@ -23,10 +23,12 @@ const sourceLabel = (s: BriefSource) =>
 export function MorningBriefCard({
   api,
   onOpenSource,
+  canOpenSource = () => true,
   compact = false,
 }: {
   api: MorningBriefApi;
   onOpenSource?: (source: BriefSource) => void;
+  canOpenSource?: (source: BriefSource) => boolean;
   compact?: boolean;
 }) {
   const [read, setRead] = useState<Read>({ kind: "loading" });
@@ -99,22 +101,24 @@ export function MorningBriefCard({
       setAdding(null);
     }
   };
-  const cite = (source: BriefSource) =>
-    onOpenSource ? (
+  const sourceControl = (source: BriefSource, label: string) =>
+    onOpenSource && canOpenSource(source) ? (
       <button
         type="button"
         key={`${source.kind}:${source.id}`}
         onClick={() => onOpenSource(source)}
       >
-        {sourceLabel(source)} · {source.id}
+        {label}
       </button>
     ) : (
-      <span key={`${source.kind}:${source.id}`}>
-        {sourceLabel(source)} · {source.id}
-      </span>
+      <span key={`${source.kind}:${source.id}`}>{label}</span>
     );
+  const cite = (source: BriefSource) =>
+    sourceControl(source, `${sourceLabel(source)} · ${source.id}`);
 
   if (compact) {
+    const suggestion = read.kind === "ready" ? read.brief.suggestions[0] : undefined;
+    const compactSource = suggestion?.cites.find(canOpenSource);
     const line =
       read.kind === "loading"
         ? "Loading your brief…"
@@ -125,7 +129,17 @@ export function MorningBriefCard({
             : read.brief.suggestions[0]?.text || "Your morning brief is ready.";
     return (
       <section aria-label="Morning brief" className="park-home-brief-row">
-        <span>{line}</span>
+        {compactSource && onOpenSource ? (
+          <button
+            type="button"
+            className="park-home-brief-row__link"
+            onClick={() => onOpenSource(compactSource)}
+          >
+            {line}
+          </button>
+        ) : (
+          <span>{line}</span>
+        )}
         <button
           type="button"
           className="park-btn park-btn--secondary park-btn--sm"
@@ -176,7 +190,7 @@ export function MorningBriefCard({
               <ul>
                 {read.brief.meetings.items.map((item) => (
                   <li key={item.source.id}>
-                    {item.title} · {item.start}
+                    {sourceControl(item.source, item.title)} · {item.start}
                   </li>
                 ))}
               </ul>
@@ -218,7 +232,7 @@ export function MorningBriefCard({
               <ul>
                 {read.brief.deadlines.items.map((item) => (
                   <li key={item.source.id}>
-                    {item.title} · {item.due}
+                    {sourceControl(item.source, item.title)} · {item.due}
                   </li>
                 ))}
               </ul>

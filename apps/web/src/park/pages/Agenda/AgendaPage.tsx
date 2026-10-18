@@ -22,6 +22,7 @@ import { Button, PageSheet } from "../../components";
 import { FirstRunPanels } from "../../sample/FirstRunPanels";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { AppLink } from "../../shared/AppLink";
+import { homeTarget } from "../Home/homeTargets";
 import "../../components/park.components.css";
 import type { AppCtx } from "../../app/AppCtx";
 import {
@@ -151,7 +152,7 @@ function PersonalAgendaPage({ app }: AgendaPageProps) {
   return (
     <Frame source={state.source}>
       {state.data.days === null ? (
-        <Plate A={state.data} api={api} />
+        <Plate A={state.data} api={api} app={app} />
       ) : (
         <Ready
           A={state.data}
@@ -165,9 +166,19 @@ function PersonalAgendaPage({ app }: AgendaPageProps) {
   );
 }
 
-function Plate({ A, api }: { A: LiveAgenda; api: Api }) {
+function Plate({ A, api, app }: { A: LiveAgenda; api: Api; app: AppCtx }) {
   const [peopleKey, setPeopleKey] = useState(0);
   const [meetings, setMeetings] = useState<PeopleRow[]>([]);
+  const targetRow = useMemo(
+    () =>
+      app.params.item
+        ? ([...A.plate.rows, ...A.plate.parked].find(
+            (row) => homeTarget(row.ref)?.params.item === app.params.item,
+          ) ?? null)
+        : null,
+    [A.plate.rows, A.plate.parked, app.params.item],
+  );
+  const [selected, setSelected] = useState<AgendaPlateRow | null>(targetRow);
   const [teamIds, setTeamIds] = useState<string[]>([]);
   const [schedule, setSchedule] = useState<{ start: string; minutes: number } | null>(null);
   const demo = sessionView.demo();
@@ -184,6 +195,7 @@ function Plate({ A, api }: { A: LiveAgenda; api: Api }) {
   const minutes = useMemo(() => (http ? meetingMinutesApi(http) : null), [http]);
   const pinboards = useMemo(() => (http ? peopleListsApi(http) : null), [http]);
   const getJson = useMemo(() => (http ? (path: string) => http.getJson(path) : null), [http]);
+  useEffect(() => setSelected(targetRow), [targetRow]);
   useEffect(() => {
     if (!http) {
       setTeamIds([]);
@@ -246,24 +258,45 @@ function Plate({ A, api }: { A: LiveAgenda; api: Api }) {
         <output>{ORGANISATION_SETUP}</output>
       </>
     );
+  const openRow = (row: AgendaPlateRow) => {
+    const target = homeTarget(row.ref);
+    if (!target) return;
+    if (target.page === "world" || target.page === "needs") {
+      app.go(target.page, target.params);
+      return;
+    }
+    setSelected(row);
+    if (row.ref.kind === "meeting") {
+      document.getElementById("agenda-meetings")?.focus();
+    }
+  };
   const list = (rows: AgendaPlateRow[], empty: string) =>
     rows.length ? (
       <ul>
-        {rows.map((r) => (
-          <li key={`${r.ref.kind}:${r.ref.id}`}>
-            <strong>{r.title ?? "Untitled item"}</strong>
-            {r.due ? (
-              <p>
-                Due <time dateTime={r.due}>{agendaDateLabel(r.due)}</time>
-              </p>
-            ) : null}
-            {isCalendarEntry(r) && r.at ? (
-              <p>
-                <time dateTime={r.at}>{agendaDateLabel(r.at)}</time>
-              </p>
-            ) : null}
-          </li>
-        ))}
+        {rows.map((r) => {
+          const target = homeTarget(r.ref);
+          return (
+            <li key={`${r.ref.kind}:${r.ref.id}`}>
+              {target ? (
+                <button type="button" onClick={() => openRow(r)}>
+                  {r.title ?? "Untitled item"}
+                </button>
+              ) : (
+                <strong>{r.title ?? "Untitled item"}</strong>
+              )}
+              {r.due ? (
+                <p>
+                  Due <time dateTime={r.due}>{agendaDateLabel(r.due)}</time>
+                </p>
+              ) : null}
+              {isCalendarEntry(r) && r.at ? (
+                <p>
+                  <time dateTime={r.at}>{agendaDateLabel(r.at)}</time>
+                </p>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
     ) : (
       <p>{empty}</p>
@@ -333,7 +366,7 @@ function Plate({ A, api }: { A: LiveAgenda; api: Api }) {
             </h2>
             {list(A.plate.parked, "No parked work.")}
           </section>
-          <div id="agenda-meetings">
+          <div id="agenda-meetings" tabIndex={-1}>
             <PeopleLists key={peopleKey} onMeetings={setMeetings} />
           </div>
         </div>
@@ -343,7 +376,24 @@ function Plate({ A, api }: { A: LiveAgenda; api: Api }) {
               <span aria-hidden="true">{icon("calendar", 16)}</span>
               Event details
             </h2>
-            <p>Select a meeting to see its details and any prepared brief.</p>
+            {selected ? (
+              <>
+                <strong>{selected.title ?? "Untitled item"}</strong>
+                <p>{selected.from ?? selected.group}</p>
+                {selected.due ? (
+                  <p>
+                    Due <time dateTime={selected.due}>{agendaDateLabel(selected.due)}</time>
+                  </p>
+                ) : null}
+                {selected.at ? (
+                  <p>
+                    <time dateTime={selected.at}>{agendaDateLabel(selected.at)}</time>
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p>Select an item to see its details and any prepared brief.</p>
+            )}
           </section>
           <section aria-label="Available times" className="park-agenda-state park-agenda-sidecard">
             <h2 className="park-agenda-cardtitle">

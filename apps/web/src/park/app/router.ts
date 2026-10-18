@@ -15,6 +15,8 @@ export interface ParkRoute {
 // segment, not a query value.
 const QUERY: Partial<Record<PageId, string>> = {
   skills: "id",
+  agenda: "item",
+  needs: "id",
   team: "focus",
   profile: "tab",
   settings: "section",

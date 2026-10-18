@@ -30,7 +30,7 @@ export function NeedsPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const [data, setData] = useState<Loaded>(null);
   const [attempt, setAttempt] = useState(0);
-  const [chosen, setChosen] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<string | null>(app.params.id ?? null);
   const heading = useRef<HTMLHeadingElement>(null);
   const read = useRef({ dec: app.dec, added: app.added });
   read.current = { dec: app.dec, added: app.added };
