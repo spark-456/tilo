@@ -143,3 +143,13 @@ def test_P0_TILO_APPS_caps_access_and_public_route_shape(app_case):
     with TestClient(api) as client:
         capped = client.post("/public/apps/jo-smith/customer-survey/responses", json={"fields": {"x": "y"}})
         assert capped.status_code == 409
+
+
+def test_P0_TILO_APPS_signed_rate_limit_follows_user_across_ips(app_case):
+    api, _, artifact = app_case
+    path = f"/v1/artifacts/{artifact}/responses"
+    with TestClient(api, client=("198.51.100.10", 50000)) as first_ip:
+        for index in range(60):
+            assert first_ip.post(path, json={"fields": {"answer": str(index)}}).status_code == 201
+    with TestClient(api, client=("198.51.100.11", 50000)) as next_ip:
+        assert next_ip.post(path, json={"fields": {"answer": "again"}}).status_code == 429
