@@ -1,8 +1,29 @@
-import { expect, test } from "@playwright/test";
+import { type Locator, type Page, expect, test } from "@playwright/test";
 
-test("CX_LOADER_SMOOTHNESS_boot_cover_stays_fixed_without_long_frame_gaps_or_layout_shift", async ({
-  page,
-}) => {
+const sampleFrame = async (page: Page, image: Locator) => {
+  await page.evaluate(() => Reflect.set(window, "__loaderFrameProbe", true));
+  const box = await image.boundingBox();
+  if (!box) throw new Error("loader image has no browser bounds");
+  const session = await page.context().newCDPSession(page);
+  const frame = await session.send("Page.captureScreenshot", {
+    format: "png",
+    fromSurface: true,
+    clip: { ...box, scale: 1 },
+  });
+  await session.detach();
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          Reflect.set(window, "__loaderFrameProbe", false);
+          resolve();
+        });
+      }),
+  );
+  return frame.data;
+};
+
+test("R_LOADER_boot_cover_advances_frames_without_long_gaps_or_layout_shift", async ({ page }) => {
   await page.addInitScript(() => {
     const metrics: {
       maxFrameGap: number;
@@ -19,9 +40,21 @@ test("CX_LOADER_SMOOTHNESS_boot_cover_stays_fixed_without_long_frame_gaps_or_lay
       Reflect.set(window, "__loaderLoopComplete", true);
     });
     let previous: number | null = null;
+    Reflect.set(window, "__resetLoaderMetrics", () => {
+      metrics.maxFrameGap = 0;
+      metrics.worstFrameAt = 0;
+      metrics.cls = 0;
+      previous = null;
+    });
     const frame = (now: number) => {
       const loopComplete = Reflect.get(window, "__loaderLoopComplete") === true;
-      if (previous !== null && !loopComplete && now - previous > metrics.maxFrameGap) {
+      const probingFrame = Reflect.get(window, "__loaderFrameProbe") === true;
+      if (
+        previous !== null &&
+        !loopComplete &&
+        !probingFrame &&
+        now - previous > metrics.maxFrameGap
+      ) {
         metrics.maxFrameGap = now - previous;
         metrics.worstFrameAt = now;
       }
@@ -41,6 +74,11 @@ test("CX_LOADER_SMOOTHNESS_boot_cover_stays_fixed_without_long_frame_gaps_or_lay
   const cover = page.locator("#tilo-boot-cover");
   await expect(cover).toBeVisible();
   expect(await cover.evaluate((element) => getComputedStyle(element).position)).toBe("fixed");
+  await page.evaluate(() => Reflect.get(window, "__resetLoaderMetrics")());
+  const firstFrame = await sampleFrame(page, cover.locator("img"));
+  await page.waitForTimeout(800);
+  const laterFrame = await sampleFrame(page, cover.locator("img"));
+  expect(firstFrame).not.toBe(laterFrame);
   await expect
     .poll(() => page.locator("#root").evaluate((element) => !element.hasAttribute("inert")), {
       timeout: 30_000,

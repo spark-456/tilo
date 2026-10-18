@@ -1,0 +1,30 @@
+#tilo-boot-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #fff;
+  opacity: 1;
+  transition: opacity .25s ease;
+}
+html.tilo-returning-session #tilo-boot-cover {
+  visibility: hidden;
+}
+#tilo-boot-cover img {
+  display: block;
+  width: min(460px, 92vw, calc(88vh * 0.759));
+  height: auto;
+  aspect-ratio: 460 / 606;
+  object-fit: contain;
+}
+#tilo-boot-cover.tilo-boot-cover--leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  #tilo-boot-cover {
+    transition-duration: .2s;
+  }
+}

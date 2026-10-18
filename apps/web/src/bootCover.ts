@@ -1,6 +1,7 @@
 const DECODE_WAIT_MS = 800;
-/** FT-PERF-2: release when the app is ready, minimum 1.2 s */
-const MIN_BOOT_WAIT_MS = 1200;
+const FIRST_LOOP_MS = 4600;
+const RETURNING_DELAY_MS = 300;
+const MAX_BOOT_WAIT_MS = 6000;
 
 /** The HTML cover exists before the JavaScript bundle. Release it after the app and one saved loop are ready. */
 export function installBootCover(): Promise<void> {
@@ -11,13 +12,31 @@ export function installBootCover(): Promise<void> {
 
   let appReady = false;
   let loopReady = false;
-  const reveal = () => {
-    if (!appReady || !loopReady) return;
+  let seen = false;
+  let released = false;
+  let returningDelayPassed = false;
+  let maxTimer = 0;
+  const release = (fade: boolean) => {
+    if (released) return;
+    released = true;
     observer.disconnect();
+    window.clearTimeout(maxTimer);
     root.removeAttribute("inert");
     root.removeAttribute("aria-hidden");
-    cover.classList.add("tilo-boot-cover--leaving");
-    window.setTimeout(() => cover.remove(), 300);
+    document.documentElement.classList.remove("tilo-returning-session");
+    if (fade) {
+      cover.classList.add("tilo-boot-cover--leaving");
+      window.setTimeout(() => cover.remove(), 300);
+    } else {
+      cover.remove();
+    }
+  };
+  const reveal = () => {
+    if (seen) {
+      if (appReady) release(returningDelayPassed);
+      return;
+    }
+    if (appReady && loopReady) release(true);
   };
   const check = () => {
     appReady = Boolean(
@@ -32,22 +51,25 @@ export function installBootCover(): Promise<void> {
   check();
 
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  // The loop plays once per browser session; a later load only waits for the app (the cover is decoration).
-  let seen = false;
+  // A tiny blocking script in index.html marks returning sessions before first paint, so their cover stays hidden.
   try {
     seen = window.sessionStorage.getItem("tilo-boot-seen") === "1";
     window.sessionStorage.setItem("tilo-boot-seen", "1");
   } catch {
     // storage blocked: play the loop
   }
-  // Resolves once the cover artwork is decoded (the cover is drawn), so the caller can load app code after it.
-  // `decode()` of an animated image can stay pending (seen in embedded Chromium), which would hold the app back for
-  // good: the cover waits for it at most DECODE_WAIT_MS, then app code loads anyway.
-  const decoded = Promise.race([
-    image.decode().catch(() => undefined),
-    new Promise<void>((resolve) => window.setTimeout(resolve, DECODE_WAIT_MS)),
-  ]);
-  void decoded.then(() => {
+  maxTimer = window.setTimeout(
+    () => release(!document.documentElement.classList.contains("tilo-returning-session")),
+    MAX_BOOT_WAIT_MS,
+  );
+  if (seen) {
+    window.setTimeout(() => {
+      if (released) return;
+      returningDelayPassed = true;
+      document.documentElement.classList.remove("tilo-returning-session");
+      reveal();
+    }, RETURNING_DELAY_MS);
+  } else {
     window.setTimeout(
       () => {
         loopReady = true;
@@ -56,8 +78,15 @@ export function installBootCover(): Promise<void> {
         window.dispatchEvent(new Event("tilo-boot-loop-complete"));
         reveal();
       },
-      reduced || seen ? 200 : MIN_BOOT_WAIT_MS,
+      reduced ? 200 : FIRST_LOOP_MS,
     );
-  });
+  }
+  // Resolves once the cover artwork is decoded (the cover is drawn), so the caller can load app code after it.
+  // `decode()` of an animated image can stay pending (seen in embedded Chromium), which would hold the app back for
+  // good: the cover waits for it at most DECODE_WAIT_MS, then app code loads anyway.
+  const decoded = Promise.race([
+    image.decode().catch(() => undefined),
+    new Promise<void>((resolve) => window.setTimeout(resolve, DECODE_WAIT_MS)),
+  ]);
   return decoded;
 }
