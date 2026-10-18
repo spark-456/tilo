@@ -14,6 +14,7 @@ from __future__ import annotations
 import contextlib
 import copy
 import hashlib
+import logging
 import os
 import random
 import re
@@ -53,6 +54,7 @@ _SAFE_ID = re.compile(r"[A-Za-z0-9_.-]{1,128}")
 _ATTEMPTS = 8
 _CONTENDED = (gexc.FailedPrecondition, gexc.Aborted, gexc.NotFound)
 _LOCK_WAIT = (gexc.Aborted, gexc.Conflict)  # `AlreadyExists` is a Conflict too: caught first, never retried
+logger = logging.getLogger("tilo_api.people_firestore")
 
 
 class PeopleStoreNotConfigured(RuntimeError):
@@ -71,7 +73,8 @@ def _guarded() -> Iterator[None]:
         yield
     except PeopleError:
         raise
-    except Exception:
+    except Exception as exc:
+        logger.warning("people Firestore operation failed (%s)", type(exc).__name__)
         raise PeopleError("the people store is unavailable") from None
 
 
