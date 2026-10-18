@@ -576,12 +576,17 @@
     background: var(--card);
     box-shadow: var(--sh);
   }
-  /* 44px touch targets on phone */
+  /* 44px touch targets on phone (FT-UX-1) */
   [data-park] .park-world-head button,
   [data-park] .park-world-head a,
   [data-park] .park-world-back,
   [data-park] .park-world-moreclose,
-  [data-park] .park-world-storyviewbtn {
+  [data-park] .park-world-storyviewbtn,
+  [data-park] .park-world-skillchip,
+  [data-park] .park-world-toolchip,
+  [data-park] .park-world-chipfit,
+  [data-park] .park-world-spendlink,
+  [data-park] .park-world-dactions button {
     min-height: 44px;
     min-width: 44px;
   }

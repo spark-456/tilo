@@ -1277,8 +1277,10 @@
     padding: 4px;
   }
   [data-park] .park-world-lenses a {
-    min-height: 24px;
-    padding: 0 6px;
+    min-height: 44px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
   }
   /* Districts: the name and note, then the counts, then the chip, all across the columns right of the tile
      (the design's column tracks stay; the items span them so nothing runs past the card). */
@@ -1315,11 +1317,27 @@
   [data-park] .park-world-rowlabel--stack {
     padding-top: 0;
   }
-  /* A long chip name wraps inside the chip and the chip gets taller (min 28px). */
+  /* FT-UX-1: long chips meet 44px minimum tap targets on phone. */
   [data-park] .park-world-chipfit {
     height: auto;
-    min-height: 28px;
+    min-height: 44px;
     text-align: left;
+    display: inline-flex;
+    align-items: center;
+  }
+  [data-park] .park-world-skillchip,
+  [data-park] .park-world-toolchip {
+    min-height: 44px;
+    height: auto;
+    display: inline-flex;
+    align-items: center;
+  }
+  [data-park] .park-world-back,
+  [data-park] .park-world-spendlink {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
   }
   [data-park] .park-world-chipfit .park-world-chipname {
     padding: 4px 0;
