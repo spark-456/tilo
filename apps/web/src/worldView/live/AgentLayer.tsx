@@ -20,10 +20,12 @@ export function AgentLayer({
   worldId,
   rooms,
   onReview,
+  onChangeDirection,
 }: {
   worldId: string;
   rooms: RoomClient | null;
   onReview?: (() => void) | undefined;
+  onChangeDirection?: ((instruction: string) => Promise<void>) | undefined;
 }) {
   const facts = useWorldFacts(worldId, rooms);
   const [team, setTeam] = useState(false);
@@ -142,6 +144,7 @@ export function AgentLayer({
             setChat(null);
             setTeam(true);
           }}
+          onChangeDirection={onChangeDirection}
         />
       ) : null}
       {facts.layout && !team && !opened ? (

@@ -14,9 +14,11 @@ import { Conversations } from "./live/Conversations";
 export default function LiveStageEmbed({
   worldId,
   onReview,
+  onChangeDirection,
 }: {
   worldId: string;
   onReview?: (() => void) | undefined;
+  onChangeDirection?: ((instruction: string) => Promise<void>) | undefined;
 }) {
   const client = useClient();
   // The words of a Meeting Hall turn live only in the archive (MR-12); the stage reads them from the room, as the
@@ -48,7 +50,12 @@ export default function LiveStageEmbed({
         worldId={world.worldId}
         paused={status === "paused"}
       />
-      <AgentLayer worldId={worldId} rooms={rooms} onReview={onReview} />
+      <AgentLayer
+        worldId={worldId}
+        rooms={rooms}
+        onReview={onReview}
+        onChangeDirection={onChangeDirection}
+      />
       {world.note ? (
         <div
           className="park-world-livenote"
@@ -68,9 +75,15 @@ export default function LiveStageEmbed({
 }
 
 /** TILO-T-WORLD: the agents' chat for the World page's Chat tab; it lives in this chunk so the page imports one module. */
-export function LiveChat({ worldId }: { worldId: string }) {
+export function LiveChat({
+  worldId,
+  onChangeDirection,
+}: {
+  worldId: string;
+  onChangeDirection?: ((instruction: string) => Promise<void>) | undefined;
+}) {
   const rooms = useMemo(createRoomClient, []);
-  return <Conversations worldId={worldId} rooms={rooms} />;
+  return <Conversations worldId={worldId} rooms={rooms} onChangeDirection={onChangeDirection} />;
 }
 
 export { ResultTab } from "./live/ResultTab";

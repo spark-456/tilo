@@ -2357,3 +2357,38 @@
   border: 2px solid var(--amber, #f5a524);
   pointer-events: none;
 }
+[data-park] .tw-direction {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line, #dedede);
+  border-radius: 14px;
+  background: var(--paper, #fff);
+}
+
+[data-park] .tw-direction label,
+[data-park] .tw-direction__actions,
+[data-park] .tw-res-followup__actions {
+  display: flex;
+  gap: 8px;
+}
+
+[data-park] .tw-direction label {
+  flex-direction: column;
+}
+
+[data-park] .tw-direction textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+[data-park] .tw-res-followup,
+[data-park] .tw-chat-followup {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+[data-park] .tw-chat-followup {
+  padding: 0 12px 10px;
+}

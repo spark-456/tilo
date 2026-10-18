@@ -448,6 +448,12 @@ export function WorldPage({ app }: { app: AppCtx }) {
         : "Link copied. This is a sample world, so there is nothing real to share.",
     );
   };
+  const changeDirection = async (instruction: string) => {
+    if (!worldClient) throw new Error("World client unavailable");
+    const next = await worldClient.startAgain(w.id, instruction);
+    markPendingWorld(next.world_id);
+    app.go("world", { id: next.world_id });
+  };
 
   const openSlackDialog = (trigger: HTMLButtonElement) => {
     if (!slackState.connected) return;
@@ -793,7 +799,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
           >
             {trackRun && canDraw ? (
               <Suspense fallback={null}>
-                <LiveStageEmbed worldId={w.id} onReview={() => setTab("story")} />
+                <LiveStageEmbed
+                  worldId={w.id}
+                  onReview={() => setTab("story")}
+                  onChangeDirection={changeDirection}
+                />
               </Suspense>
             ) : trackRun ? (
               <RecordedWorldArt events={runEvents} />
@@ -958,7 +968,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
             <TabPanel tab="chat" on={shown} title="Chat" sub="How your agents talk to each other">
               {shown === "chat" ? (
                 <Suspense fallback={null}>
-                  <LiveChat worldId={w.id} />
+                  <LiveChat worldId={w.id} onChangeDirection={changeDirection} />
                 </Suspense>
               ) : null}
             </TabPanel>
@@ -996,7 +1006,14 @@ export function WorldPage({ app }: { app: AppCtx }) {
             slide={wide ? "tw-slide-r" : "tw-slide-up"}
           >
             {delivered ? (
-              <RunResult api={api} worldId={w.id} events={runEvents} shared={result} />
+              <RunResult
+                api={api}
+                worldId={w.id}
+                events={runEvents}
+                shared={result}
+                onAskQuestion={() => setTab("chat")}
+                onChangeDirection={changeDirection}
+              />
             ) : null}
             {trackRun && !delivered ? (
               <EmptyPanel
