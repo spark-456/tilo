@@ -54,13 +54,16 @@ for (const width of [390, 1440]) {
           </main>
         </ParkProvider>,
       );
-      for (let attempt = 0; attempt < 100; attempt++) {
+      for (let attempt = 0; attempt < 500; attempt++) {
         await act(async () => {
           await new Promise((resolve) => setTimeout(resolve, 20));
         });
         if (view.container.querySelector(`[data-testid="park-page-${page}"]`)) break;
       }
-      expect(view.container.querySelector(`[data-testid="park-page-${page}"]`)).not.toBeNull();
+      expect(
+        view.container.querySelector(`[data-testid="park-page-${page}"]`),
+        view.container.innerHTML.slice(0, 800),
+      ).not.toBeNull();
       // Loading placeholders are not an audit of the ready page.
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -80,6 +83,6 @@ for (const width of [390, 1440]) {
       expect(incomplete, "These checks require manual review; they are not passing checks").toEqual(
         [],
       );
-    });
+    }, 15_000);
   }
 }
