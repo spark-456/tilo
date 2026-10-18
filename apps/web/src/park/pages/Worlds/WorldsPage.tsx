@@ -8,7 +8,7 @@ import { ErrorState, StateAction } from "../../../design/tilo-t";
 import { createRoutinesClient } from "../../api/live/routines";
 import type { Connector, Decision, Ledger, Plan, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { useParkApi } from "../../app/context";
+import { useParkApi, useWorldClient } from "../../app/context";
 import { money } from "../../app/ledgerKpis";
 import {
   SLACK_NOTE_MAX,
@@ -53,6 +53,7 @@ interface Loaded {
 
 export function WorldsPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
+  const worldClient = useWorldClient();
   const preview = useFirstRunPreview();
   const [routines] = useState(createRoutinesClient);
   const { dec, added, needsLeft, night } = app;
@@ -332,6 +333,8 @@ export function WorldsPage({ app }: { app: AppCtx }) {
                         w={w}
                         art={art}
                         status={statusOf(w, needsLeft)}
+                        client={worldClient}
+                        night={night}
                         onOpen={open}
                       />
                     ) : (

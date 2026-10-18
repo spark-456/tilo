@@ -610,6 +610,7 @@ export function HomePage({ app }: { app: AppCtx }) {
               rows={recentRows(worlds, needs, served)}
               sample={served ? worlds.find((w) => w.sample) : undefined}
               night={night}
+              client={briefClient}
               onWorld={open}
               onWorlds={() => go("worlds")}
             />

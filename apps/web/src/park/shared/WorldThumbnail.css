@@ -1,0 +1,41 @@
+[data-park] .park-worldthumb {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+}
+[data-park] .park-worldthumb > svg,
+[data-park] .park-worldthumb > div {
+  max-width: 100%;
+  max-height: 100%;
+}
+[data-park] .park-worldthumb__placeholder {
+  width: 100%;
+  height: 100%;
+  color: var(--hero, #5a3fe0);
+}
+[data-park] .park-worldthumb__placeholder--town {
+  color: var(--amber, #f0a500);
+}
+[data-park] .park-worldthumb__placeholder--city {
+  color: var(--blue, #2a6fd6);
+}
+[data-park] .park-worldthumb__ground {
+  fill: var(--paper, #f6f4ee);
+  stroke: var(--lineStrong, var(--line));
+  stroke-width: 2;
+}
+[data-park] .park-worldthumb__block path:first-child {
+  fill: color-mix(in srgb, currentColor 52%, white);
+}
+[data-park] .park-worldthumb__block path:nth-child(2) {
+  fill: color-mix(in srgb, currentColor 72%, black);
+}
+[data-park] .park-worldthumb__block path:nth-child(3) {
+  fill: currentColor;
+}
+[data-park] .park-worldthumb__block .park-worldthumb__door {
+  fill: color-mix(in srgb, currentColor 35%, black);
+}
