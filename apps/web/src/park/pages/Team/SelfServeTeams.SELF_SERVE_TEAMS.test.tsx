@@ -145,6 +145,41 @@ it("R_TEAM a lead changes a member between Viewer Editor and Admin", async () =>
   expect(el.textContent).toContain("Ben is now Editor.");
 });
 
+it("UX_POLISH_TEAM switches named teams and shows rich member roles plus approval pending copy", async () => {
+  const client = fakeClient(
+    [
+      { team: "tm_a", name: "Launch crew", lead: true, state: "member", invitedBy: null },
+      { team: "tm_b", name: "Finance", lead: false, state: "member", invitedBy: null },
+    ],
+    {
+      tm_a: [
+        { id: "u_me", name: "Mina Shah", lead: true, role: "owner" },
+        { id: "u_ben", name: "Ben Ortiz", lead: false, role: "viewer" },
+      ],
+      tm_b: [{ id: "u_lee", name: "Lee Chen", lead: true, role: "owner" }],
+    },
+  );
+  const el = await mount(client);
+  const switcher = el.querySelector('[aria-label="Choose a team"]');
+  expect(switcher?.querySelectorAll("button")).toHaveLength(2);
+  expect(switcher?.querySelector('[aria-pressed="true"]')?.textContent).toContain("Launch crew");
+  expect(el.querySelector('[data-testid="team-member-u_ben"]')?.textContent).toContain("Viewer");
+  expect(el.textContent).not.toContain("Lee Chen");
+
+  const input = el.querySelector<HTMLInputElement>(
+    'input[aria-label="Invite to your team by email"]',
+  );
+  if (!input) throw new Error("no invite field");
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(input, "jo@example.com");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => button(el, "Invite").click());
+  await settle();
+  expect(el.textContent).toContain("Invitation waiting for your approval");
+});
+
 it("TEAM_ACCESS_1 shows team names from their leads and only marks the viewer as lead", async () => {
   const client = fakeClient(
     [

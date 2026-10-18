@@ -12,8 +12,13 @@ import { Button } from "../../components";
 import { type MyTeamName, isValidEmail } from "./teamModel";
 
 export const INVITE_SENT =
-  "Invitation saved. If that address belongs to someone who has signed in, they will see it on their Team page.";
+  "Invitation waiting for your approval. It will be sent only after you approve it.";
 const MEMBER_ROLES = ["viewer", "editor", "admin"] as const;
+
+const roleName = (role: RosterMember["role"]): string =>
+  role === "owner"
+    ? "Owner"
+    : `${(role ?? "viewer")[0]?.toUpperCase()}${(role ?? "viewer").slice(1)}`;
 
 interface Loaded {
   teams: MyTeam[];
@@ -77,6 +82,7 @@ export function SelfServeTeams(props: {
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
+  const [activeTeam, setActiveTeam] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!client) return;
@@ -114,6 +120,8 @@ export function SelfServeTeams(props: {
       setBusy(false);
     }
   };
+  const memberTeams = data.teams.filter((team) => team.state === "member");
+  const active = memberTeams.find((team) => team.team === activeTeam) ?? memberTeams[0] ?? null;
 
   return (
     <section
@@ -230,66 +238,110 @@ export function SelfServeTeams(props: {
                 </Button>
               ) : null}
             </div>
-          ) : (
-            <article className="park-team-ownrow" key={t.team} data-testid="team-row">
-              <div className="park-team-ownrowhead">
-                <span className="park-team-ownavatar" aria-hidden="true">
-                  {teamName(t, data.rosters[t.team]).slice(0, 1).toUpperCase()}
-                </span>
-                <div>
-                  <h3 className="park-team-h2">
-                    {teamName(t, data.rosters[t.team])}
-                    {t.lead ? " · You lead it" : ""}
-                  </h3>
-                  <span>{`${data.rosters[t.team]?.length ?? 0} ${(data.rosters[t.team]?.length ?? 0) === 1 ? "person" : "people"}`}</span>
-                </div>
+          ) : null,
+        )}
+        {memberTeams.length ? (
+          <nav className="park-team-switcher" aria-label="Choose a team">
+            {memberTeams.map((team) => {
+              const label = teamName(team, data.rosters[team.team]);
+              return (
+                <button
+                  type="button"
+                  className="park-team-switch"
+                  data-testid="team-row"
+                  aria-pressed={team.team === active?.team}
+                  key={team.team}
+                  onClick={() => setActiveTeam(team.team)}
+                >
+                  <span className="park-team-switchmark" aria-hidden="true">
+                    {label.slice(0, 1).toUpperCase()}
+                  </span>
+                  <span>
+                    <strong>{label}</strong>
+                    <small>
+                      {team.lead
+                        ? " · You lead it"
+                        : `${data.rosters[team.team]?.length ?? 0} people`}
+                    </small>
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        ) : null}
+        {active ? (
+          <article className="park-team-ownrow" data-testid="team-panel">
+            <div className="park-team-ownrowhead">
+              <span className="park-team-ownavatar" aria-hidden="true">
+                {teamName(active, data.rosters[active.team]).slice(0, 1).toUpperCase()}
+              </span>
+              <div>
+                <h3 className="park-team-h2">{teamName(active, data.rosters[active.team])}</h3>
+                <span>{`${data.rosters[active.team]?.length ?? 0} ${(data.rosters[active.team]?.length ?? 0) === 1 ? "person" : "people"}`}</span>
               </div>
-              <ul className="park-team-ownpeople">
-                {(data.rosters[t.team] ?? []).map((m) => (
-                  <li className="park-team-ownperson" key={m.id}>
-                    <span>
-                      {m.name}
-                      {m.lead ? " · Owner" : ""}
+            </div>
+            <ul className="park-team-ownpeople">
+              {(data.rosters[active.team] ?? []).map((member) => (
+                <li
+                  className="park-team-ownperson"
+                  data-testid={`team-member-${member.id}`}
+                  key={member.id}
+                >
+                  <span className="park-team-memberavatar" aria-hidden="true">
+                    {member.name
+                      .split(" ")
+                      .map((part) => part[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </span>
+                  <span className="park-team-memberidentity">
+                    <strong>{member.name}</strong>
+                    <small>{member.lead ? "Team owner" : "Team member"}</small>
+                  </span>
+                  <span className={`park-team-role park-team-role--${member.role ?? "viewer"}`}>
+                    {roleName(member.role)}
+                  </span>
+                  {active.lead && !member.lead ? (
+                    <span className="park-team-selectwrap park-team-rolepicker">
+                      <select
+                        className="park-team-select"
+                        aria-label={`Role for ${member.name}`}
+                        value={member.role ?? "viewer"}
+                        disabled={busy}
+                        onChange={(e) => {
+                          const role = e.target.value as (typeof MEMBER_ROLES)[number];
+                          void act(
+                            () => client.changeRole(active.team, member.id, role),
+                            `${member.name} is now ${roleName(role)}.`,
+                          );
+                        }}
+                      >
+                        {MEMBER_ROLES.map((role) => (
+                          <option key={role} value={role}>
+                            {roleName(role)}
+                          </option>
+                        ))}
+                      </select>
                     </span>
-                    {t.lead && !m.lead ? (
-                      <span className="park-team-selectwrap">
-                        <select
-                          className="park-team-select"
-                          aria-label={`Role for ${m.name}`}
-                          value={m.role ?? "viewer"}
-                          disabled={busy}
-                          onChange={(e) => {
-                            const role = e.target.value as (typeof MEMBER_ROLES)[number];
-                            void act(
-                              () => client.changeRole(t.team, m.id, role),
-                              `${m.name} is now ${role[0]?.toUpperCase()}${role.slice(1)}.`,
-                            );
-                          }}
-                        >
-                          {MEMBER_ROLES.map((role) => (
-                            <option key={role} value={role}>
-                              {`${role[0]?.toUpperCase()}${role.slice(1)}`}
-                            </option>
-                          ))}
-                        </select>
-                      </span>
-                    ) : (
-                      !m.lead && (
-                        <span>{`${(m.role ?? "viewer")[0]?.toUpperCase()}${(m.role ?? "viewer").slice(1)}`}</span>
-                      )
-                    )}
-                  </li>
-                ))}
-              </ul>
-              {t.lead ? (
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            {active.lead ? (
+              <div className="park-team-invitecard">
+                <div>
+                  <strong>Invite by email</strong>
+                  <span>The invitation waits for your approval before it is sent.</span>
+                </div>
                 <Invite
                   busy={busy}
-                  onInvite={(email) => act(() => client.invite(t.team, email), INVITE_SENT)}
+                  onInvite={(email) => act(() => client.invite(active.team, email), INVITE_SENT)}
                 />
-              ) : null}
-            </article>
-          ),
-        )}
+              </div>
+            ) : null}
+          </article>
+        ) : null}
       </div>
       <output className="park-team-ownnote">{note}</output>
     </section>
