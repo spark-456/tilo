@@ -109,6 +109,8 @@ export interface ComposerProps {
   /** What the person typed, or the size's example task when the box is empty. */
   readonly shown: string;
   readonly phase: Phase;
+  /** Visible streamed progress step while drafting (FT-SUP-2). */
+  readonly draftStep?: string | null;
   /** A start is on its way to the server: the confirm control waits (live only). */
   readonly sending?: boolean;
   /** QA-DEMO-1: a demo session. The plan is a labelled sample and confirming opens the sample world. */
@@ -238,9 +240,10 @@ export function ComposerPanel(p: ComposerProps) {
           {/* a still ring: the draft is a fixed-timer stand-in with no call behind it, so it does not turn (HR-1) */}
           <ThinkingTilo label="Tilo is drafting" size={20} still />
           <span className="park-home-drafting__text">
-            {p.sample
-              ? `Showing a sample plan for “${p.shown}”`
-              : `Tilo is drafting a ${mode.word} for “${p.shown}”`}
+            {p.draftStep ??
+              (p.sample
+                ? `Showing a sample plan for “${p.shown}”`
+                : `Tilo is drafting a ${mode.word} for “${p.shown}”`)}
           </span>
         </div>
       ) : null}

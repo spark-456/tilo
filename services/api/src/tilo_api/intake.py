@@ -325,7 +325,16 @@ async def _thinking(
         raise
     try:
         task_id, task = await run_in_threadpool(
-            create_task, tasks, writer, result, extraction, scenario=scenario, kinds=kinds, skill=tagged
+            create_task,
+            tasks,
+            writer,
+            result,
+            extraction,
+            scenario=scenario,
+            kinds=kinds,
+            skill=tagged,
+            model_router=model_router,
+            clock=today,
         )
     except WriterBusy:
         raise  # the existing app handler preserves store_unavailable; retain sources after any ambiguous write

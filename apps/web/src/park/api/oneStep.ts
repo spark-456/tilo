@@ -45,7 +45,12 @@ export interface RunPlan {
 
 export interface OneStepApi {
   /** Intake, skip every question, fetch the approaches. Throws a `TiloApiError` whose message is the reason. */
-  prepare(text: string, files: readonly File[], refs?: readonly SkillRef[]): Promise<RunPlan>;
+  prepare(
+    text: string,
+    files: readonly File[],
+    refs?: readonly SkillRef[],
+    onStep?: (step: string) => void,
+  ): Promise<RunPlan>;
   /** The person changed one assumption: answer that question, then price the new brief again. */
   revise(taskId: string, field: string, answer: string): Promise<RunPlan>;
   /**
@@ -172,16 +177,18 @@ export function oneStepOver(http: HttpClient): OneStepApi {
     return planOf(taskId, brief, asked.get(taskId) ?? [], priced);
   };
   return {
-    async prepare(text, files, refs = []) {
+    async prepare(text, files, refs, onStep) {
+      onStep?.("Reading your task...");
       let intake: IntakeResult;
       try {
-        intake = (await http.submitIntake(text, [...files], undefined, refs)) as IntakeResult;
+        intake = (await http.submitIntake(text, [...files], undefined, refs ?? [])) as IntakeResult;
       } catch (e) {
         throw said("read this task", e);
       }
       if (!isText(intake?.task_id) || intake.task_id === "" || typeof intake.brief !== "object") {
         throw new TiloApiError(BAD_REPLY, 200, true, true);
       }
+      onStep?.("Structuring brief...");
       const seen = new Set<string>();
       const questions = (intake.questions ?? []).filter((q) => {
         if (seen.has(q.field)) return false; // the API answers 422 to a field named twice
@@ -190,18 +197,21 @@ export function oneStepOver(http: HttpClient): OneStepApi {
       });
       asked.set(intake.task_id, intake.questions ?? []); // every question's text maps its assumption to a field
       let brief: { goal?: unknown; assumptions?: unknown } = intake.brief;
-      // Every question skipped, even when there are none: the approaches route wants each one answered or skipped.
-      try {
-        brief = (
-          await http.answerQuestions(
-            intake.task_id,
-            questions.map((q) => ({ field: q.field, answer: null })),
-            {},
-          )
-        ).brief;
-      } catch (e) {
-        throw said("record the assumptions", e);
+      // Skip questions if any were asked (FT-SUP-2: avoid unnecessary answers roundtrip when none asked)
+      if (questions.length > 0) {
+        try {
+          brief = (
+            await http.answerQuestions(
+              intake.task_id,
+              questions.map((q) => ({ field: q.field, answer: null })),
+              {},
+            )
+          ).brief;
+        } catch (e) {
+          throw said("record the assumptions", e);
+        }
       }
+      onStep?.("Pricing approaches...");
       return price(intake.task_id, brief);
     },
     async revise(taskId, field, answer) {
