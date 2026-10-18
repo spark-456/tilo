@@ -3,9 +3,10 @@
 The web client sends a short-lived App Check token in `X-Firebase-AppCheck`. `AppCheckGate` is a pure ASGI
 middleware beside `AccessGate`; it asks `deps.get_app_check_verifier()` whether the token is genuine. Enforcement is
 the flag `TILO_APPCHECK_ENFORCE`, read on every request, and ONLY exactly "1" turns it on; the default is off
-(infra/ACCESS.md section 7: the owner alone flips it). Off, a missing, empty, refused or unverifiable token is logged
-once as a WARNING on `tilo_api.appcheck` (never the token, never the error text) and the answer is unchanged. On, it
-is a 401 and the route never runs. `/health`, `/healthz` and `POST /internal/schedules/tick` (its own Google OIDC
+(infra/ACCESS.md section 7: the owner alone flips it). Off, a missing or empty token is logged once at INFO, while a
+refused or unverifiable token remains a WARNING on `tilo_api.appcheck` (never the token or error text), and the answer
+is unchanged. On, a missing token is also a WARNING, returns 401, and never runs the route. `/health`, `/healthz` and
+`POST /internal/schedules/tick` (its own Google OIDC
 check, FR-AGT-14b) are never checked: probes and Cloud Scheduler carry no App Check token; nor is `GET`/`POST
 /l/<token>` (FR-PA-06b), a mail link whose signed single-use token is its own credential.
 
@@ -336,9 +337,8 @@ _missing_log = {"at": float("-inf"), "skipped": 0}
 _missing_lock = threading.Lock()
 
 
-def _warn_missing(clock: Callable[[], float] = time.monotonic) -> None:
-    """Logs the missing-token warning at most once per `_MISSING_LOG_EVERY_S` per process, naming how many were left
-    out since the last line (an unauthenticated caller must not be able to fill the log or the bill)."""
+def _log_missing(clock: Callable[[], float] = time.monotonic) -> None:
+    """Logs a missing token at most once per interval, at warning only when enforcement refuses the request."""
     now = clock()
     with _missing_lock:
         if now - _missing_log["at"] < _MISSING_LOG_EVERY_S:
@@ -346,15 +346,15 @@ def _warn_missing(clock: Callable[[], float] = time.monotonic) -> None:
             return
         skipped, _missing_log["at"], _missing_log["skipped"] = _missing_log["skipped"], now, 0
     suffix = f", {skipped} more since the last line" if skipped else ""
-    logger.warning("App Check token missing from the request (reason=missing%s)", suffix)
+    log = logger.warning if enforcing() else logger.info
+    log("App Check token missing from the request (reason=missing%s)", suffix)
 
 
 def _is_verified(scope: Scope, token: str) -> bool:
-    """True for a genuine token. Anything else (no token, a refused one, a verifier that fails) is False and logged
-    once as a warning with a fixed reason code (`TokenRefused.code`, or `verifier_failed:<error type>` for any other
-    failure of the verifier), never the token or an error text."""
+    """True for a genuine token. Missing tokens use `_log_missing`; refusal and verifier failure are warnings with a
+    fixed reason code (`TokenRefused.code`, or `verifier_failed:<error type>`), never a token or error text."""
     if not token:
-        _warn_missing()
+        _log_missing()
         return False
     from tilo_api import deps  # noqa: PLC0415  (deps imports this module)
 

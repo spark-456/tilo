@@ -15,8 +15,8 @@ the smallest seam that keeps that true while the client starts sending tokens, a
 - Enforcement is a config flag `TILO_APPCHECK_ENFORCE`, read on every request: exactly `"1"` turns it on (the
   convention of `TILO_API_DEV` and `TILO_JUDGE_LIVE`); unset, empty or anything else is off. DEFAULT IS OFF
   (infra/ACCESS.md section 7: "enforcement stays off"), and the owner alone turns it on.
-- Enforcement OFF: no behaviour change at all. A missing, empty, invalid or unverifiable token is only logged,
-  one WARNING on the logger `tilo_api.appcheck` per request, never carrying the token. A valid token logs nothing.
+- Enforcement OFF: no behaviour change at all. A missing or empty token is logged at INFO; an invalid or
+  unverifiable token is a WARNING on `tilo_api.appcheck`. Neither carries the token. A valid token logs nothing.
 - Enforcement ON (pinned lightly; AMBIGUITY, PRD gives no status): a missing or refused token gets 401 and the
   route never runs; a valid one passes.
 - Exempt routes, never checked or logged in either mode: `/health`, `/healthz` (Cloud Run probes carry no token)
@@ -144,22 +144,23 @@ def test_SEC_10_off_a_verifier_that_fails_never_breaks_the_call(verifier, client
     assert str(error) not in caplog.text and good_token() not in caplog.text
 
 
-def test_SEC_10_off_a_missing_token_is_logged_once_as_a_warning_and_nothing_else_changes(verifier, client, caplog):
+def test_FT_SUP_6_off_a_missing_token_is_informational_and_nothing_else_changes(verifier, client, caplog):
     with caplog.at_level(logging.DEBUG, logger=LOGGER):
         response = client.get(PROTECTED)
     assert response.status_code == 200
-    records = warnings_of(caplog)
+    assert warnings_of(caplog) == []
+    records = [r for r in caplog.records if r.name == LOGGER and r.levelno == logging.INFO]
     assert len(records) == 1
-    assert records[0].levelno == logging.WARNING
     assert "app" in records[0].getMessage().lower() and "check" in records[0].getMessage().lower()
     assert verifier.calls == []  # nothing to verify
 
 
-def test_SEC_10_off_an_empty_header_counts_as_missing(verifier, client, caplog):
+def test_FT_SUP_6_off_an_empty_header_is_informational(verifier, client, caplog):
     with caplog.at_level(logging.DEBUG, logger=LOGGER):
         response = client.get(PROTECTED, headers={HEADER: ""})
     assert response.status_code == 200
-    assert len(warnings_of(caplog)) == 1
+    assert warnings_of(caplog) == []
+    assert len([r for r in caplog.records if r.name == LOGGER and r.levelno == logging.INFO]) == 1
     assert verifier.calls == []
 
 
@@ -239,6 +240,14 @@ def test_SEC_10_on_a_missing_or_refused_token_is_401_and_the_route_does_not_run(
         assert response.status_code == 401, headers
         assert "worlds" not in response.text
         assert bad_token() not in response.text
+
+
+def test_FT_SUP_6_on_a_missing_token_remains_a_warning(verifier, client, monkeypatch, caplog):
+    monkeypatch.setenv(ENFORCE, "1")
+    with caplog.at_level(logging.DEBUG, logger=LOGGER):
+        response = client.get(PROTECTED)
+    assert response.status_code == 401
+    assert len(warnings_of(caplog)) == 1
 
 
 def test_SEC_10_on_a_valid_token_is_served_and_verified_exactly_as_sent(verifier, client, monkeypatch):
