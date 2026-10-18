@@ -42,9 +42,7 @@ const WORD: Record<WorldState, string> = {
 const inBase = (w: World, q: string, tier: TierFilter): boolean =>
   (!q.trim() || w.name.toLowerCase().includes(q.trim().toLowerCase())) &&
   (tier === "all" || w.tier === tier);
-/** "Working" also holds a world that needs you. */
-const inStatus = (w: World, f: StatusFilter): boolean =>
-  f === "all" || w.st === f || (f === "running" && w.st === "needs");
+const inStatus = (w: World, f: StatusFilter): boolean => f === "all" || w.st === f;
 
 export const countFor = (
   all: readonly World[],

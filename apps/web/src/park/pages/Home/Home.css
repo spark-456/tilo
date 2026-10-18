@@ -166,6 +166,10 @@
   background: var(--card);
   box-shadow: var(--sh);
 }
+[data-park] .park-home-panel:focus-within {
+  border-color: var(--focus, #5a3fe0);
+  box-shadow: var(--sh), 0 0 0 2px var(--heroSoft);
+}
 [data-park] .park-home-input-row {
   display: flex;
   align-items: center;
@@ -198,12 +202,6 @@
 }
 [data-park] .park-home-input::placeholder {
   color: var(--ink3);
-}
-/* the design draws no ring on the input; a keyboard user still needs to see where they are */
-[data-park] .park-home-panel .park-home-input:focus-visible {
-  outline: 3px solid var(--focus, #5a3fe0);
-  outline-offset: 4px;
-  border-radius: 8px;
 }
 [data-park] .park-home-mode-row {
   display: flex;

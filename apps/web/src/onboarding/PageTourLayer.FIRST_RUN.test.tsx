@@ -77,6 +77,14 @@ it("FIRST_RUN_FR_UX_13_effect_replay_keeps_the_first_invitation_visible", () => 
   expect(dialog()?.textContent).toContain("Take a tour of Home?");
 });
 
+it("FT_UX_3 shows the World tour invitation as a non-modal corner card", () => {
+  mount(view("world"));
+  const invite = dialog();
+  expect(invite?.classList.contains("onb-corner")).toBe(true);
+  expect(invite?.getAttribute("aria-modal")).toBeNull();
+  expect(invite?.closest(".onb-scrim")).toBeNull();
+});
+
 it("FIRST_RUN_FR_UX_13_returns_focus_when_the_account_button_is_replaced", () => {
   mount(view());
   click(button("Not now"));

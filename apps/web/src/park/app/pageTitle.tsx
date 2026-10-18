@@ -1,7 +1,7 @@
 // UI-10 B3: a page may name itself in the document title (a world by its name) instead of the shell's generic
 // page label. The shell owns `document.title`; a page hands it a title through this context and takes it back on
 // unmount, so the title always follows what the page shows.
-import { createContext, useContext, useEffect } from "react";
+import { createContext, useContext, useLayoutEffect } from "react";
 
 type SetTitle = (title: string | null) => void;
 
@@ -10,7 +10,7 @@ export const PageTitleContext = createContext<SetTitle | null>(null);
 /** While the calling component is mounted the document title is `<title> · Tilo`. Outside the shell: nothing. */
 export function usePageTitle(title: string): void {
   const set = useContext(PageTitleContext);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!set) return undefined;
     set(title);
     return () => set(null);

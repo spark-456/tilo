@@ -73,6 +73,11 @@ const ROWS: readonly [string, string, string][] = [
 ];
 
 describe("WEB_4_home_styles: Home.css exists and follows the Park conventions", () => {
+  it("FT_UX_3 gives the composer a calm focus treatment instead of a boxed input ring", () => {
+    const source = css();
+    expect(source).toMatch(/\.park-home-panel:focus-within\s*\{[^}]*box-shadow:/s);
+    expect(source).not.toMatch(/\.park-home-input:focus-visible\s*\{[^}]*outline:\s*3px/s);
+  });
   it("WEB_4_home_styles_Home_css_exists_and_HomePage_imports_it", () => {
     expect(existsSync(CSS_PATH), "src/park/pages/Home/Home.css").toBe(true);
     const page = readFileSync(join(__dirname, "HomePage.tsx"), "utf8");

@@ -14,6 +14,18 @@
   background: var(--scrim);
 }
 
+[data-park] .onb-invite-corner {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+}
+[data-park] .onb-card.onb-corner {
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  padding: 20px;
+}
+
 [data-park] .onb-card {
   box-sizing: border-box;
   display: flex;
@@ -167,6 +179,10 @@
 }
 
 @media (max-width: 480px) {
+  [data-park] .onb-invite-corner {
+    right: 16px;
+    bottom: 88px;
+  }
   [data-park] .onb-card {
     padding: 20px;
   }
