@@ -560,10 +560,10 @@ export function WorldPage({ app }: { app: AppCtx }) {
             ) : null}
           </div>
           <div className="park-world-titleline">
-            <h1 className="park-world-h1" tabIndex={-1}>
+            <h1 className="park-world-h1" tabIndex={-1} title={w.name}>
               {w.name}
-              {w.sample || demo ? <SampleBadge /> : null}
             </h1>
+            {w.sample || demo ? <SampleBadge /> : null}
             <span className="park-world-sizechip">
               {icon("city", 13)}
               {w.tier}
