@@ -24,9 +24,19 @@ def test_AS_01_stray_app_is_normalised_to_markdown_even_with_an_upload() -> None
     assert safe_app_brief(brief(), "Summarize this paper", [pdf])["deliverables"][0]["format"] == "markdown"
 
 
-def test_AS_01_website_request_is_normalised_to_markdown() -> None:
+def test_AS_01_website_request_uses_native_website() -> None:
     request = "a cool looking website showing over 40 different timezones live"
-    assert safe_app_brief(brief(), request, [])["deliverables"][0]["format"] == "markdown"
+    assert safe_app_brief(brief(), request, [])["deliverables"][0]["format"] == "website"
+
+
+@pytest.mark.parametrize("model_format", ["markdown", "app"])
+@pytest.mark.parametrize(
+    "request", ["Make a website questionnaire for our customers", "Make an app", "Create a questionnaire"]
+)
+def test_R_APP_DELIVERABLE_website_questionnaire_uses_native_website(model_format: str, request: str) -> None:
+    requested = {"deliverables": [{"title": "Customer questionnaire", "format": model_format}]}
+    result = safe_app_brief(requested, request, [])
+    assert result["deliverables"][0]["format"] == "website"
 
 
 def test_AS_01_quiz_without_a_native_source_is_normalised_to_markdown() -> None:
