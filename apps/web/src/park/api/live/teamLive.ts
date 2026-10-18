@@ -146,6 +146,7 @@ export function teamErrorText(e: unknown): string {
     case 422:
       return e.message;
     case 503:
+      if (e.code === "team_invite_email_unsent") return e.message;
       return NOT_SET_UP;
     default:
       return e.message;

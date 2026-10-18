@@ -184,33 +184,58 @@ export function LiveBody({
 /** The invite field for the heading: Owner only, a valid address, one write at a time. */
 export function LiveInvite({ live, toast }: { live: LiveTeam; toast: (m: string) => void }) {
   const [email, setEmail] = useState("");
+  const [confirm, setConfirm] = useState<string | null>(null);
   const off = !live.isOwner || live.busy;
   const valid = isValidEmail(email);
-  const invite = () => {
+  const review = () => {
     const to = email.trim();
     if (off || !valid) return;
+    setConfirm(to);
+  };
+  const invite = () => {
+    const to = confirm;
+    if (off || !to) return;
     void live.send({ kind: "invite", email: to, role: "Member" }).then((ok) => {
       if (!ok) return;
       setEmail("");
-      toast(`Invite saved for ${to}. No email goes out yet`);
+      setConfirm(null);
+      toast(`Invitation emailed to ${to}`);
     });
   };
   return (
-    <div className="park-team-invite">
-      <div className="park-team-field">
-        <input
-          className="park-team-input"
-          aria-label="Invite by email"
-          placeholder="name@company.com"
-          value={email}
-          disabled={!live.isOwner}
-          onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && invite()}
-        />
+    <div className="park-team-invite-wrap">
+      <div className="park-team-invite">
+        <div className="park-team-field">
+          <input
+            className="park-team-input"
+            aria-label="Invite by email"
+            placeholder="name@company.com"
+            value={email}
+            disabled={!live.isOwner}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setConfirm(null);
+            }}
+            onKeyDown={(e) => e.key === "Enter" && review()}
+          />
+        </div>
+        <Button variant="primary" disabled={off || !valid} onClick={review}>
+          Invite
+        </Button>
       </div>
-      <Button variant="primary" disabled={off || !valid} onClick={invite}>
-        Invite
-      </Button>
+      {confirm ? (
+        <dialog className="park-team-invite-confirm" aria-label="Approve team invitation" open>
+          <p>Send an invitation email to {confirm}?</p>
+          <div className="park-team-invite-actions">
+            <Button variant="primary" disabled={off} onClick={invite}>
+              Approve and send
+            </Button>
+            <Button variant="secondary" disabled={live.busy} onClick={() => setConfirm(null)}>
+              Cancel
+            </Button>
+          </div>
+        </dialog>
+      ) : null}
     </div>
   );
 }

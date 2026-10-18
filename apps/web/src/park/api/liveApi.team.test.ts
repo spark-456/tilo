@@ -174,6 +174,14 @@ describe("TEAM_WEB_errors: every outcome has a plain sentence", () => {
     const none = teamErrorText(await statusOf(503, { detail: "not_configured" }));
     expect(none).toBe("Team controls are not set up on this install yet.");
     expect(none).not.toContain("not_configured");
+    expect(
+      teamErrorText(
+        await statusOf(503, {
+          detail: "The invite was saved, but the email was not sent.",
+          code: "team_invite_email_unsent",
+        }),
+      ),
+    ).toBe("The invite was saved, but the email was not sent. Try again from the pending invite.");
   });
 
   it("TEAM_WEB_409_says_the_true_cause_in_a_plain_sentence", async () => {

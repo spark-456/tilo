@@ -31,6 +31,7 @@ from tilo_api import deps
 from tilo_api.people_limits import write_limit
 from tilo_api.people_writes import Refusal, _capped_body, valid_email
 from tilo_api.team_events import TeamEvents, get_team_events
+from tilo_api.team_invites import production_sender
 from tilo_api.team_rules import ROLES, MustAskLocked, RoleChangeRefused, load_capabilities, load_switches, set_switch
 from tilo_api.team_store import (
     LEVELS,
@@ -69,6 +70,11 @@ Store = Annotated[TeamRepository, Depends(get_team_store)]
 Flags = Annotated[FlagStore, Depends(deps.get_flag_store)]
 Clock = Annotated[Callable[[], str], Depends(deps.get_clock)]
 Events = Annotated[TeamEvents, Depends(get_team_events)]
+Artifacts = Annotated[Any, Depends(deps.get_artifact_store)]
+OutboxStore = Annotated[Any, Depends(deps.get_outbox_store)]
+Adapters = Annotated[dict[str, Any], Depends(deps.get_connector_adapters)]
+Desks = Annotated[deps.DeskWorlds, Depends(deps.get_desk_worlds)]
+Writer = Annotated[deps.EventWriter, Depends(deps.get_event_writer)]
 _NOT_FOUND = "No such team."
 _ATTEMPTS = 5
 MAX_LIMIT_MINOR = 10**12  # 10 billion INR: anything above is a typo, never a limit
@@ -330,7 +336,7 @@ def remove_member(person_id: str, principal: Principal, store: Store, flags: Fla
 @router.post("/v1/team/invites", status_code=201, dependencies=[Depends(write_limit)])
 def invite(
     principal: Principal, body: Annotated[InviteIn, Depends(_json_body(InviteIn))], store: Store, flags: Flags,
-    clock: Clock,
+    clock: Clock, artifacts: Artifacts, outbox_store: OutboxStore, adapters: Adapters, desks: Desks, writer: Writer,
 ) -> dict[str, Any]:  # fmt: skip
     invite_id = "inv_" + secrets.token_hex(8)
 
@@ -345,9 +351,32 @@ def invite(
         invites = {**state.invites, invite_id: {"email": body.email, "role": body.role}}
         return replace(state, invites=invites)
 
-    _write(store, principal, flags, change)
-    _audit(principal, "invite", invite_id, clock())
-    return {"invite_id": invite_id}
+    state = _write(store, principal, flags, change)
+    at = clock()
+    try:
+        outbox_id = production_sender(
+            artifacts=artifacts,
+            outbox_store=outbox_store,
+            adapters=adapters,
+            desks=desks,
+            writer=writer,
+        )(
+            owner=principal.user_id,
+            email=body.email,
+            role=body.role,
+            team_name=next(iter(state.names.values()), "your team"),
+            invite_id=invite_id,
+            at=at,
+        )
+    except Exception as exc:
+        logger.warning("team invite mail not sent (%s)", type(exc).__name__)
+        raise Refusal(
+            503,
+            "The invite was saved, but the email was not sent.",
+            code="team_invite_email_unsent",
+        ) from exc
+    _audit(principal, "invite", invite_id, at)
+    return {"invite_id": invite_id, "outbox_id": outbox_id}
 
 
 @router.put("/v1/team/switches/{key}", dependencies=[Depends(write_limit)])

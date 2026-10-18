@@ -53,6 +53,8 @@ const REPLAY_ONLY =
   "Live models are unavailable right now, so nothing new was started. Finished runs can still be replayed.";
 const SAFETY_UNAVAILABLE = "The safety screen is unavailable. Try again later.";
 const NOT_CONFIGURED = "This feature is not configured on this server.";
+const TEAM_INVITE_EMAIL_UNSENT =
+  "The invite was saved, but the email was not sent. Try again from the pending invite.";
 /** Legacy routes use these exact details instead of a code. Match only known wire values;
  * no server text, including extensions of these sentences, is ever displayed. */
 const SAFETY_DETAILS = new Set([
@@ -73,6 +75,7 @@ function unavailableMessage(text: string): string {
     if (body?.code === "not_configured" || body?.detail === "not_configured") {
       return NOT_CONFIGURED;
     }
+    if (body?.code === "team_invite_email_unsent") return TEAM_INVITE_EMAIL_UNSENT;
     if (typeof body?.detail === "string" && SAFETY_DETAILS.has(body.detail)) {
       return SAFETY_UNAVAILABLE;
     }
@@ -1204,7 +1207,12 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
           for (const listener of [...this.missingListeners]) listener();
         note(null);
         // FT-PERF-1: back off only once a run has events; a world waiting to start keeps the fast poll.
-        delay = fresh.length > 0 || cursor === 0 ? this.pollMs : this.pollMs >= 1000 ? 3000 : this.pollMs * 3;
+        delay =
+          fresh.length > 0 || cursor === 0
+            ? this.pollMs
+            : this.pollMs >= 1000
+              ? 3000
+              : this.pollMs * 3;
       } catch (error) {
         const known =
           error instanceof TiloApiError ? error : new TiloApiError(UNREACHABLE, null, true);
