@@ -1,7 +1,7 @@
 [data-park] .park-meeting-hall {
   display: grid;
   gap: 18px;
-  padding: 22px;
+  padding: 24px;
   margin-top: 24px;
   border: 1px solid var(--line);
   border-radius: 20px;
@@ -9,11 +9,22 @@
   background: var(--card);
   box-shadow: var(--sh);
 }
+
 [data-park] .park-meeting-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
 }
+
+[data-park] .park-meeting-head-text {
+  flex: 1;
+  min-width: 220px;
+}
+
 [data-park] .park-meeting-mark,
 [data-park] .park-meeting-avatar {
   display: inline-flex;
@@ -25,58 +36,222 @@
   color: var(--priInk);
   font-weight: 800;
 }
+
 [data-park] .park-meeting-mark {
-  width: 42px;
-  height: 42px;
-  font-size: 17px;
-}
-[data-park] .park-meeting-head h2,
-[data-park] .park-meeting-head p {
-  margin: 0;
-}
-[data-park] .park-meeting-head h2 {
+  width: 44px;
+  height: 44px;
   font-size: 18px;
 }
+
+[data-park] .park-meeting-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+
 [data-park] .park-meeting-head p {
-  margin-top: 2px;
+  margin: 3px 0 0;
   color: var(--ink3);
   font-size: 13px;
 }
-[data-park] .park-meeting-body,
-[data-park] .park-meeting-setup fieldset,
-[data-park] .park-meeting-form fieldset {
+
+[data-park] .park-meeting-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+[data-park] .park-meeting-roommeta {
+  color: var(--ink2);
+}
+
+[data-park] .park-meeting-status-tag {
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: var(--sunk);
+  color: var(--ink2);
+  border: 1px solid var(--line2);
+}
+
+[data-park] .park-meeting-body {
   display: grid;
-  gap: 14px;
+  gap: 20px;
   min-width: 0;
-  padding: 0;
-  border: 0;
 }
-[data-park] .park-meeting-group {
+
+/* 2-column layout for room + transcript on desktop */
+[data-park] .park-meeting-room-view {
   display: grid;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
 }
-[data-park] .park-meeting-label,
-[data-park] .park-meeting-invites legend {
+
+/* Meeting scene & room stage */
+[data-park] .park-meeting-scene {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+[data-park] .park-meeting-room-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  padding: 32px 20px;
+  border-radius: 20px;
+  background: radial-gradient(ellipse at center, rgba(245, 165, 36, 0.08) 0%, var(--sunk) 100%);
+  border: 1px solid var(--line2);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+[data-park] .park-meeting-table {
+  width: min(320px, 80%);
+  height: 110px;
+  border-radius: 55px;
+  background: linear-gradient(145deg, var(--card), var(--sunk));
+  border: 3px solid var(--priSoft);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08), inset 0 2px 4px rgba(255, 255, 255, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+[data-park] .park-meeting-table-surface {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+[data-park] .park-meeting-table-title {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ink2);
+}
+
+[data-park] .park-meeting-table-sub {
+  font-size: 11px;
+  color: var(--ink3);
+  font-weight: 600;
+}
+
+/* Seats around the table */
+[data-park] .park-meeting-seats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 18px;
+  width: 100%;
+  z-index: 2;
+}
+
+[data-park] .park-meeting-seat {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 99px;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+[data-park] .park-meeting-seat--lead {
+  border-color: var(--pri);
+  background: var(--priSoft);
+}
+
+[data-park] .park-meeting-seat--speaking {
+  border-color: var(--pri);
+  background: var(--card);
+}
+
+[data-park] .park-meeting-seat-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+[data-park] .park-meeting-seat-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+[data-park] .park-meeting-seat-name {
+  white-space: nowrap;
+}
+
+[data-park] .park-meeting-speaking-badge,
+[data-park] .park-meeting-lead-badge {
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+[data-park] .park-meeting-lead-badge {
+  background: var(--pri);
+  color: #ffffff;
+}
+
+[data-park] .park-meeting-speaking-badge {
+  background: var(--priSoft);
+  color: var(--priInk);
+  border: 1px solid var(--pri);
+}
+
+/* "Call to the table" tray */
+[data-park] .park-meeting-tray {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+}
+
+[data-park] .park-meeting-label {
   color: var(--ink3);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
-[data-park] .park-meeting-pills,
-[data-park] .park-meeting-invites {
+
+[data-park] .park-meeting-tray-desc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink3);
+}
+
+[data-park] .park-meeting-tray-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
-[data-park] .park-meeting-invites legend {
-  width: 100%;
-  margin-bottom: 2px;
-}
+
 [data-park] .park-meeting-rolepill,
 [data-park] .park-meeting-agentchip {
   display: inline-flex;
-  min-height: 42px;
+  min-height: 40px;
   align-items: center;
   gap: 8px;
   padding: 0 13px;
@@ -89,12 +264,15 @@
   font-weight: 700;
   cursor: pointer;
 }
+
 [data-park] .park-meeting-rolepill[aria-pressed="true"],
-[data-park] .park-meeting-agentchip:has(input:checked) {
+[data-park] .park-meeting-agentchip:has(input:checked),
+[data-park] .park-meeting-agentchip--active {
   border-color: var(--pri);
   background: var(--priSoft);
   color: var(--priInk);
 }
+
 [data-park] .park-meeting-agentchip input {
   position: absolute;
   width: 1px;
@@ -102,49 +280,303 @@
   overflow: hidden;
   clip-path: inset(50%);
 }
-[data-park] .park-meeting-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  font-size: 12px;
+
+[data-park] .park-meeting-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
+
+[data-park] .park-meeting-group {
+  display: grid;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+}
+
+[data-park] .park-meeting-setup {
+  display: grid;
+  gap: 14px;
+}
+
 [data-park] .park-meeting-convene {
   min-height: 44px;
   justify-self: start;
   padding-inline: 22px;
 }
-[data-park] .park-meeting-hall label {
+
+/* Transcript pane & Chat bubbles */
+[data-park] .park-meeting-transcript-pane {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+[data-park] .park-meeting-transcript-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+[data-park] .park-meeting-transcript-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+[data-park] .park-meeting-chat-bubbles {
+  display: grid;
+  gap: 14px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+}
+
+[data-park] .park-meeting-empty-chat {
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+  color: var(--ink3);
+  font-size: 13px;
+}
+
+[data-park] .park-meeting-turn {
+  display: grid;
+  gap: 10px;
+}
+
+[data-park] .park-meeting-bubble {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+[data-park] .park-meeting-bubble--user {
+  background: var(--priSoft);
+  border: 1px solid var(--pri);
+  color: var(--priInk);
+  margin-left: 24px;
+}
+
+[data-park] .park-meeting-bubble--agent {
+  background: var(--card);
+  border: 1px solid var(--line2);
+  color: var(--ink);
+  margin-right: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+[data-park] .park-meeting-bubble-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+[data-park] .park-meeting-bubble-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 10px;
+}
+
+[data-park] .park-meeting-bubble-sender {
+  font-weight: 800;
+}
+
+[data-park] .park-meeting-bubble-target {
+  color: var(--ink3);
+}
+
+[data-park] .park-meeting-bubble-outcome {
+  margin-left: auto;
+  color: var(--ink3);
+  font-size: 11px;
+}
+
+[data-park] .park-meeting-bubble-text {
+  white-space: pre-wrap;
+}
+
+[data-park] .park-meeting-proposal-notice {
+  margin-top: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--priSoft);
+  color: var(--priInk);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* Proposal form */
+[data-park] .park-meeting-proposal-form fieldset {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--pri);
+  background: var(--priSoft);
+}
+
+[data-park] .park-meeting-proposal-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--priInk);
+}
+
+[data-park] .park-meeting-proposal-units {
+  margin: 0;
+  font-size: 12px;
+  color: var(--priInk);
+}
+
+[data-park] .park-meeting-proposal-form label {
   display: grid;
   gap: 6px;
   font-size: 13px;
   font-weight: 700;
 }
-[data-park] .park-meeting-hall select,
-[data-park] .park-meeting-hall textarea {
+
+[data-park] .park-meeting-proposal-form textarea {
   width: 100%;
-  min-height: 44px;
+  min-height: 80px;
   padding: 10px 12px;
   border: 1px solid var(--line2);
   border-radius: 12px;
   color: inherit;
   background: var(--card);
   font: inherit;
-}
-[data-park] .park-meeting-hall textarea {
-  min-height: 88px;
   resize: vertical;
 }
-[data-park] .park-meeting-hall pre {
-  margin: 0;
-  padding: 14px;
-  border-radius: 14px;
+
+/* Composer / message box below */
+[data-park] .park-meeting-composer {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 18px;
   background: var(--sunk);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  border: 1px solid var(--line);
 }
-[data-park] .park-meeting-roommeta {
-  margin: 0;
+
+[data-park] .park-meeting-composer fieldset {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+[data-park] .park-meeting-composer-fields {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+[data-park] .park-meeting-composer-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 800;
   color: var(--ink2);
+}
+
+[data-park] .park-meeting-composer-select select {
+  min-height: 38px;
+  padding: 6px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
   font-size: 13px;
   font-weight: 700;
+}
+
+[data-park] .park-meeting-composer-textarea {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink2);
+}
+
+[data-park] .park-meeting-composer-textarea textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+[data-park] .park-meeting-composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+[data-park] .park-meeting-confirmed {
+  display: block;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--priSoft);
+  color: var(--priInk);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Phone view (< 768px): room collapses to a seat strip */
+@media (max-width: 768px) {
+  [data-park] .park-meeting-room-view {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-park] .park-meeting-room-stage {
+    min-height: auto;
+    padding: 12px 8px;
+  }
+
+  [data-park] .park-meeting-table {
+    display: none;
+  }
+
+  [data-park] .park-meeting-seats {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 4px 2px 10px;
+    margin-top: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  [data-park] .park-meeting-seat {
+    flex: none;
+  }
+
+  [data-park] .park-meeting-bubble--user {
+    margin-left: 8px;
+  }
+
+  [data-park] .park-meeting-bubble--agent {
+    margin-right: 8px;
+  }
 }

@@ -349,4 +349,29 @@
 /* triggeredBy: approval.requested -> approval.resolved (TW-6): amber chip ring pings opacity .7→0, scale .9→1.6 (tilo-w.css) */
 [data-park] .tw-needs-ping{animation:wPing 1.6s ease-out infinite}
 @media (prefers-reduced-motion:reduce){[data-park] .tw-needs-ping{animation:none!important}}
-/* triggeredBy: approval.requested -> approval.resolved (TW-6): amber chip ring pings opacity .7→0, scale .9→1.6 (tilo-w.css) */
+
+/* P0-MEETING-ROOM: speaking ring ONLY while agent has recorded message (HR rules) */
+[data-park] .park-meeting-speaking-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 99px;
+  border: 2px solid var(--pri);
+  animation: wPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+[data-park] .park-meeting-seat--speaking .park-meeting-avatar,
+[data-park] .park-meeting-seat--speaking .park-meeting-seat-avatar {
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--pri);
+  animation: wPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@media (prefers-reduced-motion:reduce){
+  [data-park] .park-meeting-speaking-ring {
+    animation: none !important;
+    opacity: 0.8 !important;
+  }
+  [data-park] .park-meeting-seat--speaking .park-meeting-avatar,
+  [data-park] .park-meeting-seat--speaking .park-meeting-seat-avatar {
+    animation: none !important;
+    box-shadow: 0 0 0 3px var(--pri) !important;
+  }
+}

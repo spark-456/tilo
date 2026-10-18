@@ -86,17 +86,18 @@ it("MR-01/MR-06 reads recorded attendees, convenes, asks, confirms and adjourns 
   await clickLabel("Writer");
   await tap("Convene");
   expect(document.body.textContent).toContain("0 of 5 credits");
+  // P0-MEETING-ROOM: updated button labels to Send and End conversation per owner review spec
   await enter("Question", "   ");
-  await tap("Send question");
+  await tap("Send");
   expect(calls.filter(([path]) => path.endsWith("/turns"))).toHaveLength(0);
   await enter("Question", "Why?");
-  await tap("Send question");
+  await tap("Send");
   expect(document.body.textContent).toContain("Revise the draft");
   expect(document.body.textContent).toContain("Change from turn 1");
   await enter("Change wording", "Revise with sources");
   await tap("Confirm change");
   expect(document.body.textContent).toContain("Change recorded; planning pending.");
-  await tap("Adjourn");
+  await tap("End conversation");
   expect(document.body.textContent).toContain("Adjourned · Closed by request");
   expect(calls).toContainEqual(["/v1/worlds/w_one/rooms", { lead: "A_one", agents: ["A_two"] }]);
   expect(calls).toContainEqual([
