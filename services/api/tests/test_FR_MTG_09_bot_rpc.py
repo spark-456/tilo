@@ -119,6 +119,23 @@ def test_FR_MTG_09_MEET_SIMPLE_attend_never_repeats_a_launch_the_bot_answered(mo
     assert raised.value.detail == "bot_unavailable" and len(calls) == 1
 
 
+@pytest.mark.parametrize(
+    "status,detail",
+    [
+        (502, "browser_unavailable"),
+        (409, "meeting_requires_sign_in"),
+        (409, "meeting_join_failed"),
+    ],
+)
+def test_P0_MEET_JOIN_bot_rpc_preserves_known_reason_codes(monkeypatch, status, detail):
+    monkeypatch.setenv("LIVE", "1")
+    rpc = quick(lambda _: httpx.Response(status, json={"detail": detail}))
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(rpc.attend("mt_demo", JOIN))
+    assert raised.value.status_code == status
+    assert raised.value.detail == detail
+
+
 def test_FR_MTG_09_MEET_SIMPLE_attend_gives_up_after_the_budget(monkeypatch):
     monkeypatch.setenv("LIVE", "1")
     calls, spent = [], []

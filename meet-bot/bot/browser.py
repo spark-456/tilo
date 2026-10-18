@@ -44,6 +44,10 @@ class JoinFailed(RuntimeError):
     pass
 
 
+class BrowserStartFailed(RuntimeError):
+    pass
+
+
 def clean_singleton_locks(profile: Path) -> None:
     """A killed container leaves Chromium's lock files behind, which blocks the next launch."""
     for name in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
@@ -110,9 +114,11 @@ class MeetBrowser:
             if self.face:
                 await self.ctx.add_init_script(Path(__file__).with_name("face.js").read_text(encoding="utf-8"))
             self.page = self.ctx.pages[0] if self.ctx.pages else await self.ctx.new_page()
-        except BaseException:
+        except BaseException as exc:
             await self.__aexit__()
-            raise
+            if isinstance(exc, asyncio.CancelledError):
+                raise
+            raise BrowserStartFailed("Chromium session could not start") from exc
         return self
 
     async def __aexit__(self, *exc: Any) -> None:

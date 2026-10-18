@@ -165,6 +165,10 @@ export function displayApiError(error: unknown): string {
       "The invitation is taking longer than expected. Check your calendar before trying again.",
     not_approved: "That could not be confirmed. Try again.",
     bot_unavailable: "Tilo could not join the meeting right now. Try again.",
+    browser_unavailable: "Tilo's meeting browser could not start. Try again.",
+    meeting_requires_sign_in: "This meeting does not allow Tilo to join as a guest.",
+    meeting_join_failed:
+      "Google Meet did not let Tilo join. Check the meeting link and guest access.",
     already_attending: "You are already attending this meeting.",
     already_hosted: "This meeting already has a host.",
     already_rated: "You have already rated this skill.",

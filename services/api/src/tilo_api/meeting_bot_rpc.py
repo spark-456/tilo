@@ -24,7 +24,17 @@ ATTEND_BUDGET_S = 45.0  # repeating a launch the bot never started
 _BACKOFF_S = (1.0, 2.0, 3.0, 4.0, 5.0)
 _COLD = frozenset({502, 503, 504})
 # What the bot app itself says after it has run a meeting (meet-bot/bot/cloud_run.py): these are never repeated.
-_RAN = frozenset({"Meeting bot failed", "Meeting duration exceeded", "Bot is attending another meeting"})
+_RAN = frozenset(
+    {
+        "Meeting bot failed",
+        "Meeting duration exceeded",
+        "Bot is attending another meeting",
+        "browser_unavailable",
+        "meeting_requires_sign_in",
+        "meeting_join_failed",
+    }
+)
+_REASONS = frozenset({"browser_unavailable", "meeting_requires_sign_in", "meeting_join_failed"})
 
 
 class MeetingBotRpc:
@@ -78,6 +88,8 @@ class MeetingBotRpc:
                     await self._sleep(pause)
                     spent.slept += pause
             raise ValueError("Bot did not start")
+        except _BotRefused as exc:
+            raise HTTPException(exc.status, exc.detail) from None
         except Exception:
             raise HTTPException(503, "bot_unavailable") from None
 
@@ -93,7 +105,10 @@ class MeetingBotRpc:
                     | ({"X-Tilo-Meeting-Claim": claim} if claim else {}),  # ADR-0042 MV-16: the bot never logs it
                 ) as response:
                     if response.status_code != 200:
-                        if response.status_code in _COLD and not await _bot_ran(response):
+                        detail = await _bot_detail(response)
+                        if detail in _REASONS:
+                            raise _BotRefused(response.status_code, detail)
+                        if response.status_code in _COLD and detail not in _RAN:
                             raise _NotStarted
                         raise ValueError("Bot refused")
                     data = bytearray()
@@ -130,17 +145,30 @@ class _NotStarted(Exception):
     """The bot did not start the launch (cold start or unreachable): safe to ask again."""
 
 
+class _BotRefused(Exception):
+    def __init__(self, status: int, detail: str) -> None:
+        self.status, self.detail = status, detail
+
+
 async def _bot_ran(response: httpx.Response) -> bool:
     """True when the body is the bot app's own post-launch answer; a Google front-end page or empty body is not."""
+    try:
+        return await _bot_detail(response) in _RAN
+    except Exception:
+        return False
+
+
+async def _bot_detail(response: httpx.Response) -> str:
     try:
         body = bytearray()
         async for chunk in response.aiter_bytes():
             body.extend(chunk)
             if len(body) > 2048:
-                return False
-        return json.loads(body).get("detail") in _RAN
+                return ""
+        detail = json.loads(body).get("detail")
+        return detail if isinstance(detail, str) else ""
     except Exception:
-        return False
+        return ""
 
 
 def get_meeting_bot_client() -> MeetingBotRpc:
