@@ -1,25 +1,150 @@
 [data-park] .park-meeting-hall {
-  padding: 24px;
+  display: grid;
+  gap: 18px;
+  padding: 22px;
   margin-top: 24px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 20px;
   color: var(--ink);
   background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park] .park-meeting-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+[data-park] .park-meeting-mark,
+[data-park] .park-meeting-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: 12px;
+  background: var(--priSoft);
+  color: var(--priInk);
+  font-weight: 800;
+}
+[data-park] .park-meeting-mark {
+  width: 42px;
+  height: 42px;
+  font-size: 17px;
+}
+[data-park] .park-meeting-head h2,
+[data-park] .park-meeting-head p {
+  margin: 0;
+}
+[data-park] .park-meeting-head h2 {
+  font-size: 18px;
+}
+[data-park] .park-meeting-head p {
+  margin-top: 2px;
+  color: var(--ink3);
+  font-size: 13px;
+}
+[data-park] .park-meeting-body,
+[data-park] .park-meeting-setup fieldset,
+[data-park] .park-meeting-form fieldset {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+[data-park] .park-meeting-group {
+  display: grid;
+  gap: 8px;
+}
+[data-park] .park-meeting-label,
+[data-park] .park-meeting-invites legend {
+  color: var(--ink3);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+[data-park] .park-meeting-pills,
+[data-park] .park-meeting-invites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+[data-park] .park-meeting-invites legend {
+  width: 100%;
+  margin-bottom: 2px;
+}
+[data-park] .park-meeting-rolepill,
+[data-park] .park-meeting-agentchip {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 13px;
+  border: 1px solid var(--line2);
+  border-radius: 99px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-park] .park-meeting-rolepill[aria-pressed="true"],
+[data-park] .park-meeting-agentchip:has(input:checked) {
+  border-color: var(--pri);
+  background: var(--priSoft);
+  color: var(--priInk);
+}
+[data-park] .park-meeting-agentchip input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+[data-park] .park-meeting-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+[data-park] .park-meeting-convene {
+  min-height: 44px;
+  justify-self: start;
+  padding-inline: 22px;
 }
 [data-park] .park-meeting-hall label {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 12px 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
 }
+[data-park] .park-meeting-hall select,
 [data-park] .park-meeting-hall textarea {
   width: 100%;
-  min-height: 80px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 12px;
   color: inherit;
   background: var(--card);
+  font: inherit;
+}
+[data-park] .park-meeting-hall textarea {
+  min-height: 88px;
+  resize: vertical;
 }
 [data-park] .park-meeting-hall pre {
+  margin: 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--sunk);
   white-space: pre-wrap;
-  border-bottom: 1px solid var(--line);
   overflow-wrap: anywhere;
+}
+[data-park] .park-meeting-roommeta {
+  margin: 0;
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 700;
 }

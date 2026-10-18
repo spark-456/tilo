@@ -80,10 +80,12 @@ it("MR-01/MR-06 reads recorded attendees, convenes, asks, confirms and adjourns 
       />,
     );
   });
-  expect(document.body.textContent).toContain("writer · A_two");
-  await clickLabel("writer · A_two");
+  // R-MEETHALL deliberately replaces raw ids with the recorded role name.
+  expect(document.body.textContent).toContain("Writer");
+  expect(document.body.textContent).not.toContain("A_two");
+  await clickLabel("Writer");
   await tap("Convene");
-  expect(document.body.textContent).toContain("0 / 5 credits");
+  expect(document.body.textContent).toContain("0 of 5 credits");
   await enter("Question", "   ");
   await tap("Send question");
   expect(calls.filter(([path]) => path.endsWith("/turns"))).toHaveLength(0);

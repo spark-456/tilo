@@ -26,6 +26,10 @@ const OUTCOME = {
   failed: "Reply failed",
 };
 
+const roleLabel = (rank: string): string =>
+  rank.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const creditsLabel = (credits: number): string => String(Math.round(credits * 10) / 10);
+
 export function MeetingHall({ worldId, client }: { worldId: string; client: RoomClient }) {
   const [people, setPeople] = useState<Attendee[] | null>(null);
   const [lead, setLead] = useState("");
@@ -66,7 +70,7 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
     ) ?? [];
   const path = roomPath(worldId, room?.room_id);
   const open = room?.state === "open";
-  const label = (id: string) => [people?.find((a) => a.id === id)?.rank ?? "Agent", id].join(" · ");
+  const label = (id: string) => roleLabel(people?.find((a) => a.id === id)?.rank ?? "Agent");
   const proposedTurn = room?.turns.find(
     (t) => t.reply?.proposal && !t.change && !confirmed[t.reply.proposal.proposal_id],
   );
@@ -146,13 +150,14 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
   const form = (action: string, children: ReactNode, disabled = false) => (
     <form
       key={action === "Confirm change" ? proposal?.proposal_id : action}
+      className={action === "Convene" ? "park-meeting-setup" : "park-meeting-form"}
       onSubmit={submit(action)}
     >
-      <fieldset disabled={disabled}>
+      <fieldset disabled={disabled || busy}>
         {children}
         <button
           type="submit"
-          className={`park-btn park-btn--${action === "Confirm change" ? "secondary" : "primary"} park-btn--md`}
+          className={`park-btn park-btn--${action === "Confirm change" ? "secondary" : "primary"} park-btn--md${action === "Convene" ? " park-meeting-convene" : ""}`}
         >
           {action}
         </button>
@@ -175,26 +180,47 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
     .join("\n\n");
   return (
     <section className="park-meeting-hall" aria-label="Meeting Hall">
-      <h2>Meeting Hall</h2>
+      <header className="park-meeting-head">
+        <span className="park-meeting-mark" aria-hidden="true">
+          M
+        </span>
+        <span>
+          <h2>Meeting Hall</h2>
+          <p>Bring the right roles together for a focused conversation.</p>
+        </span>
+      </header>
       {error ? <p role="alert">{error}</p> : null}
       {!people && !error ? <p>Loading recorded attendees…</p> : null}
-      <fieldset disabled={busy}>
+      <div className="park-meeting-body" aria-busy={busy}>
         {people && !room ? (
           lead ? (
             form(
               "Convene",
               <>
-                <label>
-                  Lead
-                  <select value={lead} onChange={(e) => setLead(e.target.value)}>
-                    {options(leaders)}
-                  </select>
-                </label>
-                <fieldset key={lead}>
+                <fieldset className="park-meeting-group">
+                  <legend className="park-meeting-label">Lead</legend>
+                  <div className="park-meeting-pills">
+                    {leaders.map((id) => (
+                      <button
+                        key={id}
+                        type="button"
+                        className="park-meeting-rolepill"
+                        aria-pressed={lead === id}
+                        onClick={() => setLead(id)}
+                      >
+                        {label(id)}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+                <fieldset key={lead} className="park-meeting-invites">
                   <legend>Invite agents (up to seven)</legend>
                   {choices.map((a) => (
-                    <label key={a.id}>
+                    <label key={a.id} className="park-meeting-agentchip">
                       <input type="checkbox" name="agents" value={a.id} />
+                      <span className="park-meeting-avatar" aria-hidden="true">
+                        {label(a.id).slice(0, 1)}
+                      </span>
                       {label(a.id)}
                     </label>
                   ))}
@@ -207,8 +233,8 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
         ) : null}
         {room ? (
           <>
-            <p>
-              {room.credits_spent} / {room.credit_cap} credits
+            <p className="park-meeting-roommeta">
+              {creditsLabel(room.credits_spent)} of {creditsLabel(room.credit_cap)} credits
             </p>
             <p>
               {open
@@ -256,7 +282,7 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
             ) : null}
           </>
         ) : null}
-      </fieldset>
+      </div>
     </section>
   );
 }
