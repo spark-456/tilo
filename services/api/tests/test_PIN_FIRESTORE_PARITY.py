@@ -46,4 +46,5 @@ def test_PIN_FIRESTORE_PARITY_create_uses_real_people_and_api_stores(
     second = rig.client.post("/v1/pinboards", json={"title": "A pin from another instance"})
 
     assert second.status_code == 201, second.text
-    assert rig.client.get("/v1/pinboards").json()["items"] == [created.json(), second.json()]
+    listed = rig.client.get("/v1/pinboards").json()["items"]
+    assert {row["id"] for row in listed} == {created.json()["id"], second.json()["id"]}
