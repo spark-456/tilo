@@ -111,10 +111,13 @@ def test_P0_TILO_APPS_signed_in_editor_capture_and_owner_delete(app_case):
         assert client.delete(f"/v1/artifacts/{artifact}/responses/{response_id}").status_code == 204
         assert client.get(f"/v1/artifacts/{artifact}/responses").json()["count"] == 0
         api.dependency_overrides[deps.get_current_principal] = lambda: deps.Principal(OTHER, "viewer", WORLD)
-        assert (
-            client.post(f"/v1/artifacts/{artifact}/responses", json={"fields": {"answer": "viewer"}}).status_code == 201
-        )
+        viewed = client.post(f"/v1/artifacts/{artifact}/responses", json={"fields": {"answer": "viewer"}})
+        assert viewed.status_code == 201
+        api.dependency_overrides[deps.get_current_principal] = lambda: deps.Principal(OTHER, "team_lead", WORLD)
         assert client.get(f"/v1/artifacts/{artifact}/responses").status_code == 404
+        assert client.get(f"/v1/artifacts/{artifact}/responses.csv").status_code == 404
+        assert client.delete(f"/v1/artifacts/{artifact}/responses/{viewed.json()['response_id']}").status_code == 404
+        assert client.delete(f"/v1/artifacts/{artifact}/publish").status_code == 404
 
 
 def test_P0_TILO_APPS_caps_access_and_public_route_shape(app_case):

@@ -44,7 +44,9 @@ Apps = Annotated[Any, Depends(get_app_store)]
 
 
 def _slug(value: str, fallback: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:64] or fallback
+    made = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:64]
+    safe_fallback = re.sub(r"[^a-z0-9]+", "-", fallback.lower()).strip("-")[:64]
+    return made or safe_fallback or "app-" + hashlib.sha256(fallback.encode()).hexdigest()[:12]
 
 
 def _owned(
@@ -196,7 +198,7 @@ async def signed_response(
 def list_responses(
     artifact_id: str, principal: Principal, store: State, artifacts: Artifacts, apps: Apps
 ) -> dict[str, Any]:
-    _owned(artifact_id, principal, store, artifacts)
+    _owned(artifact_id, principal, store, artifacts, "owner")
     rows = apps.responses(artifact_id)
     return {"responses": [{k: v for k, v in row.items() if k != "epoch"} for row in rows], "count": len(rows)}
 
@@ -208,7 +210,7 @@ def _csv_safe(value: Any) -> str:
 
 @router.get("/v1/artifacts/{artifact_id}/responses.csv")
 def response_csv(artifact_id: str, principal: Principal, store: State, artifacts: Artifacts, apps: Apps) -> Response:
-    _owned(artifact_id, principal, store, artifacts)
+    _owned(artifact_id, principal, store, artifacts, "owner")
     rows = apps.responses(artifact_id)
     fields = list(dict.fromkeys(key for row in rows for key in row.get("fields", {})))
     output = io.StringIO(newline="")
@@ -225,6 +227,6 @@ def response_csv(artifact_id: str, principal: Principal, store: State, artifacts
 def delete_response(
     artifact_id: str, response_id: str, principal: Principal, store: State, artifacts: Artifacts, apps: Apps
 ) -> None:
-    _owned(artifact_id, principal, store, artifacts)
+    _owned(artifact_id, principal, store, artifacts, "owner")
     if not apps.delete(artifact_id, response_id):
         raise HTTPException(404, "not_found")
