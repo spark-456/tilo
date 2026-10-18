@@ -18,11 +18,15 @@
   flex: 1;
   min-height: 75vh;
   border: 0;
+  background: #fff;
+  color-scheme: light;
 }
 .tilo-app-preview {
   width: 100%;
   min-height: 460px;
   border: 1px solid #d5dce2;
+  background: #fff;
+  color-scheme: light;
 }
 .tilo-app-response-scroll {
   overflow-x: auto;
