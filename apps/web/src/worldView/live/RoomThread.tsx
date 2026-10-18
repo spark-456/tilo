@@ -30,6 +30,7 @@ const CLOSED = {
 } as const;
 
 export const CHANGE_STARTER = "I'd like you to take a different direction: ";
+export const displayCredits = (credits: number): string => String(Math.round(credits * 10) / 10);
 
 export function RoomThread({
   client,
@@ -97,7 +98,7 @@ export function RoomThread({
       {room ? (
         <p className="tw-room__meta">
           {open
-            ? `${turns.length} of ${room.max_turns} questions · ${room.credits_spent} of ${room.credit_cap} credits`
+            ? `${turns.length} of ${room.max_turns} questions · ${displayCredits(room.credits_spent)} of ${displayCredits(room.credit_cap)} credits`
             : `Ended · ${room.reason ? CLOSED[room.reason] : "closed"}`}
         </p>
       ) : (
