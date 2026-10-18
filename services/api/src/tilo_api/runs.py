@@ -645,13 +645,25 @@ class Run:
             return None
         try:
             self.layout, config = self.seams.layout_builder(plan, world_id=self.world_id), load_agents_config()
-            if (record := self.store.worlds.get(self.world_id)) is not None:
+            record = self.store.worlds.get(self.world_id)
+            if record is None and hasattr(self.store, "load_world"):
+                record = self.store.load_world(self.world_id)
+            if record is not None:
                 record.layout = self.layout  # before `world.started`: the event writer validates against it (ADR-0026)
                 try:
                     self.store.commit(worlds={self.world_id: record}, evict=False)  # durable: the layout is stored too
                 except Exception as caught_error:
                     log_caught(caught_error, __name__, locals())
                     record.layout = None  # the record stays cached, as it was, for the run's `world.failed`
+                    raise
+            else:
+                record = deps.WorldRecord(owner=self.owner, districts={}, run_id=self.run_id, layout=self.layout)
+                self.store.worlds[self.world_id] = record
+                try:
+                    self.store.commit(worlds={self.world_id: record}, evict=False)
+                except Exception as caught_error:
+                    log_caught(caught_error, __name__, locals())
+                    record.layout = None
                     raise
         except Exception as caught_error:
             log_caught(caught_error, __name__, locals())

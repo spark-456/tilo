@@ -3,7 +3,7 @@ import { act } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, mount } from "../../../../test-support/park/componentsHarness";
 import { HttpClient } from "../../../api/http";
-import { roomOf } from "../../api/live/meetingHall";
+import { attendees, roomOf } from "../../api/live/meetingHall";
 import { MeetingHall } from "./MeetingHall";
 
 afterEach(cleanup);
@@ -118,6 +118,22 @@ it("MR-12/HR-1 rejects foreign rooms and unreadable replies without fixture fall
   });
   expect(document.querySelector('[role="alert"]')?.textContent).toContain("Access denied");
   expect(client.postJson).not.toHaveBeenCalled();
+});
+
+it("FT_SUP_4 attendees does not request layout when world has not started", async () => {
+  const calls: string[] = [];
+  const client = {
+    getJson: vi.fn(async (path: string) => {
+      calls.push(path);
+      if (path.includes("/events")) return { events: [] };
+      throw new Error("layout should not be called");
+    }),
+    postJson: vi.fn(),
+  };
+  const result = await attendees(client, "w_new");
+  expect(result).toEqual([]);
+  expect(calls).toEqual(["/worlds/w_new/events"]);
+  expect(client.getJson).toHaveBeenCalledOnce();
 });
 
 async function tap(text: string) {

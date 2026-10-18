@@ -360,8 +360,13 @@ class DurableStore(deps.Store):
                 logger.warning("startup world recovery failed (%s)", type(exc).__name__)
 
     def load_world(self, world_id: str, settle: bool = False) -> deps.WorldRecord | None:
-        if world_id not in self.worlds and (d := self._doc("worlds", world_id)) is not None:
-            self._adopt_world(world_id, d)
+        record = self.worlds.get(world_id)
+        if (record is None or record.layout is None) and (d := self._doc("worlds", world_id)) is not None:
+            if record is None:
+                self._adopt_world(world_id, d)
+            elif d.get("layout") is not None:
+                with self._held():
+                    record.layout = d["layout"]
         if settle:
             self.settle(world_id)
         return self.worlds.get(world_id)

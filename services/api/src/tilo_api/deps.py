@@ -370,6 +370,8 @@ def member_world(principal: Principal, store: Store, world_id: str) -> WorldReco
     id, a session that is not a web sign-in (an email or signed-link session), and an unknown world all get the one
     unknown-world 404 (no membership oracle)."""
     world = store.worlds.get(world_id)
+    if world is None and hasattr(store, "load_world"):
+        world = store.load_world(world_id)
     if world is None:
         raise HTTPException(status_code=404, detail="Tilo could not find that.")
     unbound_owner = (
@@ -389,7 +391,16 @@ def world_layout(store: Store, world_id: str) -> dict | None:
     run, a restart or another Cloud Run instance holds no `Run`, but the record keeps the layout, ADR-0026)."""
     layout = getattr(store.runs.get(world_id), "layout", None)
     if not isinstance(layout, dict) or not layout:
-        layout = getattr(store.worlds.get(world_id), "layout", None)
+        if hasattr(store, "load_world"):
+            store.load_world(world_id)
+        world = store.worlds.get(world_id)
+        layout = getattr(world, "layout", None)
+        if (not isinstance(layout, dict) or not layout) and hasattr(store, "_doc"):
+            d = store._doc("worlds", world_id)
+            if d and d.get("layout"):
+                if world is not None:
+                    world.layout = d["layout"]
+                layout = d["layout"]
     return layout if isinstance(layout, dict) and layout else None
 
 

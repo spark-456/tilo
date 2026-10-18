@@ -115,3 +115,20 @@ def test_FR_WLD_05_CL_INT_4_a_malformed_layout_value_is_404_not_500(client, stor
     seed(store, "not a layout")
     as_principal(make_principal())
     assert client.get(f"/worlds/{WORLD}/layout").status_code == 404
+
+
+def test_FT_SUP_4_world_layout_reloads_from_store_when_record_layout_is_none(client, store, repo_root):
+    layout = two_district_layout(repo_root)
+    world = make_world(owner=OWNER)
+    world.layout = None
+    store.worlds[WORLD] = world
+
+    def fake_load_world(world_id):
+        store.worlds[world_id].layout = copy.deepcopy(layout)
+        return store.worlds[world_id]
+
+    store.load_world = fake_load_world
+    as_principal(make_principal())
+    response = client.get(f"/worlds/{WORLD}/layout")
+    assert response.status_code == 200
+    assert response.json() == layout
