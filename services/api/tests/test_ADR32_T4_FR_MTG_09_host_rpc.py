@@ -335,6 +335,12 @@ def test_ADR32_T4_FR_MTG_09_a_good_url_builds_and_unset_is_not_configured():
         open_meeting_host_rpc({}, transport=Scripted(), token_for=lambda a: "t")
 
 
+def test_R_MEET_join_read_allows_a_cold_host_without_extending_send_lease():
+    rig = Rig(Reply(200, body({"join_url": "https://meet.google.com/abc-defg-hij", "expires_at": NOW})))
+    rig.rpc.join_link(receipt())
+    assert 40 <= rig.transport.calls[0]["timeout_s"] <= 45
+
+
 @pytest.fixture
 def cold_seam(monkeypatch):
     monkeypatch.delenv("TILO_CONNECTORS_URL", raising=False)

@@ -9,6 +9,7 @@ from _clint2_lib import wait_for
 from _mtg09b_lib import MEETING, ORG, OWNER, SAM, WORLD, HostRig, block_network
 from _ppl11c_lib import gone_meeting
 from tilo_api.meeting_bot import BotCapture, attend_meeting
+from tilo_api.meeting_host_rpc import HostRpcError
 from tilo_api.people_writes import Refusal, Writer
 from tilo_contracts import Transcript
 from tilo_memory.artifacts import Scope
@@ -107,6 +108,20 @@ def test_FR_MTG_09_attend_route_completes_with_fake_worker(rig):
     assert response.json()["transcript"] is not None
     assert response.headers["cache-control"] == "no-store"
     bot.attend.assert_awaited_once()
+
+
+def test_R_MEET_unconnected_host_asks_owner_to_sign_in(rig):
+    from tilo_api.meeting_bot_rpc import get_meeting_bot_client
+
+    h, _, bot = rig
+    host = h.rig.app.dependency_overrides[h.deps.get_meeting_host_client]()
+    host.join_link = lambda _receipt: (_ for _ in ()).throw(HostRpcError("rejected", "host_not_connected"))
+    h.rig.app.dependency_overrides[get_meeting_bot_client] = lambda: bot
+
+    response = h.rig.client.post(f"/v1/meetings/{MEETING}/attend", json={})
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Tilo's meeting host needs to be signed in"
+    bot.attend.assert_not_awaited()
 
 
 def test_FR_MTG_09_failed_bot_releases_claim_without_notes(rig):
