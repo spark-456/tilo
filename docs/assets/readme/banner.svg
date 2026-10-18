@@ -1,29 +1,62 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300" role="img" aria-label="Tilo: people describe work, agents run it">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320" role="img" aria-label="Tilo: people describe work, a Director plans it, agent teams run it">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="0" stop-color="#0b1020"/>
+      <stop offset="0.6" stop-color="#1e1b4b"/>
       <stop offset="1" stop-color="#312e81"/>
     </linearGradient>
-    <linearGradient id="top" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#38bdf8"/>
+    <linearGradient id="word" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#bef264"/>
+      <stop offset="0.5" stop-color="#38bdf8"/>
       <stop offset="1" stop-color="#a78bfa"/>
     </linearGradient>
+    <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.2" fill="#ffffff" opacity="0.07"/>
+    </pattern>
+    <path id="route" d="M 905 235 C 960 285 1010 285 1060 235 S 1120 195 1135 215"/>
   </defs>
-  <rect width="1200" height="300" fill="url(#bg)"/>
-  <!-- isometric blocks -->
-  <g transform="translate(860 70)">
-    <g fill="#38bdf8"><polygon points="60,40 120,10 180,40 120,70"/></g>
-    <g fill="#0ea5e9"><polygon points="60,40 120,70 120,130 60,100"/></g>
-    <g fill="#0369a1"><polygon points="120,70 180,40 180,100 120,130"/></g>
-    <g fill="#a78bfa"><polygon points="170,100 220,75 270,100 220,125"/></g>
-    <g fill="#7c3aed"><polygon points="170,100 220,125 220,175 170,150"/></g>
-    <g fill="#5b21b6"><polygon points="220,125 270,100 270,150 220,175"/></g>
-    <g fill="#f472b6"><polygon points="10,110 50,90 90,110 50,130"/></g>
-    <g fill="#db2777"><polygon points="10,110 50,130 50,165 10,145"/></g>
-    <g fill="#9d174d"><polygon points="50,130 90,110 90,145 50,165"/></g>
-    <path d="M90 150 Q 150 190 170 150" stroke="#fde68a" stroke-width="3" fill="none" stroke-dasharray="6 6"/>
+  <rect width="1200" height="320" fill="url(#bg)"/>
+  <rect width="1200" height="320" fill="url(#dots)"/>
+  <circle cx="1000" cy="150" r="190" fill="#6366f1" opacity="0.12"/>
+
+  <!-- isometric city, gently floating -->
+  <g transform="translate(850 55)">
+    <g>
+      <animateTransform attributeName="transform" type="translate" values="0 0;0 -6;0 0" dur="5s" repeatCount="indefinite"/>
+      <polygon points="60,40 120,10 180,40 120,70" fill="#38bdf8"/>
+      <polygon points="60,40 120,70 120,135 60,105" fill="#0ea5e9"/>
+      <polygon points="120,70 180,40 180,105 120,135" fill="#0369a1"/>
+    </g>
+    <g>
+      <animateTransform attributeName="transform" type="translate" values="0 0;0 -9;0 0" dur="6.5s" repeatCount="indefinite"/>
+      <polygon points="170,95 225,68 280,95 225,122" fill="#bef264"/>
+      <polygon points="170,95 225,122 225,185 170,158" fill="#84cc16"/>
+      <polygon points="225,122 280,95 280,158 225,185" fill="#4d7c0f"/>
+    </g>
+    <g>
+      <animateTransform attributeName="transform" type="translate" values="0 0;0 -4;0 0" dur="4.2s" repeatCount="indefinite"/>
+      <polygon points="0,115 45,93 90,115 45,137" fill="#f472b6"/>
+      <polygon points="0,115 45,137 45,175 0,153" fill="#db2777"/>
+      <polygon points="45,137 90,115 90,153 45,175" fill="#9d174d"/>
+    </g>
+    <g>
+      <animateTransform attributeName="transform" type="translate" values="0 0;0 -7;0 0" dur="5.6s" repeatCount="indefinite"/>
+      <polygon points="105,150 150,128 195,150 150,172" fill="#a78bfa"/>
+      <polygon points="105,150 150,172 150,212 105,190" fill="#7c3aed"/>
+      <polygon points="150,172 195,150 195,190 150,212" fill="#5b21b6"/>
+    </g>
   </g>
-  <text x="70" y="140" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="84" font-weight="700" fill="url(#top)">Tilo</text>
-  <text x="72" y="190" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#e2e8f0">People describe work. A Director plans it. Agent teams run it.</text>
-  <text x="72" y="228" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" fill="#94a3b8">Built by spark-456 for the Google Cloud AI Builder Cup 2026</text>
+  <!-- route with a walking helper -->
+  <use href="#route" fill="none" stroke="#fde68a" stroke-width="2.5" stroke-dasharray="6 7" opacity="0.7">
+    <animate attributeName="stroke-dashoffset" values="0;-26" dur="1.6s" repeatCount="indefinite"/>
+  </use>
+  <circle r="7" fill="#fde047">
+    <animateMotion dur="5s" repeatCount="indefinite" rotate="auto"><mpath href="#route"/></animateMotion>
+  </circle>
+
+  <text x="64" y="150" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="96" font-weight="800" fill="url(#word)">Tilo</text>
+  <text x="68" y="202" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="27" fill="#e2e8f0">People describe work. A Director plans it.</text>
+  <text x="68" y="238" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="27" fill="#e2e8f0">Agent teams run it. You see it as a living city.</text>
+  <rect x="68" y="262" width="372" height="30" rx="15" fill="#ffffff" opacity="0.1"/>
+  <text x="86" y="283" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#cbd5e1">Google Cloud AI Builder Cup 2026</text>
 </svg>

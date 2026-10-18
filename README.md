@@ -20,6 +20,17 @@
 
 </div>
 
+<p align="center">
+<a href="#-what-is-tilo">What</a> ·
+<a href="#%EF%B8%8F-tour">Tour</a> ·
+<a href="#-how-it-works">How it works</a> ·
+<a href="#%EF%B8%8F-architecture">Architecture</a> ·
+<a href="#%EF%B8%8F-trust-and-safety">Trust</a> ·
+<a href="#-run-it-locally">Run it</a>
+</p>
+
+---
+
 ## ✨ What is Tilo?
 
 Most AI tools hand you a chat box and a wall of text. **Tilo** turns a one-sentence request into a plan with a price, runs it with a team of specialised helpers, and shows the work as a tiny isometric city you can read at a glance: helpers walk between buildings, and anything important stops at a gate until a person says yes.
@@ -28,6 +39,11 @@ Most AI tools hand you a chat box and a wall of text. **Tilo** turns a one-sente
 - **See the plan and the cost first.** Assumptions are editable in place; the price is shown in credits before anything starts.
 - **Watch it happen.** Every step is written in plain sentences next to the world, with a Story lens and a Trace lens.
 - **You stay in charge.** Risky steps wait for approval from the web app, phone or email.
+
+| 🗣️ **Plain words in** | 🧾 **Price first** | 🏙️ **A world you can read** | 🛡️ **You stay in charge** |
+|---|---|---|---|
+| One sentence, plus files if they help | Plan and cost in real money before anything starts | Story and Trace lenses on every job | Risky steps wait at a gate for a person |
+
 
 ## 🖼️ Tour
 
