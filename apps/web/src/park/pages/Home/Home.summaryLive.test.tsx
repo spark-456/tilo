@@ -45,11 +45,16 @@ const worldsText = (el: HTMLElement): string =>
 const heroOf = (el: HTMLElement): string => textOf(el.querySelector(".park-home-hero") as Element);
 
 describe("HOME_SUMMARY_LIVE: the summary is derived from served worlds and decisions", () => {
-  it("HOME_SUMMARY_LIVE_served_worlds_and_no_open_decision_say_only_the_served_count", async () => {
+  it("LIVE27_FIX_only_started_worlds_count_as_in_progress", async () => {
     const rig = await mountLiveHome(
       live({
         getWorlds: async () =>
-          servedWorlds(item("a", "started"), item("b", "started"), item("c", "idle")),
+          servedWorlds(
+            item("a", "started"),
+            item("b", "started"),
+            item("c", "idle"),
+            item("d", "paused"),
+          ),
         getDecisions: async () => ({ data: [], source: "live" }),
       }),
     );

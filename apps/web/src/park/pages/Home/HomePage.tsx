@@ -458,10 +458,7 @@ export function HomePage({ app }: { app: AppCtx }) {
     ready && base.decisionsServed ? base.decisions.filter((d) => !dec[d.k]).length : null;
   const needs = served ? (openServed ?? 0) : needsLeft;
   const summary = served
-    ? liveSummaryLine(
-        worlds.filter((w) => !w.isNew && (w.st === "running" || w.st === "needs")).length,
-        openServed,
-      )
+    ? liveSummaryLine(worlds.filter((w) => !w.isNew && w.st === "running").length, openServed)
     : summaryLine(needs, night);
   const root = useRef<HTMLDivElement>(null);
   const composerShown = !failed || (worldsLive && worlds !== "failed");
