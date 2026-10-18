@@ -91,12 +91,18 @@
   border-radius: 99px;
 }
 [data-park] .park-world-h1 {
+  min-width: 0;
+  flex: 1 1 auto;
   margin: 0;
   font-weight: 700;
   font-size: 34px;
   letter-spacing: -0.6px;
   line-height: 1.15;
   text-wrap: balance;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 [data-park] .park-world-meta {
   margin: 0;

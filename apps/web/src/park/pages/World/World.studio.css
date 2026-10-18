@@ -299,9 +299,10 @@
     letter-spacing: -0.4px;
     margin: 0;
     line-height: 1.2;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
   }
   [data-park] .park-world-metalist {
     grid-row: 2;
@@ -451,7 +452,7 @@
     justify-content: center;
     line-height: 1.25;
     min-width: 0;
-    flex: 0 1 auto;
+    flex: 1 1 280px;
   }
   [data-park] .park-world-eyebrowrow {
     display: none;
@@ -466,7 +467,11 @@
     font-size: 18px;
     font-weight: 700;
     letter-spacing: -0.4px;
-    white-space: nowrap;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
     margin: 0;
     line-height: 1.2;
   }
