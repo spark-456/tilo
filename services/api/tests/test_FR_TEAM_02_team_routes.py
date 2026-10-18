@@ -219,6 +219,21 @@ def test_R_TEAM_email_invite_uses_the_person_approved_T2_outbox() -> None:
         response = api.post("/v1/team/invites", {"email": "new@b.co", "role": "Member"})
 
         assert response.status_code == 201, response.text
+        # P0-TEAM-INVITE: Invite stages an approval card in Needs you before sending
+        cards_res = api.get("/cards")
+        assert cards_res.status_code == 200
+        cards = cards_res.json()["cards"]
+        assert len(cards) == 1
+        card = cards[0]
+        assert len(api.sent) == 0
+
+        # Person approves in Needs you:
+        answer_res = api.post(
+            f"/worlds/{card['world_id']}/cards/{card['card_id']}/answer",
+            {"option": "approve", "channel": "web"},
+        )
+        assert answer_res.status_code == 200
+
         assert len(api.sent) == 1
         entry = api.sent[0]
         assert entry["action_type"] == "send_email"

@@ -337,6 +337,7 @@ def remove_member(person_id: str, principal: Principal, store: Store, flags: Fla
 def invite(
     principal: Principal, body: Annotated[InviteIn, Depends(_json_body(InviteIn))], store: Store, flags: Flags,
     clock: Clock, artifacts: Artifacts, outbox_store: OutboxStore, adapters: Adapters, desks: Desks, writer: Writer,
+    api_store: Annotated[deps.Store, Depends(deps.get_store)],
 ) -> dict[str, Any]:  # fmt: skip
     invite_id = "inv_" + secrets.token_hex(8)
 
@@ -360,6 +361,8 @@ def invite(
             adapters=adapters,
             desks=desks,
             writer=writer,
+            api_store=api_store,
+            clock=clock,
         )(
             owner=principal.user_id,
             email=body.email,
@@ -369,10 +372,10 @@ def invite(
             at=at,
         )
     except Exception as exc:
-        logger.warning("team invite mail not sent (%s)", type(exc).__name__)
+        logger.warning("team invite stage failed (%s)", type(exc).__name__)
         raise Refusal(
             503,
-            "The invite was saved, but the email was not sent.",
+            "The invite was saved, but the email could not be queued for approval.",
             code="team_invite_email_unsent",
         ) from exc
     _audit(principal, "invite", invite_id, at)
