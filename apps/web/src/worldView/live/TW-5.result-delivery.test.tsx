@@ -34,7 +34,7 @@ const settle = () =>
   });
 
 describe("TW-5: Result tab and previews", () => {
-  it("renders main deliverable card, rich mockups, also delivered items, working files, and where it was made", async () => {
+  it("renders the recorded main deliverable and named working files", async () => {
     const events = [
       ev("world.started", "system", "w_live"),
       ev("artifact.delivered", "A_w1", "art_plan", {
@@ -91,13 +91,10 @@ describe("TW-5: Result tab and previews", () => {
     shareBtn?.click();
     expect(onShare).toHaveBeenCalled();
 
-    // 3. ALSO DELIVERED previews
-    expect(m.container.textContent).toContain("ALSO DELIVERED");
+    // R-RESULT deliberately replaces the sample preview cards with only recorded deliverables.
+    expect(m.container.textContent).not.toContain("ALSO DELIVERED");
     expect(m.container.textContent).toContain("Offsite budget.xlsx");
-    expect(m.container.textContent).toContain("Kickoff deck");
-    expect(m.container.textContent).toContain("Event site");
-    expect(m.container.textContent).toContain("porto-offsite.lovable.app");
-    expect(m.container.textContent).toContain("Invite email");
+    expect(m.container.textContent).not.toContain("Kickoff deck");
 
     // 4. Folded Working Files
     const files = m.container.querySelector<HTMLDetailsElement>(

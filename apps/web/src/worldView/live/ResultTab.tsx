@@ -5,10 +5,16 @@ import { useState } from "react";
 import { Icon } from "../../design/tilo-t";
 import type { Api } from "../../park/api";
 import { openResult, readResult, saveResult } from "../../park/api/results";
+import { Markdown } from "../../park/pages/World/markdown";
 import type { SharedResult } from "../../park/pages/World/ResultPanel";
 import type { RunEvent } from "../../park/pages/World/useRunEvents";
 import type { ResultView } from "../../park/pages/World/useRunResult";
 import { Markdown } from "../../park/pages/World/markdown";
+
+const readableMath = (text: string): string =>
+  text
+    .replace(/\$\\to\$/g, "→")
+    .replace(/\$([^$\n]+)\$/g, "$1");
 
 function ResultBody({ view, retry }: { view: ResultView; retry?: () => void }) {
   if (view.status === "loading") return <p className="park-world-noruns">Loading the result…</p>;
@@ -38,9 +44,9 @@ function ResultBody({ view, retry }: { view: ResultView; retry?: () => void }) {
     // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling text box must be reachable by keyboard to be read
     <div className="park-world-resulttext" data-testid="result-text" tabIndex={0}>
       {view.kind === "markdown" ? (
-        <Markdown text={view.text} />
+        <Markdown text={readableMath(view.text)} />
       ) : (
-        <pre className="park-world-resultpre">{view.text}</pre>
+        <pre className="park-world-resultpre">{readableMath(view.text)}</pre>
       )}
       {view.cut ? (
         <p className="park-world-sub">Showing the start. Download it for the rest.</p>
@@ -66,10 +72,10 @@ const FORMAT_NAMES: Record<string, string> = {
   txt: "Text",
 };
 
-function safeDeliverableName(raw: string): string {
+function safeDeliverableName(raw: string): string | null {
   const trimmed = raw.trim();
   const cleaned = trimmed.replace(/[^\w\s.-]/g, "").replace(/\s+/g, " ");
-  return cleaned || "Delivered file";
+  return cleaned || null;
 }
 
 function deliveredName(event: RunEvent, id: string): string {
@@ -77,7 +83,8 @@ function deliveredName(event: RunEvent, id: string): string {
     | { artifact?: { label?: unknown }; format?: unknown; filename?: unknown }
     | undefined;
   if (typeof data?.filename === "string" && data.filename.trim()) {
-    return safeDeliverableName(data.filename);
+    const filename = safeDeliverableName(data.filename);
+    if (filename) return filename;
   }
   const label = data?.artifact?.label;
   const cleanLabel = typeof label === "string" ? safeDeliverableName(label) : null;
@@ -87,7 +94,8 @@ function deliveredName(event: RunEvent, id: string): string {
   );
   const cleanSummary = fromSummary?.[1] ? safeDeliverableName(fromSummary[1]) : null;
   if (cleanSummary && !/^item$/i.test(cleanSummary)) return cleanSummary;
-  return (typeof data?.format === "string" && FORMAT_NAMES[data.format]) || "Delivered file";
+  const summary = safeDeliverableName(event.summary.replace(/[.!]+$/, ""));
+  return (typeof data?.format === "string" && FORMAT_NAMES[data.format]) || summary || "Working file";
 }
 
 function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
@@ -100,7 +108,9 @@ function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
       typeof id === "string" &&
       !items.some((x) => x.id === id)
     ) {
-      items.push({ id, name: deliveredName(e, id) });
+      const name = deliveredName(e, id);
+      if (!items.some((x) => x.name.toLocaleLowerCase() === name.toLocaleLowerCase()))
+        items.push({ id, name });
     }
   }
   return items;
@@ -168,17 +178,21 @@ function WorkingFiles({
             <span className="tw-res-files__name park-world-sub">{f.name}</span>
             <button
               type="button"
-              className="tw-res-file-btn secondary"
+              className="tw-res-file-btn tw-res-file-btn--icon secondary"
+              aria-label={`Open ${f.name}`}
+              title={`Open ${f.name}`}
               onClick={() => readItem(f.id, openResult)}
             >
-              {`Open working file: ${f.name}`}
+              <Icon name="eye" size={16} />
             </button>
             <button
               type="button"
-              className="tw-res-file-btn secondary"
+              className="tw-res-file-btn tw-res-file-btn--icon secondary"
+              aria-label={`Download ${f.name}`}
+              title={`Download ${f.name}`}
               onClick={() => readItem(f.id, (b) => saveResult(b, f.name))}
             >
-              {`Download working file: ${f.name}`}
+              <Icon name="download" size={16} />
             </button>
           </li>
         ))}
@@ -214,6 +228,11 @@ export function ResultTab({
           .split("\n")[0]
           ?.replace(/^#*\s*/, "") || "Porto offsite plan"
       : "Porto offsite plan");
+  const mainEvent = events.find((event) => event.type === "artifact.delivered");
+  const mainData = mainEvent?.data as { format?: unknown } | undefined;
+  const mainFormat =
+    typeof mainData?.format === "string" ? mainData.format.toUpperCase() : "FILE";
+  const mainSummary = mainEvent?.summary || "Ready to open or download.";
 
   const handleOpen = () => {
     if (blob) openResult(blob);
@@ -293,16 +312,14 @@ export function ResultTab({
 
         <div className="tw-res-body">
           <div className="tw-res-meta-line">
-            <span className="tw-res-type-pill" data-type="PDF">
-              PDF
+            <span className="tw-res-type-pill" data-type={mainFormat}>
+              {mainFormat}
             </span>
-            <span className="tw-res-meta">6 pages · 1.2 MB · made in Tilo by Kai</span>
+            <span className="tw-res-meta">Made in Tilo</span>
           </div>
 
           <h2 className="tw-res-title">{mainName}</h2>
-          <p className="tw-res-summary">
-            Venue, flights, budget and a 3-day agenda for 12 people, 14–16 May. €1,720 under budget.
-          </p>
+          <p className="tw-res-summary">{mainSummary}</p>
 
           <div className="tw-res-actions">
             <button type="button" className="tw-res-btn tw-res-btn--pri" onClick={handleOpen}>
@@ -328,6 +345,8 @@ export function ResultTab({
         </div>
       </div>
 
+      {events.length === 0 ? (
+        <>
       {/* 3. ALSO DELIVERED Header */}
       <div className="tw-res-also tw-res-slide-2">ALSO DELIVERED</div>
 
@@ -510,6 +529,8 @@ export function ResultTab({
           <p className="tw-res-text-p">Reply with any food needs by Wednesday. M</p>
         </div>
       </div>
+        </>
+      ) : null}
 
       {/* 4. Folded Working Files */}
       {rawDelivered.length > 1 ? (
