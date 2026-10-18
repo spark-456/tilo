@@ -247,6 +247,16 @@ def _desk(we: WorkEvents, org: str, owner: str) -> str:
     return world
 
 
+def _release_desk(writer: Any, world: str) -> None:
+    """A request-scoped Desk append must not leave another service instance locked out."""
+    release = getattr(writer, "release_world", None)
+    if callable(release):
+        try:
+            release(world)
+        except Exception as exc:  # the event already committed; lease expiry remains the backstop
+            logger.warning("skill Desk writer release failed (%s)", type(exc).__name__)
+
+
 def _part(
     kind: str, owner: str, summary: str, data: dict[str, Any], key: tuple[str, ...], used: dict[str, Any]
 ) -> dict[str, Any]:
@@ -341,17 +351,20 @@ def capture_route(
             raise _draft_failed()
         world = _desk(we, deps.ORG_ID, owner)
         store.put(record)
-        for number in range(1, len(texts) + 1):  # HR-1: one event per step; the model call's cost rides on step 1
-            data = {"skill": skill_id, "method": body.method, "step": number, "artifact": pinned}
-            part = _part(
-                "skill.captured",
-                owner,
-                "A step was added to a new skill.",
-                data,
-                (skill_id, "captured", str(number)),
-                used if number == 1 else {},
-            )
-            we.writer.append(world, part)
+        try:
+            for number in range(1, len(texts) + 1):  # HR-1: one event per step; the model cost rides on step 1
+                data = {"skill": skill_id, "method": body.method, "step": number, "artifact": pinned}
+                part = _part(
+                    "skill.captured",
+                    owner,
+                    "A step was added to a new skill.",
+                    data,
+                    (skill_id, "captured", str(number)),
+                    used if number == 1 else {},
+                )
+                we.writer.append(world, part)
+        finally:
+            _release_desk(we.writer, world)
         return {"capture_id": skill_id, "captured_steps": [{"text": t} for t in texts]}
 
     return _guarded(save)
@@ -497,6 +510,8 @@ def version_route(
         except Exception:
             store.put(draft)  # the proposal only exists once its event does
             raise
+        finally:
+            _release_desk(we.writer, world)
         return _view(after, registry, views, team, lost)
 
     return _guarded(save)
