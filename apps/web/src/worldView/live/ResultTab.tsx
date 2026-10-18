@@ -8,6 +8,7 @@ import { openResult, readResult, saveResult } from "../../park/api/results";
 import type { SharedResult } from "../../park/pages/World/ResultPanel";
 import type { RunEvent } from "../../park/pages/World/useRunEvents";
 import type { ResultView } from "../../park/pages/World/useRunResult";
+import { Markdown } from "../../park/pages/World/markdown";
 
 function ResultBody({ view, retry }: { view: ResultView; retry?: () => void }) {
   if (view.status === "loading") return <p className="park-world-noruns">Loading the result…</p>;
@@ -36,7 +37,11 @@ function ResultBody({ view, retry }: { view: ResultView; retry?: () => void }) {
   return (
     // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling text box must be reachable by keyboard to be read
     <div className="park-world-resulttext" data-testid="result-text" tabIndex={0}>
-      <pre className="park-world-resultpre">{view.text}</pre>
+      {view.kind === "markdown" ? (
+        <Markdown text={view.text} />
+      ) : (
+        <pre className="park-world-resultpre">{view.text}</pre>
+      )}
       {view.cut ? (
         <p className="park-world-sub">Showing the start. Download it for the rest.</p>
       ) : null}

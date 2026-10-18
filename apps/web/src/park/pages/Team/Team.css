@@ -605,11 +605,6 @@
     display: inline-flex;
     align-items: center;
   }
-  [data-park] .park-switch {
-    min-height: 44px;
-    min-width: 44px;
-    align-items: center;
-  }
   [data-park] .park-team-more {
     min-width: 44px;
     min-height: 44px;

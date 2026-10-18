@@ -202,9 +202,12 @@ describe("STUDIO_3 the World page of a live run", () => {
     });
     click(control(result, "Download"));
     expect(clicks[0]?.download).toBe("tilo-result-Road trip.md");
-    // Share is the filled button here; Share to Slack and Share with team sit beside it
+    // TW-5 replaced the Studio result actions: Open is filled; Share sits beside it.
+    expect((control(result, "Open result") as HTMLButtonElement).className).toContain(
+      "tw-res-btn--pri",
+    );
     const share = control(result, "Share") as HTMLButtonElement;
-    expect(share.className).toContain("park-btn--primary");
+    expect(share.className).toContain("tw-res-btn--sec");
     expect(control(result, "Share to Slack")).toBeTruthy();
   });
 

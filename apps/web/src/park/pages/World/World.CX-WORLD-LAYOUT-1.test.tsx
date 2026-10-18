@@ -10,6 +10,7 @@ import { HttpClient } from "../../../api/http";
 vi.mock("../../../worldView/LiveStageEmbed", () => ({
   default: () => <div data-testid="live-stage-stub" />,
   LiveChat: () => null,
+  ResultTab: () => <div data-testid="run-result" />,
 }));
 
 afterEach(cleanup);
