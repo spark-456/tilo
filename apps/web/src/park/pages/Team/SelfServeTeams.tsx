@@ -252,25 +252,27 @@ export function SelfServeTeams(props: {
                       {m.lead ? " · Owner" : ""}
                     </span>
                     {t.lead && !m.lead ? (
-                      <select
-                        className="park-team-select"
-                        aria-label={`Role for ${m.name}`}
-                        value={m.role ?? "viewer"}
-                        disabled={busy}
-                        onChange={(e) => {
-                          const role = e.target.value as (typeof MEMBER_ROLES)[number];
-                          void act(
-                            () => client.changeRole(t.team, m.id, role),
-                            `${m.name} is now ${role[0]?.toUpperCase()}${role.slice(1)}.`,
-                          );
-                        }}
-                      >
-                        {MEMBER_ROLES.map((role) => (
-                          <option key={role} value={role}>
-                            {`${role[0]?.toUpperCase()}${role.slice(1)}`}
-                          </option>
-                        ))}
-                      </select>
+                      <span className="park-team-selectwrap">
+                        <select
+                          className="park-team-select"
+                          aria-label={`Role for ${m.name}`}
+                          value={m.role ?? "viewer"}
+                          disabled={busy}
+                          onChange={(e) => {
+                            const role = e.target.value as (typeof MEMBER_ROLES)[number];
+                            void act(
+                              () => client.changeRole(t.team, m.id, role),
+                              `${m.name} is now ${role[0]?.toUpperCase()}${role.slice(1)}.`,
+                            );
+                          }}
+                        >
+                          {MEMBER_ROLES.map((role) => (
+                            <option key={role} value={role}>
+                              {`${role[0]?.toUpperCase()}${role.slice(1)}`}
+                            </option>
+                          ))}
+                        </select>
+                      </span>
                     ) : (
                       !m.lead && (
                         <span>{`${(m.role ?? "viewer")[0]?.toUpperCase()}${(m.role ?? "viewer").slice(1)}`}</span>

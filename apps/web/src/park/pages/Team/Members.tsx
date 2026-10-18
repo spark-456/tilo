@@ -109,19 +109,21 @@ function Person({
           </div>
         </td>
         <td>
-          <select
-            className="park-team-select"
-            aria-label={`Role for ${p.name}`}
-            value={p.role ?? ""}
-            disabled={!canChange(p)}
-            onChange={(e) => onRole(p, e.target.value)}
-          >
-            {roles.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+          <span className="park-team-selectwrap">
+            <select
+              className="park-team-select"
+              aria-label={`Role for ${p.name}`}
+              value={p.role ?? ""}
+              disabled={!canChange(p)}
+              onChange={(e) => onRole(p, e.target.value)}
+            >
+              {roles.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </span>
         </td>
         <td className="park-team-strong">{v.limit}</td>
         <td className="park-team-helped">
