@@ -28,27 +28,33 @@ const WAYS = [
 export function TeachBanner({ night, onStart }: { night: boolean; onStart: () => void }) {
   return (
     <section aria-label="Teach Tilo a skill" className="park-skills-banner">
-      <div className="park-skills-banner__art" aria-hidden="true">
-        {agent({ role: "research", rank: "lead", expr: "talking" }, 120, night)}
+      <div className="park-skills-banner__header">
+        <div className="park-skills-banner__lead">
+          <div className="park-skills-banner__art" aria-hidden="true">
+            {agent({ role: "research", rank: "lead", expr: "talking" }, 80, night)}
+          </div>
+          <div className="park-skills-banner__text">
+            <span className="park-skills-eyebrow">TEACH TILO A SKILL</span>
+            <h2 className="park-skills-banner__h2">Show Tilo how you like it done, once.</h2>
+          </div>
+        </div>
+        <div className="park-skills-banner__cta">
+          <Button variant="secondary" onClick={onStart}>
+            Start teaching →
+          </Button>
+        </div>
       </div>
-      <div className="park-skills-banner__text">
-        <span className="park-skills-eyebrow">TEACH TILO A SKILL</span>
-        <h2 className="park-skills-banner__h2">Show Tilo how you like it done, once.</h2>
-        <ol className="park-skills-banner__ways">
-          {WIZARD_STEPS.map((s, i) => (
-            <li key={s.label} className="park-skills-banner__way">
-              <span className="park-skills-banner__n">{i + 1}</span>
-              <span>
-                <strong>{s.label}</strong>
-                <span className="park-skills-banner__sub">{WAYS[i]}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-      </div>
-      <Button variant="secondary" onClick={onStart}>
-        Start teaching →
-      </Button>
+      <ol className="park-skills-banner__ways">
+        {WIZARD_STEPS.map((s, i) => (
+          <li key={s.label} className="park-skills-banner__way">
+            <span className="park-skills-banner__n">{i + 1}</span>
+            <span className="park-skills-banner__copy">
+              <strong>{s.label}</strong>
+              <span className="park-skills-banner__sub">{WAYS[i]}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

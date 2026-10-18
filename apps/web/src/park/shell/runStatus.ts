@@ -30,10 +30,7 @@ export function runBarOf(all: readonly World[]): RunBarState | null {
       detail: only ? (only.activity?.[0]?.text ?? only.short) : worldsText(running.length),
     };
   }
-  const held = worlds.filter((w) => w.st === "needs");
-  if (held.length > 0) {
-    const only = held.length === 1 ? held[0] : undefined;
-    return { kind: "held", label: HELD_LABEL, detail: only ? only.short : worldsText(held.length) };
-  }
+  // P0-SKILLS-PAGE: approvals live only in Needs you and the nav badge.
+  // The bottom pill for held runs ("Waiting for your approval") is removed everywhere.
   return null;
 }

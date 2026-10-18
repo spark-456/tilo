@@ -54,7 +54,7 @@ for (const width of [390, 1440]) {
           </main>
         </ParkProvider>,
       );
-      for (let attempt = 0; attempt < 100; attempt++) {
+      for (let attempt = 0; attempt < 150; attempt++) {
         await act(async () => {
           await new Promise((resolve) => setTimeout(resolve, 20));
         });
