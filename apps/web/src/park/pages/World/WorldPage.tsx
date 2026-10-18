@@ -371,7 +371,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const isTown = w.tier === "Town";
   // Live run navigation follows the recorded run, regardless of the world's size.
   const showRunViews = loaded.live || isCity;
-  const isPaused = Boolean(paused[w.id]);
+  const isPaused = view?.phase === "paused" || Boolean(paused[w.id]);
   const mine = loaded.decisions.filter((d) => d.world === w.id);
   const slackPending = slackPendingByWorld[w.id] ?? null;
   const handoff = loaded.handoffs.find((h) => h.world === w.id) ?? null;
@@ -403,6 +403,26 @@ export function WorldPage({ app }: { app: AppCtx }) {
       : look[0];
 
   const togglePause = () => {
+    if (loaded.live && worldClient && !w.sample) {
+      if (isPaused) {
+        worldClient.startAgain(w.id).then(
+          (next) => {
+            markPendingWorld(next.world_id);
+            app.go("world", { id: next.world_id });
+          },
+          () => app.toast("This run could not continue. Try again."),
+        );
+      } else {
+        worldClient.pauseWorld(w.id).then(
+          () => {
+            setPaused((current) => ({ ...current, [w.id]: true }));
+            app.toast("Paused. No spend while paused");
+          },
+          () => app.toast("This run could not be paused. Try again."),
+        );
+      }
+      return;
+    }
     setPaused((p) => ({ ...p, [w.id]: !isPaused }));
     // Issue 932: a sample world has no run behind it, so the toast says what happened: this page only.
     app.toast(
