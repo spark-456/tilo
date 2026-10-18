@@ -623,10 +623,7 @@ export function HomePage({ app }: { app: AppCtx }) {
                 }}
               />
             ) : null}
-            <ChatHistory
-              onChat={(id) => go("chat", id ? { id } : {})}
-              onWorlds={() => go("worlds")}
-            />
+            <ChatHistory onChat={() => go("chat")} />
           </div>
           <TodayPanel
             served={served}
