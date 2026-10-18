@@ -31,11 +31,11 @@ def test_AS_01_website_request_uses_native_website() -> None:
 
 @pytest.mark.parametrize("model_format", ["markdown", "app"])
 @pytest.mark.parametrize(
-    "request", ["Make a website questionnaire for our customers", "Make an app", "Create a questionnaire"]
+    "task_text", ["Make a website questionnaire for our customers", "Make an app", "Create a questionnaire"]
 )
-def test_R_APP_DELIVERABLE_website_questionnaire_uses_native_website(model_format: str, request: str) -> None:
+def test_R_APP_DELIVERABLE_website_questionnaire_uses_native_website(model_format: str, task_text: str) -> None:
     requested = {"deliverables": [{"title": "Customer questionnaire", "format": model_format}]}
-    result = safe_app_brief(requested, request, [])
+    result = safe_app_brief(requested, task_text, [])
     assert result["deliverables"][0]["format"] == "website"
 
 
