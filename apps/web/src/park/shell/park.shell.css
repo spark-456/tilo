@@ -104,6 +104,16 @@
   max-width: 1320px;
   margin: 0 auto;
 }
+[data-park] .park-shell__main h1 {
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+[data-park]
+  .park-shell__main
+  :where(a[href], button, input, select, textarea, summary):focus-visible {
+  outline: 3px solid var(--focus, #5a3fe0);
+  outline-offset: 2px;
+}
 /* POLISH-1: one page container for Home, Worlds and Team (and Connectors, which already uses these numbers): the
    content is at most 1296 wide with an 8px inner gutter, so its left edge is the same on every page (80px at 1440).
    A phone's page gutter is 16, the same as Home's own. */
@@ -390,11 +400,19 @@
   position: absolute;
   top: 8px;
   right: 9px;
-  width: 9px;
-  height: 9px;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
   border-radius: 99px;
   background: #f0a500;
   box-shadow: 0 0 0 2px var(--pop);
+  color: #1f1d2b;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
 }
 [data-park] .park-shell__avatar {
   flex: none;

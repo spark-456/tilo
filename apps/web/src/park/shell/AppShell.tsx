@@ -204,6 +204,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             .join(" · "),
         }
       : null;
+  const notificationCount = !state.read
+    ? liveNotifications
+      ? notifications.filter((n) => n.dec === undefined || !app.dec[n.dec]).length
+      : app.needsLeft
+    : 0;
   // Honest: success is said only after the sign-in layer's promise resolves, a failure says it failed.
   const signOutViaSeam = (): void => {
     if (!auth) {
@@ -237,12 +242,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         needsLeft={app.needsLeft}
         night={appearance.night}
         menu={state.menu}
-        unread={
-          !state.read &&
-          (liveNotifications
-            ? notifications.some((n) => n.dec === undefined || !app.dec[n.dec])
-            : app.needsLeft > 0)
-        }
+        unread={notificationCount > 0}
+        notificationCount={notificationCount}
         initials={
           auth
             ? auth.status === "signedIn"
