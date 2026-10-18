@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -14,11 +15,13 @@ from tilo_memory.artifacts import ArtifactStore, NewVersion, Origin, Scope
 from tilo_people.errors import VersionConflict
 
 from tilo_api import deps
-from tilo_api.meeting_host_rpc import MeetingHostRpc
+from tilo_api.meeting_host_rpc import HostRpcError, MeetingHostRpc
 from tilo_api.meeting_join import owned_receipt
 from tilo_api.meeting_voice_claims import AttendClaims
 from tilo_api.people_meetings import _mine
 from tilo_api.people_writes import Refusal, Writer, _purge
+
+logger = logging.getLogger("tilo_api.meeting_bot")
 
 
 @dataclass(frozen=True)
@@ -48,7 +51,15 @@ async def attend_meeting(
     wake = getattr(bot, "wake", None)
     if wake is not None:  # a cold bot answers before the 60-second join link is made, never after (MEET-SIMPLE)
         await wake()
-    join = await asyncio.to_thread(host.join_link, receipt)
+    try:
+        join = await asyncio.to_thread(host.join_link, receipt)
+    except HostRpcError as error:
+        if error.kind == "rejected" and error.code == "host_not_connected":
+            raise Refusal(409, "Tilo's meeting host needs to be signed in") from None
+        if error.kind == "rejected" and error.code in ("not_joinable", "no_join_link"):
+            raise Refusal(409, error.code) from None
+        logger.warning("meeting attend join link unavailable (%s)", error.kind)
+        raise Refusal(503, "bot_unavailable") from None
     if owned_receipt(w, store, artifacts, meeting_id) != receipt:
         raise Refusal(409, "not_joinable")
     try:

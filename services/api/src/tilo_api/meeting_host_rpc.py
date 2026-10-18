@@ -61,6 +61,7 @@ MAX_VIEWS_REPLY_BYTES = 262_144  # 32 views of 16 scopes stay under 160 KiB
 VIEWS_PATH = "/internal/connections/views"
 READ_PATH = "/internal/workspace/read"  # ADR-0048: an agent's read of the person's own Gmail, Calendar or Drive
 READ_TIMEOUT_S = 25.0  # Google may be slow; one deadline for the token fetch and the request together
+JOIN_TIMEOUT_S = 45.0  # read-only join may wake a cold host; the 30-second outbox send lease is unchanged
 MAX_READ_REPLY_BYTES = 6 * 1024 * 1024  # a 4 MiB PDF in base64 plus the answer around it
 _SCHEMA = "meeting_host_rpc.schema.json"
 CONNECT_PATH = "/internal/connections/"  # start, callback, disconnect (ADR-0035 decision 2)
@@ -255,7 +256,9 @@ class MeetingHostRpc:
         """The API supplies its scoped receipt; connectors alone reads the host grant."""
         try:
             checked = MeetingHostRpcReceipt.model_validate(receipt)
-            return MeetingJoin.model_validate_json(self._post("join", checked.model_dump(mode="json")))
+            return MeetingJoin.model_validate_json(
+                self._post("join", checked.model_dump(mode="json"), timeout_s=JOIN_TIMEOUT_S)
+            )
         except ValidationError:
             raise HostRpcError("unknown") from None
 
