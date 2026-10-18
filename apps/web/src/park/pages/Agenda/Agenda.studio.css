@@ -204,6 +204,7 @@
 }
 [data-park][data-theme="studio"] .park-agenda-root button:focus-visible,
 [data-park][data-theme="studio"] .park-agenda-root input:focus-visible,
+[data-park][data-theme="studio"] .park-agenda-root select:focus-visible,
 [data-park][data-theme="studio"] .park-agenda-root summary:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
@@ -246,16 +247,63 @@
   color: var(--ink);
   font: inherit;
 }
+[data-park][data-theme="studio"] .park-agenda-hostselect {
+  position: relative;
+  display: block;
+}
+[data-park][data-theme="studio"] .park-agenda-hostselect select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  padding-right: 38px;
+}
+[data-park][data-theme="studio"] .park-agenda-hostselect::after {
+  content: "⌄";
+  position: absolute;
+  top: 10px;
+  right: 13px;
+  color: var(--ink2);
+  font-size: 17px;
+  pointer-events: none;
+}
 [data-park][data-theme="studio"] .park-agenda-hostnotice {
   display: flex;
   gap: 10px;
   align-items: flex-start;
   font-size: 14px;
 }
-[data-park][data-theme="studio"] .park-agenda-hostnotice input {
+[data-park][data-theme="studio"] .park-agenda-hostnotice input[type="checkbox"],
+[data-park][data-theme="studio"] .park-agenda-minutes input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  place-content: center;
   width: 24px;
   height: 24px;
+  margin: 0;
+  border: 1px solid var(--lineStrong);
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--onPri);
   flex: none;
+}
+[data-park][data-theme="studio"] .park-agenda-hostnotice input[type="checkbox"]::before,
+[data-park][data-theme="studio"] .park-agenda-minutes input[type="checkbox"]::before {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+}
+[data-park][data-theme="studio"] .park-agenda-hostnotice input[type="checkbox"]:checked,
+[data-park][data-theme="studio"] .park-agenda-minutes input[type="checkbox"]:checked {
+  border-color: var(--priFill);
+  background: var(--priFill);
+}
+[data-park][data-theme="studio"] .park-agenda-hostnotice input[type="checkbox"]:checked::before,
+[data-park][data-theme="studio"] .park-agenda-minutes input[type="checkbox"]:checked::before {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
 }
 
 [data-park][data-theme="studio"] .park-agenda-hostbox {
