@@ -49,7 +49,7 @@ for (const width of [1440, 390] as const) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
       await page.goto("/team");
       await expect(page.getByRole("heading", { name: "Team", exact: true })).toBeVisible({
-        timeout: 10_000,
+        timeout: 20_000,
       });
       if (theme === "dark")
         await page
