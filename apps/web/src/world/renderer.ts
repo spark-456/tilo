@@ -449,14 +449,18 @@ export function renderAgents(
   layer: WorldLayer,
   frame: Frame,
   positions: ReadonlyMap<string, { x: number; y: number }>,
+  lit: readonly string[] = [],
 ) {
   const shown = new Set<string>();
   const mode = layer.density();
   const scale = agentScale(mode);
   const rankTags = mode === "professional" && !isNarrow(layer);
+  const hasLit = lit.length > 0;
   for (const agent of frame.agents) {
     const p = positions.get(agent.id);
     if (!p) continue;
+    const isLit = !hasLit || lit.includes(agent.id);
+    const alpha = isLit ? 1 : 0.45;
     const shadows = layer.shadows !== false;
     const key = `${agent.rank}:${agent.tint}:${shadows}`;
     let fig = layer.figures.get(agent.id);
@@ -473,6 +477,7 @@ export function renderAgents(
     }
     fig.g.scale.set(scale); // read at draw time: a density switch is one redraw, never an event
     fig.g.position.set(p.x, p.y);
+    fig.g.alpha = alpha;
     // In front of the building it stands at, behind one nearer the viewer.
     fig.g.zIndex = p.y + agent.level * LEVEL_RISE + agent.level * 4000 + 16;
     fig.g.visible = true;
@@ -494,6 +499,7 @@ export function renderAgents(
         layer.agentTags.set(agent.id, rank);
       }
       rank.c.position.set(p.x, p.y - 30 * scale - 12);
+      rank.c.alpha = alpha;
     }
     const head = p.y - 30 * scale - (rankTags ? 26 : 14); // above the rank tag when there is one
     // WORLD-LIVE: the tool icon, there only while agent.working is the agent's latest event.

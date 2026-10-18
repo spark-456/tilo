@@ -41,6 +41,7 @@ export interface AgentStats {
   /** The last three messages it sent, oldest first. */
   readonly said: readonly Message[];
   readonly status: AgentStatus;
+  readonly order: number;
 }
 
 interface Acc {
@@ -106,7 +107,7 @@ export function agentStatsOf(layout: Layout, events: readonly Event[]): Map<stri
     if (message?.text) mine.said = [...mine.said.slice(-2), message];
   }
   const out = new Map<string, AgentStats>();
-  for (const a of layout.semantic.agents) {
+  for (const [i, a] of layout.semantic.agents.entries()) {
     const mine = acc.get(a.id) as Acc;
     const agent = state.agents[a.id];
     const stands = agent ? standingAt(state, agent) : null;
@@ -135,6 +136,7 @@ export function agentStatsOf(layout: Layout, events: readonly Event[]): Map<stri
       credits: round(mine.credits),
       said: mine.said,
       status,
+      order: i,
     });
   }
   return out;

@@ -26,11 +26,16 @@ export function AgentLayer({ worldId, rooms }: { worldId: string; rooms: RoomCli
     const handoff = [...facts.messages].reverse().find((m) => {
       const from = facts.stats.get(m.from);
       const to = facts.stats.get(m.to);
-      return m.kind === "handoff" && from?.status === "handing over" && !!to;
+      const validKind = m.kind === "handoff" || m.kind === "question";
+      return validKind && from?.status === "handing over" && !!to;
     });
     if (!handoff) return null;
-    const a = registerProbe.get(worldId)?.locate(handoff.from);
-    const b = registerProbe.get(worldId)?.locate(handoff.to);
+    const probe = registerProbe.get(worldId);
+    if (probe?.isWalking?.(handoff.from) || probe?.isWalking?.(handoff.to)) {
+      return null;
+    }
+    const a = probe?.locate(handoff.from);
+    const b = probe?.locate(handoff.to);
     return a && b
       ? { message: handoff, at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - 34 } }
       : null;
@@ -42,7 +47,7 @@ export function AgentLayer({ worldId, rooms }: { worldId: string; rooms: RoomCli
       {talking && !team ? (
         <button
           type="button"
-          className="tw-talk-dots"
+          className="tw-talk-dots tw-talking-dots"
           style={{ left: talking.at.x, top: talking.at.y }}
           aria-label={`Open conversation between ${facts.names.get(talking.message.from) ?? "agents"} and ${facts.names.get(talking.message.to) ?? "agents"}`}
           data-testid="world-talk-dots"
@@ -51,9 +56,9 @@ export function AgentLayer({ worldId, rooms }: { worldId: string; rooms: RoomCli
             setChat({ open: true, filter: `pair:${pair}` });
           }}
         >
-          <i />
-          <i />
-          <i />
+          <span />
+          <span />
+          <span />
         </button>
       ) : null}
       {chat?.open ? (

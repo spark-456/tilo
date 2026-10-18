@@ -202,3 +202,134 @@
 [data-park] .tw-chat-popup--open,[data-park] .tw-convene-dialog{animation:wChatIn .22s var(--tt-ease-standard) both}
 [data-park] .tw-chat-popup--closing{animation:wChatOut .16s var(--tt-ease-standard) both}
 [data-park] .tw-scrim{animation:wScrim .2s ease-out both}
+
+/* TILO-W-MOTION: Keyframes and classes for Tilo W sprite, walk cycle, talking dots, drawer, pins.
+   Triggered by recorded events (agent.moved, agent.handoff, question.routed, building.completed, etc.)
+   or UI chrome (agent hover, click drawer). */
+@keyframes wLegA {
+  0%, 50%, 100% { transform: rotate(0); }
+  25% { transform: rotate(26deg); }
+  75% { transform: rotate(-26deg); }
+}
+@keyframes wLegB {
+  0%, 50%, 100% { transform: rotate(0); }
+  25% { transform: rotate(26deg); }
+  75% { transform: rotate(-26deg); }
+}
+@keyframes wArmA {
+  0%, 50%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-22deg); }
+  75% { transform: rotate(22deg); }
+}
+@keyframes wArmB {
+  0%, 50%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-22deg); }
+  75% { transform: rotate(22deg); }
+}
+@keyframes wBobA {
+  0%, 100% { transform: none; }
+  25%, 75% { transform: scale(1.04, 0.95); }
+  50% { transform: translateY(-3px) scale(0.97, 1.03); }
+}
+@keyframes wBobB {
+  0%, 100% { transform: none; }
+  25%, 75% { transform: scale(1.04, 0.95); }
+  50% { transform: translateY(-3px) scale(0.97, 1.03); }
+}
+@keyframes wHop {
+  0%, 100% { transform: none; }
+  30% { transform: translateY(-7px) scale(0.96, 1.05); }
+  62% { transform: scale(1.06, 0.93); }
+}
+@keyframes wDot {
+  0%, 60%, 100% { opacity: 0.3; transform: none; }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+@keyframes wRing {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes wPing {
+  0% { opacity: 0.7; transform: scale(0.9); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+@keyframes wIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes wPlot {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes wSettle {
+  0% { transform: scale(1.035); }
+  100% { transform: none; }
+}
+@keyframes wPin {
+  0% { opacity: 0; transform: scale(0.4); }
+  70% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes wDrawer {
+  from { opacity: 0; transform: translateX(32px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes wSheet {
+  from { opacity: 0; transform: translateY(60px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes wLand {
+  0% { opacity: 0; transform: translateY(-10px); }
+  60% { opacity: 1; transform: translateY(1px) scale(1.08, 0.92); }
+  100% { opacity: 1; transform: none; }
+}
+
+[data-park] .tw-sprite__ring { animation: wRing .18s ease-out both; }
+[data-park] .tw-sprite__bob--walkA { animation: wBobA .56s ease-in-out 0s var(--wWalkStrides, 3); }
+[data-park] .tw-sprite__bob--walkB { animation: wBobB .56s ease-in-out 0s var(--wWalkStrides, 3); }
+[data-park] .tw-sprite__bob--happy { animation: wHop .6s ease-out 3; }
+[data-park] .tw-sprite__legL--walkA { animation: wLegA .56s ease-in-out 0s var(--wWalkStrides, 3); }
+[data-park] .tw-sprite__legL--walkB { animation: wLegB .56s ease-in-out 0s var(--wWalkStrides, 3); }
+[data-park] .tw-sprite__legR--walkA { animation: wLegA .56s ease-in-out -0.28s var(--wWalkStrides, 3); }
+[data-park] .tw-sprite__legR--walkB { animation: wLegB .56s ease-in-out -0.28s var(--wWalkStrides, 3); }
+[data-park] .tw-sprite__armL--walkA { animation: wArmA .56s ease-in-out -0.28s var(--wWalkStrides, 3); }
+[data-park] .tw-sprite__armL--walkB { animation: wArmB .56s ease-in-out -0.28s var(--wWalkStrides, 3); }
+[data-park] .tw-sprite__armL--work { animation: tWorkL .5s ease-in-out infinite; }
+[data-park] .tw-sprite__armR--walkA { animation: wArmA .56s ease-in-out 0s var(--wWalkStrides, 3); }
+[data-park] .tw-sprite__armR--walkB { animation: wArmB .56s ease-in-out 0s var(--wWalkStrides, 3); }
+[data-park] .tw-sprite__armR--work { animation: tWorkR .5s ease-in-out .25s infinite; }
+
+[data-park] .tw-talking-dots span { animation: wDot 1.2s ease-in-out infinite; }
+[data-park] .tw-talking-dots span:nth-child(2) { animation-delay: .16s; }
+[data-park] .tw-talking-dots span:nth-child(3) { animation-delay: .32s; }
+
+[data-park] .tw-agent-panel { animation: wDrawer .26s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+[data-park] .tw-phone-sheet { animation: wSheet .28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+[data-park] .tw-building-pin { animation: wPin .3s ease-out both; }
+[data-park] .tw-building-settle { animation: wSettle .3s ease-out both; }
+[data-park] .tw-plot-in { animation: wPlot .4s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-park] .tw-sprite__ring,
+  [data-park] .tw-sprite__bob--walkA,
+  [data-park] .tw-sprite__bob--walkB,
+  [data-park] .tw-sprite__bob--happy,
+  [data-park] .tw-sprite__legL--walkA,
+  [data-park] .tw-sprite__legL--walkB,
+  [data-park] .tw-sprite__legR--walkA,
+  [data-park] .tw-sprite__legR--walkB,
+  [data-park] .tw-sprite__armL--walkA,
+  [data-park] .tw-sprite__armL--walkB,
+  [data-park] .tw-sprite__armL--work,
+  [data-park] .tw-sprite__armR--walkA,
+  [data-park] .tw-sprite__armR--walkB,
+  [data-park] .tw-sprite__armR--work,
+  [data-park] .tw-talking-dots span,
+  [data-park] .tw-agent-panel,
+  [data-park] .tw-phone-sheet,
+  [data-park] .tw-building-pin,
+  [data-park] .tw-building-settle,
+  [data-park] .tw-plot-in {
+    animation: none !important;
+  }
+}

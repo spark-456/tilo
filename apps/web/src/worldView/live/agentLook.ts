@@ -23,3 +23,17 @@ export function clock(first: string | undefined, ts: string): string {
   const s = Math.max(0, Math.round((Date.parse(ts) - Date.parse(first ?? ts)) / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
+
+import type { AgentSpriteKind, AgentSpriteMood } from "../../design/tilo-w";
+
+export const spriteMoodOfStatus: Readonly<Record<AgentStatus, AgentSpriteMood>> = {
+  working: "work",
+  "handing over": "talk",
+  "in a meeting": "talk",
+  finished: "happy",
+  ready: "idle",
+  waiting: "idle",
+};
+
+export const spriteKindOfRank = (rank: string): AgentSpriteKind =>
+  rank === "director" ? "director" : rank === "lead" ? "lead" : "agent";

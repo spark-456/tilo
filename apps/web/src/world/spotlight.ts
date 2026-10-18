@@ -76,6 +76,7 @@ export function useSpotlight(worldId: string): Spotlight {
 export interface Probe {
   agentAt(x: number, y: number): string | null;
   locate(id: string): { x: number; y: number } | null;
+  isWalking?(id: string): boolean;
 }
 const probes = new Map<string, Probe>();
 export const registerProbe = Object.assign(
