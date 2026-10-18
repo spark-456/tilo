@@ -231,24 +231,25 @@ describe("STUDIO_2 Chat: honest data", () => {
     expect(status(el)).toBe("Tilo is answering");
   });
 
-  it("CX_T_CHAT lists only current-session questions and New chat clears them", async () => {
+  // P0-CHAT-FUNCTIONS replaces the old current-session-only list with saved conversation titles.
+  it("P0-CHAT-FUNCTIONS New chat clears the current thread in an unsigned session", async () => {
     const api = quickApi(async () => ({
       data: { kind: "answered", text: "A real answer.", cost: null },
       source: "live",
     }));
     const { el } = await mountChat(api);
     const history = q(el, 'nav[aria-label="Chat history"]');
-    expect(textOf(history)).toContain("Current chat");
+    expect(textOf(history)).toContain("Recent chats");
     expect(textOf(history)).not.toContain("Yesterday");
     expect(qa(history, "a")).toHaveLength(0);
     await send(el, "First live question");
     await send(el, "Second live question");
     expect(qa(el, ".park-chat-turn .tt-bd")).toHaveLength(2);
-    expect(qa(history, "a").map(textOf)).toEqual(["First live question", "Second live question"]);
+    expect(qa(history, ".park-chat-history__turn")).toHaveLength(0);
     expect(textOf(q(el, '[role="log"]'))).toContain("A real answer.");
     act(() => q<HTMLButtonElement>(history, "button").click());
     expect(qa(history, "a")).toHaveLength(0);
-    expect(textOf(q(el, '[role="log"]'))).toContain("Past chats are not kept");
+    expect(textOf(q(el, '[role="log"]'))).toContain("Ask a direct question");
   });
 
   it("STUDIO_2 chat on the fixture Api the answer is labelled a sample and shows no cost", async () => {
@@ -263,7 +264,7 @@ describe("STUDIO_2 Chat: honest data", () => {
   it("STUDIO_2 chat starts empty with no listed past chats", async () => {
     const { el } = await mountChat(fakeApi());
     expect(qa(el, ".park-chat-pair")).toHaveLength(0);
-    expect(textOf(q(el, '[role="log"]'))).toContain("Past chats are not kept");
+    expect(textOf(q(el, '[role="log"]'))).toContain("Ask a direct question");
     expect(qa(el, "h1")).toHaveLength(1);
     expect(qa(el, "main")).toHaveLength(0);
   });

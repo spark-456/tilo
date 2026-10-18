@@ -2,9 +2,11 @@
 // greeting with its decorative crew, Your worlds as cards, Chat history, and the side column (Needs you, Up next
 // today, Just finished, spend and the spend tiles). Presentation only: HomePage.tsx owns the data, the composer state
 // and every navigation call.
-import type { MouseEvent, ReactNode } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useState } from "react";
+import { sessionView } from "../../../api/ClientProvider";
 import type { Dec, Decision, Ledger, World } from "../../api/types";
 import { kpis } from "../../app/ledgerKpis";
+import { type SavedChat, loadServerChats, readChats, saveChats } from "../../chat/chatHistory";
 import { KpiTile } from "../../components";
 import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
 import { WorldThumbnail, type WorldThumbnailClient } from "../../shared/WorldThumbnail";
@@ -229,11 +231,34 @@ export function WorldsSection({
   );
 }
 
-/**
- * Chat history. The server keeps no Quick question or answer (COST-FAST-1), so there is nothing it can list: the
- * section says so plainly and links to the Chat page, never a sample conversation.
- */
-export function ChatHistory({ onChat }: { onChat: () => void }) {
+/** The latest saved private Quick chats, with direct paths to the available Worlds sections. */
+export function ChatHistory({
+  onChat,
+  onWorlds,
+}: { onChat: (id?: string) => void; onWorlds: () => void }) {
+  const owner = sessionView.identity()?.email ?? null;
+  const [chats, setChats] = useState<SavedChat[]>(() => readChats(owner));
+  useEffect(() => {
+    if (!owner) return;
+    let live = true;
+    loadServerChats()
+      .then((remote) => {
+        if (!live || remote.length === 0) return;
+        setChats((current) => {
+          const merged = new Map(current.map((entry) => [entry.id, entry]));
+          for (const entry of remote)
+            if (!merged.has(entry.id) || (merged.get(entry.id)?.updatedAt ?? 0) < entry.updatedAt)
+              merged.set(entry.id, entry);
+          const next = [...merged.values()].sort((a, b) => b.updatedAt - a.updatedAt);
+          saveChats(owner, next);
+          return next;
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [owner]);
   return (
     <section aria-label="Chat history" className="park-home-section">
       <div className="park-home-section__head">
@@ -241,24 +266,42 @@ export function ChatHistory({ onChat }: { onChat: () => void }) {
           <h2 className="park-home-h2">Chat history</h2>
           <span className="park-home-section__sub">Quick answers from your single helper</span>
         </div>
-        <GoLink href="/chat" onGo={onChat}>
+        <GoLink href="/chat" onGo={() => onChat()}>
           Open chat
         </GoLink>
       </div>
-      <div className="park-home-history">
-        <span className="park-home-history__face" aria-hidden="true">
-          <span className="park-home-history__visor">
-            <span />
-            <span />
+      {chats.slice(0, 3).map((chat) => (
+        <GoLink
+          key={chat.id}
+          href={`/chat?id=${encodeURIComponent(chat.id)}`}
+          onGo={() => onChat(chat.id)}
+        >
+          {chat.title}
+        </GoLink>
+      ))}
+      {chats.length === 0 ? (
+        <div className="park-home-history">
+          <span className="park-home-history__face" aria-hidden="true">
+            <span className="park-home-history__visor">
+              <span />
+              <span />
+            </span>
           </span>
-        </span>
-        <span className="park-home-history__text">
-          <span className="park-home-history__title">No saved chats yet</span>
-          <span className="park-home-history__line">
-            Quick answers are not kept after you leave, so there is nothing to list here. Ask one
-            above or on the Chat page.
+          <span className="park-home-history__text">
+            <span className="park-home-history__title">No saved chats yet</span>
+            <span className="park-home-history__line">
+              Ask a question on the Chat page to start a saved conversation.
+            </span>
           </span>
-        </span>
+        </div>
+      ) : null}
+      <div className="park-home-history-links">
+        <GoLink href="/worlds" onGo={onWorlds}>
+          Routines
+        </GoLink>
+        <GoLink href="/worlds" onGo={onWorlds}>
+          Workspaces
+        </GoLink>
       </div>
     </section>
   );
