@@ -44,6 +44,9 @@ import { useAgenda, useAgendaUi } from "./useAgenda";
 import "./Agenda.css";
 import "./Agenda.studio.css";
 
+// A plate row opens its meeting through the ref the API recorded; this names that ref kind once.
+const MEETING_REF = "meeting";
+
 export interface AgendaPageProps {
   app: AppCtx;
 }
@@ -268,7 +271,7 @@ function Plate({ A, api, app }: { A: LiveAgenda; api: Api; app: AppCtx }) {
       return;
     }
     setSelected(row);
-    if (row.ref.kind === "meeting") {
+    if (row.ref.kind === MEETING_REF) {
       document.getElementById("agenda-meetings")?.focus();
     }
   };
