@@ -188,7 +188,9 @@ class HostRun(Run):
             {CONNECTOR_ID: self.stub}, seams.outbox_store, seams.writer, {}, seams.artifacts, seams.redactor,
             seams.open_archive, seams.team,
         )  # fmt: skip
-        super().__init__(seams.store, task, {}, _CAP, run_seams)
+        super().__init__(
+            seams.store, task, _plan()["approaches"][0], _CAP, run_seams
+        )  # world.planned reads its credits
         self.unit: dict[str, Any] = {}
         self.worker = ""
 
