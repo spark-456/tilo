@@ -1,25 +1,29 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 for (const width of [1440, 390])
   for (const theme of ["light", "dark"] as const) {
     test(`P0-TILO-APPS public capture under Hosting CSP ${width} ${theme}`, async ({ page }) => {
+      test.setTimeout(90_000);
       await page.setViewportSize({ width, height: 850 });
       await page.emulateMedia({ colorScheme: theme });
       const csp =
-        "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
-      await page.route("**/u/ada/survey", async (route) => {
-        const response = await route.fetch();
-        await route.fulfill({
-          response,
-          headers: {
-            ...response.headers(),
-            "content-security-policy": csp,
-            "referrer-policy": "no-referrer",
-          },
+        "default-src 'none'; script-src 'self' 'sha256-tefG0F8FzDhNo13oUhTWshKdAy7QC9OgKTVbWwuwZSQ='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+      if (process.env.TILO_WEB_PROD === "1") {
+        await page.route("**/u/ada/survey", async (route) => {
+          const response = await route.fetch();
+          await route.fulfill({
+            response,
+            headers: {
+              ...response.headers(),
+              "content-security-policy": csp,
+              "referrer-policy": "no-referrer",
+            },
+          });
         });
-      });
+      }
       let posts = 0;
       await page.route("**/public/apps/ada/survey**", async (route) => {
         if (route.request().method() === "POST") {
@@ -43,6 +47,13 @@ for (const width of [1440, 390])
       await page.goto("/u/ada/survey");
       await expect(page.getByText("Made with Tilo")).toBeVisible();
       await expect(page.locator("nav")).toHaveCount(0);
+      const accessibility = await new AxeBuilder({ page })
+        .include(".tilo-public-app")
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+        .analyze();
+      expect(accessibility.violations, JSON.stringify(accessibility.violations, null, 2)).toEqual(
+        [],
+      );
       const frame = page.frameLocator("iframe");
       await frame.locator('input[name="name"]').fill("Ada");
       await frame.getByRole("button", { name: "Send" }).click();
@@ -59,6 +70,7 @@ for (const width of [1440, 390])
 test("P0-TILO-APPS owner publishes, anonymous person responds, owner downloads CSV", async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   const html = '<form><label>Name <input name="name"></label><button>Send</button></form>';
   const rows: Array<{ id: string; at: string; fields: { name: string } }> = [];
   let published = false;

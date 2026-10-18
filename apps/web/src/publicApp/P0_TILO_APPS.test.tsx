@@ -21,7 +21,7 @@ it("P0-TILO-APPS serves a signed-out sandbox viewer without Tilo navigation", as
   await act(async () => Promise.resolve());
   const frame = view.container.querySelector("iframe");
   expect(frame?.getAttribute("sandbox")).toBe("allow-scripts allow-forms");
-  expect(frame?.srcdoc).toContain("/app-capture.js");
+  expect(frame?.srcdoc).toContain("tilo-form-submit");
   expect(view.container.querySelector("nav")).toBeNull();
   expect(view.container.textContent).not.toContain("Thank you");
   expect(fetch).toHaveBeenCalledWith(
