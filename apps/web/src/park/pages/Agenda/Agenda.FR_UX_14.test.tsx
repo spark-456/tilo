@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
+import { act } from "react";
 import { afterEach, expect, it } from "vitest";
-import { cleanup, renderAgenda } from "../../../../test-support/park/agendaHarness";
+import { cleanup, renderAgenda, settle } from "../../../../test-support/park/agendaHarness";
 import { createLiveApi } from "../../api/liveApi";
 import { ORGANISATION_SETUP } from "../../api/organisationSetup";
 
@@ -52,7 +53,7 @@ it("CX_PAGES_ENRICH_AGENDA_live_agenda_keeps_empty_structures_visible", async ()
   expect(container.querySelectorAll(".cx-agenda-day")).toHaveLength(7);
   for (const label of ["Event details", "Available times", "Boards"])
     expect(container.querySelector(`[aria-label="${label}"]`)).not.toBeNull();
-  expect(container.querySelectorAll("[data-week-slot]")).toHaveLength(336);
+  expect(container.querySelectorAll("[data-week-slot]")).toHaveLength(392);
   expect(container.textContent).not.toContain("Not available yet");
   expect(container.textContent).not.toContain("2026-10-10");
   expect(container.textContent).not.toContain("synced just now");
@@ -63,9 +64,9 @@ it("CX_PAGES_ENRICH_AGENDA_empty_calendar_keeps_grid_and_new_action", async () =
   expect(container.querySelector('[aria-label="Week calendar"]')).not.toBeNull();
   expect(container.querySelector('[aria-label="Week time slots"]')).not.toBeNull();
   expect(container.textContent).toContain("+ New");
-  const today = container.querySelector('[aria-label="Today\'s calendar"]');
-  expect(today?.querySelector("h2")?.textContent).toBe("Today's calendar");
-  expect(today?.querySelector("a")?.textContent).toBe("Check Google Calendar");
+  const mini = container.querySelector('[aria-label="Mini month"]');
+  expect(mini?.querySelectorAll("button").length).toBe(42);
+  expect(mini?.querySelector("a")?.textContent).toBe("Google Calendar connection");
 });
 it("FR_UX_14 a failed plate read shows the existing error instead of sample pins", async () => {
   const { container } = await mount({}, 503);
@@ -86,11 +87,12 @@ it("FR_PB calendar summaries and parked work retain supplied facts and truncatio
     ],
     parked: [{ ...body.rows[0], ref: { kind: "work_item", id: "work-a" }, title: null }],
   });
-  const calendar = container.querySelector('[aria-label="Today\'s calendar"]');
-  expect(calendar?.querySelector("h2")?.textContent).toBe("Today's calendar");
-  expect(calendar?.textContent).toContain("Design review");
-  expect(calendar?.querySelector("a")?.textContent).toBe("Check Google Calendar");
-  expect(calendar?.querySelector('time[datetime="2026-10-09T05:00:00Z"]')).not.toBeNull();
+  const month = container.querySelector<HTMLButtonElement>(".cx-agenda-views button:nth-child(3)");
+  act(() => month?.click());
+  await settle();
+  expect(container.querySelector('[aria-label="Month calendar"]')?.textContent).toContain(
+    "Design review",
+  );
   expect(container.querySelector('[aria-label="Parked work"]')?.textContent).toContain(
     "Untitled item",
   );

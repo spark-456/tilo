@@ -11,12 +11,16 @@ import { MeetingAttend } from "./MeetingHost";
 import { MeetingMinutes } from "./MeetingMinutes";
 import { CALENDAR_ENTRY_KIND } from "./model";
 
-const START_HOUR = 8;
-const END_HOUR = 20;
+const START_HOUR = 7;
+const END_HOUR = 21;
 const SLOTS_PER_DAY = (END_HOUR - START_HOUR) * 4;
 const SLOT_HEIGHT = 14;
 const localDate = (date: Date): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const civilDate = (value: string): Date => {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+};
 const human = (value: string): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -68,6 +72,8 @@ export function LiveWeek({
   onDeleted?: () => void;
 }) {
   const [start, setStart] = useState(() => monday(new Date()));
+  const [view, setView] = useState<"Day" | "Week" | "Month">("Week");
+  const [selectedDay, setSelectedDay] = useState(() => localDate(new Date()));
   const days = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(start);
     date.setDate(start.getDate() + index);
@@ -93,7 +99,6 @@ export function LiveWeek({
       })),
   ];
   const todayKey = today?.slice(0, 10) ?? localDate(new Date());
-  const todayEntries = entries.filter((entry) => localDate(new Date(entry.start)) === todayKey);
   const [selected, setSelected] = useState<Entry | null>(null);
   const [briefRequested, setBriefRequested] = useState(false);
   const [attendeeNames, setAttendeeNames] = useState<string[] | null>(null);
@@ -106,6 +111,26 @@ export function LiveWeek({
   const [hostConnection, setHostConnection] = useState<HostState | null>(null);
   const [actionError, setActionError] = useState("");
   const [busy, setBusy] = useState(false);
+  const monthFirst = new Date(start.getFullYear(), start.getMonth(), 1);
+  const monthGridStart = monday(monthFirst);
+  const monthDays = Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(monthGridStart);
+    day.setDate(monthGridStart.getDate() + index);
+    return day;
+  });
+  const chooseDay = (day: Date) => {
+    setSelectedDay(localDate(day));
+    setStart(monday(day));
+    setView("Day");
+  };
+  const navigate = (direction: number) => {
+    const anchor = view === "Day" ? civilDate(selectedDay) : start;
+    const next = new Date(anchor);
+    if (view === "Month") next.setMonth(next.getMonth() + direction);
+    else next.setDate(next.getDate() + direction * (view === "Week" ? 7 : 1));
+    setSelectedDay(localDate(next));
+    setStart(monday(next));
+  };
   useEffect(() => {
     if (!slotPick) return;
     let live = true;
@@ -212,50 +237,58 @@ export function LiveWeek({
 
   return (
     <section className="cx-agenda-liveweek" aria-label="Week calendar">
-      <section className="cx-agenda-today" aria-label="Today's calendar">
-        <h2>Today's calendar</h2>
-        {todayEntries.length ? (
-          <ul>
-            {todayEntries.map((entry) => (
-              <li key={entry.key}>
-                <strong>{entry.title}</strong>
-                <time dateTime={entry.start}>{human(entry.start)}</time>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No events today.</p>
-        )}
-        <AppLink to="/connectors">Check Google Calendar</AppLink>
-      </section>
+      <aside className="cx-agenda-sidebar" aria-label="Mini month">
+        <strong>
+          {new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(start)}
+        </strong>
+        <div className="cx-agenda-mini">
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+            <span aria-hidden="true" key={day}>
+              {day.slice(0, 1)}
+            </span>
+          ))}
+          {monthDays.map((day) => (
+            <button
+              key={localDate(day)}
+              type="button"
+              className={localDate(day) === todayKey ? "is-today" : ""}
+              aria-label={`Show ${new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(day)}`}
+              onClick={() => chooseDay(day)}
+            >
+              {day.getDate()}
+            </button>
+          ))}
+        </div>
+        <AppLink to="/connectors">Google Calendar connection</AppLink>
+      </aside>
       <div className="cx-agenda-weektitle">
         <div>
           <h2>
-            Week of{" "}
-            {new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(start)}
+            {view === "Week" ? "Week of " : ""}
+            {new Intl.DateTimeFormat(
+              undefined,
+              view === "Month"
+                ? { month: "long", year: "numeric" }
+                : { day: "numeric", month: "short", year: "numeric" },
+            ).format(view === "Day" ? civilDate(selectedDay) : start)}
           </h2>
           <p>Choose an open time or drag across 15-minute slots to schedule.</p>
         </div>
         <div className="cx-agenda-weekactions">
-          <button
-            type="button"
-            aria-label="Previous week"
-            onClick={() =>
-              setStart((day) => new Date(day.getFullYear(), day.getMonth(), day.getDate() - 7))
-            }
-          >
+          <button type="button" aria-label="Previous week" onClick={() => navigate(-1)}>
             ‹
           </button>
-          <button type="button" aria-label="Today" onClick={() => setStart(monday(new Date()))}>
-            Today
-          </button>
           <button
             type="button"
-            aria-label="Next week"
-            onClick={() =>
-              setStart((day) => new Date(day.getFullYear(), day.getMonth(), day.getDate() + 7))
-            }
+            aria-label="Today"
+            onClick={() => {
+              setStart(monday(new Date()));
+              setSelectedDay(localDate(new Date()));
+            }}
           >
+            Today
+          </button>
+          <button type="button" aria-label="Next week" onClick={() => navigate(1)}>
             ›
           </button>
           <button
@@ -268,16 +301,63 @@ export function LiveWeek({
           >
             + New
           </button>
+          <fieldset className="cx-agenda-views" aria-label="Calendar view">
+            {(["Day", "Week", "Month"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={view === mode}
+                onClick={() => setView(mode)}
+              >
+                {mode}
+              </button>
+            ))}
+          </fieldset>
         </div>
       </div>
-      <section className="cx-agenda-scroll" aria-label="Week time slots">
+      <div className="cx-agenda-month" aria-label="Month calendar" hidden={view !== "Month"}>
+        {monthDays.map((day) => {
+          const key = localDate(day);
+          return (
+            <div className="cx-agenda-monthday" key={key}>
+              <button type="button" onClick={() => chooseDay(day)} aria-label={`Show ${key}`}>
+                {day.getDate()}
+              </button>
+              {entries
+                .filter((entry) => localDate(new Date(entry.start)) === key)
+                .map((entry) => (
+                  <button
+                    key={entry.key}
+                    type="button"
+                    className="cx-agenda-monthchip"
+                    onClick={() => {
+                      setSelected(entry);
+                      setBriefRequested(false);
+                    }}
+                  >
+                    {entry.title}
+                  </button>
+                ))}
+            </div>
+          );
+        })}
+      </div>
+      <section
+        className="cx-agenda-scroll"
+        aria-label="Week time slots"
+        data-view={view.toLowerCase()}
+        hidden={view === "Month"}
+      >
         <div className="cx-agenda-headrow">
           <span aria-hidden="true" />
           {days.map((day) => {
             const dayKey = localDate(day);
             const due = parked.filter((row) => row.due?.slice(0, 10) === dayKey && row.title);
             return (
-              <div key={dayKey} className={dayKey === localDate(new Date()) ? "is-today" : ""}>
+              <div
+                key={dayKey}
+                className={`${dayKey === localDate(new Date()) ? "is-today" : ""} ${dayKey === selectedDay ? "is-selected" : ""}`}
+              >
                 {labelDate(day)}
                 {due.map((row) => (
                   <span className="cx-agenda-due" key={`${row.ref.kind}:${row.ref.id}`}>
@@ -290,10 +370,13 @@ export function LiveWeek({
         </div>
         <div className="cx-agenda-grid">
           <div className="cx-agenda-hours">
-            {Array.from({ length: END_HOUR - START_HOUR }, (_, hour) => {
+            {Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, hour) => {
               const label = `${String(START_HOUR + hour).padStart(2, "0")}:00`;
               return (
-                <div key={label} style={{ height: SLOT_HEIGHT * 4 }}>
+                <div
+                  key={label}
+                  style={{ height: hour === END_HOUR - START_HOUR ? 24 : SLOT_HEIGHT * 4 }}
+                >
                   {label}
                 </div>
               );
@@ -307,7 +390,7 @@ export function LiveWeek({
             return (
               <div
                 key={dayKey}
-                className={`cx-agenda-day ${dayKey === localDate(new Date()) ? "is-today" : ""}`}
+                className={`cx-agenda-day ${dayKey === localDate(new Date()) ? "is-today" : ""} ${dayKey === selectedDay ? "is-selected" : ""}`}
                 style={{ height: SLOT_HEIGHT * SLOTS_PER_DAY }}
               >
                 {Array.from({ length: SLOTS_PER_DAY }, (_, slot) => {
@@ -352,7 +435,7 @@ export function LiveWeek({
                     />
                   );
                 })}
-                {events.map((entry) => {
+                {events.map((entry, index) => {
                   const date = new Date(entry.start);
                   const offset = (date.getHours() * 60 + date.getMinutes() - START_HOUR * 60) / 15;
                   if (offset < 0 || offset >= SLOTS_PER_DAY) return null;
@@ -367,6 +450,7 @@ export function LiveWeek({
                       key={entry.key}
                       type="button"
                       className={`cx-agenda-event${entry.meeting ? "" : " is-calendar-entry"}`}
+                      data-event-tone={index % 4}
                       style={{ top: offset * SLOT_HEIGHT, height }}
                       onClick={() => {
                         setSelected(entry);
@@ -440,6 +524,7 @@ export function LiveWeek({
                 nowMinutes < (END_HOUR - START_HOUR) * 60 ? (
                   <span
                     className="cx-agenda-nowline"
+                    role="img"
                     aria-label="Current time"
                     style={{ top: (nowMinutes / 15) * SLOT_HEIGHT }}
                   />

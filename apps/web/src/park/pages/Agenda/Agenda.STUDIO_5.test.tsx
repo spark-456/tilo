@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 // UI-STUDIO-5 Agenda (design/studio-v2 "Tilo S Agenda"): the live Agenda lays today's calendar, the plate, the
 // meetings and parked work from the live plate. Empty week structures remain visible.
+import { act } from "react";
 import { afterEach, expect, it } from "vitest";
-import { cleanup, renderAgenda } from "../../../../test-support/park/agendaHarness";
+import { cleanup, renderAgenda, settle } from "../../../../test-support/park/agendaHarness";
 import { createLiveApi } from "../../api/liveApi";
 
 afterEach(cleanup);
@@ -48,9 +49,15 @@ it("STUDIO_5 agenda live: today and the recorded plate", async () => {
   expect(container.textContent).toContain(
     "Tilo prepares a brief before each meeting and takes notes in the ones you invite it to.",
   );
-  expect(container.querySelector('[aria-label="Today\'s calendar"]')?.textContent).toContain(
-    "Supplier call",
+  // P0-AGENDA-REDO replaces the old Today list with a navigable month grid.
+  act(() =>
+    container.querySelector<HTMLButtonElement>(".cx-agenda-views button:nth-child(3)")?.click(),
   );
+  await settle();
+  const month = container.querySelector<HTMLElement>('[aria-label="Month calendar"]');
+  expect(month?.hidden).toBe(false);
+  expect(container.querySelector<HTMLElement>('[aria-label="Week time slots"]')?.hidden).toBe(true);
+  expect(month?.textContent).toContain("Supplier call");
   const main = container.querySelector(".park-agenda-studiomain");
   expect(main?.querySelector('[aria-label="Your plate"]')?.textContent).toContain("Send the quote");
   expect(container.querySelector('[aria-label="Week calendar"]')).not.toBeNull();

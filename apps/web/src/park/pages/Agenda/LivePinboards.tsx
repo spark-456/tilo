@@ -3,6 +3,22 @@ import type { PeopleList, PeopleRow } from "../../api/live/peopleLists";
 
 type LoadState = "loading" | "failed" | "unavailable" | PeopleList;
 type CreatePin = (title: string, teamId: string | null, idempotencyKey: string) => Promise<void>;
+type DevicePin = { id: string; title: string };
+const deviceKey = (personId: string, scope: string) => `tilo.agenda.pins.${personId}.${scope}`;
+const readDevicePins = (key: string | null): DevicePin[] => {
+  if (!key) return [];
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(key) ?? "[]");
+    return Array.isArray(value)
+      ? value.filter(
+          (pin): pin is DevicePin =>
+            !!pin && !(typeof pin.id !== "string" || typeof pin.title !== "string"),
+        )
+      : [];
+  } catch {
+    return [];
+  }
+};
 
 function PinCard({ pin, tone }: { pin: PeopleRow; tone: number }) {
   return (
@@ -22,6 +38,7 @@ function Board({
   rows,
   state,
   teamId,
+  personId,
   createPin,
   onPinCreated,
 }: {
@@ -29,6 +46,7 @@ function Board({
   rows: readonly PeopleRow[];
   state: LoadState;
   teamId: string | null;
+  personId?: string | null;
   createPin: CreatePin | null;
   onPinCreated: () => void;
 }) {
@@ -36,9 +54,24 @@ function Board({
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [devicePins, setDevicePins] = useState<DevicePin[]>([]);
   const idempotencyKey = useRef<string | null>(null);
   const personal = title === "My board";
   const targetTeam = personal ? null : teamId;
+  const storageKey = personId ? deviceKey(personId, targetTeam ?? "personal") : null;
+  useEffect(() => {
+    setDevicePins(readDevicePins(storageKey));
+  }, [storageKey]);
+  const keepDevicePins = (pins: DevicePin[]) => {
+    setDevicePins(pins);
+    if (storageKey) {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(pins));
+      } catch {
+        /* storage may be disabled */
+      }
+    }
+  };
   const canAdd = createPin !== null && (personal || teamId !== null) && state !== "unavailable";
   const hintId = personal ? "agenda-my-pin-hint" : "agenda-team-pin-hint";
 
@@ -46,18 +79,22 @@ function Board({
     event.preventDefault();
     const titleText = draft.trim();
     if (!titleText || !createPin || !canAdd || busy) return;
-    idempotencyKey.current ??= crypto.randomUUID();
+    const pinKey = idempotencyKey.current ?? crypto.randomUUID();
+    idempotencyKey.current = pinKey;
     setBusy(true);
     setMessage("");
     try {
-      await createPin(titleText, targetTeam, idempotencyKey.current);
+      await createPin(titleText, targetTeam, pinKey);
       idempotencyKey.current = null;
       setDraft("");
       setAdding(false);
       setMessage("Pin saved");
       onPinCreated();
     } catch {
-      setMessage("Could not confirm the pin was saved. Check this board before trying again.");
+      keepDevicePins([...devicePins, { id: pinKey, title: titleText }]);
+      setDraft("");
+      setAdding(false);
+      setMessage("Saved on this device · couldn't sync to your board yet");
     } finally {
       setBusy(false);
     }
@@ -85,11 +122,40 @@ function Board({
             Could not load pins. Try again in a moment.
           </p>
         ) : null}
-        {typeof state === "object" && rows.length === 0 ? (
+        {typeof state === "object" && rows.length === 0 && devicePins.length === 0 ? (
           <p className="park-agenda-liveboard__empty">Nothing pinned here yet.</p>
         ) : null}
         {rows.map((pin, index) => (
           <PinCard key={pin.id} pin={pin} tone={index % 4} />
+        ))}
+        {devicePins.map((pin, index) => (
+          <article
+            className="park-agenda-livepin"
+            data-pin-tone={(rows.length + index) % 4}
+            key={pin.id}
+          >
+            <span className="park-agenda-livepin__tack" aria-hidden="true" />
+            <strong>{pin.title}</strong>
+            <span className="park-agenda-livepin__scope">Saved on this device</span>
+            <button
+              type="button"
+              disabled={busy || !createPin}
+              onClick={() => {
+                if (!createPin) return;
+                setBusy(true);
+                void createPin(pin.title, targetTeam, pin.id)
+                  .then(() => {
+                    keepDevicePins(devicePins.filter((item) => item.id !== pin.id));
+                    setMessage("Pin saved");
+                    onPinCreated();
+                  })
+                  .catch(() => setMessage("Saved on this device · couldn't sync to your board yet"))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              Retry sync
+            </button>
+          </article>
         ))}
         {adding ? (
           <form className="park-agenda-liveboard__add" onSubmit={(event) => void save(event)}>
@@ -144,11 +210,13 @@ function Board({
 export function LivePinboards({
   load,
   teamIds,
+  personId,
   createPin,
   onPinCreated,
 }: {
   load: (() => Promise<{ data: PeopleList }>) | null;
   teamIds: readonly string[];
+  personId?: string | null;
   createPin: CreatePin | null;
   onPinCreated: () => void;
 }) {
@@ -196,6 +264,7 @@ export function LivePinboards({
           rows={rows.filter((pin) => pin.scope === "Personal")}
           state={state}
           teamId={null}
+          personId={personId ?? null}
           createPin={createPin}
           onPinCreated={onPinCreated}
         />
@@ -204,6 +273,7 @@ export function LivePinboards({
           rows={rows.filter((pin) => pin.scope !== "Personal")}
           state={state}
           teamId={teamIds[0] ?? null}
+          personId={personId ?? null}
           createPin={createPin}
           onPinCreated={onPinCreated}
         />
