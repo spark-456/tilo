@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 from tilo_harness.writer import WriterBusy as _WriterBusy
 from tilo_logging import configure_logging as _configure_logging
 
+from tilo_api import app_responses as _app_responses
 from tilo_api import appcheck as _appcheck
 from tilo_api import byok_routes as _byok_routes
 from tilo_api import connect_routes as _connect_routes
@@ -143,6 +144,7 @@ def _world_views(store: Annotated[_deps.Store, Depends(_deps.get_store)]) -> Cal
 
 app.include_router(_access_router)
 app.include_router(_preview.router)  # WEB-2: the fixed website preview shell (public, WS-10)
+app.include_router(_app_responses.router)
 app.include_router(_sample_router)  # STARTER-1: ahead of the owner-scoped /worlds/{id} routes
 app.include_router(intake_router)
 app.include_router(_dispatch_router)
