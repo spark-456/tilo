@@ -1,19 +1,18 @@
 """FT-SUP-2: approaches latency.
-When intake creates a task with no clarifying questions, approaches prefetch is queued
-immediately so GET /tasks/{task_id}/approaches returns without waiting for prefetch scheduling.
+Intake returns without approaches work; the explicit GET requests it. This preserves
+the web's visible progress while keeping each API request's effects inside that request.
 """
 
 from __future__ import annotations
 
 
-def test_FT_SUP_2_create_task_prefetches_approaches_when_no_questions(clear_flow):
+def test_LIVE25_FIX2_intake_does_not_prefetch_approaches_when_no_questions(clear_flow):
     intake = clear_flow.new_task()
     task_id = intake["task_id"]
 
     task = clear_flow.store.tasks[task_id]
     assert task.questions == []
-    # Prefetch was queued during intake (FT-SUP-2)
-    assert task.approaches_work.get("future") is not None
+    assert task.approaches_work == {}
 
     response = clear_flow.approaches(task_id)
     assert response.status_code == 200, response.text
