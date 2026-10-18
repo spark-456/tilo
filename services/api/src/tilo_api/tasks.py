@@ -593,7 +593,7 @@ def _loud() -> bool:
 def _run_started(store: deps.Store, task: deps.TaskRecord) -> bool:
     store.settle(task.world_id)
     current = store.runs.get(task.world_id)
-    return (current is not None and getattr(current, "run_id", None) == task.run_id) or any(
+    return (current is not None and getattr(current, "run_id", task.run_id) == task.run_id) or any(
         e["type"] == "world.started" and e.get("run_id") == task.run_id for e in store.events.get(task.world_id, [])
     )
 
