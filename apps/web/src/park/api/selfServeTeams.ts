@@ -49,7 +49,7 @@ const path = (team: string) => `/v1/teams/${encodeURIComponent(team)}`;
 export interface TeamsClient {
   mine(): Promise<{ teams: MyTeam[]; you: string | null }>;
   roster(team: string): Promise<RosterMember[]>;
-  create(): Promise<void>;
+  create(name: string): Promise<void>;
   invite(team: string, email: string): Promise<void>;
   accept(team: string): Promise<void>;
   leave(team: string, me: string): Promise<void>;
@@ -75,8 +75,8 @@ export function teamsClient(): TeamsClient | null {
           : [],
       );
     },
-    create: async () => {
-      await t.postJson("/v1/teams", {});
+    create: async (name) => {
+      await t.postJson("/v1/teams", { name });
     },
     invite: async (team, email) => {
       await t.postJson(`${path(team)}/invites`, { email });

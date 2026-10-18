@@ -60,6 +60,20 @@ class InviteIn(_Closed):
         return value
 
 
+class CreateTeamIn(_Closed):
+    name: Annotated[str | None, Field(default=None, max_length=80)] = None
+
+    @field_validator("name")
+    @classmethod
+    def _name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("name")
+        return trimmed
+
+
 def _forbidden() -> Refusal:
     return Refusal(403, "forbidden")
 
@@ -186,14 +200,15 @@ def _after_the_team(d: Directory, team: str, now: str) -> str:
 
 @router.post("/v1/teams", status_code=201)
 def create_team(
-    _: Annotated[Empty, Depends(json_body(Empty))],
+    body: Annotated[CreateTeamIn, Depends(json_body(CreateTeamIn))],
     principal: Principal,
     stores: Stores,
     clock: Clock,
     settings: TeamSettings,
 ) -> dict[str, Any]:
     """Any person of the org creates a team: the id is minted here (96 random bits), the creator's founding entry is
-    `{team, lead: true, assigned_by: creator at now}` (PE-37). The body is `{}`: nothing in it names a team."""
+    `{team, lead: true, assigned_by: creator at now}` (PE-37). The optional name is kept in the service-owned team
+    settings document; older clients that send `{}` receive the lead-based default."""
     _session(principal)
     now, team = clock(), "tm_" + secrets.token_hex(12)
     stamp = {"by": principal.user_id, "at": now}
@@ -205,7 +220,7 @@ def create_team(
     if not _change(stores, lambda d: asked, add):
         raise _forbidden()
     d, _ = _snapshot(stores)
-    name = _default_name(d, team, now)
+    name = body.name or _default_name(d, team, now)
     for _ in range(_ATTEMPTS):
         state = settings.read()
         if settings.compare_and_set(state.version, replace(state, names={**state.names, team: name})):

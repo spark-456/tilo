@@ -159,6 +159,20 @@ def test_R_TEAM_names_are_returned_instead_of_exposing_a_team_id(people_rig, mon
     assert _roster(rig, "u_mia", team).json()["name"] == "Mia's team"
 
 
+def test_R_TEAM_create_team_accepts_and_returns_a_person_chosen_name(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    for uid in (FOUNDER, "u_mia"):
+        assert _join(rig, uid).status_code == 201
+    _tick(rig, 1)
+    rig.as_user("u_mia")
+    made = rig.post("/v1/teams", {"name": "  Launch crew  "})
+    assert made.status_code == 201, made.text[:300]
+    assert made.json()["name"] == "Launch crew"
+    mine = rig.client.get("/v1/teams").json()["teams"]
+    assert mine[0]["name"] == "Launch crew"
+    assert _roster(rig, "u_mia", made.json()["team"]).json()["name"] == "Launch crew"
+
+
 def test_SELF_SERVE_TEAMS_a_lead_invites_the_invitee_accepts_and_reads_the_roster(people_rig, monkeypatch):
     rig = _rig(people_rig, monkeypatch)
     team = _three(rig)
