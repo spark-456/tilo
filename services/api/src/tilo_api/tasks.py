@@ -731,6 +731,23 @@ def _again_ids(world_id: str) -> tuple[str, str, str]:
     return found[0], found[1], found[2]
 
 
+def _continued_brief(brief: dict[str, Any], stream: list[dict[str, Any]]) -> dict[str, Any]:
+    """Carry bounded, recorded work into a new run without changing the paused run or the brief schema."""
+    carried = copy.deepcopy(brief)
+    constraints = list(carried.get("constraints") or [])
+    room = max(0, 20 - len(constraints))
+    summaries = [
+        e.get("summary")
+        for e in stream
+        if e.get("type") in {"unit.completed", "artifact.delivered"} and isinstance(e.get("summary"), str)
+    ]
+    constraints.extend(
+        f"Earlier run completed: {line[:275]}" for line in (summaries[-room:] if room else []) if line.strip()
+    )
+    carried["constraints"] = constraints
+    return carried
+
+
 _SHARED = "world.share_changed"
 
 
@@ -757,7 +774,8 @@ def rerun(
 
     # The latest world state; a share change is not one, so sharing a stopped world does not hide its stop.
     last = next((e for e in reversed(stream) if e["type"].startswith("world.") and e["type"] != _SHARED), None)
-    if last is None or last["type"] != "world.failed":
+    paused = last is not None and last["type"] == "world.paused" and world.paused
+    if last is None or (last["type"] != "world.failed" and not paused):
         raise HTTPException(status_code=409, detail="Only a run that stopped can be started again.")
     old = store.load_world_task(world_id)
     planned = next((e for e in reversed(stream) if e["type"] == "world.planned"), None)
@@ -787,7 +805,8 @@ def rerun(
         raise HTTPException(status_code=422, detail=f"One run may use at most {ceiling:g} credits.")
     if again is None:
         fresh = deps.TaskRecord(
-            old.owner, new_world, new_run, copy.deepcopy(old.draft), copy.deepcopy(old.brief), list(old.questions), 1,
+            old.owner, new_world, new_run, copy.deepcopy(old.draft),
+            _continued_brief(old.brief, stream) if paused else copy.deepcopy(old.brief), list(old.questions), 1,
             answers=dict(old.answers), edits=copy.deepcopy(old.edits), approaches=copy.deepcopy(old.approaches),
             granted=False, scenario=old.scenario, gaps=old.gaps,
         )  # fmt: skip

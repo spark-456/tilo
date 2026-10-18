@@ -28,7 +28,7 @@ const refused = (error: unknown): boolean => {
 
 /** The one honest action for any stopped run (RERUN-1, RERUN-ANY): it always asks `/rerun` first; only a server
  * refusal points to a new task, and any other failure says so and leaves the button for another try. */
-function StartItAgain({ again, events }: { again: StartAgain; events: readonly RunEvent[] }) {
+function StartItAgain({ again, events, paused = false }: { again: StartAgain; events: readonly RunEvent[]; paused?: boolean }) {
   const { cap, sent } = restartApproval(events);
   const restart = isRestartStop(events);
   const [state, setState] = useState<"idle" | "busy" | "error" | "refused">("idle");
@@ -47,13 +47,13 @@ function StartItAgain({ again, events }: { again: StartAgain; events: readonly R
       ) : null}
       <p className="park-world-noruns">
         {sent > 0
-          ? `The stopped run already sent things outside Tilo (${sent} recorded outbound ${sent === 1 ? "action" : "actions"}). Starting again may send them again.`
-          : "No outbound sends are recorded for the stopped run. This does not confirm that nothing was sent."}
+          ? `The ${paused ? "paused" : "stopped"} run already sent things outside Tilo (${sent} recorded outbound ${sent === 1 ? "action" : "actions"}). Starting again may send them again.`
+          : `No outbound sends are recorded for the ${paused ? "paused" : "stopped"} run. This does not confirm that nothing was sent.`}
       </p>
       <p className="park-world-noruns">
         {cap === null
           ? "The spending cap is not available in the recorded events. Starting again is unavailable."
-          : `Starting again approves a new run with a spending cap of ${cap} credits, in addition to any credits already used by the stopped run.`}
+          : `Starting again approves a new run with a spending cap of ${cap} credits, in addition to any credits already used by the ${paused ? "paused" : "stopped"} run.`}
       </p>
       <Button
         variant="primary"
@@ -61,7 +61,7 @@ function StartItAgain({ again, events }: { again: StartAgain; events: readonly R
         disabled={cap === null || state === "busy"}
         aria-busy={state === "busy"}
       >
-        {state === "busy" ? "Starting…" : "Start it again"}
+        {state === "busy" ? "Starting…" : paused ? "Continue" : "Start it again"}
       </Button>
       {state === "error" ? (
         <p className="park-world-noruns" role="alert">
@@ -276,6 +276,13 @@ export function RunStatus({
           <h2 className="park-world-h2">This run stopped</h2>
           <p className="park-world-failreason">{`Why: ${view.failure.reason}`}</p>
           {again ? <StartItAgain again={again} events={events} /> : null}
+        </div>
+      ) : null}
+      {view.phase === "paused" && again ? (
+        <div className="park-world-failed" data-testid="run-paused">
+          <h2 className="park-world-h2">This run is paused</h2>
+          <p className="park-world-noruns">Continue starts a new run using this task and its recorded progress.</p>
+          <StartItAgain again={again} events={events} paused />
         </div>
       ) : null}
     </section>

@@ -38,6 +38,10 @@ def _approved(flow: Flow, *, end: str | None = "world.failed") -> dict[str, Any]
     stream.append(_event(world_id, n + 2, "world.started", {}))
     if end == "world.failed":
         stream.append(_event(world_id, n + 3, "world.failed", {"reason": REASON, "unit": None}))
+    elif end == "world.paused":
+        stream.append({**_event(world_id, n + 3, "unit.completed", {}), "summary": "The first source was checked."})
+        stream.append(_event(world_id, n + 4, "world.paused", {"reason": "pause_all"}))
+        flow.store.worlds[world_id].paused = True
     elif end == "world.completed":
         stream.append(_event(world_id, n + 3, "world.completed", {"credits_used": 1, "deliverable_count": 1}))
     return {**intake, "approach": approach}
@@ -79,6 +83,22 @@ def test_RERUN_1_pressing_twice_is_one_new_world(flow):
     assert first.status_code == second.status_code == 200
     assert first.json() == second.json()
     assert len(flow.events(first.json()["world_id"], "budget.granted")) == 1
+
+
+def test_R_RUN_paused_world_continues_in_a_new_run_with_recorded_context(flow, monkeypatch):
+    from tilo_api import runs
+
+    started = []
+    monkeypatch.setattr(runs, "start_run", lambda _store, task, **_kw: started.append(task.world_id))
+    flow.app.dependency_overrides[runs.run_seams] = lambda: object()
+    old = _approved(flow, end="world.paused")
+    response = flow.client.post(f"/worlds/{old['world_id']}/rerun")
+    assert response.status_code == 200, response.text
+    new = flow.store.tasks[response.json()["task_id"]]
+    assert new.world_id != old["world_id"] and started[-1] == new.world_id
+    assert new.brief["goal"] == flow.store.tasks[old["task_id"]].brief["goal"]
+    assert any("The first source was checked." in line for line in new.brief["constraints"])
+    assert flow.store.worlds[old["world_id"]].paused is True
 
 
 def test_RERUN_1_another_user_gets_the_unknown_world_404(flow):

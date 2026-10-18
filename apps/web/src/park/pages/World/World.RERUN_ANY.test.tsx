@@ -35,13 +35,13 @@ const UNIT_FAILED = [
   ev(3, "world.failed", { reason: "a unit failed, so the work stopped", unit: "U1" }),
 ];
 
-function clientWith(startAgain: HttpClient["startAgain"]): HttpClient {
+function clientWith(startAgain: HttpClient["startAgain"], events = UNIT_FAILED): HttpClient {
   const client = new HttpClient({
     baseUrl: "http://localhost:0",
     fetch: async () => new Response("{}", { status: 404 }),
   });
   client.subscribeEvents = (_world, onEvent) => {
-    for (const e of UNIT_FAILED) onEvent(e as unknown as Parameters<typeof onEvent>[0]);
+    for (const e of events) onEvent(e as unknown as Parameters<typeof onEvent>[0]);
     return () => undefined;
   };
   client.startAgain = startAgain;
@@ -49,6 +49,26 @@ function clientWith(startAgain: HttpClient["startAgain"]): HttpClient {
 }
 
 describe("RERUN_ANY Start it again for any stopped run", () => {
+  it("test_R_RUN_pause_calls_the_api_before_showing_paused", async () => {
+    const client = clientWith(vi.fn(async () => ({ world_id: "w_new", task_id: "t_new" })), [
+      ev(1, "budget.granted", { cap: 40 }), ev(2, "world.started"),
+    ]);
+    const pause = vi.fn(async () => undefined);
+    client.pauseWorld = pause;
+    const rig = await mountWorld({ id: "hires", api: liveWorldsApi(), client });
+    click(control(rig.el, "Pause"));
+    await settle();
+    expect(pause).toHaveBeenCalledWith("hires");
+  });
+  it("test_R_RUN_paused_world_offers_continue_into_new_run", async () => {
+    const start = vi.fn(async () => ({ world_id: "w_continued", task_id: "t_continued" }));
+    const events = [ev(1, "budget.granted", { cap: 40 }), ev(2, "world.started"), ev(3, "world.paused", { reason: "pause_all" })];
+    const rig = await mountWorld({ id: "hires", api: liveWorldsApi(), client: clientWith(start, events) });
+    click(control(rig.el, "Continue"));
+    await settle();
+    expect(start).toHaveBeenCalledWith("hires");
+    expect(rig.app.go).toHaveBeenCalledWith("world", { id: "w_continued" });
+  });
   it("RERUN_ANY_a_unit_failure_calls_rerun_and_opens_the_new_world", async () => {
     const start = vi.fn(async () => ({ world_id: "w_new", task_id: "t_new" }));
     const rig = await mountWorld({ id: "hires", api: liveWorldsApi(), client: clientWith(start) });

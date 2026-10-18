@@ -645,6 +645,11 @@ class Run:
             return None
         try:
             self.layout, config = self.seams.layout_builder(plan, world_id=self.world_id), load_agents_config()
+            if not isinstance(self.layout, dict) or not isinstance(self.layout.get("semantic"), dict):
+                raise ValueError("layout has no semantic map")
+            semantic = self.layout["semantic"]
+            self.levels = {d["id"]: level["id"] for level in semantic["levels"] for d in level["districts"]}
+            self.director = next((a["id"] for a in semantic["agents"] if a["rank"] == "director"), "system")
             record = self.store.worlds.get(self.world_id)
             if record is None and hasattr(self.store, "load_world"):
                 record = self.store.load_world(self.world_id)
@@ -666,12 +671,10 @@ class Run:
                     record.layout = None
                     raise
         except Exception as caught_error:
-            log_caught(caught_error, __name__, locals())
+            logger.warning("run %s: invalid layout (%s)", self.run_id, type(caught_error).__name__)
             self._fail("the world could not be laid out", None)
             return None
-        self.plan, semantic = plan, self.layout["semantic"]
-        self.levels = {d["id"]: level["id"] for level in semantic["levels"] for d in level["districts"]}
-        self.director = next((a["id"] for a in semantic["agents"] if a["rank"] == "director"), "system")
+        self.plan = plan
         return config
 
     def _record_plan(self, cause: str | None) -> None:

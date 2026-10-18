@@ -15,6 +15,16 @@ from fastapi.testclient import TestClient
 PAUSE_BUDGET_S = 2.0  # FR-WLD-07
 
 
+def test_R_RUN_malformed_layout_finishes_with_failure_instead_of_keyerror(run_flow, caplog):
+    rf = run_flow
+    rf.build_layout = lambda _plan, *, world_id: {}
+    rf.start()
+    assert rf.approve().status_code == 200
+    wait_for(lambda: rf.events("world.failed"), what="world.failed after malformed layout")
+    assert rf.events("world.started") == []
+    assert "KeyError" not in caplog.text
+
+
 def test_FR_WLD_07_pause_all_during_the_run_stops_every_event_except_world_paused(run_flow):
     rf = run_flow
     rf.runner.block_on = "U2"  # the run is mid-flight: U1 done, U2 working
