@@ -41,6 +41,7 @@ export interface TeamView {
   tools: TeamToolRow[];
   capabilities: TeamCapability[];
   invites: TeamInviteRow[];
+  teams?: { id: string; name: string }[];
 }
 
 /** One Owner-only write. The server applies it with a compare-and-set; the page sends no version. */
@@ -79,7 +80,8 @@ export function isTeamView(v: unknown): v is TeamView {
       v.capabilities,
       (c) => isStr(c.key) && isStr(c.label) && Array.isArray(c.roles) && c.roles.every(isStr),
     ) &&
-    each(v.invites, (i) => isStr(i.id) && isStr(i.email) && isStr(i.role))
+    each(v.invites, (i) => isStr(i.id) && isStr(i.email) && isStr(i.role)) &&
+    (v.teams === undefined || each(v.teams, (t) => isStr(t.id) && isStr(t.name)))
   );
 }
 

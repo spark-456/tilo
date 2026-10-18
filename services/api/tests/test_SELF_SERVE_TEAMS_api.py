@@ -26,6 +26,10 @@ def _rig(people_rig, monkeypatch):
     rig.unwire("founder_gate")
     monkeypatch.setenv(ENV_UID, FOUNDER)
     rig.set_now(NOW)
+    from tilo_api.team_store import InMemoryTeamStore, get_team_store
+
+    team_settings = InMemoryTeamStore()
+    rig.app.dependency_overrides[get_team_store] = lambda: team_settings
     return rig
 
 
@@ -140,10 +144,33 @@ def test_SELF_SERVE_TEAMS_a_member_creates_a_team_and_becomes_its_lead(people_ri
     assert entry == {"team": team, "lead": True, "assigned_by": {"by": "u_mia", "at": "2026-10-15T09:01:00.000Z"}}
     roster = _roster(rig, "u_mia", team)
     assert roster.status_code == 200
-    assert roster.json()["members"] == [{"id": "u_mia", "display_name": "Mia", "lead": True}]
+    assert roster.json()["members"] == [{"id": "u_mia", "display_name": "Mia", "lead": True, "role": "owner"}]
     rig.as_user("u_mia")
     mine = rig.client.get("/v1/teams").json()["teams"]
-    assert mine == [{"team": team, "lead": True, "state": "member"}]
+    assert mine == [{"team": team, "name": "Mia's team", "lead": True, "state": "member"}]
+
+
+def test_R_TEAM_names_are_returned_instead_of_exposing_a_team_id(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    team = _three(rig)
+    rig.as_user("u_mia")
+    mine = rig.client.get("/v1/teams").json()["teams"]
+    assert mine == [{"team": team, "name": "Mia's team", "lead": True, "state": "member"}]
+    assert _roster(rig, "u_mia", team).json()["name"] == "Mia's team"
+
+
+def test_R_TEAM_create_team_accepts_and_returns_a_person_chosen_name(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    for uid in (FOUNDER, "u_mia"):
+        assert _join(rig, uid).status_code == 201
+    _tick(rig, 1)
+    rig.as_user("u_mia")
+    made = rig.post("/v1/teams", {"name": "  Launch crew  "})
+    assert made.status_code == 201, made.text[:300]
+    assert made.json()["name"] == "Launch crew"
+    mine = rig.client.get("/v1/teams").json()["teams"]
+    assert mine[0]["name"] == "Launch crew"
+    assert _roster(rig, "u_mia", made.json()["team"]).json()["name"] == "Launch crew"
 
 
 def test_SELF_SERVE_TEAMS_a_lead_invites_the_invitee_accepts_and_reads_the_roster(people_rig, monkeypatch):
@@ -157,7 +184,13 @@ def test_SELF_SERVE_TEAMS_a_lead_invites_the_invitee_accepts_and_reads_the_roste
     rig.as_user("u_ben")
     pending = rig.client.get("/v1/teams").json()["teams"]
     assert pending == [
-        {"team": team, "lead": False, "state": "pending", "invited_by": {"id": "u_mia", "display_name": "Mia"}}
+        {
+            "team": team,
+            "name": "Mia's team",
+            "lead": False,
+            "state": "pending",
+            "invited_by": {"id": "u_mia", "display_name": "Mia"},
+        }
     ]
     _tick(rig, 3)
     accepted = rig.post(f"/v1/teams/{team}/accept", {})
@@ -165,6 +198,28 @@ def test_SELF_SERVE_TEAMS_a_lead_invites_the_invitee_accepts_and_reads_the_roste
     assert rig.stored("persons", "u_ben")["memberships"][0]["accepted_at"] == "2026-10-15T09:03:00.000Z"
     names = [(m["id"], m["lead"]) for m in _roster(rig, "u_ben", team).json()["members"]]
     assert names == [("u_mia", True), ("u_ben", False)]
+
+
+def test_R_TEAM_a_lead_changes_a_members_viewer_editor_or_admin_role(people_rig, monkeypatch):
+    rig = _rig(people_rig, monkeypatch)
+    team = _three(rig)
+    _tick(rig, 2)
+    assert _invite(rig, "u_mia", team, "ben@example.com").status_code == 200
+    rig.as_user("u_ben")
+    assert rig.post(f"/v1/teams/{team}/accept", {}).status_code == 200
+    roster = _roster(rig, "u_ben", team).json()["members"]
+    assert [(m["id"], m["role"]) for m in roster] == [("u_mia", "owner"), ("u_ben", "viewer")]
+
+    rig.as_user("u_mia")
+    changed = rig.post(f"/v1/teams/{team}/members/u_ben/role", {"role": "editor"})
+    assert changed.status_code == 200, changed.text[:300]
+    assert next(m for m in changed.json()["members"] if m["id"] == "u_ben")["role"] == "editor"
+    assert rig.post(f"/v1/teams/{team}/members/u_ben/role", {"role": "admin"}).status_code == 200
+
+    rig.as_user("u_ben")
+    before = _roster(rig, "u_ben", team).json()
+    assert rig.post(f"/v1/teams/{team}/members/u_mia/role", {"role": "viewer"}).status_code == 403
+    assert _roster(rig, "u_ben", team).json() == before
 
 
 def test_SELF_SERVE_TEAMS_an_invitation_has_one_answer_whatever_the_address(people_rig, monkeypatch):

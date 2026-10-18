@@ -42,6 +42,8 @@ class TeamState:
     tools: dict[str, str] = field(default_factory=dict)  # connector id -> one of LEVELS; unset = "act" (as before)
     worlds: dict[str, str] = field(default_factory=dict)  # the team's world id -> the person it belongs to
     invites: dict[str, dict[str, str]] = field(default_factory=dict)  # invite id -> {email, role}; nothing is sent
+    names: dict[str, str] = field(default_factory=dict)  # self-serve team id -> display name
+    member_roles: dict[str, dict[str, str]] = field(default_factory=dict)  # team id -> person id -> access role
     version: int = 0
 
     def with_roles(self, roles: Mapping[str, str]) -> TeamState:
@@ -95,7 +97,8 @@ def _from_doc(doc: Mapping[str, Any] | None) -> TeamState:
     if doc is None:
         return TeamState()
     roles, limits, switches, tools = doc["roles"], doc["limits"], doc["switches"], doc["tools"]
-    worlds, invites, version = doc["worlds"], doc["invites"], doc["version"]
+    worlds, invites, names = doc["worlds"], doc["invites"], doc.get("names", {})
+    member_roles, version = doc.get("member_roles", {}), doc["version"]
     ok = (
         all(isinstance(p, str) and r in ROLES for p, r in roles.items())
         and all(isinstance(p, str) and type(v) is int and v >= 0 for p, v in limits.items())
@@ -103,11 +106,28 @@ def _from_doc(doc: Mapping[str, Any] | None) -> TeamState:
         and all(isinstance(k, str) and v in LEVELS for k, v in tools.items())
         and all(isinstance(w, str) and isinstance(p, str) for w, p in worlds.items())
         and all(isinstance(i, dict) and set(i) == {"email", "role"} for i in invites.values())
+        and all(isinstance(t, str) and isinstance(n, str) and 0 < len(n) <= 80 for t, n in names.items())
+        and all(
+            isinstance(t, str)
+            and isinstance(rows, dict)
+            and all(isinstance(p, str) and role in {"viewer", "editor", "admin"} for p, role in rows.items())
+            for t, rows in member_roles.items()
+        )
         and type(version) is int
     )
     if not ok:
         raise ValueError("malformed team document")
-    return TeamState(dict(roles), dict(limits), dict(switches), dict(tools), dict(worlds), dict(invites), version)
+    return TeamState(
+        roles=dict(roles),
+        limits=dict(limits),
+        switches=dict(switches),
+        tools=dict(tools),
+        worlds=dict(worlds),
+        invites=dict(invites),
+        names=dict(names),
+        member_roles={team: dict(rows) for team, rows in member_roles.items()},
+        version=version,
+    )
 
 
 class FirestoreTeamStore:

@@ -16,6 +16,8 @@ from _api_lib import base_event
 from _ppl11c_lib import PERSON_BODY
 from _tsw1_lib import ASHA, BEN, CARA, DEV, ORGOWNER, WORLD, web
 from _tsw1_lib import Rig as WorldRig
+from tilo_api import app
+from tilo_api.team_store import InMemoryTeamStore, get_team_store
 
 ENV_UID = "TILO_PEOPLE_BOOTSTRAP_UID"
 FOUNDER = "u_founder"
@@ -29,6 +31,8 @@ def _rig(people_rig, monkeypatch):
     rig.unwire("founder_gate")
     monkeypatch.setenv(ENV_UID, FOUNDER)
     rig.set_now("2026-10-15T09:00:00.000Z")
+    team_settings = InMemoryTeamStore()
+    rig.app.dependency_overrides[get_team_store] = lambda: team_settings
     return rig
 
 
@@ -174,6 +178,7 @@ def test_SELF_SERVE_TEAMS_an_invite_in_the_founding_millisecond_keeps_the_founde
         "id": "u_mia",
         "display_name": "Mia",
         "lead": True,
+        "role": "owner",
     }
     _tick(rig, 2)
     assert _do(rig, "u_ben", f"/v1/teams/{team}/accept").status_code == 200
@@ -186,6 +191,8 @@ def test_SELF_SERVE_TEAMS_PE_32_a_world_shared_with_a_self_serve_team_is_read_by
     the team. Ben reads `GET /worlds/{id}`; Cara, an org owner outside the team and a person of another org get the
     unknown-world 404."""
     rig = WorldRig()
+    team_settings = InMemoryTeamStore()
+    app.dependency_overrides[get_team_store] = lambda: team_settings
     rig.store.events[WORLD] = [
         base_event(seq=1, type_="world.requested", data={"title": "T"}, vis="all", world_id=WORLD, actor=ASHA)
     ]

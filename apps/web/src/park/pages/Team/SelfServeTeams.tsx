@@ -13,6 +13,7 @@ import { type MyTeamName, isValidEmail } from "./teamModel";
 
 export const INVITE_SENT =
   "Invitation saved. If that address belongs to someone who has signed in, they will see it on their Team page.";
+const MEMBER_ROLES = ["viewer", "editor", "admin"] as const;
 
 interface Loaded {
   teams: MyTeam[];
@@ -29,7 +30,8 @@ async function load(client: TeamsClient): Promise<Loaded> {
   return { teams, you, rosters };
 }
 
-function teamName(roster: RosterMember[] | undefined): string {
+function teamName(team: MyTeam, roster: RosterMember[] | undefined): string {
+  if (team.name) return team.name;
   const lead = roster?.find((m) => m.lead);
   return lead ? `Team led by ${lead.name}` : "Team";
 }
@@ -73,6 +75,8 @@ export function SelfServeTeams(props: {
   const [data, setData] = useState<Loaded | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
 
   const refresh = useCallback(async () => {
     if (!client) return;
@@ -82,7 +86,7 @@ export function SelfServeTeams(props: {
       onLoaded?.(
         next.you,
         next.teams.flatMap((t) =>
-          t.state === "member" ? [{ name: teamName(next.rosters[t.team]), lead: t.lead }] : [],
+          t.state === "member" ? [{ name: teamName(t, next.rosters[t.team]), lead: t.lead }] : [],
         ),
       );
     } catch {
@@ -112,78 +116,180 @@ export function SelfServeTeams(props: {
   };
 
   return (
-    <section className="park-team-card" aria-label="Your teams" data-testid="self-serve-teams">
-      <h2 className="park-team-h2">Your teams</h2>
-      {data.teams.length === 0 ? <p>You are not in a team yet.</p> : null}
-      {data.teams.map((t) =>
-        t.state === "lapsed" ? (
-          <div className="park-team-details" key={t.team} data-testid="team-lapsed">
-            <p>An invitation that no longer counts. Remove it to free the place.</p>
-            {data.you ? (
-              <Button
-                variant="secondary"
-                disabled={busy}
-                onClick={() =>
-                  void act(() => client.leave(t.team, data.you ?? ""), "Old invitation removed.")
+    <section
+      className="park-team-card park-team-own"
+      aria-label="Your teams"
+      data-testid="self-serve-teams"
+    >
+      <div className="park-team-ownhead">
+        <div>
+          <h2 className="park-team-h2">Your teams</h2>
+          <p className="park-team-ownhint">Create spaces for the people and work you share.</p>
+        </div>
+        {!creating ? (
+          <Button variant="secondary" disabled={busy} onClick={() => setCreating(true)}>
+            Create a team
+          </Button>
+        ) : null}
+      </div>
+      {creating ? (
+        <div className="park-team-create">
+          <label className="park-team-createlabel" htmlFor="park-team-name">
+            Team name
+          </label>
+          <div className="park-team-createactions">
+            <input
+              id="park-team-name"
+              className="park-team-input"
+              aria-label="Team name"
+              maxLength={80}
+              placeholder="e.g. Launch crew"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setCreating(false);
+                  setName("");
                 }
-              >
-                Remove
-              </Button>
-            ) : null}
-          </div>
-        ) : t.state === "pending" ? (
-          <div className="park-team-details" key={t.team} data-testid="team-invitation">
-            <p>{`${t.invitedBy ?? "A team lead"} invited you to their team.`}</p>
+              }}
+            />
+            <Button
+              variant="primary"
+              disabled={busy || !name.trim()}
+              onClick={() =>
+                void act(() => client.create(name.trim()), "Team created. You lead it.").then(
+                  (ok) => {
+                    if (ok) {
+                      setCreating(false);
+                      setName("");
+                    }
+                  },
+                )
+              }
+            >
+              {`Create ${name.trim() || "team"}`}
+            </Button>
             <Button
               variant="secondary"
               disabled={busy}
-              onClick={() => void act(() => client.accept(t.team), "You joined the team.")}
+              onClick={() => {
+                setCreating(false);
+                setName("");
+              }}
             >
-              Accept
+              Cancel
             </Button>
-            {data.you ? (
+          </div>
+        </div>
+      ) : null}
+      {data.teams.length === 0 ? (
+        <div className="park-team-ownempty">
+          <span className="park-team-ownmark" aria-hidden="true">
+            +
+          </span>
+          <p>You are not in a team yet.</p>
+          <span>Name a team to start sharing worlds and inviting people.</span>
+        </div>
+      ) : null}
+      <div className="park-team-ownlist">
+        {data.teams.map((t) =>
+          t.state === "lapsed" ? (
+            <div className="park-team-details" key={t.team} data-testid="team-lapsed">
+              <p>An invitation that no longer counts. Remove it to free the place.</p>
+              {data.you ? (
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() =>
+                    void act(() => client.leave(t.team, data.you ?? ""), "Old invitation removed.")
+                  }
+                >
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+          ) : t.state === "pending" ? (
+            <div className="park-team-details" key={t.team} data-testid="team-invitation">
+              <p>{`${t.invitedBy ?? "A team lead"} invited you to their team.`}</p>
               <Button
                 variant="secondary"
                 disabled={busy}
-                onClick={() =>
-                  void act(() => client.leave(t.team, data.you ?? ""), "Invitation declined.")
-                }
+                onClick={() => void act(() => client.accept(t.team), "You joined the team.")}
               >
-                Decline
+                Accept
               </Button>
-            ) : null}
-          </div>
-        ) : (
-          <div className="park-team-details" key={t.team} data-testid="team-row">
-            <h3 className="park-team-h2">
-              {teamName(data.rosters[t.team])}
-              {t.lead ? " · You lead it" : ""}
-            </h3>
-            <ul>
-              {(data.rosters[t.team] ?? []).map((m) => (
-                <li key={m.id}>
-                  {m.name}
-                  {m.lead ? " (lead)" : ""}
-                </li>
-              ))}
-            </ul>
-            {t.lead ? (
-              <Invite
-                busy={busy}
-                onInvite={(email) => act(() => client.invite(t.team, email), INVITE_SENT)}
-              />
-            ) : null}
-          </div>
-        ),
-      )}
-      <Button
-        variant="secondary"
-        disabled={busy}
-        onClick={() => void act(() => client.create(), "Team created. You lead it.")}
-      >
-        Create a team
-      </Button>
-      <output>{note}</output>
+              {data.you ? (
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() =>
+                    void act(() => client.leave(t.team, data.you ?? ""), "Invitation declined.")
+                  }
+                >
+                  Decline
+                </Button>
+              ) : null}
+            </div>
+          ) : (
+            <article className="park-team-ownrow" key={t.team} data-testid="team-row">
+              <div className="park-team-ownrowhead">
+                <span className="park-team-ownavatar" aria-hidden="true">
+                  {teamName(t, data.rosters[t.team]).slice(0, 1).toUpperCase()}
+                </span>
+                <div>
+                  <h3 className="park-team-h2">
+                    {teamName(t, data.rosters[t.team])}
+                    {t.lead ? " · You lead it" : ""}
+                  </h3>
+                  <span>{`${data.rosters[t.team]?.length ?? 0} ${(data.rosters[t.team]?.length ?? 0) === 1 ? "person" : "people"}`}</span>
+                </div>
+              </div>
+              <ul className="park-team-ownpeople">
+                {(data.rosters[t.team] ?? []).map((m) => (
+                  <li className="park-team-ownperson" key={m.id}>
+                    <span>
+                      {m.name}
+                      {m.lead ? " · Owner" : ""}
+                    </span>
+                    {t.lead && !m.lead ? (
+                      <select
+                        className="park-team-select"
+                        aria-label={`Role for ${m.name}`}
+                        value={m.role ?? "viewer"}
+                        disabled={busy}
+                        onChange={(e) => {
+                          const role = e.target.value as (typeof MEMBER_ROLES)[number];
+                          void act(
+                            () => client.changeRole(t.team, m.id, role),
+                            `${m.name} is now ${role[0]?.toUpperCase()}${role.slice(1)}.`,
+                          );
+                        }}
+                      >
+                        {MEMBER_ROLES.map((role) => (
+                          <option key={role} value={role}>
+                            {`${role[0]?.toUpperCase()}${role.slice(1)}`}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      !m.lead && (
+                        <span>{`${(m.role ?? "viewer")[0]?.toUpperCase()}${(m.role ?? "viewer").slice(1)}`}</span>
+                      )
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {t.lead ? (
+                <Invite
+                  busy={busy}
+                  onInvite={(email) => act(() => client.invite(t.team, email), INVITE_SENT)}
+                />
+              ) : null}
+            </article>
+          ),
+        )}
+      </div>
+      <output className="park-team-ownnote">{note}</output>
     </section>
   );
 }

@@ -867,3 +867,123 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+[data-park] .park-team-own {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px;
+  overflow: hidden;
+}
+[data-park] .park-team-ownhead,
+[data-park] .park-team-ownrowhead,
+[data-park] .park-team-createactions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+[data-park] .park-team-ownhead {
+  justify-content: space-between;
+}
+[data-park] .park-team-ownhint,
+[data-park] .park-team-ownrowhead span,
+[data-park] .park-team-ownempty span,
+[data-park] .park-team-ownnote {
+  margin: 4px 0 0;
+  color: var(--ink3);
+  font-size: 13px;
+}
+[data-park] .park-team-create {
+  padding: 16px;
+  border: 1px solid var(--line2);
+  border-radius: 18px;
+  background: var(--sunk);
+}
+[data-park] .park-team-createlabel {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 750;
+}
+[data-park] .park-team-createactions .park-team-input {
+  min-width: 0;
+  flex: 1;
+}
+[data-park] .park-team-ownempty {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 28px 18px;
+  border: 1px dashed var(--line2);
+  border-radius: 18px;
+  text-align: center;
+}
+[data-park] .park-team-ownempty p {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 750;
+}
+[data-park] .park-team-ownmark,
+[data-park] .park-team-ownavatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--heroSoft);
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 850;
+}
+[data-park] .park-team-ownlist {
+  display: grid;
+  gap: 12px;
+}
+[data-park] .park-team-ownrow {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line2);
+  border-radius: 18px;
+  background: var(--card);
+}
+[data-park] .park-team-ownrow h3 {
+  margin: 0;
+}
+[data-park] .park-team-ownpeople {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-team-ownpeople li {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: var(--sunk);
+  color: var(--ink2);
+  font-size: 12px;
+}
+[data-park] .park-team-ownperson {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-park] .park-team-ownperson .park-team-select {
+  min-height: 32px;
+  padding: 4px 28px 4px 8px;
+  font-size: 12px;
+}
+[data-park] .park-team-ownnote:empty {
+  display: none;
+}
+@media (max-width: 600px) {
+  [data-park] .park-team-ownhead,
+  [data-park] .park-team-createactions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

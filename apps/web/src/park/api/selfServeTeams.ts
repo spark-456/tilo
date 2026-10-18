@@ -10,6 +10,7 @@ export interface TeamsTransport {
 
 export interface MyTeam {
   team: string;
+  name?: string;
   lead: boolean;
   state: "member" | "pending" | "lapsed"; // lapsed: an entry that counts for nothing, removable by its person
   invitedBy: string | null; // the inviter's display name, only while an invitation is pending (PE-20)
@@ -19,6 +20,7 @@ export interface RosterMember {
   id: string;
   name: string;
   lead: boolean;
+  role?: "owner" | "viewer" | "editor" | "admin";
 }
 
 let transport: TeamsTransport | null = null;
@@ -36,6 +38,7 @@ function teamRow(raw: unknown): MyTeam | null {
   const by = isObject(raw.invited_by) ? raw.invited_by.display_name : null;
   return {
     team: raw.team,
+    name: typeof raw.name === "string" && raw.name.trim() ? raw.name : "Team",
     lead: raw.lead === true,
     state: raw.state,
     invitedBy: typeof by === "string" ? by : null,
@@ -47,10 +50,11 @@ const path = (team: string) => `/v1/teams/${encodeURIComponent(team)}`;
 export interface TeamsClient {
   mine(): Promise<{ teams: MyTeam[]; you: string | null }>;
   roster(team: string): Promise<RosterMember[]>;
-  create(): Promise<void>;
+  create(name: string): Promise<void>;
   invite(team: string, email: string): Promise<void>;
   accept(team: string): Promise<void>;
   leave(team: string, me: string): Promise<void>;
+  changeRole(team: string, person: string, role: "viewer" | "editor" | "admin"): Promise<void>;
 }
 
 /** The installed client, or null (no live api: nothing is shown and nothing is sent). */
@@ -69,12 +73,24 @@ export function teamsClient(): TeamsClient | null {
       if (!isObject(body) || !Array.isArray(body.members)) throw new Error("Roster is unavailable");
       return body.members.flatMap((m) =>
         isObject(m) && typeof m.id === "string" && typeof m.display_name === "string"
-          ? [{ id: m.id, name: m.display_name, lead: m.lead === true }]
+          ? [
+              {
+                id: m.id,
+                name: m.display_name,
+                lead: m.lead === true,
+                ...(m.role === "owner" ||
+                m.role === "viewer" ||
+                m.role === "editor" ||
+                m.role === "admin"
+                  ? { role: m.role }
+                  : {}),
+              },
+            ]
           : [],
       );
     },
-    create: async () => {
-      await t.postJson("/v1/teams", {});
+    create: async (name) => {
+      await t.postJson("/v1/teams", { name });
     },
     invite: async (team, email) => {
       await t.postJson(`${path(team)}/invites`, { email });
@@ -84,6 +100,9 @@ export function teamsClient(): TeamsClient | null {
     },
     leave: async (team, me) => {
       await t.postJson(`${path(team)}/members/${encodeURIComponent(me)}/remove`, {});
+    },
+    changeRole: async (team, person, role) => {
+      await t.postJson(`${path(team)}/members/${encodeURIComponent(person)}/role`, { role });
     },
   };
 }

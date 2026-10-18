@@ -146,6 +146,7 @@ def _view_of(state: TeamState, principal: deps.Principal) -> dict[str, Any]:
     switches, rows = effective_switches(state), [(k, s.must_ask) for k, s in load_switches().items()]
     return {
         "version": state.version,
+        "teams": [{"id": team, "name": name} for team, name in sorted(state.names.items())],
         "me": {"id": principal.user_id, "role": me},
         "members": [
             {"id": p, "role": r, "limit_minor": state.limits.get(p) if sees_all or p == principal.user_id else None}

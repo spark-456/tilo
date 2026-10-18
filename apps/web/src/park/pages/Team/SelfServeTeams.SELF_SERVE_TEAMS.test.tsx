@@ -23,10 +23,10 @@ function fakeClient(teams: MyTeam[], rosters: Record<string, RosterMember[]> = {
   const client = {
     mine: vi.fn(async () => ({ teams: state.teams, you: "u_me" })),
     roster: vi.fn(async (team: string) => rosters[team] ?? []),
-    create: vi.fn(async () => {
+    create: vi.fn(async (name: string) => {
       state.teams = [
         ...state.teams,
-        { team: "tm_new", lead: true, state: "member", invitedBy: null },
+        { team: "tm_new", name, lead: true, state: "member", invitedBy: null },
       ];
       rosters.tm_new = [{ id: "u_me", name: "Me", lead: true }];
     }),
@@ -37,6 +37,11 @@ function fakeClient(teams: MyTeam[], rosters: Record<string, RosterMember[]> = {
       );
     }),
     leave: vi.fn(async () => undefined),
+    changeRole: vi.fn(async (team: string, person: string, role: "viewer" | "editor" | "admin") => {
+      rosters[team] = (rosters[team] ?? []).map((member) =>
+        member.id === person ? { ...member, role } : member,
+      );
+    }),
   } satisfies TeamsClient;
   return client;
 }
@@ -71,10 +76,18 @@ it("SELF_SERVE_TEAMS Create a team asks the server and shows the team only from 
   const el = await mount(client);
   expect(el.textContent).toContain("You are not in a team yet.");
   await act(async () => button(el, "Create a team").click());
+  const name = el.querySelector<HTMLInputElement>('input[aria-label="Team name"]');
+  if (!name) throw new Error("no team name field");
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(name, "Launch crew");
+    name.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => button(el, "Create Launch crew").click());
   await settle();
-  expect(client.create).toHaveBeenCalledTimes(1);
+  expect(client.create).toHaveBeenCalledWith("Launch crew");
   expect(client.mine).toHaveBeenCalledTimes(2);
-  expect(el.textContent).toContain("Team led by Me · You lead it");
+  expect(el.textContent).toContain("Launch crew · You lead it");
   expect(el.querySelector('input[aria-label="Invite to your team by email"]')).not.toBeNull();
 });
 
@@ -108,6 +121,28 @@ it("SELF_SERVE_TEAMS a member who does not lead gets no invite field", async () 
   const el = await mount(client);
   expect(el.textContent).toContain("Team led by Lena");
   expect(el.querySelector('input[aria-label="Invite to your team by email"]')).toBeNull();
+});
+
+it("R_TEAM a lead changes a member between Viewer Editor and Admin", async () => {
+  const client = fakeClient(
+    [{ team: "tm_a", name: "Launch crew", lead: true, state: "member", invitedBy: null }],
+    {
+      tm_a: [
+        { id: "u_me", name: "Me", lead: true, role: "owner" },
+        { id: "u_ben", name: "Ben", lead: false, role: "viewer" },
+      ],
+    },
+  );
+  const el = await mount(client);
+  const role = el.querySelector<HTMLSelectElement>('select[aria-label="Role for Ben"]');
+  if (!role) throw new Error("no role picker");
+  await act(async () => {
+    role.value = "editor";
+    role.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await settle();
+  expect(client.changeRole).toHaveBeenCalledWith("tm_a", "u_ben", "editor");
+  expect(el.textContent).toContain("Ben is now Editor.");
 });
 
 it("TEAM_ACCESS_1 shows team names from their leads and only marks the viewer as lead", async () => {
@@ -154,6 +189,14 @@ it("SELF_SERVE_TEAMS a refused write says nothing changed", async () => {
   client.create.mockRejectedValueOnce(new Error("403"));
   const el = await mount(client);
   await act(async () => button(el, "Create a team").click());
+  const name = el.querySelector<HTMLInputElement>('input[aria-label="Team name"]');
+  if (!name) throw new Error("no team name field");
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(name, "Launch crew");
+    name.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => button(el, "Create Launch crew").click());
   await settle();
   expect(el.textContent).toContain("That did not go through. Nothing was changed.");
 });
@@ -179,6 +222,14 @@ it("FR_TEAM_01 SELF_SERVE_TEAMS reports the person's teams after the first read 
   await settle();
   expect(seen.at(-1)).toEqual(["u_me", []]);
   await act(async () => button(host as HTMLElement, "Create a team").click());
+  const name = host.querySelector<HTMLInputElement>('input[aria-label="Team name"]');
+  if (!name) throw new Error("no team name field");
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(name, "Launch crew");
+    name.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => button(host as HTMLElement, "Create Launch crew").click());
   await settle();
-  expect(seen.at(-1)).toEqual(["u_me", [{ name: "Team led by Me", lead: true }]]);
+  expect(seen.at(-1)).toEqual(["u_me", [{ name: "Launch crew", lead: true }]]);
 });
