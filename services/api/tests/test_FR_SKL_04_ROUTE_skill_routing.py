@@ -209,6 +209,38 @@ def test_FR_SKL_04_ROUTE_no_match_leaves_the_approaches_and_the_plan_as_they_wer
     assert run_flow.store.tasks[run_flow.task_id].skill is None
 
 
+@pytest.mark.parametrize("title", ["@youtubeskills", "Help me with Youtube skill"])
+def test_R_RUN_2_skill_tagged_named_world_leaves_waiting_and_starts_the_director(run_flow, title):
+    from _clint1_lib import seam  # noqa: PLC0415
+    from _clint2_lib import wait_for  # noqa: PLC0415
+    from tilo_api import deps  # noqa: PLC0415
+    from tilo_api.skill_store import MemorySkillStore  # noqa: PLC0415
+    from tilo_people.stores import PeopleStores  # noqa: PLC0415
+
+    taught_store = MemorySkillStore()
+    run_flow.app.dependency_overrides[seam(deps, "get_skill_store")] = lambda: taught_store
+    people = PeopleStores.in_memory()
+    run_flow.app.dependency_overrides[seam(deps, "get_people_stores")] = lambda: people
+
+    response = run_flow.flow.client.post(
+        "/intake",
+        data={"text": title, "refs": json.dumps([{"kind": "skill", "id": "exec_summary"}])},
+    )
+    assert response.status_code == 201, response.text
+    intake = response.json()
+    approaches = run_flow.flow.approaches(intake["task_id"])
+    assert approaches.status_code == 200, approaches.text
+    run_flow.task_id, run_flow.world_id = intake["task_id"], intake["world_id"]
+    run_flow.as_member()
+
+    started = run_flow.flow.approve(run_flow.task_id, approaches.json()["recommended"], 80)
+
+    assert started.status_code == 200, started.text
+    wait_for(lambda: run_flow.events("world.started"), what=f"Director start for {title}")
+    assert run_flow.compile_calls
+    assert run_flow.store.tasks[run_flow.task_id].skill["source"] == "tagged"
+
+
 def test_FR_SKL_04_ROUTE_quick_answers_carry_the_skill_and_the_catalog_as_fenced_data(quick_rig, monkeypatch):
     import _costfast1_lib  # noqa: PLC0415
 
