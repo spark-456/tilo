@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { endpoint } from "./api";
 import { captureHtml } from "./capture";
+import "./publicApp.css";
 
 type App = { title: string; html: string };
 
@@ -63,23 +64,8 @@ export function PublicAppViewer({ handle, slug }: { handle: string; slug: string
       </main>
     );
   return (
-    <div
-      className="tilo-public-app"
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        fontFamily: "system-ui",
-      }}
-    >
-      <header
-        style={{
-          padding: "12px 24px",
-          borderBottom: "1px solid #ddd",
-          display: "flex",
-          justifyContent: "space-between",
-        }}
-      >
+    <div className="tilo-public-app">
+      <header className="tilo-public-app__header">
         <strong>{app.title}</strong>
         <span>Made with Tilo</span>
       </header>
@@ -90,7 +76,7 @@ export function PublicAppViewer({ handle, slug }: { handle: string; slug: string
         title={app.title}
         sandbox="allow-scripts allow-forms"
         srcDoc={captureHtml(app.html)}
-        style={{ width: "100%", flex: 1, minHeight: "75vh", border: 0 }}
+        className="tilo-public-app__frame"
       />
     </div>
   );
