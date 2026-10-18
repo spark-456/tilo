@@ -13,6 +13,17 @@ const api: Api = {
   getSkills: () => live([]),
   getLearn: () => live(learn),
   getUser: () => live(user),
+  captureSkill: () => live({ id: "copy-review", steps: ["Like or comment on YouTube videos"] }),
+  proposeVersion: () =>
+    live({
+      steps: [],
+      question: null,
+      estimates: null,
+      inputs: [],
+      hosts: [],
+      cannot: [{ text: "Like or comment on YouTube videos", reason: "not_declared" }],
+      needsSetup: [],
+    }),
   captureFile: (file, onStored, method) => {
     if (file.type !== "video/webm" || method !== "record" || file.size === 0)
       return Promise.reject(new Error("Expected a nonempty screen recording"));
