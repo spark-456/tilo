@@ -3,6 +3,13 @@
    No transition, animation or keyframes: the details fade, the hover fades and the 1.8 s flash timer
    arrive with WEB-3b (BQ-WEB-3). */
 
+[data-park] .park-team-root,
+[data-park] [data-testid="park-page-team"] {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 /* ---- heading and invite ---- */
 [data-park] .park-team-top {
   display: flex;
@@ -391,11 +398,19 @@
 [data-park] .park-team-more[aria-expanded="true"] {
   background: var(--chip);
 }
+[data-park] .park-team-root button:focus-visible,
+[data-park] .park-team-root a:focus-visible,
+[data-park] .park-team-root input:focus-visible,
+[data-park] .park-team-root select:focus-visible,
+[data-park] [data-testid="park-page-team"] button:focus-visible,
+[data-park] [data-testid="park-page-team"] a:focus-visible,
+[data-park] [data-testid="park-page-team"] input:focus-visible,
+[data-park] [data-testid="park-page-team"] select:focus-visible,
 [data-park] .park-team-matrix:focus-visible,
 [data-park] .park-team-select:focus-visible,
 [data-park] .park-team-more:focus-visible,
 [data-park] .park-team-btn:focus-visible {
-  outline: 3px solid #5a3fe0;
+  outline: 3px solid var(--focus, #5a3fe0);
   outline-offset: 2px;
 }
 
@@ -590,6 +605,12 @@
 
 /* UI-10 W9: keep the dense tables scrollable inside their card, and stack coverage on phones. */
 @media (max-width: 600px) {
+  [data-park] .park-team-root,
+  [data-park] [data-testid="park-page-team"] {
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
   [data-park] [data-testid="park-page-team"] .park-team-card {
     max-width: 100%;
     overflow: hidden;
@@ -1006,7 +1027,7 @@
   gap: 8px;
 }
 [data-park] .park-team-ownperson .park-team-select {
-  min-height: 32px;
+  min-height: 44px;
   padding: 4px 28px 4px 8px;
   font-size: 12px;
 }

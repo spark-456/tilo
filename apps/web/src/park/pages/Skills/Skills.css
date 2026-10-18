@@ -8,6 +8,12 @@
    reference, so a 44px name field is 46px with its border. */
 
 /* ---- the page ---- */
+[data-park] .park-skills-root,
+[data-park] [data-testid="park-page-skills"] {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: hidden;
+}
 [data-park] .park-skills-root button,
 [data-park] .park-skills-root input,
 [data-park] .park-skills-root textarea {
@@ -1193,8 +1199,16 @@
 }
 
 /* README Interactions: the 3px #5A3FE0 ring, offset 2px, on every control of the page. */
+[data-park] .park-skills-root button:focus-visible,
+[data-park] .park-skills-root a:focus-visible,
+[data-park] .park-skills-root input:focus-visible,
+[data-park] .park-skills-root select:focus-visible,
+[data-park] [data-testid="park-page-skills"] button:focus-visible,
+[data-park] [data-testid="park-page-skills"] a:focus-visible,
+[data-park] [data-testid="park-page-skills"] input:focus-visible,
+[data-park] [data-testid="park-page-skills"] select:focus-visible,
 [data-park] .park-skills-root :focus-visible {
-  outline: 3px solid #5a3fe0;
+  outline: 3px solid var(--focus, #5a3fe0);
   outline-offset: 2px;
 }
 
@@ -2240,6 +2254,12 @@
 
 /* LIVE-P2-A (QA row 26): on a phone a skill's name and its line wrap instead of ending in an ellipsis */
 @media (max-width: 480px) {
+  [data-park] .park-skills-root,
+  [data-park] [data-testid="park-page-skills"] {
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
   [data-park] .park-skills-lib-row-name,
   [data-park] .park-skills-lib-row-sub {
     white-space: normal;

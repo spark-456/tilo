@@ -7,6 +7,9 @@
 
 [data-park] .park-agenda-root {
   font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 [data-park] .park-agenda-root .cx-agenda-liveweek {
@@ -393,6 +396,11 @@
   box-shadow: 0 18px 60px rgb(0 0 0 / 24%);
 }
 @media (max-width: 600px) {
+  [data-park] .park-agenda-root {
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
   [data-park] .park-agenda-root .cx-agenda-liveweek {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1514,9 +1522,15 @@
 
 /* focus ring (README "Interactions and motion") */
 [data-park] .park-agenda-root button:focus-visible,
-[data-park] .park-agenda-root input:focus-visible {
-  outline: 3px solid #5a3fe0;
+[data-park] .park-agenda-root a:focus-visible,
+[data-park] .park-agenda-root input:focus-visible,
+[data-park] .park-agenda-root select:focus-visible {
+  outline: 3px solid var(--focus, #5a3fe0);
   outline-offset: 2px;
+}
+
+[data-park] .park-agenda-hostselect select {
+  min-height: 44px;
 }
 
 /* states */
@@ -1543,7 +1557,7 @@
   [data-park] [data-testid="park-page-agenda"] .park-agenda-synced {
     white-space: normal;
     height: auto;
-    min-height: 40px;
+    min-height: 44px;
     max-width: 100%;
   }
   [data-park] [data-testid="park-page-agenda"] .park-agenda-newinput {
