@@ -1224,3 +1224,33 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+/* ---- TW-6: Needs-you chip above agent on stage ---- */
+[data-park] .tw-needs-chip {
+  position: absolute;
+  left: 0;
+  top: -34px;
+  transform: translateX(-50%);
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 99px;
+  background: var(--amber, #f5a524);
+  color: #1a1407;
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+[data-park] .tw-needs-ping {
+  position: absolute;
+  inset: 0;
+  border-radius: 99px;
+  border: 2px solid var(--amber, #f5a524);
+  pointer-events: none;
+}

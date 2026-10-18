@@ -4,6 +4,7 @@
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import type { ActivityItem } from "../../api/types";
 import { icon } from "../../shell/kit";
+import { activeApprovalOf } from "./Panels";
 import { clockOf, storyOf } from "./runSteps";
 import type { RunEvent } from "./useRunEvents";
 
@@ -25,14 +26,25 @@ export function latestLine(
   events: readonly RunEvent[] | null,
   activity: readonly ActivityItem[] | undefined,
 ): LatestLine | null {
-  const e = events ? storyOf(events)[0] : undefined;
-  if (e) {
-    const at = clockOf(e.ts);
-    return {
-      text: e.summary.trim(),
-      meta: at ? `Latest recorded · ${at} UTC` : "Latest recorded",
-      kind: DONE.test(e.type) ? "done" : ASKS.test(e.type) ? "needs" : "info",
-    };
+  if (events) {
+    const activeApproval = activeApprovalOf(events);
+    if (activeApproval) {
+      const at = activeApproval.time;
+      return {
+        text: activeApproval.question || `${activeApproval.who} needs your yes`,
+        meta: at ? `Needs you · ${at}` : "Needs you",
+        kind: "needs",
+      };
+    }
+    const e = storyOf(events)[0];
+    if (e) {
+      const at = clockOf(e.ts);
+      return {
+        text: e.summary.trim(),
+        meta: at ? `Latest recorded · ${at} UTC` : "Latest recorded",
+        kind: DONE.test(e.type) ? "done" : ASKS.test(e.type) ? "needs" : "info",
+      };
+    }
   }
   const a = events === null ? activity?.[0] : undefined;
   return a ? { text: a.text, meta: `${a.who} · ${a.t}`, kind: a.kind } : null;
@@ -41,7 +53,7 @@ export function latestLine(
 const KIND_ICON = { done: "check", needs: "flag", info: "doc" } as const;
 
 /** The artboard's top-right card: a tile with a glyph (check, flag or document: never colour alone), the line, who and when. */
-export function MapToast({ line }: { line: LatestLine }) {
+export function MapToast({ line, onReview }: { line: LatestLine; onReview?: () => void }) {
   return (
     <output className="park-world-toast" data-kind={line.kind} data-park-floating="">
       <span className="park-world-toast__tile" aria-hidden="true">
@@ -51,6 +63,16 @@ export function MapToast({ line }: { line: LatestLine }) {
         <span className="park-world-toast__line">{line.text}</span>
         <span className="park-world-toast__meta">{line.meta}</span>
       </span>
+      {line.kind === "needs" && onReview ? (
+        <button
+          type="button"
+          className="park-world-toast__act"
+          onClick={onReview}
+          data-testid="world-toast-review"
+        >
+          Review
+        </button>
+      ) : null}
     </output>
   );
 }

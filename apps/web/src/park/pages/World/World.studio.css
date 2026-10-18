@@ -52,9 +52,28 @@
   background: var(--okSoft);
   color: var(--okInk);
 }
+[data-park] .park-world-toast[data-kind="needs"] {
+  background: var(--amberSoft);
+  border: 1.5px solid var(--amber);
+  width: auto;
+  min-width: 260px;
+}
 [data-park] .park-world-toast[data-kind="needs"] .park-world-toast__tile {
   background: var(--amberTile);
   color: var(--amberInk);
+}
+[data-park] .park-world-toast__act {
+  margin-left: auto;
+  flex: none;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 99px;
+  background: var(--pri);
+  color: var(--onPri);
+  font-weight: 700;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
 }
 [data-park] .park-world-toast__text {
   display: flex;
@@ -517,6 +536,149 @@
 [data-park] .park-world-tracetotalcr {
   text-align: right;
   color: var(--ink);
+}
+
+/* ---- TW-6: Needs-you approval card at top of Story ---- */
+[data-park] .park-world-approval {
+  border: 1.5px solid var(--amber);
+  background: var(--amberSoft);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+[data-park] .park-world-approval-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+[data-park] .park-world-approval-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--amber);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+[data-park] .park-world-approval-avatarinner {
+  width: 18px;
+  height: 10px;
+  border-radius: 5px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+[data-park] .park-world-approval-avatareye {
+  width: 3px;
+  height: 4px;
+  border-radius: 2px;
+  background: #1f1d2b;
+}
+[data-park] .park-world-approval-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  color: var(--amberInk);
+  min-width: 0;
+}
+[data-park] .park-world-approval-who {
+  font-weight: 700;
+  font-size: 13.5px;
+}
+[data-park] .park-world-approval-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+[data-park] .park-world-approval-hand {
+  color: var(--amberInk);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+[data-park] .park-world-approval-q {
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.3;
+  letter-spacing: -0.3px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-approval-exact {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+[data-park] .park-world-approval-exactlbl {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink3);
+  letter-spacing: 0.4px;
+}
+[data-park] .park-world-approval-exacttxt {
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-approval-grid {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 4px 10px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+[data-park] .park-world-approval-actions {
+  display: flex;
+  gap: 8px;
+}
+[data-park] .park-world-approval-btn {
+  height: 44px;
+  border-radius: 12px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--line2);
+  background: var(--card);
+  color: var(--ink);
+  padding: 0 16px;
+}
+[data-park] .park-world-approval-btn--approve {
+  flex: 1;
+  background: var(--pri);
+  color: var(--onPri);
+  border: none;
+  font-weight: 700;
+}
+[data-park] .park-world-approval-btn--edit,
+[data-park] .park-world-approval-btn--decline {
+  font-weight: 600;
+}
+[data-park] .park-world-approval-done {
+  height: 44px;
+  border-radius: 12px;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--okInk);
 }
 
 /* Phone bottom sheet: 372px peek, 600px tall */

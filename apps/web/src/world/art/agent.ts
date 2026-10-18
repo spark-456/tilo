@@ -17,7 +17,13 @@ const HEIGHT: Readonly<Record<string, number>> = {
 
 export const AGENT_SCALE = 1.35;
 
-export function drawAgent(g: Graphics, rank: string, tint: string, shadows = true): void {
+export function drawAgent(
+  g: Graphics,
+  rank: string,
+  tint: string,
+  shadows = true,
+  hand = false,
+): void {
   const director = rank === "director";
   const col = tint;
   const [cT, cR, limb] = [lt(col, 0.2), dk(col, 0.22), dk(col, 0.3)];
@@ -29,7 +35,11 @@ export function drawAgent(g: Graphics, rank: string, tint: string, shadows = tru
   box(g, PF, [x0 + 2, y0 + w - 5, 0], [4, 4, 3], leg);
   box(g, PF, [x0 + w - 6, y0 + w - 5, 0], [4, 4, 3], leg);
   box(g, PF, [x0 - 3, y0 + w - 4, z + 3], [3, 3.5, hh * 0.45], leg);
-  box(g, PF, [x0 + w, y0 + w - 4, z + 3], [3, 3.5, hh * 0.45], leg);
+  if (hand) {
+    box(g, PF, [x0 + w, y0 + w - 4, z + hh - 2], [3, 3.5, hh * 0.55], leg);
+  } else {
+    box(g, PF, [x0 + w, y0 + w - 4, z + 3], [3, 3.5, hh * 0.45], leg);
+  }
   box(g, PF, [x0 + 1.2, y0 + 1.2, z + 1], [w - 2.4, w - 2.4, hh - 2], { t: cR, l: cR, r: cR });
   poly(
     g,

@@ -15,13 +15,55 @@ import { PlaybackBar } from "./PlaybackBar";
 import { StageEvents } from "./StageEvents";
 import { TeamMeeting } from "./TeamMeeting";
 
-export function AgentLayer({ worldId, rooms }: { worldId: string; rooms: RoomClient | null }) {
+export function AgentLayer({
+  worldId,
+  rooms,
+  onReview,
+}: {
+  worldId: string;
+  rooms: RoomClient | null;
+  onReview?: (() => void) | undefined;
+}) {
   const facts = useWorldFacts(worldId, rooms);
   const [team, setTeam] = useState(false);
   const [chat, setChat] = useState<{ open: boolean; filter: string } | null>(null);
   const spot = useSpotlight(worldId);
   const hovered = spot.hover && spot.opened !== spot.hover ? facts.stats.get(spot.hover) : null;
   const opened = spot.opened ? facts.stats.get(spot.opened) : null;
+  const pendingApproval = useMemo(() => {
+    const resolvedGates = new Set<string>();
+    const resolvedCards = new Set<string>();
+    for (const e of facts.events) {
+      if (e.type === "approval.resolved") {
+        const d = e.data as { gate_id?: string; card_id?: string } | null;
+        if (d?.gate_id) resolvedGates.add(d.gate_id);
+        if (d?.card_id) resolvedCards.add(d.card_id);
+        if (e.target) resolvedGates.add(e.target);
+      }
+    }
+    const req = [...facts.events].reverse().find((e) => {
+      if (e.type !== "approval.requested") return false;
+      const d = e.data as { gate_id?: string; card_id?: string } | null;
+      const gateId = d?.gate_id ?? e.target;
+      const cardId = d?.card_id;
+      if (gateId && resolvedGates.has(gateId)) return false;
+      if (cardId && resolvedCards.has(cardId)) return false;
+      const resolvedLater = facts.events.some(
+        (r) =>
+          r.type === "approval.resolved" &&
+          r.seq > e.seq &&
+          (r.target === e.target ||
+            r.cause === e.id ||
+            (r.data as { gate_id?: string } | null)?.gate_id === gateId),
+      );
+      return !resolvedLater;
+    });
+    if (!req) return null;
+    const actorId = req.actor ?? facts.layout?.semantic.agents[0]?.id ?? "A_s1";
+    const loc = registerProbe.get(worldId)?.locate(actorId);
+    return { event: req, actorId, loc };
+  }, [facts.events, facts.layout, worldId]);
+
   const talking = useMemo(() => {
     const handoff = [...facts.messages].reverse().find((m) => {
       const from = facts.stats.get(m.from);
@@ -39,6 +81,31 @@ export function AgentLayer({ worldId, rooms }: { worldId: string; rooms: RoomCli
     <>
       <PlaybackBar worldId={worldId} />
       <StageEvents worldId={worldId} layout={facts.layout} events={facts.events} />
+      {pendingApproval?.loc ? (
+        <span
+          className="tw-needs-chip-anchor"
+          style={{
+            position: "absolute",
+            left: pendingApproval.loc.x,
+            top: pendingApproval.loc.y,
+            width: 0,
+            height: 0,
+            zIndex: 970,
+          }}
+        >
+          <button
+            type="button"
+            className="tw-needs-chip"
+            data-testid="world-needs-chip"
+            aria-label="Needs you: review approval"
+            onClick={onReview}
+          >
+            <span className="tw-needs-ping" aria-hidden="true" />
+            <Icon name="hand" size={13} />
+            Needs you
+          </button>
+        </span>
+      ) : null}
       {talking && !team ? (
         <button
           type="button"

@@ -28,6 +28,8 @@ export interface AgentState {
   /** TILO-T-WORLD: the seq of the agent's own agent.handoff while it is its latest event; it talks with the receiver
    * for TALK_WINDOW events, then stands at its post (`standingAt`). Null otherwise. */
   readonly doneAt: number | null;
+  /** TW-6: agent raises hand on approval.requested, drops hand on approval.resolved */
+  readonly hand: boolean;
 }
 
 /** How many later events a handing-over agent stays beside its receiver (the design's talkWin: 2). */
@@ -107,6 +109,7 @@ export function createInitialState(layout: Layout): WorldState {
       back: null,
       post: null,
       doneAt: null,
+      hand: false,
     };
   }
   const gates: Record<string, GateState> = {};
@@ -344,10 +347,35 @@ function applyKnown(state: WorldState, event: Event): WorldState {
     }
     case "approval":
     case "policy": {
+      let nextState = state;
       const gateId = (event.data as Record<string, unknown> | null)?.gate_id;
-      if (typeof gateId !== "string" || !(gateId in state.gates)) return state;
-      const next = gateAfter(event, verb);
-      return next ? { ...state, gates: { ...state.gates, [gateId]: next } } : state;
+      if (typeof gateId === "string" && gateId in state.gates) {
+        const nextGate = gateAfter(event, verb);
+        if (nextGate)
+          nextState = { ...nextState, gates: { ...nextState.gates, [gateId]: nextGate } };
+      }
+      if (family === "approval") {
+        if (verb === "requested" && event.actor) {
+          const a = state.agents[event.actor];
+          if (a) {
+            nextState = {
+              ...nextState,
+              agents: { ...nextState.agents, [event.actor]: { ...a, hand: true } },
+            };
+          }
+        } else if (verb === "resolved") {
+          const updated = { ...nextState.agents };
+          let changed = false;
+          for (const [id, a] of Object.entries(updated)) {
+            if (a.hand) {
+              updated[id] = { ...a, hand: false };
+              changed = true;
+            }
+          }
+          if (changed) nextState = { ...nextState, agents: updated };
+        }
+      }
+      return nextState;
     }
     default:
       return state;
