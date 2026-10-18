@@ -14,6 +14,7 @@ This directory contains live application screenshots captured directly from the 
 | `1440-teach-tilo.png` | **Teach Tilo** | The interactive 3-step skill teaching wizard (Describe it, Show an example, Review the steps) for creating and teaching custom agent workflows. |
 | `1440-team.png` | **Team** | The workspace team management page showing team members, roles, activity status, and agent permissions. |
 | `1440-skills.png` | **Skills Gallery** | The catalog of built-in and taught agent capabilities with search, category filtering, and status badges. |
+| `1440-connectors.png` | **Connectors** | The Connectors dashboard displaying supported tool integrations (Google Mail, Google Calendar, Google Drive) with status, permissions, and connection controls. |
 
 ## Mobile Views (390 × 844)
 

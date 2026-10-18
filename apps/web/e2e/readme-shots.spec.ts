@@ -1,23 +1,25 @@
-import { mkdirSync, existsSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { expect, test } from "@playwright/test";
+import { fileURLToPath } from "node:url";
+import { type Page, expect, test } from "@playwright/test";
 
-const readmeDir = resolve(__dirname, "../../docs/assets/readme");
-const evidenceDir = resolve(__dirname, "../../../../Tilo/agy-bridge/evidence/README-SHOTS");
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+const readmeDir = resolve(__dirname, "../../../docs/assets/readme");
+const evidenceDir = resolve(__dirname, "../../../../../Tilo/agy-bridge/evidence/README-SHOTS");
 
 mkdirSync(readmeDir, { recursive: true });
 mkdirSync(evidenceDir, { recursive: true });
 
-async function preparePage(page: any, theme: "day" | "night" = "day") {
+async function preparePage(page: Page, theme: "day" | "night" = "day") {
   await page.addInitScript((val: string) => {
     localStorage.setItem("tilo.time", val);
     sessionStorage.setItem("tilo-boot-seen", "1");
   }, theme);
 }
 
-async function finishNavigation(page: any) {
+async function finishNavigation(page: Page) {
   const bootCover = page.locator("#tilo-boot-cover");
-  if (await bootCover.count() > 0) {
+  if ((await bootCover.count()) > 0) {
     await bootCover.waitFor({ state: "detached", timeout: 15_000 }).catch(() => {});
   }
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
@@ -27,7 +29,9 @@ async function finishNavigation(page: any) {
 test.describe("README Screenshots @1440", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test("Capture 1440 Home, Worlds, World running, Result, Agenda, Teach Tilo, Team, Skills", async ({ page }) => {
+  test("Capture 1440 Home, Worlds, World running, Result, Agenda, Teach Tilo, Team, Skills, Connectors", async ({
+    page,
+  }) => {
     test.setTimeout(180_000);
     await preparePage(page, "day");
 
@@ -47,14 +51,18 @@ test.describe("README Screenshots @1440", () => {
       fullPage: false,
       animations: "disabled",
     });
-    await page.locator("[data-park]").evaluate((node: HTMLElement) => node.setAttribute("data-time", "night"));
+    await page
+      .locator("[data-park]")
+      .evaluate((node: HTMLElement) => node.setAttribute("data-time", "night"));
     await page.waitForTimeout(300);
     await page.screenshot({
       path: resolve(evidenceDir, "1440-dark-Home.png"),
       fullPage: false,
       animations: "disabled",
     });
-    await page.locator("[data-park]").evaluate((node: HTMLElement) => node.setAttribute("data-time", "day"));
+    await page
+      .locator("[data-park]")
+      .evaluate((node: HTMLElement) => node.setAttribute("data-time", "day"));
     await page.waitForTimeout(300);
 
     // 2. Worlds
@@ -82,7 +90,7 @@ test.describe("README Screenshots @1440", () => {
     await page.goto("/world/comp");
     await expect(page.locator('[data-testid="park-page-world"]')).toBeVisible({ timeout: 60_000 });
     await finishNavigation(page);
-    const resultTab = page.locator('#park-world-tab-result');
+    const resultTab = page.locator("#park-world-tab-result");
     if (await resultTab.isVisible()) {
       await resultTab.click();
     } else {
@@ -141,6 +149,18 @@ test.describe("README Screenshots @1440", () => {
       fullPage: false,
       animations: "disabled",
     });
+
+    // 9. Connectors
+    await page.goto("/connectors");
+    await expect(page.locator('[data-testid="park-page-connectors"]')).toBeVisible({
+      timeout: 60_000,
+    });
+    await finishNavigation(page);
+    await page.screenshot({
+      path: resolve(readmeDir, "1440-connectors.png"),
+      fullPage: false,
+      animations: "disabled",
+    });
   });
 });
 
@@ -167,14 +187,18 @@ test.describe("README Screenshots @390", () => {
       fullPage: false,
       animations: "disabled",
     });
-    await page.locator("[data-park]").evaluate((node: HTMLElement) => node.setAttribute("data-time", "night"));
+    await page
+      .locator("[data-park]")
+      .evaluate((node: HTMLElement) => node.setAttribute("data-time", "night"));
     await page.waitForTimeout(300);
     await page.screenshot({
       path: resolve(evidenceDir, "390-dark-Home.png"),
       fullPage: false,
       animations: "disabled",
     });
-    await page.locator("[data-park]").evaluate((node: HTMLElement) => node.setAttribute("data-time", "day"));
+    await page
+      .locator("[data-park]")
+      .evaluate((node: HTMLElement) => node.setAttribute("data-time", "day"));
     await page.waitForTimeout(300);
 
     // 10. A World (390)
