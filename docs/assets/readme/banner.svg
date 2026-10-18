@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300" role="img" aria-label="Tilo: people describe work, agents run it">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#312e81"/>
+    </linearGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="300" fill="url(#bg)"/>
+  <!-- isometric blocks -->
+  <g transform="translate(860 70)">
+    <g fill="#38bdf8"><polygon points="60,40 120,10 180,40 120,70"/></g>
+    <g fill="#0ea5e9"><polygon points="60,40 120,70 120,130 60,100"/></g>
+    <g fill="#0369a1"><polygon points="120,70 180,40 180,100 120,130"/></g>
+    <g fill="#a78bfa"><polygon points="170,100 220,75 270,100 220,125"/></g>
+    <g fill="#7c3aed"><polygon points="170,100 220,125 220,175 170,150"/></g>
+    <g fill="#5b21b6"><polygon points="220,125 270,100 270,150 220,175"/></g>
+    <g fill="#f472b6"><polygon points="10,110 50,90 90,110 50,130"/></g>
+    <g fill="#db2777"><polygon points="10,110 50,130 50,165 10,145"/></g>
+    <g fill="#9d174d"><polygon points="50,130 90,110 90,145 50,165"/></g>
+    <path d="M90 150 Q 150 190 170 150" stroke="#fde68a" stroke-width="3" fill="none" stroke-dasharray="6 6"/>
+  </g>
+  <text x="70" y="140" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="84" font-weight="700" fill="url(#top)">Tilo</text>
+  <text x="72" y="190" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" fill="#e2e8f0">People describe work. A Director plans it. Agent teams run it.</text>
+  <text x="72" y="228" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" fill="#94a3b8">Built by spark-456 for the Google Cloud AI Builder Cup 2026</text>
+</svg>
