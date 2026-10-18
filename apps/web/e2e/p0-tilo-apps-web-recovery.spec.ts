@@ -62,6 +62,7 @@ for (const width of [1440, 390])
       const dir = process.env.TILO_EVIDENCE_DIR;
       if (dir) {
         await mkdir(dir, { recursive: true });
+        await expect(page.locator("#tilo-boot-cover")).toHaveCount(0);
         await page.screenshot({ path: join(dir, `${width}-${theme}.png`), fullPage: true });
       }
     });
