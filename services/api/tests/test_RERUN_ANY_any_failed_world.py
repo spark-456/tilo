@@ -46,12 +46,34 @@ def test_RERUN_ANY_a_failed_world_reruns_for_the_owner(flow, monkeypatch, reason
     new_world = response.json()["world_id"]
     assert new_world != old["world_id"]
     task = flow.store.tasks[response.json()["task_id"]]
-    assert task.granted and task.brief == flow.store.tasks[old["task_id"]].brief
+    assert task.granted
+    assert task.brief["goal"] == flow.store.tasks[old["task_id"]].brief["goal"]
     assert [g["data"]["cap"] for g in flow.events(new_world, "budget.granted")] == [80.0]
     assert started[before:] == [(new_world, old["approach"], 80.0)]
     again = flow.client.post(f"/worlds/{old['world_id']}/rerun")  # pressed twice: the same one new world
     assert again.status_code == 200 and again.json() == response.json()
     assert len(started) == before + 1
+
+
+def test_P0_RUN_DIES_try_again_resumes_from_the_failed_unit_and_keeps_completed_work(flow, monkeypatch):
+    from tilo_api import runs
+
+    monkeypatch.setattr(runs, "start_run", lambda *_args, **_kwargs: None)
+    flow.app.dependency_overrides[runs.run_seams] = lambda: object()
+    old = _failed_with(flow, "the model reply was cut off before step U2 finished")
+    stream = flow.store.events[old["world_id"]]
+    stream.insert(
+        -1,
+        {**_event(old["world_id"], len(stream), "unit.completed", {}), "summary": "U1 checked the sources."},
+    )
+    stream[-1]["data"]["unit"] = "U2"
+
+    response = flow.client.post(f"/worlds/{old['world_id']}/rerun")
+
+    assert response.status_code == 200, response.text
+    brief = flow.store.tasks[response.json()["task_id"]].brief
+    assert any("U1 checked the sources." in line for line in brief["constraints"])
+    assert any("U2" in line and "resume" in line.lower() for line in brief["constraints"])
 
 
 def test_RERUN_ANY_a_share_change_after_the_stop_does_not_hide_it(flow):

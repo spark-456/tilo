@@ -733,7 +733,9 @@ def _again_ids(world_id: str) -> tuple[str, str, str]:
     return found[0], found[1], found[2]
 
 
-def _continued_brief(brief: dict[str, Any], stream: list[dict[str, Any]]) -> dict[str, Any]:
+def _continued_brief(
+    brief: dict[str, Any], stream: list[dict[str, Any]], failed_unit: str | None = None
+) -> dict[str, Any]:
     """Carry bounded, recorded work into a new run without changing the paused run or the brief schema."""
     carried = copy.deepcopy(brief)
     constraints = list(carried.get("constraints") or [])
@@ -746,6 +748,8 @@ def _continued_brief(brief: dict[str, Any], stream: list[dict[str, Any]]) -> dic
     constraints.extend(
         f"Earlier run completed: {line[:275]}" for line in (summaries[-room:] if room else []) if line.strip()
     )
+    if failed_unit and len(constraints) < 20:
+        constraints.append(f"Resume from failed unit {failed_unit}; keep the earlier completed work.")
     carried["constraints"] = constraints
     return carried
 
@@ -808,7 +812,8 @@ def rerun(
     if again is None:
         fresh = deps.TaskRecord(
             old.owner, new_world, new_run, copy.deepcopy(old.draft),
-            _continued_brief(old.brief, stream) if paused else copy.deepcopy(old.brief), list(old.questions), 1,
+            _continued_brief(old.brief, stream, None if paused else str(last["data"].get("unit") or "failed step")),
+            list(old.questions), 1,
             answers=dict(old.answers), edits=copy.deepcopy(old.edits), approaches=copy.deepcopy(old.approaches),
             granted=False, scenario=old.scenario, gaps=old.gaps,
         )  # fmt: skip

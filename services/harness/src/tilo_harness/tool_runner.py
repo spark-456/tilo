@@ -45,6 +45,7 @@ from typing import TYPE_CHECKING, Any, Literal
 import jsonschema
 from tilo_providers.clock import Clock, real_today
 from tilo_providers.diagnostics import log_caught
+from tilo_providers.errors import OutputTruncatedError
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse, ModelProvider, SafetyProvider
 from tilo_providers.media import MediaPart, check_parts
 from tilo_providers.prompts import load_prompt, neutralise_marker
@@ -77,6 +78,7 @@ CREDIT_CAP = 20.0  # credits per unit, model calls and tools together
 RESULT_CAP = 6000  # characters of one tool result shown to the model
 RESULTS_TOTAL_CAP = 16000  # characters of all tool results shown to the model
 ARCHIVE_CAP = 200_000  # characters of one raw result written to the archive
+MAX_CONTINUATIONS = 3  # P0-RUN-DIES: bounded recovery after router-level larger-cap retry and fallback
 PROMPT_ROLE = "specialist"  # the role whose prompts/<role>/tools*.md frame the tool loop, for every worker role
 
 Stop = Literal["done", "step_cap", "credit_cap", "no_text"]
@@ -100,6 +102,18 @@ _REFUSALS = {
     "many": "(refused: too many tool calls in one step)",
     "limit": "(refused: this unit has used its allowance of that tool)",
 }
+
+
+def _output_truncated(error: BaseException) -> bool:
+    """Whether the safe exception chain says the provider exhausted its output cap."""
+    seen: BaseException | None = error
+    for _ in range(6):
+        if seen is None:
+            return False
+        if isinstance(seen, OutputTruncatedError):
+            return True
+        seen = seen.__cause__ or seen.__context__
+    return False
 
 
 @dataclass(frozen=True)
@@ -227,6 +241,7 @@ class ToolUnitRunner:
                 "Use only the recorded source refs in the inputs; no code, HTML or URLs.\n"
             )
         stop: Stop = "step_cap"
+        continuations = 0
         while loop.step < self._max_steps:
             if loop.credits >= self._credit_cap:
                 stop = "credit_cap"
@@ -234,7 +249,20 @@ class ToolUnitRunner:
             loop.step += 1
             live = self._live(allowed, loop)
             request = self._request(role, base, allowed, live, loop)
-            response = await asyncio.to_thread(provider.generate, request)
+            if continuations:
+                request = request.model_copy(
+                    update={
+                        "prompt": request.prompt
+                        + "\n\nContinue from where you stopped. Finish this same step without repeating completed work."
+                    }
+                )
+            try:
+                response = await asyncio.to_thread(provider.generate, request)
+            except Exception as error:
+                if not _output_truncated(error) or continuations >= MAX_CONTINUATIONS:
+                    raise
+                continuations += 1
+                continue
             if self._meter is not None:
                 loop.credits += _credits(self._meter(role, request, response))
             if not (response.tool_calls and live):

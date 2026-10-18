@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // RERUN-ANY: a world that stopped for any recorded reason (here the live "a unit failed, so the work stopped") offers
-// "Start it again", which calls `/rerun` and opens the new world; "New task" appears only when the server refuses (409).
+// "Try again", which calls `/rerun` and opens the new world; "New task" appears only when the server refuses (409).
 // No network is touched.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, click } from "../../../../test-support/park/componentsHarness";
@@ -48,11 +48,12 @@ function clientWith(startAgain: HttpClient["startAgain"], events = UNIT_FAILED):
   return client;
 }
 
-describe("RERUN_ANY Start it again for any stopped run", () => {
+describe("RERUN_ANY Try again for any stopped run", () => {
   it("test_R_RUN_pause_calls_the_api_before_showing_paused", async () => {
-    const client = clientWith(vi.fn(async () => ({ world_id: "w_new", task_id: "t_new" })), [
-      ev(1, "budget.granted", { cap: 40 }), ev(2, "world.started"),
-    ]);
+    const client = clientWith(
+      vi.fn(async () => ({ world_id: "w_new", task_id: "t_new" })),
+      [ev(1, "budget.granted", { cap: 40 }), ev(2, "world.started")],
+    );
     const pause = vi.fn(async () => undefined);
     client.pauseWorld = pause;
     const rig = await mountWorld({ id: "hires", api: liveWorldsApi(), client });
@@ -62,19 +63,27 @@ describe("RERUN_ANY Start it again for any stopped run", () => {
   });
   it("test_R_RUN_paused_world_offers_continue_into_new_run", async () => {
     const start = vi.fn(async () => ({ world_id: "w_continued", task_id: "t_continued" }));
-    const events = [ev(1, "budget.granted", { cap: 40 }), ev(2, "world.started"), ev(3, "world.paused", { reason: "pause_all" })];
-    const rig = await mountWorld({ id: "hires", api: liveWorldsApi(), client: clientWith(start, events) });
+    const events = [
+      ev(1, "budget.granted", { cap: 40 }),
+      ev(2, "world.started"),
+      ev(3, "world.paused", { reason: "pause_all" }),
+    ];
+    const rig = await mountWorld({
+      id: "hires",
+      api: liveWorldsApi(),
+      client: clientWith(start, events),
+    });
     click(control(rig.el, "Continue"));
     await settle();
     expect(start).toHaveBeenCalledWith("hires");
     expect(rig.app.go).toHaveBeenCalledWith("world", { id: "w_continued" });
   });
-  it("RERUN_ANY_a_unit_failure_calls_rerun_and_opens_the_new_world", async () => {
+  it("P0_RUN_DIES_try_again_calls_rerun_and_opens_the_resumed_world", async () => {
     const start = vi.fn(async () => ({ world_id: "w_new", task_id: "t_new" }));
     const rig = await mountWorld({ id: "hires", api: liveWorldsApi(), client: clientWith(start) });
     expect(pageText(rig.el)).not.toContain("Tilo restarted while this was running");
 
-    click(control(rig.el, "Start it again"));
+    click(control(rig.el, "Try again"));
     await settle();
 
     expect(start).toHaveBeenCalledWith("hires");
@@ -88,7 +97,7 @@ describe("RERUN_ANY Start it again for any stopped run", () => {
     });
     const rig = await mountWorld({ id: "hires", api: liveWorldsApi(), client: clientWith(start) });
 
-    click(control(rig.el, "Start it again"));
+    click(control(rig.el, "Try again"));
     await settle();
 
     expect(start).toHaveBeenCalledTimes(1);

@@ -260,7 +260,7 @@ def _chain(error: BaseException) -> list[BaseException]:
     return links
 
 
-def test_PL_02_router_gives_a_truncated_reply_no_same_profile_retry_and_a_classifiable_cause():
+def test_PL_02_router_gives_a_truncated_reply_one_same_profile_retry_and_a_classifiable_cause():
     from tilo_providers.errors import OutputTruncatedError  # noqa: PLC0415
     from tilo_providers.router import RouterError  # noqa: PLC0415
     from tilo_providers.vertex_smoke import classify  # noqa: PLC0415
@@ -277,7 +277,7 @@ def test_PL_02_router_gives_a_truncated_reply_no_same_profile_retry_and_a_classi
     with pytest.raises(RouterError) as raised:
         _router(config, providers).generate("director", request)
     for profile in {director.primary, director.fallback}:
-        assert len(providers[profile].calls) <= 1, f"{profile}: a truncated reply is never retried or repaired"
+        assert len(providers[profile].calls) <= 2, f"{profile}: a truncated reply gets at most one larger retry"
     assert any(isinstance(link, OutputTruncatedError) for link in _chain(raised.value)), "the cause is kept"
     assert raised.value.attempts[-1].error_type == "OutputTruncatedError"
     assert classify(raised.value) == "truncated"  # the line the live run prints, instead of "unknown"

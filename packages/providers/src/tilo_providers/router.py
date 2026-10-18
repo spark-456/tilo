@@ -51,6 +51,7 @@ SearchFor = Callable[[str], SearchProvider]
 # budget left.
 _DEFAULT_EXPECTED_OUTPUT = 1024
 _CAP_HEADROOM = 2
+_LOWER_THINKING = {"high": "medium", "medium": "low", "low": "minimal", "minimal": "minimal"}
 
 
 class RouterError(Exception):
@@ -164,7 +165,14 @@ def _usage(attempt: RouterAttempt, response: Any) -> None:  # a GenerateResponse
         attempt.tokens_audio = response.usage.get("audio_tokens")
 
 
-def _fail(run: RouterResult, attempt: RouterAttempt, error: Exception, *, output_started: bool = False) -> None:
+def _fail(
+    run: RouterResult,
+    attempt: RouterAttempt,
+    error: Exception,
+    *,
+    output_started: bool = False,
+    truncated_terminal: bool = True,
+) -> None:
     """Records a failed candidate. Returns (the router falls back) for quota, retryable, base ProviderError,
     EFF-03 cap refusals and any unexpected exception (NotImplementedError, an adapter bug); raises a
     RouterError carrying every attempt, the adapter's error as `__cause__`, for everything with no fallback.
@@ -183,7 +191,7 @@ def _fail(run: RouterResult, attempt: RouterAttempt, error: Exception, *, output
         ) from error
     if output_started:  # answers are never spliced
         raise StreamInterruptedError(f"{where} failed after output started", run.attempts) from error
-    if isinstance(error, OutputTruncatedError):  # no sibling: the same cap burns the same tokens
+    if isinstance(error, OutputTruncatedError) and truncated_terminal:
         cap = run.request.max_output_tokens
         message = f"{where} reply truncated at its max_output_tokens cap of {cap}; not retried at the same cap"
         raise RouterExhaustedError(message, run.attempts, run.budget) from error
@@ -200,7 +208,7 @@ def _exhausted(run: RouterResult) -> RouterError:
     if run.attempts and all(a.error_type == "TokenCapExceededError" for a in run.attempts):
         message = f"EFF-03: role {run.role_id!r} is over max_input_tokens for every candidate"
         return TokenCapExceededError(message, run.attempts)
-    return RouterExhaustedError(f"PL-03: role {run.role_id!r} exhausted every candidate", run.attempts)
+    return RouterExhaustedError(f"PL-03: role {run.role_id!r} exhausted every candidate", run.attempts, run.budget)
 
 
 @dataclass(frozen=True)
@@ -353,7 +361,14 @@ class Router:
         return ids
 
     @contextmanager
-    def _candidate(self, run: RouterResult, profile_id: str, reason: str | None) -> Iterator[RouterAttempt]:
+    def _candidate(
+        self,
+        run: RouterResult,
+        profile_id: str,
+        reason: str | None,
+        *,
+        truncated_terminal: bool = True,
+    ) -> Iterator[RouterAttempt]:
         """PL-03 choke point: EVERY touch of a candidate (building it, `count_tokens` for its cap and price,
         generate, stream up to its first chunk, embed) runs inside this block. It records exactly one
         attempt and hands any exception to `_fail`: a fallback-worthy one is suppressed (the attempt's
@@ -370,7 +385,7 @@ class Router:
             run.attempts.append(attempt)
             if isinstance(error, OutputTruncatedError):
                 self._charge_truncated(run, attempt, error)
-            _fail(run, attempt, error)
+            _fail(run, attempt, error, truncated_terminal=truncated_terminal)
         else:
             run.attempts.append(attempt)
         finally:
@@ -533,6 +548,14 @@ class Router:
         if run.budget is not None:
             run.budget = max(0.0, run.budget - credits)
 
+    def _truncation_retry(self, run: RouterResult, profile_id: str, sent: GenerateRequest) -> None:
+        """Give one paid cut-off answer more room on the same profile, while asking it to think less."""
+        profile = self._config.profiles[profile_id]
+        cap = sent.max_output_tokens or _DEFAULT_EXPECTED_OUTPUT
+        larger = min(cap * 2, profile.context)
+        thinking = _LOWER_THINKING.get(sent.thinking_level or "") or sent.thinking_level
+        run.request = run.request.model_copy(update={"max_output_tokens": larger, "thinking_level": thinking})
+
     def generate(
         self,
         role_id: str,
@@ -550,7 +573,9 @@ class Router:
         threshold, schema, reason = confidence_threshold or 0.0, run.request.response_schema, None
         for profile_id in run.candidates:  # EFF-02: cheapest first
             prompt: str | None = None  # None: the role's own input; else the one schema-repair prompt
-            for is_repair in (False, True):
+            is_repair = False
+            retried_truncation = False
+            while True:
                 wait = None  # no deadline: no limit
                 if deadline is not None:
                     left = deadline.remaining()
@@ -560,7 +585,7 @@ class Router:
                         ) from run.last_error
                     wait = left if profile_id == run.candidates[-1] else left * deadline.first_share
                 try:
-                    with self._candidate(run, profile_id, reason) as attempt:
+                    with self._candidate(run, profile_id, reason, truncated_terminal=False) as attempt:
                         provider = self._provider(role_id, profile_id)
                         sent, estimate, attempt.ceiling_credits = self._prepare(run, profile_id, provider, prompt)
                         attempt.quoted_credits = estimate
@@ -568,6 +593,11 @@ class Router:
                 except RouterSafetyError:  # a safety outcome, never a silent fallback
                     return replace(run, outcome="safety_blocked")
                 if attempt.error_type:
+                    if attempt.error_type == OutputTruncatedError.__name__ and not retried_truncation:
+                        self._truncation_retry(run, profile_id, sent)
+                        retried_truncation = True
+                        reason = "retry after truncated reply with lower thinking and a larger output cap"
+                        continue
                     reason = f"fallback after {attempt.error_type}"
                     break
                 self._spend(run, profile_id, estimate, response.usage)
@@ -581,6 +611,7 @@ class Router:
                             {"prompt": sent.prompt, "error": neutralise_marker(problem, "ERROR")},
                         )
                         reason = "repair attempt after schema validation failed"
+                        is_repair = True
                         continue
                 elif verify is not None and not verify(response):
                     attempt.outcome, reason = "verifier_rejected", "escalated after verifier rejected the response"

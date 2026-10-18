@@ -2,7 +2,7 @@
 // STUDIO-3 acceptance, World (design/studio-v2 "Tilo S World.dc.html", "Tilo Studio Canvas" 05 One world): the city
 // on the left and the Story / Steps / Result tabs on the right, every word from a recorded event (HR-1..HR-7):
 // Story is the run's events in plain words, Steps is the plan in order ("Step n of m"), Result is the delivered
-// output with Download and Share. A failed run shows its recorded reason with "Start it again"; one filled button.
+// output with Download and Share. A failed run shows its recorded reason with "Try again"; one filled button.
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readComponentsCss } from "../../../../test-support/park/componentsCss";
@@ -233,12 +233,12 @@ describe("STUDIO_3 the World page of a live run", () => {
     expect(textOf(panel(rig.el, "Result"))).toContain(
       "This run stopped before it delivered anything.",
     );
-    // Start it again is the one filled button the person sees
+    // Try again is the one filled button the person sees
     const visiblePrimary = [...rig.el.querySelectorAll(".park-btn--primary")].filter(
       (b) => !b.closest("[hidden]"),
     );
-    expect(visiblePrimary.map((b) => textOf(b))).toEqual(["Start it again"]);
-    click(control(rig.el, "Start it again"));
+    expect(visiblePrimary.map((b) => textOf(b))).toEqual(["Try again"]);
+    click(control(rig.el, "Try again"));
     await settle();
     expect(start).toHaveBeenCalledWith("hires");
     expect(rig.app.go).toHaveBeenCalledWith("world", { id: "w_new" });

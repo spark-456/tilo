@@ -2,7 +2,7 @@
 // WORLD-USEFUL: a real run's World page is something a person can read and use. Replays one run's recorded events
 // stage by stage (no network, no paid call) and checks what the page says at each: the plan forming, agents at
 // work with a plain progress line, what was assumed instead of asked (chips), the finished deliverable readable on
-// the page with Open and Download, and a failure that shows the recorded reason with "Start it again".
+// the page with Open and Download, and a failure that shows the recorded reason with "Try again".
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, click, mount } from "../../../../test-support/park/componentsHarness";
@@ -325,7 +325,7 @@ describe("WORLD_USEFUL the World page of a live run", () => {
     expect(pageText(rig.el)).not.toContain("a unit failed");
     expect(rig.el.querySelector(".park-world-runstatus progress")).toBeNull();
 
-    click(control(rig.el, "Start it again"));
+    click(control(rig.el, "Try again"));
     await settle();
     expect(start).toHaveBeenCalledWith("hires");
     expect(rig.app.go).toHaveBeenCalledWith("world", { id: "w_new" });
@@ -344,7 +344,7 @@ describe("WORLD_USEFUL the World page of a live run", () => {
       ev("budget.granted", "Approved.", { cap: 20, granted: 20 }),
       ev("world.failed", "Stopped.", { reason: "a tool was off", unit: null }),
     );
-    click(control(rig.el, "Start it again"));
+    click(control(rig.el, "Try again"));
     await settle();
     expect(pageText(rig.el)).toContain("cannot start this run again from here");
     click(control(rig.el, "New task"));

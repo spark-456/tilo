@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // RERUN-1: a world a restart stopped (world.failed "Tilo restarted during this run; start it again") offers ONE
-// honest action on its World page, "Start it again", which asks the API for a new run of the same task and opens the
+// honest action on its World page, "Try again", which asks the API for a new run of the same task and opens the
 // new world. No other stop, and no unfinished run, offers it. No network is touched.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, click } from "../../../../test-support/park/componentsHarness";
@@ -49,7 +49,7 @@ const STOPPED = [
   ev(3, "world.failed", { reason: RESTART, unit: null }),
 ];
 
-describe("RERUN_1 Start it again", () => {
+describe("RERUN_1 Try again", () => {
   it("RERUN_1_a_restart_stop_offers_one_action_that_starts_a_new_run_and_opens_it", async () => {
     const start = vi.fn(async () => ({ world_id: "w_new", task_id: "t_new" }));
     const rig = await mountWorld({
@@ -62,7 +62,7 @@ describe("RERUN_1 Start it again", () => {
     expect(pageText(rig.el)).toContain("in addition to any credits already used");
     expect(pageText(rig.el)).toContain("No outbound sends are recorded");
 
-    click(control(rig.el, "Start it again"));
+    click(control(rig.el, "Try again"));
     await settle();
 
     expect(start).toHaveBeenCalledTimes(1);
@@ -80,11 +80,11 @@ describe("RERUN_1 Start it again", () => {
       client: clientWith(STOPPED, start),
     });
 
-    click(control(rig.el, "Start it again"));
+    click(control(rig.el, "Try again"));
     await settle();
 
     expect(pageText(rig.el)).toContain("Nothing was started and nothing was charged");
-    expect(hasControl(rig.el, "Start it again")).toBe(true);
+    expect(hasControl(rig.el, "Try again")).toBe(true);
     expect(rig.app.go).not.toHaveBeenCalled();
   });
 
@@ -111,7 +111,7 @@ describe("RERUN_1 Start it again", () => {
     );
     expect(pageText(rig.el)).toContain("Starting again may send them again");
     expect(start).not.toHaveBeenCalled();
-    click(control(rig.el, "Start it again"));
+    click(control(rig.el, "Try again"));
     await settle();
     expect(start).toHaveBeenCalledTimes(1);
   });
@@ -127,8 +127,8 @@ describe("RERUN_1 Start it again", () => {
         client: clientWith(events, start),
       });
       expect(pageText(rig.el)).toContain("spending cap is not available");
-      expect((control(rig.el, "Start it again") as HTMLButtonElement).disabled).toBe(true);
-      click(control(rig.el, "Start it again"));
+      expect((control(rig.el, "Try again") as HTMLButtonElement).disabled).toBe(true);
+      click(control(rig.el, "Try again"));
       await settle();
       expect(start).not.toHaveBeenCalled();
     },
@@ -147,7 +147,7 @@ describe("RERUN_1 Start it again", () => {
     });
     expect(pageText(stopped.el)).toContain("Why: an internal error stopped the work");
     expect(pageText(stopped.el)).not.toContain("Tilo restarted while this was running");
-    expect(hasControl(stopped.el, "Start it again")).toBe(true);
+    expect(hasControl(stopped.el, "Try again")).toBe(true);
     cleanup();
     for (const events of [[ev(1, "world.started")], [...STOPPED, ev(4, "world.completed", {})]]) {
       const rig = await mountWorld({
@@ -155,7 +155,7 @@ describe("RERUN_1 Start it again", () => {
         api: liveWorldsApi(),
         client: clientWith(events),
       });
-      expect(hasControl(rig.el, "Start it again")).toBe(false);
+      expect(rig.el.querySelector('[data-testid="start-it-again"]')).toBeNull();
       cleanup();
     }
   });

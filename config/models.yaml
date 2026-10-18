@@ -57,30 +57,31 @@ profiles:
 roles:
   embed: { primary: embed-google, fallback: embed-google } # vectors from different profiles cannot be mixed
   # PL-02 / BQ-PL02-1: thinking tokens count against max_output_tokens, so a role that thinks states a cap that fits
-  # thinking plus the JSON reply (16384 for high and medium). Not a model limit: the repo states none.
+  # thinking plus the JSON reply (32768 for the long-running roles below). Not a model limit: the profile context
+  # remains the retry ceiling.
   # max_input_tokens (EFF-03): 100000, under the smallest context of any example profile (NIM: 128000)
   # `thinking` is only the DEFAULT for a caller that sets no level: the Router fills it in per profile that declares the
   # thinking capability (BQ-LE2E-10). The Director's planning calls set their own: brief extraction low, approaches and
   # plan compile medium (thinking tokens are billed as output), so `high` is not what a plain planning call pays for.
   director: { primary: flash-38, fallback: flash-37, thinking: high, max_input_tokens: 100000, max_output_tokens: 16384 }
-  lead: { primary: flash-38, fallback: flash-37, thinking: medium, max_output_tokens: 16384 }
+  lead: { primary: flash-38, fallback: flash-37, thinking: medium, max_output_tokens: 32768 }
   # COST-AUDIT: the Lead's district review is a short plain-text verdict on the cheap tier, no thinking (tilo_harness.lead_review)
   lead_review: { primary: lite-31, fallback: flash-37, max_output_tokens: 1024 }
   # Long-text roles (8 Oct 2026, live run 2: both writer calls stopped `truncated` with 0 visible tokens): without a cap the
   # Router sends 1024 (BQ-63) and the model's own thinking uses all of it, so a role that writes a document or a research
   # note states a cap that fits thinking plus the text, and thinks little.
-  specialist: { primary: lite-31, fallback: flash-37, thinking: low, max_output_tokens: 8192 } # EFF-02: cheapest first
+  specialist: { primary: lite-31, fallback: flash-37, thinking: low, max_output_tokens: 32768 } # EFF-02: cheapest first
   # ADR-0034 decision 3 / ADR-0051 decision A (TS-20): the one understanding step for describe, upload and record. It
   # reads typed words, documents and (S2) a recording as delimited data, so both profiles declare json, vision, video and
   # documents; lite-31 carries an audio_input price, flash-37 does not (a recording with sound is read only by a profile
   # that has one). max_output_tokens fits thinking plus the JSON reply. The user picks the final models and prices.
   skill_capture: { primary: lite-31, fallback: flash-37, thinking: low, max_output_tokens: 16384 }
   verifier: { primary: flash-38, fallback: flash-37, thinking: high, max_input_tokens: 100000, max_output_tokens: 16384 }
-  writer: { primary: flash-38, fallback: flash-37, thinking: low, max_output_tokens: 16384 }
+  writer: { primary: flash-38, fallback: flash-37, thinking: low, max_output_tokens: 32768 }
   narrator: { primary: lite-31, fallback: flash-37, max_output_tokens: 4096 } # fallback added for NFR-25 (BQ-18)
   autopilot: { primary: flash-37, fallback: lite-31, max_input_tokens: 16000 }
   # issue #272 (b): the live scenario generator (evals/generator.yaml caps its spend) and its autorater.
-  generator: { primary: flash-38, fallback: flash-37, thinking: low }
+  generator: { primary: flash-38, fallback: flash-37, thinking: low, max_output_tokens: 32768 }
   autorater: { primary: flash-37, fallback: lite-31 }
   # FR-PA-19: the assistant panel's fallback (config/assistant.yaml) on the cheapest profile; the
   # fallback (NFR-25) is used only on a provider error. Per-call caps: 8000 tokens in, 1000 out (EFF-03).

@@ -1,5 +1,5 @@
 // WORLD-USEFUL: the top of a real run's World page. One plain progress line, what the run assumed instead of
-// asking (chips), the recorded reason a run stopped with "Start it again", and the delivered result, readable here
+// asking (chips), the recorded reason a run stopped with "Try again", and the delivered result, readable here
 // with Open and Download. Every word comes from a recorded event (HR-1..HR-7); with no event it says so.
 import { useState } from "react";
 import { ResultTab } from "../../../worldView/LiveStageEmbed";
@@ -28,7 +28,11 @@ const refused = (error: unknown): boolean => {
 
 /** The one honest action for any stopped run (RERUN-1, RERUN-ANY): it always asks `/rerun` first; only a server
  * refusal points to a new task, and any other failure says so and leaves the button for another try. */
-function StartItAgain({ again, events, paused = false }: { again: StartAgain; events: readonly RunEvent[]; paused?: boolean }) {
+function StartItAgain({
+  again,
+  events,
+  paused = false,
+}: { again: StartAgain; events: readonly RunEvent[]; paused?: boolean }) {
   const { cap, sent } = restartApproval(events);
   const restart = isRestartStop(events);
   const [state, setState] = useState<"idle" | "busy" | "error" | "refused">("idle");
@@ -61,7 +65,7 @@ function StartItAgain({ again, events, paused = false }: { again: StartAgain; ev
         disabled={cap === null || state === "busy"}
         aria-busy={state === "busy"}
       >
-        {state === "busy" ? "Starting…" : paused ? "Continue" : "Start it again"}
+        {state === "busy" ? "Starting…" : paused ? "Continue" : "Try again"}
       </Button>
       {state === "error" ? (
         <p className="park-world-noruns" role="alert">
@@ -244,7 +248,7 @@ export function AssumedChips({ assumptions }: { assumptions: readonly string[] }
   );
 }
 
-/** The one status banner: the progress line and bar, and a stopped run's recorded reason with "Start it again". The
+/** The one status banner: the progress line and bar, and a stopped run's recorded reason with "Try again". The
  * assumptions sit beside the tabs (AssumedChips) and the result in the Result tab (RunResult). */
 export function RunStatus({
   view,
@@ -281,7 +285,9 @@ export function RunStatus({
       {view.phase === "paused" && again ? (
         <div className="park-world-failed" data-testid="run-paused">
           <h2 className="park-world-h2">This run is paused</h2>
-          <p className="park-world-noruns">Continue starts a new run using this task and its recorded progress.</p>
+          <p className="park-world-noruns">
+            Continue starts a new run using this task and its recorded progress.
+          </p>
           <StartItAgain again={again} events={events} paused />
         </div>
       ) : null}
