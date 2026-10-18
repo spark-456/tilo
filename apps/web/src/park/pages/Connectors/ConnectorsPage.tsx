@@ -18,7 +18,8 @@ import { ToolAccess } from "./ToolAccess";
 import "./Connectors.css";
 import "./Connectors.studio.css";
 import { ConnectionsSection } from "../../shared/RunAdmin";
-import { AttentionBanner, AvailableRow, ConnectedTile } from "./ConnectorParts";
+import { BrandIcon } from "./BrandIcon";
+import { AttentionBanner, AvailableRow, ConnectedTile, RealConnectedCard } from "./ConnectorParts";
 import { Drawer } from "./Drawer";
 import { GoogleAccess } from "./GoogleAccess";
 import { LiveConnectors } from "./LiveConnectors";
@@ -186,11 +187,11 @@ export function ConnectorsPage({
         <Heading />
         {live ? <GoogleAccess flow={live} /> : null}
         {live ? <MeetingHostAccess flow={live} /> : null}
-        <div className="park-connectors-empty">
+        <div className="park-connectors-empty" role="alert">
           <span className="park-connectors-empty-glyph">{icon("plug", 22)}</span>
           <div className="park-connectors-empty-title">Connector data is unavailable</div>
           <div className="park-connectors-empty-line">
-            The connector list is unavailable. No connection status can be shown.
+            Tilo had a problem reaching the connector service. Try again in a moment.
           </div>
         </div>
       </Frame>
@@ -205,11 +206,27 @@ export function ConnectorsPage({
   }
 
   const all = merge(load.connectors, NO_OVERRIDES, now());
-  const inChip = (c: Connector) => chip === "All" || chipOf(c.cat) === chip;
-  const chips = CATEGORY_CHIPS.filter((k) => all.some((c) => chipOf(c.cat) === k));
-  const on = all.filter((c) => isOn(c) && matches(c, q) && inChip(c));
-  const avail = all.filter((c) => !isOn(c) && matches(c, q) && inChip(c));
-  const attn = all.filter((c) => c.st === "attention");
+  const GOOGLE_CONNECTOR_IDS = new Set([
+    "gmail",
+    "gdrive",
+    "google_drive",
+    "gcal",
+    "google_calendar",
+  ]);
+  const isGoogle = (id: string) => GOOGLE_CONNECTOR_IDS.has(id.toLowerCase());
+
+  // CONNECT-UX: only Gmail, Google Drive and Google Calendar as real connected cards
+  const googleConnectors = all.filter((c) => isGoogle(c.id) && matches(c, q));
+  // everything else as one calm "Coming later" row of greyed items (never Canva)
+  const comingLater = all.filter(
+    (c) =>
+      !isGoogle(c.id) &&
+      c.id.toLowerCase() !== "canva" &&
+      c.name.toLowerCase() !== "canva" &&
+      matches(c, q),
+  );
+  const on = googleConnectors.filter((c) => isOn(c));
+  const attn = googleConnectors.filter((c) => c.st === "attention");
   const cur = all.find((c) => c.id === open);
   const nOn = `${on.length} connected`;
 
@@ -238,21 +255,6 @@ export function ConnectorsPage({
         </div>
       </Heading>
 
-      <fieldset className="park-connectors-chips">
-        <legend className="park-connectors-chips__legend">Category</legend>
-        {(["All", ...chips] as const).map((k) => (
-          <button
-            key={k}
-            type="button"
-            className="park-connectors-chip"
-            aria-pressed={chip === k}
-            onClick={() => setChip(k)}
-          >
-            {k}
-          </button>
-        ))}
-      </fieldset>
-
       <p className="park-connectors-strip" role="note">
         <strong>Example connections</strong>
         {SAMPLE_STRIP}
@@ -270,46 +272,59 @@ export function ConnectorsPage({
         />
       ))}
 
-      <section className="park-connectors-section" aria-label="Connected">
-        <div className="park-connectors-sechead">
-          <span className="park-connectors-sectitle">Connected</span>
-          <span className="park-connectors-count">{nOn}</span>
-        </div>
-        {groupConnectors(on).map(({ heading, connectors: members }) => (
-          <div className="park-connectors-category" key={heading}>
-            <h2>{heading}</h2>
-            <div className="park-connectors-grid">
-              {members.map((c) => (
-                <ConnectedTile key={c.id} c={c} onOpen={() => setOpen(c.id)} />
-              ))}
-            </div>
+      {googleConnectors.length === 0 ? (
+        <div className="park-connectors-empty" data-testid="connectors-empty">
+          <span className="park-connectors-empty-glyph">{icon("search", 22)}</span>
+          <div className="park-connectors-empty-title">No matching connectors</div>
+          <div className="park-connectors-empty-line">
+            {q
+              ? `No connectors matched "${q}". Try searching for Gmail, Drive or Calendar.`
+              : "Connect Gmail, Google Drive or Google Calendar to allow your agents to search mail, read files, and check your schedule."}
           </div>
-        ))}
-      </section>
+        </div>
+      ) : (
+        <section className="park-connectors-section" aria-label="Connected">
+          <div className="park-connectors-sechead">
+            <span className="park-connectors-sectitle">Connected</span>
+            <span className="park-connectors-count">{nOn}</span>
+          </div>
+          <div className="park-connectors-grid">
+            {googleConnectors.map((c) => (
+              <RealConnectedCard
+                key={c.id}
+                c={c}
+                onOpen={() => setOpen(c.id)}
+                onConnect={() => sample(c, "connected")}
+                onReconnect={() => sample(c, "reconnected")}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
-      <section className="park-connectors-section" aria-label="Available">
-        <div className="park-connectors-sechead">
-          <span className="park-connectors-sectitle">Add a tool</span>
-          <span className="park-connectors-count">
-            Sign in with the tool. Tilo never sees your password.
-          </span>
-        </div>
-        {groupConnectors(avail).map(({ heading, connectors: members }) => (
-          <div className="park-connectors-category" key={heading}>
-            <h2>{heading}</h2>
-            <div className="park-connectors-availgrid">
-              {members.map((c) => (
-                <AvailableRow
-                  key={c.id}
-                  c={c}
-                  busy={false}
-                  onConnect={() => sample(c, "connected")}
-                />
-              ))}
-            </div>
+      {comingLater.length > 0 ? (
+        <section
+          className="park-connectors-section park-connectors-coming-later"
+          aria-label="Coming later"
+          data-coming-later=""
+        >
+          <div className="park-connectors-sechead">
+            <h2 className="park-connectors-sectitle">Coming later</h2>
+            <span className="park-connectors-count">Planned integrations</span>
           </div>
-        ))}
-      </section>
+          <div className="park-connectors-coming-row">
+            {comingLater.map((c) => (
+              <div key={c.id} className="park-connectors-coming-item" data-coming-item={c.id}>
+                <span className="park-connectors-coming-mono">
+                  <BrandIcon id={c.id} mono={c.mono} />
+                </span>
+                <span className="park-connectors-coming-name">{c.name}</span>
+                <span className="park-connectors-coming-tag">Later</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {cur ? (
         <Drawer

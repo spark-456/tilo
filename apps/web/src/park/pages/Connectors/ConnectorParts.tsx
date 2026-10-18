@@ -107,3 +107,99 @@ export function AvailableRow({
     </div>
   );
 }
+
+export function RealConnectedCard({
+  c,
+  onOpen,
+  onConnect,
+  onReconnect,
+}: {
+  c: Merged;
+  onOpen: () => void;
+  onConnect: () => void;
+  onReconnect: () => void;
+}) {
+  const attn = c.st === "attention";
+  const on = c.st === "connected";
+  const avail = c.st === "available";
+
+  return (
+    <article
+      className={
+        attn
+          ? "park-connectors-tile park-connectors-card park-connectors-tile--attn"
+          : "park-connectors-tile park-connectors-card"
+      }
+      data-connector-card={c.id}
+    >
+      <button type="button" className="park-connectors-card-main" onClick={onOpen}>
+        <div className="park-connectors-tile-head">
+          <span className="park-connectors-mono">
+            <BrandIcon id={c.id} mono={c.mono} />
+          </span>
+          <div className="park-connectors-tile-names">
+            <span className="park-connectors-tile-name">{c.name}</span>
+            <span className="park-connectors-tile-acct">
+              {c.acct || (avail ? "Not connected yet" : "Account not available")}
+            </span>
+          </div>
+          <span className={`park-connectors-level park-connectors-level--${c.level}`}>
+            {LEVEL_LABEL[c.level] || (avail ? "Available" : "Connected")}
+          </span>
+        </div>
+        <div className="park-connectors-tile-foot">
+          <span
+            className={
+              attn ? "park-connectors-sync park-connectors-sync--attn" : "park-connectors-sync"
+            }
+          >
+            <span
+              className={
+                attn ? "park-connectors-dot park-connectors-dot--attn" : "park-connectors-dot"
+              }
+            />
+            {avail ? "Not connected" : syncLine(c)}
+          </span>
+          <span className="park-connectors-used">{avail ? "No active worlds" : usedLine(c)}</span>
+          <span className="park-connectors-manage">Manage</span>
+        </div>
+      </button>
+      <div className="park-connectors-card-actions">
+        {attn ? (
+          <button
+            type="button"
+            className="park-connectors-action-btn park-connectors-action-btn--reconnect"
+            onClick={(e) => {
+              e.stopPropagation();
+              onReconnect();
+            }}
+          >
+            Reconnect
+          </button>
+        ) : on ? (
+          <button
+            type="button"
+            className="park-connectors-action-btn park-connectors-action-btn--reconnect"
+            onClick={(e) => {
+              e.stopPropagation();
+              onReconnect();
+            }}
+          >
+            Reconnect
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="park-connectors-action-btn park-connectors-action-btn--connect"
+            onClick={(e) => {
+              e.stopPropagation();
+              onConnect();
+            }}
+          >
+            Connect
+          </button>
+        )}
+      </div>
+    </article>
+  );
+}
