@@ -29,20 +29,22 @@ export function ToolAccess({ skills, tools }: { skills: Skill[]; tools: Learn["t
               <span className="park-skills-access-name">
                 {r.skill} · {r.tool}
               </span>
-              <select
-                className="park-skills-access-select"
-                aria-label={`${r.skill}: ${r.tool} access`}
-                data-skill-tool={key}
-                data-team-level={r.team}
-                value={shownLevel(r.team, picked[key] ?? r.level)}
-                onChange={(e) => setPicked({ ...picked, [key]: Number(e.currentTarget.value) })}
-              >
-                {LEVELS.map((label, i) => (
-                  <option key={label} value={i} disabled={!allowed.includes(i)}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+              <span className="park-skills-access-selectwrap">
+                <select
+                  className="park-skills-access-select"
+                  aria-label={`${r.skill}: ${r.tool} access`}
+                  data-skill-tool={key}
+                  data-team-level={r.team}
+                  value={shownLevel(r.team, picked[key] ?? r.level)}
+                  onChange={(e) => setPicked({ ...picked, [key]: Number(e.currentTarget.value) })}
+                >
+                  {LEVELS.map((label, i) => (
+                    <option key={label} value={i} disabled={!allowed.includes(i)}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </span>
             </li>
           );
         })}

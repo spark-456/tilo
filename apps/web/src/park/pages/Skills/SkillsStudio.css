@@ -201,8 +201,13 @@
 }
 [data-park] .park-skills-gallery__none {
   margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 14px;
+  background: var(--sunk);
   font-size: 15px;
-  color: var(--ink2);
+  line-height: 1.45;
+  color: var(--ink3);
 }
 [data-park] .park-skills-cards,
 [data-park] .park-skills-learning__list {
@@ -580,12 +585,14 @@
   font: inherit;
   font-size: 14px;
   font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   cursor: pointer;
+}
+[data-park] .park-skill-link:hover {
+  color: var(--ink2);
 }
 [data-park] .park-skill-drawer__used {
   display: flex;
@@ -868,13 +875,61 @@
 [data-park] .park-teach__setup-link {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
-  padding: 0 12px;
+  min-height: 44px;
+  padding: 0 14px;
   border: 1px solid var(--line);
   border-radius: 99px;
   background: var(--card);
   color: var(--ink);
   font-weight: 600;
+  text-decoration: none;
+}
+[data-park] .park-teach__setup-link:hover {
+  background: var(--btn2);
+}
+[data-park] .park-teach__checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+[data-park] .park-teach__checkbox-label input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  border: 1px solid var(--lineStrong, var(--line));
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--onPri, #1f1d2b);
+  cursor: pointer;
+}
+[data-park] .park-teach__checkbox-label input[type="checkbox"]::before {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+}
+[data-park] .park-teach__checkbox-label input[type="checkbox"]:checked {
+  border-color: var(--heroFill);
+  background: var(--heroFill);
+}
+[data-park] .park-teach__checkbox-label input[type="checkbox"]:checked::before {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+[data-park] .park-teach__checkbox-label input[type="checkbox"]:focus-visible {
+  outline: 3px solid var(--focus, var(--heroInk));
+  outline-offset: 2px;
 }
 [data-park] .park-teach__row--step {
   min-height: 60px;
@@ -1182,5 +1237,11 @@
   [data-park] .park-skills-page {
     padding-right: 0;
     padding-left: 0;
+  }
+}
+
+@media (max-width: 440px) {
+  [data-park] .park-skills-cards {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

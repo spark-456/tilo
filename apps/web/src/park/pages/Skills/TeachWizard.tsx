@@ -224,7 +224,7 @@ export function ScreenExample({ t, onAccepted }: { t: Teach; onAccepted?: () => 
         Video is captured locally for up to five minutes. Nothing is sent until you choose Use this
         recording.
       </p>
-      <label>
+      <label className="park-teach__checkbox-label">
         <input
           type="checkbox"
           checked={narrate}
