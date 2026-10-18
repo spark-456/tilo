@@ -269,7 +269,7 @@ def browser_control_unavailable(brief: dict[str, Any], steps: list[dict[str, Any
         actions = {item["id"] for item in registry.get("web")["actions"]}
     except (KeyError, TypeError, ValueError):
         actions = set()
-    return not {"open_url", "click_first_result"}.issubset(actions)
+    return "browse_web" not in actions
 
 
 def start_run(store: deps.Store, task: deps.TaskRecord, *, approach: dict, budget_cap: float, seams: Seams) -> None:

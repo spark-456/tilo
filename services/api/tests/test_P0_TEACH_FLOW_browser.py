@@ -8,6 +8,11 @@ class _Registry:
         return {"actions": [{"id": "web_search"}, {"id": "fetch_url"}]}
 
 
+class _BrowserRegistry(_Registry):
+    def get(self, tool: str) -> dict:
+        return {"actions": [*super().get(tool)["actions"], {"id": "browse_web"}]}
+
+
 def test_P0_TEACH_FLOW_open_and_play_skill_fails_honestly_without_browser_action() -> None:
     assert browser_control_unavailable(
         {"goal": "Open YouTube and play the first video"},
@@ -18,6 +23,11 @@ def test_P0_TEACH_FLOW_open_and_play_skill_fails_honestly_without_browser_action
         {"goal": "Summarise YouTube search results"},
         [{"text": "Search YouTube", "tool": "web", "action": "web_search"}],
         _Registry(),
+    )
+    assert not browser_control_unavailable(
+        {"goal": "Open YouTube and play the first video"},
+        [{"text": "Open YouTube", "tool": "web", "action": "browse_web"}],
+        _BrowserRegistry(),
     )
 
 

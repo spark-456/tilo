@@ -12,7 +12,7 @@ for (const width of [1440, 390] as const) {
     test(`P0_TEACH_FLOW_review_${width}_${theme}_shows_browser_limit`, async ({ page }) => {
       mkdirSync(evidence, { recursive: true });
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
-      await page.goto("/skills-record-harness.html");
+      await page.goto("/skills-record-harness.html", { waitUntil: "domcontentloaded" });
       if (theme === "dark") {
         await page
           .locator("[data-park]")
