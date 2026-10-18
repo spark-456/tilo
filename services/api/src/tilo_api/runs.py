@@ -10,6 +10,7 @@ import copy
 import dataclasses
 import logging
 import math
+import re
 import threading
 import time
 import unicodedata
@@ -253,6 +254,22 @@ def _taught_outline(plan: dict[str, Any], steps: list[dict[str, Any]] | None, re
         )
         gates.append(gate)
     return {**plan, "units": units, "gates": gates}
+
+
+def browser_control_unavailable(brief: dict[str, Any], steps: list[dict[str, Any]] | None, registry: Any) -> bool:
+    """A web-search taught step cannot fulfil a request to operate a page."""
+    if not steps:
+        return False
+    goal = " ".join([str(brief.get("goal", "")), *(str(step.get("text", "")) for step in steps)])
+    if not re.search(r"\b(?:open|navigate|click|play|type|fill)\b", goal, re.I):
+        return False
+    if not re.search(r"\b(?:browser|website|webpage|youtube|https?://|[a-z0-9-]+\.com\b)", goal, re.I):
+        return False
+    try:
+        actions = {item["id"] for item in registry.get("web")["actions"]}
+    except (KeyError, TypeError, ValueError):
+        actions = set()
+    return "browse_web" not in actions
 
 
 def start_run(store: deps.Store, task: deps.TaskRecord, *, approach: dict, budget_cap: float, seams: Seams) -> None:
@@ -678,6 +695,13 @@ class Run:
         except Exception as exc:
             logger.warning("run %s: the owner's records could not be read (%s)", self.run_id, type(exc).__name__)
             self._fail("the owner's records could not be read", None)
+            return None
+        browser_brief = {
+            **self.brief,
+            "goal": " ".join((str(self.brief.get("goal", "")), str((self.skill or {}).get("name", "")))),
+        }
+        if browser_control_unavailable(browser_brief, self.skill_plan, registry):
+            self._fail("Tilo can't operate a browser yet, so this skill cannot open or play a video", None)
             return None
         try:
             context = PlanInputs(

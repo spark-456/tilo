@@ -328,6 +328,21 @@ describe("SKILLS_5_live_teach: describe it (step 1)", () => {
 });
 
 describe("SKILLS_5_live_teach: a capture the server cannot make", () => {
+  it("P0_TEACH_FLOW_failed_example_has_error_and_words_path", async () => {
+    const r = await rig({
+      "POST /v1/skills/captures": () => json({ detail: "draft_failed" }, 502),
+    }).mount();
+    const picker = q(r.el, 'input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(picker, "files", {
+      value: [new File(["example"], "example.webm", { type: "video/webm" })],
+      configurable: true,
+    });
+    act(() => picker.dispatchEvent(new Event("change", { bubbles: true })));
+    await settle();
+    expect(text(r)).toContain("could not read your example");
+    expect(describeField(r.el)).not.toBeNull();
+    expect(isDisabled(control(r.el, NEXT_EXAMPLE))).toBe(true);
+  });
   it.each([
     [503, NOT_CONNECTED],
     [502, ERR_TRY],
@@ -371,6 +386,45 @@ describe("SKILLS_5_live_teach: a capture the server cannot make", () => {
 });
 
 describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
+  it("P0_TEACH_FLOW_question_has_answer_and_skip_without_blocking_save", async () => {
+    const { server, mount } = rig();
+    const r = await mount();
+    await toVersion(r);
+    expect(q(r.el, 'input[aria-label="Answer Link or PDF?"]')).not.toBeNull();
+    expect(hasControl(r.el, "Save answer")).toBe(true);
+    expect(hasControl(r.el, "Skip question")).toBe(true);
+    clickEl(control(r.el, "Skip question"));
+    name(r, "Match invoices");
+    clickEl(control(r.el, "Save skill"));
+    await settle();
+    expect(server.posts("/v1/skills")).toHaveLength(1);
+    expect((server.posts("/v1/skills")[0] as Record<string, unknown>).clarifying_question).toBeUndefined();
+  });
+
+  it("P0_TEACH_FLOW_saved_answer_is_sent_as_a_question_option", async () => {
+    const { server, mount } = rig();
+    const r = await mount();
+    await toVersion(r);
+    typeInto(q(r.el, 'input[aria-label="Answer Link or PDF?"]') as HTMLInputElement, "PDF file");
+    clickEl(control(r.el, "Save answer"));
+    name(r, "Match invoices");
+    clickEl(control(r.el, "Save skill"));
+    await settle();
+    const [body] = server.posts("/v1/skills") as { clarifying_question: unknown }[];
+    expect(body?.clarifying_question).toEqual({
+      text: "Link or PDF?",
+      options: ["PDF file", "Open the link", "Skip"],
+      answer: 0,
+    });
+  });
+
+  it("P0_TEACH_FLOW_browser_task_states_limit_on_review", async () => {
+    const r = await rig().mount();
+    await describe_(r, "Open YouTube and play the first video");
+    clickEl(control(r.el, NEXT_REVIEW));
+    await settle();
+    expect(text(r)).toContain("Tilo can't operate a browser yet");
+  });
   it("test_R_SKILL_TEACH_502_keeps_capture_and_opens_one_editable_step", async () => {
     const { server, mount } = rig({
       "POST /v1/skills/captures/tsk_C1/version": () => json({ detail: "draft_failed" }, 502),
@@ -379,7 +433,8 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
     await toVersion(r);
     expect(currentStep(r.el)).toBe("Review the steps");
     const step = r.el.querySelector<HTMLInputElement>('input[aria-label="Edit step 1"]');
-    expect(step?.value).toBe("Describe this step");
+    // P0-TEACH-FLOW: the fallback keeps the actual captured request instead of a generic placeholder.
+    expect(step?.value).toBe("Open the invoice mail");
     expect(text(r)).toContain("Open the invoice mail");
     typeInto(step as HTMLInputElement, "Draft an invoice summary");
     expect(step?.value).toBe("Draft an invoice summary");

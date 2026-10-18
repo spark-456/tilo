@@ -143,6 +143,7 @@ class TriggerIn(_Closed):
 class QuestionIn(_Closed):
     text: Text
     options: Annotated[list[Annotated[str, Field(max_length=200)]], Field(max_length=10)]
+    answer: Annotated[int, Field(ge=0, le=3)] | None = None
 
 
 class SkillIn(_Closed):
@@ -231,7 +232,11 @@ def build_record(
         "plan": plan,
         "question": None
         if question is None
-        else {"text": w.text(question.text), "options": [w.text(o) for o in question.options], "answer": None},
+        else {
+            "text": w.text(question.text),
+            "options": [w.text(o) for o in question.options],
+            "answer": question.answer,
+        },
         "trigger": _trigger(body.trigger, cfg),
         "estimates": estimates_for(plan, cfg),
         "tool_access": {},

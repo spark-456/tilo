@@ -55,6 +55,8 @@ it("test_R_SKILL_TEACH_keeps_recording_until_capture_succeeds", async () => {
   m.render(<ScreenExample t={{ ...teach, fileError: "Upload failed." }} onAccepted={onAccepted} />);
   expect(onAccepted).not.toHaveBeenCalled();
   expect(m.container.querySelector("video")?.getAttribute("src")).toBe("blob:local");
+  expect(button("Retry recording")).toBeDefined();
+  expect(button("Skip, describe it in words")).toBeDefined();
   m.render(<ScreenExample t={{ ...teach, usedFile: true }} onAccepted={onAccepted} />);
   expect(onAccepted).toHaveBeenCalledOnce();
 });

@@ -48,6 +48,8 @@ export interface Teach {
   desc: string;
   ask: readonly boolean[];
   qAns: string | null;
+  qSaved: boolean;
+  qSkipped: boolean;
   scope: Scope;
   teamId: string | null;
   teams: readonly string[] | null;
@@ -75,9 +77,12 @@ export interface Teach {
   removeHost: (host: string) => void;
   setTrig: (t: Trigger) => void;
   setQAns: (a: string) => void;
+  saveAnswer: () => void;
+  skipQuestion: () => void;
   toggleAsk: (i: number) => void;
   capture: () => void;
   captureFiles: (files: FileList | readonly File[], method?: "upload" | "record") => boolean;
+  skipRecording: () => void;
   next: () => void;
   back: () => void;
   save: () => void;
@@ -104,6 +109,8 @@ export function useTeach({
   const [desc, setDesc] = useState(isLive ? "" : DEFAULT_DESC);
   const [ask, setAsk] = useState<readonly boolean[]>(DEFAULT_ASK);
   const [qAns, setQAns] = useState<string | null>(null);
+  const [qSaved, setQSaved] = useState(false);
+  const [qSkipped, setQSkipped] = useState(false);
   // A live save takes only what POST /v1/skills accepts: a skill for the person that runs when they ask.
   const [scope, setScope] = useState<Scope>(isLive ? "me" : "team");
   const [teamId, setTeamId] = useState<string | null>(null);
@@ -168,7 +175,7 @@ export function useTeach({
           fallback: true,
           steps: [
             {
-              text: "Describe this step",
+              text: captured.steps[0] ?? "Answer the request or explain what Tilo cannot do",
               tool: "writer",
               action: "compose",
               verb: "draft",
@@ -194,6 +201,13 @@ export function useTeach({
     if (!version || !captured) return;
     if (version.fallback && !version.steps[0]?.text.trim()) return;
     const steps = version.steps.map((s, i) => ({ ...s, ask: s.locked || ask[i] === true }));
+    const question = version.question && !qSkipped ? version.question : null;
+    const answer = qSaved ? qAns?.trim().slice(0, 200) : null;
+    const options = question
+      ? answer
+        ? [answer, ...question.options.filter((option) => option !== answer)].slice(0, 4)
+        : question.options
+      : [];
     const skill: Skill = {
       ...blankSkill(user.name),
       ...liveSavedOverride(user.name),
@@ -206,7 +220,9 @@ export function useTeach({
         plan: steps.map((s) => ({ text: s.text, tool: `${s.tool} · ${s.action}`, ask: s.ask })),
         server: {
           captured: captured.steps,
-          question: version.question,
+          question: question
+            ? { text: question.text, options, ...(answer ? { answer: 0 } : {}) }
+            : null,
           steps,
           inputs: version.inputs,
           hosts,
@@ -264,17 +280,27 @@ export function useTeach({
     setFileError(null);
     setUploading(true);
     setReadingUploaded(false);
-    once(async () => {
-      try {
-        const r = await api.captureFile(file, () => setReadingUploaded(true), method);
-        setCaptured(r.data);
-        setUsedFile(true);
-        setVersion(null);
-      } finally {
-        if (mounted.current) setUploading(false);
-        if (mounted.current) setReadingUploaded(false);
-      }
-    }, failed);
+    once(
+      async () => {
+        try {
+          const r = await api.captureFile(file, () => setReadingUploaded(true), method);
+          setCaptured(r.data);
+          setUsedFile(true);
+          setVersion(null);
+        } finally {
+          if (mounted.current) setUploading(false);
+          if (mounted.current) setReadingUploaded(false);
+        }
+      },
+      (e) => {
+        setFileError(
+          method === "record"
+            ? "Tilo could not read your recording. Retry or describe it in words."
+            : "Tilo could not read your example. Retry or describe it in words.",
+        );
+        failed(e);
+      },
+    );
     return true;
   };
   const reset = () => {
@@ -282,6 +308,8 @@ export function useTeach({
     setCap(0);
     setSaved(false);
     setQAns(null);
+    setQSaved(false);
+    setQSkipped(false);
     setName(defaultName);
     setCaptured(null);
     setVersion(null);
@@ -331,6 +359,8 @@ export function useTeach({
     desc,
     ask,
     qAns,
+    qSaved,
+    qSkipped,
     scope,
     teamId,
     teams,
@@ -379,13 +409,31 @@ export function useTeach({
     },
     removeHost: (host) => setHosts((current) => current.filter((item) => item !== host)),
     setTrig,
-    setQAns,
+    setQAns: (answer) => {
+      setQAns(answer);
+      setQSaved(false);
+    },
+    saveAnswer: () => {
+      if (qAns?.trim()) {
+        setQSaved(true);
+        setQSkipped(false);
+      }
+    },
+    skipQuestion: () => {
+      setQAns(null);
+      setQSaved(false);
+      setQSkipped(true);
+    },
     toggleAsk: (i) => {
       if (isLive && version?.steps[i]?.locked !== false) return; // a step the server forced to ask stays on
       setAsk((a) => a.map((on, j) => (j === i ? !on : on)));
     },
     capture,
     captureFiles,
+    skipRecording: () => {
+      setFileError(null);
+      setFailure(null);
+    },
     next: () => {
       if (isLive) return proposeIt();
       if (cap >= CAPTURE_STEPS) setStage(1);
