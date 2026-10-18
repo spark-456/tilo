@@ -935,3 +935,139 @@
     display: none;
   }
 }
+
+/* ---- TW-DARK: World page & Result tab dark mode contrast and readability (WCAG AA) ---- */
+[data-park][data-time="night"] .park-world-slackdialog,
+[data-park][data-time="night"] .park-world-resultdialog {
+  background: var(--pop);
+  color: var(--ink);
+  border-color: var(--line);
+  box-shadow: var(--shPop);
+}
+[data-park][data-time="night"] .park-world-slacktitle {
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-slacksub,
+[data-park][data-time="night"] .park-world-slacklabel,
+[data-park][data-time="night"] .park-world-slackcount {
+  color: var(--ink2);
+}
+[data-park][data-time="night"] .park-world-slackselect,
+[data-park][data-time="night"] .park-world-slacknote {
+  background: var(--field);
+  color: var(--ink);
+  border-color: var(--line);
+}
+[data-park][data-time="night"] .park-world-slackselect:focus-visible,
+[data-park][data-time="night"] .park-world-slacknote:focus-visible {
+  outline-color: var(--heroInk);
+}
+[data-park][data-time="night"] .park-world-out {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-resulttext {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+[data-park][data-time="night"] .park-world-resulttext h3,
+[data-park][data-time="night"] .park-world-resulttext h4,
+[data-park][data-time="night"] .park-world-resulttext h5,
+[data-park][data-time="night"] .park-world-resulttext h6,
+[data-park][data-time="night"] .park-world-resulttext p,
+[data-park][data-time="night"] .park-world-resulttext li {
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-resulttext pre,
+[data-park][data-time="night"] .park-world-resultpre {
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+[data-park][data-time="night"] .park-world-resulttext code {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--amberInk);
+  border: 1px solid var(--line2);
+}
+[data-park][data-time="night"] .park-world-resulttext a {
+  color: var(--heroInk);
+  text-decoration: underline;
+}
+[data-park][data-time="night"] .park-world-resulttext a:hover,
+[data-park][data-time="night"] .park-world-resulttext a:focus-visible {
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-resulttext th {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  border-color: var(--line);
+  font-weight: 700;
+}
+[data-park][data-time="night"] .park-world-resulttext td {
+  border-color: var(--line);
+  color: var(--ink);
+}
+[data-park] .park-world-resulttext:focus-visible {
+  outline: 3px solid var(--focus, #5a3fe0);
+  outline-offset: -2px;
+}
+[data-park][data-time="night"] .park-world-resulttext:focus-visible {
+  outline-color: var(--heroInk);
+}
+[data-park][data-time="night"] .park-world-step--done .park-world-stepmark {
+  background: var(--ok);
+  color: var(--inv);
+}
+[data-park][data-time="night"] .park-world-step--working .park-world-stepmark,
+[data-park][data-time="night"] .park-world-step--started .park-world-stepmark {
+  background: var(--heroFill);
+  color: #ffffff;
+}
+[data-park][data-time="night"] .park-world-lovablelink {
+  background: var(--heroFill);
+  color: #ffffff;
+}
+[data-park][data-time="night"] .park-world-back:focus-visible,
+[data-park][data-time="night"] .park-world-live:focus-visible,
+[data-park][data-time="night"] .park-world-lenses a:focus-visible,
+[data-park][data-time="night"] .park-world-spendlink:focus-visible,
+[data-park][data-time="night"] .park-world-skillchip:focus-visible,
+[data-park][data-time="night"] .park-world-toolchip:focus-visible,
+[data-park][data-time="night"] .park-world-lovablelink:focus-visible,
+[data-park][data-time="night"] .park-world-tab:focus-visible,
+[data-park][data-time="night"] .park-world-panel:focus-visible {
+  outline-color: var(--heroInk);
+}
+[data-park][data-time="night"] .park-world-tab--on {
+  background: var(--tabOn);
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-tab:not(.park-world-tab--on) {
+  color: var(--ink2);
+}
+[data-park][data-time="night"] .park-world-dock {
+  background: var(--card);
+  border-color: var(--line);
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-livenote {
+  background: var(--pop);
+  border-color: var(--line);
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-toast {
+  background: var(--pop);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-zoom {
+  background: var(--pop);
+  border: 1px solid var(--line);
+}
+[data-park][data-time="night"] .park-world-fade {
+  background: linear-gradient(to bottom, transparent, var(--paper));
+}
