@@ -9,7 +9,6 @@ import { Markdown } from "../../park/pages/World/markdown";
 import type { SharedResult } from "../../park/pages/World/ResultPanel";
 import type { RunEvent } from "../../park/pages/World/useRunEvents";
 import type { ResultView } from "../../park/pages/World/useRunResult";
-import { Markdown } from "../../park/pages/World/markdown";
 
 const readableMath = (text: string): string =>
   text
@@ -179,20 +178,22 @@ function WorkingFiles({
             <button
               type="button"
               className="tw-res-file-btn tw-res-file-btn--icon secondary"
-              aria-label={`Open ${f.name}`}
+              aria-label={`Open working file: ${f.name}`}
               title={`Open ${f.name}`}
               onClick={() => readItem(f.id, openResult)}
             >
               <Icon name="eye" size={16} />
+              <span className="park-sr-only">{`Open working file: ${f.name}`}</span>
             </button>
             <button
               type="button"
               className="tw-res-file-btn tw-res-file-btn--icon secondary"
-              aria-label={`Download ${f.name}`}
+              aria-label={`Download working file: ${f.name}`}
               title={`Download ${f.name}`}
               onClick={() => readItem(f.id, (b) => saveResult(b, f.name))}
             >
               <Icon name="download" size={16} />
+              <span className="park-sr-only">{`Download working file: ${f.name}`}</span>
             </button>
           </li>
         ))}
