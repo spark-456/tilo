@@ -11,9 +11,7 @@ test.beforeAll(async ({ browser, baseURL }) => {
   test.setTimeout(150_000);
   const page = await browser.newPage(baseURL ? { baseURL } : {});
   await page.goto("/agenda", { timeout: 120_000 });
-  await page
-    .getByRole("heading", { name: "Agenda", exact: true })
-    .waitFor({ timeout: 120_000 });
+  await page.getByRole("heading", { name: "Agenda", exact: true }).waitFor({ timeout: 120_000 });
   await page.close();
 });
 
