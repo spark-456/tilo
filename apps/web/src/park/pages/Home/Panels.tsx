@@ -7,6 +7,7 @@ import type { Dec, Decision, Ledger, World } from "../../api/types";
 import { kpis } from "../../app/ledgerKpis";
 import { KpiTile } from "../../components";
 import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
+import { WorldThumbnail, type WorldThumbnailClient } from "../../shared/WorldThumbnail";
 import { Buddy } from "../../studio/Buddy";
 import { type LiveRow, type NextEvent, type Spend, decisionsWaiting } from "./homeData";
 import { icon, needsAgent, worldArt } from "./homeKit";
@@ -102,12 +103,21 @@ export interface WorldsProps {
   /** STARTER-1: the recorded sample project, when the Api served it and the person has not hidden it. */
   readonly sample?: World | undefined;
   readonly night: boolean;
+  readonly client: WorldThumbnailClient | null;
   readonly onWorld: (id: string) => void;
   readonly onWorlds: () => void;
 }
 
 /** The newest served worlds, as cards; each state and progress line comes from the Api. */
-export function WorldsSection({ served, rows, sample, night, onWorld, onWorlds }: WorldsProps) {
+export function WorldsSection({
+  served,
+  rows,
+  sample,
+  night,
+  client,
+  onWorld,
+  onWorlds,
+}: WorldsProps) {
   const title = served ? "Recent worlds" : "Sample worlds";
   return (
     <section aria-label={title} className="park-home-section">
@@ -138,7 +148,14 @@ export function WorldsSection({ served, rows, sample, night, onWorld, onWorlds }
                 onClick={() => onWorld(r.world.id)}
               >
                 <span className="park-home-live__art">
-                  <span className="park-home-live__pic">{worldArt(r.world, night, 84)}</span>
+                  <span className="park-home-live__pic">
+                    <WorldThumbnail
+                      world={r.world}
+                      client={r.world.sample ? null : client}
+                      night={night}
+                      fallback={worldArt(r.world, night, 84)}
+                    />
+                  </span>
                   <span className={`park-home-pill park-home-pill--${variant}`}>
                     <span className="park-home-pill__dot" aria-hidden="true" />
                     {PILL[state]}
@@ -186,7 +203,14 @@ export function WorldsSection({ served, rows, sample, night, onWorld, onWorlds }
               onClick={() => onWorld(sample.id)}
             >
               <span className="park-home-live__art">
-                <span className="park-home-live__pic">{worldArt(sample, night, 84)}</span>
+                <span className="park-home-live__pic">
+                  <WorldThumbnail
+                    world={sample}
+                    client={null}
+                    night={night}
+                    fallback={worldArt(sample, night, 84)}
+                  />
+                </span>
               </span>
               <span className="park-home-live__foot">
                 <span className="park-home-live__text">

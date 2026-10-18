@@ -8,6 +8,7 @@ import { parkPath } from "../../app/router";
 import { useAfterTask } from "../../app/useStaged";
 import { cx } from "../../components/cx";
 import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
+import { WorldThumbnail, type WorldThumbnailClient } from "../../shared/WorldThumbnail";
 import type { Art } from "./art";
 import { type Status, lastLine, plural } from "./model";
 
@@ -15,6 +16,8 @@ export interface CardProps {
   w: World;
   art: Art;
   status: Status;
+  client: WorldThumbnailClient | null;
+  night: boolean;
   onOpen: (worldId: string) => void;
 }
 
@@ -32,14 +35,32 @@ function linkProps(w: World, onOpen: CardProps["onOpen"]) {
 }
 
 /** The picture by size: a city's plan, a town's building row or a village's one building (frozen frames). */
-function Picture({ w, art }: { w: World; art: Art }) {
+function Picture({
+  w,
+  art,
+  client,
+  night,
+}: {
+  w: World;
+  art: Art;
+  client: WorldThumbnailClient | null;
+  night: boolean;
+}) {
   const artOn = useAfterTask(); // a city's picture is the heavy part: drawn a task after the card (WEB-MOTION-2)
-  if (w.tier === "City") return artOn ? <>{art.city(w)}</> : null;
-  if (w.tier === "Town") return <>{art.strip(w, 104)}</>;
-  return <>{art.single(w, 96)}</>;
+  const fallback =
+    w.tier === "City"
+      ? artOn
+        ? art.city(w)
+        : null
+      : w.tier === "Town"
+        ? art.strip(w, 104)
+        : art.single(w, 96);
+  return (
+    <WorldThumbnail world={w} client={w.sample ? null : client} night={night} fallback={fallback} />
+  );
 }
 
-function WorldCardView({ w, art, status, onOpen }: CardProps) {
+function WorldCardView({ w, art, status, client, night, onOpen }: CardProps) {
   const pct = w.prog != null ? `${w.prog}%` : "—";
   return (
     <a
@@ -52,7 +73,7 @@ function WorldCardView({ w, art, status, onOpen }: CardProps) {
     >
       <div className="park-worlds-card__art">
         <div className="park-worlds-card__pic">
-          <Picture w={w} art={art} />
+          <Picture w={w} art={art} client={client} night={night} />
         </div>
         <span className={cx("park-worlds-chip", `park-worlds-chip--${status.tone}`)}>
           <span className={`park-worlds-dot park-worlds-dot--${status.tone}`} />
