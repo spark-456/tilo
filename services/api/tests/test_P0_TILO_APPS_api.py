@@ -102,6 +102,16 @@ def test_P0_TILO_APPS_publish_public_submit_owner_csv_and_unpublish(app_case):
         assert client.get("/public/apps/jo-smith/customer-survey").status_code == 404
 
 
+def test_P0_TILO_APPS_signed_artifact_reader_requires_access(app_case):
+    api, _, artifact = app_case
+    with TestClient(api) as client:
+        result = client.get(f"/v1/artifacts/{artifact}")
+        assert result.status_code == 200
+        assert result.json() == {"title": "Customer survey", "html": HTML.decode()}
+        api.dependency_overrides[deps.get_current_principal] = lambda: deps.Principal(OTHER, "owner", "elsewhere")
+        assert client.get(f"/v1/artifacts/{artifact}").status_code == 404
+
+
 def test_P0_TILO_APPS_signed_in_editor_capture_and_owner_delete(app_case):
     api, _, artifact = app_case
     with TestClient(api) as client:

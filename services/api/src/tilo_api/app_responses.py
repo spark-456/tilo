@@ -43,6 +43,16 @@ class Publish(BaseModel):
 Apps = Annotated[Any, Depends(get_app_store)]
 
 
+@router.get("/v1/artifacts/{artifact_id}")
+def read_app_artifact(artifact_id: str, principal: Principal, store: State, artifacts: Artifacts) -> dict[str, str]:
+    ref, scope, where = _owned(artifact_id, principal, store, artifacts, "viewer")
+    titles = getattr(store.runs.get(where["world_id"]), "titles", {})
+    return {
+        "title": titles.get(artifact_id, "Website"),
+        "html": artifacts.read(scope, ref).decode("utf-8"),
+    }
+
+
 def _slug(value: str, fallback: str) -> str:
     made = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:64]
     safe_fallback = re.sub(r"[^a-z0-9]+", "-", fallback.lower()).strip("-")[:64]

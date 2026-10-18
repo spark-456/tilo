@@ -20,6 +20,9 @@ import { type ViewRoute, parseViewPath, viewTitle } from "./worldView/routes";
 const ParkApp = lazy(() => import("./park/app/ParkApp"));
 const LegalPage = lazy(() => import("./legal/LegalPage"));
 const OAuthCallback = lazy(() => import("./oauth/CallbackRoute"));
+const PublicAppViewer = lazy(() =>
+  import("./publicApp/PublicAppViewer").then((m) => ({ default: m.PublicAppViewer })),
+);
 // OLD-UI-OUT-2: a world's lenses and the Needs-you page are Park pages (the Park shell frames them); their code is a
 // chunk of its own that only these addresses load.
 const WorldViewApp = lazy(() => import("./worldView/WorldViewApp"));
@@ -103,6 +106,13 @@ export function Root() {
       </Suspense>
     );
   }
+  const publicPath = /^\/u\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/.exec(pathname);
+  if (publicPath?.[1] && publicPath[2])
+    return (
+      <Suspense fallback={null}>
+        <PublicAppViewer handle={publicPath[1]} slug={publicPath[2]} />
+      </Suspense>
+    );
   return (
     <SignInGate auth={session}>
       <AccessGuard>
