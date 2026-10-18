@@ -390,6 +390,7 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
       plan_steps: unknown[];
       captured_steps: unknown[];
     }[];
+    if (!saved) throw new Error("The skill was not saved");
     expect(saved.plan_steps).toEqual([
       {
         text: "Draft an invoice summary",

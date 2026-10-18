@@ -4,8 +4,8 @@
 // answer moves the flow on. On sample data the description is read at once and Save is this page's only. There is no
 // practice run yet; uploaded examples and confirmed local recordings use the two real capture routes (HR-1..7).
 import { useEffect, useRef, useState } from "react";
-import { TiloApiError } from "../../../api/http";
 import { displayApiError } from "../../api/errorMessage";
+import { TiloApiError } from "../../api/hostCopy";
 import type { Api } from "../../api/index";
 import { teamsClient } from "../../api/selfServeTeams";
 import type { Skill, SkillCapture, SkillVersion, Source, User } from "../../api/types";
