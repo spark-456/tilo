@@ -1,7 +1,8 @@
 // FR-UX-13: the world the composer shows for a task the server accepted (`POST /intake`). Only what the reply
 // served carries a value: the id is the server's `task_id`, the name comes from the brief's goal (else the
 // words the person typed), the tier from the size they chose. The task is not approved yet and has no events, so
-// it is "scheduled" with a plain waiting line, never "running" (HR-1..HR-7). Never imports the fixtures.
+// it needs the person's approval with a plain waiting line, never "running" or "scheduled" without a real
+// schedule (HR-1..HR-7). Never imports the fixtures.
 import type { TierKey, TierName, World } from "../types";
 
 const TIER_OF: Readonly<Record<TierKey, TierName>> = {
@@ -23,7 +24,7 @@ export function worldFromIntake(mode: TierKey, reply: IntakeReply, typed: string
     short: name.length > 26 ? `${name.slice(0, 24)}…` : name,
     tier: TIER_OF[mode],
     tool: "",
-    st: "scheduled",
+    st: "needs",
     isNew: true,
     agents: 0,
     spend: "",

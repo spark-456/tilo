@@ -18,9 +18,9 @@ export interface WorldListItem {
 
 /** `needs` comes only from a recorded open card and `running` only from `world.started`/`resumed` (BQ-WIRE2-2). */
 export const STATE_OF: Readonly<Record<WorldListStatus, WorldState>> = {
-  idle: "scheduled",
+  idle: "needs",
   started: "running",
-  paused: "scheduled",
+  paused: "needs",
   completed: "finished",
   failed: "finished",
 };

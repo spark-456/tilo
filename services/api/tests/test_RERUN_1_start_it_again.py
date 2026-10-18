@@ -5,6 +5,7 @@ RERUN-ANY widened this from restart stops to every `world.failed`: see test_RERU
 from __future__ import annotations
 
 import copy
+import threading
 from typing import Any
 
 import pytest
@@ -99,6 +100,37 @@ def test_R_RUN_paused_world_continues_in_a_new_run_with_recorded_context(flow, m
     assert new.brief["goal"] == flow.store.tasks[old["task_id"]].brief["goal"]
     assert any("The first source was checked." in line for line in new.brief["constraints"])
     assert flow.store.worlds[old["world_id"]].paused is True
+
+
+def test_R_RUN_2_paused_continue_starts_a_new_run_from_the_brief_and_completes(run_flow):
+    from _clint2_lib import wait_for  # noqa: PLC0415
+
+    run_flow.runner.block_on = "U2"
+    run_flow.start()
+    approving = threading.Thread(target=run_flow.approve)
+    approving.start()
+    try:
+        assert run_flow.runner.entered.wait(8), "the first run never reached U2"
+        assert run_flow.pause().status_code in (200, 202)
+        wait_for(lambda: run_flow.events("world.paused"), what="the first run to pause")
+    finally:
+        run_flow.runner.release.set()
+        approving.join(10)
+
+    old_world = run_flow.world_id
+    continued = run_flow.flow.client.post(f"/worlds/{old_world}/rerun")
+    assert continued.status_code == 200, continued.text
+    run_flow.task_id = continued.json()["task_id"]
+    run_flow.world_id = continued.json()["world_id"]
+    run_flow.as_member()
+    requested = wait_for(lambda: run_flow.events("approval.requested"), what="the continued run's approval")[0]
+    cards = wait_for(lambda: run_flow.cards().json() if run_flow.cards().status_code == 200 else None, what="gate")
+    card = next(card for card in cards if card["id"] == requested["data"]["card_id"])
+    assert run_flow.answer(card["id"], "approve").status_code == 200
+    wait_for(lambda: run_flow.events("world.completed"), what="the continued run to complete")
+    continued_task = run_flow.store.tasks[run_flow.task_id]
+    assert continued_task.brief["goal"]
+    assert run_flow.world_id != old_world
 
 
 def test_RERUN_1_another_user_gets_the_unknown_world_404(flow):

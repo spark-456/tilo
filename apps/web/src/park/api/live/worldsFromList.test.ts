@@ -15,8 +15,8 @@
 // - null title: the neutral label "Untitled world" (BQ-WIRE2-1), never a scenario name.
 // - status (BQ-WIRE2-2): started -> running, completed -> finished (the only exact matches). A world is "needs" only
 //   from a recorded open card, which this list does not carry, and "running" only from `world.started`/`resumed`.
-//   Everything else is NOT running and NOT needs: idle -> scheduled, paused -> scheduled (stopped, nothing running,
-//   no `when` shown), failed -> finished (the run ended; the Park type has no failure state and `out`/`runs` stay empty).
+//   Idle and paused need the person's next action; neither claims a schedule because the list serves no schedule.
+//   Failed -> finished (the run ended; the Park type has no failure state and `out`/`runs` stay empty).
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { worlds as fixtureWorlds } from "../fixtures";
@@ -33,9 +33,9 @@ const item = (over: Partial<WorldListItem> = {}): WorldListItem => ({
 
 const STATUSES = ["idle", "started", "paused", "completed", "failed"] as const;
 const EXPECTED = {
-  idle: "scheduled",
+  idle: "needs",
   started: "running",
-  paused: "scheduled",
+  paused: "needs",
   completed: "finished",
   failed: "finished",
 } as const;
@@ -104,12 +104,12 @@ describe("WIRE_2_worldsFromList: status is honest (HR-1, HR-5)", () => {
     expect(w?.st).toBe(EXPECTED[status]);
   });
 
-  it("WIRE_2_mapper_property_only_started_is_running_and_needs_is_never_produced", () => {
+  it("WIRE_2_mapper_property_only_started_is_running_and_only_waiting_states_need_action", () => {
     fc.assert(
       fc.property(fc.array(arbItem, { maxLength: 20 }), (items) => {
         worldsFromList(items).forEach((w, i) => {
-          expect(w.st).not.toBe("needs");
           expect(w.st === "running").toBe(items[i]?.status === "started");
+          expect(w.st === "needs").toBe(["idle", "paused"].includes(items[i]?.status ?? ""));
         });
       }),
       { numRuns: 100 },
@@ -180,7 +180,7 @@ describe("WIRE_2_worldsFromList: nothing is invented (HR-1..HR-7)", () => {
         expect(out.map((w) => w.id)).toEqual(items.map((i) => i.world_id));
         for (const w of out) {
           expect(w.name.length).toBeGreaterThan(0);
-          expect(["running", "finished", "scheduled"]).toContain(w.st);
+          expect(["needs", "running", "finished"]).toContain(w.st);
         }
       }),
       { numRuns: 100 },

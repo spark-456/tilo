@@ -25,6 +25,15 @@ def test_R_RUN_malformed_layout_finishes_with_failure_instead_of_keyerror(run_fl
     assert "KeyError" not in caplog.text
 
 
+def test_R_RUN_2_meeting_run_with_no_semantic_layout_fails_cleanly_without_keyerror(run_flow, caplog):
+    run_flow.build_layout = lambda _plan, *, world_id: {"meeting": {"world_id": world_id}}
+    run_flow.start()
+    assert run_flow.approve().status_code == 200
+    wait_for(lambda: run_flow.events("world.failed"), what="world.failed for malformed meeting layout")
+    assert run_flow.events("world.started") == []
+    assert "KeyError" not in caplog.text
+
+
 def test_FR_WLD_07_pause_all_during_the_run_stops_every_event_except_world_paused(run_flow):
     rf = run_flow
     rf.runner.block_on = "U2"  # the run is mid-flight: U1 done, U2 working
