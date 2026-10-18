@@ -2026,6 +2026,15 @@
   cursor: pointer;
 }
 
+[data-park] .tw-res-file-btn--icon {
+  width: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
 [data-park] .tw-res-made {
   display: flex;
   flex-direction: column;
