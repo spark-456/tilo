@@ -457,7 +457,18 @@ def convene(body: Annotated[Any, Depends(_body)], ctx: Annotated[Ctx, Depends(ge
         if ctx.world.paused:
             return _refuse(409, "world_paused")
         stream = ctx.stream()
-        if sum(r.state == "open" for r in rebuild(stream).values()) >= ctx.cfg.open_rooms_per_world:
+        open_rooms = [r for r in rebuild(stream).values() if r.state == "open"]
+        repeated = next(
+            (
+                room
+                for room in open_rooms
+                if room.convener == p.user_id and room.lead == lead and room.agents == list(agents)
+            ),
+            None,
+        )
+        if repeated is not None:
+            return JSONResponse(_view(ctx, repeated), status_code=200)
+        if len(open_rooms) >= ctx.cfg.open_rooms_per_world:
             return _refuse(409, "room_open")
         vis = (
             [] if rank == "director" else sorted(d for d in districts if d)

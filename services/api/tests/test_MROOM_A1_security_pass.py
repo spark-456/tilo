@@ -120,7 +120,7 @@ def test_MROOM_A1_four_concurrent_convenes_leave_one_open_room(tmp_path):
     app.dependency_overrides[deps.get_event_writer] = lambda: _SlowWrites(env)
     with ThreadPoolExecutor(4) as pool:
         codes = sorted(f.result().status_code for f in [pool.submit(env.convene) for _ in range(4)])
-    assert codes == [201, 409, 409, 409]
+    assert codes == [200, 200, 200, 201]  # identical concurrent retries all receive the one room
     assert _kinds(env).count("meeting.convened") == 1
 
 

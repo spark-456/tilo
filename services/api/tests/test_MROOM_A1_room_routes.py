@@ -110,7 +110,8 @@ def test_MROOM_A1_more_than_max_agents_is_refused(tmp_path):
 def test_MROOM_A1_one_open_room_and_paused_world(tmp_path):
     env = make_env(tmp_path)
     first = env.convene().json()
-    assert env.convene().json() == {"error": "room_open"}
+    assert env.convene().json() == first  # an identical retry is idempotent
+    assert env.convene(agents=["A_s1"]).json() == {"error": "room_open"}
     env.adjourn(first["room_id"])
     assert env.convene().status_code == 201
     env.store.worlds[WORLD].paused = True
