@@ -47,6 +47,24 @@ const sentence = (text: string): string => {
   return /[.!?]$/.test(t) ? t : `${t}.`;
 };
 
+export function cleanFailureReason(reason: string): string {
+  if (!reason) return "An unexpected error occurred. Try again in a moment.";
+  if (
+    /RouterExhausted/i.test(reason) ||
+    /no model could answer/i.test(reason) ||
+    /OutputTruncated/i.test(reason)
+  ) {
+    return "The AI models were unavailable or busy. Try again in a moment.";
+  }
+  if (/\b503\b/.test(reason)) {
+    return "The service is temporarily unavailable. Try again in a moment.";
+  }
+  if (/\b502\b/.test(reason)) {
+    return "Tilo had a problem on its side. Try again in a moment.";
+  }
+  return reason;
+}
+
 export function runView(events: readonly RunEvent[]): RunView {
   const reversed = [...events].reverse();
   const last = (type: string): RunEvent | undefined => reversed.find((e) => e.type === type);
@@ -85,10 +103,12 @@ export function runView(events: readonly RunEvent[]): RunView {
       line: "Getting ready. Nothing has been recorded yet.",
     };
   }
+
   if (worldEvent?.type === "world.failed") {
     const data = objectOf(worldEvent.data);
     const said = typeof data.reason === "string" ? data.reason.trim() : "";
-    const reason = said !== "" ? said : worldEvent.summary;
+    const rawReason = said !== "" ? said : worldEvent.summary;
+    const reason = cleanFailureReason(rawReason);
     const unit = typeof data.unit === "string" ? data.unit : null;
     return {
       ...base,

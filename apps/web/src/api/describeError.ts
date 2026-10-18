@@ -11,6 +11,13 @@ export function describeError(doing: string, error: unknown): string {
     return `Something went wrong while trying to ${doing}. We could not confirm it. Check before trying again.`;
   }
   const said = error instanceof Error && error.message ? error.message : "an unknown error";
-  const reason = said.replace(/[.!?]+$/, ""); // the sentence below adds its own full stop
+  let reason = said.replace(/[.!?]+$/, ""); // the sentence below adds its own full stop
+  if (/RouterExhausted/i.test(reason)) {
+    reason = "models are unavailable right now";
+  } else if (/\b503\b/.test(reason)) {
+    reason = "the service is unavailable right now";
+  } else if (/\b502\b/.test(reason)) {
+    reason = "the server had a problem on its side";
+  }
   return `Could not ${doing}: ${reason}. Nothing was changed. You can try again.`;
 }

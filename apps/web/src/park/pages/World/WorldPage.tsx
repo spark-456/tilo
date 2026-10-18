@@ -504,7 +504,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
         ? `${w.nextL} ${w.nextV}`
         : "";
   const spentLine = live
-    ? `${live.credits} credits used`
+    ? `${Math.round(live.credits * 10) / 10} credits used`
     : w.spend
       ? `${w.spend} spent so far${w.of ? ` · ${w.of}` : ""}`
       : "";
@@ -515,10 +515,11 @@ export function WorldPage({ app }: { app: AppCtx }) {
     stepsTotalCount > 0
       ? Math.min(100, Math.round((stepsDoneCount / stepsTotalCount) * 100))
       : (w.prog ?? 0);
-  const creditsUsed = live
+  const rawCredits = live
     ? live.credits
     : w.spendV || (w.spend ? Number.parseInt(w.spend.replace(/\D/g, "") || "0", 10) : 0);
-  const creditsCap = w.budget || 120;
+  const creditsUsed = Math.round(rawCredits * 10) / 10;
+  const creditsCap = typeof w.budget === "number" ? Math.round(w.budget * 10) / 10 : 120;
   const creditsPct =
     creditsCap > 0 ? Math.min(100, Math.round((creditsUsed / creditsCap) * 100)) : 0;
   // WORLD-DESIGN: the artboard's card on the map says the newest recorded line, or nothing.

@@ -303,7 +303,15 @@ export function displayApiError(error: unknown): string {
     write_failed: "We could not confirm the saved change. Reload before trying again.",
     write_refused: "This change could not be saved. Check your access before trying again.",
     wrong_account: "Choose the meeting host account to connect.",
+    RouterExhausted: "Live models are unavailable right now. Try again in a moment.",
+    RouterExhaustedError: "Live models are unavailable right now. Try again in a moment.",
+    "503": "This feature is unavailable right now. Try again in a moment.",
+    "502": "Tilo had a problem on its side. Try again in a moment.",
   };
+  const raw = `${error.code ?? ""} ${error.refusal ?? ""} ${error.message ?? ""}`;
+  if (/RouterExhausted/i.test(raw)) {
+    return "Live models are unavailable right now. Try again in a moment.";
+  }
   const mapped = [error.code, error.refusal, error.message]
     .filter((code): code is string => code !== null)
     .find((code) => Object.hasOwn(reasons, code));
@@ -372,7 +380,9 @@ export function reasonOf(status: number, text: string): string {
     said.length <= 200 &&
     !/[<>{}]/.test(said) &&
     !STOCK.has(said) &&
-    !CODE_WORD.test(said) // a stable code (`demo_runs_busy`) is for the page, not for people
+    !CODE_WORD.test(said) && // a stable code (`demo_runs_busy`) is for the page, not for people
+    !/RouterExhausted/i.test(said) &&
+    !/\b50[23]\b/.test(said)
   ) {
     return said;
   }

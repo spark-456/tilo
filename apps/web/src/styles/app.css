@@ -14,6 +14,14 @@ textarea {
   font-family: inherit;
   font-size: inherit;
 }
+
+a {
+  color: var(--color-brand-primary, #5a3fe0);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
 /* PRD 9.6/18.2: stage mode is a display setting; type and targets scale by --ui-scale.
    Type: every size is one of the PRD 18.2 steps. tokens.css holds the steps in rem
    (--font-size-N); --text-N is the same step times --ui-scale, declared here because --ui-scale

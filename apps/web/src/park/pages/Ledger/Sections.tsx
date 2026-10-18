@@ -130,13 +130,18 @@ export function CostPerRun({ L, go }: { L: Ledger; go: AppCtx["go"] }) {
   );
 }
 
+export function formatCredits(n: number): string {
+  const rounded = Math.round(n * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
 export function RecordedRuns({ L }: { L: Ledger }) {
   return (
     <section aria-label="Recorded run costs" className="park-ledger-card">
       <Head eyebrow="COST PER RUN" title="Recorded run totals" />
       {L.totalCredits !== undefined ? (
         <p className="park-ledger-sub">
-          {L.totalCredits.toLocaleString()} credits · {money(L, L.spent)}
+          {formatCredits(L.totalCredits)} credits · {money(L, L.spent)}
         </p>
       ) : null}
       <div className="park-ledger-type park-ledger-recorded" aria-hidden="true">
@@ -148,7 +153,7 @@ export function RecordedRuns({ L }: { L: Ledger }) {
           <div key={run.id} className="park-ledger-type park-ledger-recorded">
             <span className="park-ledger-ellipsis">Run {index + 1}</span>
             <span>
-              {run.credits !== undefined ? `${run.credits.toLocaleString()} credits · ` : ""}
+              {run.credits !== undefined ? `${formatCredits(run.credits)} credits · ` : ""}
               {money(L, run.usd)} · {run.completed ? "Completed" : "No finish event"}
             </span>
           </div>
