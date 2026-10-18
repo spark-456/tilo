@@ -139,8 +139,6 @@ def create_task(
     scenario: str | None = None,
     kinds: Sequence[DeliverableKind] | None = None,
     skill: dict[str, Any] | None = None,
-    model_router: Router | None = None,
-    clock: Clock | None = None,
 ) -> tuple[str, deps.TaskRecord]:
     """FR-INT-03/04: the task from its intake and the Director's brief (extracted first, so a failed extraction
     stores nothing), then the questions, decided in code."""
@@ -177,9 +175,6 @@ def create_task(
         parts={task.world_id: parts},
         create=created,
     )
-    if not task.questions and model_router is not None and clock is not None:
-        with task.lock:
-            _queue_approaches(store, writer, intake.task_id, task, model_router, clock)
     return intake.task_id, task
 
 
