@@ -122,6 +122,25 @@ def test_P0_TILO_APPS_owner_can_reload_publication_status(app_case):
         assert client.get(f"/v1/artifacts/{artifact}/publish").json()["app"]["published"] is False
 
 
+def test_P0_TILO_APPS_artifact_routes_hydrate_owner_on_fresh_store(app_case):
+    api, _, artifact = app_case
+    source = api.dependency_overrides[deps.get_store]()
+
+    class LazyOwnerStore(deps.Store):
+        def load_owner(self, owner: str, settle: bool = False) -> None:
+            assert owner == OWNER and settle is False
+            self.worlds.update(source.worlds)
+            self.events.update(source.events)
+            self.runs.update(source.runs)
+
+    lazy = LazyOwnerStore()
+    api.dependency_overrides[deps.get_store] = lambda: lazy
+    with TestClient(api) as client:
+        assert client.get(f"/v1/artifacts/{artifact}").status_code == 200
+        assert client.post(f"/v1/artifacts/{artifact}/publish", json={}).status_code == 200
+        assert client.get(f"/v1/artifacts/{artifact}/responses").status_code == 200
+
+
 def test_P0_TILO_APPS_signed_in_editor_capture_and_owner_delete(app_case):
     api, _, artifact = app_case
     with TestClient(api) as client:

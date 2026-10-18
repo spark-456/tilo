@@ -62,6 +62,12 @@ def _slug(value: str, fallback: str) -> str:
 def _owned(
     artifact_id: str, principal: deps.Principal, store: deps.Store, artifacts: ArtifactStore, access: str = "editor"
 ) -> tuple[dict[str, Any], Scope, dict[str, Any]]:
+    # Artifact-id URLs carry no world_id for DurableStore.load_path to hydrate.
+    # Load only the caller's scope before scanning refs; these reads never settle or write a world.
+    if principal.role == "owner":
+        store.load_owner(principal.user_id, settle=False)
+    elif principal.world_id is not None:
+        store.load_world(principal.world_id, settle=False)
     for world_id, world in store.worlds.items():
         owner = principal.user_id == world.owner
         member = owner or principal.world_id == world_id
