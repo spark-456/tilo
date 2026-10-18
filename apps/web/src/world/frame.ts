@@ -131,6 +131,19 @@ const centreOf = (r: Rect, lift: number): { cx: number; cy: number } => {
   return { cx, cy };
 };
 
+/** The solver's footprint stays authoritative. The stage insets only the drawn building around the same centre,
+ * exposing more of the recorded roads and district ground without changing any layout coordinates. */
+function displayFootprint(rect: Rect): Rect {
+  const gx = Math.min(0.25, rect.w * 0.15);
+  const gy = Math.min(0.25, rect.d * 0.15);
+  return {
+    x: rect.x + gx,
+    y: rect.y + gy,
+    w: rect.w - gx * 2,
+    d: rect.d - gy * 2,
+  };
+}
+
 /**
  * 3 standing slots per building (0.75 cells apart), rows at Dock and Hall (TW-2, PROMPT.md).
  * Slot 0: center (0 offset).
@@ -217,19 +230,20 @@ export function frameOf(layout: Layout, state: WorldState): Frame {
     if (status === "hidden") return []; // nothing is drawn until building.planned
     const lift = liftOf(buildingLevel.get(b.id));
     const inSession = b.id === state.hall && Object.keys(state.rooms).length > 0;
+    const rect = displayFootprint(b.footprint);
     return [
       {
         id: b.id,
         name: names.get(b.id) ?? b.id,
-        rect: b.footprint,
+        rect,
         floors: b.floors,
         status,
         tint: tints.get(buildingDistrict.get(b.id) ?? "") ?? tokens.color.ink["3"],
         ...styleOf({ id: b.id, common_type: common.get(b.id) as never }),
         lift,
-        ...centreOf(b.footprint, lift),
-        gw: b.footprint.w,
-        gd: b.footprint.d,
+        ...centreOf(rect, lift),
+        gw: rect.w,
+        gd: rect.d,
         inSession,
       },
     ];
@@ -276,8 +290,9 @@ export function frameOf(layout: Layout, state: WorldState): Frame {
     { r: Rect; kind: "building" | "district" | "level"; lift: number; level: number }
   >();
   for (const b of geometry?.buildings ?? []) {
+    const rect = displayFootprint(b.footprint);
     spots.set(b.id, {
-      r: b.footprint,
+      r: rect,
       kind: "building",
       lift: liftOf(buildingLevel.get(b.id)),
       level: levelIndex.get(buildingLevel.get(b.id) ?? "") ?? 0,

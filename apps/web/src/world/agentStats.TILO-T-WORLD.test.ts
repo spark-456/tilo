@@ -75,7 +75,8 @@ test("FR-WLD-06 TILO-T-WORLD stats: name, role, task, place, units done, tools a
   expect(stats?.name).toBe("Specialist 1");
   expect(stats?.role).toBe("Specialist");
   expect(stats?.task).toBe("Triage the inbox");
-  expect(stats?.at?.name).toBe("Reply Desk");
+  // R-WORLD-SPREAD: the recorded handoff puts the specialist beside its receiver.
+  expect(stats?.at?.name).toBe("Mail Room");
   expect(stats?.unitsDone).toBe(1);
   expect(stats?.tools).toEqual(["gmail.search", "sheets.read"]);
   expect(stats?.credits).toBe(2);

@@ -422,7 +422,7 @@
 /* ---- Stage: the stage beside its panels ---- */
 [data-park] .park-view-stagegrid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 16px;
   align-items: start;
 }
@@ -434,7 +434,7 @@
 }
 [data-park] .park-view-stagebox {
   display: flex;
-  height: clamp(420px, 66vh, 760px);
+  height: clamp(480px, 72vh, 840px);
   border: 1px solid var(--line2);
   border-radius: 22px;
   background: var(--sunk);
@@ -461,8 +461,8 @@
 }
 @media (max-width: 767px) {
   [data-park] .park-view-stagebox {
-    height: 56vh;
-    min-height: 320px;
+    height: 60vh;
+    min-height: 360px;
   }
 }
 [data-park] .park-view-sheet-hud {

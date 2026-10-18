@@ -33,6 +33,8 @@ const SAY_DURATION_MS = MAX_DURATION_MS;
 /** Events whose relocation is a walk; every other relocation is a plain placement (no motion). */
 const WALKS: ReadonlySet<string> = new Set([
   "agent.moved",
+  "agent.handoff",
+  "question.routed",
   "meeting.convened",
   "meeting.adjourned",
 ]);
