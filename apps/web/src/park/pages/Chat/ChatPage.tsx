@@ -66,13 +66,13 @@ function Answer({
       <div className="park-chat-turn">
         <Face mood={mood} />
         <div className="park-chat-turn__body">
-          <div className="park-chat-meta">TILO · READING…</div>
+          <div className="park-chat-meta">Tilo · Personal helper · Reading…</div>
         </div>
       </div>
     );
   if (turn.state === "answered") {
     const cost = turn.sample ? null : quickCostLine(turn.cost);
-    const meta = `TILO · ${turn.seconds > 0 ? `ANSWERED IN ${turn.seconds}S` : "ANSWERED"}`;
+    const meta = `Tilo · Personal helper · ${turn.seconds > 0 ? `Answered in ${turn.seconds}s` : "Answered"}`;
     return (
       <div className="park-chat-turn">
         <Face mood={mood} />
@@ -105,7 +105,7 @@ function Answer({
     <div className="park-chat-turn">
       <Face mood={mood} />
       <div className="park-chat-turn__body">
-        <div className="park-chat-meta">TILO</div>
+        <div className="park-chat-meta">Tilo · Personal helper</div>
         {turn.state === "switch" ? (
           <div className="park-chat-world-card">
             <strong>This needs a world.</strong>
@@ -308,6 +308,7 @@ export function ChatPage({ app }: { app: AppCtx }) {
                       aria-disabled={chat.busy || undefined}
                     >
                       <Icon name="send" size={20} />
+                      <span>Send</span>
                     </button>
                   </div>
                 )}

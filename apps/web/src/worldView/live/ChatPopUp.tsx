@@ -367,7 +367,7 @@ export function ChatPopUp({
           return (
             <div key={m.seq} className="tw-chat-row tw-chat-row--agent">
               <span
-                className={`tw-chat-av $firstInGroup ? "" : "tw-chat-av--ghost"`}
+                className={firstInGroup ? "tw-chat-av" : "tw-chat-av tw-chat-av--ghost"}
                 data-ag-color={colKey}
                 aria-hidden="true"
               >
@@ -380,6 +380,7 @@ export function ChatPopUp({
                 {firstInGroup ? (
                   <span className="tw-chat-sender">
                     <strong>{nameOf(m.from)}</strong>
+                    <span className="tw-chat-role">{roleOf(m.from)}</span>
                     {toL ? <span className="tw-chat-to">{toL}</span> : null}
                   </span>
                 ) : null}
@@ -425,18 +426,31 @@ export function ChatPopUp({
             </div>
             {turn.reply ? (
               <div className="tw-chat-row tw-chat-row--agent">
-                <div className="tw-chat-bubble" data-outcome={turn.reply.outcome}>
+                <span
+                  className="tw-chat-av"
+                  data-ag-color={agentColorKey(turn.reply.from, agentIds)}
+                  aria-hidden="true"
+                >
+                  <span className="tw-chat-visor">
+                    <span className="tw-chat-eye" />
+                    <span className="tw-chat-eye" />
+                  </span>
+                </span>
+                <div className="tw-chat-bubble-wrap">
                   <span className="tw-chat-sender">
                     <strong>{nameOf(turn.reply.from)}</strong>
+                    <span className="tw-chat-role">{roleOf(turn.reply.from)}</span>
                   </span>
-                  <span className="tw-chat-text">
-                    {turn.reply.text ?? "No reply was produced. Nothing was made up."}
-                  </span>
-                  {turn.reply.artifacts.length > 0 ? (
-                    <span className="tw-chat-to">
-                      Artifacts {turn.reply.artifacts.map((item) => item.artifact_id).join(", ")}
+                  <div className="tw-chat-bubble" data-outcome={turn.reply.outcome}>
+                    <span className="tw-chat-text">
+                      {turn.reply.text ?? "No reply was produced. Nothing was made up."}
                     </span>
-                  ) : null}
+                    {turn.reply.artifacts.length > 0 ? (
+                      <span className="tw-chat-to">
+                        Artifacts {turn.reply.artifacts.map((item) => item.artifact_id).join(", ")}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             ) : null}
@@ -489,6 +503,7 @@ export function ChatPopUp({
           onClick={handleSend}
         >
           <Icon name="send" size={16} />
+          <span>Send</span>
         </button>
       </div>
     </aside>
