@@ -8,6 +8,7 @@ and 503 for a store that cannot be read.
 
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Callable
 from typing import Annotated, Any
@@ -101,6 +102,7 @@ class _PeopleRoute(APIRoute):
 
 
 router = APIRouter(route_class=_PeopleRoute)
+logger = logging.getLogger("tilo_api.people")
 
 
 def _not_found() -> HTTPException:
@@ -124,7 +126,8 @@ def _answer(found: Callable[[], dict[str, Any] | None]) -> dict[str, Any]:
         answer = found()
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
+        logger.warning("people store operation failed (%s)", type(exc).__name__)
         raise _unreadable() from None
     if answer is None:
         raise _not_found()

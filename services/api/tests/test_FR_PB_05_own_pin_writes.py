@@ -34,6 +34,21 @@ def test_FR_PB_02_create_private_pin_and_remove_records_existing_events(people_r
     assert rig.get("/v1/pinboards").json()["items"] == []
 
 
+def test_R_PIN_store_failure_logs_its_type_without_the_pin_text(people_rig, monkeypatch, caplog):
+    rig = people_rig()
+    rig.add_people()
+    rig.as_user(PRIYA)
+
+    def broken(_record):
+        raise RuntimeError("My recorded note must stay private")
+
+    monkeypatch.setattr(rig.stores.pins, "create", broken)
+    response = create(rig)
+    assert response.status_code == 503
+    assert "RuntimeError" in caplog.text
+    assert "My recorded note" not in caplog.text
+
+
 @pytest.mark.parametrize("actor", [DEV, OWNER, SAM])
 def test_FR_PB_05_another_person_never_removes_private_pin(people_rig, actor):
     rig = people_rig()

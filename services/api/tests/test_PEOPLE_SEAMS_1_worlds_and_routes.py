@@ -196,6 +196,17 @@ def test_PEOPLE_SEAMS_1_a_work_item_with_a_mail_source_needs_the_signed_in_perso
     assert len(rig_store.stream(desk_id)) == 1
 
 
+def test_R_PIN_personal_pin_uses_the_deployed_desk_event_writer(people_rig):
+    rig_store = make_rig("memory")
+    store, writer = rig_store.process()
+    rig = _wired(people_rig, store, writer, "desk_worlds")
+    rig.as_user(PRIYA)
+    response = rig.post("/v1/pinboards", {"title": "A note"})
+    assert response.status_code == 201, response.text
+    desk_id = seams_store.StoreDeskWorlds(store).desk_world(deps.ORG_ID, PRIYA)
+    assert [e["type"] for e in rig_store.stream(desk_id)] == ["pinboard.item_added"]
+
+
 def test_PEOPLE_SEAMS_1_the_meeting_world_route_makes_the_owners_world_and_nobody_elses(people_rig):
     rig_store = make_rig("memory")
     store = process(rig_store)

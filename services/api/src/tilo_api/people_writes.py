@@ -10,6 +10,7 @@ no clock read (`now` is handed in).
 from __future__ import annotations
 
 import json
+import logging
 import re
 import secrets
 from collections.abc import Awaitable, Callable, Mapping
@@ -33,6 +34,8 @@ from tilo_policy.schemas import conforms
 from tilo_api import deps
 from tilo_api.people_events import WorkEvents
 from tilo_api.people_quotes import GONE, MAX_HISTORY
+
+logger = logging.getLogger("tilo_api.people_writes")
 
 
 class Refusal(HTTPException):
@@ -330,7 +333,8 @@ class Writer:
         if work_events is not None:
             try:
                 work_events.record(self.org, self.actor, after)
-            except Exception:
+            except Exception as exc:
+                logger.warning("people event append failed (%s)", type(exc).__name__)
                 self._undo(store, request, stored.version, created=version is None)
                 raise Refusal(503, "unavailable") from None  # never the record's text or the cause
 
