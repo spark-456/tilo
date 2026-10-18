@@ -1708,3 +1708,11 @@
   max-height: 46vh;
   overflow: auto;
 }
+[data-park] .park-world-resulttext code {
+  font-family: monospace;
+  font-size: 13.5px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--sunk);
+  color: var(--ink);
+}
