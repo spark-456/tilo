@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Buddy, EmptyState, Icon } from "../../design/tilo-t";
 import type { RoomClient } from "../../park/api/live/meetingHall";
+import { seatFor } from "../../park/api/live/roomTalk";
 import {
   type Message,
   type MessageKind,
@@ -15,6 +16,8 @@ import {
 import { select } from "../../world/selection";
 import { flyTo, setLit } from "../../world/spotlight";
 import { useWorldFacts } from "../../world/useWorldFacts";
+import { DirectionForm } from "./DirectionForm";
+import { RoomThread } from "./RoomThread";
 import { MOOD_OF_STATUS, clock, roleOf } from "./agentLook";
 import "./live.css";
 
@@ -35,7 +38,15 @@ export const KIND_WORD: Readonly<Record<MessageKind, string>> = {
 const NO_WORDS =
   "The words of this turn are kept in the room archive and are not available to show.";
 
-export function Conversations({ worldId, rooms }: { worldId: string; rooms: RoomClient | null }) {
+export function Conversations({
+  worldId,
+  rooms,
+  onChangeDirection,
+}: {
+  worldId: string;
+  rooms: RoomClient | null;
+  onChangeDirection?: ((instruction: string) => Promise<void>) | undefined;
+}) {
   const facts = useWorldFacts(worldId, rooms);
   const [agent, setAgent] = useState("");
   const [other, setOther] = useState("");
@@ -48,6 +59,12 @@ export function Conversations({ worldId, rooms }: { worldId: string; rooms: Room
     facts.names.get(id) ?? (id.startsWith("u_") || id === "system" ? "You" : id);
   const rank = (id: string) => facts.layout?.semantic.agents.find((a) => a.id === id)?.rank ?? "";
   const first = facts.events[0]?.ts;
+  const directorId = facts.layout?.semantic.agents.find((item) => item.rank === "director")?.id;
+  const director = directorId ? facts.stats.get(directorId) : undefined;
+  const directorSeat = useMemo(
+    () => (facts.layout && directorId ? seatFor(facts.layout, facts.events, directorId) : null),
+    [directorId, facts.events, facts.layout],
+  );
 
   const log = useRef<HTMLOListElement>(null);
   const stick = useRef(true);
@@ -161,6 +178,18 @@ export function Conversations({ worldId, rooms }: { worldId: string; rooms: Room
           })}
         </ol>
       )}
+      {director ? (
+        <RoomThread
+          client={rooms}
+          worldId={worldId}
+          seat={directorSeat}
+          events={facts.events}
+          stats={[director]}
+          heading="Ask a question about this world"
+          defaultTo={director.id}
+        />
+      ) : null}
+      {onChangeDirection ? <DirectionForm onStart={onChangeDirection} /> : null}
     </section>
   );
 }

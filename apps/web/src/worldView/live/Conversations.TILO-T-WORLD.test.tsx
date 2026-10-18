@@ -53,8 +53,60 @@ async function open(rooms: RoomClient | null = null) {
 }
 
 const rows = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>(".tw-msg")];
+const press = (root: HTMLElement, label: string) => {
+  const found = [...root.querySelectorAll("button")].find((button) => button.textContent === label);
+  if (!found) throw new Error(`${label} button missing`);
+  click(found);
+};
 
 describe("TILO-T-WORLD Conversations", () => {
+  it("P0_AGENT_CHAT_asks_the_real_director_and_can_start_a_direction_change", async () => {
+    const answer = {
+      room_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      world_id: "w_live",
+      run_id: "r_live",
+      state: "open" as const,
+      reason: null,
+      lead: "A_dir",
+      agents: [],
+      as_role: "owner" as const,
+      credit_cap: 20,
+      credits_spent: 1,
+      max_turns: 20,
+      turns: [],
+    };
+    const postJson = vi.fn(async () => answer);
+    const getJson = vi.fn(async () => answer);
+    const change = vi.fn(async () => undefined);
+    const { m } = await open({ postJson, getJson });
+    expect(m.container.textContent).toContain("Answers come only from this world's record.");
+    const question = m.container.querySelector<HTMLTextAreaElement>('[aria-label="Your question"]');
+    act(() => {
+      const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+      set?.call(question, "What did the team conclude?");
+      question?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    press(m.container, "Send");
+    await settle();
+    expect(postJson).toHaveBeenCalledWith("/v1/worlds/w_live/rooms", {
+      lead: "A_dir",
+      agents: [],
+    });
+    cleanup();
+
+    const redirected = fakeWorld(layout, run());
+    const changed = mount(
+      withClient(
+        redirected.client,
+        <Conversations worldId="w_live" rooms={null} onChangeDirection={change} />,
+      ),
+    );
+    await settle();
+    expect(
+      changed.container.querySelector('[aria-label="What should the team change?"]'),
+    ).not.toBeNull();
+  });
+
   it("lists each recorded message with who said it to whom and the real words, in order", async () => {
     const { m } = await open();
     const list = rows(m.container);

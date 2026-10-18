@@ -5,10 +5,11 @@ import { useState } from "react";
 import { Icon } from "../../design/tilo-t";
 import type { Api } from "../../park/api";
 import { openResult, readResult, saveResult } from "../../park/api/results";
-import { Markdown } from "../../park/pages/World/markdown";
 import type { SharedResult } from "../../park/pages/World/ResultPanel";
+import { Markdown } from "../../park/pages/World/markdown";
 import type { RunEvent } from "../../park/pages/World/useRunEvents";
 import type { ResultView } from "../../park/pages/World/useRunResult";
+import { DirectionForm } from "./DirectionForm";
 
 const readableMath = (text: string): string =>
   text
@@ -123,6 +124,8 @@ export interface ResultTabProps {
   readonly onOpen?: () => void;
   readonly onDownload?: () => void;
   readonly onShare?: () => void;
+  readonly onAskQuestion?: () => void;
+  readonly onChangeDirection?: (instruction: string) => Promise<void>;
 }
 
 const DEFAULT_FILES = [
@@ -215,7 +218,10 @@ export function ResultTab({
   onOpen,
   onDownload,
   onShare,
+  onAskQuestion,
+  onChangeDirection,
 }: ResultTabProps) {
+  const [directionOpen, setDirectionOpen] = useState(false);
   const rawDelivered = extractDeliveredFiles(events);
   const view = shared?.view;
   const blob = view && (view.status === "text" || view.status === "file") ? view.blob : null;
@@ -336,6 +342,39 @@ export function ResultTab({
               Share
             </button>
           </div>
+
+          {onAskQuestion || onChangeDirection ? (
+            <div className="tw-res-followup">
+              <strong>Want to follow up?</strong>
+              <div className="tw-res-followup__actions">
+                {onAskQuestion ? (
+                  <button
+                    type="button"
+                    className="tw-res-btn tw-res-btn--sec"
+                    onClick={onAskQuestion}
+                  >
+                    Ask a question
+                  </button>
+                ) : null}
+                {onChangeDirection ? (
+                  <button
+                    type="button"
+                    className="tw-res-btn tw-res-btn--sec"
+                    aria-expanded={directionOpen}
+                    onClick={() => setDirectionOpen((open) => !open)}
+                  >
+                    Change direction
+                  </button>
+                ) : null}
+              </div>
+              {directionOpen && onChangeDirection ? (
+                <DirectionForm
+                  onStart={onChangeDirection}
+                  onCancel={() => setDirectionOpen(false)}
+                />
+              ) : null}
+            </div>
+          ) : null}
 
           {/* Preserve text view for compatibility with existing tests checking result-text */}
           {view ? (

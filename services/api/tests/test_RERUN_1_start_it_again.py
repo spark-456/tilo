@@ -133,6 +133,35 @@ def test_R_RUN_2_paused_continue_starts_a_new_run_from_the_brief_and_completes(r
     assert run_flow.world_id != old_world
 
 
+def test_P0_AGENT_CHAT_change_direction_starts_from_the_brief_instruction_and_step_summaries(flow, monkeypatch):
+    from tilo_api import runs
+
+    started = []
+    monkeypatch.setattr(runs, "start_run", lambda _store, task, **_kw: started.append(task))
+    flow.app.dependency_overrides[runs.run_seams] = lambda: object()
+    old = _approved(flow, end="world.completed")
+    stream = flow.store.events[old["world_id"]]
+    stream.insert(
+        -1,
+        {
+            **_event(old["world_id"], len(stream), "unit.completed", {"unit": "U1"}),
+            "summary": "Compared the three recorded supplier quotes.",
+        },
+    )
+
+    response = flow.client.post(
+        f"/worlds/{old['world_id']}/rerun",
+        json={"direction": "Keep the same research, but recommend the lowest-risk supplier."},
+    )
+
+    assert response.status_code == 200, response.text
+    fresh = flow.store.tasks[response.json()["task_id"]]
+    assert fresh.brief["goal"] == flow.store.tasks[old["task_id"]].brief["goal"]
+    assert any("lowest-risk supplier" in line for line in fresh.brief["constraints"])
+    assert any("Compared the three recorded supplier quotes." in line for line in fresh.brief["constraints"])
+    assert started[-1].world_id == fresh.world_id
+
+
 def test_RERUN_1_another_user_gets_the_unknown_world_404(flow):
     old = _approved(flow)
     flow.as_user("u_someone_else")

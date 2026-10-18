@@ -88,6 +88,11 @@ class ApproveIn(BaseModel):
         return value
 
 
+class RerunIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    direction: Annotated[str, Field(min_length=1, max_length=2000)]
+
+
 def _json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaitable[Body]]:
     """Strict JSON (no NaN or Infinity), and a 422 that never echoes the input back. Only `application/json` is
     read (415 otherwise): a cross-site form or `text/plain` POST needs no CORS preflight, a JSON one does."""
@@ -723,20 +728,22 @@ def approve(
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
 
-def _again_ids(world_id: str) -> tuple[str, str, str]:
+def _again_ids(world_id: str, direction: str = "") -> tuple[str, str, str]:
     """The ids of a world's "Start it again" run: derived from the old world, so pressing twice is one new world."""
     found = []
     for prefix in ("t", "w", "r"):
-        raw = json.dumps(["/worlds/rerun", world_id, prefix], separators=(",", ":")).encode()
+        raw = json.dumps(["/worlds/rerun", world_id, direction, prefix], separators=(",", ":")).encode()
         number = int.from_bytes(hashlib.sha256(raw).digest()[:16], "big")
         found.append(prefix + "_" + "".join(_CROCKFORD[(number >> (5 * i)) & 31] for i in range(25, -1, -1)))
     return found[0], found[1], found[2]
 
 
-def _continued_brief(brief: dict[str, Any], stream: list[dict[str, Any]]) -> dict[str, Any]:
+def _continued_brief(brief: dict[str, Any], stream: list[dict[str, Any]], direction: str = "") -> dict[str, Any]:
     """Carry bounded, recorded work into a new run without changing the paused run or the brief schema."""
     carried = copy.deepcopy(brief)
     constraints = list(carried.get("constraints") or [])
+    if direction:
+        constraints.append(f"Change direction: {direction[:275]}")
     room = max(0, 20 - len(constraints))
     summaries = [
         e.get("summary")
@@ -761,6 +768,8 @@ def rerun(
     writer: WriterDep,
     seams: Annotated[runs.Seams | None, Depends(runs.run_seams)],
     flags: FlagsDep,
+    safety: Annotated[SafetyProvider, Depends(deps.get_safety)],
+    body: RerunIn | None = None,
 ) -> dict[str, Any]:
     """RERUN-1, RERUN-ANY: a world whose latest world state is `world.failed` (a restart, a unit that failed, any
     recorded reason) is started again as a NEW run of the same task: the same brief, the approach the person approved
@@ -773,11 +782,17 @@ def rerun(
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check, before anything is stored
     store.settle(world_id)
     stream = store.events.get(world_id, [])
+    direction = body.direction.strip() if body is not None else ""
+    if body is not None and not direction:
+        raise HTTPException(status_code=422, detail="Describe what the team should change.")
+    _screen(safety, [direction] if direction else [])
 
     # The latest world state; a share change is not one, so sharing a stopped world does not hide its stop.
     last = next((e for e in reversed(stream) if e["type"].startswith("world.") and e["type"] != _SHARED), None)
     paused = last is not None and last["type"] == "world.paused" and world.paused
-    if last is None or (last["type"] != "world.failed" and not paused):
+    redirectable = last is not None and (last["type"] in ("world.completed", "world.failed") or paused)
+    retryable = last is not None and (last["type"] == "world.failed" or paused)
+    if (direction and not redirectable) or (not direction and not retryable):
         raise HTTPException(status_code=409, detail="Only a run that stopped can be started again.")
     old = store.load_world_task(world_id)
     planned = next((e for e in reversed(stream) if e["type"] == "world.planned"), None)
@@ -788,7 +803,7 @@ def rerun(
             status_code=409,
             detail="This task used attached files, which stay with the first run. Describe it again from Home.",
         )
-    task_id, new_world, new_run = _again_ids(world_id)
+    task_id, new_world, new_run = _again_ids(world_id, direction)
     # The durable store, not this process's cache: a second press on another instance (after scale to zero) finds the
     # first one's task and dedupes. Pressed twice is one new world once its run started; a first press whose start
     # failed falls through to `approve`, which starts it again with the grant it recorded (SIMPLE-RUN-2).
@@ -808,7 +823,8 @@ def rerun(
     if again is None:
         fresh = deps.TaskRecord(
             old.owner, new_world, new_run, copy.deepcopy(old.draft),
-            _continued_brief(old.brief, stream) if paused else copy.deepcopy(old.brief), list(old.questions), 1,
+            _continued_brief(old.brief, stream, direction) if paused or direction else copy.deepcopy(old.brief),
+            list(old.questions), 1,
             answers=dict(old.answers), edits=copy.deepcopy(old.edits), approaches=copy.deepcopy(old.approaches),
             granted=False, scenario=old.scenario, gaps=old.gaps,
         )  # fmt: skip

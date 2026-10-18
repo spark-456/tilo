@@ -9,6 +9,7 @@ import type { RoomClient } from "../../park/api/live/meetingHall";
 import { seatFor } from "../../park/api/live/roomTalk";
 import type { Message } from "../../world/conversations";
 import type { WorldFacts } from "../../world/useWorldFacts";
+import { DirectionForm } from "./DirectionForm";
 import { clock } from "./agentLook";
 import { agentMessageText } from "./agentMessageText";
 import { useRoomTalk } from "./useRoomTalk";
@@ -49,6 +50,7 @@ interface ChatPopUpProps {
   initialFilter?: string;
   onClose: () => void;
   onConvene: () => void;
+  onChangeDirection?: ((instruction: string) => Promise<void>) | undefined;
 }
 
 export function ChatPopUp({
@@ -59,11 +61,13 @@ export function ChatPopUp({
   initialFilter = "all",
   onClose,
   onConvene,
+  onChangeDirection,
 }: ChatPopUpProps) {
   const [filter, setFilter] = useState(initialFilter);
   const [closing, setClosing] = useState(false);
   const [inputVal, setInputVal] = useState("");
   const [pending, setPending] = useState("");
+  const [directionOpen, setDirectionOpen] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
   const phone = usePhonePopup();
 
@@ -465,6 +469,21 @@ export function ChatPopUp({
         ) : null}
       </div>
 
+      {onChangeDirection ? (
+        <div className="tw-chat-followup">
+          <button
+            type="button"
+            className="tw-room__quiet"
+            aria-expanded={directionOpen}
+            onClick={() => setDirectionOpen((open) => !open)}
+          >
+            Change direction
+          </button>
+          {directionOpen ? (
+            <DirectionForm onStart={onChangeDirection} onCancel={() => setDirectionOpen(false)} />
+          ) : null}
+        </div>
+      ) : null}
       <div className="tw-chat-bottom">
         <span className="tw-chat-to-badge">To {headerMeta.toName}</span>
         <input

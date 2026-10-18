@@ -222,14 +222,27 @@ export function RunResult({
   worldId,
   events,
   shared,
+  onAskQuestion,
+  onChangeDirection,
 }: {
   api: Api;
   worldId: string;
   events: readonly RunEvent[];
   /** The page's one read of the result (WORLD-LIVE), also used by the Delivery Dock. */
   shared: SharedResult;
+  onAskQuestion?: () => void;
+  onChangeDirection?: (instruction: string) => Promise<void>;
 }) {
-  return <ResultTab api={api} worldId={worldId} events={events} shared={shared} />;
+  return (
+    <ResultTab
+      api={api}
+      worldId={worldId}
+      events={events}
+      shared={shared}
+      {...(onAskQuestion ? { onAskQuestion } : {})}
+      {...(onChangeDirection ? { onChangeDirection } : {})}
+    />
+  );
 }
 
 /** What the run assumed instead of asking (FR-INT-04), as chips beside the tabs; nothing when none is recorded. */

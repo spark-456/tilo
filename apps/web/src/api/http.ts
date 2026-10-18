@@ -1017,8 +1017,11 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
   /** `POST /worlds/{id}/rerun` (RERUN-1, RERUN-ANY): a world that stopped (`world.failed`, any reason) is started
    * again as a NEW run of the same task (same brief, approach and cap). The owner only; the answer names the new world.
    * A 409 is the server's refusal (still running, finished, or nothing approved to start again). */
-  startAgain(worldId: string): Promise<{ world_id: string; task_id: string }> {
-    return this.post(`/worlds/${encodeURIComponent(worldId)}/rerun`, {});
+  startAgain(worldId: string, direction?: string): Promise<{ world_id: string; task_id: string }> {
+    return this.post(
+      `/worlds/${encodeURIComponent(worldId)}/rerun`,
+      direction ? { direction } : {},
+    );
   }
 
   /** `GET /worlds/{id}/layout` (FR-WLD-05): the run's own layout, built from its plan, never made up
