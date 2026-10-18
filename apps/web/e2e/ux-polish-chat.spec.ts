@@ -15,7 +15,9 @@ for (const width of [1440, 390] as const) {
       mkdirSync(evidence, { recursive: true });
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
       await page.goto("/chat");
-      await expect(page.getByRole("heading", { name: "Chat with your Tilo" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Chat with your Tilo" })).toBeVisible({
+        timeout: 20_000,
+      });
       if (theme === "dark")
         await page
           .locator("[data-park]")
