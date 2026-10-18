@@ -8,7 +8,7 @@ for (const width of [1440, 390])
       await page.setViewportSize({ width, height: 850 });
       await page.emulateMedia({ colorScheme: theme });
       const csp =
-        "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+        "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
       await page.route("**/u/ada/survey", async (route) => {
         const response = await route.fetch();
         await route.fulfill({
