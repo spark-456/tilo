@@ -193,9 +193,13 @@ async def _capture(
     if body.website:
         return {"response_id": "accepted", "count": len(apps.responses(artifact_id))}
     row = _row(body, clock) | {"artifact_id": artifact_id, "submitted_by": submitted_by}
-    ip = request.client.host if request.client else "unknown"
-    ip = hashlib.sha256(ip.encode()).hexdigest()[:24]
-    count = await run_in_threadpool(apps.add, artifact_id, row, ip)
+    identity = (
+        f"user:{submitted_by}"
+        if submitted_by is not None
+        else f"ip:{request.client.host if request.client else 'unknown'}"
+    )
+    rate_key = hashlib.sha256(identity.encode()).hexdigest()[:24]
+    count = await run_in_threadpool(apps.add, artifact_id, row, rate_key)
     return {"response_id": row["id"], "count": count}
 
 
