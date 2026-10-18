@@ -4,7 +4,7 @@
    is 44px or more. */
 [data-park] .park-skills-page {
   box-sizing: border-box;
-  width: 100%;
+  width: min(100%, 640px);
   max-width: var(--park-page-max, 1296px);
   margin: 0 auto;
   padding: 48px var(--park-page-pad, 8px) 64px;
@@ -981,6 +981,17 @@
 [data-park] .park-teach__drop [role="alert"] {
   flex: 1 1 100%;
   font-size: 14px;
+}
+[data-park] .park-teach__drop video {
+  display: block;
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
+  max-height: 360px;
+  aspect-ratio: 16 / 9;
+  border-radius: 16px;
+  object-fit: contain;
+  background: var(--sunk);
 }
 [data-park] .park-teach__name {
   display: flex;
