@@ -24,6 +24,10 @@ def test_P0_TEACH_FLOW_open_and_play_skill_fails_honestly_without_browser_action
         [{"text": "Search YouTube", "tool": "web", "action": "web_search"}],
         _Registry(),
     )
+    assert browser_control_unavailable(
+        {"goal": "Open YouTube and play the first video"}, None, _Registry(), selected_skill=True
+    )
+    assert not browser_control_unavailable({"goal": "Open YouTube"}, None, _Registry())
     assert not browser_control_unavailable(
         {"goal": "Open YouTube and play the first video"},
         [{"text": "Open YouTube", "tool": "web", "action": "browse_web"}],

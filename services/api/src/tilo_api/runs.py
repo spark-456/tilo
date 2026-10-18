@@ -256,11 +256,13 @@ def _taught_outline(plan: dict[str, Any], steps: list[dict[str, Any]] | None, re
     return {**plan, "units": units, "gates": gates}
 
 
-def browser_control_unavailable(brief: dict[str, Any], steps: list[dict[str, Any]] | None, registry: Any) -> bool:
+def browser_control_unavailable(
+    brief: dict[str, Any], steps: list[dict[str, Any]] | None, registry: Any, *, selected_skill: bool = False
+) -> bool:
     """A web-search taught step cannot fulfil a request to operate a page."""
-    if not steps:
+    if not steps and not selected_skill:
         return False
-    goal = " ".join([str(brief.get("goal", "")), *(str(step.get("text", "")) for step in steps)])
+    goal = " ".join([str(brief.get("goal", "")), *(str(step.get("text", "")) for step in steps or [])])
     if not re.search(r"\b(?:open|navigate|click|play|type|fill)\b", goal, re.I):
         return False
     if not re.search(r"\b(?:browser|website|webpage|youtube|https?://|[a-z0-9-]+\.com\b)", goal, re.I):
@@ -700,7 +702,7 @@ class Run:
             **self.brief,
             "goal": " ".join((str(self.brief.get("goal", "")), str((self.skill or {}).get("name", "")))),
         }
-        if browser_control_unavailable(browser_brief, self.skill_plan, registry):
+        if browser_control_unavailable(browser_brief, self.skill_plan, registry, selected_skill=self.skill is not None):
             self._fail("Tilo can't operate a browser yet, so this skill cannot open or play a video", None)
             return None
         try:
