@@ -77,11 +77,10 @@ describe("RUN_INDICATOR logic: a running world", () => {
   });
 });
 
-describe("RUN_INDICATOR logic: held runs are static", () => {
-  it("RUN_INDICATOR_a_held_run_reads_Waiting_for_your_approval_and_is_not_moving", () => {
+describe("RUN_INDICATOR logic: held runs produce no bar (P0-SKILLS-PAGE)", () => {
+  it("RUN_INDICATOR_a_held_run_reads_no_bar", () => {
     const bar = runBarOf([world({ st: "needs" })]);
-    expect(bar?.kind).toBe("held");
-    expect(bar?.label).toBe("Waiting for your approval");
+    expect(bar).toBeNull();
   });
 
   it("RUN_INDICATOR_a_running_world_wins_over_a_held_one", () => {

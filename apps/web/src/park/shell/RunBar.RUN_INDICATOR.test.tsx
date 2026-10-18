@@ -224,13 +224,11 @@ describe("RUN_INDICATOR bar: moving versus static", () => {
     expect(bar()?.getAttribute("data-motion")).toBe("on");
   });
 
-  it("RUN_INDICATOR_a_held_run_shows_the_static_label_and_nothing_moves", async () => {
+  // P0-SKILLS-PAGE (owner review): approvals live only in Needs you and the nav badge.
+  // The bottom pill for held runs is removed everywhere.
+  it("RUN_INDICATOR_a_held_run_renders_no_bottom_pill", async () => {
     await mountApp({ api: servedApi({ worlds: [w("a", "needs")] }) });
-    const el = bar() as HTMLElement;
-    expect(el.getAttribute("data-state")).toBe("held");
-    expect(el.textContent).toContain("Waiting for your approval");
-    expect(qa(el, THINKING_TILO)).toHaveLength(0);
-    expect(el.querySelector("[data-spin]")).toBeNull();
+    expect(bar()).toBeNull();
   });
 
   it("RUN_INDICATOR_prefers_reduced_motion_shows_still_tilo_and_keeps_the_label", async () => {

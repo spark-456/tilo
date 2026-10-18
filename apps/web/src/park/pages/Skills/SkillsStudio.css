@@ -59,55 +59,80 @@
   border: 1px solid var(--line);
   border-radius: 28px;
   box-shadow: var(--sh);
-  padding: 24px 28px 24px 24px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 28px;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+[data-park] .park-skills-banner__header {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+[data-park] .park-skills-banner__lead {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+  flex: 1;
 }
 [data-park] .park-skills-banner__art {
-  width: 150px;
-  height: 156px;
-  border-radius: 24px;
+  width: 90px;
+  height: 90px;
+  border-radius: 20px;
   background: var(--heroSoft);
   display: flex;
   align-items: flex-end;
   justify-content: center;
   overflow: hidden;
+  flex: none;
 }
 [data-park] .park-skills-banner__text {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
 }
 [data-park] .park-skills-banner__h2 {
   margin: 0;
   font-weight: 700;
-  font-size: 30px;
-  letter-spacing: -1px;
-  line-height: 1.15;
+  font-size: 26px;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+[data-park] .park-skills-banner__cta {
+  flex: none;
 }
 [data-park] .park-skills-banner__ways {
   list-style: none;
-  margin: 4px 0 0;
+  margin: 0;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 [data-park] .park-skills-banner__way {
   border-radius: 16px;
   background: var(--sunk);
-  padding: 12px 14px;
+  padding: 14px 16px;
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 14.5px;
-  line-height: 1.3;
+  font-size: 14px;
+  line-height: 1.35;
+  min-width: 0;
+}
+[data-park] .park-skills-banner__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 [data-park] .park-skills-banner__way strong {
   display: block;
+  font-weight: 700;
 }
 [data-park] .park-skills-banner__n {
   width: 36px;
@@ -1106,11 +1131,9 @@
 
 /* ---- Narrow screens (390px phone included) ---- */
 @media (max-width: 900px) {
-  [data-park] .park-skills-banner {
-    grid-template-columns: minmax(0, 1fr);
-  }
   [data-park] .park-skills-banner__art {
-    display: none;
+    width: 72px;
+    height: 72px;
   }
 }
 @media (max-width: 640px) {
@@ -1137,13 +1160,31 @@
     font-size: 16px;
   }
   [data-park] .park-skills-banner {
-    padding: 20px;
+    padding: 18px;
+    gap: 16px;
+  }
+  [data-park] .park-skills-banner__header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  [data-park] .park-skills-banner__lead {
+    gap: 12px;
+  }
+  [data-park] .park-skills-banner__art {
+    width: 60px;
+    height: 60px;
+    border-radius: 14px;
   }
   [data-park] .park-skills-banner__h2 {
-    font-size: 24px;
+    font-size: 20px;
+  }
+  [data-park] .park-skills-banner__cta button {
+    width: 100%;
   }
   [data-park] .park-skills-banner__ways {
     grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
   }
   [data-park] .park-skills-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
