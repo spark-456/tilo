@@ -191,7 +191,7 @@ function PersonalLedgerPage({ app }: LedgerPageProps) {
                   />
                 </svg>
               </div>
-              <p className="park-ledger-sub">Daily costs will appear here when recorded.</p>
+              <div className="park-ledger-empty">Daily costs will appear here when recorded.</div>
             </section>
           )}
           <WhereItGoes L={L} />

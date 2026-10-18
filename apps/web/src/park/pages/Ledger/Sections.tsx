@@ -154,7 +154,7 @@ export function RecordedRuns({ L }: { L: Ledger }) {
           </div>
         ))}
         {!L.recordedRuns?.length ? (
-          <p className="park-ledger-sub">No run costs recorded yet.</p>
+          <div className="park-ledger-empty">No run costs recorded yet.</div>
         ) : null}
       </div>
     </section>
