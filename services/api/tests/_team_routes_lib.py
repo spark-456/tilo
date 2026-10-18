@@ -37,11 +37,14 @@ class Writer:
     def __init__(self) -> None:
         self.parts: list[tuple[str, dict[str, Any]]] = []
         self.fail = False
+        self.api_store: Any = None
 
     def append(self, world_id: str, event: dict[str, Any]) -> dict[str, Any]:
         if self.fail:
             raise RuntimeError("the event writer is down")
         self.parts.append((world_id, event))
+        if self.api_store is not None:
+            self.api_store.events.setdefault(world_id, []).append(event)
         return event
 
 
@@ -114,6 +117,9 @@ def team_api(snapshot: Any = None, *, store: Any = None) -> Iterator[TeamApi]:
             grant.verify(entry["idempotency_key"])
             api.sent.append(entry)
 
+    api.api_store = deps.Store()
+    api.writer.api_store = api.api_store
+    app.dependency_overrides[deps.get_store] = lambda: api.api_store
     app.dependency_overrides[deps.get_current_principal] = lambda: deps.Principal(
         user_id=api.user,
         role="owner",
