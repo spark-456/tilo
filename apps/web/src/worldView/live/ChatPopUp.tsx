@@ -3,6 +3,7 @@
 // Filters: All / pair / agent / You / Team meeting; Convene dialog opens from header.
 import type { Event } from "@tilo/contracts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "../../design/tilo-t";
 import type { RoomClient } from "../../park/api/live/meetingHall";
 import { seatFor } from "../../park/api/live/roomTalk";
@@ -15,6 +16,22 @@ import "./ChatPopUp.css";
 import "./live.css";
 
 const AGENT_COLORS = ["ag1", "ag2", "ag3", "ag4", "ag5", "ag6", "ag7"] as const;
+
+function usePhonePopup(): boolean {
+  const query = "(max-width: 760px)";
+  const [phone, setPhone] = useState(
+    () => typeof window !== "undefined" && window.matchMedia?.(query).matches === true,
+  );
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia(query);
+    const changed = () => setPhone(media.matches);
+    changed();
+    media.addEventListener("change", changed);
+    return () => media.removeEventListener("change", changed);
+  }, []);
+  return phone;
+}
 
 export function agentColorKey(id: string, allIds: readonly string[] = []): string {
   const idx = allIds.indexOf(id);
@@ -48,6 +65,7 @@ export function ChatPopUp({
   const [inputVal, setInputVal] = useState("");
   const [pending, setPending] = useState("");
   const logRef = useRef<HTMLDivElement>(null);
+  const phone = usePhonePopup();
 
   const agentIds = useMemo(
     () => (facts.layout?.semantic.agents ?? []).map((a) => a.id),
@@ -230,7 +248,7 @@ export function ChatPopUp({
     void talk.send(talkTarget, "quick", text).finally(() => setPending(""));
   };
 
-  return (
+  const popup = (
     <aside
       className={
         closing ? "tw-chat-popup tw-chat-popup--closing" : "tw-chat-popup tw-chat-popup--open"
@@ -475,4 +493,6 @@ export function ChatPopUp({
       </div>
     </aside>
   );
+  const parkRoot = phone ? document.querySelector<HTMLElement>("[data-park]") : null;
+  return phone && parkRoot ? createPortal(popup, parkRoot) : popup;
 }
