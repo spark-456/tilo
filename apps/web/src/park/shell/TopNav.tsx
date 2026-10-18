@@ -51,6 +51,7 @@ export interface TopNavProps {
   night: boolean;
   menu: "notif" | "acct" | null;
   unread: boolean;
+  notificationCount?: number;
   initials: string;
   sample: boolean;
   /** The team's name, for the sample chip's explanation. */
@@ -144,11 +145,13 @@ export function TopNav(p: TopNavProps) {
           <nav aria-label="Main" className="park-shell__tabs">
             {fit.shown.map(([id, label]) => {
               const on = p.page === id || (id === "worlds" && p.page === "world");
+              const waiting = id === "needs" && p.needsLeft > 0 ? waitingWords : "";
               return (
                 <a
                   key={id}
                   href={parkPath(id)}
                   aria-current={on ? "page" : undefined}
+                  aria-label={waiting ? `${label}, ${waiting} waiting` : undefined}
                   className={`park-shell__tab ${on ? "park-shell__tab--on" : ""}`}
                   onClick={link(id)}
                   onPointerEnter={() => prefetchPage(id)}
@@ -206,13 +209,22 @@ export function TopNav(p: TopNavProps) {
           <button
             type="button"
             aria-label="Notifications"
+            title={
+              p.notificationCount
+                ? `${p.notificationCount} unread notification${p.notificationCount === 1 ? "" : "s"}`
+                : "Notifications"
+            }
             aria-expanded={p.menu === "notif"}
             aria-haspopup="dialog"
             className={`park-shell__iconbtn park-shell__bell ${p.menu === "notif" ? "park-shell__iconbtn--on" : ""}`}
             onClick={p.onBell}
           >
             {icon("bell", 19)}
-            {p.unread ? <span className="park-shell__unread" /> : null}
+            {p.unread ? (
+              <span className="park-shell__unread" aria-hidden="true">
+                {p.notificationCount ? Math.min(p.notificationCount, 9) : null}
+              </span>
+            ) : null}
           </button>
           <button
             type="button"
