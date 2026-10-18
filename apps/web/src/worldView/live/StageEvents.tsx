@@ -34,11 +34,20 @@ export function failureNote(events: readonly Event[]): string {
     : `${done} approved ${done === 1 ? "action" : "actions"} had already happened before it stopped: see the Story for which.`;
 }
 
-const place = (layout: Layout | null, common: string): string | null =>
-  layout?.semantic.levels
-    .flatMap((l) => l.districts)
-    .flatMap((d) => d.buildings)
-    .find((b) => b.common_type === common)?.id ?? null;
+const place = (layout: Layout | null, common: string): string | null => {
+  const all = layout?.semantic.levels.flatMap((l) => l.districts).flatMap((d) => d.buildings) ?? [];
+  if (common === "meeting_hall") {
+    return (
+      all.find((b) => b.common_type === "meeting_hall" || b.name === "Meeting Hall")?.id ?? null
+    );
+  }
+  if (common === "delivery_dock") {
+    return (
+      all.find((b) => b.common_type === "delivery_dock" || b.name === "Delivery Dock")?.id ?? null
+    );
+  }
+  return all.find((b) => b.common_type === common)?.id ?? null;
+};
 
 interface Flight {
   readonly seq: number;
@@ -94,25 +103,34 @@ export function StageEvents({
         />
       ))}
       {burst !== null ? (
-        <span className="tw-confetti" aria-hidden="true" data-testid="confetti">
-          {Array.from({ length: CONFETTI }, (_, i) => {
-            const a = (i / CONFETTI) * Math.PI * 2;
-            const r = 90 + (i % 5) * 28;
-            return (
-              <i
-                // biome-ignore lint/suspicious/noArrayIndexKey: a fixed ring of pieces, never reordered
-                key={i}
-                style={
-                  {
-                    "--cx": `${Math.round(Math.cos(a) * r)}px`,
-                    "--cy": `${Math.round(Math.sin(a) * r - 40)}px`,
-                    background: ["var(--lime)", "var(--amber)", "var(--pri)", "var(--mint)"][i % 4],
-                  } as React.CSSProperties
-                }
-              />
-            );
-          })}
-        </span>
+        <>
+          <span className="tw-confetti" aria-hidden="true" data-testid="confetti">
+            {Array.from({ length: CONFETTI }, (_, i) => {
+              const a = (i / CONFETTI) * Math.PI * 2;
+              const r = 90 + (i % 5) * 28;
+              return (
+                <i
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a fixed ring of pieces, never reordered
+                  key={i}
+                  style={
+                    {
+                      "--cx": `${Math.round(Math.cos(a) * r)}px`,
+                      "--cy": `${Math.round(Math.sin(a) * r - 40)}px`,
+                      background: ["var(--lime)", "var(--amber)", "var(--pri)", "var(--mint)"][
+                        i % 4
+                      ],
+                    } as React.CSSProperties
+                  }
+                />
+              );
+            })}
+          </span>
+          <span
+            className="tw-dock-celebration tw-dock-hop"
+            data-testid="dock-hop"
+            aria-hidden="true"
+          />
+        </>
       ) : null}
       {failed ? (
         <div className="tw-failed tw-pop" data-testid="world-failed-card" role="alert">

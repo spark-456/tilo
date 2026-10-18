@@ -248,7 +248,9 @@ describe("WEB_6_world_render: the map card (art, hero tag, progress, legend)", (
     const { el } = await mountWorld({ id: "invoice" });
     expect(elWithText(el, "Mon 09:00")).toBeTruthy();
     // WORLD-LAYOUT-1 also lists the next value inside the 'More' facts card; the map card's copy carries the empty bar
-    const labels = [...el.querySelectorAll("*")].filter((n) => n.children.length === 0 && n.textContent?.trim() === "Mon 09:00");
+    const labels = [...el.querySelectorAll("*")].filter(
+      (n) => n.children.length === 0 && n.textContent?.trim() === "Mon 09:00",
+    );
     expect(labels.map((n) => progressBeside(n))).toContain(0);
   });
 

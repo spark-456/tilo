@@ -94,6 +94,9 @@ const LiveStageEmbed = lazy(() => import("../../../worldView/LiveStageEmbed"));
 const LiveChat = lazy(() =>
   import("../../../worldView/LiveStageEmbed").then((m) => ({ default: m.LiveChat })),
 );
+const FailureCard = lazy(() =>
+  import("../../../worldView/LiveStageEmbed").then((m) => ({ default: m.FailureCard })),
+);
 const canDrawStage = (): boolean => {
   try {
     return document.createElement("canvas").getContext("webgl2") !== null;
@@ -252,6 +255,15 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const runEvents = useRunEvents(worldClient, runId);
   // WORLD-LIVE: the run's result is read once, when it is recorded delivered, for the Delivery Dock and the Result tab.
   const result = useSharedResult(api, runId, runEvents);
+
+  const lastDeliveredRef = useRef<number | null>(null);
+  useEffect(() => {
+    const del = runEvents.find((e) => e.type === "artifact.delivered");
+    if (del && del.seq !== lastDeliveredRef.current) {
+      lastDeliveredRef.current = del.seq;
+      setTab("result");
+    }
+  }, [runEvents]);
 
   useEffect(() => {
     let live = true;
@@ -845,6 +857,22 @@ export function WorldPage({ app }: { app: AppCtx }) {
           <TabPanel tab="story" on={shown} title="Story" sub="What your team is doing, in order">
             {part(2) ? (
               <>
+                {view?.phase === "failed" || runEvents.some((e) => e.type === "world.failed") ? (
+                  <Suspense fallback={null}>
+                    <FailureCard
+                      events={runEvents}
+                      view={view}
+                      {...(loaded.live && !w.sample && worldClient
+                        ? {
+                            onRetry: () =>
+                              worldClient.startAgain(w.id).then((r) => {
+                                app.go("world", { id: r.world_id });
+                              }),
+                          }
+                        : {})}
+                    />
+                  </Suspense>
+                ) : null}
                 {loaded.gaps.decisions ? (
                   <NotYetCard title="Waiting on you" />
                 ) : open > 0 ? (
