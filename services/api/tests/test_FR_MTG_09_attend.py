@@ -110,6 +110,42 @@ def test_FR_MTG_09_attend_route_completes_with_fake_worker(rig):
     bot.attend.assert_awaited_once()
 
 
+@pytest.mark.emulator
+def test_MEET_ATTEND_FIRESTORE_PARITY_route_uses_the_real_people_store(
+    rig, pw1b_emulator_host: str, monkeypatch: pytest.MonkeyPatch
+):
+    from tilo_api import deps, prod
+    from tilo_api.meeting_bot_rpc import get_meeting_bot_client
+
+    h, _, bot = rig
+    project = "demo-meet-attend-parity"
+    for name in ("K_SERVICE", "CLOUD_RUN_JOB", "GOOGLE_CLOUD_PROJECT", "TILO_API_DEV"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("FIRESTORE_EMULATOR_HOST", pw1b_emulator_host)
+    monkeypatch.setenv("TILO_FIRESTORE_PROJECT", project)
+    monkeypatch.setenv("TILO_PEOPLE_STORE", "firestore")
+    monkeypatch.setenv("TILO_TEAM_STORE", "firestore")
+    monkeypatch.setenv("TILO_SKILLS_STORE", "firestore")
+    monkeypatch.setenv("TILO_OUTBOX_STORE", "firestore")
+    monkeypatch.setenv("TILO_API_STORE", "firestore")
+    deps.get_people_stores.cache_clear()
+    prod.reset()
+
+    durable = deps.get_people_stores()
+    for stored in h.rig.real.persons.list(ORG):
+        durable.persons.create(stored.record)
+    durable.meetings.create(h.rig.real.meetings.get(ORG, MEETING).record)
+    h.rig.unwire("people_stores")
+    h.rig.app.dependency_overrides[get_meeting_bot_client] = lambda: bot
+
+    response = h.rig.client.post(f"/v1/meetings/{MEETING}/attend", json={})
+
+    assert response.status_code == 200, response.text
+    stored = durable.meetings.get(ORG, MEETING)
+    assert stored is not None and stored.record["status"] == "ended"
+    assert stored.record["transcript"] == response.json()["transcript"]
+
+
 def test_R_MEET_unconnected_host_asks_owner_to_sign_in(rig):
     from tilo_api.meeting_bot_rpc import get_meeting_bot_client
 
