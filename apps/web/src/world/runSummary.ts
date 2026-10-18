@@ -74,6 +74,8 @@ export const BUILDING_STATE = {
   operational: "At work",
   completed: "Finished",
   archived: "Archived",
+  needs: "Needs you",
+  failed: "Failed",
 } as const;
 
 /** The words for a channel island's state, shared by the stage tags and the Inspect panel. */

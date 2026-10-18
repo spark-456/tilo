@@ -41,6 +41,13 @@ export function PlaybackBar({ worldId }: { worldId: string }) {
     if (to !== "paused" && index >= last) setReplayPoint(worldId, 0);
     setSpeed(to);
   };
+
+  const evT = last;
+  const evN = point === null ? last : Math.max(1, Math.min(index + 1, last));
+  const evItem = events[evN - 1] ?? events[0];
+  const evName = evItem?.type ?? "idle";
+  const scrubPct = evT > 0 ? Math.round((evN / evT) * 100) : 0;
+
   return (
     <fieldset className="tw-play" aria-label="Replay speed">
       {(Object.keys(LABEL) as Speed[]).map((s) => (
@@ -48,29 +55,54 @@ export function PlaybackBar({ worldId }: { worldId: string }) {
           key={s}
           type="button"
           aria-pressed={speed === s}
+          aria-label={s === "paused" ? (speed === "paused" ? "Play replay" : "Pause replay") : LABEL[s]}
           className="tw-play__b"
-          onClick={() => start(s)}
+          onClick={() => {
+            if (s === "paused") {
+              if (speed === "paused") {
+                start("1x");
+              } else {
+                start("paused");
+              }
+            } else {
+              start(s);
+            }
+          }}
         >
           {s === "paused" ? (
-            <Icon name="pause" size={16} />
+            <Icon name={speed === "paused" ? "play" : "pause"} size={16} />
           ) : s === "catch" ? (
             <Icon name="bolt" size={16} />
           ) : null}
-          {LABEL[s]}
+          {s === "paused" ? "Play / Pause" : LABEL[s]}
         </button>
       ))}
-      {point !== null ? (
-        <button
-          type="button"
-          className="tw-play__b"
-          onClick={() => {
+      <button
+        type="button"
+        className="tw-play__b"
+        onClick={() => {
+          if (point !== null) {
             setSpeed("paused");
             setReplayPoint(worldId, null);
-          }}
-        >
-          Whole run
-        </button>
-      ) : null}
+          } else {
+            setReplayPoint(worldId, 0);
+            setSpeed("1x");
+          }
+        }}
+      >
+        Whole run
+      </button>
+      <div className="tw-play__scrubber" data-testid="playback-scrubber">
+        <div className="tw-play__track">
+          <div
+            className="tw-play__fill"
+            style={{ width: `${scrubPct}%` }}
+          />
+        </div>
+        <span className="tw-play__meta">
+          {`event ${evN} of ${evT} · ${evName}`}
+        </span>
+      </div>
     </fieldset>
   );
 }

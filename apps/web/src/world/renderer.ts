@@ -27,11 +27,14 @@ import { P } from "./art/iso";
 import type { Pt } from "./art/iso";
 import {
   buildingTag,
+  completedTag,
   districtTag,
   drawTool,
+  failedTag,
   islandTag,
   makeBubble,
   makePill,
+  needsTag,
   policyTag,
   sessionTag,
 } from "./art/labels";
@@ -274,6 +277,8 @@ const PIN: Readonly<Record<string, PinKind | undefined>> = {
   operational: "active",
   completed: "complete",
   archived: "skipped",
+  needs: "needs",
+  failed: "blocked",
 };
 const GATE_PIN: Readonly<Record<string, PinKind>> = {
   closed: "lock",
@@ -294,7 +299,10 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
   ]);
   const mode = layer.density();
   const narrow = isNarrow(layer);
-  layer.tagScale = narrow ? Math.max(1, READABLE_TAG_PX / (layer.content.scale.x * TAG_PX)) : 1;
+  const camZoom = layer.content.parent?.scale?.x ?? 1;
+  const invZoom = camZoom > 0 ? 1 / camZoom : 1;
+  layer.tagScale =
+    (narrow ? Math.max(1, READABLE_TAG_PX / (layer.content.scale.x * TAG_PX)) : 1) * invZoom;
   const key = JSON.stringify([
     groundKey,
     frame.buildings,
@@ -313,7 +321,7 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
     for (const p of frame.plates) drawPlate(g, p.rect, p.lift);
     for (const d of frame.districts) drawDistrict(g, d.rect, d.tint, d.lift);
     for (const r of frame.roads) drawRoad(g, r.points, r.lift);
-    for (const b of frame.bridges) drawBridge(g, b.points, b.kind, b.state, b.lift);
+    for (const b of frame.bridges) drawBridge(g, b.points, b.kind, b.state, b.lift, b.active);
   }
 
   const seen = new Set<string>(); // items kept this frame; the rest are removed
@@ -357,6 +365,15 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
     const kind = PIN[b.status];
     if (kind) pinned.push(() => drawPin(layer.pins, it.top, kind, { tint: b.tint }));
     const inSession = b.inSession;
+    const tagFn = inSession
+      ? sessionTag
+      : b.status === "needs"
+        ? needsTag
+        : b.status === "failed"
+          ? failedTag
+          : b.status === "completed"
+            ? completedTag
+            : buildingTag;
     tag(
       layer,
       live,
@@ -366,7 +383,7 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
           ? "In session"
           : `${b.name} · In session`
         : named(b.name, word(BUILDING_STATE, b.status), mode, narrow),
-      inSession ? sessionTag : buildingTag,
+      tagFn,
       [it.top[0], it.top[1] - (kind ? 50 : 14)],
       restZones,
     );

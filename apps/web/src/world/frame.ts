@@ -73,6 +73,7 @@ export interface FrameBridge extends FramePath {
   readonly island: string;
   readonly kind: Bridge;
   readonly state: Link;
+  readonly active?: boolean;
 }
 export interface FrameGate {
   readonly id: string;
@@ -269,13 +270,18 @@ export function frameOf(layout: Layout, state: WorldState): Frame {
     points: r.path,
     lift: liftOf(buildingLevel.get(r.from)),
   }));
-  const bridges: FrameBridge[] = (geometry?.bridges ?? []).map((b) => ({
-    island: b.island,
-    kind: islandState.get(b.island)?.bridge ?? "road",
-    state: islandState.get(b.island)?.state ?? "connected",
-    points: b.path,
-    lift: liftOf(buildingLevel.get(b.from)),
-  }));
+  const bridges: FrameBridge[] = (geometry?.bridges ?? []).map((b) => {
+    const bStatus = state.buildings[b.from]?.status;
+    const active = bStatus === "constructing" || bStatus === "needs";
+    return {
+      island: b.island,
+      kind: islandState.get(b.island)?.bridge ?? "road",
+      state: islandState.get(b.island)?.state ?? "connected",
+      points: b.path,
+      lift: liftOf(buildingLevel.get(b.from)),
+      active,
+    };
+  });
   const gateBuilding = new Map(layout.semantic.gates.map((g) => [g.id, g.between[0]]));
   const gates: FrameGate[] = (geometry?.gates ?? []).map((g) => ({
     id: g.id,

@@ -96,13 +96,16 @@ export function drawBridge(
   kind: Bridge,
   state: Link,
   lift: number,
+  active = false,
 ): void {
   const color = dk(PALETTE.road, kind === "road" ? 0.1 : 0.22);
-  if (state === "connected") {
+  if (state === "connected" && !active && kind === "road") {
     strip(g, path, BRIDGE_WIDTH[kind], color, lift);
     return;
   }
-  const edge = state === "failed" ? tokens.color.signal.blocked : PALETTE.ink2;
+  const edge = state === "failed" ? tokens.color.signal.blocked : active ? PALETTE.ink : PALETTE.ink2;
+  const alpha = active ? 0.9 : 0.35;
+  const width = active ? 2.0 : 1.4;
   const h = BRIDGE_WIDTH[kind] / 2;
   const [first, last] = [path[0], path[path.length - 1]];
   if (!first || !last) return;
@@ -114,7 +117,7 @@ export function drawBridge(
       const len = Math.hypot(o.x - p0.x, o.y - p0.y) || 1;
       return P(q.x + (s * h * -(o.y - p0.y)) / len, q.y + (s * h * (o.x - p0.x)) / len, lift + 0.2);
     });
-    dashed(g, side, { color: edge, width: 1.6, closed: false });
+    dashed(g, side, { color: edge, width, closed: false, alpha });
   }
 }
 

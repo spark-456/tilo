@@ -40,6 +40,15 @@ export const policyTag = () =>
   makePill("Policy", { fill: tokens.color.policy, ink: PALETTE.ink, lip: true });
 /** TW-4: lime In session tag when a meeting is convened in the Hall. */
 export const sessionTag = (text: string) => makePill(text, { fill: "#c8f23a", ink: "#0b0b0c" });
+/** TW-3: amber Needs tag when a building awaits approval. */
+export const needsTag = (name: string) =>
+  makePill(name, { fill: tokens.color.signal.needs, ink: "#1A1407", lip: true });
+/** TW-3: red Failed tag when a building/step failed. */
+export const failedTag = (name: string) =>
+  makePill(name, { fill: tokens.color.signal.blocked, ink: PALETTE.white, lip: true });
+/** TW-3: green Completed tag when a building finished. */
+export const completedTag = (name: string) =>
+  makePill(name, { fill: tokens.color.signal.done, ink: PALETTE.white, lip: true });
 
 /** WORLD-LIVE: a speech bubble whose tail tip is at (0, 0) and which grows upward: the receiver's name in bold,
  * then the real note, wrapped at 170 px. Dark text on the white pill fill (same pair as the building tags). */

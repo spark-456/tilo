@@ -9,7 +9,9 @@ export type BuildingStatus =
   | "constructing"
   | "operational"
   | "completed"
-  | "archived";
+  | "archived"
+  | "needs"
+  | "failed";
 
 export interface AgentState {
   readonly id: string;
@@ -78,7 +80,7 @@ export interface WorldState {
   readonly gates: Readonly<Record<string, GateState>>;
   /** The layout's Meeting Hall building, where a convened room gathers (WORLD-LIVE), or null. */
   readonly hall: string | null;
-  /** The layout's Delivery Dock building, where agents gather on world.completed (TW-5), or null. */
+  /** The layout's Delivery Dock building, where deliverables arrive (TW-3) and agents gather on world.completed (TW-5), or null. */
   readonly dock: string | null;
   /** The layout's named destinations for a routed question. Null means the layout supplied no honest place. */
   readonly desk: string | null;
@@ -156,6 +158,8 @@ const BUILDING_STATUS_BY_VERB: Readonly<Record<string, BuildingStatus>> = {
   operational: "operational",
   completed: "completed",
   archived: "archived",
+  needs: "needs",
+  failed: "failed",
 };
 
 const NOTE_MAX = 140;
@@ -219,10 +223,16 @@ function applyKnown(state: WorldState, event: Event): WorldState {
             ? "paused"
             : verb === "resumed"
               ? "started"
-              : verb === "failed"
-                ? "failed"
-                : undefined;
-      return status ? { ...state, status } : state;
+              : verb === "completed"
+                ? "completed"
+                : verb === "failed"
+                  ? "failed"
+                  : undefined;
+      const buildings = { ...state.buildings };
+      if (verb === "failed" && event.target in state.buildings) {
+        buildings[event.target] = { id: event.target, status: "failed" };
+      }
+      return { ...state, ...(status ? { status } : {}), buildings };
     }
     case "level": {
       const level = state.levels[event.target];
@@ -245,7 +255,10 @@ function applyKnown(state: WorldState, event: Event): WorldState {
     }
     case "building": {
       const building = state.buildings[event.target];
-      const status = BUILDING_STATUS_BY_VERB[verb];
+      const status =
+        (event.target === state.hall || event.target === state.dock) && verb === "planned"
+          ? "operational"
+          : BUILDING_STATUS_BY_VERB[verb];
       if (!building || !status) return state;
       return {
         ...state,
@@ -303,7 +316,14 @@ function applyKnown(state: WorldState, event: Event): WorldState {
         ),
         doneAt: verb === "handoff" ? event.seq : null,
       };
-      return { ...state, agents: { ...state.agents, [agent.id]: next } };
+      const buildings =
+        verb === "blocked" && event.target in state.buildings
+          ? {
+              ...state.buildings,
+              [event.target]: { id: event.target, status: "failed" as const },
+            }
+          : state.buildings;
+      return { ...state, buildings, agents: { ...state.agents, [agent.id]: next } };
     }
     case "question": {
       // TILO-T-WORLD: an agent routing a question to a person says it: its bubble is the event's own line, to "You".
@@ -388,16 +408,25 @@ function applyKnown(state: WorldState, event: Event): WorldState {
     }
     case "approval":
     case "policy": {
-      let nextState = state;
+      const buildings = { ...state.buildings };
+      const bld = buildings[event.target];
+      if (bld) {
+        if (verb === "requested") {
+          buildings[event.target] = { ...bld, status: "needs" };
+        } else if (verb === "resolved") {
+          buildings[event.target] = { ...bld, status: "operational" };
+        }
+      }
+      let nextState = buildings !== state.buildings ? { ...state, buildings } : state;
       const gateId = (event.data as Record<string, unknown> | null)?.gate_id;
-      if (typeof gateId === "string" && gateId in state.gates) {
+      if (typeof gateId === "string" && gateId in nextState.gates) {
         const nextGate = gateAfter(event, verb);
         if (nextGate)
           nextState = { ...nextState, gates: { ...nextState.gates, [gateId]: nextGate } };
       }
       if (family === "approval") {
         if (verb === "requested" && event.actor) {
-          const a = state.agents[event.actor];
+          const a = nextState.agents[event.actor];
           if (a) {
             nextState = {
               ...nextState,
