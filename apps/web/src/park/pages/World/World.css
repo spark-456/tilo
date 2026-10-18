@@ -1325,14 +1325,14 @@
     display: inline-flex;
     align-items: center;
   }
-  [data-park] .park-world-skillchip,
-  [data-park] .park-world-toolchip {
+  [data-park] .park-world-skillchip:where(button),
+  [data-park] .park-world-toolchip:where(button) {
     min-height: 44px;
     height: auto;
     display: inline-flex;
     align-items: center;
   }
-  [data-park] .park-world-back,
+  [data-park] .park-world-back:where(a),
   [data-park] .park-world-spendlink {
     min-height: 44px;
     min-width: 44px;

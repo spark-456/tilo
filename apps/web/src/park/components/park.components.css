@@ -253,6 +253,13 @@
 [data-park] .park-switch__knob--on {
   transform: translateX(18px);
 }
+@media (max-width: 600px) {
+  [data-park] .park-switch {
+    min-height: 44px;
+    min-width: 44px;
+    align-items: center;
+  }
+}
 
 /* ---- Status chip and summary pill ---- */
 [data-park] .park-chip {

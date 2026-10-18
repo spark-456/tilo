@@ -28,17 +28,9 @@ export async function attendees(client: RoomClient, worldId: string): Promise<At
   const missing = Symbol("layout not yet available");
   const feed = await client.getJson(`${path}/events`);
   if (!record(feed) || !Array.isArray(feed.events)) throw bad();
-  // FR-WLD-05: layout only exists after the world has started or recorded events.
   const events = feed.events;
-  const started = events.some(
-    (e) =>
-      record(e) &&
-      (e.type === "world.started" ||
-        e.type === "world.planned" ||
-        typeof e.district === "string" ||
-        typeof e.actor === "string"),
-  );
-  if (!started) return [];
+  // A readable events feed does not prove the layout is readable. Check it even before
+  // the first event so access and server failures reach the Meeting Hall.
   const layout = await client.getJson(`${path}/layout`).catch((error: unknown) => {
     if (error instanceof TiloApiError && error.status === 404) return missing;
     throw error;

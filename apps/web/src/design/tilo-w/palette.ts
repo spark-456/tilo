@@ -73,6 +73,7 @@ export function agentColorTokenByOrder(orderIndex: number): AgentColorToken {
  * Chat bubble tint: color-mix(in srgb, agent 13%, var(--card)).
  * When CSS color-mix is supported or hex approximation is needed.
  */
-export function agentChatTint(col: string): string {
-  return `color-mix(in srgb, ${col} 13%, var(--card, #ffffff))`;
+export function agentChatTint(col: string | number, _dark?: boolean): string {
+  const color = typeof col === "number" ? agentColorByOrder(col) : col;
+  return `color-mix(in srgb, ${color} 13%, var(--card, #ffffff))`;
 }
