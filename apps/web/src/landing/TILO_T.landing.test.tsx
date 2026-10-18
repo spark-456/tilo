@@ -7,7 +7,7 @@ import { RECORDED_RUN } from "./recordedRun";
 
 afterEach(cleanup);
 
-it("CX-T-LANDING keeps the Studio story and adds honest T agenda and task ideas", async () => {
+it("TILO_T landing matches design/tilo-t Tilo T Landing artboard", async () => {
   mount(
     <SignInScreen
       busy={false}
@@ -21,25 +21,21 @@ it("CX-T-LANDING keeps the Studio story and adds honest T agenda and task ideas"
     await vi.dynamicImportSettled();
   });
   const headings = [...document.querySelectorAll("h2")].map((heading) => heading.textContent);
+  expect(headings).toContain("You type one sentence. You get the whole thing back.");
+  expect(headings).toContain("Three steps. No jargon, no surprises.");
+  expect(headings).toContain("Six helpers. Each one good at one thing.");
   expect(headings).toContain("Your week, and the bits worth keeping.");
-  expect(headings).toContain("A good place to start.");
-  expect(headings.indexOf("Everything in play, at a glance.")).toBeLessThan(
+  expect(headings).toContain("One town for the whole team.");
+  expect(headings.indexOf("One town for the whole team.")).toBeLessThan(
     headings.indexOf("Your week, and the bits worth keeping."),
   );
-  expect(headings.indexOf("A good place to start.")).toBeLessThan(
+  expect(headings.indexOf("While you get on with your day.")).toBeLessThan(
     headings.indexOf("Your little city is waiting."),
   );
   const week = document.querySelector("#landing-week")?.closest("section");
   expect(week?.textContent).toContain("Your meetings appear after sign-in");
-  expect(week?.textContent).not.toMatch(/\d+ of \d+ credits|follow-ups drafted|meeting at \d/i);
   expect(week?.querySelector('[role="progressbar"]')).toBeNull();
-  const replay = document.querySelector('[aria-label="Recorded example events"]');
-  expect(replay?.textContent).toContain(RECORDED_RUN.facts.planned);
-  expect(replay?.textContent).toContain(RECORDED_RUN.facts.done);
-  expect(replay?.textContent).toContain("Recorded example");
-  const pause = replay?.querySelector("button");
-  expect(pause?.textContent).toBe("Pause example");
-  await act(async () => click(pause as Element));
-  expect(replay?.classList.contains("tt-paused")).toBe(true);
-  expect(pause?.textContent).toBe("Play example");
+  expect(document.querySelector(".landing-t-scorecard")).not.toBeNull();
+  expect(document.body.textContent).toContain("Brightcell wins, narrowly.");
+  expect(document.body.textContent).toContain("Explore a demo town");
 });

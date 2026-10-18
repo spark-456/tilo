@@ -63,7 +63,7 @@ describe("STUDIO_6 the signed-out landing", () => {
   it("STUDIO_6 Continue with Google is on the page, once, and is the only filled button", async () => {
     landing();
     expect(named("Continue with Google")).toHaveLength(1);
-    expect(named("Explore a demo session")).toHaveLength(1);
+    expect(named("Explore a demo town")).toHaveLength(1);
     await settle();
     expect(stage()).not.toBeNull(); // the landing below the hero arrived
     expect(named("Continue with Google")).toHaveLength(1);

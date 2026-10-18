@@ -88,12 +88,16 @@ export function SignInScreen({
         <ThemeToggle night={night} onToggle={toggle} />
       </header>
       <main className="landing-hero">
+        <span className="landing-hero__badge">
+          <span className="landing-hero__badge-tag">NEW</span>
+          Quick answers now take one helper and a few seconds
+        </span>
         <h1 className="landing-hero__title">
           Describe the work. <span className="landing-mark">Watch your team do it.</span>
         </h1>
         <p className="landing-hero__lead">
-          Plain words in. A Director plans the work, teams of AI helpers run it, and you watch it
-          happen in a small living city and approve what matters.
+          Plain words in. A tiny city of AI helpers plans it, does it, and checks with you before
+          anything important.
         </p>
         <div className="landing-hero__actions">
           <button
@@ -114,11 +118,12 @@ export function SignInScreen({
             disabled={busy}
             onClick={onDemo}
           >
-            Explore a demo session
+            Explore a demo town
           </button>
         </div>
         <p className="landing-hero__note">
-          A sample company to explore. Demo sessions replay recorded runs.
+          Free to try · you see the cost first. A sample company to explore. Demo sessions replay
+          recorded runs.
         </p>
         {signOutFailedText ? (
           <p className="landing-error" role="alert" data-testid="sign-out-failed">

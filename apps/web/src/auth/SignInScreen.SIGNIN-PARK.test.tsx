@@ -37,18 +37,18 @@ describe("SIGNIN-PARK the sign-in screen", () => {
     expect(text()).toContain("A sample company to explore. Demo sessions replay recorded runs.");
   });
 
-  it("SIGNIN-PARK Continue with Google and Explore a demo session are real buttons that start their sign-in once", () => {
+  it("SIGNIN-PARK Continue with Google and Explore a demo town are real buttons that start their sign-in once", () => {
     const { onGoogle, onDemo } = screen();
     click(button(/continue with google/i) as HTMLElement);
     expect(onGoogle).toHaveBeenCalledTimes(1);
-    click(button(/explore a demo session/i) as HTMLElement);
+    click(button(/explore a demo/i) as HTMLElement);
     expect(onDemo).toHaveBeenCalledTimes(1);
   });
 
   it("SIGNIN-PARK both buttons wait while a sign-in is running", () => {
     screen({ busy: true });
     expect((button(/continue with google/i) as HTMLButtonElement).disabled).toBe(true);
-    expect((button(/explore a demo session/i) as HTMLButtonElement).disabled).toBe(true);
+    expect((button(/explore a demo/i) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("SIGNIN-PARK has no field and no form, and links Terms and Privacy Policy", () => {

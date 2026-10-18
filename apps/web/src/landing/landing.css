@@ -231,6 +231,31 @@
   padding: 40px 40px 0;
   text-align: center;
 }
+.landing-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--card);
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 600;
+}
+.landing-hero__badge-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 99px;
+  background: var(--lime);
+  color: #0b0b0c;
+  font-family: var(--mono, "Geist Mono", ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 700;
+}
 .landing-hero__title {
   max-width: 1080px;
   margin: 0;

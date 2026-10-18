@@ -72,19 +72,19 @@ const landing = () =>
 const text = () => document.body.textContent ?? "";
 
 const HEADINGS = [
-  "Four steps. No jargon, no surprises.",
+  "You type one sentence. You get the whole thing back.",
+  "Three steps. No jargon, no surprises.",
+  "Six helpers. Each one good at one thing.",
   "A quick answer, or a whole world.",
-  "Nothing leaves without your yes.",
+  "Nothing important happens without a yes.",
   "Skills that grow with you.",
-  "A notetaker that tells people it’s there.",
-  "Run it with your team.",
-  "Signed in and working in one step.",
-  "Everything in play, at a glance.",
+  "It joins, takes minutes, and follows up.",
+  "One town for the whole team.",
   "Your week, and the bits worth keeping.",
-  "Your tools, on your terms.",
-  "Built for companies. Just as handy for one person.",
-  "Agents you can actually watch, and trust.",
-  "A good place to start.",
+  "Works with the apps you already use.",
+  "Personal help, team-grade control.",
+  "Honest by design.",
+  "While you get on with your day.",
   "Your little city is waiting.",
 ];
 
@@ -142,69 +142,67 @@ describe("LANDING_2 the landing is a complete product page", () => {
     ).toHaveLength(0);
   });
 
-  it("LANDING_2 the hero says what Tilo is: describe, a Director plans, teams run it, watch, approve", () => {
+  it("LANDING_2 the hero says what Tilo is: plain words, tiny city, AI helpers, plans it, checks with you", () => {
     landing();
     const lead = q(document.body, ".landing-hero__lead")?.textContent ?? "";
-    for (const word of ["Plain words in", "Director", "teams", "watch", "approve"])
+    for (const word of ["Plain words in", "tiny city", "AI helpers", "plans it", "checks with you"])
       expect(lead).toContain(word);
   });
 });
 
 describe("LANDING_2 what it says is true, and what is not live says so", () => {
-  it("LANDING_2 the pillars are all there: skills, notetaker, teams, onboarding, pins, connectors, both audiences", async () => {
+  it("LANDING_2 the pillars are all there: one sentence, three steps, helpers, speeds, safety, skills, meetings, teams, agenda, connectors, audiences, why, day", async () => {
     landing();
     await settle();
     for (const part of [
-      "Teach it",
-      "Skills learn from real runs",
-      "disclosed notetaker",
-      "Create a team and invite people by email",
-      "Who can say yes",
-      "One step to start",
-      "A short first-run tour",
-      "A sample project",
-      "Pinboards in the Agenda",
-      "Your context",
-      "ENTERPRISE AND TEAMS",
-      "PERSONAL PRODUCTIVITY",
-      "Built on Google Cloud",
+      "Brightcell wins, narrowly.",
+      "Three steps",
+      "Six helpers",
+      "A quick answer, or a whole world",
+      "Nothing important happens without a yes",
+      "Skills that grow with you",
+      "It joins, takes minutes, and follows up",
+      "One town for the whole team",
+      "Your week, and the bits worth keeping",
+      "Works with the apps you already use",
+      "Personal help, team-grade control",
+      "Honest by design",
+      "While you get on with your day",
     ])
       expect(text(), part).toContain(part);
   });
 
-  it("LANDING_2 not-yet-live things carry a Coming or Rolling out chip", async () => {
+  it("LANDING_2 connectors show connected and connect states, and no Canva", async () => {
     landing();
     await settle();
-    const li = (name: string) =>
-      qa<HTMLElement>(document.body, ".landing-app").find((e) => e.textContent?.startsWith(name));
-    expect(li("Canva")?.textContent).toContain("Coming");
-    expect(li("Slack")?.textContent).toContain("Coming");
-    expect(li("Meeting host")?.textContent).toContain("Rolling out");
-    expect(li("Gmail")?.textContent).toContain("Google sign-in");
-    expect(li("Lovable")?.textContent).toContain("Brief hand-off");
-    expect(q(document.body, "#meetings")?.textContent).toContain("Rolling out");
-    expect(q(document.body, "#skills")?.textContent).toContain("Coming");
+    const c = q(document.body, "#connectors")?.textContent ?? "";
+    expect(c).toContain("Gmail");
+    expect(c).toContain("Calendar");
+    expect(c).toContain("Drive");
+    expect(c).toContain("Connected");
+    expect(c).toContain("Connect");
+    expect(c).not.toContain("Canva");
   });
 
-  it("LANDING_2 meeting claims keep a person in the loop: approve the host card, confirm minutes, approve the follow-up", async () => {
+  it("LANDING_2 meeting claims keep a person in the loop: brief before, live minutes, drafted follow-ups", async () => {
     landing();
     await settle();
     const m = q(document.body, "#meetings")?.textContent ?? "";
-    expect(m).toContain("You approve a card");
-    expect(m).toContain("never lets anyone in on its own");
-    expect(m).toContain("You read them and confirm");
-    expect(m).toContain("nothing is sent until you approve");
-    expect(m).toContain("Example, not a real meeting");
+    expect(m).toContain("Send Tilo to any call");
+    expect(m).toContain("brief ready 15 minutes before");
+    expect(m).toContain("MINUTES · LIVE");
+    expect(m).toContain("Price settled at €74 a pack");
+    expect(m).toContain("follow-ups drafted");
   });
 
-  it("LANDING_2 connectors: Tilo never sees passwords; levels are the app's own; no WhatsApp or invented numbers", async () => {
+  it("LANDING_2 connectors: Tilo never sees passwords; reading vs sending; no WhatsApp or invented numbers", async () => {
     landing();
     await settle();
     const c = q(document.body, "#connectors")?.textContent ?? "";
     expect(c).toContain("never sees or stores your passwords");
-    expect(c).toContain("Off, Read, Draft or Act");
+    expect(c).toContain("Reading is fine; sending, paying and sharing always ask first");
     expect(text()).not.toMatch(/whatsapp/i);
-    expect(text()).not.toMatch(/\d+\s?(%|x faster|hours saved)/i);
+    expect(c).not.toMatch(/\d+\s?(%|x faster|hours saved)/i);
   });
 
   it("LANDING_2 the footer still links Privacy and Terms", async () => {
