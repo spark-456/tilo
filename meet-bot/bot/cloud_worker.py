@@ -50,19 +50,23 @@ def transcript_from_items(meeting_id: str, items) -> dict:
     return Transcript(v="1.0", meeting_id=meeting_id, utterances=utterances).model_dump(mode="json")
 
 
+# The request handler's own refusal lines (type + redacted reason) carry no participant text.
+OPERATIONAL_LOGGER = "bot.cloud_run"
+
+
 @contextmanager
 def quiet_capture():
     # Cloud logs are operational only. Session modules can log untrusted participant text at any level.
     loggers = [
         logging.getLogger(name)
         for name in list(logging.root.manager.loggerDict)
-        if name.startswith(("bot.", "tilo_providers"))
+        if name.startswith(("bot.", "tilo_providers")) and name != OPERATIONAL_LOGGER
     ]
     states = [(logger, logger.disabled) for logger in loggers]
 
     class ContentFilter(logging.Filter):
         def filter(self, record):
-            return not record.name.startswith(("bot.", "tilo_providers"))
+            return record.name == OPERATIONAL_LOGGER or not record.name.startswith(("bot.", "tilo_providers"))
 
     boundary = ContentFilter("tilo-content-boundary")
     handlers = set(logging.root.handlers)
