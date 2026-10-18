@@ -807,3 +807,107 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* CONNECT-UX real cards & coming later row */
+[data-park] .park-connectors-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+[data-park] .park-connectors-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+
+[data-park] .park-connectors-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+[data-park] .park-connectors-action-btn {
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-park] .park-connectors-action-btn--connect {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+[data-park] .park-connectors-action-btn--reconnect {
+  background: var(--redSoft);
+  color: var(--red);
+  border-color: var(--red);
+}
+
+[data-park] .park-connectors-action-btn--connected {
+  background: var(--tint);
+  color: var(--ink2);
+}
+
+[data-park] .park-connectors-coming-later {
+  margin-top: 24px;
+}
+
+[data-park] .park-connectors-coming-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+[data-park] .park-connectors-coming-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  color: var(--ink3);
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.75;
+  filter: grayscale(0.8);
+}
+
+[data-park] .park-connectors-coming-mono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-park] .park-connectors-coming-name {
+  color: var(--ink2);
+}
+
+[data-park] .park-connectors-coming-tag {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--tint);
+  color: var(--ink3);
+}
