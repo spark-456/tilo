@@ -80,6 +80,9 @@ export interface WorldState {
   readonly hall: string | null;
   /** The layout's Delivery Dock building, where agents gather on world.completed (TW-5), or null. */
   readonly dock: string | null;
+  /** The layout's named destinations for a routed question. Null means the layout supplied no honest place. */
+  readonly desk: string | null;
+  readonly expertOffice: string | null;
   /** Open meeting rooms: room id -> who sits in it, until meeting.adjourned (WORLD-LIVE). */
   readonly rooms: Readonly<Record<string, readonly string[]>>;
 }
@@ -128,6 +131,8 @@ export function createInitialState(layout: Layout): WorldState {
     // Only a dock the layout names as one: never guessed from an id or another building type.
     allBuildings.find((b) => b.common_type === "delivery_dock" || b.name === "Delivery Dock")?.id ??
     null;
+  const desk = allBuildings.find((b) => b.common_type === "your_desk")?.id ?? null;
+  const expertOffice = allBuildings.find((b) => b.common_type === "expert_office")?.id ?? null;
   return {
     seq: 0,
     trace: [],
@@ -139,6 +144,8 @@ export function createInitialState(layout: Layout): WorldState {
     gates,
     hall,
     dock,
+    desk,
+    expertOffice,
     rooms: {},
   };
 }
@@ -279,11 +286,15 @@ function applyKnown(state: WorldState, event: Event): WorldState {
         event.target in state.districts ||
         event.target in state.levels;
       // The actor's own next event ends its last note and tool (WORLD-LIVE: both exist only because an event said so).
+      const handoffTo =
+        verb === "handoff" && state.agents[event.target]
+          ? standingAt(state, state.agents[event.target] as AgentState)
+          : null;
       const next: AgentState = {
         ...agent,
         working: verb === "working",
         say: SAYS.has(verb) ? noteOf(event) : null,
-        location: isLocation ? event.target : agent.location,
+        location: isLocation ? event.target : (handoffTo ?? agent.location),
         post: postAfter(
           agent,
           verb,
@@ -299,9 +310,21 @@ function applyKnown(state: WorldState, event: Event): WorldState {
       const asker = state.agents[event.actor];
       if (verb !== "routed" || !asker) return state;
       const say = noteOf(event);
+      const domain = (event.data as Record<string, unknown> | null)?.domain;
+      const destination =
+        typeof domain === "string" ? state.expertOffice : domain === null ? state.desk : null;
       return {
         ...state,
-        agents: { ...state.agents, [asker.id]: { ...asker, working: false, say, doneAt: null } },
+        agents: {
+          ...state.agents,
+          [asker.id]: {
+            ...asker,
+            working: false,
+            say,
+            location: destination ?? asker.location,
+            doneAt: null,
+          },
+        },
       };
     }
     case "meeting": {

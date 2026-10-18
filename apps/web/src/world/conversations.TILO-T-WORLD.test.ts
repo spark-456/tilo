@@ -94,13 +94,14 @@ test("FR-WLD-04 TILO-T-WORLD conversations: a handoff carries its acceptance cri
   const [m] = conversationsOf(layout, run);
   expect(m?.text).toBe("Triaged 12 emails.");
   expect(m?.detail).toEqual(["One category each", "Flag suspicious"]);
-  expect(m?.where).toBeNull(); // A_s1 has no recorded place yet: nothing is guessed
+  // R-WORLD-SPREAD: the handoff event records the speaker arriving at the receiver.
+  expect(m?.where).toBe("B1");
   const placed = conversationsOf(layout, [
     ...run.slice(0, 2),
     ev("agent.moved", "A_s1", "B2", { from: "B1" }),
     ev("agent.handoff", "A_s1", "A_l1", { envelope: { summary: "ok" } }),
   ]);
-  expect(placed[0]?.where).toBe("B2");
+  expect(placed[0]?.where).toBe("B1");
 });
 
 test("FR-WLD-04 TILO-T-WORLD conversations: a room turn has no text of its own until the archive's words arrive", () => {

@@ -62,7 +62,8 @@ describe("TILO-T-WORLD agent hover card", () => {
     const text = card?.textContent ?? "";
     expect(text).toContain("Specialist 1");
     expect(text).toContain("Triage the inbox");
-    expect(text).toContain("Reply Desk");
+    // R-WORLD-SPREAD: while handing over, the worker stands beside the Lead at Mail Room.
+    expect(text).toContain("Mail Room");
     expect(text).toContain("gmail.search");
     expect(text).toContain("Triaged 12 emails.");
     expect(card?.querySelector(".tw-facts__grid")?.textContent).toContain("2");

@@ -101,7 +101,8 @@ describe("TILO-T-WORLD Conversations", () => {
     const fly = vi.fn();
     const off = onFly("w_live", fly);
     click(rows(m.container)[1]?.querySelector("button") as Element);
-    expect(fly).toHaveBeenCalledWith("B2", 900);
+    // R-WORLD-SPREAD: the handoff itself carries the worker to the receiver at B1.
+    expect(fly).toHaveBeenCalledWith("B1", 900);
     expect(getSpotlight("w_live").lit).toEqual(["A_s1", "A_l1"]);
     expect(getSelection("w_live")).toBe("A_s1");
     off();
