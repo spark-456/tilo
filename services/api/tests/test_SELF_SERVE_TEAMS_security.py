@@ -178,6 +178,7 @@ def test_SELF_SERVE_TEAMS_an_invite_in_the_founding_millisecond_keeps_the_founde
         "id": "u_mia",
         "display_name": "Mia",
         "lead": True,
+        "role": "owner",
     }
     _tick(rig, 2)
     assert _do(rig, "u_ben", f"/v1/teams/{team}/accept").status_code == 200

@@ -103,6 +103,7 @@ BODY_ROUTES = {
     "invite to own team": "/v1/teams/tm_ops/invites",
     "accept team invitation": "/v1/teams/tm_ops/accept",
     "remove team member": "/v1/teams/tm_ops/members/u_priya/remove",
+    "change team member role": "/v1/teams/tm_ops/members/u_priya/role",
     "snooze nudge": "/v1/nudges/01JB5VQ0000000000000000000/snooze",
     "subscribe push": "/v1/push/subscribe",
     "unsubscribe push": "/v1/push/unsubscribe",

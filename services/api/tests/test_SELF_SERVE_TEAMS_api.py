@@ -144,7 +144,7 @@ def test_SELF_SERVE_TEAMS_a_member_creates_a_team_and_becomes_its_lead(people_ri
     assert entry == {"team": team, "lead": True, "assigned_by": {"by": "u_mia", "at": "2026-10-15T09:01:00.000Z"}}
     roster = _roster(rig, "u_mia", team)
     assert roster.status_code == 200
-    assert roster.json()["members"] == [{"id": "u_mia", "display_name": "Mia", "lead": True}]
+    assert roster.json()["members"] == [{"id": "u_mia", "display_name": "Mia", "lead": True, "role": "owner"}]
     rig.as_user("u_mia")
     mine = rig.client.get("/v1/teams").json()["teams"]
     assert mine == [{"team": team, "name": "Mia's team", "lead": True, "state": "member"}]

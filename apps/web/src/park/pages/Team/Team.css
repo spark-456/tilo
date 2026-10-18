@@ -986,8 +986,4 @@
     align-items: stretch;
     flex-direction: column;
   }
-  [data-park] .park-team-ownhead > .park-btn,
-  [data-park] .park-team-createactions > .park-btn {
-    width: 100%;
-  }
 }
