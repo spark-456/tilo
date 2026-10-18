@@ -14,6 +14,7 @@
 !config/speech*.yaml
 !config/voice*.yaml
 !config/meeting*.yaml
+!config/meeting-wake.json
 !prompts/router
 !prompts/speech
 # The Live voice meter checks tilo-api's answers against its contract's JSON Schema (ADR-0042).
