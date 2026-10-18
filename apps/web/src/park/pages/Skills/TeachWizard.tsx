@@ -38,6 +38,15 @@ export const TRY_OFF =
 export const EXAMPLE_OFF =
   "Adding an example file or recording your screen is not available yet. Tilo learns from your description for now.";
 
+const YOUTUBE_LIMIT =
+  "YouTube isn't connected, and liking or commenting posts publicly as you. Tilo can watch and summarise a video, or draft a comment for you to post.";
+
+export function unavailableStepCopy(item: { text: string; reason: string }): string {
+  const socialVideo = /\b(?:youtube|videos?)\b/i.test(item.text);
+  const publicAction = /\b(?:like|liking|comment|commenting)\b/i.test(item.text);
+  return socialVideo && publicAction ? YOUTUBE_LIMIT : `${item.text} · ${item.reason}`;
+}
+
 export interface WizardProps {
   t: Teach;
   user: User;
@@ -549,7 +558,7 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
           <ul className="park-teach__list">
             {v.cannot.map((item, i) => (
               <li key={`${i}:${item.text}`} className="park-teach__row">
-                {item.text} · {item.reason}
+                {unavailableStepCopy(item)}
               </li>
             ))}
           </ul>
