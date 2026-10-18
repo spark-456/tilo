@@ -27,3 +27,12 @@
 .tilo-app-response-scroll {
   overflow-x: auto;
 }
+@media (prefers-color-scheme: dark) {
+  .tilo-public-app {
+    background: #111820;
+    color: #eef3f6;
+  }
+  .tilo-public-app__header {
+    border-bottom-color: #33414c;
+  }
+}
