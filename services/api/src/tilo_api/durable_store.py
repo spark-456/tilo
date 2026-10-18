@@ -407,7 +407,9 @@ class DurableStore(deps.Store):
         if cached is not None or not _valid("worlds", world_id):
             return cached
         with _io():
-            found = self.backend.find("tasks", "world_id", world_id, limit=1)
+            found = self.backend.find("tasks", "world_id", world_id, limit=10)
+        world = self.load_world(world_id)
+        found.sort(key=lambda row: row[1].get("run_id") != getattr(world, "run_id", None))
         for task_id, d in found:
             if not _valid("tasks", task_id) or d.get("world_id") != world_id:
                 continue

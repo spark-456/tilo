@@ -215,7 +215,11 @@ class Store:
 
     def load_world_task(self, world_id: str) -> TaskRecord | None:
         """The task made for a world, if this store holds one (a scheduled or meeting host run stores none)."""
-        return next((t for t in list(self.tasks.values()) if t.world_id == world_id), None)
+        world = self.worlds.get(world_id)
+        tasks = [task for task in list(self.tasks.values()) if task.world_id == world_id]
+        return next((task for task in tasks if world is not None and task.run_id == world.run_id), None) or next(
+            iter(tasks), None
+        )
 
     def load_path(self, params: Mapping[str, Any]) -> Store:
         return self

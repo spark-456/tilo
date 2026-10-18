@@ -202,6 +202,26 @@ def test_FR_SKL_04_ROUTE_the_approaches_answer_names_the_matched_skill_and_the_r
     assert requested["seq"] > loaded[0]["seq"]
 
 
+def test_R_RUN_a_skill_tagged_start_leaves_scheduled_and_finishes(run_flow):
+    from _clint2_lib import wait_for  # noqa: PLC0415
+    from test_FR_PA_11_SKILL_TAG_intake_refs import post  # noqa: PLC0415
+
+    response = post(run_flow.flow, [{"kind": "skill", "id": "web_research"}])
+    assert response.status_code == 201, response.text
+    intake = response.json()
+    run_flow.task_id, run_flow.world_id = intake["task_id"], intake["world_id"]
+    run_flow.as_member()
+    approaches = run_flow.flow.approaches(run_flow.task_id).json()
+
+    started = run_flow.flow.approve(run_flow.task_id, approaches["recommended"], 80)
+    assert started.status_code == 200, started.text
+    wait_for(lambda: run_flow.events("world.started"), what="skill-tagged world.started")
+    cards = wait_for(lambda: run_flow.cards().json(), what="skill-tagged run gate")
+    gate = next(card for card in cards if card["kind"] == "gate")
+    assert run_flow.answer(gate["id"], "approve").status_code == 200
+    wait_for(lambda: run_flow.events("world.completed"), what="skill-tagged world.completed")
+
+
 def test_FR_SKL_04_ROUTE_no_match_leaves_the_approaches_and_the_plan_as_they_were(run_flow):
     run_flow.flow.provider.embed = Embedder({}).embed  # every text embeds to the same place: no skill clears the bar
     run_flow.start()

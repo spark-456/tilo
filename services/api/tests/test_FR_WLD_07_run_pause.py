@@ -25,6 +25,40 @@ def test_R_RUN_malformed_layout_finishes_with_failure_instead_of_keyerror(run_fl
     assert "KeyError" not in caplog.text
 
 
+def test_R_RUN_start_pause_continue_starts_a_new_run_in_the_same_world_and_finishes(run_flow):
+    rf = run_flow
+    rf.runner.block_on = "U3"
+    rf.start()
+    first_approve = []
+    approving = threading.Thread(target=lambda: first_approve.append(rf.approve()))
+    approving.start()
+    assert rf.runner.entered.wait(8), "the first run never reached U3"
+    wait_for(lambda: rf.events("artifact.created"), what="recorded progress before pause")
+    first_run = rf.store.runs[rf.world_id]
+    try:
+        assert rf.pause().status_code in (200, 202)
+        wait_for(lambda: rf.events("world.paused"), what="the first run to pause")
+    finally:
+        rf.runner.release.set()
+        approving.join(10)
+    assert first_approve and first_approve[0].status_code == 200
+
+    continued = rf.flow.client.post(f"/worlds/{rf.world_id}/rerun")
+    assert continued.status_code == 200, continued.text
+    assert first_run._ended.is_set(), "Continue did not wait for the paused run to stop"
+    assert continued.json()["world_id"] == rf.world_id
+    wait_for(lambda: rf.events("world.started") if len(rf.events("world.started")) == 2 else [], what="continued run")
+    cards = wait_for(
+        lambda: [card for card in rf.cards().json() if card["kind"] == "gate"],
+        what="the continued run's gate",
+    )
+    assert rf.answer(cards[-1]["id"], "approve").status_code == 200
+    wait_for(lambda: rf.events("world.completed"), what="the continued run to finish")
+
+    assert len({event["run_id"] for event in rf.events("world.started")}) == 2
+    assert any("Earlier run completed:" in line for line in rf.compile_calls[-1]["brief"]["constraints"])
+
+
 def test_FR_WLD_07_pause_all_during_the_run_stops_every_event_except_world_paused(run_flow):
     rf = run_flow
     rf.runner.block_on = "U2"  # the run is mid-flight: U1 done, U2 working

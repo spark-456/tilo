@@ -202,8 +202,12 @@ def _tool_access(seams: Any, connector: str, action: str, tier: str, skill_ids: 
 def start_run(store: deps.Store, task: deps.TaskRecord, *, approach: dict, budget_cap: float, seams: Seams) -> None:
     store.settle(task.world_id)  # the queued events go out first, so `world.started` follows them
     with store.runs_guard:  # one run per world, in any process: a started world's stream says so (ADR-0026 decision 5)
-        started = any(e["type"] == "world.started" for e in store.events.get(task.world_id, []))
-        if task.world_id in store.runs or started:
+        started = any(
+            e["type"] == "world.started" and e.get("run_id") == task.run_id for e in store.events.get(task.world_id, [])
+        )
+        current = store.runs.get(task.world_id)
+        current_ended = getattr(current, "_ended", None)
+        if (current is not None and not (current_ended is not None and current_ended.is_set())) or started:
             return
         run = store.runs[task.world_id] = Run(store, task, approach, budget_cap, seams)
     threading.Thread(target=run.main, name=f"run-{task.world_id}", daemon=True).start()
@@ -370,12 +374,16 @@ class Run:
         the run's event credits is the meter, HR-1)."""
         if isinstance(credits, bool) or not isinstance(credits, int | float) or not math.isfinite(credits):
             return 0
-        spent = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))
+        spent = math.fsum(e["credits"] for e in self._run_events())
         return max(0, min(credits, self.cap - spent))
+
+    def _run_events(self) -> list[dict[str, Any]]:
+        """Only this run's slice of a world that may contain earlier paused runs."""
+        return [e for e in self.store.events.get(self.world_id, []) if e.get("run_id") == self.run_id]
 
     def recorded_version(self, artifact_id: str) -> int:
         """The highest version of `artifact_id` this world's stream recorded (EV-15), 0 if none."""
-        stream = list(self.store.events.get(self.world_id, []))
+        stream = self._run_events()
         versions = (e["data"]["artifact"] for e in stream if e["type"] in _RECORDS)
         return max((ref["version"] for ref in versions if ref["artifact_id"] == artifact_id), default=0)
 
@@ -712,7 +720,7 @@ class Run:
             logger.warning("run %s: no artifact scope or archive (%s)", self.run_id, type(exc).__name__)
             self._fail("the run's item store could not be opened", None)
             return
-        stream = self.store.events.get(self.world_id, [])
+        stream = self._run_events()
         granted = next((e["id"] for e in reversed(stream) if e["type"] == "budget.granted"), None)
         summary = f"Work started with a budget of {self.cap:g} credits."
         self._record_plan(granted)
@@ -747,7 +755,7 @@ class Run:
             return
         if stopped := result.failed + result.held + result.skipped:
             reason = "a step was held, so the work stopped" if result.held and not result.failed else None
-            answers = [e for e in self.store.events.get(self.world_id, []) if e["type"] == "question.answered"]
+            answers = [e for e in self._run_events() if e["type"] == "question.answered"]
             declined = bool(
                 result.held and answers and answers[-1]["data"].get("answered_by") in ("person", "team_lead")
             )
@@ -760,7 +768,7 @@ class Run:
                 summary="Stopped by you." if declined else None,
             )
             return
-        credits = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))  # the meter (HR-1)
+        credits = math.fsum(e["credits"] for e in self._run_events())  # this run's meter (HR-1)
         data = {"credits_used": credits, "deliverable_count": len(self.delivered)}
         cause = self.delivered[-1] if self.delivered else None
         await self._remember_deliverables()  # before world.completed: nothing is written to a finished world
@@ -772,9 +780,7 @@ class Run:
         if self.seams.grounding is None:
             return
         delivered = {
-            e["data"]["artifact"]["artifact_id"]
-            for e in self.store.events.get(self.world_id, [])
-            if e["type"] == "artifact.delivered"
+            e["data"]["artifact"]["artifact_id"] for e in self._run_events() if e["type"] == "artifact.delivered"
         }  # only what the run delivered, never a unit's intermediates
 
         open_grounding = self.seams.grounding
@@ -974,9 +980,9 @@ class Run:
         """BQ-218, FR-CON-10: the items a `deliver` unit (and the units it waits for) really produced are delivered in
         Tilo: no outbound side effect, so no gate. Nothing is made up: a run whose units produced nothing delivers
         nothing and says so (deliverable_count 0)."""
-        seen = {e["data"]["artifact"]["artifact_id"] for e in self.store.events.get(self.world_id, [])
+        seen = {e["data"]["artifact"]["artifact_id"] for e in self._run_events()
                 if e["type"] == "artifact.delivered"}  # fmt: skip
-        sites = {e["data"]["artifact"]["artifact_id"] for e in self.store.events.get(self.world_id, [])
+        sites = {e["data"]["artifact"]["artifact_id"] for e in self._run_events()
                  if e["type"] == "artifact.created" and e["data"].get("media_type") == "text/html"}  # fmt: skip
         for source in (unit["id"], *unit["depends_on"]):
             for producer, item, made in self.produced.get(source, []):

@@ -592,7 +592,10 @@ def _loud() -> bool:
 
 def _run_started(store: deps.Store, task: deps.TaskRecord) -> bool:
     store.settle(task.world_id)
-    return task.world_id in store.runs or any(e["type"] == "world.started" for e in store.events.get(task.world_id, []))
+    current = store.runs.get(task.world_id)
+    return (current is not None and getattr(current, "run_id", None) == task.run_id) or any(
+        e["type"] == "world.started" and e.get("run_id") == task.run_id for e in store.events.get(task.world_id, [])
+    )
 
 
 def _granted_cap(store: deps.Store, task: deps.TaskRecord, asked: float) -> float:
@@ -739,7 +742,7 @@ def _continued_brief(brief: dict[str, Any], stream: list[dict[str, Any]]) -> dic
     summaries = [
         e.get("summary")
         for e in stream
-        if e.get("type") in {"unit.completed", "artifact.delivered"} and isinstance(e.get("summary"), str)
+        if e.get("type") in {"artifact.created", "artifact.delivered"} and isinstance(e.get("summary"), str)
     ]
     constraints.extend(
         f"Earlier run completed: {line[:275]}" for line in (summaries[-room:] if room else []) if line.strip()
@@ -760,11 +763,10 @@ def rerun(
     seams: Annotated[runs.Seams | None, Depends(runs.run_seams)],
     flags: FlagsDep,
 ) -> dict[str, Any]:
-    """RERUN-1, RERUN-ANY: a world whose latest world state is `world.failed` (a restart, a unit that failed, any
-    recorded reason) is started again as a NEW run of the same task: the same brief, the approach the person approved
-    and the cap they granted, through the approve path (so the policy engine, the ceiling and the owner's grants decide
-    again). Only the owner; anyone else gets the unknown-world 404. A world still running, waiting or finished is a 409.
-    Pressing twice is one new world."""
+    """RERUN-1, RERUN-ANY, R-RUN: a stopped run starts again with the same approved task. A failed run gets a new
+    world; Continue after `world.paused` keeps the world and starts a new run from its recorded progress. Both use the
+    approve path, so the policy engine, ceiling and owner's grants decide again. Only the owner; anyone else gets the
+    unknown-world 404. A world still running, waiting or finished is a 409. Repeated presses dedupe to the new run."""
     world = store.load_world(world_id)
     if world is None or world.owner != principal.user_id:
         raise HTTPException(status_code=404, detail="No such world.")
@@ -774,7 +776,12 @@ def rerun(
 
     # The latest world state; a share change is not one, so sharing a stopped world does not hide its stop.
     last = next((e for e in reversed(stream) if e["type"].startswith("world.") and e["type"] != _SHARED), None)
-    paused = last is not None and last["type"] == "world.paused" and world.paused
+    task_id, generated_world, new_run = _again_ids(world_id)
+    again = store.load_task(task_id)
+    if again is not None and again.granted and (not _loud() or _run_started(store, again)):
+        return {"world_id": again.world_id, "task_id": task_id}
+    pending_continue = again is not None and again.world_id == world_id and again.run_id == new_run
+    paused = last is not None and last["type"] == "world.paused" and (world.paused or pending_continue)
     if last is None or (last["type"] != "world.failed" and not paused):
         raise HTTPException(status_code=409, detail="Only a run that stopped can be started again.")
     old = store.load_world_task(world_id)
@@ -786,13 +793,10 @@ def rerun(
             status_code=409,
             detail="This task used attached files, which stay with the first run. Describe it again from Home.",
         )
-    task_id, new_world, new_run = _again_ids(world_id)
+    new_world = world_id if paused else generated_world
     # The durable store, not this process's cache: a second press on another instance (after scale to zero) finds the
     # first one's task and dedupes. Pressed twice is one new world once its run started; a first press whose start
     # failed falls through to `approve`, which starts it again with the grant it recorded (SIMPLE-RUN-2).
-    again = store.load_task(task_id)
-    if again is not None and again.granted and (not _loud() or _run_started(store, again)):
-        return {"world_id": again.world_id, "task_id": task_id}
     cap = _granted_cap(store, old, 0.0)
     if cap <= 0:
         raise HTTPException(status_code=409, detail="This world has no approved budget to start again.")
@@ -804,17 +808,30 @@ def rerun(
     if cap > (ceiling := deps.budget_cap_ceiling()):
         raise HTTPException(status_code=422, detail=f"One run may use at most {ceiling:g} credits.")
     if again is None:
+        previous = store.runs.get(world_id) if paused else None
+        ended = getattr(previous, "_ended", None)
+        if ended is not None and not ended.wait(2.25):
+            raise HTTPException(status_code=409, detail="The paused run is still stopping. Press Continue again.")
         fresh = deps.TaskRecord(
             old.owner, new_world, new_run, copy.deepcopy(old.draft),
-            _continued_brief(old.brief, stream) if paused else copy.deepcopy(old.brief), list(old.questions), 1,
+            _continued_brief(old.brief, stream) if paused else copy.deepcopy(old.brief), list(old.questions),
+            max((int(e.get("seq", 0)) for e in stream), default=0) + 1 if paused else 1,
             answers=dict(old.answers), edits=copy.deepcopy(old.edits), approaches=copy.deepcopy(old.approaches),
+            maker_picks=copy.deepcopy(old.maker_picks),
             granted=False, scenario=old.scenario, gaps=old.gaps,
         )  # fmt: skip
+        fresh.skill = copy.deepcopy(old.skill)
+        worlds = (
+            {world_id: dataclasses.replace(world, run_id=new_run, paused=False, layout=None)}
+            if paused
+            else {new_world: deps.WorldRecord(owner=old.owner, districts={}, run_id=new_run)}
+        )
+        created = [("tasks", task_id)] if paused else [("worlds", new_world), ("tasks", task_id)]
         store.save(
             writer,
-            worlds={new_world: deps.WorldRecord(owner=old.owner, districts={}, run_id=new_run)},
+            worlds=worlds,
             tasks={task_id: fresh},
-            create=[("worlds", new_world), ("tasks", task_id)],
+            create=created,
         )
     body = ApproveIn(approach_id=str(planned["data"]["approach"]), budget_cap=cap)
     approve(task_id, principal, body, store, writer, seams, flags)

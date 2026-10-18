@@ -60,14 +60,14 @@ describe("RERUN_ANY Start it again for any stopped run", () => {
     await settle();
     expect(pause).toHaveBeenCalledWith("hires");
   });
-  it("test_R_RUN_paused_world_offers_continue_into_new_run", async () => {
-    const start = vi.fn(async () => ({ world_id: "w_continued", task_id: "t_continued" }));
+  it("test_R_RUN_paused_world_offers_continue_into_new_run_in_the_same_world", async () => {
+    const start = vi.fn(async () => ({ world_id: "hires", task_id: "t_continued" }));
     const events = [ev(1, "budget.granted", { cap: 40 }), ev(2, "world.started"), ev(3, "world.paused", { reason: "pause_all" })];
     const rig = await mountWorld({ id: "hires", api: liveWorldsApi(), client: clientWith(start, events) });
     click(control(rig.el, "Continue"));
     await settle();
     expect(start).toHaveBeenCalledWith("hires");
-    expect(rig.app.go).toHaveBeenCalledWith("world", { id: "w_continued" });
+    expect(rig.app.go).toHaveBeenCalledWith("world", { id: "hires" });
   });
   it("RERUN_ANY_a_unit_failure_calls_rerun_and_opens_the_new_world", async () => {
     const start = vi.fn(async () => ({ world_id: "w_new", task_id: "t_new" }));

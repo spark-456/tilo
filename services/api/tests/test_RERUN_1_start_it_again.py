@@ -39,7 +39,7 @@ def _approved(flow: Flow, *, end: str | None = "world.failed") -> dict[str, Any]
     if end == "world.failed":
         stream.append(_event(world_id, n + 3, "world.failed", {"reason": REASON, "unit": None}))
     elif end == "world.paused":
-        stream.append({**_event(world_id, n + 3, "unit.completed", {}), "summary": "The first source was checked."})
+        stream.append({**_event(world_id, n + 3, "artifact.created", {}), "summary": "The first source was checked."})
         stream.append(_event(world_id, n + 4, "world.paused", {"reason": "pause_all"}))
         flow.store.worlds[world_id].paused = True
     elif end == "world.completed":
@@ -95,10 +95,11 @@ def test_R_RUN_paused_world_continues_in_a_new_run_with_recorded_context(flow, m
     response = flow.client.post(f"/worlds/{old['world_id']}/rerun")
     assert response.status_code == 200, response.text
     new = flow.store.tasks[response.json()["task_id"]]
-    assert new.world_id != old["world_id"] and started[-1] == new.world_id
+    assert new.world_id == old["world_id"] and started[-1] == old["world_id"]
     assert new.brief["goal"] == flow.store.tasks[old["task_id"]].brief["goal"]
     assert any("The first source was checked." in line for line in new.brief["constraints"])
-    assert flow.store.worlds[old["world_id"]].paused is True
+    assert flow.store.worlds[old["world_id"]].paused is False
+    assert flow.store.load_world_task(old["world_id"]) is new
 
 
 def test_RERUN_1_another_user_gets_the_unknown_world_404(flow):
