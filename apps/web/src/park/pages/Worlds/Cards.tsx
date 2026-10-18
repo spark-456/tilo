@@ -83,11 +83,11 @@ function WorldCardView({ w, art, status, client, night, onOpen }: CardProps) {
       </div>
       <div className="park-worlds-card__body">
         <div className="park-worlds-card__titles">
-          <span className="park-worlds-card__name">
-            {w.name}
+          <div className="park-worlds-card__name-row">
+            <span className="park-worlds-card__name">{w.name}</span>
             {w.sample ? <SampleBadge /> : null}
             {w.access === "team" ? <span className="park-worlds-team">Team</span> : null}
-          </span>
+          </div>
           <span className="park-worlds-card__last">{w.sample ? <SampleNote /> : lastLine(w)}</span>
         </div>
         <div className="park-worlds-track">
@@ -97,10 +97,12 @@ function WorldCardView({ w, art, status, client, night, onOpen }: CardProps) {
           />
         </div>
         <div className="park-worlds-card__foot">
-          {/* The live list serves no agent count or spend: nothing is printed rather than a zero (HR-1). */}
-          <span>
-            {w.agents > 0 ? `${w.tier} · ${plural(w.agents, "helper", "helpers")}` : w.tier}
-          </span>
+          {/* P0-WORLDS-CARDS: agents count when > 0, no empty "Village" text when 0 */}
+          {w.agents > 0 ? (
+            <span className="park-worlds-card__agents">
+              {`${w.tier} · ${plural(w.agents, "helper", "helpers")}`}
+            </span>
+          ) : null}
           {w.spend ? (
             <span className="park-worlds-card__cost">
               {[w.spend, w.of].filter(Boolean).join(" ")}
