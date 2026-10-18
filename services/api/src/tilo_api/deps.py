@@ -169,6 +169,7 @@ class TaskRecord:
     skill: dict[str, Any] | None = (
         None  # SKILL-ROUTE: the skill the task matched (or was tagged with), pinned at the run
     )
+    skill_plan: list[dict[str, Any]] | None = None  # SKILLS-EXEC: stored taught steps, separate from public metadata
 
 
 @dataclass

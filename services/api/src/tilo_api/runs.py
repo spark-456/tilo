@@ -199,6 +199,62 @@ def _tool_access(seams: Any, connector: str, action: str, tier: str, skill_ids: 
         raise _GateFailed("tool access does not allow this step")
 
 
+def _taught_outline(plan: dict[str, Any], steps: list[dict[str, Any]] | None, registry: Any) -> dict[str, Any]:
+    """Turn the pinned taught version into validated units; the Director cannot replace the person's saved order."""
+    if not steps:
+        return plan
+    units: list[dict[str, Any]] = []
+    for index, step in enumerate(steps, start=1):
+        tool, action = step.get("tool"), step.get("action")
+        writer = (tool, action) == ("writer", "compose")
+        declared = (
+            None
+            if writer
+            else next((row for row in registry.get(tool).get("actions", []) if row.get("id") == action), None)
+        )
+        if not writer and declared is None:
+            raise ValueError("a taught step is no longer declared")
+        side_effect = bool(declared and declared.get("gate_type") == "approval")
+        units.append(
+            {
+                "id": f"U{index}",
+                "unit_type": "taught_step",
+                "title": str(step.get("text") or "Run taught step")[:80],
+                "role": "writer" if writer or step.get("verb") in ("draft", "write") else "specialist",
+                "district": "D1",
+                "skills": [],
+                "connectors": [] if writer else [tool],
+                "actions": [action] if side_effect else [],
+                "depends_on": [] if index == 1 else [f"U{index - 1}"],
+            }
+        )
+    if not any(unit["actions"] for unit in units):
+        delivery = next((unit for unit in plan["units"] if unit.get("unit_type") == "deliver"), None)
+        units.append(
+            {
+                "id": f"U{len(units) + 1}",
+                "unit_type": "deliver",
+                "title": str((delivery or {}).get("title") or "Deliver the finished work")[:80],
+                "role": "writer",
+                "district": "D1",
+                "skills": [],
+                "connectors": [],
+                "actions": [],
+                "depends_on": [units[-1]["id"]],
+            }
+        )
+    by_id = {unit["id"]: unit for unit in units}
+    gates = []
+    for number, unit in enumerate((unit for unit in units if unit["actions"]), start=1):
+        action = unit["actions"][0]
+        gate = {"id": f"G{number}", "action_type": action, "guards": [unit["id"]], "policy_ref": None}
+        gate["risk_tier"] = plangraph._floor_tier(  # noqa: SLF001 - same deterministic plan rule as the compiler
+            gate, by_id, tilo_policy.load_risk_table(), {name: registry.get(name) for name in registry.ids()}
+        )
+        gates.append(gate)
+    return {**plan, "units": units, "gates": gates}
+
+
 def start_run(store: deps.Store, task: deps.TaskRecord, *, approach: dict, budget_cap: float, seams: Seams) -> None:
     store.settle(task.world_id)  # the queued events go out first, so `world.started` follows them
     with store.runs_guard:  # one run per world, in any process: a started world's stream says so (ADR-0026 decision 5)
@@ -263,6 +319,7 @@ class Run:
         for pick in task.maker_picks:
             self.brief["deliverables"][pick["deliverable"]]["make_with"] = pick["make_with"]
         self.skill = task.skill  # SKILL-ROUTE: what the start-plan card named; a library skill is pinned in `_prepare`
+        self.skill_plan = copy.deepcopy(task.skill_plan)
         self.intake_answers = (
             tuple(  # (the Director's question, the person's answer) for the units' prompts (UNIT-PROMPT)
                 (q.text, str(task.answers[q.field]))
@@ -629,6 +686,7 @@ class Run:
                 policies=dict(self.store.policies),
             )  # fmt: skip
             plan = pin_matched_skill(self._compile(context), self.skill, set(context.skills))
+            plan = _taught_outline(plan, self.skill_plan, registry)
         except Exception as exc:
             logger.warning("run %s: no plan (%s)", self.run_id, type(exc).__name__)
             self._fail("the Director could not plan this task", None)

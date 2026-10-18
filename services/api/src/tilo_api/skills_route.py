@@ -193,6 +193,26 @@ class SkillContext:
         found = next((e for e in self.catalog(None) if e["id"] == ref_id and wanted in (None, e["kind"])), None)
         return None if found is None else _data(found, 1.0, "tagged")
 
+    def taught_plan(self, tagged: dict[str, Any] | None) -> list[dict[str, Any]] | None:
+        """Return the readable version's stored steps for an explicitly tagged taught skill."""
+        if tagged is None or tagged.get("kind") != "taught":
+            return None
+        try:
+            record = next(
+                (
+                    row
+                    for row in self.read_taught()
+                    if row.get("id") == tagged["id"]
+                    and row.get("version") == tagged["version"]
+                    and not row.get("paused")
+                ),
+                None,
+            )
+        except Exception as exc:  # noqa: BLE001 - intake already resolved visibility; a second read fails closed
+            logger.warning("tagged taught skill plan not read: %s", type(exc).__name__)
+            return None
+        return None if record is None else json.loads(json.dumps(record["plan"]))
+
     def block(self) -> str:
         """The catalog as fenced data for a prompt: one line per skill, name and purpose only."""
         lines = [f"{e['name']}: {e['purpose']}" for e in self.catalog()]
