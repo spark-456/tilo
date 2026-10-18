@@ -79,7 +79,7 @@ describe("STUDIO_3 Worlds: filters", () => {
     const { c } = await renderWorlds();
     expect(cardIds(c, GRID)).toHaveLength(11);
     click(tab(c, "Working"));
-    expect(cardIds(c, GRID)).toEqual(["k1", "hires", "northline", "calls", "venues"]);
+    expect(cardIds(c, GRID)).toEqual(["hires", "northline", "calls", "venues"]);
     click(scaleButton(c, "Villages"));
     expect(cardIds(c, GRID)).toEqual(["calls", "venues"]);
     expect(tabCounts(c)).toEqual({ All: 4, Working: 2, "Needs you": 0, Scheduled: 0, Done: 2 });

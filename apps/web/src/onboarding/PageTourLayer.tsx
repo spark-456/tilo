@@ -23,19 +23,22 @@ function Invitation({
 }: { page: PageId; begin: () => void; close: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
-  useEffect(() => ref.current?.focus(), []);
+  const corner = page === "world";
+  useEffect(() => {
+    if (!corner) ref.current?.focus();
+  }, [corner]);
   return (
-    <div className="onb-scrim">
+    <div className={corner ? "onb-invite-corner" : "onb-scrim"}>
       <div
         ref={ref}
         // biome-ignore lint/a11y/useSemanticElements: reuse the existing onboarding dialog/focus pattern
         role="dialog"
-        aria-modal="true"
+        aria-modal={corner ? undefined : "true"}
         aria-labelledby={`${id}-title`}
         aria-describedby={`${id}-body`}
         tabIndex={-1}
-        className="onb-card"
-        onKeyDown={trapTab}
+        className={corner ? "onb-card onb-corner" : "onb-card"}
+        onKeyDown={corner ? undefined : trapTab}
       >
         <h2 id={`${id}-title`} className="onb-welcome-title">
           Take a tour of {PAGE_LABEL[page]}?
