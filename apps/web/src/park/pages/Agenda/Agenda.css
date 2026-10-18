@@ -492,11 +492,101 @@
   border-radius: 3px 3px 12px 3px;
   background: var(--paper);
   color: var(--ink);
+  transform: rotate(-1.2deg);
   box-shadow: 0 8px 14px -10px rgba(40, 30, 15, 0.7);
+}
+[data-park] .park-agenda-livepin[data-pin-tone="0"] {
+  background: #fff2a8;
+}
+[data-park] .park-agenda-livepin[data-pin-tone="1"] {
+  background: #ffd8e7;
+  transform: rotate(1deg);
+}
+[data-park] .park-agenda-livepin[data-pin-tone="2"] {
+  background: #cef2dc;
+  transform: rotate(-0.6deg);
+}
+[data-park] .park-agenda-livepin[data-pin-tone="3"] {
+  background: #cfeaff;
+  transform: rotate(1.3deg);
+}
+[data-park] .park-agenda-livepin strong,
+[data-park] .park-agenda-liveboard__addnote {
+  font-family: var(--fH, "Geist", sans-serif);
 }
 [data-park] .park-agenda-livepin p {
   margin: 0;
   font-size: 12px;
+}
+[data-park] .park-agenda-livepin__scope {
+  margin-top: auto;
+  color: #4a4655;
+  font-size: 11px;
+  font-weight: 700;
+}
+[data-park] .park-agenda-liveboard__addnote {
+  display: flex;
+  min-height: 104px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px;
+  border: 2px dashed rgba(74, 70, 85, 0.35);
+  border-radius: 3px 3px 12px 3px;
+  background: color-mix(in srgb, var(--paper) 82%, var(--card));
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transform: rotate(0.7deg);
+}
+[data-park] .park-agenda-liveboard__addnote span {
+  font-size: 24px;
+  line-height: 1;
+}
+[data-park] .park-agenda-liveboard__addnote:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+[data-park] .park-agenda-liveboard__add {
+  display: grid;
+  min-height: 104px;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 3px 3px 12px 3px;
+  background: #fff2a8;
+  transform: rotate(0.5deg);
+}
+[data-park] .park-agenda-liveboard__add input {
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid rgba(74, 70, 85, 0.2);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #1f1d2b;
+  font: inherit;
+}
+[data-park] .park-agenda-liveboard__addactions {
+  display: flex;
+  gap: 8px;
+}
+[data-park] .park-agenda-liveboard__addactions button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(74, 70, 85, 0.25);
+  border-radius: 9px;
+  background: transparent;
+  color: #1f1d2b;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-park] .park-agenda-liveboard__addactions button[type="submit"] {
+  border-color: #1f1d2b;
+  background: #1f1d2b;
+  color: #ffffff;
 }
 [data-park] .park-agenda-cork {
   display: grid;
@@ -1443,6 +1533,35 @@
   margin: 0;
   font-size: 18px;
   font-weight: 800;
+}
+[data-park] .park-agenda-studio .park-agenda-cardtitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-park] .park-agenda-studio .park-agenda-cardtitle > span {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--priSoft);
+  color: var(--priInk);
+}
+[data-park] .park-agenda-studio .park-agenda-cardlink {
+  align-self: flex-start;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
 }
 [data-park] .park-agenda-studio .park-agenda-state ul {
   display: flex;
