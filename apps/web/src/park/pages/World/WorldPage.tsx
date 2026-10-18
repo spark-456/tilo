@@ -771,7 +771,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
           >
             {trackRun && canDraw ? (
               <Suspense fallback={null}>
-                <LiveStageEmbed worldId={w.id} />
+                <LiveStageEmbed worldId={w.id} onReview={() => setTab("story")} />
               </Suspense>
             ) : trackRun ? (
               <RecordedWorldArt events={runEvents} />
@@ -823,7 +823,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
               </div>
             ) : null}
           </div>
-          {toastLine ? <MapToast line={toastLine} /> : null}
+          {toastLine ? <MapToast line={toastLine} onReview={() => setTab("story")} /> : null}
           {trackRun && runEvents.length > 0 ? (
             <DeliveryDock
               result={result}
@@ -907,7 +907,12 @@ export function WorldPage({ app }: { app: AppCtx }) {
                 ) : null}
                 {trackRun ? <RunProgressCard events={runEvents} steps={false} /> : null}
                 {trackRun ? (
-                  <RunStory events={runEvents} skills={loaded.skills} />
+                  <RunStory
+                    events={runEvents}
+                    skills={loaded.skills}
+                    onApprove={(req) => app.toast(`Approved. ${req.who} is continuing.`)}
+                    onDecline={() => app.toast("Declined. Nothing was sent.")}
+                  />
                 ) : (
                   <Activity
                     items={

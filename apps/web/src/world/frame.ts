@@ -93,6 +93,8 @@ export interface FrameAgent {
   readonly say: FrameSay | null;
   /** TW-5: agents hop 3 times at the dock on world.completed. */
   readonly hopping?: boolean;
+  /** TW-6: agent raises hand on approval.requested */
+  readonly hand?: boolean;
 }
 /** A speech bubble: the receiver's name (or, when `head` is set, that exact heading) over the words. */
 export interface FrameSay {
@@ -312,6 +314,7 @@ export function frameOf(layout: Layout, state: WorldState): Frame {
           ? { text: agent.say.text, to: namesOf(layout).get(agent.say.to) ?? "You" }
           : null,
         hopping: state.status === "completed",
+        hand: Boolean(agent.hand),
       },
     ];
   });

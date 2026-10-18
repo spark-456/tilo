@@ -11,7 +11,13 @@ import { type RoomWords, useClientWorld } from "../world/useClientWorld";
 import { AgentLayer } from "./live/AgentLayer";
 import { Conversations } from "./live/Conversations";
 
-export default function LiveStageEmbed({ worldId }: { worldId: string }) {
+export default function LiveStageEmbed({
+  worldId,
+  onReview,
+}: {
+  worldId: string;
+  onReview?: (() => void) | undefined;
+}) {
   const client = useClient();
   // The words of a Meeting Hall turn live only in the archive (MR-12); the stage reads them from the room, as the
   // Meeting Hall panel does, when the turn is recorded. No room client (a demo, no API) means no bubble text.
@@ -42,7 +48,7 @@ export default function LiveStageEmbed({ worldId }: { worldId: string }) {
         worldId={world.worldId}
         paused={status === "paused"}
       />
-      <AgentLayer worldId={worldId} rooms={rooms} />
+      <AgentLayer worldId={worldId} rooms={rooms} onReview={onReview} />
       {world.note ? (
         <div
           className="park-world-livenote"
