@@ -200,37 +200,41 @@ export function WorldsPage({ app }: { app: AppCtx }) {
                 </div>
                 <label className="park-worlds-slackfield">
                   <span className="park-worlds-slacklabel">World</span>
-                  <select
-                    aria-label="World to share"
-                    className="park-worlds-slackselect"
-                    value={slackWorldId}
-                    onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                      setSlackWorldId(e.target.value)
-                    }
-                  >
-                    {all.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="park-worlds-slackselectwrap">
+                    <select
+                      aria-label="World to share"
+                      className="park-worlds-slackselect"
+                      value={slackWorldId}
+                      onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                        setSlackWorldId(e.target.value)
+                      }
+                    >
+                      {all.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
                 </label>
                 <label className="park-worlds-slackfield">
                   <span className="park-worlds-slacklabel">Channel</span>
-                  <select
-                    aria-label="Slack channel"
-                    className="park-worlds-slackselect"
-                    value={slackChannel}
-                    onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                      setSlackChannel(e.target.value)
-                    }
-                  >
-                    {slackState.channels.map((ch) => (
-                      <option key={ch} value={ch}>
-                        {ch}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="park-worlds-slackselectwrap">
+                    <select
+                      aria-label="Slack channel"
+                      className="park-worlds-slackselect"
+                      value={slackChannel}
+                      onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                        setSlackChannel(e.target.value)
+                      }
+                    >
+                      {slackState.channels.map((ch) => (
+                        <option key={ch} value={ch}>
+                          {ch}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
                 </label>
                 <label className="park-worlds-slackfield">
                   <span className="park-worlds-slacklabel">
