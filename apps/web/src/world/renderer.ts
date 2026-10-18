@@ -452,12 +452,13 @@ export function renderAgents(
     const p = positions.get(agent.id);
     if (!p) continue;
     const shadows = layer.shadows !== false;
-    const key = `${agent.rank}:${agent.tint}:${shadows}`;
+    const hand = Boolean(agent.hand);
+    const key = `${agent.rank}:${agent.tint}:${shadows}:${hand ? 1 : 0}`;
     let fig = layer.figures.get(agent.id);
     if (!fig || fig.key !== key) {
       fig?.g.destroy();
       const g = new Graphics();
-      drawAgent(g, agent.rank, agent.tint, shadows);
+      drawAgent(g, agent.rank, agent.tint, shadows, hand);
       // FR-WLD-13: the rig never changes during a walk; rasterize its many faces once.
       // Position/depth still follow the caller's recorded choreography on every frame.
       g.cacheAsTexture({ resolution: 2, antialias: true });

@@ -183,15 +183,127 @@ export function EmptyPanel({ title, line }: { title: string; line: string }) {
   );
 }
 
+function HandIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V11 M11 11V5a1.5 1.5 0 0 1 3 0v6 M14 11V6.5a1.5 1.5 0 0 1 3 0V14c0 4-2.5 7-6 7-2.6 0-4.2-1.4-5.6-3.6L4 14.5a1.5 1.5 0 0 1 2.4-1.8L8 14.5" />
+    </svg>
+  );
+}
+
+export interface ActiveApproval {
+  readonly id: string;
+  readonly seq: number;
+  readonly actor?: string | undefined;
+  readonly who: string;
+  readonly time: string;
+  readonly question: string;
+  readonly exact: string;
+  readonly risk: string;
+  readonly cost: string;
+  readonly gateId: string;
+  readonly cardId?: string | undefined;
+}
+
+export function activeApprovalOf(events: readonly RunEvent[]): ActiveApproval | null {
+  const resolvedGates = new Set<string>();
+  const resolvedCards = new Set<string>();
+  for (const e of events) {
+    if (e.type === "approval.resolved") {
+      const d = e.data as { gate_id?: string; card_id?: string } | null;
+      if (d?.gate_id) resolvedGates.add(d.gate_id);
+      if (d?.card_id) resolvedCards.add(d.card_id);
+      if (e.target) resolvedGates.add(e.target);
+    }
+  }
+  const req = [...events].reverse().find((e) => {
+    if (e.type !== "approval.requested") return false;
+    const d = e.data as { gate_id?: string; card_id?: string } | null;
+    const gateId = d?.gate_id ?? e.target;
+    const cardId = d?.card_id;
+    if (gateId && resolvedGates.has(gateId)) return false;
+    if (cardId && resolvedCards.has(cardId)) return false;
+    const resolvedLater = events.some(
+      (r) =>
+        r.type === "approval.resolved" &&
+        r.seq > e.seq &&
+        ((e.target && r.target === e.target) ||
+          (gateId && (r.data as { gate_id?: string } | null)?.gate_id === gateId)),
+    );
+    return !resolvedLater;
+  });
+  if (!req) return null;
+  const d = (req.data as Record<string, unknown> | null) ?? {};
+  const summary = req.summary?.trim() ?? "";
+  const whoMatch = /^(.*?)\s+needs your yes/i.exec(summary);
+  const who = whoMatch?.[1]
+    ? whoMatch[1]
+    : req.actor
+      ? req.actor.charAt(0).toUpperCase() + req.actor.slice(1)
+      : "Agent";
+  const time = clockOf(req.ts) ? `${clockOf(req.ts)} UTC` : "";
+  const question =
+    typeof d.question === "string" ? d.question : summary || "Approval requested for action.";
+  const exact =
+    typeof d.exact === "string"
+      ? d.exact
+      : typeof d.action_type === "string"
+        ? `Action: ${d.action_type}`
+        : summary;
+  const risk =
+    typeof d.risk === "string" ? d.risk : "Medium. People will see it and it can't be unsent.";
+  const cost =
+    typeof d.cost === "string"
+      ? d.cost
+      : req.credits
+        ? `${req.credits} credit${req.credits === 1 ? "" : "s"}`
+        : "1 credit";
+  const gateId = typeof d.gate_id === "string" ? d.gate_id : (req.target ?? "");
+  const cardId = typeof d.card_id === "string" ? d.card_id : undefined;
+  const id = typeof d.id === "string" ? d.id : `approval-${req.seq}`;
+
+  return {
+    id,
+    seq: req.seq,
+    actor: req.actor,
+    who,
+    time,
+    question,
+    exact,
+    risk,
+    cost,
+    gateId,
+    cardId,
+  };
+}
+
 /** The Story of a real run: its recorded events in plain words, newest first, with their recorded time of day. */
 export function RunStory({
   events,
   skills = [],
+  onApprove,
+  onDecline,
+  onEdit,
 }: {
   events: readonly RunEvent[];
   skills?: readonly Skill[];
+  onApprove?: (req: ActiveApproval) => void;
+  onDecline?: (req: ActiveApproval) => void;
+  onEdit?: (req: ActiveApproval) => void;
 }) {
   const [view, setView] = useState<"plain" | "trace">("plain");
+  const [localDecision, setLocalDecision] = useState<"approved" | "declined" | null>(null);
+  const approval = activeApprovalOf(events);
   const story = storyOf(events);
   if (story.length === 0)
     return (
@@ -237,6 +349,86 @@ export function RunStory({
           </button>
         </div>
       </div>
+      {approval ? (
+        <section
+          aria-label="Needs you"
+          className="park-world-approval"
+          data-testid="world-approval-card"
+        >
+          <div className="park-world-approval-head">
+            <span className="park-world-approval-avatar" aria-hidden="true">
+              <span className="park-world-approval-avatarinner">
+                <span className="park-world-approval-avatareye" />
+                <span className="park-world-approval-avatareye" />
+              </span>
+            </span>
+            <div className="park-world-approval-meta">
+              <strong className="park-world-approval-who">{approval.who} needs your yes</strong>
+              <span className="park-world-approval-sub">
+                approval.requested{approval.time ? ` · ${approval.time}` : ""}
+              </span>
+            </div>
+            <span className="park-world-approval-hand" aria-hidden="true">
+              <HandIcon size={18} />
+            </span>
+          </div>
+
+          <div className="park-world-approval-q">{approval.question}</div>
+
+          <div className="park-world-approval-exact">
+            <span className="park-world-approval-exactlbl">EXACT ACTION</span>
+            <span className="park-world-approval-exacttxt">{approval.exact}</span>
+          </div>
+
+          <div className="park-world-approval-grid">
+            <strong>Risk</strong>
+            <span>{approval.risk}</span>
+            <strong>Cost</strong>
+            <span>{approval.cost}</span>
+          </div>
+
+          {localDecision === null ? (
+            <div className="park-world-approval-actions">
+              <button
+                type="button"
+                className="park-world-approval-btn park-world-approval-btn--approve"
+                onClick={() => {
+                  setLocalDecision("approved");
+                  onApprove?.(approval);
+                }}
+              >
+                {icon("check", 16)} Approve
+              </button>
+              <button
+                type="button"
+                className="park-world-approval-btn park-world-approval-btn--edit"
+                onClick={() => onEdit?.(approval)}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="park-world-approval-btn park-world-approval-btn--decline"
+                onClick={() => {
+                  setLocalDecision("declined");
+                  onDecline?.(approval);
+                }}
+              >
+                Decline
+              </button>
+            </div>
+          ) : (
+            <div className="park-world-approval-done">
+              {icon("check", 16)}
+              <span>
+                {localDecision === "approved"
+                  ? `Approved. ${approval.who} is continuing.`
+                  : "Declined. Nothing was sent."}
+              </span>
+            </div>
+          )}
+        </section>
+      ) : null}
       {view === "plain" ? (
         <ol className="park-world-story" aria-label="What happened, newest first">
           {story.map((e) => (

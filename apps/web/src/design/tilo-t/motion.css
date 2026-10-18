@@ -194,3 +194,8 @@
 /* triggeredBy: world.completed: the city goes from muted to full colour, 800 ms */
 .tw-light canvas{animation:tLight .8s var(--tt-ease-standard) both}
 @media (prefers-reduced-motion:reduce){.tw-parcel,.tw-confetti i,.tw-light canvas{animation:none!important}}
+
+/* triggeredBy: approval.requested -> approval.resolved (TW-6): amber chip ring pings opacity .7→0, scale .9→1.6 (tilo-w.css) */
+@keyframes wPing{0%{opacity:.7;transform:scale(.9)}100%{opacity:0;transform:scale(1.6)}}
+.tw-needs-ping{animation:wPing 1.6s ease-out infinite}
+@media (prefers-reduced-motion:reduce){.tw-needs-ping{animation:none!important}}
