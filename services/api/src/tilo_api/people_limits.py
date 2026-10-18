@@ -152,7 +152,12 @@ def limits_of(stores: PeopleStores) -> Limits:
             if isinstance(stores.work_items, FirestoreRecordStore):  # the stores' own client: no second one (FS-2)
                 from tilo_api.people_limits_store import DurableLimits  # noqa: PLC0415 - it imports this module
 
-                kinds = {"meeting": stores.meetings, "person": stores.persons, "work_item": stores.work_items}
+                kinds = {
+                    "meeting": stores.meetings,
+                    "person": stores.persons,
+                    "work_item": stores.work_items,
+                    "pin": stores.pins,
+                }
                 found = DurableLimits(stores.work_items._client, kinds)
             else:
                 found = Limits()
