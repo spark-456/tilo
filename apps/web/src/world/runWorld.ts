@@ -9,6 +9,7 @@
 import type { Event, Layout } from "@tilo/contracts";
 import type { Container } from "pixi.js";
 import { subscribeDensity } from "../display/density";
+import type { StageVisibility } from "../stage/Stage";
 import { MAX_DURATION_MS, createChoreographer } from "./choreographer";
 import { type Frame, type FrameAgent, type FrameSay, frameOf } from "./frame";
 import { createMobileQuality } from "./mobileQuality";
@@ -55,6 +56,7 @@ interface WorldOptions {
   readonly world: Container;
   readonly requestRender: () => void;
   readonly size: () => { width: number; height: number };
+  readonly visibility?: StageVisibility;
   readonly layout: Layout;
   /** Read live (not captured once): a prefers-reduced-motion change applies mid-playback. */
   readonly reducedMotion: () => boolean;
@@ -227,7 +229,8 @@ function createLive(
   // WORLD-LIVE: a handoff note is held for a readable time by a queue of its own (a bubble is not a walk, so reduced
   // motion does not cut it), one hold per speaker, in seq order, each starting no earlier than its event was received.
   const talk = createChoreographer();
-  let hiddenAt: number | null = document.hidden ? performance.now() : null;
+  const visible = () => !document.hidden && (o.visibility?.isVisible() ?? true);
+  let hiddenAt: number | null = visible() ? null : performance.now();
   let hiddenTotal = 0;
   let raf = 0;
   let noteTimer: ReturnType<typeof setTimeout> | null = null;
@@ -239,7 +242,7 @@ function createLive(
   let resumeFrame = false;
   const onVisibility = () => {
     const now = performance.now();
-    if (document.hidden) {
+    if (!visible()) {
       hiddenAt ??= now;
       resumeFrame ||= Boolean(raf || noteTimer);
       if (raf) cancelAnimationFrame(raf);
@@ -257,6 +260,7 @@ function createLive(
     }
   };
   document.addEventListener("visibilitychange", onVisibility);
+  const unview = o.visibility?.subscribe(onVisibility);
   const playTime = (now = performance.now()) =>
     now - hiddenTotal - (hiddenAt === null ? 0 : now - hiddenAt);
   // A room's bubbles stay while the room is open (it is a conversation, not a moment); meeting.adjourned ends them.
@@ -283,7 +287,7 @@ function createLive(
   // destination over the entry's start..finish. Returns whether any actor still has queued or
   // in-flight moves (so the rAF loop keeps rendering every frame while, and only while, one does).
   function drawAgents(now: number): boolean {
-    if (document.hidden) {
+    if (!visible()) {
       dirtyWhileHidden = true;
       return false;
     }
@@ -367,7 +371,7 @@ function createLive(
 
   function tickAnim() {
     raf = 0;
-    if (stopped || paused || scrubbed || document.hidden) {
+    if (stopped || paused || scrubbed || !visible()) {
       mobileQuality.idle();
       return;
     }
@@ -446,7 +450,7 @@ function createLive(
       }
       const frame = frameOf(layout, state);
       lastFrame = frame;
-      if (document.hidden) dirtyWhileHidden = true;
+      if (!visible()) dirtyWhileHidden = true;
       else renderStatic(layer, frame);
       if (wasPaused) {
         // Resumed: every agent goes straight to where the record says it is, no walk (HR-3).
@@ -521,6 +525,7 @@ function createLive(
     stop() {
       stopped = true;
       document.removeEventListener("visibilitychange", onVisibility);
+      unview?.();
       unselect();
       unspot();
       probe();

@@ -50,7 +50,13 @@ export type WorldSeam = (
   world: Container,
   requestRender: () => void,
   size: () => { width: number; height: number },
+  visibility: StageVisibility,
 ) => (() => void) | undefined;
+
+export interface StageVisibility {
+  isVisible: () => boolean;
+  subscribe: (onChange: () => void) => () => void;
+}
 
 /** PRD 18.3 S-04 stage. The camera is the Pixi world container's transform (PRD 9.7); a frame
  * is drawn only on input, an eased keyboard move, resize or visibility change. Readiness: the
@@ -185,6 +191,14 @@ export function Stage({
     let gridKey = ""; // the view the grid was last built for: world-content frames skip rebuilding it
     let inViewport = typeof IntersectionObserver === "undefined";
     const active = () => !document.hidden && inViewport;
+    const visibilityListeners = new Set<() => void>();
+    const visibility: StageVisibility = {
+      isVisible: active,
+      subscribe: (onChange) => {
+        visibilityListeners.add(onChange);
+        return () => visibilityListeners.delete(onChange);
+      },
+    };
 
     const draw = () => {
       const { clientWidth: w, clientHeight: h } = target;
@@ -370,6 +384,7 @@ export function Stage({
         }
         fit();
       }
+      for (const onChange of visibilityListeners) onChange();
     };
     document.addEventListener("visibilitychange", onVisible, { signal: on.signal });
     const viewportObserver =
@@ -388,10 +403,12 @@ export function Stage({
       ready = true;
       target.prepend(app.canvas);
       app.stage.addChild(world);
-      unplug = seamRef.current?.(world, requestRender, () => ({
-        width: target.clientWidth,
-        height: target.clientHeight,
-      }));
+      unplug = seamRef.current?.(
+        world,
+        requestRender,
+        () => ({ width: target.clientWidth, height: target.clientHeight }),
+        visibility,
+      );
       fit(); // the first frame, at once: input that arrived during init is already in `cur`
       const box = "devicePixelContentBoxSize" in ResizeObserverEntry.prototype;
       observer.observe(target, box ? { box: "device-pixel-content-box" } : {});

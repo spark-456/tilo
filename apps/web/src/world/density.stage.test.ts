@@ -324,3 +324,44 @@ it("P0_PERF finishes a recorded walk when reduced motion is enabled mid-walk", (
   stop();
   raf.mockRestore();
 });
+
+it("P0_PERF pauses recorded world drawing when its stage leaves the viewport", () => {
+  const raf = vi.spyOn(globalThis, "requestAnimationFrame");
+  const cancel = vi.spyOn(globalThis, "cancelAnimationFrame");
+  let visible = true;
+  let notify = () => undefined;
+  let deliver: (event: Event) => void = () => undefined;
+  const visibility = {
+    isVisible: () => visible,
+    subscribe: (onChange: () => void) => {
+      notify = onChange;
+      return () => undefined;
+    },
+  };
+  const stop = runClientWorld({
+    world: new Container(),
+    layout,
+    size: () => ({ width: 900, height: 600 }),
+    requestRender: () => undefined,
+    reducedMotion: () => false,
+    onSeq: () => undefined,
+    ...{ visibility },
+    watch: (on) => {
+      for (const event of events.slice(0, 18)) on(event);
+      deliver = on;
+      return () => undefined;
+    },
+  });
+  deliver(events[18] as Event);
+  const pending = raf.mock.results.at(-1)?.value as number;
+  visible = false;
+  notify();
+  expect(cancel).toHaveBeenCalledWith(pending);
+  const frames = raf.mock.calls.length;
+  visible = true;
+  notify();
+  expect(raf.mock.calls.length).toBeGreaterThan(frames);
+  stop();
+  raf.mockRestore();
+  cancel.mockRestore();
+});
