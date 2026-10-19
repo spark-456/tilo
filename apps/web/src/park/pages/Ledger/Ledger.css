@@ -74,7 +74,7 @@
 /* The recorded period is a label until the API supports month selection (UI-10 / W12). */
 [data-park] .park-ledger-month {
   align-self: center;
-  font-size: var(--text-14);
+  font-size: var(--font-size-14);
   font-weight: 700;
   color: var(--ink2);
 }

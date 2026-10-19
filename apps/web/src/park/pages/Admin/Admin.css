@@ -1,6 +1,6 @@
 [data-park] .park-admin {
   color: var(--ink);
-  font-size: var(--text-14);
+  font-size: var(--font-size-14);
 }
 [data-park] .park-admin-sections {
   display: grid;
@@ -8,10 +8,10 @@
   min-width: 0;
 }
 [data-park] .park-admin h1 {
-  font-size: var(--text-32);
+  font-size: var(--font-size-32);
 }
 [data-park] .park-admin h2 {
-  font-size: var(--text-20);
+  font-size: var(--font-size-20);
   margin: 0 0 var(--space-12);
 }
 [data-park] .park-admin nav,
@@ -59,4 +59,103 @@
 [data-park] .park-admin .routine-list {
   padding: 0;
   list-style: none;
+}
+
+/* RESPONSIVE: Settings read as one page with the others. The title is 32px (the --text-N steps are only declared on the
+   deleted old shell, so the title and body had fallen back to 16px), each card is one column with an even gap, the
+   section chips are 40px pills that wrap on a phone, and the display mode is a pair of pills, not a bare fieldset. */
+[data-park] .park-admin h1 {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+  line-height: 1.1;
+}
+[data-park] .park-admin h2 {
+  margin: 0;
+  font-weight: 700;
+}
+[data-park] .park-admin-sections > * section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  min-width: 0;
+}
+[data-park] .park-admin-sections > * section > p {
+  margin: 0;
+  color: var(--ink2);
+  line-height: 1.5;
+}
+[data-park] .park-admin nav button {
+  min-height: 40px;
+  padding: 0 var(--space-16);
+  border-color: var(--line);
+  border-radius: 99px;
+  font-size: var(--font-size-14);
+  font-weight: 600;
+}
+[data-park] .park-admin nav button[aria-current="page"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--card);
+}
+[data-park] .park-admin .park-profile-group {
+  margin: var(--space-8) 0 0;
+}
+[data-park] .park-admin .park-profile-motion-help {
+  margin: 0;
+  line-height: 1.45;
+}
+[data-park] .park-admin fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  border: 0;
+}
+[data-park] .park-admin legend {
+  width: 100%;
+  margin-bottom: var(--space-8);
+  padding: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+[data-park] .park-admin fieldset label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 44px;
+  padding: 0 var(--space-16);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--card);
+  cursor: pointer;
+}
+[data-park] .park-admin fieldset label:has(input:checked) {
+  border-color: var(--ink);
+}
+[data-park] .park-admin fieldset input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--ink);
+}
+[data-park] .park-admin fieldset label:has(input:focus-visible) {
+  outline: 3px solid var(--focus, #5a3fe0);
+  outline-offset: 2px;
+}
+@media (max-width: 560px) {
+  [data-park] .park-admin h1 {
+    font-size: var(--font-size-24);
+  }
+  [data-park] .park-admin nav {
+    gap: var(--space-8);
+  }
+  [data-park] .park-admin nav button {
+    flex: 1 1 auto;
+  }
+  [data-park] .park-admin fieldset label {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
 }
