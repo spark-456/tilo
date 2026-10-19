@@ -13,8 +13,44 @@ afterEach(() => {
   clearWorldThumbnailCache();
   document.body.replaceChildren();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 describe("R-PREVIEW static world card thumbnails", () => {
+  it("P0_PERF_delays_layout_images_until_the_card_nears_the_viewport", async () => {
+    let enter = () => undefined;
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(callback: IntersectionObserverCallback) {
+          enter = () =>
+            callback([{ isIntersecting: true } as IntersectionObserverEntry], this as never);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const getJson = vi.fn(async () => village);
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () =>
+      root.render(
+        <WorldThumbnail
+          world={world("Village", "w_village_basic")}
+          client={{ getJson }}
+          night={false}
+        />,
+      ),
+    );
+    expect(getJson).not.toHaveBeenCalled();
+    await act(async () => {
+      enter();
+      await Promise.resolve();
+    });
+    expect(getJson).toHaveBeenCalledTimes(1);
+    act(() => root.unmount());
+  });
+
   it("R_PREVIEW_layout_plan_keeps_the_recorded_world_names_and_geometry", () => {
     const plan = layoutPlan(village as unknown as Parameters<typeof layoutPlan>[0]);
     expect(plan.districts[0]?.name).toBe("Mail");
@@ -42,6 +78,7 @@ describe("R-PREVIEW static world card thumbnails", () => {
   });
 
   it("R_PREVIEW_layout_read_and_picture_are_cached_across_cards", async () => {
+    vi.stubGlobal("IntersectionObserver", undefined); // this test exercises the cache, not viewport visibility
     const getJson = vi.fn(async () => village);
     const client = { getJson } as unknown as HttpClient;
     const first = document.createElement("div");
