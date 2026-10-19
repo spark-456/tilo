@@ -234,7 +234,7 @@ const FORMAT_NAMES: Record<string, string> = {
 function safeDeliverableName(raw: string): string | null {
   const trimmed = raw.trim();
   const cleaned = trimmed.replace(/[<>:"/\\|?*\p{Cc}]/gu, " ").replace(/\s+/g, " ");
-  return cleaned.slice(0, 80) || null;
+  return cleaned.slice(0, 255) || null;
 }
 
 function recordedArtifact(

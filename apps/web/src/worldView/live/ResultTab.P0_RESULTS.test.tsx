@@ -251,6 +251,16 @@ describe("P0_RESULTS inline delivery", () => {
     expect(m.container.querySelector("h2")?.textContent).toBe("Café ₹.csv");
   });
 
+  it("P0_RESULTS_keeps_the_complete_recorded_filename", () => {
+    const name = `${"Quarterly market research findings and customer interviews ".repeat(2)}.md`;
+    const m = mount(
+      <div data-park="">
+        <ResultTab worldId="w_report" events={[delivered("md", name)]} />
+      </div>,
+    );
+    expect(m.container.querySelector("h2")?.textContent).toBe(name);
+  });
+
   it("P0_RESULTS_uses_the_recorded_artifact_name_for_in_app_files", async () => {
     const created = {
       seq: 1,
