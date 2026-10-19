@@ -526,10 +526,19 @@
   [data-park][data-theme="studio"] .park-skills-ask-opt,
   [data-park][data-theme="studio"] .park-skills-rate-btn,
   [data-park][data-theme="studio"] .park-skills-review-trust,
+  [data-park][data-theme="studio"] .park-skills-review-keep,
   [data-park][data-theme="studio"] .park-connectors-action-btn,
   [data-park][data-theme="studio"] .park-profile-mopt,
   [data-park][data-theme="studio"] .park-profile-scene,
   [data-park][data-theme="studio"] .park-admin nav button {
+    min-height: 40px;
+  }
+  [data-park][data-theme="studio"] .park-skills-rate-btn {
+    min-width: 40px;
+  }
+  [data-park][data-theme="studio"] .park-ledger-method {
+    display: inline-flex;
+    align-items: center;
     min-height: 40px;
   }
   [data-park][data-theme="studio"] .park-chat-input,
@@ -550,6 +559,8 @@
   [data-park][data-theme="studio"] .park-team-link {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    min-width: 40px;
     min-height: 40px;
   }
 }
@@ -569,5 +580,18 @@
   [data-park][data-theme="studio"] .park-first-run-banner button {
     width: 40px;
     height: 40px;
+  }
+}
+
+/* A switch keeps its 44x26 look; on a tablet its tap area grows to 44px with an invisible edge (a phone's own rule in
+   park.components.css already makes the box itself 44px). */
+@media (min-width: 601px) and (max-width: 899px), (min-width: 601px) and (pointer: coarse) {
+  [data-park][data-theme="studio"] .park-switch {
+    position: relative;
+  }
+  [data-park][data-theme="studio"] .park-switch::after {
+    content: "";
+    position: absolute;
+    inset: -9px -2px;
   }
 }
