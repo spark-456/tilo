@@ -3,7 +3,7 @@
 // Teach wizard. Below the gallery stay "Help your agents get better" and tool access. Data comes only through the Api
 // (`useParkApi`: GET /v1/skills?include_builtin=true, GET /v1/learn); the wizard posts captures, version and save; a live
 // pause posts /v1/skills/{id}/state. A page whose Api is not built says "Skills data is unavailable", never numbers.
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { displayApiError } from "../../api/errorMessage";
 import { isSkillRow, skillFromRow } from "../../api/live/skillsFromApi";
 import type { Learn, Skill, Source, User } from "../../api/types";
@@ -186,18 +186,21 @@ function Ready({
   const [paused, setPaused] = useState<Record<string, boolean>>({});
   const [persisted, setPersisted] = useState<Record<string, Skill>>({});
 
-  const baseSkills = withTaught(data.skills, t.taught);
-  const skills = baseSkills.map((s) => {
-    let next = { ...(persisted[s.id] ?? s) };
-    if (rev[s.id] === "trusted") next.st = "trusted";
-    if (s.st === "review" && ans[s.id]) next.st = "learning";
-    for (const entry of Object.values(fixed)) {
-      if (entry.skillName === next.name) {
-        next = applySkillFix(next, entry.stepIndex, entry.instruction);
+  const baseSkills = useMemo(() => withTaught(data.skills, t.taught), [data.skills, t.taught]);
+  const skills = useMemo(() => {
+    const fixes = Object.values(fixed);
+    return baseSkills.map((s) => {
+      let next = { ...(persisted[s.id] ?? s) };
+      if (rev[s.id] === "trusted") next.st = "trusted";
+      if (s.st === "review" && ans[s.id]) next.st = "learning";
+      for (const entry of fixes) {
+        if (entry.skillName === next.name) {
+          next = applySkillFix(next, entry.stepIndex, entry.instruction);
+        }
       }
-    }
-    return next;
-  });
+      return next;
+    });
+  }, [baseSkills, persisted, rev, ans, fixed]);
 
   const trusted = skills.filter((s) => s.st === "trusted").length;
   const learning = skills.filter((s) => s.st === "learning").length;
