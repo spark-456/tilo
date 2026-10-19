@@ -163,8 +163,15 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel as _BaseModel
+from pydantic import ConfigDict, Field
 from typing_extensions import TypeAliasType
+
+
+class BaseModel(_BaseModel):
+    """Every generated model builds its validator on first use, not at import (about 1 s per service start)."""
+
+    model_config = ConfigDict(defer_build=True)
 
 
 class AgentsConfigLimits(BaseModel):

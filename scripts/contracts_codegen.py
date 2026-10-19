@@ -316,7 +316,28 @@ def generate_python(bundled: dict, head: list[str]) -> str:
             + DATAMODEL_ARGS
             + ["--custom-file-header=" + "\n".join(f"# {line}" for line in head)]
         )
-        return target.read_text(encoding="utf-8")
+        return defer_builds(target.read_text(encoding="utf-8"))
+
+
+PYDANTIC_IMPORT = "from pydantic import BaseModel, ConfigDict, Field\nfrom typing_extensions import TypeAliasType\n"
+DEFERRED_BASE = (
+    "from pydantic import BaseModel as _BaseModel\n"
+    "from pydantic import ConfigDict, Field\n"
+    "from typing_extensions import TypeAliasType\n"
+    "\n"
+    "\n"
+    "class BaseModel(_BaseModel):\n"
+    '    """Every generated model builds its validator on first use, not at import (about 1 s per service start)."""\n'
+    "\n"
+    "    model_config = ConfigDict(defer_build=True)\n"
+)
+
+
+def defer_builds(source: str) -> str:
+    """The generated models share one base that defers pydantic's schema build (same fields, same validation)."""
+    if source.count(PYDANTIC_IMPORT) != 1:
+        raise SystemExit("contracts: datamodel-code-generator changed its pydantic import line; update defer_builds")
+    return source.replace(PYDANTIC_IMPORT, DEFERRED_BASE, 1)
 
 
 def draft7_tuples(node: object) -> object:
