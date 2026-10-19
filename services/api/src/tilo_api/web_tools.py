@@ -10,16 +10,37 @@ import threading
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from tilo_browser.egress import EgressPolicy
-from tilo_browser.fetch import FetchService, RawArchiveStore, UpstreamResponse, is_forbidden_hostname
+from tilo_browser.fetch import FetchBlocked, FetchService, RawArchiveStore, UpstreamResponse, is_forbidden_hostname
 from tilo_harness.tools import FakeFetchUrl, FakeWebSearch, ToolResult, archive_id
 from tilo_memory.artifacts import NewVersion, Origin
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.media import MediaPart
 
 _URL = re.compile(r"https://[^\s<>\"'`\)\]}]+", re.IGNORECASE)
 MAX_TYPED_HOSTS = 20
+# P0-RUNS-FIX: a search engine's page is never read; web research goes through the search provider (web_search).
+_SEARCH_ENGINES = frozenset({"google", "bing", "duckduckgo", "yahoo", "baidu", "yandex", "ecosia", "startpage", "ask"})
+_QUERY_KEYS = ("q", "query", "p", "text", "wd")
+SEARCH_ENGINE_NOTE = (
+    "(not opened: {host} is a search engine. Tilo searches with web_search: call web_search with the words to find, "
+    "then fetch_url one of its result links.)"
+)
+BLOCKED_NOTE = (
+    "(not read: {host} is not among this task's search results or the sites the person named ({reason}). "
+    "Skip this source; use web_search and read one of its result links.)"
+)
+BROWSER_FALLBACK_NOTE = "(The visible browser could not open this page, so Tilo read it directly.)\n"
+
+
+def search_engine_host(host: str) -> bool:
+    """google.com, www.google.co.in, bing.com, search.yahoo.com and the like: a search page, not a source."""
+    labels = host.lower().rstrip(".").split(".")
+    while labels and labels[0] in ("www", "m", "search"):
+        labels = labels[1:]
+    return len(labels) >= 2 and labels[0] in _SEARCH_ENGINES
 
 
 def typed_hosts(texts: Iterable[Any]) -> set[str]:
@@ -148,19 +169,42 @@ class FetchTool:
     tier, external_content, side_effect = "T1", True, False
     web_egress = True  # WT-04: a unit that read the person's private data loses it
 
-    def __init__(self, run, service, hosts, unit, context, sources):
+    def __init__(self, run, service, hosts, unit, context, sources, *, search=None, browser=None):
         self.owner, self.service, self.hosts = run, service, hosts
         self.unit, self.context, self.sources = unit, context, sources
+        self.search = search  # P0-RUNS-FIX: a search-engine URL becomes a web_search of its query
+        self.browser = browser  # P0-RUNS-FIX: (url, host) -> text read in the visible browser, or None for no browser
         self.count = 0
 
     def run(self, args):
         run = self.owner
-        got = self.service.fetch(
-            args["url"], allow_hosts=tuple(self.hosts), org_id=run.org_id, run_id=run.run_id, unit_id=self.unit["id"]
-        )
+        url = args["url"]
+        host = (urlsplit(url).hostname or "").lower() if isinstance(url, str) else ""
+        if search_engine_host(host):
+            query = next((v[0] for k in _QUERY_KEYS if (v := parse_qs(urlsplit(url).query).get(k)) and v[0]), "")
+            if query.strip() and self.search is not None:
+                return self.search.run({"query": query.strip()[:400]})
+            return ToolResult(SEARCH_ENGINE_NOTE.format(host=host))
+        note = ""
+        if self.browser is not None and self.hosts and EgressPolicy(sorted(self.hosts)).check(url).allowed:
+            try:
+                text = self.browser(url, host)
+            except Exception as caught_error:  # unavailable, refused or a login wall: read it directly instead
+                log_caught(caught_error, __name__, locals())
+                text = ""
+            if text.strip():
+                return ToolResult(text)
+            note = BROWSER_FALLBACK_NOTE
+        try:
+            got = self.service.fetch(
+                url, allow_hosts=tuple(self.hosts), org_id=run.org_id, run_id=run.run_id, unit_id=self.unit["id"]
+            )
+        except FetchBlocked as blocked:  # one source is skipped; the unit goes on with the others
+            log_caught(blocked, __name__, locals())
+            return ToolResult(BLOCKED_NOTE.format(host=blocked.block.host or "that site", reason=blocked.block.reason))
         raw = self.service.archive_store.get_bytes(run.org_id, run.run_id, got.sha256)
         if got.media_type == "text/plain":
-            return ToolResult(raw.decode())
+            return ToolResult(note + raw.decode())
         if self.count >= 10:
             raise ValueError("source limit")
         made = run.seams.artifacts.put(

@@ -1,14 +1,14 @@
 // TILO-T-WORLD: the conversation itself, shared by "Talk to <agent>" and the team meeting: the room's turns as bubbles
 // (the person's question, the agent's reply with the units it cites), a composer, the room's credits and turns, and
-// the change flow: an agent may PROPOSE a change in a reply; only then can the person confirm it (MR-07), and the
-// outcome is shown as the API gave it (accepted / queued / failed), never assumed. Nothing here authorises a side
-// effect (MR-11): a room turn is a read and a recorded note.
+// a room reply may propose a plan revision for confirmation (MR-07). A person's direct change of direction uses
+// the separate rerun path, which starts the Director with the new instruction.
 import type { Event } from "@tilo/contracts";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Buddy, Icon } from "../../design/tilo-t";
 import type { RoomClient } from "../../park/api/live/meetingHall";
 import type { Seat } from "../../park/api/live/roomTalk";
 import type { AgentStats } from "../../world/agentStats";
+import { DirectionForm } from "./DirectionForm";
 import { roleOf } from "./agentLook";
 import { useRoomTalk } from "./useRoomTalk";
 import "./live.css";
@@ -29,7 +29,6 @@ const CLOSED = {
   failed: "Closed after an error",
 } as const;
 
-export const CHANGE_STARTER = "I'd like you to take a different direction: ";
 export const displayCredits = (credits: number): string => String(Math.round(credits * 10) / 10);
 
 export function RoomThread({
@@ -42,6 +41,7 @@ export function RoomThread({
   defaultTo,
   changeAsk = false,
   autoConvene = false,
+  onChangeDirection,
 }: {
   client: RoomClient | null;
   worldId: string;
@@ -56,6 +56,7 @@ export function RoomThread({
   changeAsk?: boolean;
   /** Convene the room as soon as this opens (a team meeting: triggeredBy the person pressing Convene team). */
   autoConvene?: boolean;
+  onChangeDirection?: (instruction: string) => Promise<void>;
 }) {
   const talk = useRoomTalk(client, worldId, seat, events);
   const { convene } = talk;
@@ -66,6 +67,8 @@ export function RoomThread({
   const [to, setTo] = useState(defaultTo ?? stats[stats.length - 1]?.id ?? "");
   const [mode, setMode] = useState<"quick" | "thinking">("quick");
   const [text, setText] = useState("");
+  const [pending, setPending] = useState("");
+  const [directionOpen, setDirectionOpen] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
   const who = (id: string) => stats.find((s) => s.id === id);
   const { room } = talk;
@@ -81,7 +84,11 @@ export function RoomThread({
     e.preventDefault();
     const q = text.trim();
     if (!q || !seat || !to) return;
-    void talk.send(to, mode, q).then((ok) => ok && setText(""));
+    setPending(q);
+    void talk
+      .send(to, mode, q)
+      .then((ok) => ok && setText(""))
+      .finally(() => setPending(""));
   };
 
   if (!client || !seat) {
@@ -141,6 +148,9 @@ export function RoomThread({
           );
         })}
       </ol>
+      {pending ? (
+        <output className="tw-room__wait">{who(to)?.name ?? to} is answering…</output>
+      ) : null}
       {talk.error ? (
         <p className="tw-room__err" role="alert">
           {talk.error}
@@ -207,15 +217,12 @@ export function RoomThread({
             <button type="submit" disabled={talk.busy || waiting || !text.trim()}>
               {talk.busy ? "Asking…" : "Send"}
             </button>
-            {changeAsk ? (
+            {changeAsk && onChangeDirection ? (
               <button
                 type="button"
                 className="tw-room__quiet"
-                onClick={() => {
-                  setMode("thinking");
-                  setText((t) => (t.trim() ? t : CHANGE_STARTER));
-                  box.current?.focus();
-                }}
+                aria-expanded={directionOpen}
+                onClick={() => setDirectionOpen((open) => !open)}
               >
                 Ask them to change direction
               </button>
@@ -233,6 +240,9 @@ export function RoomThread({
           </div>
         </form>
       }
+      {directionOpen && onChangeDirection ? (
+        <DirectionForm onStart={onChangeDirection} onCancel={() => setDirectionOpen(false)} />
+      ) : null}
     </section>
   );
 }

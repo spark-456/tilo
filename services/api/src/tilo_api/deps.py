@@ -50,7 +50,7 @@ from tilo_providers.byok import OrgBinding
 from tilo_providers.clock import Clock, real_today
 from tilo_providers.config import ProviderConfigError, ProvidersConfig, load_providers_config, resolve_models_path
 from tilo_providers.interfaces import SafetyProvider
-from tilo_providers.router import Router, RouterExhaustedError
+from tilo_providers.router import SERVER_RETRY_DELAYS, Router, RouterExhaustedError
 from tilo_providers.safety import build_safety_provider
 from tilo_redact import redact
 
@@ -929,7 +929,12 @@ def router_for_mode(mode: Mode, *, org: OrgBinding | None = None) -> Router:
     try:
         live = mode == "live"
         return Router(
-            providers_config(), fixtures_dir=FIXTURES_DIR, live_permitted=live, force_replay=not live, org=org
+            providers_config(),
+            fixtures_dir=FIXTURES_DIR,
+            live_permitted=live,
+            force_replay=not live,
+            org=org,
+            retry_delays=SERVER_RETRY_DELAYS if live else (),  # P0-RUNS-FIX: a Gemini 5xx/429 waits, then retries
         )
     except ProviderConfigError as exc:
         logger.warning("model router unavailable: %s", exc)

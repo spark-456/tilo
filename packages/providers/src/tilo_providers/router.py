@@ -8,7 +8,7 @@ import contextvars
 import json
 import threading
 import time
-from collections.abc import Callable, Collection, Iterator
+from collections.abc import Callable, Collection, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
@@ -24,7 +24,9 @@ from tilo_providers.errors import (
     MissingCapabilityError,
     OutputTruncatedError,
     ProviderError,
+    QuotaError,
     RequestError,
+    RetryableError,
     SafetyError,
 )
 from tilo_providers.factory import build_provider
@@ -197,6 +199,14 @@ def _fail(
         raise RouterExhaustedError(message, run.attempts, run.budget) from error
 
 
+SERVER_RETRY_DELAYS = (2.0, 6.0, 15.0)  # seconds before the 2nd, 3rd and 4th try of one profile after a 5xx or 429
+
+
+def _busy(error: BaseException | None) -> bool:
+    """A provider 5xx or 429: worth waiting for. Not a timeout (the deadline already ran on it) nor anything else."""
+    return isinstance(error, (RetryableError, QuotaError)) and not isinstance(error, AttemptTimeoutError)
+
+
 def _exhausted(run: RouterResult) -> RouterError:
     if (
         run.attempts and run.attempts[-1].error_type == AttemptTimeoutError.__name__
@@ -310,6 +320,8 @@ class Router:
         search_for_profile: SearchFor | None = None,
         role_thinking: bool = True,
         org: OrgBinding | None = None,
+        retry_delays: Sequence[float] | None = None,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         if provider_for_profile is None and fixtures_dir is None:
             raise RouterError("Router needs either provider_for_profile or fixtures_dir")
@@ -319,6 +331,10 @@ class Router:
         self._live_permitted = live_permitted  # SEC-15: set by the caller that decided this router may go live
         self._force_replay = force_replay  # SEC-15: set by the caller that decided this router replays, LIVE or not
         self._org = org  # ADR-0041 BK-10: one org's bundle for this unit; None (the default) changes nothing
+        # P0-RUNS-FIX: a 5xx or 429 waits `retry_delays` and retries the same profile before falling back. Opt-in: the
+        # live request router passes SERVER_RETRY_DELAYS; a replay or fake answers the same again, so it falls back.
+        self._retry_delays = tuple(retry_delays or ())
+        self._sleep = sleep
         if live_permitted and not force_replay:
             config.check_live()  # ADR-0029 decisions 3 and 4: no live metering at the wrong region or past a promotion
 
@@ -575,6 +591,7 @@ class Router:
             prompt: str | None = None  # None: the role's own input; else the one schema-repair prompt
             is_repair = False
             retried_truncation = False
+            busy_retries = 0
             while True:
                 wait = None  # no deadline: no limit
                 if deadline is not None:
@@ -598,6 +615,13 @@ class Router:
                         retried_truncation = True
                         reason = "retry after truncated reply with lower thinking and a larger output cap"
                         continue
+                    if busy_retries < len(self._retry_delays) and _busy(run.last_error):
+                        delay = self._retry_delays[busy_retries]
+                        if deadline is None or deadline.remaining() > delay:
+                            busy_retries += 1
+                            self._sleep(delay)
+                            reason = f"retry after {attempt.error_type}, waited {delay:g}s"
+                            continue
                     reason = f"fallback after {attempt.error_type}"
                     break
                 self._spend(run, profile_id, estimate, response.usage)

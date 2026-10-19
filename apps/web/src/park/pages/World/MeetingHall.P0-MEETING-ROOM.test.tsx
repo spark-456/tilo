@@ -8,8 +8,9 @@ import { MeetingHall } from "./MeetingHall";
 afterEach(cleanup);
 
 describe("P0-MEETING-ROOM: World Meeting Hall as real meeting room", () => {
-  it("renders a top-down table, seat per agent with role name (never ids), Call to the table tray, and buttons", async () => {
+  it("P0_HALL_ASK_pop_up_shows_reply_bubbles_and_sends_real_direction", async () => {
     const calls: [string, unknown][] = [];
+    const redirect = vi.fn(async (_instruction: string) => {});
     let currentRoom: Record<string, unknown> | null = null;
 
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -98,13 +99,16 @@ describe("P0-MEETING-ROOM: World Meeting Hall as real meeting room", () => {
         <MeetingHall
           worldId="w_one"
           client={new HttpClient({ baseUrl: "https://api.test", fetch: fetcher })}
+          onChangeDirection={redirect}
         />,
       );
     });
 
     // 1. Table exists
     expect(document.querySelector(".park-meeting-table")).not.toBeNull();
-    expect(document.querySelector(".park-meeting-table-title")?.textContent).toContain("Conference Table");
+    expect(document.querySelector(".park-meeting-table-title")?.textContent).toContain(
+      "Conference Table",
+    );
 
     // 2. Seats and avatar chips with role names, never IDs
     expect(document.body.textContent).not.toContain("A_one");
@@ -127,16 +131,18 @@ describe("P0-MEETING-ROOM: World Meeting Hall as real meeting room", () => {
     expect(document.querySelector(".park-meeting-seat--speaking")).toBeNull();
 
     // Seat an agent via Call to the table tray checkbox
-    const writerBox = [...document.querySelectorAll("label.park-meeting-agentchip")].find((l) =>
-      l.textContent?.includes("Writer"),
-    )?.querySelector("input");
+    const writerBox = [...document.querySelectorAll("label.park-meeting-agentchip")]
+      .find((l) => l.textContent?.includes("Writer"))
+      ?.querySelector("input");
     expect(writerBox).not.toBeNull();
     await act(async () => {
       writerBox?.click();
     });
 
     // Convene room
-    const conveneBtn = [...document.querySelectorAll("button")].find((b) => b.textContent === "Convene");
+    const conveneBtn = [...document.querySelectorAll("button")].find(
+      (b) => b.textContent === "Convene",
+    );
     expect(conveneBtn).not.toBeNull();
     await act(async () => {
       conveneBtn?.click();
@@ -146,21 +152,18 @@ describe("P0-MEETING-ROOM: World Meeting Hall as real meeting room", () => {
 
     // Room is convened: check message box below with Send, End conversation, Ask them to change direction
     const sendBtn = [...document.querySelectorAll("button")].find((b) => b.textContent === "Send");
-    const endBtn = [...document.querySelectorAll("button")].find((b) => b.textContent === "End conversation");
-    const changeDirBtn = [...document.querySelectorAll("button")].find((b) =>
-      b.textContent === "Ask them to change direction",
+    const endBtn = [...document.querySelectorAll("button")].find(
+      (b) => b.textContent === "End conversation",
+    );
+    const changeDirBtn = [...document.querySelectorAll("button")].find(
+      (b) => b.textContent === "Ask them to change direction",
     );
     expect(sendBtn).not.toBeNull();
     expect(endBtn).not.toBeNull();
     expect(changeDirBtn).not.toBeNull();
 
-    // Click "Ask them to change direction" pre-populates textarea
     const textarea = document.querySelector("textarea") as HTMLTextAreaElement;
     expect(textarea).not.toBeNull();
-    await act(async () => {
-      changeDirBtn?.click();
-    });
-    expect(textarea.value).toContain("change direction");
 
     // Send question to Writer
     await act(async () => {
@@ -185,6 +188,28 @@ describe("P0-MEETING-ROOM: World Meeting Hall as real meeting room", () => {
     expect(speakingSeat).not.toBeNull();
     expect(speakingSeat?.textContent).toContain("Writer");
     expect(speakingSeat?.querySelector(".park-meeting-speaking-ring")).not.toBeNull();
+
+    await act(async () => {
+      changeDirBtn?.click();
+    });
+    const direction = document.querySelector(
+      "textarea[aria-label='What should the team change?']",
+    ) as HTMLTextAreaElement;
+    expect(direction).not.toBeNull();
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(
+        direction,
+        "Prioritize the supplier",
+      );
+      direction.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      document
+        .querySelector<HTMLFormElement>(".tw-direction")
+        ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    expect(redirect).toHaveBeenCalledWith("Prioritize the supplier");
+    expect(calls.filter(([path]) => path.endsWith("/turns"))).toHaveLength(1);
 
     // End conversation adjourns
     await act(async () => {

@@ -262,7 +262,11 @@ def _refuse_unavailable(
     if not (load_deliverable_kinds() if kinds is None else kinds):
         return
     withheld = load_kinds().unavailable if unavailable is None else unavailable
-    by_label = {k.label.casefold(): k for k in withheld}
+    by_label: dict[str, UnavailableKind] = {}
+    for k in withheld:
+        by_label[k.label.casefold()] = k
+        for alias in k.aliases:
+            by_label[alias.casefold()] = k
     if not by_label:
         return
     named = dict.fromkeys(
@@ -282,7 +286,11 @@ def _chosen_kinds(
     offered = load_deliverable_kinds() if kinds is None else kinds
     if not offered:
         return None
-    by_label = {k.label.casefold(): k for k in offered}
+    by_label: dict[str, DeliverableKind] = {}
+    for k in offered:
+        by_label[k.label.casefold()] = k
+        for alias in k.aliases:
+            by_label[alias.casefold()] = k
     pattern = _label_pattern(by_label)
     keep = _holds_whole(answer[:ANSWER_MAX_CHARS], current)
     text = answer[:ANSWER_MAX_CHARS].replace(current, ";") if keep else answer[:ANSWER_MAX_CHARS]

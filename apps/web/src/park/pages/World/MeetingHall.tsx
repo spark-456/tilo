@@ -1,4 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { TiloApiError } from "../../app/apiError";
+import { DirectionForm } from "../../shared/DirectionForm";
 import {
   type Attendee,
   type Room,
@@ -9,6 +11,7 @@ import {
   roomOf,
   roomPath,
 } from "../../api/live/meetingHall";
+import { roomFault } from "../../api/live/roomTalk";
 import "./MeetingHall.css";
 
 const CLOSED = {
@@ -30,7 +33,15 @@ const roleLabel = (rank: string): string =>
   rank.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 const creditsLabel = (credits: number): string => String(Math.round(credits * 10) / 10);
 
-export function MeetingHall({ worldId, client }: { worldId: string; client: RoomClient }) {
+export function MeetingHall({
+  worldId,
+  client,
+  onChangeDirection,
+}: {
+  worldId: string;
+  client: RoomClient;
+  onChangeDirection?: (instruction: string) => Promise<void>;
+}) {
   const [people, setPeople] = useState<Attendee[] | null>(null);
   const [lead, setLead] = useState("");
   const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
@@ -39,6 +50,8 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [questionText, setQuestionText] = useState("");
+  const [directionOpen, setDirectionOpen] = useState(false);
+  const [pendingQuestion, setPendingQuestion] = useState("");
   const active = useRef(true);
   const held = useRef(false);
 
@@ -105,6 +118,7 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
         result = roomOf(await client.postJson(path, { lead, agents }), worldId);
       } else if (room && (action === "Send" || action === "Send question")) {
         const textVal = String(data.get("text") || questionText);
+        setPendingQuestion(textVal);
         await client.postJson(`${path}/turns`, {
           to: data.get("to"),
           mode: data.get("mode"),
@@ -124,8 +138,15 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
       if (active.current && result) setRoom(result);
     } catch (e) {
       if (active.current)
-        setError(e instanceof Error ? e.message : "Could not complete the room action.");
+        setError(
+          e instanceof TiloApiError
+            ? roomFault(e)
+            : e instanceof Error
+              ? e.message
+              : "Could not complete the room action.",
+        );
     } finally {
+      if (active.current) setPendingQuestion("");
       held.current = false;
       if (active.current) setBusy(false);
     }
@@ -335,7 +356,7 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
                 </div>
 
                 <div className="park-meeting-chat-bubbles" role="log" aria-live="polite">
-                  {room.turns.length === 0 ? (
+                  {room.turns.length === 0 && !pendingQuestion ? (
                     <p className="park-meeting-empty-chat">
                       No turns yet. Send a question below to start the meeting discussion.
                     </p>
@@ -393,6 +414,20 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
                       </div>
                     ))
                   )}
+                  {pendingQuestion ? (
+                    <div className="park-meeting-turn">
+                      <div className="park-meeting-bubble park-meeting-bubble--user">
+                        <span className="park-meeting-bubble-sender">You</span>
+                        <div className="park-meeting-bubble-text">{pendingQuestion}</div>
+                      </div>
+                      <output
+                        className="park-meeting-bubble park-meeting-bubble--agent"
+                        aria-label="Agent typing"
+                      >
+                        Agent is answering…
+                      </output>
+                    </div>
+                  ) : null}
                 </div>
 
                 {Object.entries(confirmed).map(([id, status]) => (
@@ -473,18 +508,22 @@ export function MeetingHall({ worldId, client }: { worldId: string; client: Room
                     >
                       End conversation
                     </button>
-                    <button
-                      type="button"
-                      className="park-btn park-btn--secondary park-btn--md"
-                      onClick={() => {
-                        setQuestionText("Please change direction: revise our approach to ");
-                      }}
-                    >
-                      Ask them to change direction
-                    </button>
+                    {onChangeDirection ? (
+                      <button
+                        type="button"
+                        className="park-btn park-btn--secondary park-btn--md"
+                        aria-expanded={directionOpen}
+                        onClick={() => setDirectionOpen((open) => !open)}
+                      >
+                        Ask them to change direction
+                      </button>
+                    ) : null}
                   </div>
                 </fieldset>
               </form>
+            ) : null}
+            {directionOpen && onChangeDirection ? (
+              <DirectionForm onStart={onChangeDirection} onCancel={() => setDirectionOpen(false)} />
             ) : null}
           </div>
         ) : null}

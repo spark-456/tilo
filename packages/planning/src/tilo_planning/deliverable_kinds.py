@@ -46,13 +46,14 @@ class DeliverableKind:
     id: str
     label: str  # the deliverable's title when chosen
     format: str
+    aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class UnavailableKind(DeliverableKind):
     """A kind that is not offered yet; `needs` names what must ship first. Naming one in an answer is refused."""
 
-    needs: str
+    needs: str = ""
 
 
 @dataclass(frozen=True)
@@ -61,9 +62,12 @@ class KindsConfig:
     unavailable: tuple[UnavailableKind, ...]  # the others, in file order
 
 
+_OPTIONAL = {"needs", "aliases"}
+
+
 def _kind(entry: Any, index: int) -> tuple[DeliverableKind, bool, str | None]:
     where = f"kinds[{index}]"
-    if not isinstance(entry, dict) or not _KEYS <= set(entry) <= _KEYS | {"needs"}:
+    if not isinstance(entry, dict) or not _KEYS <= set(entry) <= _KEYS | _OPTIONAL:
         raise DeliverableKindsError(f"{where} must have id, label, format and available (and needs)")
     ident, label, fmt, available = entry["id"], entry["label"], entry["format"], entry["available"]
     if not isinstance(ident, str) or not _SLUG.fullmatch(ident):
@@ -81,7 +85,13 @@ def _kind(entry: Any, index: int) -> tuple[DeliverableKind, bool, str | None]:
         not available and needs is None
     ):
         raise DeliverableKindsError(f"{where}.needs must name what must ship first, and is required when unavailable")
-    return DeliverableKind(ident, label, fmt), available, needs
+    raw_aliases = entry.get("aliases", ())
+    if not isinstance(raw_aliases, list | tuple) or any(
+        not isinstance(a, str) or not a.strip() or _BAD_LABEL.search(a) for a in raw_aliases
+    ):
+        raise DeliverableKindsError(f"{where}.aliases must be a list of plain text strings")
+    aliases = tuple(" ".join(a.strip().split()) for a in raw_aliases)
+    return DeliverableKind(ident, label, fmt, aliases), available, needs
 
 
 _CACHE: dict[Path, tuple[tuple[int, int], KindsConfig]] = {}  # path -> ((mtime, size), parsed): a good parse only
@@ -121,7 +131,7 @@ def _parse(path: Path) -> KindsConfig:
     if len(offered) > MAX_CHOICES:
         raise DeliverableKindsError(f"at most {MAX_CHOICES} kinds may be available")
     withheld = tuple(
-        UnavailableKind(kind.id, kind.label, kind.format, str(needs))
+        UnavailableKind(kind.id, kind.label, kind.format, kind.aliases, needs=str(needs))
         for kind, available, needs in read
         if not available
     )

@@ -61,17 +61,53 @@ _QUIZ_INTENT = re.compile(
     r"\b(?:quiz|interactive\s+(?:test|exam|assessment)|practice\s+test|mock\s+test|self[- ]?test)\b", re.I
 )
 _QUIZ_SOURCES = {"application/pdf", "image/png", "image/jpeg"}
-_WEBSITE_INTENT = re.compile(r"\b(?:website|web\s*app|app|questionnaire)\b", re.I)
+
+
+def _website_intent_pattern() -> re.Pattern[str]:
+    try:
+        kinds = load_deliverable_kinds()
+    except Exception:
+        kinds = ()
+    website_phrases = {
+        alias
+        for kind in kinds
+        if kind.format == "website"
+        for alias in (kind.label, *kind.aliases)
+        if alias.strip()
+    } or {"website", "web app", "app", "questionnaire"}
+    sorted_phrases = sorted(website_phrases, key=len, reverse=True)
+    parts = [r"(?<![a-z0-9])" + re.escape(p).replace(r"\ ", r"[ -]") + r"(?![a-z0-9])" for p in sorted_phrases]
+    return re.compile("|".join(parts), re.IGNORECASE)
+
+
+def _quiz_intent_pattern() -> re.Pattern[str]:
+    try:
+        kinds = load_deliverable_kinds()
+    except Exception:
+        kinds = ()
+    quiz_phrases = {
+        alias
+        for kind in kinds
+        if kind.format == "app"
+        for alias in (kind.label, *kind.aliases)
+        if alias.strip()
+    }
+    if not quiz_phrases:
+        return _QUIZ_INTENT
+    sorted_phrases = sorted(quiz_phrases, key=len, reverse=True)
+    parts = [r"(?<![a-z0-9])" + re.escape(p).replace(r"\ ", r"[ -]") + r"(?![a-z0-9])" for p in sorted_phrases]
+    return re.compile("|".join(parts), re.IGNORECASE)
 
 
 def safe_app_brief(brief: dict[str, Any], task_text: str, parts: list[MediaPart]) -> dict[str, Any]:
     """Keep sourced quizzes as AppSpecs and route requested sites to the native website writer."""
-    if _QUIZ_INTENT.search(task_text) and any(part.mime_type in _QUIZ_SOURCES for part in parts):
+    quiz_pattern = _quiz_intent_pattern()
+    if quiz_pattern.search(task_text) and any(part.mime_type in _QUIZ_SOURCES for part in parts):
         return brief
     deliverables = brief.get("deliverables")
     if not isinstance(deliverables, list):
         return brief
-    wants_website = not parts and _WEBSITE_INTENT.search(task_text) is not None
+    wants_website = not parts and _website_intent_pattern().search(task_text) is not None
     return {
         **brief,
         "deliverables": [

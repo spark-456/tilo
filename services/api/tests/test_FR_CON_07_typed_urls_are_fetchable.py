@@ -98,8 +98,10 @@ def test_FR_CON_07_a_typed_host_is_fetched_and_an_unlisted_one_is_still_refused(
     assert "Hello from the typed page" in allowed.run({"url": f"https://{HOST}/report"}).content
 
     refused = _fetch_tool(tmp_path / "again", set())  # a host nobody typed or searched
-    with pytest.raises(Exception, match="(?i)allow|block|egress|refus"):
-        refused.run({"url": f"https://{HOST}/report"})
+    # P0-RUNS-FIX: still refused, now as one skipped source with a plain note instead of a failed tool call
+    shown = refused.run({"url": f"https://{HOST}/report"}).content
+    assert shown.startswith("(not read:") and "host_not_allowlisted" in shown
+    assert "Hello from the typed page" not in shown
 
 
 def test_FR_CON_07_the_run_starts_with_the_hosts_of_the_brief_and_the_answers(tmp_path, monkeypatch) -> None:

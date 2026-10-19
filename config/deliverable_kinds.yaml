@@ -25,6 +25,14 @@ kinds:
     label: Mock-test quiz
     format: app
     available: true
+    aliases:
+      - quiz
+      - interactive test
+      - interactive exam
+      - interactive assessment
+      - practice test
+      - mock test
+      - self test
   - id: past_paper_links
     label: Past-paper links
     format: markdown
@@ -33,3 +41,12 @@ kinds:
     label: Website
     format: website
     available: true
+    aliases:
+      - website
+      - web app
+      - app
+      - questionnaire
+      - landing page
+      - form
+      - signup form
+      - sign up form

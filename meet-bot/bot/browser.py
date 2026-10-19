@@ -76,6 +76,7 @@ class MeetBrowser:
         self.cfg = cfg
         self.face = face
         self.guest = bool(getattr(cfg, "guest", False))
+        self.session_file = getattr(cfg, "session_file", None)  # MEET-SESSION: signed in, but ephemeral
         self.voice = voice  # a virtual microphone exists: let Meet use it without a permission prompt
         self.ui = UIScheduler()  # one UI action at a time, mic first; see bot/ui.py
         self.page: Any = None
@@ -87,8 +88,8 @@ class MeetBrowser:
 
     # -- lifecycle -----------------------------------------------------------------------------------------------
     async def __aenter__(self) -> MeetBrowser:
-        if "K_SERVICE" in os.environ and not self.guest:
-            raise NotLoggedIn("Cloud Run requires guest mode; signed-in profiles stay on the demo machine.")
+        if "K_SERVICE" in os.environ and not (self.guest or self.session_file):
+            raise NotLoggedIn("Cloud Run needs guest mode or a mounted bot session; profiles stay on the demo machine.")
         from playwright.async_api import async_playwright
 
         self.cfg.debug_dir.mkdir(parents=True, exist_ok=True)
@@ -97,14 +98,16 @@ class MeetBrowser:
             "headless": False,
             "args": CHROMIUM_ARGS
             + (["--use-fake-ui-for-media-stream"] if self.voice else [])
-            + (["--no-sandbox"] if self.guest else []),
+            + (["--no-sandbox"] if self.guest or self.session_file else []),
             "ignore_default_args": ["--enable-automation", "--mute-audio"],
-            "chromium_sandbox": not self.guest,
+            "chromium_sandbox": not (self.guest or self.session_file),
         }
         context = {"viewport": {"width": 1280, "height": 720}, "locale": "en-US"}
         try:
-            if self.guest:
+            if self.guest or self.session_file:
                 self._browser = await self._pw.chromium.launch(**launch)
+                if self.session_file:
+                    context["storage_state"] = str(self.session_file)
                 self.ctx = await self._browser.new_context(**context)
             else:
                 clean_singleton_locks(self.cfg.profile_dir)
@@ -193,6 +196,10 @@ class MeetBrowser:
             raise NotLoggedIn("Set BOT_GOOGLE_EMAIL to the dedicated bot account before joining.")
         loc = await self.find(S.ACCOUNT_BUTTON, 3)
         if loc is None:
+            # Meet's pre-join page (Oct 2026) shows the signed-in email as plain text, with no "Google Account" badge.
+            text = (await self.page.inner_text("body")) if self.page is not None else ""
+            if self.cfg.bot_email.lower() in text.lower():
+                return
             raise NotLoggedIn("The bot account could not be verified; sign in manually first.")
         label = (await loc.get_attribute("aria-label")) or ""
         m = re.search(r"[\w.+-]+@[\w.-]+", label)
@@ -275,7 +282,7 @@ class MeetBrowser:
         deadline = time.monotonic() + timeout
         waiting_shot = False
         while time.monotonic() < deadline:
-            if await self.visible(S.LEAVE_CALL):
+            if await self.in_call():
                 await self._after_join()
                 return
             if await self.visible(S.DENIED_TEXT):
@@ -288,6 +295,26 @@ class MeetBrowser:
             await asyncio.sleep(1)
         await self.shot("join_timeout")
         raise JoinFailed(f"not in the call after {timeout:.0f}s (waiting for admission?)")
+
+    async def in_call(self) -> bool:
+        """In the call once the call's Leave control exists. Meet hides its toolbar while the mouse is idle (live
+        20 Oct: the bot was admitted but timed out waiting for a *visible* Leave button), so nudge the mouse and
+        also accept the control when it is attached but hidden, unless the lobby's waiting text is showing."""
+        try:
+            await self.page.mouse.move(random.randint(300, 900), random.randint(500, 700))
+        except Exception:
+            pass
+        if await self.visible(S.LEAVE_CALL):
+            return True
+        if await self.visible(S.WAITING_TEXT):
+            return False
+        for strat in S.LEAVE_CALL.strategies:
+            try:
+                if await locate(self.page, strat).count() > 0:
+                    return True
+            except Exception:
+                continue
+        return False
 
     # -- in call -------------------------------------------------------------------------------------------------
     async def enable_captions(self) -> bool:
@@ -325,7 +352,7 @@ class MeetBrowser:
             await self.page.mouse.move(random.randint(200, 900), random.randint(150, 500))
         except Exception:
             pass
-        return not await self.visible(S.LEAVE_CALL)
+        return not await self.in_call()
 
     async def leave(self) -> None:
         try:
