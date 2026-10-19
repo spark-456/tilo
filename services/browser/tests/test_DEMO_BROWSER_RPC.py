@@ -106,6 +106,19 @@ def test_DEMO_BROWSER_RPC_returns_target_box_and_masked_frame_for_each_action():
     assert engine.contexts[0].clicked == ["go"]
 
 
+def test_DEMO_BROWSER_RPC_inspect_button_without_input_type_uses_null():
+    from tilo_browser.session import BrowserSessions
+
+    app, _ = _app()
+    assert _start(app).status_code == 200
+    inspected = _post(
+        app, f"/sessions/{SESSION}/inspect", {"session": SESSION, "at": {"x": 210, "y": 60}}
+    )
+    assert inspected.status_code == 200
+    assert inspected.json()["facts"]["input_type"] is None
+    assert BrowserSessions._facts(node("button", "Search", id="go", type=""))["input_type"] is None
+
+
 def test_DEMO_BROWSER_RPC_stops_commit_and_password_entry():
     app, engine = _app()
     assert _start(app).status_code == 200

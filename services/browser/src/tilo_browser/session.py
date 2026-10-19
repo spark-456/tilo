@@ -157,7 +157,7 @@ class BrowserSessions:
             "tag": str(attrs.get("tag", "input" if role == "textbox" else role or "div")),
             "role": role,
             "name": mask_text(str(node.get("name", "")))[:120],
-            "input_type": attrs.get("type"),
+            "input_type": attrs.get("type") or None,
             "editable": role in ("textbox", "searchbox"),
             "secure": is_secure_node(node),
             "form_method": str(attrs.get("form_method", "none")).lower(),
