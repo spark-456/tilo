@@ -10,7 +10,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-it("R_LOADER_keeps_first_visit_covered_until_the_4_6_second_loop_and_app_are_ready", async () => {
+it("P0_PERF_releases_the_first_visit_cover_as_soon_as_the_app_is_ready", async () => {
   vi.useFakeTimers();
   document.body.innerHTML =
     '<div id="tilo-boot-cover"><img src="/loader/pool.webp"></div><div id="root" inert aria-hidden="true"></div>';
@@ -21,10 +21,6 @@ it("R_LOADER_keeps_first_visit_covered_until_the_4_6_second_loop_and_app_are_rea
   const root = document.getElementById("root") as HTMLElement;
   root.innerHTML = '<main data-boot-ready="true">Ready</main>';
   await Promise.resolve();
-  await vi.advanceTimersByTimeAsync(4599);
-  expect(document.getElementById("tilo-boot-cover")?.className).not.toContain("leaving");
-  expect(document.getElementById("root")?.hasAttribute("inert")).toBe(true);
-  await vi.advanceTimersByTimeAsync(1);
   expect(document.getElementById("tilo-boot-cover")?.className).toContain("leaving");
   expect(document.getElementById("root")?.hasAttribute("inert")).toBe(false);
 });

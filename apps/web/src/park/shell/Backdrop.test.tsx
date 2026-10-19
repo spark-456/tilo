@@ -28,6 +28,11 @@ const builds = () => sceneSpy.mock.calls.length;
 const opts = (call: unknown[] | undefined) =>
   call?.[0] as { w?: number; h?: number; night?: boolean; still?: boolean } | undefined;
 const spot = (x: number, y: number, area: number) => ({ x, y, area, st: "s" });
+const mountVisible = async (options?: Parameters<typeof mountApp>[0]) => {
+  const mounted = await mountApp(options);
+  await act(async () => seen.app.setPref("theme", "metropolis"));
+  return mounted;
+};
 const near = (got: readonly { x: number; y: number }[], want: readonly [number, number][]) => {
   expect(got).toHaveLength(want.length);
   want.forEach(([x, y], i) => {
@@ -37,8 +42,19 @@ const near = (got: readonly { x: number; y: number }[], want: readonly [number, 
 };
 
 describe("WEB_3b_backdrop: the city behind the page", () => {
-  it("WEB_3b_backdrop_the_scene_is_drawn_once_inside_an_aria_hidden_layer_with_nothing_to_click", async () => {
+  it("P0_PERF_skips_the_city_scene_when_the_opaque_studio_veil_covers_it", async () => {
     const { m } = await mountApp();
+    expect(qa(m.container, '[data-testid="fake-scene"]')).toHaveLength(0);
+    const before = builds();
+    await act(async () => seen.app.setPref("theme", "metropolis"));
+    expect(qa(m.container, '[data-testid="fake-scene"]')).toHaveLength(1);
+    await act(async () => seen.app.setPref("theme", "studio"));
+    expect(qa(m.container, '[data-testid="fake-scene"]')).toHaveLength(0);
+    expect(builds()).toBe(before + 1);
+  });
+
+  it("WEB_3b_backdrop_the_scene_is_drawn_once_inside_an_aria_hidden_layer_with_nothing_to_click", async () => {
+    const { m } = await mountVisible();
     expect(qa(m.container, '[data-testid="fake-scene"]')).toHaveLength(1);
     const layer = scene().closest('[aria-hidden="true"]') as HTMLElement;
     expect(layer).not.toBeNull();
@@ -47,7 +63,7 @@ describe("WEB_3b_backdrop: the city behind the page", () => {
   });
 
   it("WEB_3b_backdrop_a_theme_change_shows_a_night_scene_and_day_comes_back_from_the_cache", async () => {
-    const { m } = await mountApp();
+    const { m } = await mountVisible();
     const day = scene().getAttribute("data-build");
     expect(scene().getAttribute("data-night")).toBe("false");
     const before = builds();
@@ -63,7 +79,7 @@ describe("WEB_3b_backdrop: the city behind the page", () => {
   });
 
   it("WEB_3b_backdrop_night_is_asked_for_with_night_true_and_day_with_night_false", async () => {
-    const { m } = await mountApp();
+    const { m } = await mountVisible();
     await act(async () => click(q(m.container, 'button[aria-label="Switch to night"]')));
     const nights = sceneSpy.mock.calls.map((c) => opts(c)?.night);
     expect(nights).toContain(false);
@@ -71,7 +87,7 @@ describe("WEB_3b_backdrop: the city behind the page", () => {
   });
 
   it("WEB_3b_backdrop_unrelated_changes_never_redraw_the_city", async () => {
-    const { m } = await mountApp();
+    const { m } = await mountVisible();
     const start = builds();
     const build = scene().getAttribute("data-build");
     await act(async () => seen.app.decide("depot"));
@@ -84,7 +100,7 @@ describe("WEB_3b_backdrop: the city behind the page", () => {
 
   it("WEB_3b_backdrop_every_scene_asked_for_is_the_1600_by_1000_one_and_the_default_is_live", async () => {
     // WEB-MOTION-1: the city is live (still false) unless the person, the OS or the device says otherwise.
-    await mountApp();
+    await mountVisible();
     expect(sceneSpy.mock.calls.length).toBeGreaterThan(0);
     for (const c of sceneSpy.mock.calls) {
       expect(opts(c)).toMatchObject({ w: 1600, h: 1000 });
@@ -96,7 +112,7 @@ describe("WEB_3b_backdrop: the city behind the page", () => {
 describe("WEB_3b_pins: the scene's free spots become app.pins", () => {
   it("WEB_3b_pins_exact_spots_map_to_screen_space_and_follow_a_resize_without_a_redraw", async () => {
     sceneConfig.spots = [spot(1000, 420, 4), spot(820, 640, 4), spot(900, 250, 2)];
-    const { resize } = await mountApp({ viewport: { vw: 1440, vh: 900 } });
+    const { resize } = await mountVisible({ viewport: { vw: 1440, vh: 900 } });
     await act(async () => seen.app.setPref("motion", "calm")); // a key no other test has used, so it is drawn here
     near(seen.app.pins, [
       [900, 378],
@@ -115,7 +131,7 @@ describe("WEB_3b_pins: the scene's free spots become app.pins", () => {
 
   it("WEB_3b_pins_a_spot_that_is_too_small_is_skipped_and_a_spot_is_used_only_once", async () => {
     sceneConfig.spots = [spot(1000, 420, 3), spot(1010, 430, 4)];
-    await mountApp({ viewport: { vw: 1600, vh: 1000 } });
+    await mountVisible({ viewport: { vw: 1600, vh: 1000 } });
     await act(async () => seen.app.setPref("motion", "still"));
     // target 1 (min 4) takes the area-4 spot; target 2 (min 4) finds none and stays; target 3 (min 2) takes the area-3 spot
     near(seen.app.pins, [
@@ -127,7 +143,7 @@ describe("WEB_3b_pins: the scene's free spots become app.pins", () => {
 
   it("WEB_3b_pins_with_no_free_spot_the_three_targets_are_used", async () => {
     sceneConfig.spots = [];
-    await mountApp({ viewport: { vw: 1600, vh: 1000 } });
+    await mountVisible({ viewport: { vw: 1600, vh: 1000 } });
     await act(async () => seen.app.setPref("time", "night"));
     await act(async () => seen.app.setPref("motion", "calm"));
     near(seen.app.pins, [
@@ -139,7 +155,7 @@ describe("WEB_3b_pins: the scene's free spots become app.pins", () => {
 
   it("WEB_3b_pins_each_target_takes_the_nearest_free_spot", async () => {
     sceneConfig.spots = [spot(700, 700, 9), spot(995, 425, 9), spot(1100, 300, 9)];
-    await mountApp({ viewport: { vw: 1600, vh: 1000 } });
+    await mountVisible({ viewport: { vw: 1600, vh: 1000 } });
     await act(async () => seen.app.setPref("time", "night"));
     await act(async () => seen.app.setPref("motion", "still"));
     near(seen.app.pins, [
@@ -153,7 +169,7 @@ describe("WEB_3b_pins: the scene's free spots become app.pins", () => {
 // Last on purpose: it uses the day|calm key, which the pin tests above fill with their own spots first.
 describe("WEB_3b_motion: motion is part of the cache key", () => {
   it("WEB_3b_motion_a_motion_change_is_a_new_cache_key_and_the_first_comes_back_unchanged", async () => {
-    await mountApp();
+    await mountVisible();
     const calm = scene().getAttribute("data-build");
     await act(async () => seen.app.setPref("motion", "lively"));
     expect(scene().getAttribute("data-build")).not.toBe(calm);
