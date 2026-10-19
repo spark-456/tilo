@@ -99,21 +99,21 @@ Tilo is built around three ideas:
 3. **Agent teams run it.** The Director picks only the agents the job needs: a quick question gets one, a launch gets the whole crew. Each agent loads the expert skill it needs and uses tools through the connectors layer.
 4. **See it, steer it.** The work is drawn as a world and narrated in plain sentences. Anything that sends, shares or deletes goes through a gate. When it finishes you get the result, the cost and the trail behind it.
 
+What happens once the plan is approved and a step has to touch the outside world:
+
 ```mermaid
-%%{init: {"flowchart": {"nodeSpacing": 20, "rankSpacing": 28, "padding": 8}}}%%
+%%{init: {"flowchart": {"rankSpacing": 22, "nodeSpacing": 20, "padding": 6}}}%%
 flowchart LR
-    A["Describe<br/>the work"] --> B["Director<br/>plans, prices"]
-    B --> C{"You<br/>approve"}
-    C --> D["Agent teams<br/>run it"]
-    D --> E{"Side<br/>effect?"}
+    A["Agent<br/>teams<br/>run it"] --> E{"Side<br/>effect?"}
     E -- "no" --> I["Result and<br/>provenance"]
-    E -- "yes" --> F["Policy engine<br/>tier and level"]
-    F -- "needs a person" --> G["Gate: you<br/>approve"]
+    E -- "yes" --> F["Policy<br/>engine"]
     F -- "allowed" --> H["Outbox and<br/>connector"]
+    F -- "needs a<br/>person" --> G["Gate: you<br/>approve"]
     G --> H
     H --> I
-    I --> J["World, Story,<br/>Trace"]
 ```
+
+The World, Story and Trace views show every one of these steps as it is recorded.
 
 ## 🏙️ The world
 
@@ -158,16 +158,15 @@ The world is a display of facts, not a screensaver. These rules are enforced by 
 
 ```mermaid
 flowchart TD
-    O["Owner"] --> D["Director"]
+    O["Owner"] --- D["Director"]
     D --> L1["Lead: district A"]
     D --> L2["Lead: district B"]
+    TL["Human<br/>Team Lead"] -.-> L2
     L1 --> S1["Specialists"]
     L2 --> S2["Specialists"]
-    L2 -. "asks" .-> TL["Human Team Lead<br/>domain expert"]
-    S1 --> V["Verifier<br/>checks claims and numbers"]
-    S2 --> V
-    V --> W["Writer"]
-    W --> DD["Deliverables"]
+    V["Verifier"] -.-> L1
+    V -.-> L2
+    W["Writer"] --> DD["Deliverables"]
 ```
 
 | Role | Job |
@@ -265,13 +264,13 @@ Every request uses the same **card**: what happened (140 characters or fewer), w
 ### Autonomy levels and risk tiers
 
 ```mermaid
-flowchart LR
+flowchart TB
     A["Side effect proposed"] --> T{"Risk tier"}
     T -->|"T3 high"| G["Gate: ask a person"]
     T -->|"T1 or T2"| P{"Matching policy?"}
     P -->|"none or L1"| G
     P -->|"L2"| U["Run with an undo window"]
-    P -->|"L3"| R["Run and add to the daily digest"]
+    P -->|"L3"| R["Run and add to<br/>the daily digest"]
 ```
 
 | Level | Name | Behaviour |
