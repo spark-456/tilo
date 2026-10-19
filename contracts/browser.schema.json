@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/browser.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "BrowserConfig",
   "description": "config/browser.yaml (ADR-0051; FR-CON-07, FR-CON-08, PRD 12.3): the caps of the agentic browser, where a model looks at a screenshot of one isolated tilo-browser session and proposes one action at a time, and code decides (BR-01 to BR-14, browser.rules.md). The $defs hold the closed action set, the element facts the worker reports, the tilo-api to tilo-browser session bodies and the person's control body. Every key is required and no other key is allowed; the maxima are the safety ceiling, so config can only lower them.",
   "type": "object",
@@ -122,9 +122,32 @@
         "y": { "type": "integer", "minimum": 0, "maximum": 999 }
       }
     },
+    "target_box": {
+      "description": "CSS-pixel box of the action target; viewport for actions without an element target.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "integer", "minimum": 0 },
+        "y": { "type": "integer", "minimum": 0 },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "screenshot_artifact": {
+      "description": "Masked PNG bytes returned by the internal RPC for storage as a browser artifact; never a public URL.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mime_type", "sha256", "base64"],
+      "properties": {
+        "mime_type": { "const": "image/png" },
+        "sha256": { "$ref": "#/$defs/digest" },
+        "base64": { "$ref": "#/$defs/screenshot" }
+      }
+    },
     "action_kind": {
       "type": "string",
-      "enum": ["navigate", "click", "type", "scroll", "key", "back", "wait", "done", "ask"]
+      "enum": ["navigate", "click", "type", "scroll", "extract", "key", "back", "wait", "done", "ask"]
     },
     "action": {
       "description": "BR-01: the only things a model may propose. A proposal that does not validate is refused as invalid_action and still counts as a step.",
@@ -133,6 +156,7 @@
         { "$ref": "#/$defs/click_action" },
         { "$ref": "#/$defs/type_action" },
         { "$ref": "#/$defs/scroll_action" },
+        { "$ref": "#/$defs/extract_action" },
         { "$ref": "#/$defs/key_action" },
         { "$ref": "#/$defs/back_action" },
         { "$ref": "#/$defs/wait_action" },
@@ -179,6 +203,13 @@
         "kind": { "const": "scroll" },
         "direction": { "type": "string", "enum": ["up", "down"] }
       }
+    },
+    "extract_action": {
+      "description": "Read masked visible page text without changing the page.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "extract" } }
     },
     "key_action": {
       "type": "object",
@@ -384,6 +415,21 @@
       "then": { "properties": { "reason": { "type": "null" } } },
       "else": { "properties": { "reason": { "$ref": "#/$defs/reason" } } }
     },
+    "rpc_result": {
+      "description": "One successful start or action response. The screenshot artifact is masked before leaving tilo-browser.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session", "step", "kind", "url", "target_box", "screenshot_artifact", "text"],
+      "properties": {
+        "session": { "$ref": "#/$defs/session_id" },
+        "step": { "type": "integer", "minimum": 0, "maximum": 60 },
+        "kind": { "type": "string", "enum": ["start", "navigate", "click", "type", "scroll", "extract"] },
+        "url": { "$ref": "#/$defs/https_url" },
+        "target_box": { "$ref": "#/$defs/target_box" },
+        "screenshot_artifact": { "$ref": "#/$defs/screenshot_artifact" },
+        "text": { "type": "string", "maxLength": 20000 }
+      }
+    },
     "inspect_request": {
       "description": "tilo-api to tilo-browser POST /sessions/{session}/inspect, before any click, type or key (BR-03).",
       "type": "object",
@@ -401,7 +447,8 @@
       "properties": {
         "session": { "$ref": "#/$defs/session_id" },
         "facts": { "$ref": "#/$defs/facts" },
-        "digest": { "$ref": "#/$defs/digest" }
+        "digest": { "$ref": "#/$defs/digest" },
+        "target_box": { "$ref": "#/$defs/target_box" }
       }
     },
     "act_request": {

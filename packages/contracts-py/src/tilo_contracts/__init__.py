@@ -6,7 +6,7 @@
 # artifact.schema.json 1.3.0 sha256:dafce81fa75a5ed5
 # attention.schema.json 1.0.0 sha256:f35cff84728304af
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
-# browser.schema.json 1.0.0 sha256:196a0b328e45bf22
+# browser.schema.json 1.1.0 sha256:a92335a572619ef1
 # byok.schema.json 1.0.0 sha256:683d5d2b4fc8b0fe
 # calendar_entry.schema.json 1.1.0 sha256:291531543be88320
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
@@ -46,7 +46,7 @@
 # events/data/artifact.versioned.schema.json 1.0.0 sha256:b6ceac1481d2595b
 # events/data/assistant.asked.schema.json 1.0.0 sha256:8775120b73c4ed38
 # events/data/assistant.replied.schema.json 1.0.0 sha256:48fb513dadef290d
-# events/data/browser.acted.schema.json 1.0.0 sha256:3b55e5a09f00e387
+# events/data/browser.acted.schema.json 1.1.0 sha256:e4fcf23f19afd365
 # events/data/browser.controlled.schema.json 1.0.0 sha256:6b8442f6dbb88479
 # events/data/browser.started.schema.json 1.0.0 sha256:1bed13c81c886df2
 # events/data/browser.stopped.schema.json 1.0.0 sha256:8ae289ea75dfd6b5
@@ -423,7 +423,21 @@ class BrowserConfigPoint(BaseModel):
     y: Annotated[int, Field(ge=0, le=999)]
 
 
-type BrowserConfigActionKind = Literal["navigate", "click", "type", "scroll", "key", "back", "wait", "done", "ask"]
+class BrowserConfigTargetBox(BaseModel):
+    """
+    CSS-pixel box of the action target; viewport for actions without an element target.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    x: Annotated[int, Field(ge=0)]
+    y: Annotated[int, Field(ge=0)]
+    width: Annotated[int, Field(ge=1)]
+    height: Annotated[int, Field(ge=1)]
+
+
+type BrowserConfigActionKind = Literal["navigate", "click", "type", "scroll", "extract", "key", "back", "wait", "done", "ask"]
 
 
 class BrowserConfigNavigateAction(BaseModel):
@@ -456,6 +470,17 @@ class BrowserConfigScrollAction(BaseModel):
     )
     kind: Literal["scroll"]
     direction: Literal["up", "down"]
+
+
+class BrowserConfigExtractAction(BaseModel):
+    """
+    Read masked visible page text without changing the page.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["extract"]
 
 
 class BrowserConfigKeyAction(BaseModel):
@@ -600,6 +625,7 @@ class BrowserConfigInspectAnswer(BaseModel):
     session: BrowserConfigSessionId
     facts: BrowserConfigFacts
     digest: BrowserConfigDigest
+    target_box: BrowserConfigTargetBox | None = None
 
 
 class BrowserConfigCloseRequest(BaseModel):
@@ -5293,6 +5319,19 @@ class BrowserConfig(BaseModel):
     """
 
 
+class BrowserConfigScreenshotArtifact(BaseModel):
+    """
+    Masked PNG bytes returned by the internal RPC for storage as a browser artifact; never a public URL.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    mime_type: Literal["image/png"]
+    sha256: BrowserConfigDigest
+    base64: BrowserConfigScreenshot
+
+
 class BrowserConfigTypeAction(BaseModel):
     """
     Types text into the field at the point. submit true presses Enter after it, which BR-05 may treat as a commit.
@@ -5324,6 +5363,23 @@ class BrowserConfigOpenRequest(BaseModel):
     ]
     start_url: BrowserConfigHttpsUrl
     viewport: BrowserConfigViewport
+
+
+class BrowserConfigRpcResult(BaseModel):
+    """
+    One successful start or action response. The screenshot artifact is masked before leaving tilo-browser.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session: BrowserConfigSessionId
+    step: Annotated[int, Field(ge=0, le=60)]
+    kind: Literal["start", "navigate", "click", "type", "scroll", "extract"]
+    url: BrowserConfigHttpsUrl
+    target_box: BrowserConfigTargetBox
+    screenshot_artifact: BrowserConfigScreenshotArtifact
+    text: Annotated[str, Field(max_length=20000)]
 
 
 class ByokConfigRoleProfiles(BaseModel):
@@ -5789,6 +5845,8 @@ class BrowserActedData(BaseModel):
     masked: Annotated[int, Field(ge=0, le=1000)]
     blocked: Annotated[int, Field(ge=0)]
     frame: ArtifactRef | None
+    target_box: BrowserConfigTargetBox | None = None
+    caption: Annotated[str | None, Field(max_length=120, pattern="^[^\\r\\n]*$")] = None
 
 
 class BrowserStartedData(BaseModel):
@@ -7296,7 +7354,7 @@ class BriefAppliedPreference(BaseModel):
     citation: BriefCitation
 
 
-type BrowserConfigAction = BrowserConfigNavigateAction | BrowserConfigClickAction | BrowserConfigTypeAction | BrowserConfigScrollAction | BrowserConfigKeyAction | BrowserConfigBackAction | BrowserConfigWaitAction | BrowserConfigDoneAction | BrowserConfigAskAction
+type BrowserConfigAction = BrowserConfigNavigateAction | BrowserConfigClickAction | BrowserConfigTypeAction | BrowserConfigScrollAction | BrowserConfigExtractAction | BrowserConfigKeyAction | BrowserConfigBackAction | BrowserConfigWaitAction | BrowserConfigDoneAction | BrowserConfigAskAction
 """
 BR-01: the only things a model may propose. A proposal that does not validate is refused as invalid_action and still counts as a step.
 """
