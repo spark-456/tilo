@@ -43,7 +43,15 @@ for (const width of [1440, 390]) {
           ...list
             .getEntries()
             .filter((e) => !e.hadRecentInput)
-            .map((e) => e.value),
+            .map((e) => ({
+              value: e.value,
+              sources: (e.sources ?? []).map((s) => {
+                const node = s.node;
+                return node instanceof Element
+                  ? `${node.tagName.toLowerCase()}#${node.id}.${String(node.className).slice(0, 100)}`
+                  : "unknown";
+              }),
+            })),
         ),
       ).observe({ type: "layout-shift", buffered: true });
       const add = EventTarget.prototype.addEventListener;
@@ -171,7 +179,8 @@ for (const width of [1440, 390]) {
         longTasks: p.longTasks.length,
         postLoadLongTasks: post.length,
         maxPostLoadTaskMs: Math.max(0, ...post.map((t) => t.ms)),
-        cls: p.shifts.reduce((a, b) => a + b, 0),
+        cls: p.shifts.reduce((a, b) => a + b.value, 0),
+        layoutShifts: p.shifts,
         listenerAdds: p.adds,
         listenerRemoves: p.removes,
         reactCommits: p.commits,
