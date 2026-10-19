@@ -1115,3 +1115,18 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+/* RESPONSIVE: on a phone the bottom sheet's cards nest four deep (sheet, panel, body, section) and the list inside was
+   293px of a 358px sheet; each layer gives back some padding so the steps and the story read wider. */
+@media (max-width: 560px) {
+  [data-park] .park-world-panels {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+  [data-park] .park-world-panelbody {
+    padding: 12px 12px 16px;
+  }
+  [data-park] .park-world-section {
+    padding: 14px 14px 8px;
+  }
+}
