@@ -188,3 +188,22 @@ def test_DEMO_BROWSER_STEP_wikipedia_search_demo_records_navigation_then_read():
     assert rpc.calls == ["start", "navigate", "extract", "end"]
     assert [e[0] for e in run.events] == ["browser.started", "browser.acted", "browser.acted", "browser.stopped"]
     assert result.outputs[0].content == b"First. Second. Third."
+
+
+def test_DEMO_BROWSER_STEP_lost_service_records_a_valid_safe_stop():
+    from tilo_api.browser_step import BrowseStepExecutor
+
+    class LostRpc(FakeRpc):
+        def act(self, session, body):
+            raise SessionRefused("session_lost", 404)
+
+        def end(self, session):
+            raise SessionRefused("session_lost", 404)
+
+    run = FakeRun()
+    result = BrowseStepExecutor(run, LostRpc(), lambda goal, frame, text: {"kind": "extract"}).execute(
+        unit={"id": "U1", "district": "D1"}, agent="A_s1", building="B2", goal="Read", hosts=["example.org"]
+    )
+    assert not result.success
+    assert run.events[1][1]["reason"] == "engine_error"
+    assert run.events[-1][1]["outcome"] == "session_lost"

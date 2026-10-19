@@ -143,16 +143,19 @@ class BrowseStepExecutor:
                     )
                     return UnitOutcome(False, reason="The browser proposed an unsupported action.")
                 digest, target_name, target_box = None, "", None
-                if kind in ("click", "type"):
-                    found = self.rpc.inspect(session, action["at"])
-                    digest, target_name, target_box = found["digest"], found["facts"]["name"], found["target_box"]
                 try:
+                    if kind in ("click", "type"):
+                        found = self.rpc.inspect(session, action["at"])
+                        digest, target_name, target_box = (
+                            found["digest"], found["facts"]["name"], found["target_box"]
+                        )
                     last = self.rpc.act(
                         session,
                         {"session": session, "step": step, "action": action, "digest": digest, "outbox_id": None},
                     )
                 except SessionRefused as exc:
                     gated = exc.reason == "needs_person"
+                    event_reason = exc.reason if exc.reason in _SCHEMA["$defs"]["reason"]["enum"] else "engine_error"
                     self._record_refusal(
                         session,
                         step,
@@ -161,12 +164,12 @@ class BrowseStepExecutor:
                         building,
                         last,
                         kind,
-                        None if gated else exc.reason,
+                        None if gated else event_reason,
                         gated=gated,
                         box=target_box,
                         credits=charge,
                     )
-                    outcome = "needs_person" if gated else "error"
+                    outcome = "needs_person" if gated else "session_lost" if exc.reason == "session_lost" else "error"
                     return UnitOutcome(
                         False, reason="This browser action needs you." if gated else "The browser stopped safely."
                     )
@@ -211,7 +214,10 @@ class BrowseStepExecutor:
             return UnitOutcome(False, reason="The browser stopped before it had page text to summarize.")
         finally:
             if opened:
-                self.rpc.end(session)
+                try:
+                    self.rpc.end(session)
+                except SessionRefused as exc:
+                    outcome = "session_lost" if exc.reason == "session_lost" else "error"
                 if not getattr(self.run, "paused", lambda: False)():
                     self.run.put(
                         "browser.stopped",
