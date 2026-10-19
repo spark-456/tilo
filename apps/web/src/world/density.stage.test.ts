@@ -270,3 +270,27 @@ it("P0_PERF pauses a recorded world walk while the tab is hidden", () => {
   raf.mockRestore();
   cancel.mockRestore();
 });
+
+it("P0_PERF holds a static handoff note without a frame loop", () => {
+  setDensity("professional"); // the recorded handoff is placed instantly in this view
+  const raf = vi.spyOn(globalThis, "requestAnimationFrame");
+  let deliver: (event: Event) => void = () => undefined;
+  const stop = runClientWorld({
+    world: new Container(),
+    layout,
+    size: () => ({ width: 900, height: 600 }),
+    requestRender: () => undefined,
+    reducedMotion: () => false,
+    onSeq: () => undefined,
+    watch: (on) => {
+      for (const event of events.slice(0, 18)) on(event);
+      deliver = on;
+      return () => undefined;
+    },
+  });
+  const frames = raf.mock.calls.length;
+  deliver(events[18] as Event); // seq 19 is a recorded handoff with a held note
+  expect(raf.mock.calls.length).toBe(frames);
+  stop();
+  raf.mockRestore();
+});

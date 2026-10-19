@@ -230,15 +230,21 @@ function createLive(
   let hiddenAt: number | null = document.hidden ? performance.now() : null;
   let hiddenTotal = 0;
   let raf = 0;
+  let noteTimer: ReturnType<typeof setTimeout> | null = null;
+  const clearNoteTimer = () => {
+    if (noteTimer !== null) clearTimeout(noteTimer);
+    noteTimer = null;
+  };
   let dirtyWhileHidden = false;
   let resumeFrame = false;
   const onVisibility = () => {
     const now = performance.now();
     if (document.hidden) {
       hiddenAt ??= now;
-      resumeFrame ||= Boolean(raf);
+      resumeFrame ||= Boolean(raf || noteTimer);
       if (raf) cancelAnimationFrame(raf);
       raf = 0;
+      clearNoteTimer();
     } else if (hiddenAt !== null) {
       hiddenTotal += now - hiddenAt;
       hiddenAt = null;
@@ -326,6 +332,7 @@ function createLive(
     }
     talk.advance(now);
     const speaking = new Map<string, FrameAgent["say"]>();
+    let nextNoteFinish = Number.POSITIVE_INFINITY;
     for (const [id, list] of spoken) {
       const done = new Set(talk.completed(id));
       const left = list.filter((hold) => !done.has(hold.seq));
@@ -333,7 +340,7 @@ function createLive(
       const act = talk.active(id);
       const current = act ? left.find((hold) => hold.seq === act.seq) : undefined;
       if (current) speaking.set(id, current.say);
-      if (left.length > 0) busy = true; // a note still waiting for its turn or being read keeps the frames coming
+      if (act) nextNoteFinish = Math.min(nextNoteFinish, act.finish);
     }
     const shown: Frame = {
       ...lastFrame,
@@ -346,6 +353,16 @@ function createLive(
     renderAgents(layer, shown, display, litOf(layout.world_id));
     renderSelection(layer, lastFrame, display, selected(), litOf(layout.world_id));
     requestRender();
+    clearNoteTimer();
+    if (!busy && Number.isFinite(nextNoteFinish) && !stopped && !paused && !scrubbed) {
+      noteTimer = setTimeout(
+        () => {
+          noteTimer = null;
+          if (drawAgents(playTime()) && !raf) raf = requestAnimationFrame(tickAnim);
+        },
+        Math.max(0, nextNoteFinish - now),
+      );
+    }
     return busy;
   }
 
@@ -406,6 +423,7 @@ function createLive(
     if (stopped || point === null || !source.canScrub(state)) return;
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
+    clearNoteTimer();
     scrubbed ??= staticView(layer, o, source.events());
     scrubbed.show(point);
   };
@@ -420,6 +438,9 @@ function createLive(
       paused = state.status === "paused";
       onStatus(state.status);
       if (paused) {
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0;
+        clearNoteTimer();
         onSeq(state.seq);
         onTrace(state.trace);
         return;
@@ -509,6 +530,7 @@ function createLive(
       unreplay();
       scrubbed?.off();
       if (raf) cancelAnimationFrame(raf);
+      clearNoteTimer();
     },
   };
 }
