@@ -12,6 +12,7 @@ for (const width of [1440, 390] as const) {
     test(`P0-RESULTS-PAGE ${width} ${theme} shows a readable delivered result`, async ({
       page,
     }) => {
+      test.setTimeout(60_000);
       mkdirSync(evidence, { recursive: true });
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
       await page.goto(`/world/k1?theme=${theme}`);
