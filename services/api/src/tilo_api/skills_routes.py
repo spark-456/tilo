@@ -411,8 +411,8 @@ def _owned_skill(
 @router.put("/v1/skills/{skill_id}")
 def edit_skill_route(
     skill_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],  # SYS_SEC_05: sign-in before the body
     body: Annotated[SkillEditIn, Depends(json_body(SkillEditIn))],
-    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     store: Annotated[SkillStore, Depends(deps.get_skill_store)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
