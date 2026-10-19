@@ -110,7 +110,7 @@ it("P0_SKILLS_run_collects_required_inputs_and_submits_the_selected_skill", asyn
     />,
   );
   const button = [...m.container.querySelectorAll("button")].find(
-    (b) => b.textContent === "Run it",
+    (b) => b.textContent === "Run skill" || b.textContent === "Run it",
   );
   expect(button?.disabled).toBe(true);
   const field = m.container.querySelector<HTMLInputElement>('input[aria-label="Project brief"]');
@@ -156,7 +156,7 @@ it("P0_SKILLS_browser_tool_step_is_labeled_and_cannot_run", () => {
   );
   expect(m.container.textContent).toContain("Needs browser control (coming)");
   const button = [...m.container.querySelectorAll("button")].find(
-    (b) => b.textContent === "Run it",
+    (b) => b.textContent?.trim() === "Run skill", // AG-2 skills polish renamed "Run it"
   );
   expect(button?.disabled).toBe(true);
   act(() => button?.click());

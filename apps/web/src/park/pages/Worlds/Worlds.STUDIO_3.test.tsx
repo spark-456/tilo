@@ -51,6 +51,14 @@ const liveItem = (id: string, name: string, extra: Partial<World> = {}): World =
 });
 
 describe("STUDIO_3 Worlds: one town", () => {
+  it("P0_PERF_town_scene_uses_a_sized_webp_instead_of_runtime_vector_construction", async () => {
+    const { c } = await renderWorlds();
+    const image = c.querySelector<HTMLImageElement>(".park-worlds-town__scene img");
+    expect(image?.getAttribute("src")).toMatch(/worlds-town-day\.webp$/);
+    expect(image?.getAttribute("width")).toBe("1600");
+    expect(image?.getAttribute("height")).toBe("1000");
+  });
+
   it("STUDIO_3_worlds_your_town_counts_every_world_and_the_helpers_at_work", async () => {
     const { c } = await renderWorlds();
     const town = section(c, "Your town");

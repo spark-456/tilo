@@ -21,8 +21,12 @@ const QuizPage = lazy(() =>
     default: module.QuizPlayerPage,
   })),
 );
-// Preload large WorldPage module so Vite esbuild transform is ready
-const _preloadWorld = import("../pages/World/WorldPage");
+// Preload large page modules so Vite esbuild transform is ready
+await Promise.all([
+  import("../pages/Home/HomePage"),
+  import("../pages/World/WorldPage"),
+  import("../pages/Connectors/ConnectorsPage"),
+]);
 const AUDIT_PAGES = [...REAL_PAGES, "quiz"] as const;
 for (const width of [390, 1440]) {
   for (const page of AUDIT_PAGES) {
@@ -56,7 +60,7 @@ for (const width of [390, 1440]) {
           </main>
         </ParkProvider>,
       );
-      for (let attempt = 0; attempt < 150; attempt++) {
+      for (let attempt = 0; attempt < 300; attempt++) {
         await act(async () => {
           await new Promise((resolve) => setTimeout(resolve, 20));
         });

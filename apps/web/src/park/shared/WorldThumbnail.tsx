@@ -1,5 +1,5 @@
 import type { Layout, LayoutBuilding } from "@tilo/contracts";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { Plan, World } from "../api/types";
 import type { Plan as EnginePlan } from "../engines/types";
 import { cachedCity } from "../shell/cityCache";
@@ -193,7 +193,22 @@ export function WorldThumbnail({
   night: boolean;
   fallback?: ReactNode;
 }) {
-  const layout = useLayout(client, world.id);
+  const target = useRef<HTMLSpanElement>(null);
+  const [near, setNear] = useState(() => typeof IntersectionObserver === "undefined");
+  useEffect(() => {
+    if (near || !target.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setNear(true);
+        observer.disconnect();
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(target.current);
+    return () => observer.disconnect();
+  }, [near]);
+  const layout = useLayout(near ? client : null, world.id);
   const content = layout
     ? layoutArt(layout, night)
     : fallback || <SoftGradientTile world={world} />;
@@ -203,7 +218,7 @@ export function WorldThumbnail({
       ? "recorded"
       : `placeholder-${world.tier.toLowerCase()}`;
   return (
-    <span className="park-worldthumb" data-world-thumbnail={kind} aria-hidden="true">
+    <span ref={target} className="park-worldthumb" data-world-thumbnail={kind} aria-hidden="true">
       {content}
     </span>
   );
