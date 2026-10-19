@@ -10,6 +10,9 @@ import { Markdown } from "../../park/pages/World/markdown";
 import type { RunEvent } from "../../park/pages/World/useRunEvents";
 import type { ResultView } from "../../park/pages/World/useRunResult";
 import { DirectionForm } from "./DirectionForm";
+import { type DocBlock, type DocRun, readDocx } from "./docxPreview";
+
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 const readableMath = (text: string): string =>
   text.replace(/\$\\to\$/g, "→").replace(/\$([^$\n]+)\$/g, "$1");
@@ -49,12 +52,15 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
   const markdown = mime === "text/markdown" || format === "MD" || /\.md$/i.test(name);
   const plain = mime === "text/plain" || format === "TXT" || /\.txt$/i.test(name);
   const pdf = mime === "application/pdf" || format === "PDF" || /\.pdf$/i.test(name);
+  const docx = mime === DOCX_MIME || format === "DOCX" || /\.docx$/i.test(name);
   const image =
     mime?.startsWith("image/") ||
     /^(PNG|JPG|JPEG|WEBP|GIF)$/.test(format) ||
     /\.(png|jpe?g|webp|gif)$/i.test(name);
   const [text, setText] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [documentBlocks, setDocumentBlocks] = useState<DocBlock[] | null>(null);
+  const [documentError, setDocumentError] = useState(false);
   useEffect(() => {
     if (!csv && !html && !markdown && !plain) return;
     let active = true;
@@ -80,6 +86,31 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
     setImageUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [blob, format, image, pdf]);
+  useEffect(() => {
+    if (!docx) return;
+    let active = true;
+    setDocumentBlocks(null);
+    setDocumentError(false);
+    readDocx(blob).then(
+      (blocks) => {
+        if (active) setDocumentBlocks(blocks);
+      },
+      () => {
+        if (active) setDocumentError(true);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [blob, docx]);
+  const documentRuns = (runs: readonly DocRun[]) =>
+    runs.map((run, index) => {
+      const shown = readableMath(run.text);
+      const styled = run.italic ? <em>{shown}</em> : shown;
+      return (
+        <span key={`${index}:${run.text}`}>{run.bold ? <strong>{styled}</strong> : styled}</span>
+      );
+    });
   if (csv && text !== null) {
     const [head = [], ...body] = csvRows(text);
     return (
@@ -143,6 +174,47 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
         <img src={imageUrl} alt={name} />
       </div>
     );
+  if (docx && documentBlocks)
+    return (
+      <div className="park-world-resulttext tw-res-preview" data-testid="result-preview">
+        {documentBlocks.map((block, index) => {
+          if (block.kind === "table") {
+            const [head, ...rows] = block.rows;
+            return (
+              <table key={`table-${index}:${head?.join("|")}`}>
+                <thead>
+                  <tr>
+                    {head?.map((cell, column) => (
+                      <th key={`${column}:${cell}`}>{cell}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, rowIndex) => (
+                    <tr key={`${rowIndex}:${row.join("|")}`}>
+                      {row.map((cell, column) => (
+                        <td key={`${column}:${cell}`}>{cell}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            );
+          }
+          const content = documentRuns(block.runs);
+          const key = `${index}:${block.runs.map((run) => run.text).join("")}`;
+          if (block.level === 1) return <h3 key={key}>{content}</h3>;
+          if (block.level === 2) return <h4 key={key}>{content}</h4>;
+          if (block.level === 3) return <h5 key={key}>{content}</h5>;
+          return <p key={key}>{content}</p>;
+        })}
+      </div>
+    );
+  if (docx && documentError)
+    return (
+      <p className="park-world-noruns">Preview unavailable. Open or download this document.</p>
+    );
+  if (docx) return <p className="park-world-noruns">Loading preview…</p>;
   if ((csv || html || markdown || plain) && text === null)
     return <p className="park-world-noruns">Loading preview…</p>;
   if ((image || pdf) && !imageUrl) return <p className="park-world-noruns">Loading preview…</p>;
@@ -200,6 +272,7 @@ interface DeliveredFile {
 
 const OPEN_TYPES: Readonly<Record<string, string>> = {
   PDF: "application/pdf",
+  DOCX: DOCX_MIME,
   CSV: "text/csv",
   HTML: "text/html",
   MD: "text/markdown",
@@ -447,9 +520,11 @@ export function ResultTab({
         ? "CSV"
         : mime === "text/html"
           ? "HTML"
-          : mime?.startsWith("image/")
-            ? mime.slice(6).toUpperCase()
-            : "";
+          : mime === DOCX_MIME
+            ? "DOCX"
+            : mime?.startsWith("image/")
+              ? mime.slice(6).toUpperCase()
+              : "";
   const mainFormat =
     extension ||
     (declaredFormat !== "IN_APP" && declaredFormat !== "" ? declaredFormat : mimeFormat) ||

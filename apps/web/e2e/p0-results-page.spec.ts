@@ -43,3 +43,26 @@ for (const width of [1440, 390] as const) {
     });
   }
 }
+
+test("P0_RESULTS_docx_document_preview_renders_in_the_browser", async ({ page }) => {
+  test.setTimeout(60_000);
+  mkdirSync(evidence, { recursive: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/world/k1?docx=1");
+  await expect(page.getByTestId("park-page-world")).toBeVisible({ timeout: 30_000 });
+  await page.addScriptTag({ type: "module", url: "/e2e/support/p0ResultsHarness.tsx" });
+  const preview = page.getByTestId("result-preview");
+  await expect(preview.getByRole("heading", { name: "Decision brief" })).toBeVisible();
+  await expect(preview.locator("strong", { hasText: "option B" })).toBeVisible();
+  await expect(preview.getByRole("table")).toContainText("Cost");
+  expect(
+    await page
+      .getByTestId("result-visual-host")
+      .evaluate((host) => host.scrollWidth > host.clientWidth),
+  ).toBe(false);
+  await page.screenshot({
+    path: resolve(evidence, "390-light-docx.png"),
+    fullPage: true,
+    animations: "disabled",
+  });
+});

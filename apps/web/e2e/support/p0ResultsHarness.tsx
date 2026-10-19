@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import type { RunEvent } from "../../src/park/pages/World/useRunEvents";
 import { ResultTab } from "../../src/worldView/live/ResultTab";
+import { p0DocxBlob } from "../../test-support/p0DocxFixture";
 import "../../src/park/tokens/park.css";
 import "../../src/park/pages/World/World.css";
 import "../../src/worldView/live/live.css";
@@ -41,6 +42,17 @@ const recorded = [
 
 const text =
   "# Decision brief\n\nThe team recommends option B.\n\nMove $\\to$ the next review after approval.\n\n| Option | Cost |\n| --- | --- |\n| A | £12 |\n| B | £9 |";
+const docxRecorded: RunEvent[] = [
+  {
+    seq: 1,
+    type: "artifact.delivered",
+    ts: "2026-10-19T10:01:00.000Z",
+    credits: 0,
+    summary: "Decision document is ready.",
+    data: { artifact: { artifact_id: "main", label: "Decision.docx" }, format: "docx" },
+  },
+];
+const docx = new URLSearchParams(location.search).get("docx") === "1";
 const host = document.createElement("main");
 host.dataset.park = "";
 host.dataset.testid = "result-visual-host";
@@ -52,18 +64,26 @@ column.style.cssText = "max-width:860px;margin:0 auto;min-width:0";
 host.append(column);
 document.body.replaceChildren(host);
 createRoot(column).render(
-  <ResultTab
-    worldId="recorded-result"
-    events={recorded}
-    shared={{
-      view: {
-        status: "text",
-        blob: new Blob([text], { type: "text/markdown" }),
-        text,
-        kind: "markdown",
-        cut: false,
-      },
-      retry: () => undefined,
-    }}
-  />,
+  docx ? (
+    <ResultTab
+      worldId="recorded-document"
+      events={docxRecorded}
+      shared={{ view: { status: "file", blob: p0DocxBlob() }, retry: () => undefined }}
+    />
+  ) : (
+    <ResultTab
+      worldId="recorded-result"
+      events={recorded}
+      shared={{
+        view: {
+          status: "text",
+          blob: new Blob([text], { type: "text/markdown" }),
+          text,
+          kind: "markdown",
+          cut: false,
+        },
+        retry: () => undefined,
+      }}
+    />
+  ),
 );

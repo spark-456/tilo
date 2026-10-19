@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { p0DocxBlob } from "../../../test-support/p0DocxFixture";
 import { cleanup, mount } from "../../../test-support/park/componentsHarness";
 import type { Api } from "../../park/api";
 import { installResultReader } from "../../park/api/results";
@@ -240,6 +241,66 @@ describe("P0_RESULTS inline delivery", () => {
       </div>,
     );
     expect(types).toContain("application/pdf");
+  });
+
+  it("P0_RESULTS_previews_a_recorded_docx_as_a_readable_document", async () => {
+    const m = mount(
+      <div data-park="">
+        <ResultTab
+          worldId="w_document"
+          events={[delivered("docx", "Decision.docx")]}
+          shared={{
+            view: {
+              status: "file",
+              blob: p0DocxBlob(),
+            },
+            retry: () => undefined,
+          }}
+        />
+      </div>,
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+    expect(m.container.textContent).not.toContain("Preview unavailable");
+    const preview = m.container.querySelector('[data-testid="result-preview"]');
+    expect(preview?.querySelector("h3")?.textContent).toBe("Decision brief");
+    expect(preview?.querySelector("strong")?.textContent).toBe("option B");
+    expect(preview?.querySelector("table")?.textContent).toContain("Cost");
+  });
+
+  it("P0_RESULTS_previews_an_in_app_document_from_its_recorded_media_type", async () => {
+    const created = {
+      seq: 1,
+      type: "artifact.created",
+      ts: "2026-10-19T10:00:00.000Z",
+      summary: "Document made.",
+      item: { label: "Decision" },
+      data: {
+        artifact: { artifact_id: "art_main", version: 1 },
+        media_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      },
+    } as RunEvent;
+    const delivery = {
+      ...delivered("in_app", "The item"),
+      seq: 2,
+      data: { artifact: { artifact_id: "art_main", version: 1 }, format: "in_app" },
+    };
+    const m = mount(
+      <div data-park="">
+        <ResultTab
+          worldId="w_document"
+          events={[created, delivery]}
+          shared={{ view: { status: "file", blob: p0DocxBlob() }, retry: () => undefined }}
+        />
+      </div>,
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+    expect(m.container.querySelector('[data-testid="result-preview"] h3')?.textContent).toBe(
+      "Decision brief",
+    );
   });
 
   it("P0_RESULTS_preserves_a_recorded_unicode_filename", () => {
