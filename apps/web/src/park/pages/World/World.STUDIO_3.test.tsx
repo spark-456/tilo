@@ -181,8 +181,19 @@ describe("STUDIO_3 the World page of a live run", () => {
     const rig = await mountWorld({ id: "hires", api: api(), client });
     await emit(
       ...RUN(),
+      ev(
+        "artifact.created",
+        "The agent made an item.",
+        {
+          artifact: { artifact_id: "art_trip", version: 1 },
+          content_sha256: "0".repeat(64),
+          media_type: "text/markdown",
+          size_bytes: 28,
+        },
+        { item: { label: "Road trip" } } as Partial<RunEvent>,
+      ),
       ev("artifact.delivered", "The plan is ready in Tilo.", {
-        artifact: {},
+        artifact: { artifact_id: "art_trip", version: 1 },
         format: "in_app",
         outbox_id: null,
       }),
