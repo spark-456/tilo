@@ -28,6 +28,37 @@ const fileView = (text: string, type: string) => ({
 });
 
 describe("P0_RESULTS inline delivery", () => {
+  it("P0_RESULTS_uses_the_name_of_the_delivered_artifact_version", () => {
+    const created = {
+      seq: 1,
+      type: "artifact.created",
+      ts: "2026-10-19T10:00:00.000Z",
+      credits: 0,
+      summary: "Draft made.",
+      item: { label: "Draft.md" },
+      data: { artifact: { artifact_id: "art_main", version: 1 } },
+    } as RunEvent;
+    const versioned = {
+      ...created,
+      seq: 2,
+      type: "artifact.versioned",
+      item: { label: "Final.md" },
+      data: { artifact: { artifact_id: "art_main", version: 2 } },
+    } as RunEvent;
+    const delivery = {
+      ...delivered("in_app", "The item"),
+      seq: 3,
+      summary: "The item was delivered.",
+      data: { artifact: { artifact_id: "art_main", version: 2 }, format: "in_app" },
+    };
+    const m = mount(
+      <div data-park="">
+        <ResultTab worldId="w_versioned" events={[created, versioned, delivery]} />
+      </div>,
+    );
+    expect(m.container.querySelector("h2")?.textContent).toBe("Final.md");
+  });
+
   it("P0_RESULTS_keeps_delivery_event_details_out_of_the_result_page", () => {
     const m = mount(
       <div data-park="">

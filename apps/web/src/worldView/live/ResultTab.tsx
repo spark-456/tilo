@@ -234,14 +234,22 @@ function safeDeliverableName(raw: string): string | null {
 function recordedArtifact(
   events: readonly RunEvent[],
   id: string,
+  version?: number,
 ): { label: string | null; mediaType: string | null } {
-  const made = events.find((event) => {
-    const data = event.data as { artifact?: { artifact_id?: unknown } } | undefined;
+  const recorded = [...events].reverse();
+  const matches = (event: RunEvent, exactVersion: boolean) => {
+    const data = event.data as
+      | { artifact?: { artifact_id?: unknown; version?: unknown } }
+      | undefined;
     return (
       (event.type === "artifact.created" || event.type === "artifact.versioned") &&
-      data?.artifact?.artifact_id === id
+      data?.artifact?.artifact_id === id &&
+      (!exactVersion || data.artifact.version === version)
     );
-  });
+  };
+  const made =
+    recorded.find((event) => matches(event, true)) ??
+    recorded.find((event) => matches(event, false));
   const item = made as (RunEvent & { item?: { label?: unknown } }) | undefined;
   const data = made?.data as { media_type?: unknown } | undefined;
   return {
@@ -252,7 +260,7 @@ function recordedArtifact(
 
 function deliveredName(event: RunEvent, id: string, events: readonly RunEvent[]): string {
   const data = event.data as
-    | { artifact?: { label?: unknown }; format?: unknown; filename?: unknown }
+    | { artifact?: { label?: unknown; version?: unknown }; format?: unknown; filename?: unknown }
     | undefined;
   if (typeof data?.filename === "string" && data.filename.trim()) {
     const filename = safeDeliverableName(data.filename);
@@ -261,7 +269,8 @@ function deliveredName(event: RunEvent, id: string, events: readonly RunEvent[])
   const label = data?.artifact?.label;
   const cleanLabel = typeof label === "string" ? safeDeliverableName(label) : null;
   if (cleanLabel && cleanLabel !== id) return cleanLabel;
-  const recordedLabel = recordedArtifact(events, id).label;
+  const version = typeof data?.artifact?.version === "number" ? data.artifact.version : undefined;
+  const recordedLabel = recordedArtifact(events, id, version).label;
   if (recordedLabel) return recordedLabel;
   const fromSummary = event.summary.match(
     /^(?:The |Your )?(.+?) (?:is ready|was delivered)(?: in Tilo)?\.?$/i,
@@ -277,7 +286,9 @@ function deliveredName(event: RunEvent, id: string, events: readonly RunEvent[])
 function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
   const items: DeliveredFile[] = [];
   for (const e of events) {
-    const data = e.data as { artifact?: { artifact_id?: unknown }; format?: unknown } | undefined;
+    const data = e.data as
+      | { artifact?: { artifact_id?: unknown; version?: unknown }; format?: unknown }
+      | undefined;
     const id = data?.artifact?.artifact_id;
     if (
       e.type === "artifact.delivered" &&
@@ -290,7 +301,11 @@ function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
           id,
           name,
           format: typeof data?.format === "string" ? data.format : undefined,
-          mediaType: recordedArtifact(events, id).mediaType,
+          mediaType: recordedArtifact(
+            events,
+            id,
+            typeof data?.artifact?.version === "number" ? data.artifact.version : undefined,
+          ).mediaType,
         });
     }
   }
