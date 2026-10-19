@@ -144,7 +144,7 @@ export function AgentLayer({
             setChat(null);
             setTeam(true);
           }}
-          onChangeDirection={onChangeDirection}
+          {...(onChangeDirection ? { onChangeDirection } : {})}
         />
       ) : null}
       {facts.layout && !team && !opened ? (
@@ -159,6 +159,7 @@ export function AgentLayer({
           events={facts.events}
           rooms={rooms}
           onClose={() => setTeam(false)}
+          {...(onChangeDirection ? { onChangeDirection } : {})}
           onConvene={() => {
             setChat({ open: true, filter: "meeting" });
           }}

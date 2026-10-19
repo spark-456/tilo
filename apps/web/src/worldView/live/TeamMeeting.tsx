@@ -1,7 +1,7 @@
 // TILO-T-WORLD: "Convene team": a person calls a Lead (or the Director) and up to ROOM_MAX_AGENTS of its agents into the
 // Meeting Hall, asks them what they did and why, and can ask them to change direction. It is the existing meeting
 // room (ADR-0028): the stage walks them to the hall on meeting.convened and back on meeting.adjourned (events, not
-// this component); a change is only ever the confirmation of a proposal an agent made in a reply (MR-07).
+// this component); a direct direction change starts a new run through the existing rerun path.
 import type { Event } from "@tilo/contracts";
 import { useMemo, useState } from "react";
 import { Buddy, Icon } from "../../design/tilo-t";
@@ -20,6 +20,7 @@ export function TeamMeeting({
   rooms,
   onClose,
   onConvene,
+  onChangeDirection,
 }: {
   worldId: string;
   facts: WorldFacts;
@@ -27,6 +28,7 @@ export function TeamMeeting({
   rooms: RoomClient | null;
   onClose: () => void;
   onConvene?: (seat: Seat) => void;
+  onChangeDirection?: (instruction: string) => Promise<void>;
 }) {
   const layout = facts.layout;
   const heads = useMemo(
@@ -77,6 +79,7 @@ export function TeamMeeting({
           defaultTo={seat.lead}
           changeAsk
           autoConvene
+          {...(onChangeDirection ? { onChangeDirection } : {})}
         />
       </aside>
     );

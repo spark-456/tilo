@@ -67,8 +67,16 @@ function rig(initial = base(), postJson?: RoomClient["postJson"]) {
   return { client, calls, world };
 }
 
-async function open(r: ReturnType<typeof rig>) {
-  const m = mount(withClient(r.world.client, <AgentLayer worldId="w_live" rooms={r.client} />));
+async function open(
+  r: ReturnType<typeof rig>,
+  onChangeDirection?: (instruction: string) => Promise<void>,
+) {
+  const m = mount(
+    withClient(
+      r.world.client,
+      <AgentLayer worldId="w_live" rooms={r.client} onChangeDirection={onChangeDirection} />,
+    ),
+  );
   await settle();
   click(m.container.querySelector(".tw-convene") as Element);
   await settle();
@@ -95,9 +103,10 @@ describe("TILO-T-WORLD team meeting", () => {
     expect(m.container.textContent).toContain("Team meeting");
   });
 
-  it("'Ask them to change direction' puts a thinking-mode ask in the composer and sends it to the room", async () => {
+  it("P0_HALL_ASK_direction_starts_a_director_rerun_instead_of_only_sending_room_words", async () => {
     const r = rig();
-    const m = await open(r);
+    const redirect = vi.fn(async (_instruction: string) => {});
+    const m = await open(r, redirect);
     await submit(m.container.querySelector(".tw-team__form") as HTMLFormElement);
     await settle();
     const ask = [...m.container.querySelectorAll("button")].find((b) =>
@@ -105,18 +114,54 @@ describe("TILO-T-WORLD team meeting", () => {
     );
     click(ask as Element);
     const box = m.container.querySelector(
+      "textarea[aria-label='What should the team change?']",
+    ) as HTMLTextAreaElement;
+    expect(box).not.toBeNull();
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(
+        box,
+        "Focus on the supplier reply",
+      );
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await submit(m.container.querySelector(".tw-direction") as HTMLFormElement);
+    await settle();
+    expect(redirect).toHaveBeenCalledWith("Focus on the supplier reply");
+    expect(r.calls.some(([p]) => p.endsWith("/turns"))).toBe(false);
+  });
+
+  it("P0_HALL_ASK_pending_reply_shows_typing_then_a_plain_error", async () => {
+    let rejectTurn: (reason: unknown) => void = () => {};
+    const heldTurn = new Promise<unknown>((_, reject) => {
+      rejectTurn = reject;
+    });
+    const r = rig(
+      base(),
+      vi.fn(async (path: string) => (path.endsWith("/turns") ? heldTurn : room())),
+    );
+    const m = await open(r);
+    await submit(m.container.querySelector(".tw-team__form") as HTMLFormElement);
+    await settle();
+    const box = m.container.querySelector(
       "textarea[aria-label='Your question']",
     ) as HTMLTextAreaElement;
-    expect(box.value).toMatch(/different direction/);
-    const mode = [...m.container.querySelectorAll<HTMLSelectElement>(".tw-room__form select")].at(
-      -1,
-    );
-    expect(mode?.value).toBe("thinking");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(
+        box,
+        "What happened?",
+      );
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
     await submit(m.container.querySelector(".tw-room__form") as HTMLFormElement);
+    expect(m.container.querySelector(".tw-room__wait")?.textContent).toContain("answering");
+    await act(async () => {
+      rejectTurn(new TiloApiError("server error", 503, false, true, "store_unavailable"));
+    });
     await settle();
-    const turn = r.calls.find(([p]) => p.endsWith("/turns"));
-    expect(turn?.[1]).toMatchObject({ mode: "thinking" });
-    expect(String((turn?.[1] as { text: string }).text)).toMatch(/different direction/);
+    expect(m.container.querySelector(".tw-room__wait")).toBeNull();
+    expect(m.container.querySelector(".tw-room__err")?.textContent).toBe(
+      "The room's record is unavailable right now. Try again shortly.",
+    );
   });
 
   it("an open room of the person's own is closed first when the world allows one room at a time", async () => {
