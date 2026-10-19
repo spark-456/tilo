@@ -312,10 +312,7 @@ function createLive(
         walkFrom.set(id, walk);
       }
       const span = act.finish - act.start;
-      const t =
-        span > 0 && !calm()
-          ? Math.min(1, Math.max(0, (now - act.start) / span))
-          : 1;
+      const t = span > 0 && !calm() ? Math.min(1, Math.max(0, (now - act.start) / span)) : 1;
       const bob = walkBob(t, calm());
       display.set(id, {
         x: walk.from.x + (to.x - walk.from.x) * t,
@@ -481,8 +478,7 @@ function createLive(
           // A settle (a finished agent going to its post once the talk window has passed) is a walk too: the event
           // that closed the window is its recorded cause (TILO-T-WORLD).
           durationMs:
-            !calm() &&
-            (WALKS.has(event.type) || (event.actor !== a.id && stood !== stands))
+            !calm() && (WALKS.has(event.type) || (event.actor !== a.id && stood !== stands))
               ? Math.min(MOVE_DURATION_MS, MAX_DURATION_MS)
               : 0,
         });
