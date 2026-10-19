@@ -9,6 +9,7 @@ import type { SharedResult } from "../../park/pages/World/ResultPanel";
 import { Markdown } from "../../park/pages/World/markdown";
 import type { RunEvent } from "../../park/pages/World/useRunEvents";
 import type { ResultView } from "../../park/pages/World/useRunResult";
+import { type WebsiteArtifactVersion, WebsitePreview } from "../../results/WebsitePreview";
 import { DirectionForm } from "./DirectionForm";
 
 const readableMath = (text: string): string =>
@@ -318,6 +319,42 @@ function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
   return items;
 }
 
+function getWebsiteArtifact(
+  events: readonly RunEvent[],
+  mainItem: DeliveredFile,
+  _mainFormat: string,
+): WebsiteArtifactVersion | null {
+  const delivered = events.find((e) => e.type === "artifact.delivered");
+  const data = delivered?.data as
+    | { artifact?: { artifact_id?: unknown; version?: unknown }; format?: unknown }
+    | undefined;
+  const isWebsite = data?.format === "website" || mainItem.format === "website";
+  if (!isWebsite) return null;
+  const artifactId =
+    (typeof data?.artifact?.artifact_id === "string" ? data.artifact.artifact_id : null) ??
+    mainItem.id;
+  const version = typeof data?.artifact?.version === "number" ? data.artifact.version : 1;
+  const created = events.find(
+    (e) =>
+      (e.type === "artifact.created" || e.type === "artifact.versioned") &&
+      (e.data as { artifact?: { artifact_id?: unknown } })?.artifact?.artifact_id === artifactId,
+  );
+  const createdData = created?.data as
+    | { content_sha256?: unknown; media_type?: unknown }
+    | undefined;
+  const content_sha256 =
+    typeof createdData?.content_sha256 === "string" ? createdData.content_sha256 : "";
+  const media_type =
+    typeof createdData?.media_type === "string" ? createdData.media_type : "text/html";
+  return {
+    artifact_id: artifactId,
+    version,
+    title: mainItem.name || "website",
+    content_sha256,
+    media_type,
+  };
+}
+
 export interface ResultTabProps {
   readonly api?: Api;
   readonly worldId: string;
@@ -468,20 +505,46 @@ export function ResultTab({
       ? summary
       : "Ready to open or download.";
 
+  const websiteArtifact = mainItem ? getWebsiteArtifact(events, mainItem, mainFormat) : null;
+  const isWebsite = Boolean(websiteArtifact);
+  const openLabel = isWebsite ? "Open full screen" : "Open result";
+  const downloadLabel = isWebsite ? "Download as .html" : "Download";
+  const copyLabel = isWebsite ? "Copy link" : "Copy";
+
   const handleOpen = () => {
+    if (websiteArtifact) {
+      const fsBtn = document.querySelector<HTMLButtonElement>(
+        'button[aria-label="Open full screen"], button[aria-label="Exit full screen"]',
+      );
+      if (fsBtn) {
+        fsBtn.click();
+        return;
+      }
+    }
     if (blob && mainItem) openResult(openableBlob(blob, mainItem));
     else if (onOpen) onOpen();
   };
 
   const handleDownload = () => {
     if (blob) {
-      if (extension) saveNamedResult(blob, mainName);
-      else saveResult(blob, mainName);
+      if (isWebsite) {
+        const filename = mainName.endsWith(".html") ? mainName : `${mainName}.html`;
+        saveNamedResult(blob, filename);
+      } else if (extension) {
+        saveNamedResult(blob, mainName);
+      } else {
+        saveResult(blob, mainName);
+      }
     } else if (onDownload) onDownload();
   };
 
   const handleCopy = async () => {
     try {
+      if (isWebsite) {
+        await navigator.clipboard.writeText(window.location.href);
+        setActionStatus("Link copied");
+        return;
+      }
       const content =
         view?.status === "text"
           ? view.text
@@ -524,24 +587,48 @@ export function ResultTab({
           <h2 className="tw-res-title">{mainName}</h2>
           <p className="tw-res-summary">{mainSummary}</p>
 
-          {view ? (
+          {websiteArtifact ? (
+            <div className="tw-res-compat-body" data-testid="website-preview-wrapper">
+              <WebsitePreview
+                worldId={worldId}
+                artifact={websiteArtifact}
+                initialBlob={blob}
+                isSignedIn={true}
+              />
+            </div>
+          ) : view ? (
             <div className="tw-res-compat-body">
               <ResultBody view={view} retry={shared?.retry} name={mainName} format={mainFormat} />
             </div>
           ) : null}
 
           <div className="tw-res-actions">
-            <button type="button" className="tw-res-btn tw-res-btn--pri" onClick={handleOpen}>
+            <button
+              type="button"
+              className="tw-res-btn tw-res-btn--pri"
+              onClick={handleOpen}
+              aria-label={openLabel}
+            >
               <Icon name="eye" size={16} />
-              Open result
+              {openLabel}
             </button>
-            <button type="button" className="tw-res-btn tw-res-btn--sec" onClick={handleDownload}>
+            <button
+              type="button"
+              className="tw-res-btn tw-res-btn--sec"
+              onClick={handleDownload}
+              aria-label={downloadLabel}
+            >
               <Icon name="download" size={16} />
-              Download
+              {downloadLabel}
             </button>
-            <button type="button" className="tw-res-btn tw-res-btn--sec" onClick={handleCopy}>
-              <Icon name="copy" size={16} />
-              Copy
+            <button
+              type="button"
+              className="tw-res-btn tw-res-btn--sec"
+              onClick={handleCopy}
+              aria-label={copyLabel}
+            >
+              <Icon name={isWebsite ? "link" : "copy"} size={16} />
+              {copyLabel}
             </button>
             <button type="button" className="tw-res-btn tw-res-btn--sec" onClick={handleShare}>
               <Icon name="link" size={16} />
