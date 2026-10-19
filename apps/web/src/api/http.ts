@@ -807,6 +807,20 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     return this.request(path, { cache: "no-store" }, false, (response) => response.blob());
   }
 
+  /** Owner-only masked frame named by a recorded browser event. */
+  getBrowserFrame(worldId: string, artifactId: string): Promise<Blob> {
+    return this.getBlob(
+      `/worlds/${encodeURIComponent(worldId)}/browser/frames/${encodeURIComponent(artifactId)}`,
+    );
+  }
+
+  async stopBrowser(worldId: string, session: string): Promise<void> {
+    await this.post(
+      `/worlds/${encodeURIComponent(worldId)}/browser/${encodeURIComponent(session)}/stop`,
+      {},
+    );
+  }
+
   private async readPerson(path: string): Promise<unknown> {
     try {
       return await this.request<unknown>(path);
@@ -1038,7 +1052,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
   startAgain(worldId: string, direction?: string): Promise<{ world_id: string; task_id: string }> {
     return this.post(
       `/worlds/${encodeURIComponent(worldId)}/rerun`,
-      direction ? { direction } : {},
+      direction ? { direction } : undefined, // no body: a plain start-again
     );
   }
 

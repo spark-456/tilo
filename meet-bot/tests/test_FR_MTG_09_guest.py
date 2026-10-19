@@ -56,11 +56,19 @@ def test_FR_MTG_09_cloud_refuses_signed_in_profile_before_browser_start(monkeypa
     chromium.launch.assert_not_awaited()
 
 
-@pytest.mark.parametrize("account_present", [True, False])
-def test_FR_MTG_09_guest_never_uses_a_signed_in_account(monkeypatch, tmp_path, account_present):
+@pytest.mark.parametrize(
+    ("label", "refused"),
+    [
+        ("Google Account: Tilo Bot  (tilo.bot@example.com)", True),  # a signed-in account names its email
+        ("Sign in to your Google Account", False),  # MEET-GUEST: the unsigned pre-join page's own control (19 Oct)
+        (None, False),  # no account control at all
+    ],
+)
+def test_FR_MTG_09_guest_never_uses_a_signed_in_account(monkeypatch, tmp_path, label, refused):
     bot, *_ = fake_runtime(monkeypatch, tmp_path, guest=True)
-    bot.find = AsyncMock(return_value=object() if account_present else None)
-    if account_present:
+    control = None if label is None else SimpleNamespace(get_attribute=AsyncMock(return_value=label))
+    bot.find = AsyncMock(return_value=control)
+    if refused:
         with pytest.raises(NotLoggedIn):
             asyncio.run(bot.check_account())
     else:

@@ -9,5 +9,8 @@
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "base64": "https://example.org/image.png"
   },
-  "text": "Three public results"
+  "text": "Three public results",
+  "masked": 0,
+  "blocked": 0,
+  "login_required": false
 }

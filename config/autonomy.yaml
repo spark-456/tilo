@@ -48,6 +48,7 @@ actions:
   send_push: T1
   web_search: T1
   fetch_url: T1
+  browse_web: T1 # ADR-0052: reads allowlisted public pages in a recorded session; any commit step is gated separately
   create_draft: T1
   save_file: T1
   save_as_google_file: T1

@@ -1,0 +1,8 @@
+v: "1.0"
+max_sessions_per_world: 1
+max_steps: 12
+max_credits_per_session: 100
+step_timeout_s: 30
+idle_timeout_s: 120
+viewport: {width: 1200, height: 800}
+model_frames: 1

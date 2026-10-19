@@ -46,6 +46,8 @@ import "./Agenda.studio.css";
 
 // A plate row opens its meeting through the ref the API recorded; this names that ref kind once.
 const MEETING_REF = "meeting";
+// At or under this width the live week opens on one day (Agenda.css has the matching 600 px phone rules).
+const PHONE_WIDTH = 600;
 
 export interface AgendaPageProps {
   app: AppCtx;
@@ -340,6 +342,7 @@ function Plate({ A, api, app }: { A: LiveAgenda; api: Api; app: AppCtx }) {
         getJson={getJson}
         onMeetHere={meetHere}
         onDeleted={() => setPeopleKey((n) => n + 1)}
+        compact={app.vw <= PHONE_WIDTH}
       />
       <LivePinboards
         key={peopleKey}

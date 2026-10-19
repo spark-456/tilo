@@ -130,6 +130,7 @@
   background: var(--card);
   border: 1px solid var(--line2);
   border-radius: 22px;
+  box-shadow: var(--sh1);
 }
 [data-park] .park-team-members {
   padding: 14px 18px 6px;

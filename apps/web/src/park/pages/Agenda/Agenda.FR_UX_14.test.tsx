@@ -65,9 +65,12 @@ it("CX_PAGES_ENRICH_AGENDA_empty_calendar_keeps_grid_and_new_action", async () =
   expect(container.querySelector('[aria-label="Week calendar"]')).not.toBeNull();
   expect(container.querySelector('[aria-label="Week time slots"]')).not.toBeNull();
   expect(container.textContent).toContain("+ New");
-  // Restored old calendar markup: Month calendar replaces newer Mini month sidebar
-  const month = container.querySelector('[aria-label="Month calendar"]');
-  expect(month?.querySelectorAll(".park-agenda-monthday-btn").length).toBe(42);
+  // Google Calendar layout keeps Mini month sidebar, Today's calendar, and Calendar view switcher
+  const mini = container.querySelector('[aria-label="Mini month"]');
+  expect(mini?.querySelectorAll("button").length).toBe(42);
+  const today = container.querySelector('[aria-label="Today\'s calendar"]');
+  expect(today?.querySelector("h2")?.textContent).toBe("Today's calendar");
+  expect(today?.querySelector("a")?.textContent).toBe("Check Google Calendar");
   expect(container.querySelector('[aria-label="Calendar view"]')).not.toBeNull();
 });
 it("FR_UX_14 a failed plate read shows the existing error instead of sample pins", async () => {
