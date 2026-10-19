@@ -650,3 +650,9 @@
     font-size: 20px;
   }
 }
+
+/* RESPONSIVE: the four scenes size to their words (equal quarters of the 247px rail cut "Cosy room"). */
+[data-park] .park-chat-scene-controls .park-seg__item {
+  flex: 1 1 auto;
+  padding-inline: 6px;
+}
