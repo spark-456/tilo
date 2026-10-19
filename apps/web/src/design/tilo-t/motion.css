@@ -384,3 +384,60 @@
 [data-park] :is(.park-chat-quiet,.park-chat-new,.park-chat-history__turn,.park-connectors-action-btn,.park-team-btn,.park-team-select,.park-team-more,.park-profile-mopt,.park-profile-scene,.park-admin nav button,.park-skills-ask-opt,.park-worlds-dec__yes,.park-worlds-dec__open,.park-worlds-scale__btn){transition:none!important}
 }
 [data-park][data-motion="still"] :is(.park-chat-quiet,.park-chat-new,.park-chat-history__turn,.park-connectors-action-btn,.park-team-btn,.park-team-select,.park-team-more,.park-profile-mopt,.park-profile-scene,.park-admin nav button,.park-skills-ask-opt,.park-worlds-dec__yes,.park-worlds-dec__open,.park-worlds-scale__btn){transition:none!important}
+
+/* ---- Declutter: calm, gentle transitions (150ms-200ms) for interactive elements, respecting reduced motion ---- */
+[data-park] .park-card,
+[data-park] .park-sheet,
+[data-park] .park-btn,
+[data-park] .park-kpi,
+[data-park] .park-row,
+[data-park] .park-chip,
+[data-park] .park-pill,
+[data-park] .park-seg__item,
+[data-park] .park-home-composer,
+[data-park] .park-home-live,
+[data-park] .park-home-card,
+[data-park] .park-home-tray,
+[data-park] .park-home-chip,
+[data-park] .park-worlds-card,
+[data-park] .park-worlds-spot,
+[data-park] .park-team-card,
+[data-park] .park-connectors-tile,
+[data-park] .park-needs__card,
+[data-park] .park-ledger-card {
+  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, color 180ms ease, opacity 180ms ease, transform 180ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-park] .park-card,
+  [data-park] .park-sheet,
+  [data-park] .park-btn,
+  [data-park] .park-kpi,
+  [data-park] .park-row,
+  [data-park] .park-chip,
+  [data-park] .park-pill,
+  [data-park] .park-seg__item,
+  [data-park] .park-home-composer,
+  [data-park] .park-home-live,
+  [data-park] .park-home-card,
+  [data-park] .park-home-tray,
+  [data-park] .park-home-chip,
+  [data-park] .park-worlds-card,
+  [data-park] .park-worlds-spot,
+  [data-park] .park-team-card,
+  [data-park] .park-connectors-tile,
+  [data-park] .park-needs__card,
+  [data-park] .park-ledger-card {
+    transition: none !important;
+  }
+}
+
+/* ADR-0052: Tilo's browser cursor glides to each recorded browser.acted target (the move itself is an event). */
+.tilo-browser__cursor {
+  transition: left 0.38s ease, top 0.38s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tilo-browser__cursor {
+    transition: none;
+  }
+}

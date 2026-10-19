@@ -13,6 +13,7 @@ from tilo_logging import configure_logging as _configure_logging
 
 from tilo_api import appcheck as _appcheck
 from tilo_api import byok_routes as _byok_routes
+from tilo_api import browser_frames as _browser_frames
 from tilo_api import chat_routes as _chat_routes
 from tilo_api import connect_routes as _connect_routes
 from tilo_api import cors as _cors
@@ -173,6 +174,7 @@ _meeting_minutes_flag.configure_minutes_flag(_deps.get_flag_store())
 _owner_minutes_routes.install_owner_minutes_routes(app, _deps.get_flag_store())
 app.include_router(_quiz_apps.router)
 app.include_router(_results.router)
+app.include_router(_browser_frames.router)
 app.include_router(_connect_routes.router)
 app.include_router(_people_list_router)
 app.include_router(_people_teams_router)

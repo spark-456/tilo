@@ -180,7 +180,7 @@
 [data-park] .park-connectors-tile {
   background: var(--card);
   border: 1px solid var(--line2);
-  box-shadow: none;
+  box-shadow: var(--sh1);
   border-radius: 20px;
   padding: 16px;
   display: flex;

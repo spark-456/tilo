@@ -95,6 +95,7 @@
   border: 1px solid var(--line2);
   border-radius: 22px;
   background: var(--card);
+  box-shadow: var(--sh1);
 }
 [data-park] .park-ledger-card--chart {
   gap: 14px;

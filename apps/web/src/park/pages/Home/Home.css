@@ -917,16 +917,16 @@
   flex-direction: column;
   padding: 0;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line2);
   border-radius: 20px;
   background: var(--card);
-  box-shadow: var(--sh);
+  box-shadow: var(--sh1);
   color: var(--ink);
   text-align: left;
   cursor: pointer;
 }
 [data-park] .park-home-live:hover {
-  border-color: var(--lineStrong, var(--line));
+  border-color: var(--lineStrong, var(--line2));
 }
 [data-park] .park-home-live__art {
   position: relative;
@@ -1058,10 +1058,10 @@
   align-items: center;
   gap: 14px;
   padding: 18px 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line2);
   border-radius: 20px;
   background: var(--card);
-  box-shadow: var(--sh);
+  box-shadow: var(--sh1);
 }
 [data-park] .park-home-history__face {
   flex: none;
@@ -1116,10 +1116,10 @@
   flex-direction: column;
   gap: 8px;
   padding: 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line2);
   border-radius: 20px;
   background: var(--card);
-  box-shadow: var(--sh);
+  box-shadow: var(--sh1);
 }
 [data-park] .park-home-head {
   display: flex;
@@ -1143,10 +1143,11 @@
   height: 26px;
   padding: 0 8px;
   border-radius: 99px;
-  background: #f0a500;
-  color: #1f1d2b;
+  background: var(--amberSoft);
+  color: var(--amberInk);
+  border: 1px solid var(--amberLine);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 [data-park] .park-home-sr {
   position: absolute;
@@ -1288,9 +1289,10 @@
   flex-direction: column;
   gap: 10px;
   padding: 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line2);
   border-radius: 20px;
   background: var(--card);
+  box-shadow: var(--sh1);
   color: var(--ink);
   text-align: left;
   cursor: pointer;

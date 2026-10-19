@@ -6,11 +6,13 @@ import { useClient, useIsFixtureClient, useReplaySpeed } from "../api/ClientProv
 import { useStageMode } from "../display/stageMode";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { Stage } from "../stage/Stage";
+import { useReplayedLog } from "../world/replay";
 import { useRunStatus } from "../world/runLog";
 import type { RunStatus } from "../world/runSummary";
 import { speedBadgeText } from "../world/speed";
 import { useClientWorld } from "../world/useClientWorld";
 import type { WorldFixtureState } from "../world/useWorldFixture";
+import { BrowserPanel } from "../park/shared/BrowserPanel";
 import { LensFrame } from "./LensFrame";
 import { LoggedDock, ReplayDock } from "./ReplayDock";
 import { ReplayNotices } from "./ReplayNotices";
@@ -59,6 +61,7 @@ export function StageView({
   const stageWorld = fixture.active ? fixture : clientWorld;
   // FR-WLD-07: the stage is veiled only while the recorded run status is "paused" (HR-1).
   const clientStatus = useRunStatus(client, worldId);
+  const liveEvents = useReplayedLog(client, worldId).events;
   const paused = (fixture.active ? fixture.status : clientStatus) === "paused";
   const fixtureEvents = fixture.events;
   const fixtureSeq = fixture.seq;
@@ -120,6 +123,12 @@ export function StageView({
               paused={paused}
             />
           </div>
+          <BrowserPanel
+            client={client}
+            worldId={railWorld}
+            events={replayed ?? liveEvents}
+            replay={fixture.active || fixtureClient}
+          />
           {clientWorld.note ? (
             // Says what is true: the world is not drawn until the run has built one.
             <div
