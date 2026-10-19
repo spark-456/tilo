@@ -70,10 +70,11 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
   }, [blob, csv, html, markdown, plain]);
   useEffect(() => {
     if (!image && !pdf) return;
-    const imageType = image ? OPEN_TYPES[format] : undefined;
+    const previewType = OPEN_TYPES[format];
     const shown =
-      blob.type === "application/octet-stream" && imageType?.startsWith("image/")
-        ? new Blob([blob], { type: imageType })
+      blob.type === "application/octet-stream" &&
+      (previewType?.startsWith("image/") || previewType === "application/pdf")
+        ? new Blob([blob], { type: previewType })
         : blob;
     const url = URL.createObjectURL(shown);
     setImageUrl(url);

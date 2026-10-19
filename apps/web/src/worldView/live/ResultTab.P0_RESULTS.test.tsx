@@ -218,6 +218,30 @@ describe("P0_RESULTS inline delivery", () => {
     ).toBe("about:blank#pdf-preview");
   });
 
+  it("P0_RESULTS_pdf_preview_uses_recorded_type_when_download_is_generic", () => {
+    const types: string[] = [];
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, {
+        createObjectURL: vi.fn((blob: Blob) => {
+          types.push(blob.type);
+          return "about:blank#pdf-preview";
+        }),
+        revokeObjectURL: vi.fn(),
+      }),
+    );
+    mount(
+      <div data-park="">
+        <ResultTab
+          worldId="w_report"
+          events={[delivered("pdf", "Report.pdf")]}
+          shared={fileView("%PDF-1.4", "application/octet-stream")}
+        />
+      </div>,
+    );
+    expect(types).toContain("application/pdf");
+  });
+
   it("P0_RESULTS_preserves_a_recorded_unicode_filename", () => {
     const m = mount(
       <div data-park="">
