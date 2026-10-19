@@ -1,4 +1,4 @@
-import type { Event, RegisteredEvent } from "@tilo/contracts";
+import type { BrowserActedData, BrowserStartedData, BrowserStoppedData } from "@tilo/contracts";
 import { useEffect, useState } from "react";
 import type { TiloClient } from "../api/client";
 import "./BrowserPanel.css";
@@ -10,9 +10,10 @@ type FrameClient = TiloClient & {
 };
 
 type Cursor = { seq: number; x: number; y: number; caption: string };
+type BrowserEvent = { seq: number; type: string; data?: unknown; summary?: string };
 
 /** A browser frame or cursor is displayed only when its recorded event exists. */
-export function browserView(events: readonly Event[]): {
+export function browserView(events: readonly BrowserEvent[]): {
   frame: string | null;
   cursor: Cursor | null;
   session: string | null;
@@ -24,28 +25,32 @@ export function browserView(events: readonly Event[]): {
   let session: string | null = null;
   let stopped = false;
   let gated = false;
-  for (const source of events) {
-    const event = source as RegisteredEvent;
+  for (const event of events) {
+    if (!event.data || typeof event.data !== "object") continue;
     if (event.type === "browser.started") {
-      session = event.data.session;
-      frame = event.data.frame?.artifact_id ?? null;
+      const data = event.data as BrowserStartedData;
+      session = data.session;
+      frame = data.frame?.artifact_id ?? null;
       cursor = null;
       stopped = false;
       gated = false;
-    } else if (event.type === "browser.acted" && session === event.data.session) {
-      frame = event.data.frame?.artifact_id ?? frame;
-      const box = event.data.target_box;
-      if (event.data.verdict === "done" && box) {
+    } else if (event.type === "browser.acted") {
+      const data = event.data as BrowserActedData;
+      if (session !== data.session) continue;
+      frame = data.frame?.artifact_id ?? frame;
+      const box = data.target_box;
+      if (data.verdict === "done" && box) {
         cursor = {
           seq: event.seq,
           x: box.x + box.width / 2,
           y: box.y + box.height / 2,
-          caption: event.data.caption ?? event.summary,
+          caption: data.caption ?? event.summary ?? "Browser action",
         };
       }
-      if (event.data.verdict === "gated") gated = true;
-    } else if (event.type === "browser.stopped" && session === event.data.session) {
-      stopped = true;
+      if (data.verdict === "gated") gated = true;
+    } else if (event.type === "browser.stopped") {
+      const data = event.data as BrowserStoppedData;
+      if (session === data.session) stopped = true;
     }
   }
   return { frame, cursor, session, stopped, gated };
@@ -59,7 +64,7 @@ export function BrowserPanel({
 }: {
   client: TiloClient;
   worldId: string;
-  events: readonly Event[];
+  events: readonly BrowserEvent[];
   replay: boolean;
 }) {
   const view = browserView(events);

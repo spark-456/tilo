@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { BrowserPanel } from "../../../worldView/BrowserPanel";
 // The Park "World" page (STUDIO-3, design/studio-v2 "Tilo S World.dc.html"; first WEB-6 "Tilo App World.dc.html"):
 // one world. The title block with its progress and buttons, the run's status banner, then the city on the left and
 // the Story / Steps / Result tabs on the right (Story: what the team did, from the recorded events or the list's
@@ -856,6 +857,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
               </div>
             ) : null}
           </div>
+          {trackRun && worldClient ? (
+            <BrowserPanel client={worldClient} worldId={w.id} events={runEvents} replay={false} />
+          ) : null}
           {toastLine ? <MapToast line={toastLine} onReview={() => setTab("story")} /> : null}
           {trackRun && runEvents.length > 0 ? (
             <DeliveryDock

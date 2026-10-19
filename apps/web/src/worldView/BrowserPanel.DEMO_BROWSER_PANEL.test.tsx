@@ -22,5 +22,12 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
     expect(browserView([start, action]).cursor?.caption).toBe("Clicking Search");
     expect(browserView([start, action]).frame).toBe("art_second");
     expect(browserView([start, action, recorded(3, "browser.stopped", {})]).cursor?.seq).toBe(2);
+    const gated = recorded(3, "browser.acted", {
+      session: "bs_01K7M000000000000000000000",
+      verdict: "gated",
+      target_box: { x: 500, y: 500, width: 20, height: 20 },
+    });
+    expect(browserView([start, action, gated]).cursor?.seq).toBe(2);
+    expect(browserView([start, action, gated]).gated).toBe(true);
   });
 });
