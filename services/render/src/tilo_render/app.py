@@ -25,9 +25,6 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from tilo_render.docx import render_docx
-from tilo_render.pdf import render_pdf
-from tilo_render.pptx import render_pptx
 from tilo_render.spec import DeliverableSpec, RequestDeliverableSpec
 
 try:
@@ -102,9 +99,18 @@ def _no_nan_inf(_name: str) -> Any:
 
 
 def _default_renderer(spec: DeliverableSpec, fmt: Literal["pdf", "pptx", "docx"]) -> bytes:
+    # Each library loads on first use, so a cold start pays only for the format it was woken for.
     if fmt == "docx":
+        from tilo_render.docx import render_docx
+
         return render_docx(spec)
-    return render_pdf(spec) if fmt == "pdf" else render_pptx(spec)
+    if fmt == "pdf":
+        from tilo_render.pdf import render_pdf
+
+        return render_pdf(spec)
+    from tilo_render.pptx import render_pptx
+
+    return render_pptx(spec)
 
 
 def create_app(
