@@ -52,8 +52,11 @@ export function MeetingHostAccess({ flow }: { flow: ConnectFlow | null }) {
 
   const head = (
     <div className="park-connectors-sechead">
-      <span className="park-connectors-sectitle">Meeting host account</span>
-      <span className="park-connectors-count">Hosted meetings come from Tilo's own account.</span>
+      <span className="park-connectors-sectitle">Meeting host account (enterprise, optional)</span>
+      <span className="park-connectors-count">
+        Not needed to bring Tilo to a call: Tilo joins your own Meet as a guest. Enterprises can let
+        Tilo host meetings from its own Google account here.
+      </span>
     </div>
   );
   if (flow === null) {

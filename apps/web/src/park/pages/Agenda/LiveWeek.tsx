@@ -498,10 +498,7 @@ export function LiveWeek({
                       </button>
                     ) : (
                       <p>
-                        {hostConnection === "unknown"
-                          ? "Tilo could not confirm the meeting host. "
-                          : "Tilo's meeting host is not signed in. "}
-                        <AppLink to="/connectors">Sign in the meeting host</AppLink>
+                        Paste your Google Meet link in Meet with Tilo, and Tilo joins it as a guest.
                       </p>
                     )}
                     <button

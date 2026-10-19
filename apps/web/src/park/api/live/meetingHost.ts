@@ -13,7 +13,7 @@ import {
 } from "../../shared/hostMeetingRules";
 
 const ID = /^mt_[A-Za-z0-9_]{1,48}$/;
-const MEET = /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
+export const MEET = /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
 const bad = () => new TiloApiError("The meeting reply could not be read.", 200, false);
 const isObject = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -76,9 +76,10 @@ export function meetingHostApi(http: Pick<HttpClient, "getJson" | "postJson">) {
     async world(id: string): Promise<void> {
       await http.postJson(path(id, "world"), {});
     },
-    /** One request held open until the bot leaves (up to about 45 minutes). */
-    async attend(id: string): Promise<{ status: string; reason: string | null }> {
-      const r = await http.postJson(path(id, "attend"), {});
+    /** One request held open until the bot leaves (up to about 45 minutes). With `joinUrl` (MEET-GUEST) Tilo's guest
+     * bot goes to the person's own Google Meet and the host admits it: no meeting host account is involved. */
+    async attend(id: string, joinUrl?: string): Promise<{ status: string; reason: string | null }> {
+      const r = await http.postJson(path(id, "attend"), joinUrl ? { join_url: joinUrl } : {});
       if (!isObject(r) || r.id !== id || typeof r.status !== "string") throw bad();
       return {
         status: r.status,
