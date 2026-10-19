@@ -46,6 +46,9 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
   const mime = blob.type.split(";")[0]?.toLowerCase();
   const csv = mime === "text/csv" || format === "CSV" || /\.csv$/i.test(name);
   const html = mime === "text/html" || format === "HTML" || /\.html?$/i.test(name);
+  const markdown = mime === "text/markdown" || format === "MD" || /\.md$/i.test(name);
+  const plain = mime === "text/plain" || format === "TXT" || /\.txt$/i.test(name);
+  const pdf = mime === "application/pdf" || format === "PDF" || /\.pdf$/i.test(name);
   const image =
     mime?.startsWith("image/") ||
     /^(PNG|JPG|JPEG|WEBP|GIF)$/.test(format) ||
@@ -53,7 +56,7 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
   const [text, setText] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   useEffect(() => {
-    if (!csv && !html) return;
+    if (!csv && !html && !markdown && !plain) return;
     let active = true;
     blob
       .slice(0, 250_000)
@@ -64,13 +67,13 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
     return () => {
       active = false;
     };
-  }, [blob, csv, html]);
+  }, [blob, csv, html, markdown, plain]);
   useEffect(() => {
-    if (!image) return;
+    if (!image && !pdf) return;
     const url = URL.createObjectURL(blob);
     setImageUrl(url);
     return () => URL.revokeObjectURL(url);
-  }, [blob, image]);
+  }, [blob, image, pdf]);
   if (csv && text !== null) {
     const [head = [], ...body] = csvRows(text);
     return (
@@ -110,14 +113,33 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
         />
       </div>
     );
+  if (markdown && text !== null)
+    return (
+      <div className="tw-res-preview" data-testid="result-preview">
+        <Markdown text={readableMath(text)} />
+      </div>
+    );
+  if (plain && text !== null)
+    return (
+      <pre className="tw-res-preview park-world-resultpre" data-testid="result-preview">
+        {readableMath(text)}
+      </pre>
+    );
+  if (pdf && imageUrl)
+    return (
+      <div className="tw-res-preview" data-testid="result-preview">
+        <iframe title={`Preview of ${name}`} src={imageUrl} referrerPolicy="no-referrer" />
+      </div>
+    );
   if (image && imageUrl)
     return (
       <div className="tw-res-preview" data-testid="result-preview">
         <img src={imageUrl} alt={name} />
       </div>
     );
-  if ((csv || html || image) && text === null)
+  if ((csv || html || markdown || plain) && text === null)
     return <p className="park-world-noruns">Loading preview…</p>;
+  if ((image || pdf) && !imageUrl) return <p className="park-world-noruns">Loading preview…</p>;
   return <p className="park-world-noruns">Open or download this file to read it.</p>;
 }
 
@@ -179,8 +201,8 @@ const FORMAT_NAMES: Record<string, string> = {
 
 function safeDeliverableName(raw: string): string | null {
   const trimmed = raw.trim();
-  const cleaned = trimmed.replace(/[^\w\s.-]/g, "").replace(/\s+/g, " ");
-  return cleaned || null;
+  const cleaned = trimmed.replace(/[<>:"/\\|?*\p{Cc}]/gu, " ").replace(/\s+/g, " ");
+  return cleaned.slice(0, 80) || null;
 }
 
 function recordedArtifact(

@@ -26,6 +26,58 @@ const fileView = (text: string, type: string) => ({
 });
 
 describe("P0_RESULTS inline delivery", () => {
+  it("P0_RESULTS_previews_markdown_with_math_when_download_type_is_generic", async () => {
+    const m = mount(
+      <div data-park="">
+        <ResultTab
+          worldId="w_notes"
+          events={[delivered("md", "Notes.md")]}
+          shared={fileView("# Direction\nGo $\\to$ home.", "application/octet-stream")}
+        />
+      </div>,
+    );
+    await act(async () => {
+      for (let i = 0; i < 3; i++) await Promise.resolve();
+    });
+    expect(m.container.querySelector('[data-testid="result-preview"] h3')?.textContent).toBe(
+      "Direction",
+    );
+    expect(m.container.querySelector('[data-testid="result-preview"]')?.textContent).toContain(
+      "Go → home.",
+    );
+  });
+
+  it("P0_RESULTS_previews_a_pdf_inline", () => {
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, {
+        createObjectURL: vi.fn(() => "about:blank#pdf-preview"),
+        revokeObjectURL: vi.fn(),
+      }),
+    );
+    const m = mount(
+      <div data-park="">
+        <ResultTab
+          worldId="w_report"
+          events={[delivered("pdf", "Report.pdf")]}
+          shared={fileView("%PDF-1.4", "application/pdf")}
+        />
+      </div>,
+    );
+    expect(
+      m.container.querySelector<HTMLIFrameElement>('[data-testid="result-preview"] iframe')?.src,
+    ).toBe("about:blank#pdf-preview");
+  });
+
+  it("P0_RESULTS_preserves_a_recorded_unicode_filename", () => {
+    const m = mount(
+      <div data-park="">
+        <ResultTab worldId="w_budget" events={[delivered("csv", "Café ₹.csv")]} />
+      </div>,
+    );
+    expect(m.container.querySelector("h2")?.textContent).toBe("Café ₹.csv");
+  });
+
   it("P0_RESULTS_uses_the_recorded_artifact_name_for_in_app_files", async () => {
     const created = {
       seq: 1,
