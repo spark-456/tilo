@@ -557,3 +557,13 @@
     min-height: 40px;
   }
 }
+
+/* RESPONSIVE: on a 390px phone the page button gives back a few pixels so 'Needs you' and 'Connectors' keep their whole
+   name (the button's width is fixed, so no page change moves the tools). */
+@media (max-width: 430px) {
+  [data-park][data-theme="studio"] .park-shell__pagebtn {
+    gap: 2px;
+    padding: 0 2px 0 8px;
+    font-size: 14px;
+  }
+}
