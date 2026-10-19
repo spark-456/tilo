@@ -1,0 +1,13 @@
+{
+  "session": "bs_01JB7A0000000000000000BRW1",
+  "step": 2,
+  "kind": "extract",
+  "url": "https://example.org/search",
+  "target_box": {"x": 0, "y": 0, "width": 0, "height": 800},
+  "screenshot_artifact": {
+    "mime_type": "image/png",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base64": "iVBORw0KGgo="
+  },
+  "text": "Three public results"
+}
