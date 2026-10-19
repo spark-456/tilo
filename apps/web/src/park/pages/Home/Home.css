@@ -1467,6 +1467,9 @@
     overflow-x: hidden;
     box-sizing: border-box;
   }
+  [data-park] .park-home-top[role="status"] {
+    min-height: 180px;
+  }
   [data-park] .park-home-crew {
     display: none;
   }

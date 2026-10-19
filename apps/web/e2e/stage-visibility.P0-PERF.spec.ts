@@ -90,3 +90,34 @@ test("P0_PERF_reduced_motion_finishes_an_active_camera_pan", async ({ page }) =>
     })
     .toBe(-PAN_STEP_PX);
 });
+
+test("P0_PERF_stage_controls_hold_their_width_while_fonts_load", async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as typeof window & { __controlShifts: number[] }).__controlShifts = [];
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        const shift = entry as PerformanceEntry & {
+          hadRecentInput: boolean;
+          value: number;
+          sources?: { node?: Node }[];
+        };
+        if (
+          !shift.hadRecentInput &&
+          shift.sources?.some((source) =>
+            (source.node as Element | undefined)?.closest?.(".stage-controls"),
+          )
+        )
+          (window as typeof window & { __controlShifts: number[] }).__controlShifts.push(
+            shift.value,
+          );
+      }
+    }).observe({ type: "layout-shift", buffered: true });
+  });
+  await gotoRecordedStage(page);
+  await page.waitForTimeout(2000);
+  expect(
+    await page.evaluate(
+      () => (window as typeof window & { __controlShifts: number[] }).__controlShifts,
+    ),
+  ).toEqual([]);
+});
