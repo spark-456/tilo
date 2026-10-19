@@ -57,8 +57,22 @@ function preloadFonts(): Plugin {
   };
 }
 
+// @fontsource lists a .woff copy after every .woff2. Every browser this app supports reads woff2, so the build leaves
+// the .woff copies out: 50 files and about 0.75 MB less to upload and cache, and the font CSS gets shorter.
+function woff2Only(): Plugin {
+  return {
+    name: "tilo-woff2-only",
+    apply: "build",
+    enforce: "pre",
+    transform(code, id) {
+      if (!/\/@fontsource\/[^?]*\.css(\?|$)/.test(id)) return null; // Vite ids use forward slashes on every platform
+      return code.replace(/,\s*url\([^)]*\.woff\)\s*format\(['"]woff['"]\)/g, "");
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), preloadFonts(), buildStamp()],
+  plugins: [react(), preloadFonts(), buildStamp(), woff2Only()],
   define: { __TILO_BUILD_SHA__: JSON.stringify(BUILD_SHA) },
   build: {
     // Pixi (about 0.9 MB in two lazy chunks) is fetched after the landing page is interactive
