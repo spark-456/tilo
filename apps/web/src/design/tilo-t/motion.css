@@ -422,3 +422,13 @@
     transition: none !important;
   }
 }
+
+/* ADR-0052: Tilo's browser cursor glides to each recorded browser.acted target (the move itself is an event). */
+.tilo-browser__cursor {
+  transition: left 0.38s ease, top 0.38s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tilo-browser__cursor {
+    transition: none;
+  }
+}
