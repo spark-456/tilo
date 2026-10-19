@@ -121,3 +121,10 @@
     left: max(32px, calc((100vw - 1296px) / 2 + 8px));
   }
 }
+/* RESPONSIVE: on a phone or a tablet the strip is part of Home's page (the column already starts below it), so it scrolls
+   away with the greeting instead of staying pinned over the ask box and the cards as they pass under it. */
+@media (max-width: 840px) {
+  [data-park] .park-first-run-banner--home {
+    position: absolute;
+  }
+}

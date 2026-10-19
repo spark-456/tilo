@@ -544,10 +544,6 @@
   [data-park][data-theme="studio"] .park-shell__sample {
     min-height: 44px;
   }
-  [data-park][data-theme="studio"] .park-first-run-banner button {
-    width: 40px;
-    height: 40px;
-  }
   /* A text link in a footer or a sentence gets a taller line box, not a bigger look. */
   [data-park][data-theme="studio"] .park-home-legal a,
   [data-park][data-theme="studio"] .park-worlds-routines__how a,
@@ -565,5 +561,13 @@
     gap: 2px;
     padding: 0 2px 0 8px;
     font-size: 14px;
+  }
+}
+
+/* The sample strip's dismiss is 44px under 481px (sample.css); between there and a tablet or any coarse pointer it is 40px. */
+@media (min-width: 481px) and (max-width: 899px), (min-width: 481px) and (pointer: coarse) {
+  [data-park][data-theme="studio"] .park-first-run-banner button {
+    width: 40px;
+    height: 40px;
   }
 }
