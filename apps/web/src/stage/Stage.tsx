@@ -223,10 +223,15 @@ export function Stage({
       raf = 0;
       if (!active()) return;
       if (ease) {
-        const t = (performance.now() - ease.t0) / ease.ms;
-        cur = cam.easeCamera(ease.from, goal, t);
-        if (t >= 1) ease = null;
-        else raf = requestAnimationFrame(frame);
+        if (!msRef.current) {
+          cur = goal;
+          ease = null;
+        } else {
+          const t = (performance.now() - ease.t0) / ease.ms;
+          cur = cam.easeCamera(ease.from, goal, t);
+          if (t >= 1) ease = null;
+          else raf = requestAnimationFrame(frame);
+        }
       }
       draw();
     };

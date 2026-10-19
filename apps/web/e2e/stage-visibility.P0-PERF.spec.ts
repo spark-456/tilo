@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { CAMERA_PAN_MS } from "../src/stage/camera";
+import { CAMERA_PAN_MS, PAN_STEP_PX } from "../src/stage/camera";
 
 test.setTimeout(90_000);
 
@@ -73,4 +73,20 @@ test("P0_PERF_replay_dock_keeps_its_track_still_when_the_run_loads", async ({ pa
   expect(
     await page.evaluate(() => (window as typeof window & { __dockShifts: number[] }).__dockShifts),
   ).toEqual([]);
+});
+
+test("P0_PERF_reduced_motion_finishes_an_active_camera_pan", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await gotoRecordedStage(page);
+  await page.evaluate(() => {
+    document
+      .querySelector('[data-testid="stage-frame"]')
+      ?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+  });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect
+    .poll(async () => Number(await page.getByTestId("stage-frame").getAttribute("data-camera-x")), {
+      timeout: 150,
+    })
+    .toBe(-PAN_STEP_PX);
 });
