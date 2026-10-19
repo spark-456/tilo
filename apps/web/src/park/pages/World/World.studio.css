@@ -1071,3 +1071,47 @@
 [data-park][data-time="night"] .park-world-fade {
   background: linear-gradient(to bottom, transparent, var(--paper));
 }
+
+/* RESPONSIVE: the size chip in the title line had no style of its own (its glyph stood on its own line above the word);
+   beside the map the newest-line card and the level tag share the top edge, so the card is capped and the tag gives way
+   with an ellipsis instead of sitting under it. */
+[data-park] .park-world-sizechip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 99px;
+  background: var(--sunk);
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+[data-park] .park-world-sizechip svg {
+  flex: none;
+}
+@media (min-width: 761px) {
+  [data-park] .park-world-toast {
+    max-width: min(440px, calc(100% - 40px));
+  }
+  [data-park] .park-world-tag {
+    display: block;
+    max-width: calc(100% - 492px);
+    overflow: hidden;
+    line-height: 36px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* RESPONSIVE: the share dialogs scroll inside themselves on a short screen (a phone turned sideways) instead of running
+   past the top and bottom edges. */
+[data-park] .park-world-slackdialog {
+  box-sizing: border-box;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
