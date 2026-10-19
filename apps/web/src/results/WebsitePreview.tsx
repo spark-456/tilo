@@ -26,18 +26,86 @@ function safeFilename(title: string): string {
 export function WebsitePreview({
   worldId,
   artifact,
+  initialBlob,
+  isSignedIn: propIsSignedIn,
 }: {
   readonly worldId: string;
   readonly artifact: WebsiteArtifactVersion;
+  readonly initialBlob?: Blob | null;
+  readonly isSignedIn?: boolean;
 }) {
   const [html, setHtml] = useState<string | null>(null);
   const [fileBytes, setFileBytes] = useState<ArrayBuffer | null>(null);
   const [failure, setFailure] = useState<"load" | "hash" | "timeout" | "navigation" | null>(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isSignedIn, setIsSignedIn] = useState(propIsSignedIn ?? false);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+
+  const sectionRef = useRef<HTMLElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const htmlRef = useRef<string | null>(null);
   const writtenRef = useRef(false);
   const sentRef = useRef(false);
   const writtenTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (propIsSignedIn !== undefined) {
+      setIsSignedIn(propIsSignedIn);
+      return;
+    }
+    let active = true;
+    const checkAuth = async () => {
+      try {
+        const token = await authToken?.();
+        if (active) setIsSignedIn(Boolean(token));
+      } catch {
+        if (active) setIsSignedIn(false);
+      }
+    };
+    void checkAuth();
+    return () => {
+      active = false;
+    };
+  }, [propIsSignedIn]);
+
+  useEffect(() => {
+    const onFsChange = () => {
+      setIsFullScreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  const toggleFullScreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        if (sectionRef.current?.requestFullscreen) {
+          await sectionRef.current.requestFullscreen();
+        } else {
+          setIsFullScreen(true);
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else {
+          setIsFullScreen(false);
+        }
+      }
+    } catch {
+      setIsFullScreen((prev) => !prev);
+    }
+  };
+
+  const copyLink = async () => {
+    if (!isSignedIn) return;
+    try {
+      const link = window.location.href;
+      await navigator.clipboard.writeText(link);
+      setCopyStatus("Link copied");
+    } catch {
+      setCopyStatus("Copy unavailable");
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -51,22 +119,27 @@ export function WebsitePreview({
     htmlRef.current = null;
     const read = async (): Promise<void> => {
       try {
-        const token = await authToken?.();
-        const origin = API_URL?.replace(/\/+$/, "");
-        if (!origin || !token) throw new Error("unavailable");
-        const query = new URLSearchParams({
-          artifact: artifact.artifact_id,
-          version: String(artifact.version),
-        });
-        const response = await fetch(
-          `${origin}/worlds/${encodeURIComponent(worldId)}/result?${query.toString()}`,
-          { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
-        );
-        if (!response.ok) throw new Error("unavailable");
-        const content = await response.arrayBuffer();
+        let content: ArrayBuffer;
+        if (initialBlob) {
+          content = await initialBlob.arrayBuffer();
+        } else {
+          const token = await authToken?.();
+          const origin = API_URL?.replace(/\/+$/, "");
+          if (!origin || !token) throw new Error("unavailable");
+          const query = new URLSearchParams({
+            artifact: artifact.artifact_id,
+            version: String(artifact.version),
+          });
+          const response = await fetch(
+            `${origin}/worlds/${encodeURIComponent(worldId)}/result?${query.toString()}`,
+            { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
+          );
+          if (!response.ok) throw new Error("unavailable");
+          content = await response.arrayBuffer();
+        }
         const actual = bytesToHex(await crypto.subtle.digest("SHA-256", content));
         if (!active) return;
-        if (actual !== artifact.content_sha256.toLowerCase()) {
+        if (artifact.content_sha256 && actual !== artifact.content_sha256.toLowerCase()) {
           setFailure("hash");
           return;
         }
@@ -84,7 +157,7 @@ export function WebsitePreview({
       if (writtenTimeoutRef.current !== null) window.clearTimeout(writtenTimeoutRef.current);
       writtenTimeoutRef.current = null;
     };
-  }, [worldId, artifact.artifact_id, artifact.version, artifact.content_sha256]);
+  }, [worldId, artifact.artifact_id, artifact.version, artifact.content_sha256, initialBlob]);
 
   const sendPreview = useCallback(() => {
     const target = frameRef.current?.contentWindow;
@@ -145,7 +218,27 @@ export function WebsitePreview({
   };
 
   return (
-    <section aria-label="Website result">
+    <section
+      ref={sectionRef}
+      aria-label="Website result"
+      className={isFullScreen ? "tw-res-fullscreen" : undefined}
+      style={
+        isFullScreen
+          ? {
+              position: "fixed",
+              inset: 0,
+              zIndex: 9999,
+              background: "var(--bg-canvas, #ffffff)",
+              padding: "16px",
+              display: "flex",
+              flexDirection: "column",
+              boxSizing: "border-box",
+              width: "100vw",
+              height: "100vh",
+            }
+          : undefined
+      }
+    >
       <h2>{artifact.title}</h2>
       <p>Version {artifact.version}</p>
       {failure === "hash" ? <p role="alert">This file changed, so it is not shown</p> : null}
@@ -166,16 +259,42 @@ export function WebsitePreview({
           allow=""
           src={`${API_URL?.replace(/\/+$/, "")}/preview/website`}
           onLoad={loaded}
+          style={
+            isFullScreen ? { flex: 1, width: "100%", height: "100%", border: "none" } : undefined
+          }
         />
       ) : null}
-      <button
-        type="button"
-        aria-label="Download website"
-        disabled={fileBytes === null}
-        onClick={download}
-      >
-        Download
-      </button>
+      <div className="tw-res-actions">
+        <button
+          type="button"
+          aria-label={isFullScreen ? "Exit full screen" : "Open full screen"}
+          className="tw-res-btn tw-res-btn--pri"
+          onClick={toggleFullScreen}
+        >
+          {isFullScreen ? "Exit full screen" : "Open full screen"}
+        </button>
+        {isSignedIn ? (
+          <button
+            type="button"
+            aria-label="Copy link"
+            className="tw-res-btn tw-res-btn--sec"
+            onClick={copyLink}
+          >
+            Copy link
+          </button>
+        ) : null}
+        <button
+          type="button"
+          aria-label="Download website"
+          title="Download as .html"
+          className="tw-res-btn tw-res-btn--sec"
+          disabled={fileBytes === null}
+          onClick={download}
+        >
+          Download as .html
+        </button>
+      </div>
+      {copyStatus ? <output className="park-world-sub">{copyStatus}</output> : null}
     </section>
   );
 }
