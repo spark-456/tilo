@@ -17,6 +17,7 @@ const THINKING_TILO = ".thinking-tilo";
 afterEach(() => {
   vi.restoreAllMocks();
   cleanup();
+  Reflect.deleteProperty(document, "hidden");
   window.history.pushState({}, "", "/");
   Reflect.deleteProperty(window, "matchMedia");
 });
@@ -214,6 +215,22 @@ describe("RUN_INDICATOR bar: shown only while a recorded run is in progress", ()
     await poll(sch);
     expect(bar()).toBeNull();
     expect(sch.live().filter((t) => t.ms >= 5000)).toEqual([]);
+  });
+
+  it("P0_PERF_pauses_live_run_bar_polling_in_a_hidden_tab_and_refreshes_on_return", async () => {
+    const api = servedApi({ worlds: [w("a", "running")] });
+    const reads = vi.spyOn(api, "getWorlds");
+    const { sch } = await mountApp({ api });
+    expect(sch.live().some((t) => t.ms >= 5000)).toBe(true);
+    Object.defineProperty(document, "hidden", { configurable: true, value: true });
+    await act(async () => document.dispatchEvent(new Event("visibilitychange")));
+    expect(sch.live().filter((t) => t.ms >= 5000)).toEqual([]);
+    const before = reads.mock.calls.length;
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
+    await act(async () => document.dispatchEvent(new Event("visibilitychange")));
+    await settle();
+    expect(reads.mock.calls.length).toBe(before + 1);
+    expect(sch.live().some((t) => t.ms >= 5000)).toBe(true);
   });
 });
 
