@@ -64,12 +64,7 @@ describe("TW-5: Result tab and previews", () => {
     );
     await settle();
 
-    // 1. Delivered banner
-    const banner = m.container.querySelector('[data-testid="delivered-banner"]');
-    expect(banner?.textContent).toContain("Delivered to the Dock");
-    expect(banner?.textContent).toContain("artifact.delivered");
-
-    // 2. Main card
+    // Main card
     const mainCard = m.container.querySelector('[data-testid="run-result"]');
     expect(mainCard).not.toBeNull();
     expect(mainCard?.textContent).toContain("Porto offsite plan");
@@ -87,8 +82,10 @@ describe("TW-5: Result tab and previews", () => {
     downloadBtn?.click();
     expect(onDownload).toHaveBeenCalled();
 
-    const shareBtn = m.container.querySelectorAll<HTMLButtonElement>(".tw-res-btn--sec")[1];
-    shareBtn?.click();
+    const shareBtn = [...m.container.querySelectorAll<HTMLButtonElement>(".tw-res-btn--sec")].find(
+      (button) => button.textContent?.trim() === "Share",
+    );
+    act(() => shareBtn?.click());
     expect(onShare).toHaveBeenCalled();
 
     // R-RESULT deliberately replaces the sample preview cards with only recorded deliverables.
@@ -96,7 +93,7 @@ describe("TW-5: Result tab and previews", () => {
     expect(m.container.textContent).toContain("Offsite budget.xlsx");
     expect(m.container.textContent).not.toContain("Kickoff deck");
 
-    // 4. Folded Working Files
+    // Folded Working Files
     const files = m.container.querySelector<HTMLDetailsElement>(
       'details[data-testid="working-files"]',
     );
@@ -104,13 +101,7 @@ describe("TW-5: Result tab and previews", () => {
     expect(files?.open).toBe(false);
     expect(files?.textContent).toContain("Offsite budget.xlsx");
 
-    // 5. Where it was made
-    const made = m.container.querySelector('[data-testid="where-it-was-made"]');
-    expect(made).not.toBeNull();
-    expect(made?.textContent).toContain("WHERE IT WAS MADE");
-    expect(made?.textContent).toContain("Tilo");
-    expect(made?.textContent).toContain("Other services coming later");
-    expect(made?.textContent).not.toContain("Canva");
+    expect(m.container.textContent).not.toContain("artifact.delivered");
   });
 
   it("does not render working files when only a single deliverable was produced", async () => {

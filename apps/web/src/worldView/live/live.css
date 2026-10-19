@@ -1591,7 +1591,7 @@
 
 [data-park] .tw-res-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin-top: 4px;
 }
@@ -1624,6 +1624,49 @@
 
 [data-park] .tw-res-compat-body {
   margin-top: 8px;
+}
+
+[data-park] .tw-res-preview {
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--line2, #dedbe5);
+  border-radius: 12px;
+  background: var(--sunk, #eeeeeb);
+}
+
+[data-park] .tw-res-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+[data-park] .tw-res-preview th,
+[data-park] .tw-res-preview td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line2, #dedbe5);
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+[data-park] .tw-res-preview iframe {
+  display: block;
+  width: 100%;
+  height: 360px;
+  border: 0;
+  background: white;
+}
+
+[data-park] .tw-res-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 400px;
+  margin: auto;
+}
+
+@media (max-width: 600px) {
+  [data-park] .tw-res-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 [data-park] .tw-res-also {
@@ -2101,6 +2144,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--ink, #0b0b0c);
+}
+
+@media (max-width: 600px) {
+  [data-park] .tw-res-files__item {
+    padding-block: 8px;
+  }
+
+  [data-park] .tw-res-files__name {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }
 
 [data-park] .tw-res-files__who {

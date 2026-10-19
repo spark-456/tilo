@@ -183,6 +183,7 @@ TEAM_PUT_ROUTES = {
     "limit": "/v1/team/members/u_priya/limit",
     "switch": "/v1/team/switches/weekend",
     "tool": "/v1/team/tools/gmail",
+    "edit skill": "/v1/skills/tsk_missing",  # P0-SKILLS: the skill edit reads its body through json_body's cap
 }
 
 
@@ -298,7 +299,10 @@ def test_PPL_11c_s4_BQ_PPL11C_1_every_put_and_patch_write_route_is_covered(peopl
     templates = [
         t
         for t, methods in rig.app.openapi()["paths"].items()
-        if any(m in methods for m in ("put", "patch")) and t.startswith("/v1/")
+        if any(m in methods for m in ("put", "patch"))
+        and t.startswith("/v1/")
+        # P0-CHAT-FUNCTIONS: the chat-history PUT checks its own 64 KB cap in chat_routes.put_chat (413 chat_too_large)
+        and t != "/v1/me/chats/{chat_id}"
     ]
     patterns = {t: re.compile("^" + re.sub(r"\{[^/}]+\}", "[^/]+", t) + "$") for t in templates}
     all_covered = [

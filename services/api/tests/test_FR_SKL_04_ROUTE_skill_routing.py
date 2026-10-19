@@ -84,6 +84,15 @@ def taught(skill_id, owner, name, scope=("just_me", None), status="learning"):
     }  # fmt: skip
 
 
+def test_P0_SKILLS_catalog_flags_browser_work_even_after_the_first_three_steps():
+    from tilo_api.skills_route import taught_entries
+
+    skill = taught("tsk_later_browser", PRIYA, "Site research")
+    skill["plan"] = [*skill["plan"] * 3, {**skill["plan"][0], "text": "Open the supplier website"}]
+    entry = taught_entries([skill], PRIYA)[0]
+    assert entry["needs_browser_control"] is True
+
+
 @pytest.fixture(autouse=True)
 def fresh_cache():
     from tilo_api import skills_route  # noqa: PLC0415

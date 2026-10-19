@@ -182,7 +182,11 @@ class MeetBrowser:
     async def check_account(self) -> None:
         """Refuse an unreadable or different account before joining; never log account labels."""
         if self.guest:
-            if await self.find(S.ACCOUNT_BUTTON, 1) is not None:
+            # An unsigned pre-join page also carries a "Google Account" control (its sign-in link), so only an
+            # account label that names an email means the browser is signed in (live false refusal, 19 Oct).
+            loc = await self.find(S.ACCOUNT_BUTTON, 1)
+            label = ((await loc.get_attribute("aria-label")) or "") if loc is not None else ""
+            if re.search(r"[\w.+-]+@[\w.-]+", label):
                 raise NotLoggedIn("Guest mode must use an unsigned ephemeral browser.")
             return
         if not self.cfg.bot_email:

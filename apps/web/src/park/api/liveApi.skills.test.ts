@@ -223,7 +223,7 @@ describe("SKILLS_3_saveSkill: POST /v1/skills", () => {
   it("SKILLS_3_saveSkill_posts_the_draft_as_plan_steps_and_acks_on_201", async () => {
     const spy = vi.fn(async (_u: unknown, _i?: RequestInit) => json(row(), 201));
     const r = await live(spy).saveSkill(draft());
-    expect(r).toEqual({ data: { ok: true }, source: "live" });
+    expect(r).toMatchObject({ data: { ok: true }, source: "live" }); // P0-SKILLS: the ack also carries the new id
     expect(String(spy.mock.calls[0]?.[0])).toBe(`${BASE}/v1/skills`);
     expect(spy.mock.calls[0]?.[1]?.method).toBe("POST");
     const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));

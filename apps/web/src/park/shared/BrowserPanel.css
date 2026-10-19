@@ -1,0 +1,71 @@
+.tilo-browser {
+  border: 1px solid #c7d7e7;
+  border-radius: 14px;
+  background: #f7fbff;
+  padding: 12px;
+  color: #17334c;
+}
+.tilo-browser__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.tilo-browser__header div {
+  display: flex;
+  gap: 6px;
+}
+.tilo-browser__header button {
+  border: 1px solid #9bb9ce;
+  background: white;
+  border-radius: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.tilo-browser__header button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.tilo-browser__screen {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #eaf1f7;
+}
+.tilo-browser__screen img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+.tilo-browser__screen p {
+  margin: 12px;
+}
+.tilo-browser__cursor {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #56a8dbb8;
+  box-shadow: 0 0 0 4px #2089ca55;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.tilo-browser__cursor span {
+  position: absolute;
+  left: 20px;
+  top: 14px;
+  background: #17334c;
+  color: white;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.tilo-browser__caption {
+  margin: 9px 0 0;
+  font-size: 13px;
+}

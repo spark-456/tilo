@@ -9,7 +9,74 @@ import { type CurrencyCode, runMoney } from "../../app/ledgerKpis";
 import { handDraft } from "../../chat/handoff";
 import { Button } from "../../components";
 import { cx } from "../../components/cx";
+import { BookOpen, Globe2, Mail, PenLine } from "../../shared/icons";
 import { agent, icon } from "./skillsKit";
+
+export type StepType = "browse" | "read" | "write" | "email";
+
+export function stepTypeOf(
+  stepText: string,
+  detail?: { tool?: string; action?: string; verb?: string },
+): StepType {
+  const tool = (detail?.tool ?? "").toLowerCase();
+  const action = (detail?.action ?? "").toLowerCase();
+  const verb = (detail?.verb ?? "").toLowerCase();
+  const text = stepText.toLowerCase();
+
+  if (
+    tool.includes("mail") ||
+    tool.includes("email") ||
+    tool.includes("gmail") ||
+    action.includes("mail") ||
+    action.includes("email") ||
+    action.includes("send_email") ||
+    verb.includes("email") ||
+    verb.includes("mail") ||
+    /\b(?:email|emails|gmail|inbox|send email|draft email|mail)\b/i.test(text)
+  ) {
+    return "email";
+  }
+
+  if (
+    tool.includes("browser") ||
+    action.includes("browse") ||
+    action.includes("navigate") ||
+    action.includes("scrape") ||
+    verb.includes("browse") ||
+    /\b(?:browse|website|webpage|browser|url|http|navigate|open tab|search web)\b/i.test(text)
+  ) {
+    return "browse";
+  }
+
+  if (
+    tool.includes("writer") ||
+    action.includes("write") ||
+    action.includes("compose") ||
+    action.includes("draft") ||
+    action.includes("generate") ||
+    verb.includes("write") ||
+    /\b(?:write|compose|draft|create|generate|summary|summarise|outline|reply|plan|report)\b/i.test(
+      text,
+    )
+  ) {
+    return "write";
+  }
+
+  return "read";
+}
+
+function StepTypeIcon({ type }: { type: StepType }) {
+  switch (type) {
+    case "browse":
+      return <Globe2 size={16} aria-hidden="true" />;
+    case "read":
+      return <BookOpen size={16} aria-hidden="true" />;
+    case "write":
+      return <PenLine size={16} aria-hidden="true" />;
+    case "email":
+      return <Mail size={16} aria-hidden="true" />;
+  }
+}
 
 export type Shown = Skill["st"] | "paused";
 
@@ -42,6 +109,11 @@ export interface DrawerProps {
   pauseOff: string;
   onTeach: () => void;
   onClose: () => void;
+  onRun?:
+    | ((skill: Skill, values: Record<string, string>, files: File[]) => Promise<void> | void)
+    | undefined;
+  onEdit?: ((skill: Skill, name: string, steps: string[]) => Promise<void>) | undefined;
+  onDelete?: ((skill: Skill) => Promise<void>) | undefined;
   /** The step-fix form (a live owned skill), placed under the steps. */
   fix?: ReactNode;
 }
@@ -55,17 +127,48 @@ export function SkillDrawer({
   pauseOff,
   onTeach,
   onClose,
+  onRun,
+  onEdit,
+  onDelete,
   fix,
 }: DrawerProps) {
   const title = useId();
   const close = useRef<HTMLButtonElement>(null);
   const [acc, setAcc] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [files, setFiles] = useState<Record<string, File>>({});
+  const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(skill.name);
+  const [editSteps, setEditSteps] = useState([...skill.steps]);
+  const [deleting, setDeleting] = useState(false);
+  const [mutationBusy, setMutationBusy] = useState(false);
+  const [mutationError, setMutationError] = useState("");
   const st = statusOf(skill, paused);
   const isPaused = paused || skill.paused === true;
   const inputs = skill.details?.inputs.length
     ? skill.details.inputs
     : (skill.catalog?.inputs ?? []);
+  const runInputs = inputs.length
+    ? inputs
+    : [{ name: "task", label: "Task details", kind: "text", required: true }];
+  const needsBrowser =
+    skill.steps.some(
+      (step) =>
+        /\b(?:open|navigate|click|play|type|fill)\b/i.test(step) &&
+        /\b(?:browser|website|webpage|youtube|https?:\/\/|\.com\b)/i.test(step),
+    ) ||
+    skill.details?.steps.some(
+      (step) => /browser|browse_web/i.test(step.tool) || step.action === "browse_web",
+    ) === true ||
+    skill.catalog?.tools.some((tool) => /browser|browse_web/i.test(tool)) === true;
+  const readyToRun = runInputs.every(
+    (input) =>
+      !input.required ||
+      (input.kind === "file" ? Boolean(files[input.name]) : Boolean(values[input.name]?.trim())),
+  );
 
   useEffect(() => {
     close.current?.focus();
@@ -174,20 +277,34 @@ export function SkillDrawer({
             <section className="park-skill-drawer__sec">
               <h3 className="park-skill-drawer__h3">Steps it follows</h3>
               <ol className="park-skill-drawer__steps">
-                {skill.steps.map((s, i) => (
-                  <li key={`${i + 1}-${s}`} className="park-skill-drawer__step">
-                    <span className="park-skill-drawer__n">{i + 1}</span>
-                    <span>{s}</span>
-                    {skill.details?.steps[i] ? (
-                      <span className="park-skill-chip">
-                        {skill.details.steps[i].tool} · {skill.details.steps[i].action}
+                {skill.steps.map((s, i) => {
+                  const stepType = stepTypeOf(s, skill.details?.steps[i]);
+                  return (
+                    <li key={`${i + 1}-${s}`} className="park-skill-drawer__step">
+                      <span className="park-skill-drawer__n">{i + 1}</span>
+                      <span
+                        className="park-skill-drawer__step-icon"
+                        aria-hidden="true"
+                        title={stepType}
+                      >
+                        <StepTypeIcon type={stepType} />
                       </span>
-                    ) : null}
-                    {skill.fix?.asks[i] ? (
-                      <span className="park-skill-chip park-skill-chip--amber">Asks you first</span>
-                    ) : null}
-                  </li>
-                ))}
+                      <span className="park-skill-drawer__step-content">
+                        <span>{s}</span>
+                        {skill.details?.steps[i] ? (
+                          <span className="park-skill-chip">
+                            {skill.details.steps[i].tool} · {skill.details.steps[i].action}
+                          </span>
+                        ) : null}
+                        {skill.fix?.asks[i] ? (
+                          <span className="park-skill-chip park-skill-chip--amber">
+                            Asks you first
+                          </span>
+                        ) : null}
+                      </span>
+                    </li>
+                  );
+                })}
               </ol>
             </section>
           ) : null}
@@ -204,6 +321,89 @@ export function SkillDrawer({
               </ul>
             </section>
           ) : null}
+          <form
+            className="park-skill-run"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!onRun || running || !readyToRun || needsBrowser || isPaused) return;
+              setRunning(true);
+              setRunError("");
+              Promise.resolve(onRun(skill, values, Object.values(files)))
+                .catch((error: unknown) => {
+                  setRunError(
+                    error instanceof Error ? error.message : "The skill could not start.",
+                  );
+                })
+                .finally(() => setRunning(false));
+            }}
+          >
+            <h3 className="park-skill-drawer__h3">Run this skill</h3>
+            {runInputs.map((input) => (
+              <label
+                key={input.name}
+                htmlFor={`skill-run-input-${input.name}`}
+                className="park-teach__field"
+              >
+                <span className="park-teach__label">
+                  {input.label}
+                  {input.required ? (
+                    <span className="park-teach__required"> (required)</span>
+                  ) : (
+                    " (optional)"
+                  )}
+                </span>
+                {input.kind === "file" ? (
+                  <input
+                    id={`skill-run-input-${input.name}`}
+                    aria-label={input.label}
+                    type="file"
+                    className="park-teach__input park-teach__fileinput"
+                    required={input.required}
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      setFiles((before) => {
+                        const next = { ...before };
+                        if (file) next[input.name] = file;
+                        else delete next[input.name];
+                        return next;
+                      });
+                    }}
+                  />
+                ) : (
+                  <input
+                    id={`skill-run-input-${input.name}`}
+                    aria-label={input.label}
+                    className="park-teach__input"
+                    type={
+                      input.kind === "date"
+                        ? "date"
+                        : input.kind === "number"
+                          ? "number"
+                          : input.kind === "url"
+                            ? "url"
+                            : "text"
+                    }
+                    required={input.required}
+                    value={values[input.name] ?? ""}
+                    onChange={(event) =>
+                      setValues((before) => ({ ...before, [input.name]: event.target.value }))
+                    }
+                  />
+                )}
+              </label>
+            ))}
+            {needsBrowser ? (
+              <p className="park-teach__hint">Needs browser control (coming)</p>
+            ) : null}
+            <Button
+              variant="primary"
+              type="submit"
+              disabled={!onRun || !readyToRun || needsBrowser || isPaused || running}
+            >
+              Run skill
+            </Button>
+            {runError ? <p role="alert">{runError}</p> : null}
+          </form>
           {skill.details?.hosts.length ? (
             <p className="park-skill-drawer__p">Approved sites: {skill.details.hosts.join(", ")}</p>
           ) : null}
@@ -213,6 +413,113 @@ export function SkillDrawer({
             </p>
           ) : null}
           {fix}
+          {onEdit ? (
+            <section className="park-skill-drawer__sec" aria-label="Edit this skill">
+              <Button variant="secondary" onClick={() => setEditing((shown) => !shown)}>
+                Edit skill
+              </Button>
+              {editing ? (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (!editName.trim() || editSteps.some((step) => !step.trim()) || mutationBusy)
+                      return;
+                    setMutationBusy(true);
+                    setMutationError("");
+                    onEdit(
+                      skill,
+                      editName.trim(),
+                      editSteps.map((step) => step.trim()),
+                    )
+                      .then(() => setEditing(false))
+                      .catch((error: unknown) =>
+                        setMutationError(
+                          error instanceof Error ? error.message : "The skill could not be saved.",
+                        ),
+                      )
+                      .finally(() => setMutationBusy(false));
+                  }}
+                >
+                  <label className="park-teach__field">
+                    <span className="park-teach__label">Skill name</span>
+                    <input
+                      aria-label="Skill name"
+                      className="park-teach__input"
+                      required
+                      value={editName}
+                      onChange={(event) => setEditName(event.target.value)}
+                    />
+                  </label>
+                  {editSteps.map((step, index) => (
+                    // Steps cannot be reordered or removed while this form is open.
+                    // biome-ignore lint/suspicious/noArrayIndexKey: The fixed saved-step order identifies each field.
+                    <label key={index} className="park-teach__field">
+                      <span className="park-teach__label">Step {index + 1}</span>
+                      <input
+                        aria-label={`Step ${index + 1}`}
+                        className="park-teach__input"
+                        required
+                        value={step}
+                        onChange={(event) =>
+                          setEditSteps((before) =>
+                            before.map((item, i) => (i === index ? event.target.value : item)),
+                          )
+                        }
+                      />
+                    </label>
+                  ))}
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    disabled={
+                      mutationBusy || !editName.trim() || editSteps.some((step) => !step.trim())
+                    }
+                  >
+                    Save changes
+                  </Button>
+                </form>
+              ) : null}
+            </section>
+          ) : null}
+          {onDelete ? (
+            <section className="park-skill-drawer__sec" aria-label="Delete this skill">
+              <Button variant="secondary" onClick={() => setDeleting(true)}>
+                Delete skill
+              </Button>
+              {deleting ? (
+                <div>
+                  <p>Delete “{skill.name}” from My skills?</p>
+                  <Button
+                    variant="secondary"
+                    disabled={mutationBusy}
+                    onClick={() => setDeleting(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    disabled={mutationBusy}
+                    onClick={() => {
+                      setMutationBusy(true);
+                      setMutationError("");
+                      onDelete(skill)
+                        .catch((error: unknown) =>
+                          setMutationError(
+                            error instanceof Error
+                              ? error.message
+                              : "The skill could not be deleted.",
+                          ),
+                        )
+                        .finally(() => setMutationBusy(false));
+                    }}
+                  >
+                    Confirm delete
+                  </Button>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+          {mutationError ? <p role="alert">{mutationError}</p> : null}
           {skill.builtin ? null : (
             <dl className="park-skill-drawer__stats">
               {stats.map((m) => (

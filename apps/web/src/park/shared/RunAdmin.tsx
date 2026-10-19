@@ -259,7 +259,7 @@ function Recorded({ section, worldId }: { section: Section; worldId: string }) {
     );
   }
   return (
-    <div>
+    <div className="park-runconn-stack">
       {sample && (
         <p className="park-runconn-sample">Sample recorded run · no live action is shown.</p>
       )}

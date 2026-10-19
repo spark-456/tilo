@@ -20,6 +20,12 @@ import { runBarOf } from "./runStatus";
 /** How often a live, running or held bar reads the worlds again. */
 export const POLL_MS = 15 * 1000;
 
+const subscribeVisibility = (change: () => void) => {
+  document.addEventListener("visibilitychange", change);
+  return () => document.removeEventListener("visibilitychange", change);
+};
+const visibleNow = () => !document.hidden;
+
 interface Read {
   worlds: World[];
   live: boolean;
@@ -32,12 +38,14 @@ export function RunBar() {
   const route = useParkRoute();
   const state = useSyncExternalStore(store.subscribe, store.getState);
   const off = useMotionOff();
+  const visible = useSyncExternalStore(subscribeVisibility, visibleNow);
   const [read, setRead] = useState<Read | null>(null);
   const [round, setRound] = useState(0);
   const page = route ? `${route.page}/${route.params.id ?? ""}` : "";
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `page` (a page change) and `round` (the poll) only re-run the read
   useEffect(() => {
+    if (!visible) return;
     let current = true;
     const ids = new Set(state.added.map((w) => w.id));
     const sessionWorlds = new Set<World>(state.added);
@@ -61,10 +69,10 @@ export function RunBar() {
     return () => {
       current = false;
     };
-  }, [api, state.dec, state.added, page, round]);
+  }, [api, state.dec, state.added, page, round, visible]);
 
   const bar = read ? runBarOf(read.worlds) : null;
-  const polling = bar !== null && read?.live === true;
+  const polling = bar !== null && read?.live === true && visible;
   // biome-ignore lint/correctness/useExhaustiveDependencies: `round` re-arms the next read after each one
   useEffect(() => {
     if (!polling) return;
@@ -72,7 +80,7 @@ export function RunBar() {
   }, [polling, round, schedule]);
 
   if (!bar || !read) return null;
-  const moving = bar.kind === "running" && !off;
+  const moving = bar.kind === "running" && !off && visible;
   return (
     // <output> is the native status live region (implicit role "status", polite): the page's own toast and
     // loader card are the explicit role="status" elements, and this one must not be mistaken for them.

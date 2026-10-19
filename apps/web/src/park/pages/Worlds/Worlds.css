@@ -88,9 +88,10 @@
 [data-park] .park-worlds-town {
   position: relative;
   height: 340px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line2);
   border-radius: 28px;
   background: var(--ground);
+  box-shadow: var(--sh1);
   overflow: hidden;
 }
 [data-park] .park-worlds-town__art {
@@ -122,9 +123,10 @@
   width: 320px;
   max-width: calc(100% - 48px);
   padding: 22px;
-  border-radius: 22px;
+  border-radius: 20px;
+  border: 1px solid var(--line2);
   background: var(--card);
-  box-shadow: var(--sh);
+  box-shadow: var(--sh1);
   gap: 12px;
 }
 [data-park] .park-worlds-town__eyebrow {
@@ -306,12 +308,16 @@
   flex-direction: column;
   box-sizing: border-box;
   min-height: 330px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line2);
   border-radius: 22px;
   background: var(--card);
+  box-shadow: var(--sh1);
   color: var(--ink);
   text-decoration: none;
   overflow: hidden;
+}
+[data-park] .park-worlds-card:hover {
+  border-color: var(--lineStrong, var(--line2));
 }
 [data-park] .park-worlds-card--needs {
   border-color: var(--amberLine);
@@ -640,7 +646,8 @@
   flex-wrap: wrap;
   background: var(--amberSoft);
   border: 1px solid var(--amberLine);
-  border-radius: 22px;
+  border-radius: 20px;
+  box-shadow: var(--sh1);
   padding: 14px;
   gap: 14px;
 }
@@ -821,13 +828,13 @@
   align-items: center;
   min-height: 44px;
   padding: 0 16px 0 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line2);
   border-radius: 12px;
-  background: var(--btn2);
+  background: transparent;
   color: var(--ink);
   font-family: inherit;
   font-size: 14.5px;
-  font-weight: 800;
+  font-weight: 700;
   gap: 8px;
   white-space: nowrap;
   cursor: pointer;

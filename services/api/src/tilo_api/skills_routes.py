@@ -143,6 +143,7 @@ class TriggerIn(_Closed):
 class QuestionIn(_Closed):
     text: Text
     options: Annotated[list[Annotated[str, Field(max_length=200)]], Field(max_length=10)]
+    answer: Annotated[int, Field(ge=0, le=3)] | None = None
 
 
 class SkillIn(_Closed):
@@ -154,6 +155,17 @@ class SkillIn(_Closed):
     clarifying_question: QuestionIn | None = None
     inputs: Annotated[list[InputIn], Field(max_length=8)] = Field(default_factory=list)
     hosts: Annotated[list[Annotated[str, Field(max_length=253)]], Field(max_length=10)] | None = None  # TS-18
+
+
+class SkillEditIn(_Closed):
+    name: Text | None = None
+    plan_steps: Annotated[list[StepIn], Field(min_length=1, max_length=20)] | None = None
+
+    @model_validator(mode="after")
+    def _nonempty(self) -> SkillEditIn:
+        if self.name is None and self.plan_steps is None:
+            raise ValueError("edit")
+        return self
 
 
 # --- the record -------------------------------------------------------------------------------------------------
@@ -231,7 +243,11 @@ def build_record(
         "plan": plan,
         "question": None
         if question is None
-        else {"text": w.text(question.text), "options": [w.text(o) for o in question.options], "answer": None},
+        else {
+            "text": w.text(question.text),
+            "options": [w.text(o) for o in question.options],
+            "answer": question.answer,
+        },
         "trigger": _trigger(body.trigger, cfg),
         "estimates": estimates_for(plan, cfg),
         "tool_access": {},
@@ -380,6 +396,60 @@ def get_skill_route(
         return found
 
     return _guarded(read)
+
+
+def _owned_skill(
+    store: SkillStore, stores: PeopleStores, principal: deps.Principal, clock: Callable[[], str], skill_id: str
+) -> dict[str, Any]:
+    _teams(stores, principal.user_id, _now(clock))
+    found = None if _SKILL_ID.fullmatch(skill_id) is None else store.get(deps.ORG_ID, skill_id)
+    if found is None or found["owner"] != principal.user_id:
+        raise HTTPException(status_code=404, detail="not_found")
+    return found
+
+
+@router.put("/v1/skills/{skill_id}")
+def edit_skill_route(
+    skill_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],  # SYS_SEC_05: sign-in before the body
+    body: Annotated[SkillEditIn, Depends(json_body(SkillEditIn))],
+    store: Annotated[SkillStore, Depends(deps.get_skill_store)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+    registry: Annotated[Any, Depends(deps.get_connector_registry)],
+) -> dict[str, Any]:
+    def edit() -> dict[str, Any]:
+        held = _owned_skill(store, stores, principal, clock, skill_id)
+        writer = Writer(stores, deps.ORG_ID, principal.user_id, _now(clock), redact)
+        after = {**held, "version": held["version"] + 1, "updated_at": writer.now, "status": "learning", "good_runs": 0}
+        if body.name is not None:
+            after["name"] = writer.text(body.name)
+        if body.plan_steps is not None:
+            after["plan"] = plan_steps(body.plan_steps, writer.text, registry)
+            after["estimates"] = estimates_for(after["plan"], load_skill_config())
+        if not conforms("taught_skill.schema.json", after):
+            raise Refusal(422, "invalid_record")
+        store.put(after)
+        return after
+
+    return _guarded(edit)
+
+
+@router.delete("/v1/skills/{skill_id}")
+def delete_skill_route(
+    skill_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    store: Annotated[SkillStore, Depends(deps.get_skill_store)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, bool]:
+    def remove() -> dict[str, bool]:
+        _owned_skill(store, stores, principal, clock, skill_id)
+        store.delete(deps.ORG_ID, skill_id)
+        return {"ok": True}
+
+    return _guarded(remove)
 
 
 @router.get("/v1/learn")

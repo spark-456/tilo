@@ -3,17 +3,19 @@
 // Teach wizard. Below the gallery stay "Help your agents get better" and tool access. Data comes only through the Api
 // (`useParkApi`: GET /v1/skills?include_builtin=true, GET /v1/learn); the wizard posts captures, version and save; a live
 // pause posts /v1/skills/{id}/state. A page whose Api is not built says "Skills data is unavailable", never numbers.
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { displayApiError } from "../../api/errorMessage";
 import { isSkillRow, skillFromRow } from "../../api/live/skillsFromApi";
 import type { Learn, Skill, Source, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { useParkApi, useWorldClient } from "../../app/context";
+import { markPendingWorld } from "../../app/PendingWorldRoute";
+import { useParkApi, useParkStore, useWorldClient } from "../../app/context";
 import type { CurrencyCode } from "../../app/ledgerKpis";
 import { Button } from "../../components";
 import { FirstRunPanels } from "../../sample/FirstRunPanels";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { ApiReadState } from "../../shared/ApiReadState";
+import { skillRefOf } from "../../shared/skillRoute";
 import { FixSkill } from "./FixSkill";
 import { LearningNow, SkillGrid, TeachBanner } from "./Gallery";
 import { HelpSection } from "./HelpSection";
@@ -169,6 +171,7 @@ function Ready({
 }: { app: AppCtx; data: Data; teach: Teaching; retryRead: () => void }) {
   const api = useParkApi();
   const client = useWorldClient();
+  const store = useParkStore();
   const { user, learn, source, currency } = data;
   const live = source !== "fixture";
   const draft = data.skills.find((s) => s.st === "draft" && !s.builtin);
@@ -185,19 +188,26 @@ function Ready({
   const [rev, setRev] = useState<Record<string, "trusted" | "learning">>({});
   const [paused, setPaused] = useState<Record<string, boolean>>({});
   const [persisted, setPersisted] = useState<Record<string, Skill>>({});
+  const [removed, setRemoved] = useState<Set<string>>(() => new Set());
 
-  const baseSkills = withTaught(data.skills, t.taught);
-  const skills = baseSkills.map((s) => {
-    let next = { ...(persisted[s.id] ?? s) };
-    if (rev[s.id] === "trusted") next.st = "trusted";
-    if (s.st === "review" && ans[s.id]) next.st = "learning";
-    for (const entry of Object.values(fixed)) {
-      if (entry.skillName === next.name) {
-        next = applySkillFix(next, entry.stepIndex, entry.instruction);
+  const baseSkills = useMemo(() => {
+    const taught = withTaught(data.skills, t.taught);
+    return removed.size === 0 ? taught : taught.filter((skill) => !removed.has(skill.id));
+  }, [data.skills, t.taught, removed]);
+  const skills = useMemo(() => {
+    const fixes = Object.values(fixed);
+    return baseSkills.map((s) => {
+      let next = { ...(persisted[s.id] ?? s) };
+      if (rev[s.id] === "trusted") next.st = "trusted";
+      if (s.st === "review" && ans[s.id]) next.st = "learning";
+      for (const entry of fixes) {
+        if (entry.skillName === next.name) {
+          next = applySkillFix(next, entry.stepIndex, entry.instruction);
+        }
       }
-    }
-    return next;
-  });
+      return next;
+    });
+  }, [baseSkills, persisted, rev, ans, fixed]);
 
   const trusted = skills.filter((s) => s.st === "trusted").length;
   const learning = skills.filter((s) => s.st === "learning").length;
@@ -336,6 +346,62 @@ function Ready({
           pauseOff={PAUSE_OFF}
           onTeach={() => startTeach(current.builtin ? "" : current.name)}
           onClose={() => setOpen(null)}
+          onRun={
+            source === "live" && store.oneStep
+              ? async (skill, values, files) => {
+                  const detail = Object.entries(values).map(([key, value]) => `${key}: ${value}`);
+                  const prompt = [`Run the ${skill.name} skill.`, ...detail].join("\n");
+                  const ref = skillRefOf({
+                    id: skill.id,
+                    kind: skill.builtin ? "library" : "taught",
+                  });
+                  const prepared = await store.prepareRun(prompt, files, [ref]);
+                  if (!prepared.ok) throw new Error(prepared.message);
+                  const started = await store.startRun(prepared.value);
+                  if (!started.ok) throw new Error(started.message);
+                  markPendingWorld(started.value.worldId, prepared.value.goal);
+                  app.go("world", { id: started.value.worldId });
+                }
+              : undefined
+          }
+          onEdit={
+            source === "live" && client && !current.builtin
+              ? async (skill, name, steps) => {
+                  const plan_steps = steps.map((text, index) => {
+                    const detail = skill.details?.steps[index];
+                    if (!detail?.verb)
+                      throw new Error("The skill's step details could not be read.");
+                    return {
+                      text,
+                      tool: detail.tool,
+                      action: detail.action,
+                      verb: detail.verb,
+                      ask_first: detail.ask_first ?? false,
+                    };
+                  });
+                  const row = await client.putJson(`/v1/skills/${encodeURIComponent(skill.id)}`, {
+                    name,
+                    plan_steps,
+                  });
+                  if (!isSkillRow(row) || row.id !== skill.id)
+                    throw new Error("The updated skill could not be read.");
+                  setPersisted((before) => ({ ...before, [skill.id]: skillFromRow(row) }));
+                  app.toast(`“${name}” updated.`);
+                }
+              : undefined
+          }
+          onDelete={
+            source === "live" && client && !current.builtin
+              ? async (skill) => {
+                  const row = await client.deleteJson(`/v1/skills/${encodeURIComponent(skill.id)}`);
+                  if (typeof row !== "object" || row === null || !("ok" in row) || row.ok !== true)
+                    throw new Error("The deletion could not be confirmed.");
+                  setRemoved((before) => new Set([...before, skill.id]));
+                  setOpen(null);
+                  app.toast(`“${skill.name}” deleted.`);
+                }
+              : undefined
+          }
           fix={
             source === "live" && current.fix ? (
               <FixSkill

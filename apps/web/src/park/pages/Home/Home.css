@@ -906,6 +906,46 @@
   line-height: 1.45;
   color: var(--ink3);
 }
+[data-park] .park-home-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+[data-park] .park-home-browser-note {
+  display: block;
+  margin: 8px 0 0;
+  color: var(--ink3);
+  font-size: 13px;
+}
+[data-park] .park-home-results h2 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--ink);
+}
+[data-park] .park-home-results__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+[data-park] .park-home-results__list button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+[data-park] .park-home-results__list button span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 [data-park] .park-home-cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -917,16 +957,16 @@
   flex-direction: column;
   padding: 0;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line2);
   border-radius: 20px;
   background: var(--card);
-  box-shadow: var(--sh);
+  box-shadow: var(--sh1);
   color: var(--ink);
   text-align: left;
   cursor: pointer;
 }
 [data-park] .park-home-live:hover {
-  border-color: var(--lineStrong, var(--line));
+  border-color: var(--lineStrong, var(--line2));
 }
 [data-park] .park-home-live__art {
   position: relative;
@@ -1058,10 +1098,10 @@
   align-items: center;
   gap: 14px;
   padding: 18px 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line2);
   border-radius: 20px;
   background: var(--card);
-  box-shadow: var(--sh);
+  box-shadow: var(--sh1);
 }
 [data-park] .park-home-history__face {
   flex: none;
@@ -1116,10 +1156,10 @@
   flex-direction: column;
   gap: 8px;
   padding: 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line2);
   border-radius: 20px;
   background: var(--card);
-  box-shadow: var(--sh);
+  box-shadow: var(--sh1);
 }
 [data-park] .park-home-head {
   display: flex;
@@ -1143,10 +1183,11 @@
   height: 26px;
   padding: 0 8px;
   border-radius: 99px;
-  background: #f0a500;
-  color: #1f1d2b;
+  background: var(--amberSoft);
+  color: var(--amberInk);
+  border: 1px solid var(--amberLine);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 [data-park] .park-home-sr {
   position: absolute;
@@ -1288,9 +1329,10 @@
   flex-direction: column;
   gap: 10px;
   padding: 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line2);
   border-radius: 20px;
   background: var(--card);
+  box-shadow: var(--sh1);
   color: var(--ink);
   text-align: left;
   cursor: pointer;
@@ -1465,6 +1507,9 @@
     overflow-x: hidden;
     box-sizing: border-box;
   }
+  [data-park] .park-home-top[role="status"] {
+    min-height: 180px;
+  }
   [data-park] .park-home-crew {
     display: none;
   }
@@ -1496,6 +1541,8 @@
     flex: 1 1 100%;
     order: 3;
     text-align: left;
+    /* P0-PERF: the loaded font wraps this hint to two lines on a phone. */
+    min-height: 2.7em;
   }
   [data-park] .park-home-start {
     margin-left: auto;
@@ -1631,5 +1678,33 @@
   [data-park] .park-home-panel .park-home-input {
     font-size: 16px;
     letter-spacing: 0;
+  }
+}
+
+/* RESPONSIVE: Home is full-bleed (it has no shell gutter), so between a phone and the 1296px column its content sat 8 or 16px
+   from the edge while Worlds, Team and the rest sit 32px in (the shell's 24 plus the 8px page pad). It takes the same 32px,
+   and a tablet's cards, side cards and tiles use the room instead of one tall column. */
+@media (min-width: 561px) and (max-width: 1343px) {
+  [data-park] .park-home-root {
+    padding-right: 32px;
+    padding-left: 32px;
+  }
+}
+@media (min-width: 561px) and (max-width: 840px) {
+  [data-park] .park-home-cards {
+    grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
+  }
+  [data-park] .park-home-today {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  [data-park] .park-home-kpis {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  [data-park] .park-home-kpis > * {
+    grid-column: span 2;
+  }
+  [data-park] .park-home-kpis > :nth-child(4):nth-last-child(2),
+  [data-park] .park-home-kpis > :nth-child(5):last-child {
+    grid-column: span 3;
   }
 }

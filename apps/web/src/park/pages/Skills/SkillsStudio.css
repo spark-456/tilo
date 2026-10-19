@@ -56,9 +56,9 @@
 /* ---- Teach banner ---- */
 [data-park] .park-skills-banner {
   background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 28px;
-  box-shadow: var(--sh);
+  border: 1px solid var(--line2);
+  border-radius: 24px;
+  box-shadow: var(--sh1);
   padding: 24px 28px;
   display: flex;
   flex-direction: column;
@@ -252,9 +252,9 @@
   height: 100%;
   min-height: 44px;
   background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 24px;
-  box-shadow: var(--sh);
+  border: 1px solid var(--line2);
+  border-radius: 20px;
+  box-shadow: var(--sh1);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -1284,5 +1284,176 @@
 @media (max-width: 440px) {
   [data-park] .park-skills-cards {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* SKILLS-POLISH: clean card grid, consistent heights, tags, run button, step icons, video preview, drag handles */
+[data-park] .park-skills-card-item {
+  display: flex;
+}
+[data-park] .park-skills-card2 {
+  min-height: 236px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+[data-park] .park-skills-card2__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+[data-park] .park-skill-tag {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--sunk);
+  color: var(--ink2);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+[data-park] .park-skills-card2__run-btn {
+  font-size: 13px;
+  font-weight: 800;
+  padding: 5px 14px;
+  border-radius: 10px;
+  background: var(--chip);
+  color: var(--ink);
+  border: 1px solid var(--line2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+[data-park] .park-skills-card2:hover .park-skills-card2__run-btn {
+  background: var(--heroFill);
+  color: #ffffff;
+  border-color: transparent;
+}
+[data-park] .park-skill-drawer__step-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--heroInk);
+  border: 1px solid var(--line2);
+  flex-shrink: 0;
+}
+[data-park] .park-skill-drawer__step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+[data-park] .park-skill-run {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 18px;
+  box-shadow: var(--sh1);
+}
+[data-park] .park-teach__required {
+  color: var(--heroInk);
+  font-weight: 800;
+}
+[data-park] .park-teach__fileinput {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+[data-park] .park-teach__progress-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: var(--sunk);
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-teach__progress-step {
+  color: var(--ink3);
+}
+[data-park] .park-teach__progress-step--active {
+  color: var(--heroInk);
+  font-weight: 800;
+}
+[data-park] .park-teach__progress-step--done {
+  color: var(--okInk);
+  font-weight: 800;
+}
+[data-park] .park-teach__progress-sep {
+  color: var(--ink3);
+  font-size: 13px;
+  user-select: none;
+}
+[data-park] .park-teach__video-wrap {
+  width: 100%;
+  max-width: 640px;
+  margin: 14px auto;
+  display: flex;
+  justify-content: center;
+}
+[data-park] .park-teach__recording-preview,
+[data-park] video[aria-label="Recording preview"] {
+  width: 100%;
+  max-height: 360px;
+  aspect-ratio: 16 / 9;
+  border-radius: 16px;
+  object-fit: contain;
+  background: var(--bg);
+  border: 1px solid var(--line2);
+  box-shadow: var(--sh1);
+  overflow: hidden;
+}
+[data-park] .park-teach__list--cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+[data-park] .park-teach__row--step.park-teach__step-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 16px;
+  box-shadow: var(--sh1);
+}
+[data-park] .park-teach__row--step.park-teach__step-card:hover {
+  border-color: var(--lineStrong);
+}
+[data-park] .park-teach__drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 24px;
+  color: var(--ink3);
+  font-size: 15px;
+  letter-spacing: -1px;
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+}
+@media (max-width: 560px) {
+  [data-park] .park-teach__progress-header {
+    font-size: 11.5px;
+    gap: 6px;
+    padding: 4px 10px;
+  }
+  [data-park] .park-teach__row--step.park-teach__step-card {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
   }
 }

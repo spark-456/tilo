@@ -109,3 +109,15 @@ def test_RERUN_ANY_a_running_waiting_or_finished_world_is_a_409(flow, latest):
 
     assert response.status_code == 409
     assert set(flow.store.worlds) == before
+
+
+def test_RUN_RESILIENCE_rerun_with_an_empty_json_body_is_a_plain_rerun(flow, monkeypatch):
+    """The live web sent `{}` for a plain "Start again" and got a 422 (19 Oct); `{}` now reruns like no body."""
+    from tilo_api import runs
+
+    monkeypatch.setattr(runs, "start_run", lambda store, task, *, approach, budget_cap, seams: None)
+    flow.app.dependency_overrides[runs.run_seams] = lambda: object()
+    old = _failed_with(flow, UNIT_FAILED)
+    response = flow.client.post(f"/worlds/{old['world_id']}/rerun", json={})
+    assert response.status_code == 200, response.text
+    assert flow.client.post(f"/worlds/{old['world_id']}/rerun", json={"direction": "  "}).status_code in (409, 422)

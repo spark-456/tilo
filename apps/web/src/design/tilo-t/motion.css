@@ -349,4 +349,95 @@
 /* triggeredBy: approval.requested -> approval.resolved (TW-6): amber chip ring pings opacity .7→0, scale .9→1.6 (tilo-w.css) */
 [data-park] .tw-needs-ping{animation:wPing 1.6s ease-out infinite}
 @media (prefers-reduced-motion:reduce){[data-park] .tw-needs-ping{animation:none!important}}
-/* triggeredBy: approval.requested -> approval.resolved (TW-6): amber chip ring pings opacity .7→0, scale .9→1.6 (tilo-w.css) */
+
+/* P0-MEETING-ROOM: speaking ring ONLY while agent has recorded message (HR rules) */
+[data-park] .park-meeting-speaking-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 99px;
+  border: 2px solid var(--pri);
+  animation: wPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+[data-park] .park-meeting-seat--speaking .park-meeting-avatar,
+[data-park] .park-meeting-seat--speaking .park-meeting-seat-avatar {
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--pri);
+  animation: wPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@media (prefers-reduced-motion:reduce){
+  [data-park] .park-meeting-speaking-ring {
+    animation: none !important;
+    opacity: 0.8 !important;
+  }
+  [data-park] .park-meeting-seat--speaking .park-meeting-avatar,
+  [data-park] .park-meeting-seat--speaking .park-meeting-seat-avatar {
+    animation: none !important;
+    box-shadow: 0 0 0 3px var(--pri) !important;
+  }
+}
+
+/* RESPONSIVE: pointer and state feedback on the controls the pages style themselves (chips, small buttons, selects). A
+   colour fade of 160 ms (background, border and text colour only, never a layout property) when a person hovers, presses or
+   picks one; nothing here shows or implies an agent, a run or a decision. Reduced motion and the still choice switch it off. */
+[data-park] :is(.park-chat-quiet,.park-chat-new,.park-chat-history__turn,.park-connectors-action-btn,.park-team-btn,.park-team-select,.park-team-more,.park-profile-mopt,.park-profile-scene,.park-admin nav button,.park-skills-ask-opt,.park-worlds-dec__yes,.park-worlds-dec__open,.park-worlds-scale__btn){transition:background-color .16s ease,border-color .16s ease,color .16s ease}
+@media (prefers-reduced-motion:reduce){
+[data-park] :is(.park-chat-quiet,.park-chat-new,.park-chat-history__turn,.park-connectors-action-btn,.park-team-btn,.park-team-select,.park-team-more,.park-profile-mopt,.park-profile-scene,.park-admin nav button,.park-skills-ask-opt,.park-worlds-dec__yes,.park-worlds-dec__open,.park-worlds-scale__btn){transition:none!important}
+}
+[data-park][data-motion="still"] :is(.park-chat-quiet,.park-chat-new,.park-chat-history__turn,.park-connectors-action-btn,.park-team-btn,.park-team-select,.park-team-more,.park-profile-mopt,.park-profile-scene,.park-admin nav button,.park-skills-ask-opt,.park-worlds-dec__yes,.park-worlds-dec__open,.park-worlds-scale__btn){transition:none!important}
+
+/* ---- Declutter: calm, gentle transitions (150ms-200ms) for interactive elements, respecting reduced motion ---- */
+[data-park] .park-card,
+[data-park] .park-sheet,
+[data-park] .park-btn,
+[data-park] .park-kpi,
+[data-park] .park-row,
+[data-park] .park-chip,
+[data-park] .park-pill,
+[data-park] .park-seg__item,
+[data-park] .park-home-composer,
+[data-park] .park-home-live,
+[data-park] .park-home-card,
+[data-park] .park-home-tray,
+[data-park] .park-home-chip,
+[data-park] .park-worlds-card,
+[data-park] .park-worlds-spot,
+[data-park] .park-team-card,
+[data-park] .park-connectors-tile,
+[data-park] .park-needs__card,
+[data-park] .park-ledger-card {
+  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, color 180ms ease, opacity 180ms ease, transform 180ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-park] .park-card,
+  [data-park] .park-sheet,
+  [data-park] .park-btn,
+  [data-park] .park-kpi,
+  [data-park] .park-row,
+  [data-park] .park-chip,
+  [data-park] .park-pill,
+  [data-park] .park-seg__item,
+  [data-park] .park-home-composer,
+  [data-park] .park-home-live,
+  [data-park] .park-home-card,
+  [data-park] .park-home-tray,
+  [data-park] .park-home-chip,
+  [data-park] .park-worlds-card,
+  [data-park] .park-worlds-spot,
+  [data-park] .park-team-card,
+  [data-park] .park-connectors-tile,
+  [data-park] .park-needs__card,
+  [data-park] .park-ledger-card {
+    transition: none !important;
+  }
+}
+
+/* ADR-0052: Tilo's browser cursor glides to each recorded browser.acted target (the move itself is an event). */
+.tilo-browser__cursor {
+  transition: left 0.38s ease, top 0.38s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tilo-browser__cursor {
+    transition: none;
+  }
+}

@@ -12,7 +12,9 @@ from tilo_harness.writer import WriterBusy as _WriterBusy
 from tilo_logging import configure_logging as _configure_logging
 
 from tilo_api import appcheck as _appcheck
+from tilo_api import browser_frames as _browser_frames
 from tilo_api import byok_routes as _byok_routes
+from tilo_api import chat_routes as _chat_routes
 from tilo_api import connect_routes as _connect_routes
 from tilo_api import cors as _cors
 from tilo_api import deps as _deps
@@ -172,6 +174,7 @@ _meeting_minutes_flag.configure_minutes_flag(_deps.get_flag_store())
 _owner_minutes_routes.install_owner_minutes_routes(app, _deps.get_flag_store())
 app.include_router(_quiz_apps.router)
 app.include_router(_results.router)
+app.include_router(_browser_frames.router)
 app.include_router(_connect_routes.router)
 app.include_router(_people_list_router)
 app.include_router(_people_teams_router)
@@ -189,6 +192,7 @@ app.include_router(_meeting_voice_meter.router)  # ADR-0042: public to the gate,
 app.include_router(_nudge_sweep.router)  # FR-PA-15b: GET /v1/nudges, POST /v1/nudges/{id}/snooze
 app.include_router(_team_router)
 app.include_router(_memory_routes.router)
+app.include_router(_chat_routes.router)
 app.include_router(_user_settings_router)  # FR-SET-01/02: GET and PUT /v1/me/settings
 app.include_router(_brief_router)  # ADR-0049: /v1/me/brief and /v1/me/brief-settings (MO-01..04)
 

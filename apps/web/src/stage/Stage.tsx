@@ -50,7 +50,13 @@ export type WorldSeam = (
   world: Container,
   requestRender: () => void,
   size: () => { width: number; height: number },
+  visibility?: StageVisibility,
 ) => (() => void) | undefined;
+
+export interface StageVisibility {
+  isVisible: () => boolean;
+  subscribe: (onChange: () => void) => () => void;
+}
 
 /** PRD 18.3 S-04 stage. The camera is the Pixi world container's transform (PRD 9.7); a frame
  * is drawn only on input, an eased keyboard move, resize or visibility change. Readiness: the
@@ -183,10 +189,20 @@ export function Stage({
     let ease: { from: cam.CameraState; t0: number; ms: number } | null = null;
     let raf = 0;
     let gridKey = ""; // the view the grid was last built for: world-content frames skip rebuilding it
+    let inViewport = typeof IntersectionObserver === "undefined";
+    const active = () => !document.hidden && inViewport;
+    const visibilityListeners = new Set<() => void>();
+    const visibility: StageVisibility = {
+      isVisible: active,
+      subscribe: (onChange) => {
+        visibilityListeners.add(onChange);
+        return () => visibilityListeners.delete(onChange);
+      },
+    };
 
     const draw = () => {
       const { clientWidth: w, clientHeight: h } = target;
-      if (!ready || !w || !h) return;
+      if (!ready || !active() || !w || !h) return;
       const { x, y, zoom: z } = cur;
       world.position.set(w / 2 + x, h / 2 + y);
       world.scale.set(z);
@@ -205,16 +221,22 @@ export function Stage({
     // the target at the next frame, and the last frame is always exactly the target.
     const frame = () => {
       raf = 0;
+      if (!active()) return;
       if (ease) {
-        const t = (performance.now() - ease.t0) / ease.ms;
-        cur = cam.easeCamera(ease.from, goal, t);
-        if (t >= 1) ease = null;
-        else raf = requestAnimationFrame(frame);
+        if (!msRef.current) {
+          cur = goal;
+          ease = null;
+        } else {
+          const t = (performance.now() - ease.t0) / ease.ms;
+          cur = cam.easeCamera(ease.from, goal, t);
+          if (t >= 1) ease = null;
+          else raf = requestAnimationFrame(frame);
+        }
       }
       draw();
     };
     const requestRender = () => {
-      if (!raf) raf = requestAnimationFrame(frame);
+      if (active() && !raf) raf = requestAnimationFrame(frame);
     };
     // Direct manipulation follows the input with no easing.
     const jump = (next: cam.CameraState) => {
@@ -230,6 +252,20 @@ export function Stage({
     };
 
     const on = new AbortController();
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    motionQuery.addEventListener(
+      "change",
+      () => {
+        msRef.current = cam.getCameraPanDurationMs(motionQuery.matches);
+        if (!motionQuery.matches || !ease) return;
+        cur = goal;
+        ease = null;
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0;
+        draw();
+      },
+      { signal: on.signal },
+    );
     const listen = <K extends keyof HTMLElementEventMap>(
       type: K,
       fn: (e: HTMLElementEventMap[K]) => void,
@@ -350,12 +386,34 @@ export function Stage({
 
     // The device-pixel box also reports devicePixelRatio changes, keeping the canvas sharp.
     const fit = () => {
+      if (!ready || !active()) return;
       app.renderer.resize(target.clientWidth || 1, target.clientHeight || 1, devicePixelRatio);
       draw();
     };
     const observer = new ResizeObserver(fit);
-    const onVisible = () => document.visibilityState === "visible" && draw();
+    const onVisible = () => {
+      if (!active()) {
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0;
+      } else {
+        // A frozen camera lands on its requested position without a catch-up animation.
+        if (ease) {
+          cur = goal;
+          ease = null;
+        }
+        fit();
+      }
+      for (const onChange of visibilityListeners) onChange();
+    };
     document.addEventListener("visibilitychange", onVisible, { signal: on.signal });
+    const viewportObserver =
+      typeof IntersectionObserver === "undefined"
+        ? null
+        : new IntersectionObserver(([entry]) => {
+            inViewport = Boolean(entry?.isIntersecting);
+            onVisible();
+          });
+    viewportObserver?.observe(target);
 
     let unplug: (() => void) | undefined;
     const init = app.init({ ...PIXI, background: tokens.color.surface["0"] });
@@ -364,10 +422,12 @@ export function Stage({
       ready = true;
       target.prepend(app.canvas);
       app.stage.addChild(world);
-      unplug = seamRef.current?.(world, requestRender, () => ({
-        width: target.clientWidth,
-        height: target.clientHeight,
-      }));
+      unplug = seamRef.current?.(
+        world,
+        requestRender,
+        () => ({ width: target.clientWidth, height: target.clientHeight }),
+        visibility,
+      );
       fit(); // the first frame, at once: input that arrived during init is already in `cur`
       const box = "devicePixelContentBoxSize" in ResizeObserverEntry.prototype;
       observer.observe(target, box ? { box: "device-pixel-content-box" } : {});
@@ -376,6 +436,7 @@ export function Stage({
       on.abort();
       unfly?.();
       observer.disconnect();
+      viewportObserver?.disconnect();
       cancelAnimationFrame(raf);
       unplug?.();
       // Pixi's destroy() throws before init() resolves, so it always waits for init.

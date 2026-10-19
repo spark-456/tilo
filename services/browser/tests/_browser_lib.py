@@ -196,6 +196,7 @@ class FakeDriver:
         self.blocked_subrequests: list[str] = []
         self.typed: list[tuple[str, str]] = []
         self.clicked: list[str] = []
+        self.scrolled: list[str] = []
         self.uploaded: list[tuple[str, str]] = []
         self.screenshot_mask_refs: list[list[str]] = []
         self.close_calls = 0
@@ -267,6 +268,10 @@ class FakeDriver:
     def type(self, ref: str, text: str) -> None:
         self._alive()
         self.typed.append((ref, text))
+
+    def scroll(self, direction: str) -> None:
+        self._alive()
+        self.scrolled.append(direction)
 
     def find(self, selector: str) -> str:
         self._alive()

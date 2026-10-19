@@ -7,18 +7,47 @@ Bearer token, 403 when unconfigured or for an unauthorized caller).
 
 from __future__ import annotations
 
+import asyncio
+import json
+import os
 from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
+from pathlib import Path
 from typing import Any
 
+import jsonschema
 from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT202012
 from tilo_logging import configure_logging
 
+from tilo_browser.egress import EgressBlocked
 from tilo_browser.fetch import FetchBlocked, FetchService, service_caller_ok
+from tilo_browser.login import CredentialEntryRefused
+from tilo_browser.playwright_engine import PlaywrightEngine
+from tilo_browser.session import BrowserSessions, SessionRefused
+from tilo_browser.worker import ScreenshotRefused
 
 configure_logging()
+_BROWSER_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tilo-browser")
+_CONTRACTS = Path(__file__).resolve().parents[4] / "contracts"
+_BROWSER_SCHEMA = json.loads((_CONTRACTS / "browser.schema.json").read_text(encoding="utf-8"))
+_COMMON_SCHEMA = json.loads((_CONTRACTS / "common.schema.json").read_text(encoding="utf-8"))
+_REGISTRY = Registry().with_resources(
+    (doc["$id"], Resource.from_contents(doc, DRAFT202012)) for doc in (_BROWSER_SCHEMA, _COMMON_SCHEMA)
+)
+
+
+def _valid_rpc(name: str, payload: dict) -> bool:
+    validator = jsonschema.Draft202012Validator(
+        {"$ref": _BROWSER_SCHEMA["$id"] + f"#/$defs/{name}"}, registry=_REGISTRY
+    )
+    return validator.is_valid(payload)
+
 
 _STATUS_BY_REASON: dict[str, int] = {
     "file_too_large": 413,
@@ -44,6 +73,35 @@ class FetchRequestPayload(BaseModel):
     unit_id: str = "U1"
 
 
+class SessionStartPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    session: str = Field(pattern=r"^bs_[0-7][0-9A-HJKMNP-TV-Z]{25}$")
+    world_id: str
+    run_id: str
+    unit_id: str
+    allow_hosts: list[str] = Field(min_length=1, max_length=20)
+    start_url: str = Field(pattern=r"^https://", max_length=2048)
+    viewport: dict[str, int]
+
+
+class SessionActionPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    session: str
+    step: int = Field(ge=1, le=60)
+    action: dict[str, Any]
+    digest: str | None
+    outbox_id: str | None
+
+
+class SessionInspectPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    session: str
+    at: dict[str, int]
+
+
 def _refuse(status: int, message: str, *, reason: str | None = None, url: str | None = None) -> JSONResponse:
     headers = {"WWW-Authenticate": "Bearer"} if status == 401 else None
     payload: dict[str, Any] = {"error": message}
@@ -66,11 +124,110 @@ def create_app(
     oidc_verifier: Callable[[str, str], Mapping[str, Any]] | None = None,
     audience: str | None = None,
     allowed_callers: Sequence[str] = (),
+    browser_engine: Any | None = None,
 ) -> FastAPI:
     # No generated docs: the service may be public, and the route list is not for strangers (issue #411).
     fastapi_app = FastAPI(title="tilo-browser", docs_url=None, redoc_url=None, openapi_url=None)
     service = fetch_service if fetch_service is not None else FetchService()
     callers = tuple(allowed_callers)
+    sessions = BrowserSessions(browser_engine or PlaywrightEngine())
+
+    async def browser_call(fn: Callable[..., Any], *args: Any) -> Any:
+        return await asyncio.get_running_loop().run_in_executor(_BROWSER_EXECUTOR, partial(fn, *args))
+
+    async def authenticated(request: Request) -> JSONResponse | None:
+        token = _bearer_token(request)
+        if token is None:
+            return _refuse(401, "unauthorized")
+        if oidc_verifier is None or not audience or not callers:
+            return _refuse(403, "forbidden")
+        try:
+            claims = await run_in_threadpool(oidc_verifier, token, audience)
+        except Exception:
+            return _refuse(401, "unauthorized")
+        if not service_caller_ok(claims, audience=audience, allowed_callers=callers):
+            return _refuse(403, "forbidden")
+        return None
+
+    @fastapi_app.post("/sessions")
+    async def start_session(request: Request) -> JSONResponse:
+        refused = await authenticated(request)
+        if refused is not None:
+            return refused
+        try:
+            body = SessionStartPayload.model_validate(await request.json()).model_dump()
+            if not _valid_rpc("open_request", body):
+                return _refuse(422, "invalid_request")
+            result = await browser_call(sessions.start, body)
+        except (ValueError, ValidationError, KeyError, TypeError):
+            return _refuse(422, "invalid_request")
+        except SessionRefused as exc:
+            return _refuse(exc.status, exc.reason, reason=exc.reason)
+        except EgressBlocked:
+            return _refuse(403, "offsite_host", reason="offsite_host")
+        except ScreenshotRefused:
+            return _refuse(409, "screenshot_unavailable", reason="screenshot_unavailable")
+        except Exception:
+            return _refuse(503, "browser_unavailable", reason="browser_unavailable")
+        return JSONResponse(result)
+
+    @fastapi_app.post("/sessions/{session}/act")
+    async def act_session(session: str, request: Request) -> JSONResponse:
+        refused = await authenticated(request)
+        if refused is not None:
+            return refused
+        try:
+            body = SessionActionPayload.model_validate(await request.json()).model_dump()
+            if (
+                body["session"] != session
+                or body["outbox_id"] is not None
+                or not _valid_rpc("act_request", body)
+                or body["action"]["kind"] not in ("navigate", "click", "type", "scroll", "extract")
+            ):
+                return _refuse(422, "invalid_request")
+            result = await browser_call(sessions.act, session, body)
+        except (ValueError, ValidationError, KeyError, TypeError):
+            return _refuse(422, "invalid_request")
+        except SessionRefused as exc:
+            return _refuse(exc.status, exc.reason, reason=exc.reason)
+        except EgressBlocked:
+            return _refuse(403, "offsite_host", reason="offsite_host")
+        except CredentialEntryRefused:
+            return _refuse(409, "secure_field", reason="secure_field")
+        except ScreenshotRefused:
+            return _refuse(409, "screenshot_unavailable", reason="screenshot_unavailable")
+        except Exception:
+            return _refuse(503, "browser_unavailable", reason="browser_unavailable")
+        return JSONResponse(result)
+
+    @fastapi_app.post("/sessions/{session}/inspect")
+    async def inspect_session(session: str, request: Request) -> JSONResponse:
+        refused = await authenticated(request)
+        if refused is not None:
+            return refused
+        try:
+            body = SessionInspectPayload.model_validate(await request.json()).model_dump()
+            if body["session"] != session or not _valid_rpc("inspect_request", body):
+                return _refuse(422, "invalid_request")
+            result = await browser_call(sessions.inspect, session, body["at"])
+        except (ValueError, ValidationError, KeyError, TypeError):
+            return _refuse(422, "invalid_request")
+        except SessionRefused as exc:
+            return _refuse(exc.status, exc.reason, reason=exc.reason)
+        return JSONResponse(result)
+
+    @fastapi_app.delete("/sessions/{session}")
+    async def end_session(session: str, request: Request) -> JSONResponse:
+        refused = await authenticated(request)
+        if refused is not None:
+            return refused
+        try:
+            result = await browser_call(sessions.end, session)
+        except SessionRefused as exc:
+            return _refuse(exc.status, exc.reason, reason=exc.reason)
+        except ScreenshotRefused:
+            return _refuse(409, "screenshot_unavailable", reason="screenshot_unavailable")
+        return JSONResponse(result)
 
     @fastapi_app.get("/health")  # Cloud Run reserves /healthz on run.app; the smoke check uses /health (#397)
     @fastapi_app.get("/healthz")
@@ -120,4 +277,19 @@ def create_app(
     return fastapi_app
 
 
-app = create_app()
+def _configured_app() -> FastAPI:
+    audience = os.environ.get("TILO_BROWSER_AUDIENCE")
+    callers = tuple(filter(None, os.environ.get("TILO_BROWSER_CALLERS", "").split(",")))
+    if not audience or not callers:
+        return create_app()  # fail closed: internal routes are present but deny every request
+
+    def verify(token: str, wanted: str) -> Mapping[str, Any]:
+        from google.auth.transport.requests import Request  # noqa: PLC0415
+        from google.oauth2 import id_token  # noqa: PLC0415
+
+        return id_token.verify_oauth2_token(token, Request(), wanted)
+
+    return create_app(oidc_verifier=verify, audience=audience, allowed_callers=callers)
+
+
+app = _configured_app()

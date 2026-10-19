@@ -1,4 +1,4 @@
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkStore, useWorldClient } from "../../app/context";
 import { usePageTitle } from "../../app/pageTitle";
@@ -129,7 +129,15 @@ export function ChatPage({ app }: { app: AppCtx }) {
   usePageTitle("Chat");
   const store = useParkStore();
   const skillClient = useWorldClient();
-  const chat = useQuickChat();
+  const chat = useQuickChat(undefined, undefined, true);
+  const selectedFromHome = useRef<string | null>(null);
+  useEffect(() => {
+    const id = app.params.id;
+    if (id && selectedFromHome.current !== id && chat.history.some((entry) => entry.id === id)) {
+      selectedFromHome.current = id;
+      chat.select(id);
+    }
+  }, [app.params.id, chat]);
   const [scene, setScene] = useState<SceneId>(readScene);
   const [draft, setDraft] = useState("");
   const [selectedSkill, setSelectedSkill] = useState<CatalogSkill | null>(null);
@@ -178,13 +186,19 @@ export function ChatPage({ app }: { app: AppCtx }) {
             >
               <Icon name="plus" size={18} /> New chat
             </button>
-            <span className="park-chat-history__label">Current chat</span>
-            {chat.turns.map((turn) => (
-              <a key={turn.id} href={`#chat-turn-${turn.id}`} className="park-chat-history__turn">
-                {turn.question}
-              </a>
+            <span className="park-chat-history__label">Recent chats</span>
+            {chat.history.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                className="park-chat-history__turn"
+                disabled={chat.busy}
+                onClick={() => chat.select(entry.id)}
+              >
+                {entry.title}
+              </button>
             ))}
-            {chat.turns.length === 0 ? (
+            {chat.history.length === 0 ? (
               <p className="park-chat-history__empty">No questions in this chat yet.</p>
             ) : null}
           </nav>
@@ -240,8 +254,7 @@ export function ChatPage({ app }: { app: AppCtx }) {
                 <div className="park-chat-intro">
                   <p className="park-chat-intro__title">Ask a direct question</p>
                   <p className="park-chat-intro__line">
-                    One helper answers right away. Past chats are not kept, so this page starts
-                    empty each visit.
+                    One helper answers right away. Signed-in chats are saved on this device.
                   </p>
                   <div className="park-chat-intro__prompts">
                     {[

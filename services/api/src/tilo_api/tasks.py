@@ -90,7 +90,8 @@ class ApproveIn(BaseModel):
 
 class RerunIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    direction: Annotated[str, Field(min_length=1, max_length=2000)]
+    # `{}` (what the web's plain "Start again" sends) is a plain rerun; an empty or blank direction is still refused.
+    direction: Annotated[str, Field(min_length=1, max_length=2000)] | None = None
 
 
 def _json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaitable[Body]]:
@@ -786,8 +787,8 @@ def rerun(
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check, before anything is stored
     store.settle(world_id)
     stream = store.events.get(world_id, [])
-    direction = body.direction.strip() if body is not None else ""
-    if body is not None and not direction:
+    direction = body.direction.strip() if body is not None and body.direction is not None else ""
+    if body is not None and body.direction is not None and not direction:
         raise HTTPException(status_code=422, detail="Describe what the team should change.")
     _screen(safety, [direction] if direction else [])
 

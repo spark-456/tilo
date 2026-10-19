@@ -66,7 +66,10 @@ it("CX_PAGES_ENRICH_AGENDA_empty_calendar_keeps_grid_and_new_action", async () =
   expect(container.textContent).toContain("+ New");
   const mini = container.querySelector('[aria-label="Mini month"]');
   expect(mini?.querySelectorAll("button").length).toBe(42);
-  expect(mini?.querySelector("a")?.textContent).toBe("Google Calendar connection");
+  // AGENDA-RESTORE: the Google Calendar link is "Check Google Calendar" in Today's calendar again (the old design).
+  const today = container.querySelector('[aria-label="Today\'s calendar"]');
+  expect(today?.querySelector("h2")?.textContent).toBe("Today's calendar");
+  expect(today?.querySelector("a")?.textContent).toBe("Check Google Calendar");
 });
 it("FR_UX_14 a failed plate read shows the existing error instead of sample pins", async () => {
   const { container } = await mount({}, 503);

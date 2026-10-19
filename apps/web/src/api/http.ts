@@ -673,14 +673,18 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     decode?: (response: Response) => Promise<T>,
   ): Promise<T> {
     let res: Response;
-    // A8: the intake is the one call a person waits on in front of a spinner, so it has an end.
-    const stop = path === "/intake" ? new AbortController() : null;
+    // A capture can wait on a provider. End the visible wait so the person can retry or use words.
+    const capture = path.startsWith("/v1/skills/captures");
+    const stop = path === "/intake" || capture ? new AbortController() : null;
     let late = false;
     const timer = stop
-      ? setTimeout(() => {
-          late = true;
-          stop.abort();
-        }, INTAKE_TIMEOUT_MS)
+      ? setTimeout(
+          () => {
+            late = true;
+            stop.abort();
+          },
+          capture ? 45_000 : INTAKE_TIMEOUT_MS,
+        )
       : null;
     try {
       const sent = await this.withAuth(await this.withAppCheck(init));
@@ -801,6 +805,20 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
   /** X-RESULT-1: authenticated binary reads use the same refusal handling as JSON reads. */
   getBlob(path: string): Promise<Blob> {
     return this.request(path, { cache: "no-store" }, false, (response) => response.blob());
+  }
+
+  /** Owner-only masked frame named by a recorded browser event. */
+  getBrowserFrame(worldId: string, artifactId: string): Promise<Blob> {
+    return this.getBlob(
+      `/worlds/${encodeURIComponent(worldId)}/browser/frames/${encodeURIComponent(artifactId)}`,
+    );
+  }
+
+  async stopBrowser(worldId: string, session: string): Promise<void> {
+    await this.post(
+      `/worlds/${encodeURIComponent(worldId)}/browser/${encodeURIComponent(session)}/stop`,
+      {},
+    );
   }
 
   private async readPerson(path: string): Promise<unknown> {
@@ -1034,7 +1052,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
   startAgain(worldId: string, direction?: string): Promise<{ world_id: string; task_id: string }> {
     return this.post(
       `/worlds/${encodeURIComponent(worldId)}/rerun`,
-      direction ? { direction } : {},
+      direction ? { direction } : undefined, // no body: a plain start-again
     );
   }
 

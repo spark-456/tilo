@@ -15,6 +15,7 @@ import {
   clickEl,
   control,
   hasControl,
+  mountHome,
   settle,
   taskInput,
   typeInto,
@@ -29,6 +30,7 @@ import {
   showsPending,
 } from "../../../../test-support/park/liveHomeHarness";
 import { BRIEF_SUPPLIER_COMPARISON } from "../../../api/fixtures/brief";
+import { HttpClient } from "../../../api/http";
 import type { Api } from "../../api/index";
 import { createLiveApi } from "../../api/liveApi";
 import { carryOneStep } from "../../api/oneStep";
@@ -51,10 +53,11 @@ async function startTask(rig: Awaited<ReturnType<typeof mountLiveHome>>, text: s
   await settle();
 }
 
-function serverWith(intake: () => Response | Promise<Response>) {
+function serverWith(intake: () => Response | Promise<Response>, catalog?: unknown) {
   const fetchSpy = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
     const path = String(url).replace(BASE, "");
     if (init?.method === "POST" && path === "/intake") return intake();
+    if (path === "/v1/skills/catalog" && catalog) return json(catalog);
     if (init?.method === "POST" && path === "/tasks/t_abc123/answers")
       return json({ brief: BRIEF_SUPPLIER_COMPARISON });
     if (path === "/tasks/t_abc123/approaches")
@@ -96,6 +99,68 @@ function serverWith(intake: () => Response | Promise<Response>) {
 }
 
 describe("FR_UX_13 live composer over the real live Api", () => {
+  it("P0_SKILLS_home_browser_skill_states_the_limit_and_does_not_start", async () => {
+    const { api, intakes, fetchSpy } = serverWith(() => json(INTAKE), {
+      skills: [
+        {
+          id: "site-check",
+          kind: "taught",
+          scope: "mine",
+          name: "Site check",
+          purpose: "Check the supplier",
+          inputs: [],
+          tools: [],
+          needs_browser_control: true,
+          version: 1,
+        },
+      ],
+    });
+    const rig = await mountHome({
+      api,
+      worldClient: new HttpClient({ baseUrl: BASE, fetch: fetchSpy as unknown as typeof fetch }),
+    });
+    typeInto(taskInput(rig.el), "@Site");
+    await settle();
+    clickEl(q(rig.el, '[role="option"]'));
+    await settle();
+    expect(rig.el.textContent).toContain("Needs browser control (coming)");
+    const start = control(rig.el, "Start task") as HTMLButtonElement;
+    expect(start.disabled).toBe(true);
+    taskInput(rig.el).dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await settle();
+    expect(intakes()).toHaveLength(0);
+  });
+
+  it("P0_SKILLS_home_mention_alone_starts_the_tagged_skill", async () => {
+    const { api, intakes, fetchSpy } = serverWith(() => json(INTAKE), {
+      skills: [
+        {
+          id: "competitor-scan",
+          kind: "library",
+          scope: "library",
+          name: "Competitor scan",
+          purpose: "Compare options",
+          inputs: [],
+          tools: [],
+          version: "1",
+        },
+      ],
+    });
+    const rig = await mountHome({
+      api,
+      worldClient: new HttpClient({ baseUrl: BASE, fetch: fetchSpy as unknown as typeof fetch }),
+    });
+    typeInto(taskInput(rig.el), "@Competitor");
+    await settle();
+    clickEl(q(rig.el, '[role="option"]'));
+    await settle();
+    clickEl(control(rig.el, "Start task"));
+    await settle();
+    expect(intakes()).toHaveLength(1);
+    expect((intakes()[0]?.[1]?.body as FormData).get("refs")).toBe(
+      '[{"kind":"skill","id":"competitor-scan"}]',
+    );
+  });
   it("FR_PA_11 a handed skill stays pinned on the Home Thinking intake", async () => {
     const { api, intakes } = serverWith(() => json(INTAKE));
     handDraft("Compare suppliers", {

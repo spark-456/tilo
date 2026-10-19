@@ -97,6 +97,13 @@ class Empty(_Closed):
     """A confirm takes `{}`: the stamp is the actor and the clock."""
 
 
+class AttendIn(_Closed):
+    """MEET-GUEST: `{}` attends a meeting Tilo hosts; `{"join_url": ...}` sends Tilo's guest bot to the person's own
+    Google Meet, where the host admits it. The link is checked as a MeetingJoin, used once and stored nowhere."""
+
+    join_url: Annotated[str, Field(max_length=64)] | None = None
+
+
 class StartIn(_Closed):
     """MEET-SIMPLE: the person's own confirmation of a hosted meeting. `approve` is JSON `true` (their click on
     "Meet with Tilo" or on Confirm in the schedule dialog); `invited` the exact people shown, themself included."""

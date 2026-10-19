@@ -8,7 +8,7 @@
 // screen, so they hold whatever an earlier test already put in the document-wide cache. What the browser
 // then shows (cars moving, paused off Home, the budget) is in e2e/park-motion-backdrop.spec.ts.
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, q } from "../../../test-support/park/componentsHarness";
 import { sceneSpy } from "../../../test-support/park/motionEngine";
 import { mountApp, seen } from "../../../test-support/park/shellHarness";
@@ -58,8 +58,14 @@ function setReduced(value: boolean): void {
   });
 }
 
+beforeEach(() => {
+  window.localStorage.clear();
+  window.localStorage.setItem("tilo.theme", "metropolis");
+});
+
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
   window.history.pushState({}, "", "/");
   reduced = false;
   listeners.clear();
@@ -114,6 +120,7 @@ describe("WEB-MOTION-1 motion preference: lively, calm, still", () => {
 
 describe("WEB-MOTION-1 the city holds still while the world loader is open (as the handoff does)", () => {
   it("WEB-MOTION-1 opening a world on Home pauses the city, and it is not paused before", async () => {
+    window.localStorage.setItem("tilo.theme", "studio");
     await mountApp();
     const backdrop = () => q(document.body, ".park-shell__backdrop");
     // UI-STUDIO-2: the Studio Home has no city (the design's plain page), so the city is veiled and held there;

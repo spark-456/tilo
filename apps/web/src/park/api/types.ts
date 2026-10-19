@@ -208,6 +208,8 @@ export interface World {
   sample?: boolean;
   /** BQ-CTX-TEAMWORLD: `team` for a teammate's world the person reads through a share (read only); absent = theirs. */
   access?: "team";
+  /** True only when the served world status was completed; failed worlds have no result. */
+  resultReady?: boolean;
   plan?: string | null;
   districts?: WorldDistrict[] | null;
   activity?: ActivityItem[];
@@ -244,7 +246,7 @@ export interface Skill {
   steps: string[];
   /** Details supplied with a taught skill record; absent for catalogue entries with no detail API. */
   details?: {
-    steps: { tool: string; action: string }[];
+    steps: { tool: string; action: string; verb?: string; ask_first?: boolean }[];
     inputs: SkillInput[];
     hosts: string[];
     estimatedCredits: number | null;
@@ -266,7 +268,7 @@ export interface SkillDraft {
   /** SKILLS-5: a taught version as the server made it; `saveSkill` posts these steps, not the labels above. */
   server?: {
     captured: string[];
-    question: { text: string; options: string[] } | null;
+    question: { text: string; options: string[]; answer?: number | null } | null;
     steps: { text: string; tool: string; action: string; verb: string; ask: boolean }[];
     inputs?: SkillInput[];
     hosts?: string[];
@@ -564,6 +566,7 @@ export interface Notification {
 // Acknowledgements of writes
 export interface Ack {
   ok: true;
+  skill?: Skill;
 }
 export interface DecideAck extends Ack {
   dec: Dec;

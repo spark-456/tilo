@@ -13,7 +13,7 @@ import { ChunkLoadError } from "../api/chunkError";
 import type { TiloClient } from "../api/client";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { describeError } from "../park/shared/remote";
-import type { WorldSeam } from "../stage/Stage";
+import type { StageVisibility, WorldSeam } from "../stage/Stage";
 import { watchRun } from "./runLog";
 import { useSelection } from "./selection";
 
@@ -50,6 +50,7 @@ interface Host {
   readonly world: Container;
   readonly requestRender: () => void;
   readonly size: () => { width: number; height: number };
+  readonly visibility: StageVisibility | undefined;
 }
 
 /** `worldId` is the world to draw, or null (no world in the address, or a ?fixture= replay). */
@@ -72,15 +73,15 @@ export function useClientWorld(
   reducedMotion.current = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   // The stage hands its Pixi container over once, when its renderer is ready.
-  const onWorld = useCallback<WorldSeam>((world, requestRender, size) => {
-    setHost({ world, requestRender, size });
+  const onWorld = useCallback<WorldSeam>((world, requestRender, size, visibility) => {
+    setHost({ world, requestRender, size, visibility });
     return () => setHost(null);
   }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is the retry trigger.
   useEffect(() => {
     if (worldId === null || host === null) return;
-    const { world, requestRender, size } = host;
+    const { world, requestRender, size, visibility } = host;
     const before = world.children.length;
     let cancelled = false;
     const abort = new AbortController();
@@ -106,6 +107,7 @@ export function useClientWorld(
           world,
           requestRender,
           size,
+          visibility,
           layout,
           watch: (onEvent) => watchRun(client, worldId, onEvent),
           reducedMotion: () => reducedMotion.current,

@@ -15,10 +15,11 @@ COPY templates ./templates
 RUN uv sync --locked --no-dev --package tilo-browser
 
 FROM python:3.12.15-slim-trixie AS runtime
-ENV PATH="/app/.venv/bin:${PATH}" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PORT=8080
+ENV PATH="/app/.venv/bin:${PATH}" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PORT=8080 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN groupadd --system --gid 10001 tilo && useradd --system --uid 10001 --gid tilo --no-create-home tilo
 WORKDIR /app
 COPY --from=builder /app /app
+RUN playwright install --with-deps chromium && chmod -R a+rX /ms-playwright
 USER 10001:10001
 EXPOSE 8080
 CMD ["sh", "-c", "exec uvicorn tilo_browser.app:app --host 0.0.0.0 --port ${PORT}"]

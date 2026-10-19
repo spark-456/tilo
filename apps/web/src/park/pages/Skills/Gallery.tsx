@@ -1,7 +1,7 @@
 // STUDIO-4: the Skills gallery (design/studio-v2 "Tilo S Skills" view gallery): the Teach Tilo banner, search and
 // status filters, every skill as a card, and "Learning now". Every number is the Api's; a skill the Api serves no
 // count for says so. Pictures are the kit's still agents (no motion).
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Skill } from "../../api/types";
 import { Button } from "../../components";
 import { cx } from "../../components/cx";
@@ -10,13 +10,25 @@ import { WIZARD_STEPS } from "./TeachWizard";
 import { SkillIcon } from "./skillIcon";
 import { agent, icon } from "./skillsKit";
 
-type Filter = "all" | "builtin" | "yours" | "learning" | "trusted";
+type Filter = "all" | "mine" | "builtin" | "team";
 const FILTERS: readonly { key: Filter; label: string; test: (s: Skill) => boolean }[] = [
   { key: "all", label: "All", test: () => true },
-  { key: "builtin", label: "Built-in", test: (s) => s.builtin === true },
-  { key: "yours", label: "Taught", test: (s) => !s.builtin },
-  { key: "learning", label: "Learning", test: (s) => !s.builtin && s.st === "learning" },
-  { key: "trusted", label: "Trusted", test: (s) => !s.builtin && s.st === "trusted" },
+  {
+    key: "mine",
+    label: "Mine",
+    test: (s) =>
+      !s.builtin &&
+      (s.owner === "You" ||
+        s.owner?.toLowerCase().includes("you") ||
+        s.team === "Just me" ||
+        !s.team),
+  },
+  { key: "builtin", label: "Built-in", test: (s) => Boolean(s.builtin) },
+  {
+    key: "team",
+    label: "Team",
+    test: (s) => !s.builtin && Boolean(s.team && s.team !== "Just me"),
+  },
 ];
 
 const WAYS = [
@@ -60,7 +72,7 @@ export function TeachBanner({ night, onStart }: { night: boolean; onStart: () =>
 }
 
 function sub(s: Skill): string {
-  if (s.builtin) return s.description ?? "";
+  if (s.description?.trim()) return s.description.trim();
   if (s.steps.length)
     return `${s.steps.length} ${s.steps.length === 1 ? "step" : "steps"}: ${s.steps[0]}`;
   return "No steps yet.";
@@ -78,15 +90,17 @@ export function SkillGrid({
 }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const test = FILTERS.find((f) => f.key === filter)?.test ?? (() => true);
-  const needle = q.trim().toLowerCase();
-  const shown = skills.filter(
-    (s) =>
-      test(s) &&
-      (!needle ||
-        s.name.toLowerCase().includes(needle) ||
-        (s.description ?? "").toLowerCase().includes(needle)),
-  );
+  const shown = useMemo(() => {
+    const test = FILTERS.find((f) => f.key === filter)?.test ?? (() => true);
+    const needle = q.trim().toLowerCase();
+    return skills.filter(
+      (s) =>
+        test(s) &&
+        (!needle ||
+          s.name.toLowerCase().includes(needle) ||
+          (s.description ?? "").toLowerCase().includes(needle)),
+    );
+  }, [skills, q, filter]);
   return (
     <section aria-label="All skills" className="park-skills-gallery">
       <div className="park-skills-search">
@@ -125,8 +139,12 @@ export function SkillGrid({
         <ul className="park-skills-cards">
           {shown.map((s) => {
             const st = statusOf(s, Boolean(paused[s.id]));
+            const tags = [
+              s.builtin ? "Built-in" : s.team || "Personal",
+              ...s.tools.slice(0, 2).map(([tool]) => tool),
+            ];
             return (
-              <li key={s.id}>
+              <li key={s.id} className="park-skills-card-item">
                 <button type="button" className="park-skills-card2" onClick={() => onOpen(s.id)}>
                   <span className="park-skills-card2__top">
                     <span className="park-skills-card2__art" aria-hidden="true">
@@ -138,15 +156,24 @@ export function SkillGrid({
                   </span>
                   <span className="park-skills-card2__name">{s.name}</span>
                   <span className="park-skills-card2__what">{sub(s)}</span>
+                  <span className="park-skills-card2__tags">
+                    {tags.map((tag) => (
+                      <span key={tag} className="park-skill-tag">
+                        {tag}
+                      </span>
+                    ))}
+                  </span>
                   <span className="park-skills-card2__foot">
-                    <span>
+                    <span className="park-skills-card2__meta">
                       {s.builtin
                         ? `Version ${s.from}`
                         : s.runs == null
                           ? "No runs recorded"
                           : `Run ${s.runs} ${s.runs === 1 ? "time" : "times"}`}
                     </span>
-                    <span>{s.team}</span>
+                    <span className="park-skills-card2__run-btn" aria-hidden="true">
+                      Run
+                    </span>
                   </span>
                 </button>
               </li>

@@ -110,6 +110,7 @@ a:hover {
   inset: auto var(--space-16) var(--space-16) auto;
   display: flex;
   flex-direction: column;
+  min-width: 84px;
   gap: var(--space-8);
 }
 .stage-controls .secondary {

@@ -20,6 +20,7 @@ or stored. No model call, no log, no clock read (`now` is handed in).
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 import re
 import secrets
@@ -39,6 +40,7 @@ from tilo_api import deps
 from tilo_api.people_limits import _KEY, WRITES_PER_MINUTE, Limits
 from tilo_api.people_writes import Refusal
 
+logger = logging.getLogger("tilo_api.people")
 COUNTER_TTL = timedelta(seconds=120)
 KEY_TTL = timedelta(hours=24)
 CLAIM_TTL = timedelta(minutes=5)
@@ -47,6 +49,7 @@ _KINDS = {
     "/v1/people": "person",
     "/v1/people/first": "person",
     "/v1/work-items": "work_item",
+    "/v1/pinboards": "pin",
 }
 _ORG = re.compile(r"org_[0-9A-Za-z_]{1,48}")
 _UID = re.compile(r"u_[0-9A-Za-z_]{1,48}")
@@ -141,7 +144,7 @@ class DurableLimits(Limits):
             return None
         if kind == "person":
             return project("person", "membership", found.record) or {}
-        return None if found.record.get("status") == "deleted" else dict(found.record)
+        return None if found.record.get("status") in ("deleted", "removed") else dict(found.record)
 
     def _retry(self, step: Callable[[], Any]) -> bool:
         for _ in range(3):
@@ -164,6 +167,7 @@ class DurableLimits(Limits):
         if _KEY.fullmatch(key) is None:
             raise Refusal(422, "invalid_idempotency_key")  # never echoes the key
         if now is None or route not in _KINDS:
+            logger.warning("idempotency key refused: route has no record kind (%s)", route)
             raise _unavailable()
         kind, at = _KINDS[route], datetime.fromtimestamp(now, UTC)
         fp = _hash("fp", user_id, route, key, body.model_dump_json())

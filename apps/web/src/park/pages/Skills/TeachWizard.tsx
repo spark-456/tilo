@@ -44,6 +44,11 @@ const YOUTUBE_LIMIT =
 export function unavailableStepCopy(item: { text: string; reason: string }): string {
   const socialVideo = /\b(?:youtube|videos?)\b/i.test(item.text);
   const publicAction = /\b(?:like|liking|comment|commenting)\b/i.test(item.text);
+  if (
+    /\b(?:open|navigate|click|play|type|fill)\b/i.test(item.text) &&
+    /\b(?:browser|website|webpage|youtube|https?:\/\/|\.com\b)/i.test(item.text)
+  )
+    return `${item.text} · Needs browser control (coming)`;
   return socialVideo && publicAction ? YOUTUBE_LIMIT : `${item.text} · ${item.reason}`;
 }
 
@@ -77,6 +82,40 @@ export function TeachWizard({ t, user, night, onClose, onView, retryRead }: Wiza
         <button type="button" className="park-teach__back" onClick={onClose}>
           ← Back to skills
         </button>
+        <nav className="park-teach__progress-header" aria-label="Progress">
+          <span
+            className={cx(
+              "park-teach__progress-step",
+              step === 1 && "park-teach__progress-step--active",
+              step > 1 && "park-teach__progress-step--done",
+            )}
+          >
+            {step > 1 ? "✓ Record" : "Record"}
+          </span>
+          <span className="park-teach__progress-sep" aria-hidden="true">
+            ›
+          </span>
+          <span
+            className={cx(
+              "park-teach__progress-step",
+              step === 2 && "park-teach__progress-step--active",
+              step > 2 && "park-teach__progress-step--done",
+            )}
+          >
+            {step > 2 ? "✓ Review steps" : "Review steps"}
+          </span>
+          <span className="park-teach__progress-sep" aria-hidden="true">
+            ›
+          </span>
+          <span
+            className={cx(
+              "park-teach__progress-step",
+              step === 3 && "park-teach__progress-step--active",
+            )}
+          >
+            Save
+          </span>
+        </nav>
         <span className="park-teach__count">{`Step ${step} of 3`}</span>
       </div>
       <h1 className="park-skills-h1 park-teach__h1" tabIndex={-1}>
@@ -86,6 +125,7 @@ export function TeachWizard({ t, user, night, onClose, onView, retryRead }: Wiza
         {WIZARD_STEPS.map((s, i) => {
           const n = i + 1;
           const state = n < step || t.saved ? "complete" : n === step ? "construction" : "planned";
+          const displayLabel = i === 0 ? "Record" : i === 1 ? "Review steps" : "Save";
           return (
             <li
               key={s.label}
@@ -97,8 +137,9 @@ export function TeachWizard({ t, user, night, onClose, onView, retryRead }: Wiza
               </span>
               <span className="park-teach__pill">
                 <span className="park-teach__n">{state === "complete" ? "✓" : n}</span>
-                {s.label}
+                <span className="park-teach__label-text">{displayLabel}</span>
                 <span className="park-sr-only">
+                  {s.label}
                   {state === "complete" ? " (done)" : state === "planned" ? " (not yet)" : " (now)"}
                 </span>
               </span>
@@ -182,7 +223,11 @@ function UploadExample({ t, onAccepted }: { t: Teach; onAccepted?: () => void })
   );
 }
 
-export function ScreenExample({ t, onAccepted }: { t: Teach; onAccepted?: () => void }) {
+export function ScreenExample({
+  t,
+  onAccepted,
+  onSkip,
+}: { t: Teach; onAccepted?: () => void; onSkip?: () => void }) {
   const [narrate, setNarrate] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -239,8 +284,17 @@ export function ScreenExample({ t, onAccepted }: { t: Teach; onAccepted?: () => 
         </Button>
       ) : file ? (
         <>
-          {/* biome-ignore lint/a11y/useMediaCaption: this is an unsent local preview of the person's own capture; no transcript exists yet. */}
-          {url ? <video src={url} controls aria-label="Recording preview" /> : null}
+          {url ? (
+            <div className="park-teach__video-wrap">
+              {/* biome-ignore lint/a11y/useMediaCaption: this is an unsent local preview of the person's own capture; no transcript exists yet. */}
+              <video
+                src={url}
+                controls
+                aria-label="Recording preview"
+                className="park-teach__recording-preview"
+              />
+            </div>
+          ) : null}
           <Button
             variant="primary"
             size="sm"
@@ -249,8 +303,21 @@ export function ScreenExample({ t, onAccepted }: { t: Teach; onAccepted?: () => 
               awaitingUpload.current = t.captureFiles([file], "record");
             }}
           >
-            Use this recording
+            {t.fileError ? "Retry recording" : "Use this recording"}
           </Button>
+          {t.fileError ? (
+            <button
+              type="button"
+              className="park-teach__quiet"
+              onClick={() => {
+                setFile(null);
+                t.skipRecording?.();
+                onSkip?.();
+              }}
+            >
+              Skip, describe it in words
+            </button>
+          ) : null}
           <Button variant="secondary" size="sm" onClick={() => setFile(null)}>
             Discard recording
           </Button>
@@ -260,6 +327,7 @@ export function ScreenExample({ t, onAccepted }: { t: Teach; onAccepted?: () => 
           Start recording
         </Button>
       )}
+      {file && t.fileError ? <span role="alert">{t.fileError}</span> : null}
       {error ? <span role="alert">{error}</span> : null}
     </section>
   );
@@ -271,6 +339,7 @@ function Describe({
   onCancel,
   onNext,
 }: { t: Teach; onCancel: () => void; onNext: () => void } & Heading) {
+  const description = useRef<HTMLTextAreaElement>(null);
   const nameId = useId();
   const descId = useId();
   // The name can wait until Save. The person can describe the skill or upload an example.
@@ -304,6 +373,7 @@ function Describe({
           What it does, step by step
         </label>
         <textarea
+          ref={description}
           id={descId}
           className="park-teach__text"
           value={t.desc}
@@ -315,7 +385,7 @@ function Describe({
       {t.live ? (
         <>
           <UploadExample t={t} onAccepted={onNext} />
-          <ScreenExample t={t} onAccepted={onNext} />
+          <ScreenExample t={t} onAccepted={onNext} onSkip={() => description.current?.focus()} />
         </>
       ) : null}
       <fieldset className="park-teach__field park-teach__fieldset">
@@ -434,7 +504,7 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
     : PLAN.map((p) => ({ text: p.text, tool: p.tool, locked: false }));
   const question = t.live
     ? v?.question
-      ? { text: v.question.text, answers: [] as readonly string[] }
+      ? { text: v.question.text, answers: v.question.options }
       : null
     : QUESTION;
   const est = estimateSkillPlan(PLAN, t.ask, t.currency);
@@ -455,6 +525,12 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
     ...(t.live ? [] : [{ key: "team", label: user.org } as const]),
   ] as const;
   const nameId = useId();
+  const browserTask =
+    t.live &&
+    /\b(?:open|navigate|click|play|type|fill)\b/i.test([t.desc, ...t.steps].join(" ")) &&
+    /\b(?:browser|website|webpage|youtube|https?:\/\/|\.com\b)/i.test(
+      [t.desc, ...t.steps].join(" "),
+    );
   return (
     <section className="park-teach__card" aria-label="Review the steps">
       <div className="park-teach__intro">
@@ -474,6 +550,9 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
           <p>{t.steps.join(" · ")}</p>
         </div>
       ) : null}
+      {browserTask ? (
+        <output className="park-teach__hint">Needs browser control (coming)</output>
+      ) : null}
       <div className="park-teach__name">
         <span className="park-teach__nameic" aria-hidden="true">
           {icon("people", 22)}
@@ -491,21 +570,30 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
           />
         </span>
       </div>
-      <ol className="park-teach__list">
+      <ol className="park-teach__list park-teach__list--cards">
         {rows.map((p, i) => {
           const on = t.ask[i] === true || p.locked;
           return (
-            <li key={`${i}:${p.text}`} className="park-teach__row park-teach__row--step">
+            <li
+              key={`${i}:${p.text}`}
+              className="park-teach__row park-teach__row--step park-teach__step-card"
+            >
+              <span className="park-teach__drag-handle" aria-hidden="true" title="Drag step">
+                ⋮⋮
+              </span>
               <span className="park-teach__num">{i + 1}</span>
               <span className="park-teach__steptext">
-                {v?.fallback ? (
-                  <input
-                    aria-label={`Edit step ${i + 1}`}
-                    className="park-teach__input"
-                    value={p.text}
-                    maxLength={200}
-                    onChange={(event) => t.setStepText(i, event.target.value)}
-                  />
+                {t.live ? (
+                  <>
+                    <span className="park-sr-only">{p.text}</span>
+                    <input
+                      aria-label={`Edit step ${i + 1}`}
+                      className="park-teach__input"
+                      value={p.text}
+                      maxLength={200}
+                      onChange={(event) => t.setStepText(i, event.target.value)}
+                    />
+                  </>
                 ) : (
                   <span>{p.text}</span>
                 )}
@@ -590,7 +678,7 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
           </ul>
         </section>
       ) : null}
-      {question ? (
+      {question && !t.qSkipped ? (
         <div className="park-teach__question">
           <span className="park-teach__eyebrow">{QUESTION.eyebrow}</span>
           <p className="park-teach__q">{question.text}</p>
@@ -609,8 +697,32 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
               ))}
             </div>
           ) : null}
+          {t.live ? (
+            <>
+              <input
+                className="park-teach__input"
+                aria-label={`Answer ${question.text}`}
+                value={t.qAns ?? ""}
+                maxLength={60}
+                onChange={(event) => t.setQAns(event.target.value)}
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!t.qAns?.trim()}
+                onClick={t.saveAnswer}
+              >
+                Save answer
+              </Button>
+              <button type="button" className="park-teach__quiet" onClick={t.skipQuestion}>
+                Skip question
+              </button>
+              {t.qSaved ? <output>Answer saved</output> : null}
+            </>
+          ) : null}
         </div>
       ) : null}
+      {t.live && t.qSkipped ? <p className="park-teach__hint">Question skipped.</p> : null}
       <dl className="park-teach__est">
         {estimates.map((m) => (
           <div key={m.k} className="park-teach__estrow">
