@@ -25,7 +25,7 @@ formats:
 large_site:
   max_native_pages: 3
   needs: [
-      sign in, sign up, log in, login, user accounts, user profiles, database, backend, server, checkout, payments,
+      sign in, log in, login, user accounts, user profiles, database, backend, server, checkout, payments,
       shopping cart, online store, e-commerce, ecommerce, booking system, reservations, admin panel, cms,
       file uploads, multi-page, multiple pages,
     ]
