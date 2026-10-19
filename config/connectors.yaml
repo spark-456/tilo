@@ -217,5 +217,6 @@
   actions:
     - {id: web_search, capability: search, description: "Search the public web through the search provider.", risk_tier: T1, gate_type: none, irreversible: false}
     - {id: fetch_url, capability: read, description: "Download one public page or file from a host this task allows.", risk_tier: T1, gate_type: none, irreversible: false}
+    - {id: browse_web, capability: read, description: "Browse an allowlisted public site with a visible, recorded browser session; commits need a person.", risk_tier: T1, gate_type: none, irreversible: false}
   limits: {per_minute: 30, batch_size: 10}
   data_class: {returns: [public], redact: []}
