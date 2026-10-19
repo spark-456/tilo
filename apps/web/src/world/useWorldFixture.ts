@@ -67,7 +67,7 @@ export function useWorldFixture(): WorldFixtureState {
   const dataRef = useRef<Promise<import("./fixtureLoader").LoadedFixture> | null>(null);
 
   const onWorld = useCallback<WorldSeam>(
-    (world, requestRender, size) => {
+    (world, requestRender, size, visibility) => {
       if (!fixture) return undefined;
       if (!dataRef.current) dataRef.current = loadFixture(fixture);
       let cancelled = false;
@@ -84,6 +84,7 @@ export function useWorldFixture(): WorldFixtureState {
             world,
             requestRender,
             size,
+            visibility,
             layout,
             events,
             seqParam,

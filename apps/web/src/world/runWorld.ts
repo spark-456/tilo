@@ -9,6 +9,7 @@
 import type { Event, Layout } from "@tilo/contracts";
 import type { Container } from "pixi.js";
 import { subscribeDensity } from "../display/density";
+import type { StageVisibility } from "../stage/Stage";
 import { MAX_DURATION_MS, createChoreographer } from "./choreographer";
 import { type Frame, type FrameAgent, type FrameSay, frameOf } from "./frame";
 import { createMobileQuality } from "./mobileQuality";
@@ -55,6 +56,7 @@ interface WorldOptions {
   readonly world: Container;
   readonly requestRender: () => void;
   readonly size: () => { width: number; height: number };
+  readonly visibility?: StageVisibility | undefined;
   readonly layout: Layout;
   /** Read live (not captured once): a prefers-reduced-motion change applies mid-playback. */
   readonly reducedMotion: () => boolean;
@@ -227,17 +229,38 @@ function createLive(
   // WORLD-LIVE: a handoff note is held for a readable time by a queue of its own (a bubble is not a walk, so reduced
   // motion does not cut it), one hold per speaker, in seq order, each starting no earlier than its event was received.
   const talk = createChoreographer();
-  let hiddenAt: number | null = document.hidden ? performance.now() : null;
+  const visible = () => !document.hidden && (o.visibility?.isVisible() ?? true);
+  let hiddenAt: number | null = visible() ? null : performance.now();
   let hiddenTotal = 0;
+  let raf = 0;
+  let noteTimer: ReturnType<typeof setTimeout> | null = null;
+  const clearNoteTimer = () => {
+    if (noteTimer !== null) clearTimeout(noteTimer);
+    noteTimer = null;
+  };
+  let dirtyWhileHidden = false;
+  let resumeFrame = false;
   const onVisibility = () => {
     const now = performance.now();
-    if (document.hidden) hiddenAt ??= now;
-    else if (hiddenAt !== null) {
+    if (!visible()) {
+      hiddenAt ??= now;
+      resumeFrame ||= Boolean(raf || noteTimer);
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+      clearNoteTimer();
+    } else if (hiddenAt !== null) {
       hiddenTotal += now - hiddenAt;
       hiddenAt = null;
+      if (dirtyWhileHidden) renderStatic(layer, lastFrame);
+      if ((dirtyWhileHidden || resumeFrame) && !stopped && !paused && !scrubbed) {
+        if (drawAgents(playTime(now))) raf = requestAnimationFrame(tickAnim);
+      }
+      dirtyWhileHidden = false;
+      resumeFrame = false;
     }
   };
   document.addEventListener("visibilitychange", onVisibility);
+  const unview = o.visibility?.subscribe(onVisibility);
   const playTime = (now = performance.now()) =>
     now - hiddenTotal - (hiddenAt === null ? 0 : now - hiddenAt);
   // A room's bubbles stay while the room is open (it is a conversation, not a moment); meeting.adjourned ends them.
@@ -258,14 +281,19 @@ function createLive(
   // walked, and events that still arrive are only counted and traced (HR-1, HR-3).
   let paused = false;
   let lastDisplay = new Map<string, Vec>(); // what the agents were last drawn at
-  let raf = 0;
 
   // Draws every agent where the choreographer says it is at `now`: settled actors at their last
   // completed destination, an actor mid-walk lerped from its settled position to the walk's
   // destination over the entry's start..finish. Returns whether any actor still has queued or
   // in-flight moves (so the rAF loop keeps rendering every frame while, and only while, one does).
   function drawAgents(now: number): boolean {
-    choreo.advance(now);
+    if (!visible()) {
+      dirtyWhileHidden = true;
+      return false;
+    }
+    // A live preference change settles moves already in flight; later recorded events still
+    // arrive in order and choose their own presentation duration.
+    choreo.advance(calm() ? Number.POSITIVE_INFINITY : now);
     let busy = false;
     for (const id of agentIds) {
       const done = choreo.completed(id);
@@ -288,10 +316,7 @@ function createLive(
         walkFrom.set(id, walk);
       }
       const span = act.finish - act.start;
-      const t =
-        span > 0 && layer.density() !== "professional"
-          ? Math.min(1, Math.max(0, (now - act.start) / span))
-          : 1;
+      const t = span > 0 && !calm() ? Math.min(1, Math.max(0, (now - act.start) / span)) : 1;
       const bob = walkBob(t, calm());
       display.set(id, {
         x: walk.from.x + (to.x - walk.from.x) * t,
@@ -310,6 +335,7 @@ function createLive(
     }
     talk.advance(now);
     const speaking = new Map<string, FrameAgent["say"]>();
+    let nextNoteFinish = Number.POSITIVE_INFINITY;
     for (const [id, list] of spoken) {
       const done = new Set(talk.completed(id));
       const left = list.filter((hold) => !done.has(hold.seq));
@@ -317,7 +343,7 @@ function createLive(
       const act = talk.active(id);
       const current = act ? left.find((hold) => hold.seq === act.seq) : undefined;
       if (current) speaking.set(id, current.say);
-      if (left.length > 0) busy = true; // a note still waiting for its turn or being read keeps the frames coming
+      if (act) nextNoteFinish = Math.min(nextNoteFinish, act.finish);
     }
     const shown: Frame = {
       ...lastFrame,
@@ -330,12 +356,22 @@ function createLive(
     renderAgents(layer, shown, display, litOf(layout.world_id));
     renderSelection(layer, lastFrame, display, selected(), litOf(layout.world_id));
     requestRender();
+    clearNoteTimer();
+    if (!busy && Number.isFinite(nextNoteFinish) && !stopped && !paused && !scrubbed) {
+      noteTimer = setTimeout(
+        () => {
+          noteTimer = null;
+          if (drawAgents(playTime()) && !raf) raf = requestAnimationFrame(tickAnim);
+        },
+        Math.max(0, nextNoteFinish - now),
+      );
+    }
     return busy;
   }
 
   function tickAnim() {
     raf = 0;
-    if (stopped || paused || scrubbed) {
+    if (stopped || paused || scrubbed || !visible()) {
       mobileQuality.idle();
       return;
     }
@@ -390,6 +426,7 @@ function createLive(
     if (stopped || point === null || !source.canScrub(state)) return;
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
+    clearNoteTimer();
     scrubbed ??= staticView(layer, o, source.events());
     scrubbed.show(point);
   };
@@ -404,13 +441,17 @@ function createLive(
       paused = state.status === "paused";
       onStatus(state.status);
       if (paused) {
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0;
+        clearNoteTimer();
         onSeq(state.seq);
         onTrace(state.trace);
         return;
       }
       const frame = frameOf(layout, state);
       lastFrame = frame;
-      renderStatic(layer, frame);
+      if (!visible()) dirtyWhileHidden = true;
+      else renderStatic(layer, frame);
       if (wasPaused) {
         // Resumed: every agent goes straight to where the record says it is, no walk (HR-3).
         choreo.advance(Number.POSITIVE_INFINITY);
@@ -441,8 +482,7 @@ function createLive(
           // A settle (a finished agent going to its post once the talk window has passed) is a walk too: the event
           // that closed the window is its recorded cause (TILO-T-WORLD).
           durationMs:
-            layer.density() !== "professional" &&
-            (WALKS.has(event.type) || (event.actor !== a.id && stood !== stands))
+            !calm() && (WALKS.has(event.type) || (event.actor !== a.id && stood !== stands))
               ? Math.min(MOVE_DURATION_MS, MAX_DURATION_MS)
               : 0,
         });
@@ -485,6 +525,7 @@ function createLive(
     stop() {
       stopped = true;
       document.removeEventListener("visibilitychange", onVisibility);
+      unview?.();
       unselect();
       unspot();
       probe();
@@ -492,6 +533,7 @@ function createLive(
       unreplay();
       scrubbed?.off();
       if (raf) cancelAnimationFrame(raf);
+      clearNoteTimer();
     },
   };
 }

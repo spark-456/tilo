@@ -238,3 +238,130 @@ describe("FR-WLD-14 the stage follows the density mode, read at draw time", () =
     expect(s.calls.render).toBe(render);
   });
 });
+
+it("P0_PERF pauses a recorded world walk while the tab is hidden", () => {
+  const raf = vi.spyOn(globalThis, "requestAnimationFrame");
+  const cancel = vi.spyOn(globalThis, "cancelAnimationFrame");
+  let deliver: (event: Event) => void = () => undefined;
+  const stop = runClientWorld({
+    world: new Container(),
+    layout,
+    size: () => ({ width: 900, height: 600 }),
+    requestRender: () => undefined,
+    reducedMotion: () => false,
+    onSeq: () => undefined,
+    watch: (on) => {
+      for (const event of events.slice(0, 18)) on(event);
+      deliver = on;
+      return () => undefined;
+    },
+  });
+  deliver(events[18] as Event); // seq 19: the recorded agent handoff starts a walk
+  expect(raf).toHaveBeenCalled();
+  const pending = raf.mock.results.at(-1)?.value as number;
+  Object.defineProperty(document, "hidden", { configurable: true, value: true });
+  document.dispatchEvent(new Event("visibilitychange"));
+  expect(cancel).toHaveBeenCalledWith(pending);
+  const framesBeforeResume = raf.mock.calls.length;
+  Object.defineProperty(document, "hidden", { configurable: true, value: false });
+  document.dispatchEvent(new Event("visibilitychange"));
+  expect(raf.mock.calls.length).toBeGreaterThan(framesBeforeResume);
+  stop();
+  raf.mockRestore();
+  cancel.mockRestore();
+});
+
+it("P0_PERF holds a static handoff note without a frame loop", () => {
+  setDensity("professional"); // the recorded handoff is placed instantly in this view
+  const raf = vi.spyOn(globalThis, "requestAnimationFrame");
+  let deliver: (event: Event) => void = () => undefined;
+  const stop = runClientWorld({
+    world: new Container(),
+    layout,
+    size: () => ({ width: 900, height: 600 }),
+    requestRender: () => undefined,
+    reducedMotion: () => false,
+    onSeq: () => undefined,
+    watch: (on) => {
+      for (const event of events.slice(0, 18)) on(event);
+      deliver = on;
+      return () => undefined;
+    },
+  });
+  const frames = raf.mock.calls.length;
+  deliver(events[18] as Event); // seq 19 is a recorded handoff with a held note
+  expect(raf.mock.calls.length).toBe(frames);
+  stop();
+  raf.mockRestore();
+});
+
+it("P0_PERF finishes a recorded walk when reduced motion is enabled mid-walk", () => {
+  const callbacks: FrameRequestCallback[] = [];
+  const raf = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) => {
+    callbacks.push(callback);
+    return callbacks.length;
+  });
+  let reduced = false;
+  let deliver: (event: Event) => void = () => undefined;
+  const stop = runClientWorld({
+    world: new Container(),
+    layout,
+    size: () => ({ width: 900, height: 600 }),
+    requestRender: () => undefined,
+    reducedMotion: () => reduced,
+    onSeq: () => undefined,
+    watch: (on) => {
+      for (const event of events.slice(0, 18)) on(event);
+      deliver = on;
+      return () => undefined;
+    },
+  });
+  deliver(events[18] as Event); // a recorded handoff starts a walk
+  expect(callbacks).toHaveLength(1);
+  reduced = true;
+  callbacks[0]?.(performance.now());
+  expect(callbacks).toHaveLength(1); // no more interpolated frames
+  stop();
+  raf.mockRestore();
+});
+
+it("P0_PERF pauses recorded world drawing when its stage leaves the viewport", () => {
+  const raf = vi.spyOn(globalThis, "requestAnimationFrame");
+  const cancel = vi.spyOn(globalThis, "cancelAnimationFrame");
+  let visible = true;
+  let notify: () => void = () => undefined;
+  let deliver: (event: Event) => void = () => undefined;
+  const visibility = {
+    isVisible: () => visible,
+    subscribe: (onChange: () => void) => {
+      notify = onChange;
+      return () => undefined;
+    },
+  };
+  const stop = runClientWorld({
+    world: new Container(),
+    layout,
+    size: () => ({ width: 900, height: 600 }),
+    requestRender: () => undefined,
+    reducedMotion: () => false,
+    onSeq: () => undefined,
+    ...{ visibility },
+    watch: (on) => {
+      for (const event of events.slice(0, 18)) on(event);
+      deliver = on;
+      return () => undefined;
+    },
+  });
+  deliver(events[18] as Event);
+  const pending = raf.mock.results.at(-1)?.value as number;
+  visible = false;
+  notify();
+  expect(cancel).toHaveBeenCalledWith(pending);
+  const frames = raf.mock.calls.length;
+  visible = true;
+  notify();
+  expect(raf.mock.calls.length).toBeGreaterThan(frames);
+  stop();
+  raf.mockRestore();
+  cancel.mockRestore();
+});

@@ -3,7 +3,6 @@
 // drawn still (no motion on this page).
 import type { ReactNode } from "react";
 import { EmptyState, LoadingState } from "../../../design/tilo-t";
-import { backdropScene } from "../../shell/scene";
 import { type TownCounts, plural } from "./model";
 
 /** A still placeholder in the card's own size; no invented world data or motion. */
@@ -51,7 +50,14 @@ export function TownHero({
     <section aria-label="Your town" className="park-worlds-town">
       <div className="park-worlds-town__art" aria-hidden="true">
         <div className="park-worlds-town__scene">
-          {backdropScene(night ? "night" : "day", "still").el}
+          <img
+            src={`/park/worlds/worlds-town-${night ? "night" : "day"}.webp`}
+            alt=""
+            width="1600"
+            height="1000"
+            loading="lazy"
+            decoding="async"
+          />
         </div>
       </div>
       <div className="park-worlds-town__card">

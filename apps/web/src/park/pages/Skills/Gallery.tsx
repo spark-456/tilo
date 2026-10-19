@@ -1,7 +1,7 @@
 // STUDIO-4: the Skills gallery (design/studio-v2 "Tilo S Skills" view gallery): the Teach Tilo banner, search and
 // status filters, every skill as a card, and "Learning now". Every number is the Api's; a skill the Api serves no
 // count for says so. Pictures are the kit's still agents (no motion).
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Skill } from "../../api/types";
 import { Button } from "../../components";
 import { cx } from "../../components/cx";
@@ -90,15 +90,17 @@ export function SkillGrid({
 }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const test = FILTERS.find((f) => f.key === filter)?.test ?? (() => true);
-  const needle = q.trim().toLowerCase();
-  const shown = skills.filter(
-    (s) =>
-      test(s) &&
-      (!needle ||
-        s.name.toLowerCase().includes(needle) ||
-        (s.description ?? "").toLowerCase().includes(needle)),
-  );
+  const shown = useMemo(() => {
+    const test = FILTERS.find((f) => f.key === filter)?.test ?? (() => true);
+    const needle = q.trim().toLowerCase();
+    return skills.filter(
+      (s) =>
+        test(s) &&
+        (!needle ||
+          s.name.toLowerCase().includes(needle) ||
+          (s.description ?? "").toLowerCase().includes(needle)),
+    );
+  }, [skills, q, filter]);
   return (
     <section aria-label="All skills" className="park-skills-gallery">
       <div className="park-skills-search">
