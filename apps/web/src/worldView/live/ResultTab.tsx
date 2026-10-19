@@ -46,6 +46,9 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
   const mime = blob.type.split(";")[0]?.toLowerCase();
   const csv = mime === "text/csv" || format === "CSV" || /\.csv$/i.test(name);
   const html = mime === "text/html" || format === "HTML" || /\.html?$/i.test(name);
+  const markdown = mime === "text/markdown" || format === "MD" || /\.md$/i.test(name);
+  const plain = mime === "text/plain" || format === "TXT" || /\.txt$/i.test(name);
+  const pdf = mime === "application/pdf" || format === "PDF" || /\.pdf$/i.test(name);
   const image =
     mime?.startsWith("image/") ||
     /^(PNG|JPG|JPEG|WEBP|GIF)$/.test(format) ||
@@ -53,7 +56,7 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
   const [text, setText] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   useEffect(() => {
-    if (!csv && !html) return;
+    if (!csv && !html && !markdown && !plain) return;
     let active = true;
     blob
       .slice(0, 250_000)
@@ -64,13 +67,19 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
     return () => {
       active = false;
     };
-  }, [blob, csv, html]);
+  }, [blob, csv, html, markdown, plain]);
   useEffect(() => {
-    if (!image) return;
-    const url = URL.createObjectURL(blob);
+    if (!image && !pdf) return;
+    const previewType = OPEN_TYPES[format];
+    const shown =
+      blob.type === "application/octet-stream" &&
+      (previewType?.startsWith("image/") || previewType === "application/pdf")
+        ? new Blob([blob], { type: previewType })
+        : blob;
+    const url = URL.createObjectURL(shown);
     setImageUrl(url);
     return () => URL.revokeObjectURL(url);
-  }, [blob, image]);
+  }, [blob, format, image, pdf]);
   if (csv && text !== null) {
     const [head = [], ...body] = csvRows(text);
     return (
@@ -110,14 +119,33 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
         />
       </div>
     );
+  if (markdown && text !== null)
+    return (
+      <div className="park-world-resulttext tw-res-preview" data-testid="result-preview">
+        <Markdown text={readableMath(text)} />
+      </div>
+    );
+  if (plain && text !== null)
+    return (
+      <div className="park-world-resulttext tw-res-preview" data-testid="result-preview">
+        <pre className="park-world-resultpre">{readableMath(text)}</pre>
+      </div>
+    );
+  if (pdf && imageUrl)
+    return (
+      <div className="tw-res-preview" data-testid="result-preview">
+        <iframe title={`Preview of ${name}`} src={imageUrl} referrerPolicy="no-referrer" />
+      </div>
+    );
   if (image && imageUrl)
     return (
       <div className="tw-res-preview" data-testid="result-preview">
         <img src={imageUrl} alt={name} />
       </div>
     );
-  if ((csv || html || image) && text === null)
+  if ((csv || html || markdown || plain) && text === null)
     return <p className="park-world-noruns">Loading preview…</p>;
+  if ((image || pdf) && !imageUrl) return <p className="park-world-noruns">Loading preview…</p>;
   return <p className="park-world-noruns">Open or download this file to read it.</p>;
 }
 
@@ -163,9 +191,35 @@ function ResultBody({
 interface DeliveredFile {
   readonly id: string;
   readonly name: string;
+  readonly format: string | undefined;
+  readonly mediaType: string | null;
   readonly who?: string;
   readonly size?: string;
   readonly color?: string;
+}
+
+const OPEN_TYPES: Readonly<Record<string, string>> = {
+  PDF: "application/pdf",
+  CSV: "text/csv",
+  HTML: "text/html",
+  MD: "text/markdown",
+  TXT: "text/plain",
+  PNG: "image/png",
+  JPG: "image/jpeg",
+  JPEG: "image/jpeg",
+  WEBP: "image/webp",
+  GIF: "image/gif",
+};
+
+function openableBlob(blob: Blob, file: DeliveredFile): Blob {
+  if (blob.type !== "application/octet-stream") return blob;
+  const extension = /\.([a-z0-9]+)$/i.exec(file.name)?.[1]?.toUpperCase();
+  const recordedType = Object.values(OPEN_TYPES).includes(file.mediaType ?? "")
+    ? file.mediaType
+    : null;
+  const type =
+    OPEN_TYPES[extension ?? ""] ?? OPEN_TYPES[file.format?.toUpperCase() ?? ""] ?? recordedType;
+  return type ? new Blob([blob], { type }) : blob;
 }
 
 const FORMAT_NAMES: Record<string, string> = {
@@ -179,21 +233,29 @@ const FORMAT_NAMES: Record<string, string> = {
 
 function safeDeliverableName(raw: string): string | null {
   const trimmed = raw.trim();
-  const cleaned = trimmed.replace(/[^\w\s.-]/g, "").replace(/\s+/g, " ");
-  return cleaned || null;
+  const cleaned = trimmed.replace(/[<>:"/\\|?*\p{Cc}]/gu, " ").replace(/\s+/g, " ");
+  return cleaned.slice(0, 255) || null;
 }
 
 function recordedArtifact(
   events: readonly RunEvent[],
   id: string,
+  version?: number,
 ): { label: string | null; mediaType: string | null } {
-  const made = events.find((event) => {
-    const data = event.data as { artifact?: { artifact_id?: unknown } } | undefined;
+  const recorded = [...events].reverse();
+  const matches = (event: RunEvent, exactVersion: boolean) => {
+    const data = event.data as
+      | { artifact?: { artifact_id?: unknown; version?: unknown } }
+      | undefined;
     return (
       (event.type === "artifact.created" || event.type === "artifact.versioned") &&
-      data?.artifact?.artifact_id === id
+      data?.artifact?.artifact_id === id &&
+      (!exactVersion || data.artifact.version === version)
     );
-  });
+  };
+  const made =
+    recorded.find((event) => matches(event, true)) ??
+    recorded.find((event) => matches(event, false));
   const item = made as (RunEvent & { item?: { label?: unknown } }) | undefined;
   const data = made?.data as { media_type?: unknown } | undefined;
   return {
@@ -204,7 +266,7 @@ function recordedArtifact(
 
 function deliveredName(event: RunEvent, id: string, events: readonly RunEvent[]): string {
   const data = event.data as
-    | { artifact?: { label?: unknown }; format?: unknown; filename?: unknown }
+    | { artifact?: { label?: unknown; version?: unknown }; format?: unknown; filename?: unknown }
     | undefined;
   if (typeof data?.filename === "string" && data.filename.trim()) {
     const filename = safeDeliverableName(data.filename);
@@ -213,7 +275,8 @@ function deliveredName(event: RunEvent, id: string, events: readonly RunEvent[])
   const label = data?.artifact?.label;
   const cleanLabel = typeof label === "string" ? safeDeliverableName(label) : null;
   if (cleanLabel && cleanLabel !== id) return cleanLabel;
-  const recordedLabel = recordedArtifact(events, id).label;
+  const version = typeof data?.artifact?.version === "number" ? data.artifact.version : undefined;
+  const recordedLabel = recordedArtifact(events, id, version).label;
   if (recordedLabel) return recordedLabel;
   const fromSummary = event.summary.match(
     /^(?:The |Your )?(.+?) (?:is ready|was delivered)(?: in Tilo)?\.?$/i,
@@ -229,7 +292,9 @@ function deliveredName(event: RunEvent, id: string, events: readonly RunEvent[])
 function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
   const items: DeliveredFile[] = [];
   for (const e of events) {
-    const data = e.data as { artifact?: { artifact_id?: unknown } } | undefined;
+    const data = e.data as
+      | { artifact?: { artifact_id?: unknown; version?: unknown }; format?: unknown }
+      | undefined;
     const id = data?.artifact?.artifact_id;
     if (
       e.type === "artifact.delivered" &&
@@ -238,7 +303,16 @@ function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
     ) {
       const name = deliveredName(e, id, events);
       if (!items.some((x) => x.name.toLocaleLowerCase() === name.toLocaleLowerCase()))
-        items.push({ id, name });
+        items.push({
+          id,
+          name,
+          format: typeof data?.format === "string" ? data.format : undefined,
+          mediaType: recordedArtifact(
+            events,
+            id,
+            typeof data?.artifact?.version === "number" ? data.artifact.version : undefined,
+          ).mediaType,
+        });
     }
   }
   return items;
@@ -300,7 +374,7 @@ function WorkingFiles({
               className="tw-res-file-btn tw-res-file-btn--icon secondary"
               aria-label={`Open working file: ${f.name}`}
               title={`Open ${f.name}`}
-              onClick={() => readItem(f.id, openResult)}
+              onClick={() => readItem(f.id, (b) => openResult(openableBlob(b, f)))}
             >
               <Icon name="eye" size={16} />
               <span className="park-sr-only">{`Open working file: ${f.name}`}</span>
@@ -364,7 +438,7 @@ export function ResultTab({
   const mainData = mainEvent?.data as { format?: unknown } | undefined;
   const declaredFormat = typeof mainData?.format === "string" ? mainData.format.toUpperCase() : "";
   const extension = /\.([a-z0-9]+)$/i.exec(mainName)?.[1]?.toUpperCase();
-  const recordedMime = mainItem ? recordedArtifact(events, mainItem.id).mediaType : null;
+  const recordedMime = mainItem?.mediaType;
   const mime = blob?.type !== "application/octet-stream" ? blob?.type : recordedMime;
   const mimeFormat =
     mime === "text/markdown"
@@ -388,33 +462,22 @@ export function ResultTab({
         : /^(PNG|JPG|JPEG|WEBP|GIF)$/.test(mainFormat)
           ? "palette"
           : "file";
-  const mainSummary = mainEvent?.summary || "Ready to open or download.";
+  const summary = mainEvent?.summary?.trim() ?? "";
+  const mainSummary =
+    summary && !/\bartifact\.(?:created|delivered|versioned)\b/i.test(summary)
+      ? summary
+      : "Ready to open or download.";
 
   const handleOpen = () => {
-    const browserType: Record<string, string> = {
-      PDF: "application/pdf",
-      CSV: "text/csv",
-      HTML: "text/html",
-      MD: "text/markdown",
-      TXT: "text/plain",
-      PNG: "image/png",
-      JPG: "image/jpeg",
-      JPEG: "image/jpeg",
-      WEBP: "image/webp",
-      GIF: "image/gif",
-    };
-    if (blob)
-      openResult(
-        blob.type === "application/octet-stream" && browserType[mainFormat]
-          ? new Blob([blob], { type: browserType[mainFormat] })
-          : blob,
-      );
+    if (blob && mainItem) openResult(openableBlob(blob, mainItem));
     else if (onOpen) onOpen();
   };
 
   const handleDownload = () => {
-    if (blob) saveResult(blob, mainName);
-    else if (onDownload) onDownload();
+    if (blob) {
+      if (extension) saveNamedResult(blob, mainName);
+      else saveResult(blob, mainName);
+    } else if (onDownload) onDownload();
   };
 
   const handleCopy = async () => {
@@ -446,30 +509,8 @@ export function ResultTab({
     }
   };
 
-  const lastDeliveryEvent = [...events].reverse().find((e) => e.type === "artifact.delivered");
-  const deliveryTime = lastDeliveryEvent
-    ? new Date(lastDeliveryEvent.ts)
-        .toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-        .toLowerCase()
-    : "";
-  const piecesCount = rawDelivered.length;
-
   return (
     <div className="tw-res-container" data-testid="result-tab">
-      {/* 1. Delivered to the Dock Banner */}
-      <div className="tw-res-del tw-res-slide-0" data-testid="delivered-banner">
-        <span className="tw-res-del__icon" aria-hidden="true">
-          <Icon name="parcel" size={18} />
-        </span>
-        <span className="tw-res-del__meta">
-          <span className="tw-res-del__title">Delivered to the Dock</span>
-          <span className="tw-res-del__sub">
-            artifact.delivered · {deliveryTime} · {piecesCount} pieces
-          </span>
-        </span>
-      </div>
-
-      {/* 2. Main Deliverable Card */}
       <div className="tw-res-card tw-res-card--main tw-res-slide-1" data-testid="run-result">
         <div className="tw-res-body">
           <div className="tw-res-meta-line">
@@ -544,25 +585,9 @@ export function ResultTab({
         </div>
       </div>
 
-      {/* 4. Folded Working Files */}
       {rawDelivered.length > 1 ? (
         <WorkingFiles api={api} worldId={worldId} items={rawDelivered.slice(1)} />
       ) : null}
-
-      {/* 5. Where it was made */}
-      <div className="tw-res-made tw-res-slide-5" data-testid="where-it-was-made">
-        <span className="tw-res-made__header">WHERE IT WAS MADE</span>
-        <div className="tw-res-made__grid">
-          <div className="tw-res-made__card">
-            <span className="tw-res-made__icon" aria-hidden="true">
-              <Icon name="sparkle" size={18} />
-            </span>
-            <span className="tw-res-made__name">Tilo</span>
-            <span className="tw-res-made__desc">{`${piecesCount} delivered ${piecesCount === 1 ? "file" : "files"}`}</span>
-          </div>
-        </div>
-        <p className="tw-res-made__later">Other services coming later.</p>
-      </div>
     </div>
   );
 }

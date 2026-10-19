@@ -38,6 +38,7 @@ export interface CatalogSkill {
   readonly purpose: string;
   readonly inputs: readonly unknown[];
   readonly tools: readonly string[];
+  readonly needs_browser_control?: boolean;
   readonly version: string | number;
 }
 
@@ -68,6 +69,7 @@ export function catalogOf(value: unknown): CatalogSkill[] {
       Array.isArray(s.inputs) &&
       Array.isArray(s.tools) &&
       s.tools.every((t) => typeof t === "string") &&
+      (s.needs_browser_control === undefined || typeof s.needs_browser_control === "boolean") &&
       (typeof s.version === "string" || typeof s.version === "number")
     );
   });

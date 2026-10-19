@@ -92,7 +92,11 @@ export function SkillDrawer({
       (step) =>
         /\b(?:open|navigate|click|play|type|fill)\b/i.test(step) &&
         /\b(?:browser|website|webpage|youtube|https?:\/\/|\.com\b)/i.test(step),
-    ) || skill.details?.steps.some((step) => step.action === "browse_web") === true;
+    ) ||
+    skill.details?.steps.some(
+      (step) => /browser|browse_web/i.test(step.tool) || step.action === "browse_web",
+    ) === true ||
+    skill.catalog?.tools.some((tool) => /browser|browse_web/i.test(tool)) === true;
   const readyToRun = runInputs.every(
     (input) =>
       !input.required ||

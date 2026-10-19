@@ -99,6 +99,38 @@ function serverWith(intake: () => Response | Promise<Response>, catalog?: unknow
 }
 
 describe("FR_UX_13 live composer over the real live Api", () => {
+  it("P0_SKILLS_home_browser_skill_states_the_limit_and_does_not_start", async () => {
+    const { api, intakes, fetchSpy } = serverWith(() => json(INTAKE), {
+      skills: [
+        {
+          id: "site-check",
+          kind: "taught",
+          scope: "mine",
+          name: "Site check",
+          purpose: "Check the supplier",
+          inputs: [],
+          tools: [],
+          needs_browser_control: true,
+          version: 1,
+        },
+      ],
+    });
+    const rig = await mountHome({
+      api,
+      worldClient: new HttpClient({ baseUrl: BASE, fetch: fetchSpy as unknown as typeof fetch }),
+    });
+    typeInto(taskInput(rig.el), "@Site");
+    await settle();
+    clickEl(q(rig.el, '[role="option"]'));
+    await settle();
+    expect(rig.el.textContent).toContain("Needs browser control (coming)");
+    const start = control(rig.el, "Start task") as HTMLButtonElement;
+    expect(start.disabled).toBe(true);
+    taskInput(rig.el).dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await settle();
+    expect(intakes()).toHaveLength(0);
+  });
+
   it("P0_SKILLS_home_mention_alone_starts_the_tagged_skill", async () => {
     const { api, intakes, fetchSpy } = serverWith(() => json(INTAKE), {
       skills: [

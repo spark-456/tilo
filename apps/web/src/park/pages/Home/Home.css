@@ -911,6 +911,12 @@
   flex-direction: column;
   gap: 10px;
 }
+[data-park] .park-home-browser-note {
+  display: block;
+  margin: 8px 0 0;
+  color: var(--ink3);
+  font-size: 13px;
+}
 [data-park] .park-home-results h2 {
   margin: 0;
   font-size: 16px;
