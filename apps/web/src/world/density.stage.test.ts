@@ -329,7 +329,7 @@ it("P0_PERF pauses recorded world drawing when its stage leaves the viewport", (
   const raf = vi.spyOn(globalThis, "requestAnimationFrame");
   const cancel = vi.spyOn(globalThis, "cancelAnimationFrame");
   let visible = true;
-  let notify = () => undefined;
+  let notify: () => void = () => undefined;
   let deliver: (event: Event) => void = () => undefined;
   const visibility = {
     isVisible: () => visible,

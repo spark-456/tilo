@@ -50,7 +50,7 @@ interface Host {
   readonly world: Container;
   readonly requestRender: () => void;
   readonly size: () => { width: number; height: number };
-  readonly visibility: StageVisibility;
+  readonly visibility?: StageVisibility;
 }
 
 /** `worldId` is the world to draw, or null (no world in the address, or a ?fixture= replay). */

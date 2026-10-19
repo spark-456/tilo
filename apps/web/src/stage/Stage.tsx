@@ -50,7 +50,7 @@ export type WorldSeam = (
   world: Container,
   requestRender: () => void,
   size: () => { width: number; height: number },
-  visibility: StageVisibility,
+  visibility?: StageVisibility,
 ) => (() => void) | undefined;
 
 export interface StageVisibility {
