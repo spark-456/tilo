@@ -95,4 +95,39 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
     expect(node.textContent).not.toContain("Browser stopped");
     await act(async () => root.unmount());
   });
+
+  it("loads only an event's masked frame and places the cursor at its recorded box", async () => {
+    const create = vi.fn(() => "blob:masked-frame");
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: create });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+    const getBrowserFrame = vi.fn(async () => new Blob(["masked"], { type: "image/png" }));
+    const client = { getBrowserFrame } as unknown as TiloClient;
+    const session = "bs_01K7M000000000000000000000";
+    const events = [
+      recorded(1, "browser.started", {
+        session,
+        host: "en.wikipedia.org",
+        frame: { artifact_id: "art_first" },
+      }),
+      recorded(2, "browser.acted", {
+        session,
+        verdict: "done",
+        frame: { artifact_id: "art_second" },
+        target_box: { x: 200, y: 300, width: 100, height: 40 },
+        caption: "Clicking Search",
+      }),
+    ];
+    const node = document.createElement("div");
+    const root = createRoot(node);
+    await act(async () =>
+      root.render(<BrowserPanel client={client} worldId="w_demo" events={events} replay={false} />),
+    );
+    expect(getBrowserFrame).toHaveBeenCalledWith("w_demo", "art_second");
+    expect(node.querySelector("img")?.getAttribute("src")).toBe("blob:masked-frame");
+    expect(
+      node.querySelector('[data-testid="tilo-browser-cursor"]')?.getAttribute("data-event-seq"),
+    ).toBe("2");
+    expect(node.textContent).toContain("Clicking Search");
+    await act(async () => root.unmount());
+  });
 });
