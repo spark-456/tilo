@@ -238,3 +238,35 @@ describe("FR-WLD-14 the stage follows the density mode, read at draw time", () =
     expect(s.calls.render).toBe(render);
   });
 });
+
+it("P0_PERF pauses a recorded world walk while the tab is hidden", () => {
+  const raf = vi.spyOn(globalThis, "requestAnimationFrame");
+  const cancel = vi.spyOn(globalThis, "cancelAnimationFrame");
+  let deliver: (event: Event) => void = () => undefined;
+  const stop = runClientWorld({
+    world: new Container(),
+    layout,
+    size: () => ({ width: 900, height: 600 }),
+    requestRender: () => undefined,
+    reducedMotion: () => false,
+    onSeq: () => undefined,
+    watch: (on) => {
+      for (const event of events.slice(0, 18)) on(event);
+      deliver = on;
+      return () => undefined;
+    },
+  });
+  deliver(events[18] as Event); // seq 19: the recorded agent handoff starts a walk
+  expect(raf).toHaveBeenCalled();
+  const pending = raf.mock.results.at(-1)?.value as number;
+  Object.defineProperty(document, "hidden", { configurable: true, value: true });
+  document.dispatchEvent(new Event("visibilitychange"));
+  expect(cancel).toHaveBeenCalledWith(pending);
+  const framesBeforeResume = raf.mock.calls.length;
+  Object.defineProperty(document, "hidden", { configurable: true, value: false });
+  document.dispatchEvent(new Event("visibilitychange"));
+  expect(raf.mock.calls.length).toBeGreaterThan(framesBeforeResume);
+  stop();
+  raf.mockRestore();
+  cancel.mockRestore();
+});

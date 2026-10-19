@@ -229,12 +229,25 @@ function createLive(
   const talk = createChoreographer();
   let hiddenAt: number | null = document.hidden ? performance.now() : null;
   let hiddenTotal = 0;
+  let raf = 0;
+  let dirtyWhileHidden = false;
+  let resumeFrame = false;
   const onVisibility = () => {
     const now = performance.now();
-    if (document.hidden) hiddenAt ??= now;
-    else if (hiddenAt !== null) {
+    if (document.hidden) {
+      hiddenAt ??= now;
+      resumeFrame ||= Boolean(raf);
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+    } else if (hiddenAt !== null) {
       hiddenTotal += now - hiddenAt;
       hiddenAt = null;
+      if (dirtyWhileHidden) renderStatic(layer, lastFrame);
+      if ((dirtyWhileHidden || resumeFrame) && !stopped && !paused && !scrubbed) {
+        if (drawAgents(playTime(now))) raf = requestAnimationFrame(tickAnim);
+      }
+      dirtyWhileHidden = false;
+      resumeFrame = false;
     }
   };
   document.addEventListener("visibilitychange", onVisibility);
@@ -258,13 +271,16 @@ function createLive(
   // walked, and events that still arrive are only counted and traced (HR-1, HR-3).
   let paused = false;
   let lastDisplay = new Map<string, Vec>(); // what the agents were last drawn at
-  let raf = 0;
 
   // Draws every agent where the choreographer says it is at `now`: settled actors at their last
   // completed destination, an actor mid-walk lerped from its settled position to the walk's
   // destination over the entry's start..finish. Returns whether any actor still has queued or
   // in-flight moves (so the rAF loop keeps rendering every frame while, and only while, one does).
   function drawAgents(now: number): boolean {
+    if (document.hidden) {
+      dirtyWhileHidden = true;
+      return false;
+    }
     choreo.advance(now);
     let busy = false;
     for (const id of agentIds) {
@@ -335,7 +351,7 @@ function createLive(
 
   function tickAnim() {
     raf = 0;
-    if (stopped || paused || scrubbed) {
+    if (stopped || paused || scrubbed || document.hidden) {
       mobileQuality.idle();
       return;
     }
@@ -410,7 +426,8 @@ function createLive(
       }
       const frame = frameOf(layout, state);
       lastFrame = frame;
-      renderStatic(layer, frame);
+      if (document.hidden) dirtyWhileHidden = true;
+      else renderStatic(layer, frame);
       if (wasPaused) {
         // Resumed: every agent goes straight to where the record says it is, no walk (HR-3).
         choreo.advance(Number.POSITIVE_INFINITY);

@@ -17,7 +17,7 @@ afterEach(() => {
 });
 describe("R-PREVIEW static world card thumbnails", () => {
   it("P0_PERF_delays_layout_images_until_the_card_nears_the_viewport", async () => {
-    let enter = () => undefined;
+    let enter: () => void = () => undefined;
     vi.stubGlobal(
       "IntersectionObserver",
       class {
