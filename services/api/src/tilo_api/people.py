@@ -36,6 +36,7 @@ from tilo_api.people_pins import PinIn, create_pin, delete_pin, list_pins
 from tilo_api.people_plate import build_plate
 from tilo_api.people_quotes import Reader, item_quote, meeting_quotes
 from tilo_api.people_writes import (
+    AttendIn,
     Empty,
     ItemIn,
     MeetingIn,
@@ -336,7 +337,7 @@ def join_meeting_route(
 async def attend_meeting_route(
     meeting_id: str,
     request: Request,
-    _: Annotated[Empty, Depends(json_body(Empty))],
+    body: Annotated[AttendIn, Depends(json_body(AttendIn))],
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     _new_work: Annotated[deps.Mode, Depends(deps.get_work_mode)],  # a bot is new live work: refused at a cap
@@ -348,7 +349,15 @@ async def attend_meeting_route(
     claims: Annotated[AttendClaims | None, Depends(get_attend_claims)],
 ) -> dict[str, Any]:
     work = attend_meeting(
-        _writer(principal, stores, clock), store, artifacts, host, bot, meeting_id, clock, claims=claims
+        _writer(principal, stores, clock),
+        store,
+        artifacts,
+        host,
+        bot,
+        meeting_id,
+        clock,
+        claims=claims,
+        join_url=body.join_url,
     )
     try:
         return await while_connected(request, work)

@@ -4,7 +4,7 @@
 // and createConnectFlow; only fetch is mocked.
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, click, mount } from "../../../../test-support/park/componentsHarness";
+import { cleanup, mount } from "../../../../test-support/park/componentsHarness";
 import { liveConnectFlow } from "../../../api/connectEnv";
 import { PeopleLists } from "./PeopleLists";
 
@@ -57,14 +57,24 @@ function wire(state: string | string[]) {
   return fetcher;
 }
 
+// MEET-GUEST: whatever the meeting host's state, nobody is asked to sign it in; the guest join is always offered and
+// "Meet with Tilo now" (a meeting Tilo hosts) appears only with a connected host.
+const guestForm = (root: HTMLElement) =>
+  Array.from(root.querySelectorAll("button")).some((b) => b.textContent === "Send Tilo to my call");
+const signInLink = (root: HTMLElement) =>
+  Array.from(root.querySelectorAll("a")).some((a) =>
+    /sign in the meeting host/i.test(a.textContent ?? ""),
+  );
+
 describe("FR_MTG_09_AGENDA_HOST_STATE", () => {
-  it("FR_MTG_09_AGENDA_a_available_row_says_sign_in_without_could_not_confirm", async () => {
+  it("FR_MTG_09_AGENDA_a_available_row_offers_the_guest_join_and_no_sign_in", async () => {
     wire("available");
     const m = mount(<PeopleLists />);
     await act(async () => undefined);
     await act(async () => undefined);
-    const gate = m.container.querySelector('[data-testid="host-meeting-gate"]');
-    expect(gate?.textContent).toBe("Sign in the meeting host first");
+    expect(guestForm(m.container)).toBe(true);
+    expect(signInLink(m.container)).toBe(false);
+    expect(m.container.textContent).not.toContain("Meet with Tilo now");
   });
   it("FR_MTG_09_AGENDA_b_connected_row_shows_the_host_button", async () => {
     wire("connected");
@@ -72,6 +82,7 @@ describe("FR_MTG_09_AGENDA_HOST_STATE", () => {
     await act(async () => undefined);
     await act(async () => undefined);
     expect(m.container.textContent).toContain("Meet with Tilo now");
+    expect(guestForm(m.container)).toBe(true);
   });
   it("FR_MTG_09_AGENDA_c_connectors_page_flow_and_agenda_agree_on_the_same_session", async () => {
     wire("available");
@@ -80,27 +91,15 @@ describe("FR_MTG_09_AGENDA_HOST_STATE", () => {
     await act(async () => undefined);
     await act(async () => undefined);
     expect(await flow?.meetingHost()).toBe("available");
-    expect(m.container.querySelector('[data-testid="host-meeting-gate"]')?.textContent).toBe(
-      "Sign in the meeting host first",
-    );
+    expect(guestForm(m.container)).toBe(true);
   });
-  it("FR_MTG_09_AGENDA_d_a_failed_first_read_is_read_again_on_Check_again_not_stuck", async () => {
-    // The API answers state_known false when one read fails; the Agenda said so once and never looked again.
-    const fetcher = wire(["unknown_read", "available", "connected"]);
+  it("FR_MTG_09_AGENDA_d_an_unknown_host_read_still_offers_the_guest_join", async () => {
+    wire("unknown_read");
     const m = mount(<PeopleLists />);
     await act(async () => undefined);
     await act(async () => undefined);
-    const gate = () => m.container.querySelector('[data-testid="host-meeting-gate"]');
-    expect(gate()?.textContent).toContain("Tilo could not confirm the meeting host.");
-    const again = Array.from(m.container.querySelectorAll("button")).find(
-      (b) => b.textContent === "Check again",
-    );
-    expect(again).toBeDefined();
-    const reads = () => fetcher.mock.calls.filter((c) => String(c[0]).endsWith("/v1/connectors"));
-    expect(reads()).toHaveLength(1);
-    await act(async () => click(again as Element));
-    await act(async () => undefined);
-    expect(reads()).toHaveLength(2);
-    expect(gate()?.textContent).toBe("Sign in the meeting host first");
+    expect(guestForm(m.container)).toBe(true);
+    expect(signInLink(m.container)).toBe(false);
+    expect(m.container.textContent).not.toContain("could not confirm the meeting host");
   });
 });
