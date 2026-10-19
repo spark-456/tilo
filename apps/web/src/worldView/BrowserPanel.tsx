@@ -1,0 +1,161 @@
+import type { Event, RegisteredEvent } from "@tilo/contracts";
+import { useEffect, useState } from "react";
+import type { TiloClient } from "../api/client";
+import "./BrowserPanel.css";
+
+type FrameClient = TiloClient & {
+  getBrowserFrame?: (worldId: string, artifactId: string) => Promise<Blob>;
+  pauseWorld?: (worldId: string) => Promise<void>;
+  stopBrowser?: (worldId: string, session: string) => Promise<void>;
+};
+
+type Cursor = { seq: number; x: number; y: number; caption: string };
+
+/** A browser frame or cursor is displayed only when its recorded event exists. */
+export function browserView(events: readonly Event[]): {
+  frame: string | null;
+  cursor: Cursor | null;
+  session: string | null;
+  stopped: boolean;
+  gated: boolean;
+} {
+  let frame: string | null = null;
+  let cursor: Cursor | null = null;
+  let session: string | null = null;
+  let stopped = false;
+  let gated = false;
+  for (const source of events) {
+    const event = source as RegisteredEvent;
+    if (event.type === "browser.started") {
+      session = event.data.session;
+      frame = event.data.frame?.artifact_id ?? null;
+      cursor = null;
+      stopped = false;
+      gated = false;
+    } else if (event.type === "browser.acted" && session === event.data.session) {
+      frame = event.data.frame?.artifact_id ?? frame;
+      const box = event.data.target_box;
+      if (event.data.verdict === "done" && box) {
+        cursor = {
+          seq: event.seq,
+          x: box.x + box.width / 2,
+          y: box.y + box.height / 2,
+          caption: event.data.caption ?? event.summary,
+        };
+      }
+      if (event.data.verdict === "gated") gated = true;
+    } else if (event.type === "browser.stopped" && session === event.data.session) {
+      stopped = true;
+    }
+  }
+  return { frame, cursor, session, stopped, gated };
+}
+
+export function BrowserPanel({
+  client,
+  worldId,
+  events,
+  replay,
+}: {
+  client: TiloClient;
+  worldId: string;
+  events: readonly Event[];
+  replay: boolean;
+}) {
+  const view = browserView(events);
+  const reader = client as FrameClient;
+  const [image, setImage] = useState<string | null>(null);
+  const [size, setSize] = useState({ width: 1200, height: 800 });
+  const [request, setRequest] = useState<"idle" | "pausing" | "stopping" | "error">("idle");
+  useEffect(() => {
+    setImage(null);
+    if (!view.frame || !reader.getBrowserFrame || replay) return;
+    let active = true;
+    let url: string | null = null;
+    reader
+      .getBrowserFrame(worldId, view.frame)
+      .then((blob) => {
+        if (!active) return;
+        url = URL.createObjectURL(blob);
+        setImage(url);
+      })
+      .catch(() => {
+        if (active) setImage(null);
+      });
+    return () => {
+      active = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [reader, worldId, view.frame, replay]);
+  const session = view.session;
+  if (!session) return null;
+  const available = !replay && !view.stopped;
+  const control = (kind: "pause" | "stop") => {
+    if (!available || request !== "idle") return;
+    const call =
+      kind === "pause" ? reader.pauseWorld?.(worldId) : reader.stopBrowser?.(worldId, session);
+    if (!call) return;
+    setRequest(kind === "pause" ? "pausing" : "stopping");
+    call.catch(() => setRequest("error"));
+  };
+  return (
+    <section className="tilo-browser" aria-label="Tilo browser" data-testid="tilo-browser-panel">
+      <header className="tilo-browser__header">
+        <strong>Tilo browser</strong>
+        <div>
+          <button
+            type="button"
+            disabled={!available || !reader.pauseWorld}
+            onClick={() => control("pause")}
+          >
+            Pause
+          </button>
+          <button
+            type="button"
+            disabled={!available || !reader.stopBrowser}
+            onClick={() => control("stop")}
+          >
+            Stop
+          </button>
+        </div>
+      </header>
+      <div className="tilo-browser__screen" aria-label="Latest masked browser screenshot">
+        {image ? (
+          <img
+            src={image}
+            alt="Masked browser page"
+            onLoad={(e) =>
+              setSize({
+                width: e.currentTarget.naturalWidth,
+                height: e.currentTarget.naturalHeight,
+              })
+            }
+          />
+        ) : (
+          <p>{replay ? "Recorded frame unavailable in replay." : "Loading recorded frame…"}</p>
+        )}
+        {image && view.cursor ? (
+          <div
+            className="tilo-browser__cursor"
+            data-testid="tilo-browser-cursor"
+            data-event-seq={view.cursor.seq}
+            style={{
+              left: `${(view.cursor.x / size.width) * 100}%`,
+              top: `${(view.cursor.y / size.height) * 100}%`,
+            }}
+          >
+            <span>Tilo</span>
+          </div>
+        ) : null}
+      </div>
+      <p className="tilo-browser__caption" aria-live="polite">
+        {view.gated
+          ? "Waiting for you. Tilo stopped before submitting."
+          : view.stopped
+            ? "Browser stopped"
+            : (view.cursor?.caption ?? "Tilo opened the browser")}
+      </p>
+      {request === "error" ? <p role="alert">Browser control was not confirmed.</p> : null}
+    </section>
+  );
+}
