@@ -69,6 +69,7 @@ import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
 import { SkillProposals } from "./SkillProposals";
 import { ShareWithTeam } from "./TeamShare";
 import { MissingWorld, TeamItems, TeamWorld } from "./TeamWorld";
+import { redirectDirection } from "./redirectDirection";
 import { runProgress } from "./runProgress";
 import { runView } from "./runView";
 import { loadedSkillNames } from "./skillRunVisible";
@@ -451,7 +452,13 @@ export function WorldPage({ app }: { app: AppCtx }) {
   };
   const changeDirection = async (instruction: string) => {
     if (!worldClient) throw new Error("World client unavailable");
-    const next = await worldClient.startAgain(w.id, instruction);
+    const next = await redirectDirection(
+      worldClient,
+      w.id,
+      instruction,
+      view?.phase ?? null,
+      isPaused,
+    );
     markPendingWorld(next.world_id);
     app.go("world", { id: next.world_id });
   };
