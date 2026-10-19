@@ -56,7 +56,7 @@ interface WorldOptions {
   readonly world: Container;
   readonly requestRender: () => void;
   readonly size: () => { width: number; height: number };
-  readonly visibility?: StageVisibility;
+  readonly visibility?: StageVisibility | undefined;
   readonly layout: Layout;
   /** Read live (not captured once): a prefers-reduced-motion change applies mid-playback. */
   readonly reducedMotion: () => boolean;
