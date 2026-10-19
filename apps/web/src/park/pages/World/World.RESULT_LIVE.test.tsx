@@ -103,7 +103,7 @@ describe("RESULT_LIVE: every delivered item can be opened", () => {
     click(control(rig.el, "Download working file: Trip notes"));
     await settle();
     expect(read).toHaveBeenLastCalledWith("hires", "art_note");
-    expect(clicks.at(-1)?.download).toBe("tilo-result-Trip notes.md");
+    expect(clicks.at(-1)?.download).toBe("Trip notes");
 
     click(control(rig.el, "Open working file: Trip notes"));
     await settle();

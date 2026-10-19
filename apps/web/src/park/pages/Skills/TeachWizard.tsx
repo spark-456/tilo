@@ -44,6 +44,11 @@ const YOUTUBE_LIMIT =
 export function unavailableStepCopy(item: { text: string; reason: string }): string {
   const socialVideo = /\b(?:youtube|videos?)\b/i.test(item.text);
   const publicAction = /\b(?:like|liking|comment|commenting)\b/i.test(item.text);
+  if (
+    /\b(?:open|navigate|click|play|type|fill)\b/i.test(item.text) &&
+    /\b(?:browser|website|webpage|youtube|https?:\/\/|\.com\b)/i.test(item.text)
+  )
+    return `${item.text} · Needs browser control (coming)`;
   return socialVideo && publicAction ? YOUTUBE_LIMIT : `${item.text} · ${item.reason}`;
 }
 
@@ -501,10 +506,7 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
         </div>
       ) : null}
       {browserTask ? (
-        <output className="park-teach__hint">
-          Tilo can't operate a browser yet, so this skill will search the web and summarise instead.
-          Browser control is coming.
-        </output>
+        <output className="park-teach__hint">Needs browser control (coming)</output>
       ) : null}
       <div className="park-teach__name">
         <span className="park-teach__nameic" aria-hidden="true">
@@ -530,14 +532,17 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
             <li key={`${i}:${p.text}`} className="park-teach__row park-teach__row--step">
               <span className="park-teach__num">{i + 1}</span>
               <span className="park-teach__steptext">
-                {v?.fallback ? (
-                  <input
-                    aria-label={`Edit step ${i + 1}`}
-                    className="park-teach__input"
-                    value={p.text}
-                    maxLength={200}
-                    onChange={(event) => t.setStepText(i, event.target.value)}
-                  />
+                {t.live ? (
+                  <>
+                    <span className="park-sr-only">{p.text}</span>
+                    <input
+                      aria-label={`Edit step ${i + 1}`}
+                      className="park-teach__input"
+                      value={p.text}
+                      maxLength={200}
+                      onChange={(event) => t.setStepText(i, event.target.value)}
+                    />
+                  </>
                 ) : (
                   <span>{p.text}</span>
                 )}

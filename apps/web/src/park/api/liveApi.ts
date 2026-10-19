@@ -405,9 +405,9 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
         true,
       );
     }
-    if (!isSkillRow(await http.postJson("/v1/skills", body)))
-      throw new TiloApiError(BAD_REPLY, 201, true, true);
-    return { data: { ok: true }, source: "live" };
+    const saved = await http.postJson("/v1/skills", body);
+    if (!isSkillRow(saved)) throw new TiloApiError(BAD_REPLY, 201, true, true);
+    return { data: { ok: true, skill: skillFromRow(saved) }, source: "live" };
   };
   // Teach a skill by describing it (SKILLS-5): one POST each, no retry; only a readable answer is data.
   api.captureSkill = async (text) => {

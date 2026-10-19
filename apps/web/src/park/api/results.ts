@@ -40,26 +40,12 @@ const filenamePart = (label: string): string =>
     .trim()
     .slice(0, 80) || "result";
 
-/** Saves a result already read; the file name follows its type. */
-export function saveResult(blob: Blob, world: string): void {
+function downloadBlob(blob: Blob, name: string): void {
   const url = URL.createObjectURL(blob);
   try {
     const link = document.createElement("a");
     link.href = url;
-    const extension =
-      OFFICE_EXTENSIONS[blob.type] ??
-      (blob.type === "application/pdf"
-        ? ".pdf"
-        : blob.type === "application/json"
-          ? ".json"
-          : blob.type === "text/markdown"
-            ? ".md"
-            : blob.type === "text/csv"
-              ? ".csv"
-              : blob.type.startsWith("text/")
-                ? ".txt"
-                : "");
-    link.download = `tilo-result-${filenamePart(world)}${extension}`;
+    link.download = name;
     document.body.append(link);
     try {
       link.click();
@@ -69,6 +55,33 @@ export function saveResult(blob: Blob, world: string): void {
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+/** Working files keep the name recorded for the delivered item. */
+export function saveNamedResult(blob: Blob, name: string): void {
+  downloadBlob(blob, filenamePart(name));
+}
+
+/** Saves a result already read; the file name follows its type. */
+export function saveResult(blob: Blob, world: string): void {
+  const extension =
+    OFFICE_EXTENSIONS[blob.type] ??
+    (blob.type === "application/pdf"
+      ? ".pdf"
+      : blob.type === "application/json"
+        ? ".json"
+        : blob.type === "text/markdown"
+          ? ".md"
+          : blob.type === "text/csv"
+            ? ".csv"
+            : blob.type.startsWith("text/")
+              ? ".txt"
+              : "");
+  const name = filenamePart(world);
+  downloadBlob(
+    blob,
+    `tilo-result-${name}${name.toLowerCase().endsWith(extension) ? "" : extension}`,
+  );
 }
 
 /** Opens a result already read in a new tab. Text opens as plain text, never as a page that could run. */

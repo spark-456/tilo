@@ -279,8 +279,8 @@ function Balcony() {
         })}
       >
         {dots.map((c, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: fixed bunting, no identity
           <span
+            // biome-ignore lint/suspicious/noArrayIndexKey: fixed bunting, no identity
             key={i}
             style={{ width: 10, height: 10, borderRadius: 99, background: c, marginTop: drop[i] }}
           />
@@ -476,6 +476,11 @@ export function SceneArt({ scene }: { scene: SceneId }) {
   );
 }
 
+// The desk and the balcony rail are as tall as the art's own 120 and 130px unless the scene is small (the chat rail on a
+// phone or a tablet): there Chat.css sets these two variables so the helper still shows above them.
+const DESK_H = "var(--park-desk-h, 120px)";
+const RAIL_H = "var(--park-rail-h, 130px)";
+
 /** What stands in front of the helper (the office desk, the balcony rail). */
 export function SceneFront({ scene }: { scene: SceneId }) {
   if (scene === "office")
@@ -485,13 +490,13 @@ export function SceneFront({ scene }: { scene: SceneId }) {
           left: "12%",
           right: "12%",
           bottom: 0,
-          height: 120,
+          height: DESK_H,
           borderRadius: "18px 18px 0 0",
           background: "#2B2B2E",
         })}
         {d({
           left: "18%",
-          bottom: 120,
+          bottom: DESK_H,
           width: 120,
           height: 10,
           borderRadius: 4,
@@ -499,7 +504,7 @@ export function SceneFront({ scene }: { scene: SceneId }) {
         })}
         {d({
           right: "20%",
-          bottom: 120,
+          bottom: DESK_H,
           width: 30,
           height: 36,
           borderRadius: "4px 4px 8px 8px",
@@ -510,7 +515,7 @@ export function SceneFront({ scene }: { scene: SceneId }) {
   if (scene === "balcony")
     return (
       <div className="park-chat-scene__front">
-        <div style={at({ left: 0, right: 0, bottom: 0, height: 130 })}>
+        <div style={at({ left: 0, right: 0, bottom: 0, height: RAIL_H })}>
           {d({ left: 0, right: 0, top: 0, height: 10, background: "#3B3540", borderRadius: 4 })}
           {d({
             left: 0,
