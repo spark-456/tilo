@@ -71,13 +71,15 @@ for (const width of [390, 1440]) {
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
       });
-      const result = await axe.run(view.container, {
-        runOnly: {
-          type: "tag",
-          values: ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa", "best-practice"],
-        },
-        rules: { "color-contrast": { enabled: false }, "target-size": { enabled: false } },
-      });
+      const result = await act(async () =>
+        axe.run(view.container, {
+          runOnly: {
+            type: "tag",
+            values: ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa", "best-practice"],
+          },
+          rules: { "color-contrast": { enabled: false }, "target-size": { enabled: false } },
+        }),
+      );
       const failures = result.violations.map(
         (rule) => `${rule.id}: ${rule.nodes.map((node) => node.target.join(" ")).join("; ")}`,
       );
