@@ -130,6 +130,39 @@ it("P0_SKILLS_run_collects_required_inputs_and_submits_the_selected_skill", asyn
   expect(run).toHaveBeenCalledWith(skill, { brief: "Build a launch checklist" }, []);
 });
 
+it("P0_SKILLS_browser_tool_step_is_labeled_and_cannot_run", () => {
+  const skill = skillFromRow({
+    id: "tsk_site",
+    name: "Check a supplier",
+    scope: { kind: "just_me", team: null },
+    status: "learning",
+    paused: false,
+    plan: [{ text: "Research suppliers", tool: "browser", action: "navigate", ask_first: false }],
+    question: null,
+  });
+  const run = vi.fn();
+  const m = mount(
+    <SkillDrawer
+      app={stubApp("skills")}
+      skill={skill}
+      paused={false}
+      currency="USD"
+      onPause={null}
+      pauseOff=""
+      onTeach={() => {}}
+      onClose={() => {}}
+      onRun={run}
+    />,
+  );
+  expect(m.container.textContent).toContain("Needs browser control (coming)");
+  const button = [...m.container.querySelectorAll("button")].find(
+    (b) => b.textContent === "Run it",
+  );
+  expect(button?.disabled).toBe(true);
+  act(() => button?.click());
+  expect(run).not.toHaveBeenCalled();
+});
+
 it("P0_SKILLS_owner_can_edit_and_delete_from_the_drawer", async () => {
   const skill = skillFromRow({
     id: "tsk_edit",
