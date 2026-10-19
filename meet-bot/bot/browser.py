@@ -76,6 +76,7 @@ class MeetBrowser:
         self.cfg = cfg
         self.face = face
         self.guest = bool(getattr(cfg, "guest", False))
+        self.session_file = getattr(cfg, "session_file", None)  # MEET-SESSION: signed in, but ephemeral
         self.voice = voice  # a virtual microphone exists: let Meet use it without a permission prompt
         self.ui = UIScheduler()  # one UI action at a time, mic first; see bot/ui.py
         self.page: Any = None
@@ -87,8 +88,8 @@ class MeetBrowser:
 
     # -- lifecycle -----------------------------------------------------------------------------------------------
     async def __aenter__(self) -> MeetBrowser:
-        if "K_SERVICE" in os.environ and not self.guest:
-            raise NotLoggedIn("Cloud Run requires guest mode; signed-in profiles stay on the demo machine.")
+        if "K_SERVICE" in os.environ and not (self.guest or self.session_file):
+            raise NotLoggedIn("Cloud Run needs guest mode or a mounted bot session; profiles stay on the demo machine.")
         from playwright.async_api import async_playwright
 
         self.cfg.debug_dir.mkdir(parents=True, exist_ok=True)
@@ -97,14 +98,16 @@ class MeetBrowser:
             "headless": False,
             "args": CHROMIUM_ARGS
             + (["--use-fake-ui-for-media-stream"] if self.voice else [])
-            + (["--no-sandbox"] if self.guest else []),
+            + (["--no-sandbox"] if self.guest or self.session_file else []),
             "ignore_default_args": ["--enable-automation", "--mute-audio"],
-            "chromium_sandbox": not self.guest,
+            "chromium_sandbox": not (self.guest or self.session_file),
         }
         context = {"viewport": {"width": 1280, "height": 720}, "locale": "en-US"}
         try:
-            if self.guest:
+            if self.guest or self.session_file:
                 self._browser = await self._pw.chromium.launch(**launch)
+                if self.session_file:
+                    context["storage_state"] = str(self.session_file)
                 self.ctx = await self._browser.new_context(**context)
             else:
                 clean_singleton_locks(self.cfg.profile_dir)

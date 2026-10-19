@@ -100,10 +100,15 @@ async def attend_meeting(meeting_id: str, join_url: str, claim: str | None = Non
         root = Path(directory)
         agenda = root / "agenda.md"
         agenda.write_text("# Meeting\n\nDuration: 45 min\n\n1. Discussion and decisions (45 min)\n", encoding="utf-8")
+        # MEET-SESSION: Meet refuses automated anonymous guests ("You can't join this video call", 20 Oct), so a
+        # mounted bot-account session is used when present; without one the bot still tries as a guest.
+        session = Path(os.environ.get("BOT_SESSION_FILE", "/nonexistent"))
+        signed = session.is_file()
         cfg = replace(
             Config.from_env(),
-            guest=True,
-            bot_email="",
+            guest=not signed,
+            session_file=session if signed else None,
+            bot_email=os.environ.get("BOT_GOOGLE_EMAIL", "").strip() if signed else "",
             bot_display_name="Tilo notetaker",
             agenda_path=agenda,
             out_dir=root / "out",

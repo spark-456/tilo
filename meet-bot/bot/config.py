@@ -98,6 +98,9 @@ class Config:
     voice_nudges: bool
     mic_policy: str
     guest: bool = False
+    # MEET-SESSION: a signed-in bot account's saved browser session (Playwright storage state), mounted as a secret.
+    # Meet refuses automated anonymous guests, so the cloud bot joins as this account in a fresh context.
+    session_file: Path | None = None
     unreadable_leave_s: float = 300.0  # People panel and head count unreadable, no captions: leave after this long
 
     @classmethod
