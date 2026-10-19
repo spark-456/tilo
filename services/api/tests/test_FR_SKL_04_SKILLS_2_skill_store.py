@@ -170,6 +170,10 @@ class MemorySkillStore:
         found = self.rows.get((org, skill_id))
         return None if found is None else copy.deepcopy(found)
 
+    def delete(self, org: str, skill_id: str) -> None:
+        self._hit("delete", org, skill_id)
+        self.rows.pop((org, skill_id), None)
+
     def list_for_owner(self, org: str, owner: str) -> list[dict[str, Any]]:
         self._hit("list_for_owner", org, owner)
         return [copy.deepcopy(r) for (o, _), r in self.rows.items() if o == org and r["owner"] == owner]
@@ -323,6 +327,31 @@ def created(c: Ctx, user: str = PRIYA, **over: Any) -> dict[str, Any]:
     response = c.post(user, valid_body(**over))
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def test_P0_SKILLS_owner_can_edit_name_and_steps(ctx):
+    saved = created(ctx)
+    ctx.rig.as_user(PRIYA)
+    edited = ctx.rig.client.put(
+        f"/v1/skills/{saved['id']}",
+        json={"name": "Revised report", "plan_steps": [step("Draft the revised report", "writer", "compose", "draft")]},
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["name"] == "Revised report"
+    assert [s["text"] for s in edited.json()["plan"]] == ["Draft the revised report"]
+    assert edited.json()["version"] == saved["version"] + 1
+    ctx.rig.as_user(SAM)
+    assert ctx.rig.client.put(f"/v1/skills/{saved['id']}", json={"name": "Stolen"}).status_code == 404
+
+
+def test_P0_SKILLS_owner_can_delete_skill(ctx):
+    saved = created(ctx)
+    ctx.rig.as_user(SAM)
+    assert ctx.rig.client.delete(f"/v1/skills/{saved['id']}").status_code == 404
+    ctx.rig.as_user(PRIYA)
+    deleted = ctx.rig.client.delete(f"/v1/skills/{saved['id']}")
+    assert deleted.status_code == 200, deleted.text
+    assert ctx.one(PRIYA, saved["id"]).status_code == 404
 
 
 # -- seam -----------------------------------------------------------------------------------------------------------

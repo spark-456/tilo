@@ -45,6 +45,8 @@ export interface DrawerProps {
   onRun?:
     | ((skill: Skill, values: Record<string, string>, files: File[]) => Promise<void> | void)
     | undefined;
+  onEdit?: ((skill: Skill, name: string, steps: string[]) => Promise<void>) | undefined;
+  onDelete?: ((skill: Skill) => Promise<void>) | undefined;
   /** The step-fix form (a live owned skill), placed under the steps. */
   fix?: ReactNode;
 }
@@ -59,6 +61,8 @@ export function SkillDrawer({
   onTeach,
   onClose,
   onRun,
+  onEdit,
+  onDelete,
   fix,
 }: DrawerProps) {
   const title = useId();
@@ -69,6 +73,12 @@ export function SkillDrawer({
   const [files, setFiles] = useState<Record<string, File>>({});
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(skill.name);
+  const [editSteps, setEditSteps] = useState([...skill.steps]);
+  const [deleting, setDeleting] = useState(false);
+  const [mutationBusy, setMutationBusy] = useState(false);
+  const [mutationError, setMutationError] = useState("");
   const st = statusOf(skill, paused);
   const isPaused = paused || skill.paused === true;
   const inputs = skill.details?.inputs.length
@@ -300,6 +310,111 @@ export function SkillDrawer({
             </p>
           ) : null}
           {fix}
+          {onEdit ? (
+            <section className="park-skill-drawer__sec" aria-label="Edit this skill">
+              <Button variant="secondary" onClick={() => setEditing((shown) => !shown)}>
+                Edit skill
+              </Button>
+              {editing ? (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (!editName.trim() || editSteps.some((step) => !step.trim()) || mutationBusy)
+                      return;
+                    setMutationBusy(true);
+                    setMutationError("");
+                    onEdit(
+                      skill,
+                      editName.trim(),
+                      editSteps.map((step) => step.trim()),
+                    )
+                      .then(() => setEditing(false))
+                      .catch((error: unknown) =>
+                        setMutationError(
+                          error instanceof Error ? error.message : "The skill could not be saved.",
+                        ),
+                      )
+                      .finally(() => setMutationBusy(false));
+                  }}
+                >
+                  <label className="park-teach__field">
+                    <span className="park-teach__label">Skill name</span>
+                    <input
+                      aria-label="Skill name"
+                      className="park-teach__input"
+                      required
+                      value={editName}
+                      onChange={(event) => setEditName(event.target.value)}
+                    />
+                  </label>
+                  {editSteps.map((step, index) => (
+                    <label key={index} className="park-teach__field">
+                      <span className="park-teach__label">Step {index + 1}</span>
+                      <input
+                        aria-label={`Step ${index + 1}`}
+                        className="park-teach__input"
+                        required
+                        value={step}
+                        onChange={(event) =>
+                          setEditSteps((before) =>
+                            before.map((item, i) => (i === index ? event.target.value : item)),
+                          )
+                        }
+                      />
+                    </label>
+                  ))}
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    disabled={
+                      mutationBusy || !editName.trim() || editSteps.some((step) => !step.trim())
+                    }
+                  >
+                    Save changes
+                  </Button>
+                </form>
+              ) : null}
+            </section>
+          ) : null}
+          {onDelete ? (
+            <section className="park-skill-drawer__sec" aria-label="Delete this skill">
+              <Button variant="secondary" onClick={() => setDeleting(true)}>
+                Delete skill
+              </Button>
+              {deleting ? (
+                <div>
+                  <p>Delete “{skill.name}” from My skills?</p>
+                  <Button
+                    variant="secondary"
+                    disabled={mutationBusy}
+                    onClick={() => setDeleting(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    disabled={mutationBusy}
+                    onClick={() => {
+                      setMutationBusy(true);
+                      setMutationError("");
+                      onDelete(skill)
+                        .catch((error: unknown) =>
+                          setMutationError(
+                            error instanceof Error
+                              ? error.message
+                              : "The skill could not be deleted.",
+                          ),
+                        )
+                        .finally(() => setMutationBusy(false));
+                    }}
+                  >
+                    Confirm delete
+                  </Button>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+          {mutationError ? <p role="alert">{mutationError}</p> : null}
           {skill.builtin ? null : (
             <dl className="park-skill-drawer__stats">
               {stats.map((m) => (

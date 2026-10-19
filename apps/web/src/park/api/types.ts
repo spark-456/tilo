@@ -244,7 +244,7 @@ export interface Skill {
   steps: string[];
   /** Details supplied with a taught skill record; absent for catalogue entries with no detail API. */
   details?: {
-    steps: { tool: string; action: string }[];
+    steps: { tool: string; action: string; verb?: string; ask_first?: boolean }[];
     inputs: SkillInput[];
     hosts: string[];
     estimatedCredits: number | null;

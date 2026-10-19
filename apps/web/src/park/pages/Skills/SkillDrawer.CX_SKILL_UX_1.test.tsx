@@ -129,3 +129,52 @@ it("P0_SKILLS_run_collects_required_inputs_and_submits_the_selected_skill", asyn
   });
   expect(run).toHaveBeenCalledWith(skill, { brief: "Build a launch checklist" }, []);
 });
+
+it("P0_SKILLS_owner_can_edit_and_delete_from_the_drawer", async () => {
+  const skill = skillFromRow({
+    id: "tsk_edit",
+    name: "Old name",
+    scope: { kind: "just_me", team: null },
+    status: "learning",
+    paused: false,
+    plan: [{ text: "Draft old", tool: "writer", action: "compose", ask_first: false }],
+    question: null,
+  });
+  const edit = vi.fn(async () => undefined);
+  const remove = vi.fn(async () => undefined);
+  const m = mount(
+    <SkillDrawer
+      app={stubApp("skills")}
+      skill={skill}
+      paused={false}
+      currency="USD"
+      onPause={null}
+      pauseOff=""
+      onTeach={() => {}}
+      onClose={() => {}}
+      onEdit={edit}
+      onDelete={remove}
+    />,
+  );
+  const press = (text: string) =>
+    [...m.container.querySelectorAll("button")].find((b) => b.textContent === text)?.click();
+  act(() => press("Edit skill"));
+  const field = m.container.querySelector<HTMLInputElement>('input[aria-label="Skill name"]');
+  expect(field).not.toBeNull();
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(field, "New name");
+    field?.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => {
+    press("Save changes");
+    await Promise.resolve();
+  });
+  expect(edit).toHaveBeenCalledWith(skill, "New name", ["Draft old"]);
+  act(() => press("Delete skill"));
+  await act(async () => {
+    press("Confirm delete");
+    await Promise.resolve();
+  });
+  expect(remove).toHaveBeenCalledWith(skill);
+});
