@@ -120,7 +120,8 @@ class BrowseStepExecutor:
                     return UnitOutcome(False, reason="You stopped the browser.")
                 screenshot = base64.b64decode(last["screenshot_artifact"]["base64"], validate=True)
                 proposed = self.propose(
-                    goal + "\nCompleted browser actions: " + ", ".join(history),
+                    goal + "\nApproved hosts: " + ", ".join(hosts)
+                    + "\nCompleted browser actions: " + ", ".join(history),
                     screenshot,
                     "\n\n".join(extracted)[-_MAX_TEXT:],
                 )

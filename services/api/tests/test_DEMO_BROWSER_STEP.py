@@ -207,3 +207,30 @@ def test_DEMO_BROWSER_STEP_lost_service_records_a_valid_safe_stop():
     assert not result.success
     assert run.events[1][1]["reason"] == "engine_error"
     assert run.events[-1][1]["outcome"] == "session_lost"
+
+
+def test_DEMO_BROWSER_STEP_model_prompt_uses_contract_point_grid_and_safe_actions():
+    from tilo_api.run_tools import browser_proposal_prompt
+
+    prompt = browser_proposal_prompt("Search the page", "Three results")
+    assert "0–999" in prompt or "0-999" in prompt
+    assert '{"kind":"click","at":{"x":500,"y":500}}' in prompt
+    assert '{"kind":"type","at":{"x":500,"y":500},"text":"query","submit":false}' in prompt
+    assert "Never type passwords" in prompt
+    assert "Never submit" in prompt
+
+
+def test_DEMO_BROWSER_STEP_proposal_names_approved_hosts():
+    from tilo_api.browser_step import BrowseStepExecutor
+
+    seen = []
+
+    def propose(goal, frame, extracted):
+        seen.append(goal)
+        return {"kind": "extract"} if len(seen) == 1 else {"kind": "done"}
+
+    result = BrowseStepExecutor(FakeRun(), FakeRpc(), propose).execute(
+        unit={"id": "U1", "district": "D1"}, agent="A_s1", building="B2", goal="Read", hosts=["example.org"]
+    )
+    assert result.success
+    assert "Approved hosts: example.org" in seen[0]
