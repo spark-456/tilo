@@ -232,9 +232,9 @@ export function useTeach({
     // Saved only once the server says so (a 201): nothing shows as saved before that.
     once(
       async () => {
-        await api.saveSkill(skill);
+        const saved = await api.saveSkill(skill);
         setSaved(true);
-        setTaught(skill);
+        setTaught(saved.data.skill ?? skill);
         app.toast(LIVE_TEACH.saved(nm));
       },
       (e) => {

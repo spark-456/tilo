@@ -15,6 +15,7 @@ interface Step {
   text: string;
   tool: string;
   action: string;
+  verb?: string;
   ask_first: boolean;
   must_ask?: boolean;
 }
@@ -97,7 +98,12 @@ export function skillFromRow(r: SkillRow): Skill {
     used: [],
     steps: r.plan.map((s) => s.text),
     details: {
-      steps: r.plan.map((s) => ({ tool: s.tool, action: s.action })),
+      steps: r.plan.map((s) => ({
+        tool: s.tool,
+        action: s.action,
+        ...(typeof s.verb === "string" ? { verb: s.verb } : {}),
+        ask_first: s.ask_first,
+      })),
       inputs: Array.isArray(r.inputs)
         ? r.inputs.filter(
             (i) =>

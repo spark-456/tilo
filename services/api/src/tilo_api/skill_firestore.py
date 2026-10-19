@@ -74,6 +74,14 @@ class FirestoreSkillStore(SkillLedger):
         except Exception:
             raise _failed() from None
 
+    def delete(self, org: str, skill_id: str) -> None:
+        if not (self._addressable(org) and isinstance(skill_id, str) and _ID.fullmatch(skill_id)):
+            raise SkillStoreError("the skill has no addressable id")
+        try:
+            self._client.document(f"orgs/{org}/taught_skills/{skill_id}").delete()
+        except Exception:
+            raise _failed() from None
+
     def get(self, org: str, skill_id: str) -> dict[str, Any] | None:
         if not (isinstance(skill_id, str) and _ID.fullmatch(skill_id)) or not self._addressable(org):
             return None

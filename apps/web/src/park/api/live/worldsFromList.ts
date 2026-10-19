@@ -36,6 +36,7 @@ function worldOf(item: WorldListItem): World {
     tier: "Village",
     tool: "",
     st: STATE_OF[item.status],
+    resultReady: item.status === "completed",
     agents: 0,
     spend: "",
     spendV: 0,

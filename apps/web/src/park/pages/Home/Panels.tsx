@@ -229,6 +229,31 @@ export function WorldsSection({
   );
 }
 
+/** Only completed, served worlds appear here; the owner result opens on that world's Result tab. */
+export function LatestResults({
+  worlds,
+  onWorld,
+}: {
+  worlds: readonly World[];
+  onWorld: (id: string) => void;
+}) {
+  if (worlds.length === 0) return null;
+  return (
+    <section aria-label="Latest results" className="park-home-results">
+      <h2>Latest results</h2>
+      <div className="park-home-results__list">
+        {worlds.map((world) => (
+          <button key={world.id} type="button" onClick={() => onWorld(world.id)}>
+            {icon("file", 16)}
+            <span>{world.short}</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /**
  * Chat history. The server keeps no Quick question or answer (COST-FAST-1), so there is nothing it can list: the
  * section says so plainly and links to the Chat page, never a sample conversation.

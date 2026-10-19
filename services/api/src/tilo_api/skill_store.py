@@ -23,6 +23,7 @@ class SkillStoreError(RuntimeError):
 
 class SkillStore(Protocol):
     def put(self, record: dict[str, Any]) -> None: ...
+    def delete(self, org: str, skill_id: str) -> None: ...
     def get(self, org: str, skill_id: str) -> dict[str, Any] | None: ...
     def list_for_owner(self, org: str, owner: str) -> list[dict[str, Any]]: ...
     def list_visible(self, org: str, user: str, team_ids: Iterable[str]) -> list[dict[str, Any]]: ...
@@ -79,6 +80,10 @@ class MemorySkillStore(SkillLedger):
     def put(self, record: dict[str, Any]) -> None:
         with self._lock:
             self._docs[_path(record["org_id"], record["id"])] = copy.deepcopy(record)
+
+    def delete(self, org: str, skill_id: str) -> None:
+        with self._lock:
+            self._docs.pop(_path(org, skill_id), None)
 
     def get(self, org: str, skill_id: str) -> dict[str, Any] | None:
         return self._doc(_path(org, skill_id))
