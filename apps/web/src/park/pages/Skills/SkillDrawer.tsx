@@ -9,7 +9,74 @@ import { type CurrencyCode, runMoney } from "../../app/ledgerKpis";
 import { handDraft } from "../../chat/handoff";
 import { Button } from "../../components";
 import { cx } from "../../components/cx";
+import { BookOpen, Globe2, Mail, PenLine } from "../../shared/icons";
 import { agent, icon } from "./skillsKit";
+
+export type StepType = "browse" | "read" | "write" | "email";
+
+export function stepTypeOf(
+  stepText: string,
+  detail?: { tool?: string; action?: string; verb?: string },
+): StepType {
+  const tool = (detail?.tool ?? "").toLowerCase();
+  const action = (detail?.action ?? "").toLowerCase();
+  const verb = (detail?.verb ?? "").toLowerCase();
+  const text = stepText.toLowerCase();
+
+  if (
+    tool.includes("mail") ||
+    tool.includes("email") ||
+    tool.includes("gmail") ||
+    action.includes("mail") ||
+    action.includes("email") ||
+    action.includes("send_email") ||
+    verb.includes("email") ||
+    verb.includes("mail") ||
+    /\b(?:email|emails|gmail|inbox|send email|draft email|mail)\b/i.test(text)
+  ) {
+    return "email";
+  }
+
+  if (
+    tool.includes("browser") ||
+    action.includes("browse") ||
+    action.includes("navigate") ||
+    action.includes("scrape") ||
+    verb.includes("browse") ||
+    /\b(?:browse|website|webpage|browser|url|http|navigate|open tab|search web)\b/i.test(text)
+  ) {
+    return "browse";
+  }
+
+  if (
+    tool.includes("writer") ||
+    action.includes("write") ||
+    action.includes("compose") ||
+    action.includes("draft") ||
+    action.includes("generate") ||
+    verb.includes("write") ||
+    /\b(?:write|compose|draft|create|generate|summary|summarise|outline|reply|plan|report)\b/i.test(
+      text,
+    )
+  ) {
+    return "write";
+  }
+
+  return "read";
+}
+
+function StepTypeIcon({ type }: { type: StepType }) {
+  switch (type) {
+    case "browse":
+      return <Globe2 size={16} aria-hidden="true" />;
+    case "read":
+      return <BookOpen size={16} aria-hidden="true" />;
+    case "write":
+      return <PenLine size={16} aria-hidden="true" />;
+    case "email":
+      return <Mail size={16} aria-hidden="true" />;
+  }
+}
 
 export type Shown = Skill["st"] | "paused";
 
@@ -210,20 +277,34 @@ export function SkillDrawer({
             <section className="park-skill-drawer__sec">
               <h3 className="park-skill-drawer__h3">Steps it follows</h3>
               <ol className="park-skill-drawer__steps">
-                {skill.steps.map((s, i) => (
-                  <li key={`${i + 1}-${s}`} className="park-skill-drawer__step">
-                    <span className="park-skill-drawer__n">{i + 1}</span>
-                    <span>{s}</span>
-                    {skill.details?.steps[i] ? (
-                      <span className="park-skill-chip">
-                        {skill.details.steps[i].tool} · {skill.details.steps[i].action}
+                {skill.steps.map((s, i) => {
+                  const stepType = stepTypeOf(s, skill.details?.steps[i]);
+                  return (
+                    <li key={`${i + 1}-${s}`} className="park-skill-drawer__step">
+                      <span className="park-skill-drawer__n">{i + 1}</span>
+                      <span
+                        className="park-skill-drawer__step-icon"
+                        aria-hidden="true"
+                        title={stepType}
+                      >
+                        <StepTypeIcon type={stepType} />
                       </span>
-                    ) : null}
-                    {skill.fix?.asks[i] ? (
-                      <span className="park-skill-chip park-skill-chip--amber">Asks you first</span>
-                    ) : null}
-                  </li>
-                ))}
+                      <span className="park-skill-drawer__step-content">
+                        <span>{s}</span>
+                        {skill.details?.steps[i] ? (
+                          <span className="park-skill-chip">
+                            {skill.details.steps[i].tool} · {skill.details.steps[i].action}
+                          </span>
+                        ) : null}
+                        {skill.fix?.asks[i] ? (
+                          <span className="park-skill-chip park-skill-chip--amber">
+                            Asks you first
+                          </span>
+                        ) : null}
+                      </span>
+                    </li>
+                  );
+                })}
               </ol>
             </section>
           ) : null}
@@ -256,13 +337,27 @@ export function SkillDrawer({
                 .finally(() => setRunning(false));
             }}
           >
+            <h3 className="park-skill-drawer__h3">Run this skill</h3>
             {runInputs.map((input) => (
-              <div key={input.name} className="park-teach__field">
-                <span className="park-teach__label">{input.label}</span>
+              <label
+                key={input.name}
+                htmlFor={`skill-run-input-${input.name}`}
+                className="park-teach__field"
+              >
+                <span className="park-teach__label">
+                  {input.label}
+                  {input.required ? (
+                    <span className="park-teach__required"> (required)</span>
+                  ) : (
+                    " (optional)"
+                  )}
+                </span>
                 {input.kind === "file" ? (
                   <input
+                    id={`skill-run-input-${input.name}`}
                     aria-label={input.label}
                     type="file"
+                    className="park-teach__input park-teach__fileinput"
                     required={input.required}
                     onChange={(event) => {
                       const file = event.currentTarget.files?.[0];
@@ -276,7 +371,9 @@ export function SkillDrawer({
                   />
                 ) : (
                   <input
+                    id={`skill-run-input-${input.name}`}
                     aria-label={input.label}
+                    className="park-teach__input"
                     type={
                       input.kind === "date"
                         ? "date"
@@ -293,15 +390,17 @@ export function SkillDrawer({
                     }
                   />
                 )}
-              </div>
+              </label>
             ))}
-            {needsBrowser ? <p>Needs browser control (coming)</p> : null}
+            {needsBrowser ? (
+              <p className="park-teach__hint">Needs browser control (coming)</p>
+            ) : null}
             <Button
               variant="primary"
               type="submit"
               disabled={!onRun || !readyToRun || needsBrowser || isPaused || running}
             >
-              Run it
+              Run skill
             </Button>
             {runError ? <p role="alert">{runError}</p> : null}
           </form>
