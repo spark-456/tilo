@@ -1038,7 +1038,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
   startAgain(worldId: string, direction?: string): Promise<{ world_id: string; task_id: string }> {
     return this.post(
       `/worlds/${encodeURIComponent(worldId)}/rerun`,
-      direction ? { direction } : {},
+      direction ? { direction } : undefined, // no body: a plain start-again
     );
   }
 
