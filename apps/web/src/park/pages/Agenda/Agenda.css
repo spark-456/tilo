@@ -135,19 +135,234 @@
 [data-park] .park-agenda-root .cx-agenda-today a:hover {
   text-decoration: underline;
 }
+[data-park] .park-agenda-root .park-agenda-mycals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+[data-park] .park-agenda-root .park-agenda-mycals-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+}
+[data-park] .park-agenda-root .park-agenda-mycals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+[data-park] .park-agenda-root .park-agenda-calcheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+}
+[data-park] .park-agenda-root .park-agenda-calcheck input[type="checkbox"] {
+  accent-color: var(--hero);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+[data-park] .park-agenda-root .park-agenda-calcheck-box {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+[data-park] .park-agenda-root .park-agenda-calcheck-box[data-event-tone="work"] {
+  background: var(--hero);
+}
+[data-park] .park-agenda-root .park-agenda-calcheck-box[data-event-tone="personal"] {
+  background: var(--ok);
+}
+[data-park] .park-agenda-root .park-agenda-calcheck-box[data-event-tone="tilo"] {
+  background: var(--sch);
+}
+[data-park] .park-agenda-root .park-agenda-calcheck-text {
+  font-size: 13px;
+  font-weight: 600;
+}
+[data-park] .park-agenda-root .park-agenda-minidropdown {
+  width: 100%;
+}
+[data-park] .park-agenda-root .park-agenda-minidropdown-summary {
+  display: none;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  margin-bottom: 8px;
+}
+[data-park] .park-agenda-root .park-agenda-calmline {
+  display: block;
+  margin: 0 0 12px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--sunk);
+  color: var(--ink2);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+}
+[data-park] .park-agenda-root .park-agenda-popover-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+[data-park] .park-agenda-root .park-agenda-popover-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+}
+[data-park] .park-agenda-root .park-agenda-popover-dot[data-event-tone="work"] {
+  background: var(--hero);
+}
+[data-park] .park-agenda-root .park-agenda-popover-dot[data-event-tone="personal"] {
+  background: var(--ok);
+}
+[data-park] .park-agenda-root .park-agenda-popover-dot[data-event-tone="tilo"] {
+  background: var(--sch);
+}
+[data-park] .park-agenda-root .park-agenda-popover-time {
+  margin: 0;
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 700;
+}
+[data-park] .park-agenda-root .park-agenda-popover-tilo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--heroSoft);
+  color: var(--heroInk);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+[data-park] .park-agenda-root .park-agenda-popover-attendees {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink2);
+}
+[data-park] .park-agenda-root .park-agenda-popover-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+[data-park] .park-agenda-root .park-agenda-popover-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 22px;
+  cursor: pointer;
+}
+[data-park] .park-agenda-root .park-agenda-quick-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+[data-park] .park-agenda-root .park-agenda-day.is-weekend {
+  background-color: var(--sunk);
+}
 [data-park] .park-agenda-root .cx-agenda-weektitle,
 [data-park] .park-agenda-root .cx-agenda-scroll,
 [data-park] .park-agenda-root .cx-agenda-month,
-[data-park] .park-agenda-root .cx-agenda-selected {
+[data-park] .park-agenda-root .cx-agenda-selected,
+[data-park] .park-agenda-root .park-agenda-main {
   grid-column: 2;
   min-width: 0;
 }
-[data-park] .park-agenda-root .cx-agenda-weektitle {
+[data-park] .park-agenda-root .cx-agenda-weektitle,
+[data-park] .park-agenda-root .park-agenda-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
+  padding-bottom: 8px;
+}
+[data-park] .park-agenda-root .park-agenda-topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+[data-park] .park-agenda-root .park-agenda-create-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 20px 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 750;
+  cursor: pointer;
+}
+[data-park] .park-agenda-root .park-agenda-create-btn:hover {
+  background: var(--rowHover);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+[data-park] .park-agenda-root .park-agenda-create-plus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--hero);
+  line-height: 1;
+}
+[data-park] .park-agenda-root .park-agenda-todaybtn {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 750;
+  cursor: pointer;
+}
+[data-park] .park-agenda-root .park-agenda-todaybtn:hover {
+  background: var(--rowHover);
+}
+[data-park] .park-agenda-root .park-agenda-month-title {
+  margin: 0 0 0 8px;
+  font-family: "Nunito", sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--ink);
 }
 [data-park] .park-agenda-root .cx-agenda-weektitle h2 {
   margin: 0;
@@ -162,13 +377,15 @@
   color: var(--ink2);
   font-size: 13px;
 }
-[data-park] .park-agenda-root .cx-agenda-weekactions {
+[data-park] .park-agenda-root .cx-agenda-weekactions,
+[data-park] .park-agenda-root .park-agenda-weekactions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
 }
-[data-park] .park-agenda-root .cx-agenda-weekactions button {
+[data-park] .park-agenda-root .cx-agenda-weekactions button,
+[data-park] .park-agenda-root .park-agenda-weekactions button {
   min-width: 38px;
   min-height: 38px;
   padding: 0 12px;
@@ -179,7 +396,8 @@
   font-weight: 750;
   cursor: pointer;
 }
-[data-park] .park-agenda-root .cx-agenda-weekactions button:hover {
+[data-park] .park-agenda-root .cx-agenda-weekactions button:hover,
+[data-park] .park-agenda-root .park-agenda-weekactions button:hover {
   background: var(--heroSoft);
   color: var(--heroInk);
 }

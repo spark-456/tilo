@@ -54,6 +54,109 @@ function computeWeek(A: Agenda, offset: number): Agenda {
   };
 }
 
+function placeEvs(events: Ev[]): { event: Ev; lane: number; lanes: number }[] {
+  const sorted = [...events].sort((a, b) => a.s - b.s || b.e - a.e);
+  const placed: { event: Ev; lane: number; lanes: number }[] = [];
+  let cluster: { event: Ev; lane: number }[] = [];
+  let laneEnds: number[] = [];
+  let clusterEnd = -1;
+
+  const close = () => {
+    const totalLanes = Math.max(1, laneEnds.length);
+    for (const item of cluster) {
+      placed.push({ event: item.event, lane: item.lane, lanes: totalLanes });
+    }
+    cluster = [];
+    laneEnds = [];
+  };
+
+  for (const ev of sorted) {
+    if (cluster.length && ev.s >= clusterEnd) {
+      close();
+    }
+    let lane = laneEnds.findIndex((end) => end <= ev.s);
+    if (lane < 0) {
+      lane = laneEnds.length;
+    }
+    laneEnds[lane] = ev.e;
+    cluster.push({ event: ev, lane });
+    clusterEnd = cluster.length === 1 ? ev.e : Math.max(clusterEnd, ev.e);
+  }
+  close();
+  return placed;
+}
+
+function MiniMonth({
+  weekOffset: _weekOffset,
+  onSelectOffset,
+}: {
+  weekOffset: number;
+  onSelectOffset: (offset: number) => void;
+}) {
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const monthFirst = new Date(currentYear, currentMonth, 1);
+  const startDay = new Date(monthFirst);
+  const dayOfWeek = (startDay.getDay() + 6) % 7;
+  startDay.setDate(startDay.getDate() - dayOfWeek);
+
+  const cells: { date: Date; isToday: boolean; isCurrentMonth: boolean; offset: number }[] = [];
+  const cellDate = new Date(startDay);
+  for (let i = 0; i < 42; i++) {
+    const isToday =
+      cellDate.getDate() === now.getDate() &&
+      cellDate.getMonth() === now.getMonth() &&
+      cellDate.getFullYear() === now.getFullYear();
+    const isCurrentMonth = cellDate.getMonth() === currentMonth;
+    const nowMonday = new Date(now);
+    nowMonday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    nowMonday.setHours(0, 0, 0, 0);
+    const thisMonday = new Date(cellDate);
+    thisMonday.setDate(cellDate.getDate() - ((cellDate.getDay() + 6) % 7));
+    thisMonday.setHours(0, 0, 0, 0);
+    const offset = Math.round((thisMonday.getTime() - nowMonday.getTime()) / (7 * 86400000));
+
+    cells.push({
+      date: new Date(cellDate),
+      isToday,
+      isCurrentMonth,
+      offset,
+    });
+    cellDate.setDate(cellDate.getDate() + 1);
+  }
+
+  const monthLabel = new Intl.DateTimeFormat(undefined, {
+    month: "long",
+    year: "numeric",
+  }).format(now);
+
+  return (
+    <aside className="park-agenda-minimonth" aria-label="Mini month">
+      <strong>{monthLabel}</strong>
+      <div className="park-agenda-mini">
+        {["M", "T", "W", "T", "F", "S", "S"].map((d, idx) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: fixed day header list
+          <span aria-hidden="true" key={idx}>
+            {d}
+          </span>
+        ))}
+        {cells.map((c) => (
+          <button
+            key={c.date.toISOString()}
+            type="button"
+            className={`${c.isToday ? "is-today" : ""} ${c.isCurrentMonth ? "" : "is-outside"}`}
+            aria-label={`Show ${c.date.toDateString()}`}
+            onClick={() => onSelectOffset(c.offset)}
+          >
+            {c.date.getDate()}
+          </button>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
 interface CalendarProps {
   A: Agenda;
   EV: Ev[];
@@ -96,8 +199,15 @@ function Calendar({
       ? (currentHour - START_HOUR) * PX
       : ((A.now ?? 9.2) - START_HOUR) * PX;
 
+  const totalEvents = days.reduce((sum, d) => sum + d.events.length, 0);
+
   return (
     <div className="park-agenda-cal">
+      {totalEvents === 0 ? (
+        <p className="park-agenda-calmline">
+          No events this week. Connect Google Calendar or press Create.
+        </p>
+      ) : null}
       <div className="park-agenda-calhead" style={{ gridTemplateColumns: cols }}>
         <div />
         {days.map((d) => (
@@ -116,7 +226,7 @@ function Calendar({
                 {d.name}
               </span>
               <span
-                className="park-agenda-daynum"
+                className={`park-agenda-daynum${d.today && weekOffset === 0 ? " is-today" : ""}`}
                 style={{
                   background: d.today && weekOffset === 0 ? "var(--heroFill)" : "transparent",
                   color: d.today && weekOffset === 0 ? "#FFFFFF" : "var(--ink)",
@@ -153,13 +263,17 @@ function Calendar({
                     : "transparent",
             }}
           >
-            {d.events.map((e) => {
+            {placeEvs(d.events).map(({ event: e, lane, lanes }) => {
               const [, bar, bg, fg] = CAL[e.cal];
               const on = ui.sel === e.id;
               const tall = e.e - e.s >= 0.75;
+              const widthPct = 100 / lanes;
+              const leftPct = lane * widthPct;
               const style: CSSProperties = {
                 top: (e.s - START_HOUR) * PX + 1,
                 height: Math.max(20, (e.e - e.s) * PX - 3),
+                left: lanes > 1 ? `calc(${leftPct}% + 1px)` : "2px",
+                width: lanes > 1 ? `calc(${widthPct}% - 3px)` : "calc(100% - 4px)",
                 borderLeftColor: bar,
                 background: bg,
                 color: fg,
@@ -186,7 +300,9 @@ function Calendar({
                   }}
                 >
                   <span className="park-agenda-eventline">
-                    <span className="park-agenda-eventtitle">{e.t}</span>
+                    <span className="park-agenda-eventtitle" style={{ fontWeight: 600 }}>
+                      {e.t}
+                    </span>
                     {joinsOf(e, ui.flags) ? (
                       <span role="img" aria-label="Tilo joins" className="park-agenda-badge">
                         {face({ rank: "director", expr: "neutral" }, 15, app.night)}
@@ -296,13 +412,13 @@ function MonthView({
             </div>
             <div className="park-agenda-dayload">{d.load}</div>
             <div className="park-agenda-monthevents">
-              {d.events.slice(0, 2).map((e) => (
+              {d.events.slice(0, 3).map((e) => (
                 <div key={e.id} className="park-agenda-monthtag">
                   {e.t}
                 </div>
               ))}
-              {d.events.length > 2 ? (
-                <span className="park-agenda-monthmore">+{d.events.length - 2} more</span>
+              {d.events.length > 3 ? (
+                <span className="park-agenda-monthmore">+{d.events.length - 3} more</span>
               ) : null}
             </div>
           </button>
@@ -314,7 +430,9 @@ function MonthView({
 
 export function Week({ A, ui, app }: { A: Agenda; ui: AgendaUi; app: AppCtx }) {
   const [weekOffset, setWeekOffset] = useState(0);
-  const [viewMode, setViewMode] = useState<"day" | "week" | "month">("week");
+  const [viewMode, setViewMode] = useState<"day" | "week" | "month">(
+    app.vw <= 600 ? "day" : "week",
+  );
   const [selectedDay, setSelectedDay] = useState(A.today >= 0 ? A.today : 0);
   const [confirmSheet, setConfirmSheet] = useState<{
     slot: AgendaSlot;
@@ -334,27 +452,27 @@ export function Week({ A, ui, app }: { A: Agenda; ui: AgendaUi; app: AppCtx }) {
 
   return (
     <section aria-label="This week" className="park-agenda-section">
-      <div className="park-agenda-sechead">
-        <div>
-          <h2 className="park-agenda-h2">{titleText}</h2>
-          <div className="park-agenda-secsub">
-            {`${shown} events from Google Calendar · Tilo joins ${joins} still to come`}
-          </div>
-        </div>
-        <div className="park-agenda-filters">
-          {/* biome-ignore lint/a11y/useSemanticElements: a labelled group of calendar controls, not a form fieldset */}
+      <div className="park-agenda-topbar">
+        <div
+          className="park-agenda-topbar-left"
+          style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}
+        >
+          <button
+            type="button"
+            className="park-agenda-create-btn"
+            onClick={ui.findTime}
+            aria-label="Create event"
+          >
+            <span className="park-agenda-create-plus" aria-hidden="true">
+              +
+            </span>
+            <span className="park-agenda-create-text">Create</span>
+          </button>
+          {/* biome-ignore lint/a11y/useSemanticElements: a labelled group of calendar controls */}
           <div className="park-agenda-nav" role="group" aria-label="Calendar navigation">
             <button
               type="button"
-              className="park-agenda-navbtn"
-              aria-label="Previous week"
-              onClick={() => setWeekOffset((w) => w - 1)}
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              className="park-agenda-navbtn"
+              className="park-agenda-todaybtn"
               aria-label="Today"
               onClick={() => {
                 setWeekOffset(0);
@@ -366,12 +484,23 @@ export function Week({ A, ui, app }: { A: Agenda; ui: AgendaUi; app: AppCtx }) {
             <button
               type="button"
               className="park-agenda-navbtn"
+              aria-label="Previous week"
+              onClick={() => setWeekOffset((w) => w - 1)}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="park-agenda-navbtn"
               aria-label="Next week"
               onClick={() => setWeekOffset((w) => w + 1)}
             >
               ›
             </button>
           </div>
+          <h2 className="park-agenda-h2 park-agenda-month-title">{titleText}</h2>
+        </div>
+        <div className="park-agenda-weekactions">
           <div className="park-agenda-viewswitch" role="radiogroup" aria-label="Calendar view">
             {(["day", "week", "month"] as const).map((m) => (
               <button
@@ -387,33 +516,11 @@ export function Week({ A, ui, app }: { A: Agenda; ui: AgendaUi; app: AppCtx }) {
               </button>
             ))}
           </div>
-          {FILTERS.map((k) => (
-            <button
-              key={k}
-              type="button"
-              className="park-agenda-filter"
-              aria-pressed={ui.cals[k]}
-              style={{ opacity: ui.cals[k] ? 1 : 0.5 }}
-              onClick={() => ui.toggleCal(k)}
-            >
-              <span className="park-agenda-swatch" style={{ background: CAL[k][1] }} />
-              {CAL[k][0]}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="park-agenda-filter park-agenda-filter--weekend"
-            aria-pressed={ui.weekend}
-            style={
-              ui.weekend
-                ? { background: "var(--toast)", color: "var(--toastInk)" }
-                : { background: "var(--btn2)", color: "var(--ink)" }
-            }
-            onClick={ui.toggleWeekend}
-          >
-            Weekend
-          </button>
         </div>
+      </div>
+
+      <div className="park-agenda-secsub">
+        {`${shown} events from Google Calendar · Tilo joins ${joins} still to come`}
       </div>
 
       {ui.finding && find ? (
@@ -436,28 +543,137 @@ export function Week({ A, ui, app }: { A: Agenda; ui: AgendaUi; app: AppCtx }) {
         data-week-grid=""
         style={{ gridTemplateColumns: app.vw >= 1100 ? "minmax(0,1fr) 340px" : "minmax(0,1fr)" }}
       >
-        {viewMode === "month" ? (
-          <MonthView
-            A={currentA}
-            EV={EV}
-            ui={ui}
-            onSelectDay={(d) => {
-              setSelectedDay(d);
-              setViewMode("day");
-            }}
-          />
-        ) : (
-          <Calendar
-            A={currentA}
-            EV={EV}
-            ui={ui}
-            app={app}
-            weekOffset={weekOffset}
-            viewMode={viewMode}
-            selectedDay={selectedDay}
-            onConfirmSlot={(slot, item) => setConfirmSheet({ slot, item })}
-          />
-        )}
+        <div
+          className="park-agenda-layout"
+          style={{
+            display: "flex",
+            gap: "16px",
+            alignItems: "flex-start",
+            width: "100%",
+            minWidth: 0,
+            flexWrap: app.vw <= 600 ? "wrap" : "nowrap",
+          }}
+        >
+          <aside
+            className="park-agenda-sidebar"
+            aria-label="Calendar sidebar"
+            style={{ flex: app.vw <= 600 ? "1 1 100%" : "0 0 200px", minWidth: 0 }}
+          >
+            <details className="park-agenda-minidropdown" open={app.vw > 600}>
+              <summary className="park-agenda-minidropdown-summary">
+                {A.rules?.month ??
+                  new Intl.DateTimeFormat(undefined, {
+                    month: "long",
+                    year: "numeric",
+                  }).format(new Date())}
+              </summary>
+              <MiniMonth
+                weekOffset={weekOffset}
+                onSelectOffset={(offset) => {
+                  setWeekOffset(offset);
+                }}
+              />
+            </details>
+            <section className="park-agenda-mycals" aria-label="My calendars">
+              <h3 className="park-agenda-mycals-title">My calendars</h3>
+              <div className="park-agenda-mycals-list">
+                {FILTERS.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    className="park-agenda-filter park-agenda-calcheck"
+                    aria-pressed={ui.cals[k]}
+                    style={{
+                      opacity: ui.cals[k] ? 1 : 0.6,
+                      background: "transparent",
+                      border: "none",
+                      padding: "4px 0",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => ui.toggleCal(k)}
+                  >
+                    <span
+                      className="park-agenda-calcheck-box"
+                      data-event-tone={k}
+                      style={{
+                        background: CAL[k][1],
+                        width: 14,
+                        height: 14,
+                        borderRadius: 3,
+                        boxShadow: ui.cals[k] ? "inset 0 0 0 2px var(--card)" : "none",
+                      }}
+                    />
+                    <span
+                      className="park-agenda-calcheck-text"
+                      style={{ color: "var(--ink)", fontWeight: 600, fontSize: 13 }}
+                    >
+                      {CAL[k][0]}
+                    </span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="park-agenda-filter park-agenda-filter--weekend park-agenda-calcheck"
+                  aria-pressed={ui.weekend}
+                  style={{
+                    opacity: ui.weekend ? 1 : 0.6,
+                    background: "transparent",
+                    border: "none",
+                    padding: "4px 0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    cursor: "pointer",
+                  }}
+                  onClick={ui.toggleWeekend}
+                >
+                  <span
+                    className="park-agenda-calcheck-box"
+                    style={{
+                      background: ui.weekend ? "var(--toast)" : "var(--btn2)",
+                      width: 14,
+                      height: 14,
+                      borderRadius: 3,
+                    }}
+                  />
+                  <span
+                    className="park-agenda-calcheck-text"
+                    style={{ color: "var(--ink)", fontWeight: 600, fontSize: 13 }}
+                  >
+                    Weekend
+                  </span>
+                </button>
+              </div>
+            </section>
+          </aside>
+          <div className="park-agenda-main" style={{ flex: "1 1 0", minWidth: 0 }}>
+            {viewMode === "month" ? (
+              <MonthView
+                A={currentA}
+                EV={EV}
+                ui={ui}
+                onSelectDay={(d) => {
+                  setSelectedDay(d);
+                  setViewMode("day");
+                }}
+              />
+            ) : (
+              <Calendar
+                A={currentA}
+                EV={EV}
+                ui={ui}
+                app={app}
+                weekOffset={weekOffset}
+                viewMode={viewMode}
+                selectedDay={selectedDay}
+                onConfirmSlot={(slot, item) => setConfirmSheet({ slot, item })}
+              />
+            )}
+          </div>
+        </div>
         <Detail
           vm={detailOf(currentA, EV, ui.sel, ui.flags, ui.briefed, app.dec)}
           ui={ui}

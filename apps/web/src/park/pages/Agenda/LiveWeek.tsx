@@ -138,11 +138,13 @@ export function LiveWeek({
   const [start, setStart] = useState(() => monday(new Date()));
   const [view, setView] = useState<"Day" | "Week" | "Month">(compact ? "Day" : "Week");
   const [selectedDay, setSelectedDay] = useState(() => localDate(new Date()));
-  const [calFilters, setCalFilters] = useState<{ work: boolean; personal: boolean; tilo: boolean }>({
-    work: true,
-    personal: true,
-    tilo: true,
-  });
+  const [calFilters, setCalFilters] = useState<{ work: boolean; personal: boolean; tilo: boolean }>(
+    {
+      work: true,
+      personal: true,
+      tilo: true,
+    },
+  );
   const [quickTitle, setQuickTitle] = useState("");
 
   const days = Array.from({ length: 7 }, (_, index) => {
@@ -353,6 +355,7 @@ export function LiveWeek({
             </span>
             <span className="park-agenda-create-text">Create</span>
           </button>
+          {/* biome-ignore lint/a11y/useSemanticElements: a labelled group of calendar controls */}
           <div className="park-agenda-nav" role="group" aria-label="Calendar navigation">
             <button
               type="button"
@@ -385,12 +388,16 @@ export function LiveWeek({
           <h2 className="park-agenda-month-title">{currentMonthYear}</h2>
         </div>
         <div className="park-agenda-weekactions cx-agenda-weekactions">
-          <div className="park-agenda-viewswitch cx-agenda-views" role="radiogroup" aria-label="Calendar view">
+          <div
+            className="park-agenda-viewswitch cx-agenda-views"
+            role="radiogroup"
+            aria-label="Calendar view"
+          >
             {(["Day", "Week", "Month"] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
-                // biome-ignore lint/a11y/useSemanticElements: view switch
+                // biome-ignore lint/a11y/useSemanticElements: view switch radio button
                 role="radio"
                 aria-checked={view === mode}
                 aria-pressed={view === mode}
@@ -476,13 +483,17 @@ export function LiveWeek({
       <div className="park-agenda-main">
         {/* 7. Empty state: when there are no events, the grid still looks like Google Calendar, plus one calm line */}
         {visibleEntries.length === 0 ? (
-          <p className="park-agenda-calmline" role="status">
+          <output className="park-agenda-calmline">
             No events this week. Connect Google Calendar or press Create.
-          </p>
+          </output>
         ) : null}
 
         {/* 5. Month view: grid of days with up to 3 event chips and "+N more" */}
-        <section className="park-agenda-month cx-agenda-month" aria-label="Month calendar" hidden={view !== "Month"}>
+        <section
+          className="park-agenda-month cx-agenda-month"
+          aria-label="Month calendar"
+          hidden={view !== "Month"}
+        >
           {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
             <span aria-hidden="true" className="park-agenda-monthhead cx-agenda-monthhead" key={d}>
               {d}
@@ -560,7 +571,10 @@ export function LiveWeek({
                     {count === 0 ? "No events" : count === 1 ? "1 event" : `${count} events`}
                   </span>
                   {due.map((row) => (
-                    <span className="park-agenda-due cx-agenda-due" key={`${row.ref.kind}:${row.ref.id}`}>
+                    <span
+                      className="park-agenda-due cx-agenda-due"
+                      key={`${row.ref.kind}:${row.ref.id}`}
+                    >
                       Due: {row.title}
                     </span>
                   ))}
@@ -588,7 +602,9 @@ export function LiveWeek({
               const dayKey = localDate(day);
               const isToday = dayKey === localDate(new Date());
               const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-              const events = visibleEntries.filter((entry) => localDate(new Date(entry.start)) === dayKey);
+              const events = visibleEntries.filter(
+                (entry) => localDate(new Date(entry.start)) === dayKey,
+              );
 
               return (
                 <div
@@ -742,9 +758,7 @@ export function LiveWeek({
                   ) : null}
 
                   {/* Red now-line with a dot, on today only */}
-                  {isToday &&
-                  nowMinutes >= 0 &&
-                  nowMinutes < (END_HOUR - START_HOUR) * 60 ? (
+                  {isToday && nowMinutes >= 0 && nowMinutes < (END_HOUR - START_HOUR) * 60 ? (
                     <span
                       className="park-agenda-now park-agenda-nowline cx-agenda-nowline"
                       role="img"
@@ -763,7 +777,10 @@ export function LiveWeek({
 
       {/* 4. Google-style event popover card */}
       {selected ? (
-        <aside className="park-agenda-state park-agenda-event-popover cx-agenda-selected" aria-label="Event details" role="dialog">
+        <aside
+          className="park-agenda-state park-agenda-event-popover cx-agenda-selected"
+          aria-label="Event details"
+        >
           <button
             type="button"
             className="park-agenda-popover-close cx-agenda-close"
@@ -773,7 +790,11 @@ export function LiveWeek({
             ×
           </button>
           <div className="park-agenda-popover-title-row">
-            <span className="park-agenda-popover-dot" data-event-tone={toneOf(selected)} aria-hidden="true" />
+            <span
+              className="park-agenda-popover-dot"
+              data-event-tone={toneOf(selected)}
+              aria-hidden="true"
+            />
             <h3>{selected.title}</h3>
           </div>
           <p className="park-agenda-popover-time">{selectedDate}</p>
@@ -798,7 +819,7 @@ export function LiveWeek({
               className="park-btn park-btn--primary"
               onClick={() => {
                 if (selectedMeeting) void join(selectedMeeting);
-                else window.open("https://meet.google.com", "_blank");
+                else openMeetTab()?.go("https://meet.google.com");
               }}
             >
               Open meeting
