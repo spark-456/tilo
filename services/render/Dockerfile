@@ -14,6 +14,9 @@ COPY prompts ./prompts
 COPY templates ./templates
 COPY design/tokens.json ./design/tokens.json
 RUN uv sync --locked --no-dev --package tilo-render
+# The workspace packages are editable installs, so uv's bytecode step skips them and PYTHONDONTWRITEBYTECODE keeps the
+# running container from writing any: compile them here, or every cold start compiles all of that source again.
+RUN .venv/bin/python -m compileall -q -j 0 --invalidation-mode checked-hash services packages
 
 FROM python:3.12.15-slim-trixie AS runtime
 ENV PATH="/app/.venv/bin:${PATH}" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PORT=8080
