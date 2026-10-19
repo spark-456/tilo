@@ -99,18 +99,14 @@ Tilo is built around three ideas:
 3. **Agent teams run it.** The Director picks only the agents the job needs: a quick question gets one, a launch gets the whole crew. Each agent loads the expert skill it needs and uses tools through the connectors layer.
 4. **See it, steer it.** The work is drawn as a world and narrated in plain sentences. Anything that sends, shares or deletes goes through a gate. When it finishes you get the result, the cost and the trail behind it.
 
-What happens once the plan is approved and a step has to touch the outside world:
+A step that only reads and thinks just produces a result. A step that would send, share, delete or spend takes this path:
 
 ```mermaid
-%%{init: {"flowchart": {"rankSpacing": 22, "nodeSpacing": 20, "padding": 6}}}%%
-flowchart LR
-    A["Agent<br/>teams<br/>run it"] --> E{"Side<br/>effect?"}
-    E -- "no" --> I["Result and<br/>provenance"]
-    E -- "yes" --> F["Policy<br/>engine"]
-    F -- "allowed" --> H["Outbox and<br/>connector"]
-    F -- "needs a<br/>person" --> G["Gate: you<br/>approve"]
-    G --> H
-    H --> I
+flowchart TB
+    A["Agent proposes a side effect"] --> P{"Policy engine:<br/>risk tier and autonomy level"}
+    P -->|"needs a person"| G["Gate: you approve<br/>web, phone or email"]
+    P -->|"allowed"| O["Outbox releases it<br/>through a connector"]
+    G --> O
 ```
 
 The World, Story and Trace views show every one of these steps as it is recorded.
