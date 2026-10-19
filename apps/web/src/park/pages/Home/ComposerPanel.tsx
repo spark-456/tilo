@@ -142,7 +142,8 @@ export interface ComposerProps {
 export function ComposerPanel(p: ComposerProps) {
   const { mode, phase } = p;
   const needsBrowser = Boolean(
-    p.selectedSkill?.tools.some((tool) => /browser|browse_web/i.test(tool)) ||
+    p.selectedSkill?.needs_browser_control === true ||
+      p.selectedSkill?.tools.some((tool) => /browser|browse_web/i.test(tool)) ||
       (/\b(?:open|navigate|click|play|type|fill)\b/i.test(p.selectedSkill?.purpose ?? "") &&
         /\b(?:browser|website|webpage|youtube|https?:\/\/|\.com\b)/i.test(
           p.selectedSkill?.purpose ?? "",
