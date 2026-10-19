@@ -8,7 +8,9 @@ import { displayApiError } from "../../api/errorMessage";
 import { isSkillRow, skillFromRow } from "../../api/live/skillsFromApi";
 import type { Learn, Skill, Source, User } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
-import { useParkApi, useWorldClient } from "../../app/context";
+import { useParkApi, useParkStore, useWorldClient } from "../../app/context";
+import { markPendingWorld } from "../../app/PendingWorldRoute";
+import { skillRefOf } from "../../shared/skillRoute";
 import type { CurrencyCode } from "../../app/ledgerKpis";
 import { Button } from "../../components";
 import { FirstRunPanels } from "../../sample/FirstRunPanels";
@@ -169,6 +171,7 @@ function Ready({
 }: { app: AppCtx; data: Data; teach: Teaching; retryRead: () => void }) {
   const api = useParkApi();
   const client = useWorldClient();
+  const store = useParkStore();
   const { user, learn, source, currency } = data;
   const live = source !== "fixture";
   const draft = data.skills.find((s) => s.st === "draft" && !s.builtin);
@@ -336,6 +339,24 @@ function Ready({
           pauseOff={PAUSE_OFF}
           onTeach={() => startTeach(current.builtin ? "" : current.name)}
           onClose={() => setOpen(null)}
+          onRun={
+            source === "live" && store.oneStep
+              ? async (skill, values, files) => {
+                  const detail = Object.entries(values).map(([key, value]) => `${key}: ${value}`);
+                  const prompt = [`Run the ${skill.name} skill.`, ...detail].join("\n");
+                  const ref = skillRefOf({
+                    id: skill.id,
+                    kind: skill.builtin ? "library" : "taught",
+                  });
+                  const prepared = await store.prepareRun(prompt, files, [ref]);
+                  if (!prepared.ok) throw new Error(prepared.message);
+                  const started = await store.startRun(prepared.value);
+                  if (!started.ok) throw new Error(started.message);
+                  markPendingWorld(started.value.worldId, prepared.value.goal);
+                  app.go("world", { id: started.value.worldId });
+                }
+              : undefined
+          }
           fix={
             source === "live" && current.fix ? (
               <FixSkill

@@ -42,6 +42,9 @@ export interface DrawerProps {
   pauseOff: string;
   onTeach: () => void;
   onClose: () => void;
+  onRun?:
+    | ((skill: Skill, values: Record<string, string>, files: File[]) => Promise<void> | void)
+    | undefined;
   /** The step-fix form (a live owned skill), placed under the steps. */
   fix?: ReactNode;
 }
@@ -55,17 +58,36 @@ export function SkillDrawer({
   pauseOff,
   onTeach,
   onClose,
+  onRun,
   fix,
 }: DrawerProps) {
   const title = useId();
   const close = useRef<HTMLButtonElement>(null);
   const [acc, setAcc] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [files, setFiles] = useState<Record<string, File>>({});
+  const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState("");
   const st = statusOf(skill, paused);
   const isPaused = paused || skill.paused === true;
   const inputs = skill.details?.inputs.length
     ? skill.details.inputs
     : (skill.catalog?.inputs ?? []);
+  const runInputs = inputs.length
+    ? inputs
+    : [{ name: "task", label: "Task details", kind: "text", required: true }];
+  const needsBrowser =
+    skill.steps.some(
+      (step) =>
+        /\b(?:open|navigate|click|play|type|fill)\b/i.test(step) &&
+        /\b(?:browser|website|webpage|youtube|https?:\/\/|\.com\b)/i.test(step),
+    ) || skill.details?.steps.some((step) => step.action === "browse_web") === true;
+  const readyToRun = runInputs.every(
+    (input) =>
+      !input.required ||
+      (input.kind === "file" ? Boolean(files[input.name]) : Boolean(values[input.name]?.trim())),
+  );
 
   useEffect(() => {
     close.current?.focus();
@@ -204,6 +226,71 @@ export function SkillDrawer({
               </ul>
             </section>
           ) : null}
+          <form
+            className="park-skill-run"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!onRun || running || !readyToRun || needsBrowser || isPaused) return;
+              setRunning(true);
+              setRunError("");
+              Promise.resolve(onRun(skill, values, Object.values(files)))
+                .catch((error: unknown) => {
+                  setRunError(
+                    error instanceof Error ? error.message : "The skill could not start.",
+                  );
+                })
+                .finally(() => setRunning(false));
+            }}
+          >
+            {runInputs.map((input) => (
+              <label key={input.name} className="park-teach__field">
+                <span className="park-teach__label">{input.label}</span>
+                {input.kind === "file" ? (
+                  <input
+                    aria-label={input.label}
+                    type="file"
+                    required={input.required}
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      setFiles((before) => {
+                        const next = { ...before };
+                        if (file) next[input.name] = file;
+                        else delete next[input.name];
+                        return next;
+                      });
+                    }}
+                  />
+                ) : (
+                  <input
+                    aria-label={input.label}
+                    type={
+                      input.kind === "date"
+                        ? "date"
+                        : input.kind === "number"
+                          ? "number"
+                          : input.kind === "url"
+                            ? "url"
+                            : "text"
+                    }
+                    required={input.required}
+                    value={values[input.name] ?? ""}
+                    onChange={(event) =>
+                      setValues((before) => ({ ...before, [input.name]: event.target.value }))
+                    }
+                  />
+                )}
+              </label>
+            ))}
+            {needsBrowser ? <p>Needs browser control (coming)</p> : null}
+            <Button
+              variant="primary"
+              type="submit"
+              disabled={!onRun || !readyToRun || needsBrowser || isPaused || running}
+            >
+              Run it
+            </Button>
+            {runError ? <p role="alert">{runError}</p> : null}
+          </form>
           {skill.details?.hosts.length ? (
             <p className="park-skill-drawer__p">Approved sites: {skill.details.hosts.join(", ")}</p>
           ) : null}

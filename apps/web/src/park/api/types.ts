@@ -564,6 +564,7 @@ export interface Notification {
 // Acknowledgements of writes
 export interface Ack {
   ok: true;
+  skill?: Skill;
 }
 export interface DecideAck extends Ack {
   dec: Dec;
