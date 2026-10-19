@@ -9,8 +9,10 @@
 
 The browse-step executor records each successful action as `browser.acted`, using the existing browser event family and fixtures. The World and skill-run browser panels derive their frame, caption and AI cursor target solely from those recorded events. Pause and Stop are explicit controls; a clock alone never advances the cursor.
 
+Live tilo-api calls the internal RPC at `TILO_BROWSER_URL` with a Google ID token. Tilo-browser accepts it only when `TILO_BROWSER_AUDIENCE` matches that URL and `TILO_BROWSER_CALLERS` names the API service account; unset values deny the session routes.
+
 Code assigns risk by the action and inspected element, not by model output. Reading and searching an allowlisted page are T1. Submitting, posting, sending, buying and signing in require a person's T3 gate before any side effect; the first release closes the session and links the person to the site for manual continuation. No approval resumes that action automatically. The existing allowlisted egress policy applies to navigation, redirects and subresources. No public unauthenticated route is added.
 
 ## Consequences
 
-The RPC can be exercised with a fake browser in CI. The panel can replay the same recorded events as a live run. A session lost on service restart ends safely, and sites that require blocked third-party hosts may render incompletely.
+The RPC can be exercised with a fake browser in CI. The panel can replay the same recorded events as a live run. Session state is process local, so a deployment must pin the browser service to one instance until session routing exists. A session lost on restart ends safely, and sites that require blocked third-party hosts may render incompletely.
