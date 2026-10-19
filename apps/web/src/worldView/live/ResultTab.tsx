@@ -4,7 +4,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { Icon, type IconName } from "../../design/tilo-t";
 import type { Api } from "../../park/api";
-import { openResult, readResult, saveResult } from "../../park/api/results";
+import { openResult, readResult, saveNamedResult, saveResult } from "../../park/api/results";
 import type { SharedResult } from "../../park/pages/World/ResultPanel";
 import { Markdown } from "../../park/pages/World/markdown";
 import type { RunEvent } from "../../park/pages/World/useRunEvents";
@@ -289,7 +289,7 @@ function WorkingFiles({
               className="tw-res-file-btn tw-res-file-btn--icon secondary"
               aria-label={`Download working file: ${f.name}`}
               title={`Download ${f.name}`}
-              onClick={() => readItem(f.id, (b) => saveResult(b, f.name))}
+              onClick={() => readItem(f.id, (b) => saveNamedResult(b, f.name))}
             >
               <Icon name="download" size={16} />
               <span className="park-sr-only">{`Download working file: ${f.name}`}</span>
