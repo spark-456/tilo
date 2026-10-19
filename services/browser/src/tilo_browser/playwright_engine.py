@@ -33,7 +33,7 @@ _SECURE_SELECTORS = (
     'input[name*="otp" i]',
     'input[id*="card" i]',
     'input[id*="otp" i]',
-    'iframe',
+    "iframe",
     '[contenteditable="true"]',
 )
 
