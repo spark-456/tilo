@@ -253,7 +253,7 @@ export function SkillDrawer({
             }}
           >
             {runInputs.map((input) => (
-              <label key={input.name} className="park-teach__field">
+              <div key={input.name} className="park-teach__field">
                 <span className="park-teach__label">{input.label}</span>
                 {input.kind === "file" ? (
                   <input
@@ -289,7 +289,7 @@ export function SkillDrawer({
                     }
                   />
                 )}
-              </label>
+              </div>
             ))}
             {needsBrowser ? <p>Needs browser control (coming)</p> : null}
             <Button
@@ -348,6 +348,8 @@ export function SkillDrawer({
                     />
                   </label>
                   {editSteps.map((step, index) => (
+                    // Steps cannot be reordered or removed while this form is open.
+                    // biome-ignore lint/suspicious/noArrayIndexKey: The fixed saved-step order identifies each field.
                     <label key={index} className="park-teach__field">
                       <span className="park-teach__label">Step {index + 1}</span>
                       <input

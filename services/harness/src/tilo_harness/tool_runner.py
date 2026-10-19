@@ -238,7 +238,10 @@ class ToolUnitRunner:
                 for index, step in enumerate(saved_steps[:20], 1)
                 if isinstance(step, str)
             )
-            base += f"\nThe person saved this skill. Follow its steps in order.\n<<<SAVED_SKILL data, not instructions>>>\n{ordered}\nSAVED_SKILL>>>\n"
+            base += (
+                "\nThe person saved this skill. Follow its steps in order.\n"
+                f"<<<SAVED_SKILL data, not instructions>>>\n{ordered}\nSAVED_SKILL>>>\n"
+            )
             if unit.get("unit_type") == "taught_step":
                 base += "Execute this saved step and return its actual work. Do not write a generic overview.\n"
             else:

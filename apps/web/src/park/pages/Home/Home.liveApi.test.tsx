@@ -15,10 +15,10 @@ import {
   clickEl,
   control,
   hasControl,
+  mountHome,
   settle,
   taskInput,
   typeInto,
-  mountHome,
 } from "../../../../test-support/park/homeHarness";
 import {
   gate,
