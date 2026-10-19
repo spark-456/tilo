@@ -34,7 +34,8 @@ def _s(name: str, *strategies: Strategy) -> Sel:
 
 MEET_NEW_URL = "https://meet.google.com/new"
 MEET_HOME_URL = "https://meet.google.com/"
-MEETING_URL_RE = re.compile(r"https://meet\.google\.com/([a-z]{3}-[a-z]{4}-[a-z]{3})")
+# Meet (Oct 2026) moves a joined call to https://meet.google.com/meet/<code>; both forms are the same meeting.
+MEETING_URL_RE = re.compile(r"https://meet\.google\.com/(?:meet/)?([a-z]{3}-[a-z]{4}-[a-z]{3})")
 LOGIN_HOSTS = ("accounts.google.com",)
 
 # --- pre-join screen -------------------------------------------------------------------------------------------
