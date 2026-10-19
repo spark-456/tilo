@@ -36,9 +36,7 @@ for (const width of [1440, 390] as const) {
       await expect(banner).toBeVisible();
 
       // Verify bottom pill for approval is NOT present
-      const waitingPill = page.locator(
-        '.park-shell__runbar:has-text("Waiting for your approval")',
-      );
+      const waitingPill = page.locator('.park-shell__runbar:has-text("Waiting for your approval")');
       await expect(waitingPill).toHaveCount(0);
 
       const shotPath = `${width}-${theme}-Skills.png`;
