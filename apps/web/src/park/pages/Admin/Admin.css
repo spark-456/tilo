@@ -165,3 +165,14 @@
     border-radius: 22px;
   }
 }
+[data-park] .park-admin .park-admin-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-24);
+}
+[data-park] .park-admin .park-admin-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  font-weight: 600;
+}
