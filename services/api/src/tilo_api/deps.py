@@ -1107,7 +1107,7 @@ class _RoleModel:
 
 def _worker_models(mode: Mode = "replay", meter: Any = None) -> Mapping[str, Any]:
     router = _seam_router(mode, meter)
-    return {role: _RoleModel(router, role) for role in ("specialist", "writer", "verifier")}
+    return {role: _RoleModel(router, role) for role in ("specialist", "writer", "verifier", "computer_use")}
 
 
 def get_unit_runner(mode: Mode = "replay", today: Clock = real_today, meter: Any = None) -> Any:
