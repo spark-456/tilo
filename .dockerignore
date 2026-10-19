@@ -42,5 +42,9 @@ scratch*
 *.log
 **/tests
 packages/contracts-ts
+# Services read the schemas, the event registry and the generated models under contracts/, never its test fixtures
+# or rule notes (the sample world ships as package data in tilo_api/sample_data).
+contracts/fixtures
+contracts/**/*.md
 evals/*
 !evals/pyproject.toml
