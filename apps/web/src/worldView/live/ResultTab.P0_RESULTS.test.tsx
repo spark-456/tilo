@@ -134,6 +134,35 @@ describe("P0_RESULTS inline delivery", () => {
     ).toBe("blob:preview");
   });
 
+  it("P0_RESULTS_open_image_uses_the_recorded_type_when_download_is_octet_stream", () => {
+    const opened: string[] = [];
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, {
+        createObjectURL: vi.fn((blob: Blob) => {
+          opened.push(blob.type);
+          return "blob:preview";
+        }),
+        revokeObjectURL: vi.fn(),
+      }),
+    );
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    const m = mount(
+      <div data-park="">
+        <ResultTab
+          worldId="w_image"
+          events={[delivered("png", "chart.png")]}
+          shared={fileView("image bytes", "application/octet-stream")}
+        />
+      </div>,
+    );
+    const open = [...m.container.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "Open result",
+    );
+    act(() => open?.click());
+    expect(opened).toContain("image/png");
+  });
+
   it("P0_RESULTS_main_action_row_can_copy_real_text", async () => {
     const writeText = vi.fn(async () => undefined);
     vi.stubGlobal("navigator", { clipboard: { writeText } });

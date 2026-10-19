@@ -391,7 +391,24 @@ export function ResultTab({
   const mainSummary = mainEvent?.summary || "Ready to open or download.";
 
   const handleOpen = () => {
-    if (blob) openResult(blob);
+    const browserType: Record<string, string> = {
+      PDF: "application/pdf",
+      CSV: "text/csv",
+      HTML: "text/html",
+      MD: "text/markdown",
+      TXT: "text/plain",
+      PNG: "image/png",
+      JPG: "image/jpeg",
+      JPEG: "image/jpeg",
+      WEBP: "image/webp",
+      GIF: "image/gif",
+    };
+    if (blob)
+      openResult(
+        blob.type === "application/octet-stream" && browserType[mainFormat]
+          ? new Blob([blob], { type: browserType[mainFormat] })
+          : blob,
+      );
     else if (onOpen) onOpen();
   };
 
