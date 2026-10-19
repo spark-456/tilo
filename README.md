@@ -23,9 +23,10 @@
 <a href="#-try-it">Try it</a> ·
 <a href="#%EF%B8%8F-tour">Tour</a> ·
 <a href="#-how-it-works">How it works</a> ·
-<a href="#-the-world">World</a> ·
+<a href="#%EF%B8%8F-the-world">World</a> ·
 <a href="#-the-agent-team">Agents</a> ·
 <a href="#-you-stay-in-charge">Control</a> ·
+<a href="#-meetings">Meetings</a> ·
 <a href="#%EF%B8%8F-architecture">Architecture</a> ·
 <a href="#-genai-map">GenAI map</a> ·
 <a href="#%EF%B8%8F-security-notes">Security</a> ·
@@ -45,7 +46,7 @@ Organisations are starting to hand real work to AI agents, but that work is invi
 
 | 🗣️ **Plain words in** | 🧾 **Price first** | 🏙️ **A world you can read** | 🛡️ **You stay in charge** |
 |---|---|---|---|
-| One sentence, plus files if they help | Plan and cost in real money before anything starts | World, Story and Trace lenses on every job | Risky steps wait at a gate for a person |
+| One sentence, plus files if they help | Plan and cost shown before anything starts | A map, a Story and a Trace for every job | Risky steps wait at a gate for a person |
 
 Tilo is built around three ideas:
 
@@ -59,12 +60,18 @@ Tilo is built around three ideas:
 
 - The demo town is **sample data** (a made-up company with 11 worlds). It is labelled as sample throughout.
 - **Demo sessions replay recorded runs.** The landing page shows a recorded example (a 44-event run: triage an inbox, answer a supplier) replayed faster than it happened, with a banner saying so. Nothing in the demo sends real email.
-- Look around: **Home** (what needs you today), **Worlds** (your town of jobs), open a world and switch between **Story**, **Steps** and **Result**, then **Skills**, **Needs you**, **Ledger**, **Agenda** and **Team**.
-- Signing in with Google is optional and is how you would run your own work.
+- Look around: **Home** (what needs you today), **Chat**, **Worlds** (your town of jobs), open a world and switch between **Story**, **Steps** and **Result**, then **Skills**, **Needs you**, and under **More** the **Ledger**, **Agenda** and **Team** pages (on a wide screen they sit in the top bar).
+- In the demo, **approving records nothing** and **uploads are off**. Signing in with Google is optional and is how you run your own work.
 
 ## 🖼️ Tour
 
-> Screenshots are taken from the live demo town at 1440 px and 390 px wide.
+> Screenshots are taken from the live demo town at 1440 px and 390 px wide. The data is sample data.
+
+<p align="center">
+<img src="docs/assets/readme/world-desktop.png" alt="A world: an isometric map with a gate waiting for approval, and Story, Steps and Result tabs beside it" width="92%"/>
+<br/>
+<sub><b>A world.</b> The map on the left, Story, Steps and Result on the right. Here a purchase above the district limit is paused at a gate until a person decides.</sub>
+</p>
 
 | Home | Your town of worlds |
 |---|---|
@@ -93,18 +100,19 @@ Tilo is built around three ideas:
 4. **See it, steer it.** The work is drawn as a world and narrated in plain sentences. Anything that sends, shares or deletes goes through a gate. When it finishes you get the result, the cost and the trail behind it.
 
 ```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 20, "rankSpacing": 28, "padding": 8}}}%%
 flowchart LR
-    A["Describe the work"] --> B["Director plans<br/>units, cost, assumptions"]
-    B --> C{"You approve<br/>plan and budget"}
-    C --> D["Agent teams run<br/>the units"]
-    D --> E{"Side effect?"}
-    E -- "yes" --> F["Policy engine<br/>risk tier and autonomy level"]
-    F -- "needs a person" --> G["Gate: you approve<br/>web, phone or email"]
-    F -- "allowed" --> H["Outbox releases it<br/>through a connector"]
+    A["Describe<br/>the work"] --> B["Director<br/>plans, prices"]
+    B --> C{"You<br/>approve"}
+    C --> D["Agent teams<br/>run it"]
+    D --> E{"Side<br/>effect?"}
+    E -- "no" --> I["Result and<br/>provenance"]
+    E -- "yes" --> F["Policy engine<br/>tier and level"]
+    F -- "needs a person" --> G["Gate: you<br/>approve"]
+    F -- "allowed" --> H["Outbox and<br/>connector"]
     G --> H
-    E -- "no" --> I["Result and provenance"]
     H --> I
-    I --> J["World, Story and Trace<br/>show what happened"]
+    I --> J["World, Story,<br/>Trace"]
 ```
 
 ## 🏙️ The world
@@ -122,11 +130,11 @@ Each job is its own world, drawn as an isometric map. The shape of the map carri
 | **Gate** | An authorisation point before a side effect | Opens by a person's approval or by a policy, and the two look different |
 | **Cloud cover** | No access yet | A lock glyph that lifts when you consent |
 
-**Three lenses on the same events, kept in sync within 200 ms:**
+**Three views on the same recorded events:**
 
-- **World:** the isometric view with camera, zoom and level switching.
-- **Story:** a plain-language timeline of what happened, narrated from the events.
-- **Trace:** every event with its causation chain, model profile, tokens, latency and authorisation, linked to the raw archive record.
+- **World:** the isometric map with zoom and level switching.
+- **Story:** a plain-language timeline of what happened, narrated from the events. Next to it, **Steps** shows the plan in order with progress, and **Result** holds the delivered output.
+- **Trace:** a switch inside Story that lists every recorded event with its type, actor, model role, tokens, latency and credits. It names the raw archive record for each event; opening that record from the Trace is not built yet.
 
 You can **inspect** any agent, building, gate or artifact, **replay** any finished run (the reducer is deterministic), and switch to a **professional density mode** (smaller characters, labels on, no decorative motion) or a **stage mode** for presentations.
 
@@ -134,15 +142,15 @@ You can **inspect** any agent, building, gate or artifact, **replay** any finish
 
 The world is a display of facts, not a screensaver. These rules are enforced by tests.
 
-| ID | Rule |
+| # | Rule |
 |---|---|
-| HR-1 | Every animation, Story line and meter change is caused by a recorded event |
-| HR-2 | No idle animation implies work that is not happening |
-| HR-3 | Movement is cosmetic and capped at 2 s; the world never runs ahead of the harness |
-| HR-4 | Replays carry a permanent "Replay of run, recorded on a date" banner |
-| HR-5 | Unknown event types appear in the Trace only |
-| HR-6 | Any time compression shows a visible speed badge |
-| HR-7 | Actions authorised by a policy look different from actions a person approved, and both link to the authorisation |
+| 1 | Every animation, Story line and meter change is caused by a recorded event |
+| 2 | No idle animation implies work that is not happening |
+| 3 | Movement is cosmetic and capped at 2 s; the world never runs ahead of the harness |
+| 4 | Replays carry a permanent "Replay of run, recorded on a date" banner |
+| 5 | Unknown event types appear in the Trace only |
+| 6 | Any time compression shows a visible speed badge |
+| 7 | Actions authorised by a policy look different from actions a person approved, and both link to the authorisation |
 
 > Background motion on the Home screen is decoration and is the one exception; motion inside a world is always real.
 
@@ -150,15 +158,16 @@ The world is a display of facts, not a screensaver. These rules are enforced by 
 
 ```mermaid
 flowchart TD
-    O["Owner"] --- D["Director"]
+    O["Owner"] --> D["Director"]
     D --> L1["Lead: district A"]
     D --> L2["Lead: district B"]
-    TL["Human Team Lead<br/>domain expert"] -.guides.- L2
     L1 --> S1["Specialists"]
     L2 --> S2["Specialists"]
-    V["Verifier"] -.checks.- L1
-    V -.checks.- L2
-    W["Writer"] --> DD["Deliverables"]
+    L2 -. "asks" .-> TL["Human Team Lead<br/>domain expert"]
+    S1 --> V["Verifier<br/>checks claims and numbers"]
+    S2 --> V
+    V --> W["Writer"]
+    W --> DD["Deliverables"]
 ```
 
 | Role | Job |
@@ -280,6 +289,16 @@ flowchart LR
 
 Risk tiers are assigned deterministically by action type and context. Policies are objects with scope, limits, conditions, expiry and an undo window (`contracts/policy.schema.json`). Every side-effect event records who or what authorised it, and a kill switch sets every policy back to L1 instantly.
 
+## 🎥 Meetings
+
+Tilo can join a Google Meet to take minutes and draft the follow-ups.
+
+- **A guest, not a login.** The bot joins as a named guest and waits to be let in: **the host admits it**. It never creates a call and never admits anyone else.
+- **It says who it is first.** It posts a disclosure in the Meet chat before it reads anything, and any participant can say or type "Tilo leave" to stop it.
+- **Minutes as you talk.** It reads the live captions and every 45 seconds sends the last few minutes to a model (through the providers layer) to track the agenda, decisions, action items and open questions. Code, not the model, decides whether it may speak: at most four short chat nudges per meeting, at least five minutes apart.
+- **Follow-ups wait for your yes.** Anything it would send goes through a gate like every other side effect.
+- **Test meetings only for now.** The bot lives in `meet-bot/` and is still a prototype. Do not use it for sensitive meetings until Google's data terms for that use are reviewed.
+
 ## 🏗️ Architecture
 
 ```mermaid
@@ -328,7 +347,7 @@ flowchart TB
 | **tilo-harness** (`services/harness`) | Runs the work: one single-writer process per world for planning, agents, handoff and events (Google ADK, Python) |
 | **tilo-channels** (`services/channels`) | Notifications and approval links, channel identity binding |
 | **tilo-connectors** (`services/connectors`) | OAuth token broker, Gmail, Drive and Calendar adapters, and the outbox for side effects |
-| **tilo-browser** (`services/browser`) | One isolated headless browser per instance, with allowlisted egress and masking |
+| **tilo-browser** (`services/browser`) | Groundwork for browser work: one isolated headless browser per instance, with allowlisted egress and masking. Browser control you can watch (with a visible AI cursor) is coming, not live yet |
 | **tilo-render** (`services/render`) | Deliverables: PDF and PPTX rendered from templates; charts drawn by code from data, never by a model |
 | **tilo-sandbox-web** (`services/sandbox-web`) | Fictional websites used by scenarios and evals, so tests never touch the real web |
 
@@ -408,7 +427,7 @@ Business code never names a model. It asks for a **role**, and configuration dec
 | Connector | What it can do | Scopes |
 |---|---|---|
 | **Gmail** | Read, search, create drafts, send in an existing thread | Least privilege: readonly, compose, send; never full mailbox access |
-| **Google Drive** | Read the files you pick; write deliverables to a Tilo folder | `drive.file` only |
+| **Google Drive** | Read the files you pick; write deliverables to a Tilo folder. Importing a CSV from Drive is coming | `drive.file` only |
 | **Google Calendar** | Read availability for scheduling | Read-only |
 
 Every connector action is declared in `config/connectors.yaml` with a risk tier, limits, and a data class that says what is redacted. User OAuth tokens are envelope-encrypted with Cloud KMS and decryptable only by the connectors service.
@@ -423,7 +442,7 @@ Every connector action is declared in `config/connectors.yaml` with a risk tier,
 2. Third-party access only through OAuth with least-privilege, incremental scopes.
 3. Browser sessions are ephemeral; nothing is stored between runs.
 4. Secrets never enter prompts, logs, traces, the raw archive or analytics.
-5. CI uses Workload Identity Federation: no keys in the repo.
+5. Automation authenticates with Workload Identity Federation: no service-account keys in the repo.
 
 **Prompt-injection defence in depth**
 
@@ -439,7 +458,7 @@ Every connector action is declared in `config/connectors.yaml` with a risk tier,
 
 ## 📊 Eval results
 
-Tilo ships a **170-case eval bank** (`evals/cases/`, schema in `evals/case.schema.json`) in eight groups:
+Tilo ships a **160-case eval bank** (`evals/cases/`, schema in `evals/case.schema.json`) in eight groups:
 
 | Group | What it measures |
 |---|---|
@@ -472,13 +491,14 @@ Run the harness with `just eval`. Scores are not claimed here; measured results 
 ```
 apps/web            React and PixiJS web app
 services/           api, harness, connectors, channels, browser, render, sandbox-web
+meet-bot/           Google Meet guest bot (prototype)
 packages/           providers, policy, planning, memory, archive, metering, people, world,
-                    contracts-py, contracts-ts
+                    logging, redact, contracts-py, contracts-ts
 contracts/          JSON Schemas, event registry and fixtures (the source of truth)
 config/             models, prices, autonomy, connectors, teams, scenarios and other configuration
 prompts/ skills/    prompt templates and teachable skills
 templates/          deliverable templates
-evals/              eval harness and the 170-case bank
+evals/              eval harness and the 160-case bank
 infra/              Terraform
 docs/               PRD, architecture decision records, notes
 design/             design tokens and design source
@@ -488,17 +508,17 @@ tests/              acceptance tests named after requirement IDs
 ### How it is built
 
 - **Contracts first.** JSON Schemas and the event registry in `contracts/` win over prose; Python and TypeScript types are generated from them, and drift fails the build.
-- **Spec-driven.** The product spec is `docs/prd/tilo-prd-v2.md`. Requirement IDs (for example FR-WLD-02, PL-01, SEC-13) are ticket IDs, and each acceptance test is the definition of done, with the ID in the test name.
+- **Spec-driven.** The product spec is `docs/prd/tilo-prd-v2.md`. Every requirement has an ID that doubles as its ticket, and each acceptance test is the definition of done, with the ID in the test name.
 - **Decisions are written down** as architecture decision records in `docs/adr/`.
 - **Models are configuration**, side effects go through the outbox and policy engine, and nothing animates without a recorded event.
 - **Local-first.** Development uses the Firestore and Pub/Sub emulators with a `demo-` project id, and makes no paid calls.
 
 ## 🚀 How to run
 
-Prerequisites: Python with [`uv`](https://docs.astral.sh/uv/), Node with `pnpm`, and [`just`](https://github.com/casey/just).
+Prerequisites: Python 3.12 with [`uv`](https://docs.astral.sh/uv/), Node 22 or newer with `pnpm` 10, and [`just`](https://github.com/casey/just).
 
 ```bash
-just setup   # uv sync and pnpm install for every workspace member
+just setup   # uv sync, pnpm install and git hooks for every workspace member
 just dev     # web dev server
 just dev-api # tilo-api dev server
 just check   # format, lint, typecheck and all tests (the full gate)
@@ -511,9 +531,11 @@ Local development uses fake and record-and-replay providers, so it makes no paid
 ## 📝 Honest notes
 
 - **The demo is sample data.** The demo town and its worlds are a made-up company. Demo sessions replay recorded runs and say so; approving in the demo records nothing.
-- **Google connectors:** Gmail, Drive and Calendar are the connectors in scope for this release. Other connectors (for example Microsoft 365, MCP servers, Slides, Docs and Sheets creation) are future scope.
+- **Google connectors:** Gmail, Drive and Calendar are the connectors in scope for this release. Other connectors (for example Microsoft 365, MCP servers, Slides, Docs and Sheets creation, and Lovable) are future scope.
 - **Channels:** approvals work from the web app, mobile web and email. WhatsApp is not part of this release.
 - **Email Autopilot** is limited to a small test group until Google's app verification is complete.
+- **Meetings:** the Meet bot joins as a guest the host admits. It is a prototype for test meetings only.
+- **Coming, not live yet:** browser control you can watch, with a visible AI cursor; public app pages for small apps Tilo builds; importing a CSV from Drive. The `tilo-browser` service and the app-page contracts exist, but these experiences are not available on the live site.
 - **Roadmap items, not shipped:** desktop control, Build mode, workforce orchestration, scoped contributors who talk to agents directly.
 - **Evals:** the bank and harness exist; this README quotes no scores (see above).
 - **Models:** the default build routes every role through Google's Agent Platform; other adapters are for development and tests, and recordings made on them are not claimed as evidence for the default.
@@ -524,6 +546,10 @@ Local development uses fake and record-and-replay providers, so it makes no paid
 - ✅ Describe, plan, run, approve; isometric worlds with World, Story and Trace lenses
 - ✅ Gmail, Drive and Calendar connectors
 - ✅ Agenda with team and personal pinboards, Team page, Skills, Ledger
+- ✅ Meet bot that joins as a guest (prototype, test meetings)
+- 🔜 Browser control you can watch, with a visible AI cursor
+- 🔜 Public app pages
+- 🔜 Importing a CSV from Drive
 - 🔜 More connectors for other work tools
 - 🔜 Native Google Slides, Docs and Sheets deliverables
 - 🔜 Desktop control and Build mode
