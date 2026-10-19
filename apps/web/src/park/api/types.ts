@@ -208,6 +208,8 @@ export interface World {
   sample?: boolean;
   /** BQ-CTX-TEAMWORLD: `team` for a teammate's world the person reads through a share (read only); absent = theirs. */
   access?: "team";
+  /** True only when the served world status was completed; failed worlds have no result. */
+  resultReady?: boolean;
   plan?: string | null;
   districts?: WorldDistrict[] | null;
   activity?: ActivityItem[];

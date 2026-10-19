@@ -37,7 +37,15 @@ import { ComposerPanel, type Phase, QUICK_IDLE, type QuickView } from "./Compose
 import "./Home.css";
 import { HomeSkeleton } from "./HomeSkeleton";
 import { MorningBriefCard } from "./MorningBriefCard";
-import { ChatHistory, Crew, Hero, KpiStrip, TodayPanel, WorldsSection } from "./Panels";
+import {
+  ChatHistory,
+  Crew,
+  Hero,
+  KpiStrip,
+  LatestResults,
+  TodayPanel,
+  WorldsSection,
+} from "./Panels";
 import { readEffort, writeEffort } from "./effortStore";
 import {
   DRAFT_MS,
@@ -613,6 +621,18 @@ export function HomePage({ app }: { app: AppCtx }) {
               onWorld={open}
               onWorlds={() => go("worlds")}
             />
+            {served ? (
+              <LatestResults
+                worlds={worlds
+                  .filter(
+                    (world) =>
+                      world.resultReady && !world.sample && !world.isNew && world.access !== "team",
+                  )
+                  .sort((a, b) => b.started.localeCompare(a.started))
+                  .slice(0, 3)}
+                onWorld={open}
+              />
+            ) : null}
             {briefApi && !demo ? (
               <MorningBriefCard
                 api={briefApi}
