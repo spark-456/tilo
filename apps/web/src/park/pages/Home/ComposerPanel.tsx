@@ -141,6 +141,13 @@ export interface ComposerProps {
 
 export function ComposerPanel(p: ComposerProps) {
   const { mode, phase } = p;
+  const needsBrowser = Boolean(
+    p.selectedSkill?.tools.some((tool) => /browser|browse_web/i.test(tool)) ||
+      (/\b(?:open|navigate|click|play|type|fill)\b/i.test(p.selectedSkill?.purpose ?? "") &&
+        /\b(?:browser|website|webpage|youtube|https?:\/\/|\.com\b)/i.test(
+          p.selectedSkill?.purpose ?? "",
+        )),
+  );
   const effort = p.effort ?? "thinking";
   const quick = p.quick ?? QUICK_IDLE;
   const quickMode = effort === "quick";
@@ -171,7 +178,7 @@ export function ComposerPanel(p: ComposerProps) {
           onChange={(e) => p.onQuery(e.target.value)}
           onKeyDown={(e) => {
             mentionInput?.onKeyDown(e);
-            if (e.key === "Enter" && !e.defaultPrevented) p.onDraft();
+            if (e.key === "Enter" && !e.defaultPrevented && !needsBrowser) p.onDraft();
           }}
         />
       </div>
@@ -192,6 +199,9 @@ export function ComposerPanel(p: ComposerProps) {
         ) : (
           renderInput()
         )}
+        {needsBrowser ? (
+          <output className="park-home-browser-note">Needs browser control (coming)</output>
+        ) : null}
         <div className="park-home-mode-row">
           <div className="park-home-effort">
             <SegmentedControl
@@ -228,7 +238,12 @@ export function ComposerPanel(p: ComposerProps) {
             </details>
           )}
           <div className="park-home-hint">{quickMode ? effortNote : mode.hint}</div>
-          <button type="button" className="park-home-start" onClick={p.onDraft}>
+          <button
+            type="button"
+            className="park-home-start"
+            onClick={p.onDraft}
+            disabled={needsBrowser}
+          >
             {quickMode ? "Ask" : mode.start}
           </button>
         </div>
