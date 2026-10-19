@@ -689,6 +689,7 @@
   border: 1px solid var(--amberLine);
   border-radius: 22px;
   background: var(--amberSoft);
+  box-shadow: var(--sh1);
 }
 [data-park] .park-world-waitinghead {
   display: flex;
@@ -773,6 +774,7 @@
   border: 1px solid var(--line2);
   border-radius: 22px;
   background: var(--card);
+  box-shadow: var(--sh1);
 }
 [data-park] .park-world-spendhead {
   display: flex;
@@ -833,6 +835,7 @@
   border: 1px solid var(--line2);
   border-radius: 22px;
   background: var(--card);
+  box-shadow: var(--sh1);
 }
 [data-park] .park-world-fact {
   display: grid;
