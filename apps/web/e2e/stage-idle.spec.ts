@@ -1,12 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { CAMERA_PAN_MS } from "../src/stage/camera";
+import { CAMERA_TRANSITION_MS } from "../src/stage/camera";
 import { gotoStage } from "./support/camera";
 import { DESKTOP } from "./support/viewports";
+import { fixtureUrl } from "./support/world";
+
+const STILL_WORLD = fixtureUrl("village-basic", { seq: 44 });
 
 test.use({ viewport: DESKTOP });
 
 test("PRD-9.7/HR-2 stage: the iso grid has no idle animation of any kind", async ({ page }) => {
-  await gotoStage(page);
+  await gotoStage(page, STILL_WORLD);
 
   const canvas = page.getByTestId("stage-frame").locator("canvas");
   await expect(canvas).toBeVisible();
@@ -25,7 +28,7 @@ test("PRD-9.7/HR-2 stage: the iso grid has no idle animation of any kind", async
 test("P0-08b camera C10 PRD-9.7/HR-2 stage: after a camera move settles, the canvas stays pixel-identical for 2s of idle", async ({
   page,
 }) => {
-  await gotoStage(page);
+  await gotoStage(page, STILL_WORLD);
   const stage = page.getByTestId("stage-frame");
   const canvas = stage.locator("canvas");
   await expect(canvas).toBeVisible();
@@ -33,7 +36,7 @@ test("P0-08b camera C10 PRD-9.7/HR-2 stage: after a camera move settles, the can
 
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("=");
-  await page.waitForTimeout(CAMERA_PAN_MS + 200); // let the eased keyboard move fully settle
+  await page.waitForTimeout(CAMERA_TRANSITION_MS + 200); // the "=" zoom uses the longer transition
 
   const first = await canvas.evaluate((el: HTMLCanvasElement) => el.toDataURL());
   await page.waitForTimeout(2000); // no user interaction and no event in between
