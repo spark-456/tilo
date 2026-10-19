@@ -1,10 +1,13 @@
 // P0-PERF: cold-route Chromium measurements against the production preview.
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { chromium } from "@playwright/test";
 
 const base = `http://127.0.0.1:${process.env.TILO_WEB_PORT || 4133}`;
 const output = process.argv[2];
+const traceDir = process.argv[3];
+if (traceDir) mkdirSync(traceDir, { recursive: true });
 const routes = [
   ["Home", "/"],
   ["Worlds", "/worlds"],
@@ -87,6 +90,12 @@ for (const width of [1440, 390]) {
       );
     });
     const page = await context.newPage();
+    const cdp = traceDir ? await context.newCDPSession(page) : null;
+    if (cdp)
+      await cdp.send("Tracing.start", {
+        categories: "devtools.timeline,blink.user_timing,v8",
+        transferMode: "ReturnAsStream",
+      });
     const errors = [];
     const requests = [];
     const assets = [];
@@ -129,10 +138,16 @@ for (const width of [1440, 390]) {
       if (await stage.count()) {
         await stage.focus();
         fps = await page.evaluate(async () => {
+          const stage = document.querySelector("[data-stage-ready='true']");
           const times = [];
-          const end = performance.now() + 1200;
+          const end = performance.now() + 550;
+          let last = stage?.dataset.cameraX;
           const sample = (t) => {
-            times.push(t);
+            const current = stage?.dataset.cameraX;
+            if (current !== last) {
+              times.push(t);
+              last = current;
+            }
             if (t < end) requestAnimationFrame(sample);
           };
           requestAnimationFrame(sample);
@@ -141,8 +156,10 @@ for (const width of [1440, 390]) {
             ?.dispatchEvent(
               new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }),
             );
-          await new Promise((resolve) => setTimeout(resolve, 1250));
-          return Math.round(((times.length - 1) * 1000) / (times.at(-1) - times[0]));
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          return times.length > 1
+            ? Math.round(((times.length - 1) * 1000) / (times.at(-1) - times[0]))
+            : 0;
         });
       }
     }
@@ -190,6 +207,23 @@ for (const width of [1440, 390]) {
       errors,
       ...pageMetrics,
     });
+    if (cdp && traceDir) {
+      const complete = new Promise((resolve) => cdp.once("Tracing.tracingComplete", resolve));
+      await cdp.send("Tracing.end");
+      const { stream } = await complete;
+      const chunks = [];
+      for (;;) {
+        const { data, base64Encoded, eof } = await cdp.send("IO.read", { handle: stream });
+        chunks.push(Buffer.from(data, base64Encoded ? "base64" : "utf8"));
+        if (eof) break;
+      }
+      await cdp.send("IO.close", { handle: stream });
+      writeFileSync(
+        join(traceDir, `${width}-${name.toLowerCase().replaceAll(" ", "-")}.trace.json.gz`),
+        gzipSync(Buffer.concat(chunks)),
+      );
+      await cdp.detach();
+    }
     await context.close();
   }
 }
