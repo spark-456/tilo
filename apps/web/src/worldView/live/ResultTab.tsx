@@ -441,7 +441,11 @@ export function ResultTab({
         : /^(PNG|JPG|JPEG|WEBP|GIF)$/.test(mainFormat)
           ? "palette"
           : "file";
-  const mainSummary = mainEvent?.summary || "Ready to open or download.";
+  const summary = mainEvent?.summary?.trim() ?? "";
+  const mainSummary =
+    summary && !/\bartifact\.(?:created|delivered|versioned)\b/i.test(summary)
+      ? summary
+      : "Ready to open or download.";
 
   const handleOpen = () => {
     if (blob && mainItem) openResult(openableBlob(blob, mainItem));
@@ -484,30 +488,8 @@ export function ResultTab({
     }
   };
 
-  const lastDeliveryEvent = [...events].reverse().find((e) => e.type === "artifact.delivered");
-  const deliveryTime = lastDeliveryEvent
-    ? new Date(lastDeliveryEvent.ts)
-        .toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-        .toLowerCase()
-    : "";
-  const piecesCount = rawDelivered.length;
-
   return (
     <div className="tw-res-container" data-testid="result-tab">
-      {/* 1. Delivered to the Dock Banner */}
-      <div className="tw-res-del tw-res-slide-0" data-testid="delivered-banner">
-        <span className="tw-res-del__icon" aria-hidden="true">
-          <Icon name="parcel" size={18} />
-        </span>
-        <span className="tw-res-del__meta">
-          <span className="tw-res-del__title">Delivered to the Dock</span>
-          <span className="tw-res-del__sub">
-            artifact.delivered · {deliveryTime} · {piecesCount} pieces
-          </span>
-        </span>
-      </div>
-
-      {/* 2. Main Deliverable Card */}
       <div className="tw-res-card tw-res-card--main tw-res-slide-1" data-testid="run-result">
         <div className="tw-res-body">
           <div className="tw-res-meta-line">
@@ -582,25 +564,9 @@ export function ResultTab({
         </div>
       </div>
 
-      {/* 4. Folded Working Files */}
       {rawDelivered.length > 1 ? (
         <WorkingFiles api={api} worldId={worldId} items={rawDelivered.slice(1)} />
       ) : null}
-
-      {/* 5. Where it was made */}
-      <div className="tw-res-made tw-res-slide-5" data-testid="where-it-was-made">
-        <span className="tw-res-made__header">WHERE IT WAS MADE</span>
-        <div className="tw-res-made__grid">
-          <div className="tw-res-made__card">
-            <span className="tw-res-made__icon" aria-hidden="true">
-              <Icon name="sparkle" size={18} />
-            </span>
-            <span className="tw-res-made__name">Tilo</span>
-            <span className="tw-res-made__desc">{`${piecesCount} delivered ${piecesCount === 1 ? "file" : "files"}`}</span>
-          </div>
-        </div>
-        <p className="tw-res-made__later">Other services coming later.</p>
-      </div>
     </div>
   );
 }

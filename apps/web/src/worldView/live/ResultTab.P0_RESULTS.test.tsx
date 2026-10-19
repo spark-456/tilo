@@ -28,6 +28,17 @@ const fileView = (text: string, type: string) => ({
 });
 
 describe("P0_RESULTS inline delivery", () => {
+  it("P0_RESULTS_keeps_delivery_event_details_out_of_the_result_page", () => {
+    const m = mount(
+      <div data-park="">
+        <ResultTab worldId="w_clean" events={[delivered("md", "Decision.md")]} />
+      </div>,
+    );
+    expect(m.container.textContent).not.toContain("artifact.delivered");
+    expect(m.container.textContent).not.toContain("Other services coming later");
+    expect(m.container.querySelectorAll('[data-testid="run-result"]')).toHaveLength(1);
+  });
+
   it("P0_RESULTS_main_download_uses_the_recorded_filename", async () => {
     let saved = "";
     vi.stubGlobal("URL", {
