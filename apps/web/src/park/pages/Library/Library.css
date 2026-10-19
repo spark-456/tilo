@@ -58,7 +58,7 @@
   background: var(--card);
   color: var(--ink);
   font: inherit;
-  font-size: var(--text-14);
+  font-size: var(--font-size-14);
 }
 [data-park] .park-library-list {
   list-style: none;
@@ -90,13 +90,13 @@
   overflow-wrap: anywhere;
 }
 [data-park] .park-library-rowsub {
-  font-size: var(--text-14);
+  font-size: var(--font-size-14);
   font-weight: 600;
   color: var(--ink2);
 }
 [data-park] .park-library-note {
   margin: 0;
-  font-size: var(--text-14);
+  font-size: var(--font-size-14);
   font-weight: 600;
   color: var(--ink2);
 }

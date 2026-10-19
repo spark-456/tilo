@@ -558,3 +558,23 @@
     min-height: 48px;
   }
 }
+
+/* RESPONSIVE: the page keeps the same left edge as Home, Worlds and Team (the shell's gutter plus the 8px page pad), on
+   a phone the cards line up with the sample strip above, and a touch screen has no use for the keyboard hint. */
+@media (min-width: 641px) {
+  [data-park] .park-needs {
+    padding-right: var(--park-page-pad, 8px);
+    padding-left: var(--park-page-pad, 8px);
+  }
+}
+@media (max-width: 640px) {
+  [data-park] .park-needs {
+    padding-right: 0;
+    padding-left: 0;
+  }
+}
+@media (pointer: coarse) {
+  [data-park] .park-needs__keys {
+    display: none;
+  }
+}

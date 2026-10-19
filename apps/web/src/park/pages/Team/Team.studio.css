@@ -210,3 +210,56 @@
     align-items: center;
   }
 }
+
+/* RESPONSIVE: a tablet fits the members table without a sideways swipe (the columns give back room), a phone's
+   per-person card puts each value against the right edge, and the role table keeps its label column readable while
+   the four roles scroll beside it. */
+@media (min-width: 561px) and (max-width: 900px) {
+  [data-park][data-theme="studio"] .park-team-table {
+    min-width: 600px;
+  }
+  [data-park][data-theme="studio"] .park-team-grid {
+    grid-template-columns: minmax(0, 1.3fr) 124px 92px 96px 84px 44px;
+    column-gap: 10px;
+  }
+  [data-park][data-theme="studio"] .park-team-members::before {
+    content: none;
+  }
+}
+@media (max-width: 480px) {
+  [data-park][data-theme="studio"] .park-team-row > td:nth-child(n + 3):nth-child(-n + 5)::before {
+    flex: 1;
+  }
+  [data-park][data-theme="studio"] .park-team-row > td.park-team-helped {
+    gap: 10px;
+  }
+  [data-park][data-theme="studio"] .park-team-track {
+    flex: none;
+    width: 56px;
+  }
+}
+@media (max-width: 600px) {
+  [data-park][data-theme="studio"] [data-testid="park-page-team"] .park-team-mrow {
+    grid-template-columns: minmax(132px, 1fr) repeat(4, 64px);
+    min-width: 388px;
+  }
+  [data-park][data-theme="studio"] [data-testid="park-page-team"] .park-team-mlabel {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    padding-right: 8px;
+    background: var(--card);
+  }
+}
+@media (max-width: 560px) {
+  [data-park][data-theme="studio"] .park-team-invite {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  [data-park][data-theme="studio"] .park-team-invite .park-team-field {
+    width: 100%;
+  }
+  [data-park][data-theme="studio"] .park-team-invite > button {
+    width: 100%;
+  }
+}

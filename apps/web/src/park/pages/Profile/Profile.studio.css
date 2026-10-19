@@ -276,3 +276,42 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* RESPONSIVE: on a phone the three looks sit in one row of small tiles (they were three 150px cards stacked, a full screen
+   of scrolling for one choice). The name and its line stay on the tile. */
+@media (max-width: 560px) {
+  [data-park][data-theme="studio"] .park-profile-times {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  [data-park][data-theme="studio"] .park-profile-time {
+    gap: 6px;
+    padding: 6px;
+    border-radius: 16px;
+  }
+  [data-park][data-theme="studio"] .park-profile-swatch {
+    gap: 5px;
+    height: 64px;
+    padding: 8px;
+    border-radius: 10px;
+  }
+  [data-park][data-theme="studio"] .park-profile-block.park-profile-block--a {
+    height: 6px;
+  }
+  [data-park][data-theme="studio"] .park-profile-block.park-profile-block--b {
+    height: 16px;
+    border-radius: 5px;
+  }
+  [data-park][data-theme="studio"] .park-profile-block.park-profile-block--c {
+    width: 24px;
+    height: 12px;
+    border-radius: 4px;
+  }
+  [data-park][data-theme="studio"] .park-profile-tname {
+    font-size: 13.5px;
+  }
+  [data-park][data-theme="studio"] .park-profile-tsub {
+    font-size: 11.5px;
+    line-height: 1.25;
+  }
+}
