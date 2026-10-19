@@ -16,6 +16,8 @@ import { useRoomTalk } from "./useRoomTalk";
 import "./ChatPopUp.css";
 import "./live.css";
 
+export const popupCredits = (credits: number): string => (Math.round(credits * 10) / 10).toFixed(1);
+
 const AGENT_COLORS = ["ag1", "ag2", "ag3", "ag4", "ag5", "ag6", "ag7"] as const;
 
 /** The event feed is the transcript; a fresh room reply fills only the gap until those events arrive. */
@@ -281,6 +283,12 @@ export function ChatPopUp({
         <div className="tw-chat-popup__meta">
           <strong className="tw-chat-popup__title">{headerMeta.title}</strong>
           <span className="tw-chat-popup__sub">{headerMeta.sub}</span>
+          {talk.room ? (
+            <span className="tw-chat-popup__sub">
+              {popupCredits(talk.room.credits_spent)} of {popupCredits(talk.room.credit_cap)}{" "}
+              credits
+            </span>
+          ) : null}
         </div>
         <button
           type="button"

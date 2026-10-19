@@ -21,11 +21,12 @@ from tilo_providers.router import BudgetExceededError, Router, RouterError
 ROLES = {"quick": "meeting_room", "thinking": "meeting_room_thinking"}  # config/models*.yaml; `meeting` is the bot's
 DECLINED = "I can't take that message, so I have no answer to give."
 NO_RECORD = "I have no record of that."
+NOT_STARTED = "This world has no record yet. Select Start to begin."
 MAX_LINES, MAX_LINE, MAX_TEXT, MAX_UNITS, MAX_ARTIFACTS = 60, 300, 4000, 20, 10
 _UNIT = re.compile(r"U[0-9]{1,4}")
 _ARTIFACT_ID = re.compile(r"art_[0-9A-Za-z_]{1,48}")
 _ARTIFACT_EVENTS = ("artifact.created", "artifact.versioned")
-_STORY_EVENTS = ("world.requested", "world.planned", "plan.revised")
+_STORY_EVENTS = ("world.requested", "world.planned", "world.started", "plan.revised", "world.completed", "world.failed")
 
 
 class RoomModelUnavailable(Exception):
@@ -49,6 +50,7 @@ class Grounding:
     units: frozenset[str]
     artifacts: frozenset[tuple[str, int]]
     lines: tuple[tuple[int, str, str, str], ...]  # seq, type, unit, summary: what the agent's record says
+    started: bool = True
 
 
 @dataclass(frozen=True)
@@ -105,7 +107,7 @@ def _unit_of(event: Mapping[str, Any]) -> str | None:
     return unit if isinstance(unit, str) and _UNIT.fullmatch(unit) else None
 
 
-def _summary(event: Mapping[str, Any]) -> str:
+def _summary(event: Mapping[str, Any], names: Mapping[str, str] | None = None) -> str:
     text = str(event.get("summary") or "")
     data = event.get("data") or {}
     envelope = data.get("envelope")
@@ -119,6 +121,8 @@ def _summary(event: Mapping[str, Any]) -> str:
         named = [value for value in units if isinstance(value, str) and _UNIT.fullmatch(value)]
         if named:
             text += f" | steps {', '.join(named)}"
+    if event["type"] == "world.planned" and names:
+        text += " | plan " + "; ".join(f"{unit}: {name}" for unit, name in sorted(names.items()))
     item = event.get("item")
     if isinstance(item, dict) and isinstance(item.get("artifact_id"), str) and isinstance(item.get("label"), str):
         text += f" | artifact {item['label']}"
@@ -176,6 +180,16 @@ def ground(layout: Mapping[str, Any] | None, events: list[dict], agent: str) -> 
     }
     own = [e for e in events if agent in (e["actor"], e["target"]) and not e["type"].startswith("meeting.")]
     units = district_units | {u for e in own for u in _event_units(e)}
+    names = {
+        u: b["name"]
+        for lv in semantic.get("levels", [])
+        for d in lv.get("districts", [])
+        if rank == "director" or d["id"] == district
+        for b in d.get("buildings", [])
+        if isinstance(b.get("name"), str)
+        for u in b.get("plan_units", [])
+        if u in units
+    }
     if rank == "director":
         mine = [e for e in events if not e["type"].startswith("meeting.")]
     elif rank == "lead":
@@ -197,8 +211,9 @@ def ground(layout: Mapping[str, Any] | None, events: list[dict], agent: str) -> 
         if e["type"] in _ARTIFACT_EVENTS and isinstance(art, dict) and type(art.get("version")) is int:
             if isinstance(art.get("artifact_id"), str) and _ARTIFACT_ID.fullmatch(art["artifact_id"]):
                 artifacts.add((art["artifact_id"], art["version"]))
-    lines = tuple((e["seq"], e["type"], _unit_of(e) or "-", _summary(e)) for e in _capped_story(mine))
-    return Grounding(agent, rank, district, frozenset(units), frozenset(artifacts), lines)
+    lines = tuple((e["seq"], e["type"], _unit_of(e) or "-", _summary(e, names)) for e in _capped_story(mine))
+    started = any(e["type"] == "world.started" for e in events)
+    return Grounding(agent, rank, district, frozenset(units), frozenset(artifacts), lines, started)
 
 
 def _clean(text: str) -> str:
@@ -259,7 +274,7 @@ def _parse(raw: object, record: Grounding) -> dict | None:
     if len(set(units)) != len(units) or not set(units) <= record.units or not set(arts) <= record.artifacts:
         return None  # MR-06: one id outside the set fails the reply
     if doc["has_record"] != bool(units) or (not doc["has_record"] and arts):
-        return None  # an answer cites at least one unit (HR-1); "no record" cites nothing
+        return None  # answered must cite a recorded unit (the existing room event contract)
     change = None
     if proposal is not None:
         shaped = isinstance(proposal, dict) and set(proposal) == {"units", "artifacts"}
@@ -290,6 +305,8 @@ def answer(
         question = neutralise(text, limit=2000)
         if _flagged(safety, text) or (question != text and _flagged(safety, question)):
             return Reply("declined", DECLINED)  # a flagged message is never sent to the model, never a proposal
+        if not record.started:
+            return Reply("declined", NOT_STARTED)
         rows, note = _screened(safety, tuple((s, t, u, _clean(m)) for s, t, u, m in record.lines))
         system, prompt = _prompt(record, question, mode, note, rows)
         got = model.reply(mode, system, prompt, record=record, budget=budget)

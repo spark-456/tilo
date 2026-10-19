@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { BrowserPanel } from "../../shared/BrowserPanel";
 // The Park "World" page (STUDIO-3, design/studio-v2 "Tilo S World.dc.html"; first WEB-6 "Tilo App World.dc.html"):
 // one world. The title block with its progress and buttons, the run's status banner, then the city on the left and
 // the Story / Steps / Result tabs on the right (Story: what the team did, from the recorded events or the list's
@@ -47,6 +46,7 @@ import {
 import { useStaged } from "../../app/useStaged";
 import { Button, PageSheet } from "../../components";
 import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
+import { BrowserPanel } from "../../shared/BrowserPanel";
 import { icon } from "../../shell/kit";
 import { Activity, Districts, Result, RunHistory } from "./Lower";
 import { MapToast, ZoomableMap, latestLine } from "./MapChrome";
@@ -1114,7 +1114,12 @@ export function WorldPage({ app }: { app: AppCtx }) {
         </div>
       </div>
       {hasStage && roomClient && !w.sample ? (
-        <MeetingHall key={w.id} worldId={w.id} client={roomClient} />
+        <MeetingHall
+          key={w.id}
+          worldId={w.id}
+          client={roomClient}
+          onChangeDirection={changeDirection}
+        />
       ) : null}
     </Frame>
   );
