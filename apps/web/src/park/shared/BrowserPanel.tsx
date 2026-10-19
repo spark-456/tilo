@@ -1,6 +1,6 @@
 import type { BrowserActedData, BrowserStartedData, BrowserStoppedData } from "@tilo/contracts";
 import { useEffect, useState } from "react";
-import type { TiloClient } from "../api/client";
+import type { TiloClient } from "../../api/client";
 import "./BrowserPanel.css";
 
 type FrameClient = TiloClient & {

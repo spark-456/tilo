@@ -12,7 +12,7 @@ import type { RunStatus } from "../world/runSummary";
 import { speedBadgeText } from "../world/speed";
 import { useClientWorld } from "../world/useClientWorld";
 import type { WorldFixtureState } from "../world/useWorldFixture";
-import { BrowserPanel } from "./BrowserPanel";
+import { BrowserPanel } from "../park/shared/BrowserPanel";
 import { LensFrame } from "./LensFrame";
 import { LoggedDock, ReplayDock } from "./ReplayDock";
 import { ReplayNotices } from "./ReplayNotices";
