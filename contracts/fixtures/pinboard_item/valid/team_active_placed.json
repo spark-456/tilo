@@ -1,0 +1,52 @@
+{
+  "id": "pb_rate_sheet",
+  "org_id": "org_example",
+  "scope": {
+    "kind": "team",
+    "team": "tm_launch"
+  },
+  "title": "Rate sheet goes to Acme by 9 Oct",
+  "body": null,
+  "kind": "decision",
+  "url": null,
+  "owner": "u_priya",
+  "due": "2026-10-17",
+  "status": "active",
+  "created_by": {
+    "by": "tilo",
+    "ref": "A_analyst",
+    "at": "2026-10-05T10:30:00.000Z"
+  },
+  "set_up_by": "u_owner",
+  "source": {
+    "kind": "meeting",
+    "ref": "mt_q4_plan",
+    "evidence": ["u0012"]
+  },
+  "confirmed_by": {
+    "by": "u_owner",
+    "at": "2026-10-06T10:00:00.000Z"
+  },
+  "flagged": false,
+  "history": [
+    {
+      "at": "2026-10-05T10:30:00.000Z",
+      "by": "A_analyst",
+      "change": "created",
+      "status": "proposed"
+    },
+    {
+      "at": "2026-10-06T10:00:00.000Z",
+      "by": "u_owner",
+      "change": "accepted",
+      "status": "active"
+    }
+  ],
+  "created_at": "2026-10-05T10:30:00.000Z",
+  "updated_at": "2026-10-06T10:00:00.000Z",
+  "placement": {
+    "board": "launch",
+    "column": "doing",
+    "order": 2
+  }
+}

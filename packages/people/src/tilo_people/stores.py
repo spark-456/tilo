@@ -15,19 +15,32 @@ import re
 import threading
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from itertools import islice
 from typing import Any, Protocol
 
 from tilo_people._schema import valid
-from tilo_people.errors import AlreadyExists, NotFound, PeopleInputError, VersionConflict
+from tilo_people.errors import (
+    AlreadyExists,
+    EmailTaken,
+    LastPerson,
+    NotFound,
+    OrgAlreadyFounded,
+    PeopleInputError,
+    VersionConflict,
+)
 
 INDEXES: Mapping[str, tuple[str, ...]] = {
     "person": (),
     "meeting": ("owner",),
-    "work_item": ("owner",),
+    "work_item": ("owner", "world_id"),  # ADR-0040: the items of one world (the team view list)
     "pinboard_item": ("scope.user", "scope.team", "set_up_by"),
     "mention": ("pin_id", "user"),
     "calendar_entry": ("owner",),
+    "world_share": ("world_id", "team"),  # ADR-0040 PE-31: a world's shares, a team's shares
 }
+
+# Internal capped context reads; the PE-16 public list selectors remain unchanged.
+BOUNDED_INDEXES = {**INDEXES, "work_item": ("owner", "created_by.ref", "source.ref", "assigned_by.by")}
 
 _MISSING = object()
 _SAFE_ID = re.compile(r"[A-Za-z0-9_.-]{1,128}")
@@ -51,6 +64,7 @@ class RecordStore(Protocol):
     def replace(self, record: Mapping[str, Any], *, expected_version: int) -> Stored: ...
     def delete(self, org_id: str, record_id: str, *, expected_version: int) -> None: ...
     def list(self, org_id: str, field: str | None = None, value: str | None = None) -> tuple[Stored, ...]: ...
+    def list_bounded(self, org_id: str, field: str, value: str, *, limit: int) -> tuple[Stored, ...]: ...
 
 
 def _safe(value: Any) -> str:
@@ -69,7 +83,11 @@ def _at(record: Mapping[str, Any], path: str) -> Any:
 
 
 class MemoryStore:
-    """A `RecordStore` for one kind of `INDEXES`, atomic per call under one lock."""
+    """A `RecordStore` for one kind of `INDEXES`, atomic per call under one lock. `MemoryStore("person")` is the person
+    store, which also holds the address reservations and the founder marker (PPL-11c-FS); no other kind has those."""
+
+    def __new__(cls, kind: str) -> MemoryStore:
+        return super().__new__(_PersonMemoryStore if cls is MemoryStore and kind == "person" else cls)
 
     def __init__(self, kind: str) -> None:
         if not isinstance(kind, str) or kind not in INDEXES:
@@ -108,6 +126,7 @@ class MemoryStore:
         with self._lock:
             if key in self._rows:
                 raise AlreadyExists(f"AlreadyExists: {self.kind} {key[1]}")
+            self._reserve(key, copied)
             self._rows[key] = (1, copied)
         return Stored(self.kind, copy.deepcopy(copied), 1)
 
@@ -121,11 +140,20 @@ class MemoryStore:
                 raise NotFound(f"NotFound: {self.kind} {key[1]}")
             if row[0] != expected:
                 raise VersionConflict(f"VersionConflict: {self.kind} {key[1]} expected {expected} current {row[0]}")
+            self._release(key, row[1])
+            try:
+                self._reserve(key, copied)
+            except EmailTaken:
+                self._reserve(key, row[1])  # the old address is held again: a refused replace changes nothing
+                raise
             self._rows[key] = (row[0] + 1, copied)
             version = row[0] + 1
         return Stored(self.kind, copy.deepcopy(copied), version)
 
     def delete(self, org_id: str, record_id: str, *, expected_version: int) -> None:
+        self._delete(org_id, record_id, expected_version, keep_one=False)
+
+    def _delete(self, org_id: str, record_id: str, expected_version: int, *, keep_one: bool) -> None:
         expected = self._version(expected_version)
         key = (org_id, record_id)
         with self._lock:
@@ -136,7 +164,19 @@ class MemoryStore:
                 raise VersionConflict(
                     f"VersionConflict: {self.kind} {_safe(record_id)} expected {expected} current {row[0]}"
                 )
+            if keep_one:
+                self._refuse_sole(key)
+            self._release(key, row[1])
             del self._rows[key]
+
+    def _refuse_sole(self, key: tuple[str, str]) -> None:
+        """Hook of the person store (`delete_not_last`); called under `_lock`."""
+
+    def _reserve(self, key: tuple[str, str], record: Mapping[str, Any]) -> None:
+        """Hook of the person store (an address reservation); called under `_lock`."""
+
+    def _release(self, key: tuple[str, str], record: Mapping[str, Any]) -> None:
+        """Hook of the person store; called under `_lock`."""
 
     def list(self, org_id: str, field: str | None = None, value: str | None = None) -> tuple[Stored, ...]:
         if field is not None and (not isinstance(field, str) or field not in INDEXES[self.kind]):
@@ -154,6 +194,68 @@ class MemoryStore:
                 if field is None or _at(rec, field) == value
             )
 
+    def list_bounded(self, org_id: str, field: str, value: str, *, limit: int) -> tuple[Stored, ...]:
+        if field not in BOUNDED_INDEXES[self.kind] or not isinstance(value, str) or type(limit) is not int or limit < 1:
+            raise PeopleInputError("invalid bounded index query")
+        with self._lock:
+            matches = (
+                Stored(self.kind, copy.deepcopy(rec), version)
+                for (org, _), (version, rec) in self._rows.items()
+                if org == org_id and _at(rec, field) == value
+            )
+            return tuple(islice(matches, limit))
+
+
+class _PersonMemoryStore(MemoryStore):
+    """The person store: one reservation per person for its lower-cased address and the org's founder marker, both
+    changed under `_lock`, in the same step as the record (the Firestore store does the same in a transaction)."""
+
+    def __init__(self, kind: str) -> None:
+        super().__init__(kind)
+        self._emails: dict[tuple[str, str], str] = {}
+        self._founders: dict[str, str] = {}
+
+    def _reserve(self, key: tuple[str, str], record: Mapping[str, Any]) -> None:
+        """Holds the record's address for its person; `EmailTaken` if another person holds it."""
+        slot = (key[0], str(record["email"]).lower())
+        if self._emails.setdefault(slot, key[1]) != key[1]:
+            raise EmailTaken(f"EmailTaken: person {key[1]}")
+
+    def _release(self, key: tuple[str, str], record: Mapping[str, Any]) -> None:
+        self._emails.pop((key[0], str(record["email"]).lower()), None)
+
+    def create_founder(self, record: Mapping[str, Any]) -> Stored:
+        """The founder marker, the person and its address, in one step. Refused `OrgAlreadyFounded` when the org has a
+        marker (members who joined first do not block it, ADR-0044), then `AlreadyExists` (id), then `EmailTaken`; a
+        refusal writes nothing."""
+        key = self._checked(record)
+        if record.get("org_role") != "owner":
+            raise PeopleInputError("a founder is an owner")
+        copied = copy.deepcopy(dict(record))
+        with self._lock:
+            if key[0] in self._founders:
+                raise OrgAlreadyFounded("OrgAlreadyFounded")
+            if key in self._rows:
+                raise AlreadyExists(f"AlreadyExists: person {key[1]}")
+            self._reserve(key, copied)
+            self._rows[key] = (1, copied)
+            self._founders[key[0]] = key[1]
+        return Stored(self.kind, copy.deepcopy(copied), 1)
+
+    def founded(self, org_id: str) -> bool:
+        """Is there a founder marker for the org (never removed, even when everyone is erased)."""
+        with self._lock:
+            return isinstance(org_id, str) and org_id in self._founders
+
+    def delete_not_last(self, org_id: str, record_id: str, *, expected_version: int) -> None:
+        """`delete`, but `LastPerson` (nothing changed) for the sole person of an org nobody founded; the check and the
+        delete are one step under `_lock` (PPL-11c-FS FS-17)."""
+        self._delete(org_id, record_id, expected_version, keep_one=True)
+
+    def _refuse_sole(self, key: tuple[str, str]) -> None:
+        if key[0] not in self._founders and not any(org == key[0] and rid != key[1] for org, rid in self._rows):
+            raise LastPerson(f"LastPerson: person {_safe(key[1])}")
+
 
 @dataclass(frozen=True)
 class PeopleStores:
@@ -163,6 +265,8 @@ class PeopleStores:
     pins: RecordStore
     mentions: RecordStore
     calendar: RecordStore
+    world_shares: RecordStore  # required, no in-memory default: a door that forgets it fails at build (ADR-0040)
+    erase_followup: Callable[[str, str], None] | None = None
 
     @classmethod
     def in_memory(cls) -> PeopleStores:
@@ -173,6 +277,7 @@ class PeopleStores:
             pins=MemoryStore("pinboard_item"),
             mentions=MemoryStore("mention"),
             calendar=MemoryStore("calendar_entry"),
+            world_shares=MemoryStore("world_share"),
         )
 
 
@@ -210,15 +315,20 @@ def delete_meeting(stores: PeopleStores, org_id: str, meeting_id: str, *, expect
 
 
 def _delete_matching(
-    store: RecordStore, org_id: str, record_id: str, wanted: Callable[[Mapping[str, Any]], bool]
+    store: RecordStore,
+    org_id: str,
+    record_id: str,
+    wanted: Callable[[Mapping[str, Any]], bool],
+    delete: Callable[..., None] | None = None,
 ) -> bool:
-    """Deletes the record when it still exists and `wanted`; a racing writer is retried, then reported."""
+    """Deletes the record (with `delete`, default `store.delete`) when it still exists and `wanted`; a racing writer is
+    retried, then reported."""
     for attempt in range(_ATTEMPTS):
         current = store.get(org_id, record_id)
         if current is None or not wanted(current.record):
             return False
         try:
-            store.delete(org_id, record_id, expected_version=current.version)
+            (delete or store.delete)(org_id, record_id, expected_version=current.version)
         except NotFound:
             return False
         except VersionConflict:
@@ -271,12 +381,28 @@ def _always(record: Mapping[str, Any]) -> bool:
     return True
 
 
+def _refuse_last_person(stores: PeopleStores, org_id: str, user: str) -> None:
+    """BQ-PPL11C-16: the sole person of an org that was never founded is not erased (nothing is changed). A store with
+    no `founded` (a bare `RecordStore`) counts as not founded."""
+    everyone = stores.persons.list(org_id)
+    if len(everyone) == 1 and everyone[0].record["id"] == user:
+        founded = getattr(stores.persons, "founded", None)
+        if founded is None or not founded(org_id):
+            raise LastPerson(f"LastPerson: person {_safe(user)}")
+
+
 def erase_person(stores: PeopleStores, org_id: str, user: str) -> dict[str, int]:
     """PE-16 (BQ-PPL10-8): tombstones their meetings, then deletes their work items, personal pins,
-    mentions naming them, calendar entries and finally their person record. Idempotent."""
-    counts = dict.fromkeys(("meeting", "work_item", "pinboard_item", "mention", "calendar_entry", "person"), 0)
+    mentions naming them, calendar entries, the world shares they granted (PE-35) and finally their person record.
+    Idempotent."""
+    counts = dict.fromkeys(
+        ("meeting", "work_item", "pinboard_item", "mention", "calendar_entry", "world_share", "person"), 0
+    )
+    _refuse_last_person(stores, org_id, user)
     for stored in stores.meetings.list(org_id, "owner", user):
         counts["meeting"] += _tombstone(stores.meetings, org_id, stored.record["id"])
+    if stores.erase_followup is not None:
+        stores.erase_followup(org_id, user)  # sources closed first; failure prevents a completed erasure claim
     plan = (
         ("work_item", stores.work_items, "owner"),
         ("pinboard_item", stores.pins, "scope.user"),
@@ -286,5 +412,12 @@ def erase_person(stores: PeopleStores, org_id: str, user: str) -> dict[str, int]
     for name, store, index in plan:
         for stored in store.list(org_id, index, user):
             counts[name] += _delete_matching(store, org_id, stored.record["id"], _holds(index, user))
-    counts["person"] += _delete_matching(stores.persons, org_id, user, _always)
+    for stored in stores.world_shares.list(org_id):  # PE-35: the shares they granted go with them
+        if stored.record["granted_by"]["by"] == user:
+            counts["world_share"] += _delete_matching(
+                stores.world_shares, org_id, stored.record["id"], _holds("granted_by.by", user)
+            )
+    # the sole-person check is repeated inside the delete, atomically, by a store that has `delete_not_last` (FS-17)
+    delete = getattr(stores.persons, "delete_not_last", None)
+    counts["person"] += _delete_matching(stores.persons, org_id, user, _always, delete)
     return counts

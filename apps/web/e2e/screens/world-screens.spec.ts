@@ -18,7 +18,7 @@ test("S_04 renders, no console errors, placeholders aria-disabled", async ({ pag
   test.setTimeout(90_000);
   const problems = watchConsole(page);
   await page.setViewportSize(DESKTOP);
-  await page.goto(`${W}${FAST}`);
+  await page.goto(`${W}/stage${FAST}`);
   const hud = page.getByTestId("world-hud");
   await expect(page.getByRole("heading", { level: 1, name: "World" })).toBeVisible();
   await expect(page.getByTestId("stage-frame")).toHaveAttribute("data-stage-ready", "true");
@@ -175,7 +175,9 @@ test("S_12 renders, no console errors, placeholders aria-disabled", async ({ pag
   await page.setViewportSize(MOBILE);
   await expectAxeClean(page);
   await page.locator("button.primary").click();
-  await expect(page.getByRole("heading", { level: 1, name: "What should Tilo do?" })).toBeVisible();
+  // WEB-CUTOVER: the way back is "/", the Park Home (S-01 is replaced).
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Good \w+, Alex\.$/);
   expect(problems).toEqual([]);
 });
 
@@ -222,7 +224,7 @@ test("S_12 at 390x844 shows the finished header, the stat tiles and the one prim
 test("S_04 lens tabs and the outline reach Story, Trace and Inspect", async ({ page }) => {
   test.setTimeout(60_000);
   await page.setViewportSize(DESKTOP);
-  await page.goto(`${W}${FAST}`);
+  await page.goto(`${W}/stage${FAST}`);
   const hud = page.getByTestId("world-hud");
   await hud.getByRole("link", { name: "Story" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Story" })).toBeVisible();
@@ -236,7 +238,7 @@ test("S_04 lens tabs and the outline reach Story, Trace and Inspect", async ({ p
 
 // HR-6 (PRD 9.4): whenever the replay is not at its recorded pace, every world screen says so, on
 // both viewports, and keeps saying so after a lens link drops ?speed from the address.
-const WORLD_PATHS = [W, `${W}/inspect/B1`, `${W}/story`, `${W}/trace`, `${W}/delivery`];
+const WORLD_PATHS = [`${W}/stage`, `${W}/inspect/B1`, `${W}/story`, `${W}/trace`, `${W}/delivery`];
 for (const viewport of [DESKTOP, MOBILE]) {
   for (const path of WORLD_PATHS) {
     test(`HR_6 ${path.replace(W, "world") || "world"} shows the replay speed badge at ${viewport.width}x${viewport.height}`, async ({
@@ -270,7 +272,7 @@ for (const viewport of [DESKTOP, MOBILE]) {
 
 // UX-1: with a slow client and events arriving, nothing on S-04, S-05, S-10, S-11 or S-12 moves.
 const SETTLED: ReadonlyArray<readonly [string, string, string]> = [
-  ["S_04", W, "credits of 40 approved"],
+  ["S_04", `${W}/stage`, "credits of 40 approved"],
   ["S_10", `${W}/story`, DONE],
   ["S_11", `${W}/trace`, "world.completed"],
   ["S_05", `${W}/inspect/B1`, "State: Finished"],

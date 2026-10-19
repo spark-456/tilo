@@ -1,0 +1,45 @@
+/* JUDGE-FIRST-RUN F2: the first-visit task card. Every selector sits under [data-park]; colours are var(--token); no motion. */
+[data-park] .park-first-task {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--field);
+  color: var(--ink2);
+}
+[data-park] .park-first-task h2 {
+  margin: 0;
+  font-size: 19px;
+  color: var(--ink);
+}
+[data-park] .park-first-task p {
+  margin: 0;
+}
+[data-park] .park-first-task__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-first-task__pick {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--sheet);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-park] .park-first-task__watch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink3);
+  font-size: 13px;
+}

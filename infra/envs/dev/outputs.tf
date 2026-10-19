@@ -12,6 +12,21 @@ output "firestore_database" {
   }
 }
 
+output "token_database" {
+  value = {
+    name        = google_firestore_database.tokens.name
+    location_id = google_firestore_database.tokens.location_id
+    type        = google_firestore_database.tokens.type
+  }
+}
+
+output "token_rules" {
+  value = {
+    release_name = google_firebaserules_release.tokens.name
+    source       = google_firebaserules_ruleset.tokens.source[0].files[0].content
+  }
+}
+
 output "pubsub_events_topic_name" {
   value = module.events.topic_name
 }
@@ -63,9 +78,10 @@ output "secret_accessors" {
 output "monitoring" {
   description = "Alert email and alert policies (config values)."
   value = {
-    notification_email = module.monitoring.notification_channel_email
-    alert_policies     = module.monitoring.alert_policies
-    cost_alert_policy  = module.monitoring.cost_alert_policy
+    notification_email        = module.monitoring.notification_channel_email
+    alert_policies            = module.monitoring.alert_policies
+    cost_alert_policy         = module.monitoring.cost_alert_policy
+    eval_nightly_alert_policy = module.monitoring.eval_nightly_alert_policy
   }
 }
 
@@ -143,6 +159,13 @@ output "gmail_push" {
     push_path         = module.gmail_push.push_path
     scheduler_jobs    = module.gmail_push.scheduler_jobs
   }
+}
+
+output "schedule_tick" {
+  description = "The scheduled-runs tick: one Scheduler job to api (FR-AGT-14)."
+  value = merge(module.schedule_tick.tick, {
+    service_account = "${google_service_account.schedule_scheduler.account_id}@${var.project_id}.iam.gserviceaccount.com"
+  })
 }
 
 output "service_storage_grants" {

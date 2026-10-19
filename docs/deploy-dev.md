@@ -61,6 +61,12 @@ user-approved step, never from this workflow or recipe).
 
 ## What deploys what
 
+`just deploy dev` (also `just deploy env=dev`) deploys existing dev services through
+Cloud Build: API first, then all services. If the API build fails, the second build
+does not start. Non-dev arguments are rejected before any shell runs. This entry
+point does not apply infrastructure or deploy Hosting; use the web recipe below
+for Hosting. GitHub Actions remains unused under the current user policy.
+
 | Piece | How | Where it is defined |
 | --- | --- | --- |
 | Services `tilo-api`, `tilo-harness`, `tilo-channels`, `tilo-connectors`, `tilo-browser`, `tilo-render`, `tilo-sandbox-web` | Google Cloud Build: `just deploy-dev-cloudbuild` runs `cloudbuild.yaml` (P0-07f). Alternative: `.github/workflows/deploy-dev.yml` (`workflow_dispatch` only). Both build `services/<svc>/Dockerfile` with the repo root as context | PRD 6.2, 6.5 |
@@ -68,8 +74,11 @@ user-approved step, never from this workflow or recipe).
 | Infrastructure (services, IAM, ingress, env, secrets) | Terraform, applied by you (`infra/README.md`) | `infra/` |
 
 Cloud Build and the workflow only swap the image (pinned by digest) and passes `--min-instances 0` and
-`--max-instances 2..3` on an existing service. It never sets ingress, IAM, env vars or secrets;
-Terraform owns those and ignores image changes (`infra/modules/service`).
+`--max-instances` (harness and channels 3; connectors = 1 until T7; browser, render and sandbox-web 2;
+`tilo-api` 1: one instance is the one writer, ADR-0026) on an existing service. It never sets ingress, IAM, env vars or secrets;
+Terraform owns those and ignores image changes (`infra/modules/service`). Env vars are Terraform's for every service
+except `tilo-api` and `tilo-connectors`: those have `ignore_env = true`, so their `TILO_*` runtime settings are set by hand with
+`gcloud run services update` (`docs/routines-rollout.md`) and a Terraform run leaves them alone.
 
 ## Alternative: GitHub Actions workflow (one-time setup)
 
@@ -141,7 +150,7 @@ a flag or a shell command cannot be smuggled in through them.
 `cloudbuild.yaml` (repo root) has three steps: check `_SERVICE` (`all` or one of the seven short names, anything
 else fails with `unknown service`), build each image from `services/<svc>/Dockerfile` with the repo root as
 context and push it to `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>:<build id>`, then
-`gcloud run services update tilo-<svc> --image <repo>@sha256:<digest> --min-instances 0 --max-instances 2..3`,
+`gcloud run services update tilo-<svc> --image <repo>@sha256:<digest> --min-instances 0 --max-instances <n>` (`tilo-api` is always `--max-instances 1`, ADR-0026; connectors stays 1 until T7, the others 2 or 3),
 after refusing any image reference that is not `asia-southeast1-docker.pkg.dev/<project>/tilo/<svc>@sha256:...`.
 The upload is an allowlist (`.gcloudignore`): only `pyproject.toml`, `uv.lock`, `.dockerignore`, `evals/pyproject.toml`
 and the `packages`, `services`, `config`, `contracts`, `prompts` and `templates` trees leave your machine, and secret
@@ -198,6 +207,99 @@ these).
   allowlist and Cloud Audit Logs are the controls. Closing it fully needs a deploy path that fixes each service's
   runtime account, which is a later decision.
 
+## Nightly eval smoke (EFF-05b, Cloud Scheduler)
+
+Cloud Scheduler `tilo-eval-nightly` (daily 19:00 UTC) starts the Cloud Run job `tilo-eval-nightly`, which runs
+`python -m tilo_evals nightly` (replay; no secret, no live switch). `infra/envs/dev/eval_nightly.tf` creates it with two
+new service accounts (`tilo-eval-scheduler`: `roles/run.invoker` on that one job; `tilo-eval-runner`: no role).
+Order: build the image first (`just build-evals-image`, Cloud Build as `tilo-cloudbuild`, pushes `tilo/evals:latest`);
+then check the Terraform offline with `just tf-validate` (`terraform init -backend=false` and `terraform validate`
+in `infra/envs/dev`; it downloads providers but needs no credentials and changes nothing); then plan and apply as in
+`infra/README.md`. Expect exactly 6 to add (google_service_account.eval_scheduler, google_service_account.eval_runner,
+google_cloud_run_v2_job.eval_nightly, its google_cloud_run_v2_job_iam_member, google_cloud_scheduler_job.eval_nightly, and
+module.monitoring.google_monitoring_alert_policy.eval_nightly_failed, EFF-05c), 1 to change (the Artifact Registry
+repository `tilo` gains two cleanup policies, in place, for the `evals` package only: keep the newest 5 versions, delete
+older ones after 7 days), 0 to destroy; any destroy means stop and ask. The alert emails `alert_email` when an execution of
+the job finishes as failed. Test the job once with
+`gcloud run jobs execute tilo-eval-nightly --region asia-southeast1 --project essential-wares-510320-f0 --wait`
+and read the job log in Cloud Logging. The job fails until the `nightly` command (EFF-05a) is in the image.
+
+## Scheduled runs (FR-AGT-14, Cloud Scheduler + Cloud Tasks)
+
+Routines need the runs queue, the `tilo-schedule-tick` Scheduler job and six `tilo-api` settings. The steps, the
+checks and what each tick answer means are in [routines-rollout.md](routines-rollout.md).
+
+## Meeting host: connectors and api settings (ADR-0032 T5)
+
+Order, once your infrastructure run (`infra/README.md`) has finished (run it with no run in flight):
+0. Smoke: api, harness and render must still read Firestore `(default)` (a schedule tick or a run answers, not 503). That
+   proves the `resource.name` condition on their `datastore.user`.
+1. The KMS key `oauth-tokens` is Terraform's (`module.kms`); never create it by hand. Put the OAuth client id and secret
+   in the Secret Manager secrets `workspace-oauth-client-id` and `workspace-oauth-client-secret` (one version each).
+2. Set `tilo-connectors` (names here, never a value in a file or a log). `<url>` is its own URL.
+   `TILO_CONNECTORS_AUDIENCE=<url>`, `TILO_MEETING_HOST_CALLER=tilo-api@<project>.iam.gserviceaccount.com`,
+   `TILO_TOKEN_STORE=firestore`, `TILO_FIRESTORE_PROJECT=<project>`, `TILO_TOKEN_DATABASE=tilo-tokens`,
+   `TILO_KMS_KEY=projects/<project>/locations/asia-southeast1/keyRings/<ring>/cryptoKeys/oauth-tokens`, the OAuth client
+   id and secret as Secret Manager references (`--update-secrets`, which keeps the others; secret
+   `workspace-oauth-client-id` and `-secret`), and no `LIVE`.
+   Connectors runs one instance (CON-D9) until ticket T7.
+3. Set `tilo-api`: `TILO_CONNECTORS_URL=<tilo-connectors url>`. api reaches the internal service through its Direct VPC
+   egress, and holds `run.invoker` on connectors.
+4. `LIVE=1` on connectors only, and the first live invitation, are yours after T7. Connectors (T5b) builds its Firestore
+   client on `TILO_TOKEN_DATABASE` and refuses to start the broker without it: unset, `(default)` or any malformed id
+   is refused, so tokens never land in `(default)`. Order: apply the infrastructure first (it creates `tilo-tokens`, its
+   deny-all ruleset and the release `cloud.firestore/tilo-tokens`), then set the variable, then deploy the T5b image.
+
+## Live connectors: OAuth client, index, settings (ADR-0035 L7, L8)
+
+Gmail, Drive and Calendar go live through `tilo-connectors` only. Do the steps in this order; Tilo's tooling runs none of
+them. Terraform adds one Firestore composite index and two empty Secret Manager secrets (`workspace-oauth-client-id`,
+`workspace-oauth-client-secret`), each readable by `tilo-connectors` only (BQ-ADR35-L7-1). Both services have `ignore_env`, so the settings are `gcloud` steps, and a Terraform run leaves them.
+
+1. Create the OAuth client and consent screen (`infra/ACCESS.md` section 13). Keep the client id and client secret to
+   hand; do not paste them into a command line, a file or chat.
+2. Apply the infrastructure (`infra/README.md`). Expect exactly 5 to add, 0 to change, 0 to destroy: the index
+   `google_firestore_index.outbox_transfer_pending` (collection `outbox`, `transfer_pending` ASC, `enqueued_at` ASC), the
+   secrets `workspace-oauth-client-id` and `workspace-oauth-client-secret`, and one `secretAccessor` binding on each
+   (`tilo-connectors`). Then add ONE version to each secret, in the Secret Manager console (Add new version, paste the
+   value), or with `gcloud secrets versions add workspace-oauth-client-id --project $P --data-file=-`: type or paste the
+   value on the next line, then Ctrl+Z and Enter. Never put the value in the command line (it lands in history).
+   **The index must be built (state READY, a few minutes: Firestore console, Indexes) before `TILO_OUTBOX_STORE=firestore`
+   is set.** Without it, claiming a transfer raises 503 after an entry was sent (PI-17).
+3. Run the outbox store suite once against the Firestore emulator (needs Java and `pnpm install`; no cloud credential):
+
+   ```powershell
+   pnpm exec firebase emulators:exec --only firestore --project demo-tilo "uv run pytest -q services/api/tests/test_FR_CON_02_ADR35_L2_outbox_store_contract.py"
+   ```
+
+4. Set `tilo-connectors`. `^#^` makes `#` the separator, because the account email holds `@`; every value is quoted:
+
+   ```powershell
+   $P = "essential-wares-510320-f0"; $R = "asia-southeast1"
+   $Conn = gcloud run services describe tilo-connectors --project $P --region $R --format "value(status.url)"
+   gcloud run services update tilo-connectors --project $P --region $R `
+     --update-env-vars "^#^GOOGLE_OAUTH_REDIRECT_BASE_URL=https://essential-wares-510320-f0.web.app#TILO_TOKEN_STORE=firestore#TILO_FIRESTORE_PROJECT=${P}#TILO_TOKEN_DATABASE=tilo-tokens#TILO_KMS_KEY=projects/${P}/locations/${R}/keyRings/tilo-${R}/cryptoKeys/oauth-tokens#TILO_CONNECTORS_AUDIENCE=${Conn}#TILO_MEETING_HOST_CALLER=tilo-api@${P}.iam.gserviceaccount.com" `
+     --update-secrets "GOOGLE_OAUTH_CLIENT_ID=workspace-oauth-client-id:latest,GOOGLE_OAUTH_CLIENT_SECRET=workspace-oauth-client-secret:latest"
+   ```
+
+   `LIVE` stays unset. `--update-*` keeps every other setting. Connectors stays at one instance (ADR-0032 T7).
+5. Confirm the outbox index is READY first (step 2), then set `tilo-api` (same PowerShell session as step 4: `$P`, `$R` and
+   `$Conn` are reused; `TILO_API_STORE` and `TILO_PEOPLE_STORE` stay out: the separate ADR-0026 rollout):
+
+   ```powershell
+   $Conn = gcloud run services describe tilo-connectors --project $P --region $R --format "value(status.url)"
+   gcloud run services update tilo-api --project $P --region $R `
+     --update-env-vars "^#^TILO_OUTBOX_STORE=firestore#TILO_CONNECTORS_URL=${Conn}"
+   ```
+
+6. Deploy the images (`just deploy-dev-cloudbuild connectors`, then `api`) and `just deploy-web` if the web app changed. The
+   Hosting headers for `/oauth/google/callback` are already in `firebase.json`.
+7. Your go. Then `LIVE=1` on connectors only: `gcloud run services update tilo-connectors --project $P --region $R --update-env-vars "LIVE=1"`.
+   Never on `tilo-api`. To switch off, `--remove-env-vars "LIVE"`.
+8. Acceptance (L8) with `tilotesting@gmail.com`: connect Gmail read, then Drive and Calendar write; a draft appears; a send to
+   the same address arrives once; a file lands in the Tilo folder; an event appears and a cancelled one does not; disconnect
+   leaves no Tilo access in the Google account. Testing mode expires a grant after 7 days (PRD 11.5): connect again.
+
 ## Web app (Firebase Hosting, manual; P0-07c)
 
 ```powershell
@@ -207,8 +309,9 @@ just deploy-web
 ```
 
 `just deploy-web` builds `apps/web` with `VITE_TILO_API_URL` set to empty, then runs
-`pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0`. It takes no argument
-and refuses every other project by construction (the project id is fixed in the recipe). The
+`pnpm exec firebase deploy --only hosting --project essential-wares-510320-f0`. Its one optional
+argument is a tilo-api url (next section); the project id is fixed in the recipe, so it refuses every other
+project by construction. The
 `firebase-tools` CLI is an `apps/web` devDependency, so no global install is needed. The result is
 live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` alias).
 
@@ -224,8 +327,12 @@ live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` al
   without security headers), hashed files under `/assets/**` as `public, max-age=31536000, immutable`, and
   every other path as `no-cache` (the `**` default) so a new deploy is picked up on the next load. Every
   route also gets `Content-Security-Policy` (self only, no inline styles, `base-uri 'none'`,
-  `connect-src 'self'`, `frame-ancestors 'none'`, no `unsafe-eval`: the web app loads
-  `pixi.js/unsafe-eval`), `X-Content-Type-Options: nosniff` and
+  `frame-ancestors 'none'`, no `unsafe-eval`: the web app loads `pixi.js/unsafe-eval`; SEC-10 adds exactly
+  `https://www.google.com/recaptcha/` and `https://www.gstatic.com/recaptcha/` to `script-src`,
+  `https://www.google.com/recaptcha/` to `frame-src` and `https://content-firebaseappcheck.googleapis.com`
+  (the host the web SDK, `@firebase/app-check` 0.13.1, exchanges tokens at) plus `https://www.google.com/recaptcha/`
+  (reCAPTCHA Enterprise's own `enterprise/clr` fetch) to `connect-src`, for App Check with
+  reCAPTCHA Enterprise), `X-Content-Type-Options: nosniff` and
   `Referrer-Policy: strict-origin-when-cross-origin`. A new backend origin for the web app must be
   added to `connect-src` when the app is pointed at a deployed `tilo-api`.
 - Two Hosting sites exist in the project: the default site `essential-wares-510320-f0`
@@ -234,6 +341,313 @@ live at https://essential-wares-510320-f0.web.app (and the `.firebaseapp.com` al
   (https://essential-wares-510320-f0-web.web.app). The `-web` site is optional and unused.
 - Check before you deploy: `pnpm --filter @tilo/web run build` then `pnpm --filter @tilo/web exec vite preview`
   serves the same bundle locally.
+
+## Test the live world on tilo-dev
+
+The deployed web app (Hosting) can talk to the deployed `tilo-api` (https://tilo-api-4qhkpsn5ga-as.a.run.app) with
+`just deploy-web-live` (WEB-TO-API). `just deploy-web` stays the fixture build. Your own steps, in order; Tilo never
+runs them for you and never handles your password:
+
+1. In the Cloud console (APIs & Services, Credentials), restrict the Firebase browser API key BEFORE it is baked in:
+   API restrictions to exactly three APIs (Firebase App Check, Identity Toolkit and Token Service), website restrictions to
+   `https://essential-wares-510320-f0.web.app/*` and `https://essential-wares-510320-f0.firebaseapp.com/*`
+   (infra/ACCESS.md section 7). The key ends up in the public JavaScript bundle.
+2. `pnpm exec firebase login` (once, your own Google account).
+3. Set the tilo-api settings with `gcloud run services update`. The 7 `TILO_*` settings are step 2 of
+   `docs/routines-rollout.md`. `LIVE`, `TILO_API_DEV` and `TILO_JUDGE_LIVE` stay unset. The CORS origins contain a
+   comma, so use gcloud's custom delimiter for that one setting:
+
+   ```powershell
+   gcloud run services update tilo-api --project essential-wares-510320-f0 --region asia-southeast1 `
+     --update-env-vars "^@^TILO_API_CORS_ORIGINS=https://essential-wares-510320-f0.web.app,https://essential-wares-510320-f0.firebaseapp.com"
+   ```
+
+   Exact https origins only; one invalid entry and the API adds no CORS at all (no wildcard, no credentials).
+4. `just deploy-dev-cloudbuild api` (the CORS code is in the image).
+5. `$env:TILO_BAKE_FIREBASE_KEY="1"; just deploy-web-live`. It refuses to build without the Firebase config,
+   bakes the fixed API origin (not a parameter) and deploys Hosting to the dev project only.
+6. Open https://essential-wares-510320-f0.web.app and sign in with Google. This needs the Google provider enabled in
+   Firebase Authentication and both Hosting domains in Auth, Settings, Authorized domains. Unverified: not checked
+   by Tilo; if sign-in fails, look there first.
+
+## App Check enforcement (SEC-10)
+
+`tilo-api` checks the web client's `X-Firebase-AppCheck` token (`tilo_api.appcheck`) but enforcement stays off
+until you flip it: with `TILO_APPCHECK_ENFORCE` unset a missing or refused token is only logged as a warning and
+no answer changes. Turn it on only after the web app sends tokens in the deployed build and the log shows none
+refused: set `TILO_APPCHECK_ENFORCE=1` on the Cloud Run service (only exactly `1` counts); unset it to turn it off.
+`/health`, `/healthz` (probes carry no token) and the scheduler tick are never checked. The API reads the project from
+`TILO_FIRESTORE_PROJECT` (else `GOOGLE_CLOUD_PROJECT`). Decisions: BQ-SEC10-1..5 in `docs/open-questions.md`.
+
+### App Check in the web build (SEC-10)
+
+The web client (the main app and the Park pages) sends `X-Firebase-AppCheck` on every API call
+(`apps/web/src/appcheck/`), but only once the build has the Firebase web config: `VITE_FIREBASE_API_KEY` and
+`VITE_FIREBASE_PROJECT_ID`. No key literal is in the repo.
+
+**Owner step, before the first `just deploy-web` that bakes the key in.** The browser `apiKey` is written into the
+public JavaScript bundle, and this project also uses Gemini Developer API keys, so the key is only harmless if it
+is restricted. In the Google Cloud console (APIs and Services, Credentials) open the Firebase web key and
+(a) set the API restriction to exactly three APIs: Firebase App Check API, Identity Toolkit API and Token Service API
+(the last two are what Google sign-in calls; `infra/ACCESS.md` section 11); (b) set website restrictions to the referrers
+`https://essential-wares-510320-f0.web.app/*` and `https://essential-wares-510320-f0.firebaseapp.com/*`;
+(c) confirm it cannot call `generativelanguage.googleapis.com` or any other paid API. Then run
+`TILO_BAKE_FIREBASE_KEY=1 just deploy-web` (in PowerShell: `$env:TILO_BAKE_FIREBASE_KEY = "1"` first).
+
+`just deploy-web` without `TILO_BAKE_FIREBASE_KEY=1` builds with no Firebase config: App Check is skipped, the
+browser console says so once, and nothing else changes. With it, `scripts/web_build_env.py` reads the output of
+`firebase apps:sdkconfig WEB 1:379216745263:web:8cda5846cf882c2cefc7da --project essential-wares-510320-f0 --non-interactive --json`
+into the build's environment (writes nothing to disk), and uses it only if the key has the Google key shape and the
+project id is the dev project's; any `VITE_FIREBASE_*` already in your shell is dropped. If the command fails (you
+are not signed in) the build goes ahead without the config. The two public ids (`FIREBASE_APP_ID`, the reCAPTCHA Enterprise site key) are recorded in
+`infra/ACCESS.md` section 7, where enforcement is also recorded as OFF.
+
+The deployed fixture world calls no API, so it never loads reCAPTCHA: App Check starts on the first API request.
+Local hosts (localhost, 127.0.0.1) never start it.
+
+Before you read the `tilo-api` log for refused or missing tokens, set `TILO_FIRESTORE_PROJECT` (or
+`GOOGLE_CLOUD_PROJECT`) on the `tilo-api` Cloud Run service: with neither set the verifier has no project and
+refuses every token, so the log would show every request as unverified.
+
+## Durable stores (PROD-WIRE, ADR-0026; run this yourself, only after you accept ADR-0026)
+
+tilo-api keeps its worlds, people and SEC-15 declarations in Firestore only when two runtime switches are set. They
+are `gcloud` env, not Terraform (tilo-api has `ignore_env = true`), so no apply turns them on by itself:
+
+1. Set `api_durable_stores = true` for the dev env and apply the Terraform plan: CPU stays allocated between
+   requests on the one tilo-api instance (`max_instance_count = 1` holds either way; this raises idle cost).
+2. Turn the stores on (`TILO_FIRESTORE_PROJECT` is already set by the routines rollout):
+
+```powershell
+gcloud run services update tilo-api --project essential-wares-510320-f0 --region asia-southeast1 `
+  --update-env-vars "TILO_API_STORE=firestore,TILO_PEOPLE_STORE=firestore"
+```
+
+3. Check `/health`, that the instance count stays at 1, and run the tilo-api env audit in
+   `docs/routines-rollout.md` ("Env drift check"). To switch back, `--remove-env-vars
+   TILO_API_STORE,TILO_PEOPLE_STORE` (the doors answer 503 `not_configured` again), then set
+   `api_durable_stores = false` and apply, so CPU is billed per request again.
+
+### The SEC-16 spend-cap ledger (GOLIVE-935, issue 935; nothing for you to apply)
+
+The live-model spend caps (`config/spend_caps.yaml`) are enforced on a Firestore ledger, `tilo_api.spend_firestore`:
+documents `orgs/{org}/spend_ledger/{counter, hold, switch}`, each reserve, settle and release one transaction. It needs
+only what is already there: `TILO_FIRESTORE_PROJECT` on `tilo-api` (set by the routines rollout) and the service
+account's existing Firestore access (`roles/datastore.user`, as the schedule store). No composite index (single
+document reads and writes only), no rules change (`firestore.rules` already denies every client path, and the server
+bypasses them), no `TILO_API_STORE` and no always-on CPU (every call is inside a request). With no valid project or no
+credentials the seam answers 503 and every request is replay, never uncapped. A `hold:` document carries `expires_at`
+(its reserve time plus one hour, ADR-0042 MV-17); one still `held` after that (a restart or a lost claim) is settled at
+its own amount, so the count is unchanged and only its status closes, by the next reserve of that uid (at most once a
+minute per uid per instance) and by the Scheduler's tick. That is a query on equality filters of `status` and `uid`
+(Firestore's automatic single-field indexes serve it: still no composite index to create). The sweep is NOT behind
+`TILO_VOICE_METER`: on merge every SEC-16 reserve gains that synchronous query (once a minute per uid per instance) and
+every tick scans the whole org's `held` holds, with no uid filter and no limit (caps and totals are unchanged). Reading it: `GET /access` says
+`models: "live"` only while the ledger is readable, the uid is under its cap and the switch is off. To reset the
+durable kill switch after the daily hard cap tripped it, delete the document `orgs/org_tilo/spend_ledger/switch`
+(Firestore console) or set its `on` field to `false`; nothing in the API can.
+
+### The Treasury credit ledger (T3, BQ-T3-1, BQ-MTR10-4; nothing for you to apply)
+
+`GET /costs`, `GET /worlds/{id}/costs` (FR-MTR-10), `GET /v1/effort` and the web Ledger read, and Quick, the Meeting
+Hall and the live metering write, one Firestore collection: `tilo_api.treasury_firestore`, documents
+`orgs/{org}/treasury_ledger/{entry id}`, each written once (`create`), never updated or deleted. It needs only what is
+already there, as the SEC-16 ledger above: `TILO_FIRESTORE_PROJECT` on `tilo-api` and the service account's existing
+`roles/datastore.user`. No composite index (one equality query on `user`, served by Firestore's automatic single-field
+index), no rules change (`firestore.rules` denies every client path), no `TILO_API_STORE`. With no valid project or no
+credentials the routes answer 503 (`not_configured`, `store_unavailable`), never an empty report. Each live unit the
+meter settles (GOLIVE-935) is also one entry here, written after the settle: a write that fails, or no writer wired,
+logs one `treasury_ledger_write_failed` line at ERROR (the error type only; a log-based alert on that text is the
+alert-able marker), is not retried, and never undoes the settled spend. The Ledger then under-reports that unit, and
+`GET /costs` says so itself: `partial: true`, `partial_reason: below_spend_ledger` while its total is below what the
+SEC-16 ledger settled (BQ-T3-6).
+
+T3b (BQ-T3-5): each entry is also folded, in the same transaction, into one rollup per person per run at
+`orgs/{org}/treasury_rollup/{id}`, which the three routes read instead of every entry. Nothing for you to apply: no
+composite index (one equality query on `user`), no rules change (`firestore.rules` denies every client path), no IAM
+change (`roles/datastore.user` covers the transaction). Optional alert text: `treasury_rollup_too_large` at ERROR.
+
+### The meeting bot's Live voice meter (ADR-0042, BQ-M2-4, BQ-M2-5; INERT: nothing here is applied for you)
+
+`tilo_api.meeting_voice_meter` adds two public routes, `POST /internal/meeting-voice/reserve` and `.../close`, on which
+the meeting bot (`meet-bot/bot/voice_meter.py`) reserves and settles one SEC-16 unit per spoken Gemini Live reply. They
+are **off by default**: with `TILO_VOICE_METER` unset (or anything but `1`) both answer a plain 404 and the attend call
+to the bot is unchanged, so nothing in production moves until you answer BQ-M2-5. The bot's side and the exact
+commands: `meet-bot/docs/CLOUD_RUN.md` ("Live voice meter"); who may call what: `infra/ACCESS.md` section 14.
+
+| Where | Setting | Value |
+| --- | --- | --- |
+| `tilo-api` | `TILO_VOICE_METER` | `1` (the switch; exactly `1`) |
+| `tilo-api` | `TILO_VOICE_METER_AUDIENCE` | tilo-api's own service URL, `https://host` with no path, query or fragment |
+| `tilo-api` | `TILO_VOICE_METER_CALLER` | `tilo-meet-bot@<project>.iam.gserviceaccount.com`. Not `tilo-schedule-scheduler` (the tick) and not `tilo-tasks-invoker` (Cloud Tasks): equal to either, unset or malformed answers 503 `not_configured` |
+| `tilo-meet-bot` | `TILO_API_URL` | the same string as the audience |
+
+Unchanged by all of this: no Terraform change and no new IAM role (the bot mints its ID token from its metadata server,
+and tilo-api already carries `allUsers` as `run.invoker`: it checks its own tokens); the bot gets no Firestore or ledger
+access; tilo-api stays one instance (`max_instance_count` 1); the ledger is the one above (`TILO_FIRESTORE_PROJECT`,
+without it both routes answer 503 and the bot speaks the local voice). The reply price comes from `config/prices.yaml`
+for the profile `voice.live.profile` names; with no row a reply books the whole `unit_reserve_minor` (10 INR) and never
+more (K = 1).
+
+**Your steps, in order** (`$P`, `$R`, `$Api` as in `meet-bot/docs/CLOUD_RUN.md`):
+
+1. Answer BQ-M2-5 (default yes). On no, stop: the budget-lease fallback in ADR-0042 redoes decisions 2 to 9.
+2. Merge the stack, in this order: #946, #954, #967, #968, #969, #974, then the PR carrying this section (#976) and
+   the transient-refusal fix (#999, BQ-M2-12). #938 is already in; #942 and #945 were closed (their work is in the base
+   these branches carry). T2 and T3 are security-flagged, so the merge is yours.
+3. Deploy both images from the same commit (both read the baked `config/`: tilo-api the price and ceiling, the bot the
+   voice flags): `just deploy-dev-cloudbuild api dev`, then the bot image and its revision (modelled on
+   `just build-evals-image`; not run by an agent):
+
+   ```powershell
+   gcloud builds submit --config meet-bot/docker/cloudbuild.yaml --ignore-file meet-bot/docker/cloudbuild.gcloudignore `
+     --substitutions "_BOT_IMAGE=$R-docker.pkg.dev/$P/tilo/meet-bot:meter-1" --project $P --region $R `
+     --gcs-source-staging-dir "gs://$P-cloudbuild-staging/source" .
+   gcloud run services update tilo-meet-bot --project=$P --region=$R --image="$R-docker.pkg.dev/$P/tilo/meet-bot:meter-1"
+   curl.exe -s -X POST -w " -> %{http_code}`n" "$Api/internal/meeting-voice/reserve"
+   ```
+
+   Check A: `404` with `{"detail":"Not Found"}`: the image has the routes and they are off. A `403` from the access
+   gate (a 401 or 403 where the routes should answer 404) means the api image predates T2: deploy it first.
+4. Set the three `tilo-api` settings in one call (the command is in `meet-bot/docs/CLOUD_RUN.md`; one revision, so the
+   pins and the switch arrive together). Repeat the curl. Check B: `401` `{"error":"unauthenticated"}` is healthy (routes
+   on, pins valid, no token). `503` `not_configured`: an unset or malformed pin, or the caller equals the tick's or
+   the Tasks account. `404`: the switch is not exactly `1` on the serving revision.
+5. Set `TILO_API_URL` on `tilo-meet-bot` (same file). Optional and normally unnecessary: a `run.invoker` binding for the
+   bot's account on tilo-api (only if you ever remove `allUsers` from tilo-api). Terraform deliberately has no api entry
+   in `extra_invokers` (guard FR-AGT-14e), so it is a `gcloud` call:
+   `gcloud run services add-iam-policy-binding tilo-api --project=$P --region=$R --member="serviceAccount:tilo-meet-bot@$P.iam.gserviceaccount.com" --role=roles/run.invoker`.
+6. Approve a current regional Live quote (PL-06), add its price row to `config/prices.yaml`, then set
+   `voice.live.price_approved: true` and `voice.live.enabled: true` in `config/voice.yaml`, and redeploy both images
+   (step 3). Until this step nothing calls the meter. Without the row, 15 replies fill a meeting's run cap (150 INR) and 50
+   a person's lifetime cap (500 INR).
+7. `LIVE=1` is on `tilo-meet-bot` only for the sitting: you set it for the acceptance sitting and remove it afterwards
+   (`meet-bot/docs/CLOUD_RUN.md`, "End the acceptance test"). It is the bot's own gate (with `TILO_API_URL`
+   and a valid claim header). The meter routes on `tilo-api` never read `LIVE`, so whether `tilo-api` carries it does
+   not matter to them and nothing changes there for this feature (the deployed API keeps the user's switch for live
+   Home tasks). The env drift check in `docs/routines-rollout.md` lists `LIVE` under `$Never` from before go-live and
+   will print `FORBIDDEN: LIVE is set` for as long as the user keeps it: expected, not a defect of this feature
+   (BQ-M2-13).
+8. The X4 probe and one real meeting with `tilotesting@gmail.com` (`meet-bot/scripts/attend-owner.ps1`). Check C, after a
+   spoken Live reply:
+
+   ```powershell
+   gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=tilo-api AND `"meeting voice meter`"" `
+     --project $P --freshness 1h --limit 20 --format "table(timestamp,jsonPayload.message,textPayload)"
+   ```
+
+   Healthy is `reserve 200 live` then `close 200 settled` per reply. `reserve 200 capped|replay_only|unavailable|hold_open|meeting_limit`
+   is the local voice for that reply; `409 not_attending` is a meeting with no claim here (tilo-api restarted, or not the
+   attend that made it). Read the totals in the ledger documents of the section above: at most one unit per reply. The
+   bot logs `live voice meter <step>: no live answer (<reason>)` (`resource.labels.service_name=tilo-meet-bot`), with no
+   claim, token or key in it.
+
+What each answer means (from `curl` without a token, then from the bot): `404` off; `401` on and no usable token; `403` a
+Google token of another account; `422` a body that is not the closed contract; `409` `not_attending` (no claim, wrong
+nonce, expired claim), `no_hold` or `key_used`; `503` `not_configured` (pins, ledger, or a ceiling-sized reply priced above
+one unit: fix the unit or the price row); `200` is `{"decision":"live"}` (a hold exists), `{"decision":"replay","reason":..}`
+(the local voice speaks) or `{"outcome":..}` on close. The bot treats everything but a 200 `live` as the local voice and
+never speaks Live on its own word.
+
+**Rollback**, fastest first. Neither lowers a counted figure; a hold still open settles at the whole unit when its claim
+ends, or at its ledger `expires_at` (one hour):
+
+```powershell
+gcloud run services update tilo-api --project=$P --region=$R --remove-env-vars=TILO_VOICE_METER   # routes answer 404 again
+gcloud run services update tilo-meet-bot --project=$P --region=$R --remove-env-vars=TILO_API_URL   # no meter: Chirp
+```
+
+The first is enough: every reply is the local voice from the next request. A later `terraform apply` also clears the
+bot's settings, which turns the Live voice off. Set `voice.live.enabled: false` and redeploy to take it out for good.
+Do not change or deploy tilo-api during an attended meeting: its claim lives in that process, so the rest of that meeting
+is the local voice.
+
+**Known coarse edge (BQ-M2-12, not fixed here):** a refused reserve is, to the adapter, `NotConfigured`; the bot's
+`FallbackTTS` then keeps the local voice for the rest of that meeting and remembers it in `out/.tts_state.json` for a
+day, so a warm instance does not retry. Safe (never overspends), coarse (one lost reserve or a capped uid ends Live for
+that meeting). Any new revision, or the instance's idle shutdown, clears it.
+
+### Against a deployed tilo-api, and the smoke (PROD-WIRE-4)
+
+```powershell
+just deploy-web https://tilo-api-abc123def4-as.a.run.app     # your tilo-api url; the argument is positional
+just smoke-dev https://tilo-api-abc123def4-as.a.run.app
+```
+
+`just deploy-web <api-url>` builds the web app with that url as `VITE_TILO_API_URL` (nothing else gets it; the
+deploy line is unchanged and pinned to the dev project). With no argument the build is still the empty fixture
+build, even if your shell has `VITE_TILO_API_URL` set. The url must be tilo-api's own Cloud Run service (the
+Terraform module names it `tilo-api`) in lower case, no path, port or query:
+`https://tilo-api-<hash>-as.a.run.app` or the deterministic
+`https://tilo-api-<project-number>.asia-southeast1.run.app`. Another service name, a bare label or another region is
+refused, so a typo or a pasted link never builds the app (or sends your token) to a stranger's service. `just`
+checks it before any shell runs, on the first line of each recipe, which must stay first. `tilo-api` itself answers browser calls from the two hosting origins only
+(`https://essential-wares-510320-f0.web.app` and `.firebaseapp.com`; BQ-PW-4); the CSP `connect-src` in
+`firebase.json` is not widened yet (waits on CL-REACH's host list), so a deployed page cannot reach the API until
+it is.
+
+`just smoke-dev <api-url>` runs the unsigned read-only checks in [the smoke runbook](runbook/smoke-dev.md), ignoring
+any sign-in token in the environment. The optional signed-in replay flow below requires the explicit command
+`uv run python scripts/smoke_dev.py <api-url>`, which drives the deployed API and prints one line per step, stopping
+at the first failure (exit 1):
+
+| Step | What it proves |
+| --- | --- |
+| `health` | the service is up (`GET /health` is 200) |
+| `cors-allowed` | a preflight from the hosting origin to a gated route is granted for that origin, no credentials |
+| `cors-denied` | a preflight from any other origin gets no grant |
+| `gate-closed` | a gated route with no token is refused (401 or 403): SEC-15 fails closed |
+| `intake`, `answers`, `approaches`, `approve` | a signed-in person can start a task and approve an approach (replay mode, budget cap 50) |
+| `gate-card`, `answer-card`, `delivery` | the run reaches its gate card, an in-app card is approved, and the completed run delivers |
+
+The smoke approves nothing that leaves Tilo. It answers a gate card only when the card's tier is T1 or T2, it has no
+recipient, and its action names no connector, item or destination; otherwise it stops with
+`FAIL gate-card: not an in-app card; the smoke approves nothing that leaves Tilo` and sends no answer. Every gate card
+names a connector today (card rule CR-10), so the signed-in steps end at `gate-card` on a real run: the guard
+stays until adapters are wired (BQ-PW-4).
+
+The first four need no sign-in. The rest run only when you set `TILO_SMOKE_ID_TOKEN` in your own shell to a Firebase
+ID token you paste (for example `$env:TILO_SMOKE_ID_TOKEN = Read-Host`); otherwise the run ends with
+`SKIP signed-in steps: set TILO_SMOKE_ID_TOKEN`. The token is sent only as `Authorization: Bearer ...` to the url
+you gave (redirects are not followed), and is never printed, logged or written. It must be a JWT (three dot-separated
+url-safe segments, no line break: a wrapped paste is refused with `FAIL token: TILO_SMOKE_ID_TOKEN is not a JWT`
+before any request). A failure shows the HTTP status plus at most a short `detail` string from a JSON body (120
+characters, withheld when it holds any run of the token), never a raw body; an exception shows its type name only.
+Tilo never asks for or stores a password. The signed-in steps cannot pass on tilo-dev until the Firebase
+ID-token verifier (`deps.get_current_principal`, CL-REACH) is wired; before that the API answers them 401 and the
+smoke stops at `intake`. The smoke needs a real deployment and a person, so no workflow runs it and it is not part
+of `just check` or `just test`.
+
+## Hosted smoke (W22, after every Hosting release)
+
+The 13 Oct hosting regression (a build with no Firebase web config showed "Sign-in is off") passed a smoke that said
+`signedin SKIP`. `just smoke-hosted <hosting origin>` looks at what a person sees on the deployed site, with
+Playwright (`apps/web/e2e/hosted-smoke.spec.ts`, its own config `apps/web/playwright.hosted.config.ts`, no dev server):
+
+```
+just smoke-hosted https://essential-wares-510320-f0.web.app
+```
+
+| Case | What it proves |
+| --- | --- |
+| signed out | "Continue with Google" and "Explore a demo session" are on the page, no "Sign-in is off" text or console line, no console error or warning, no request answered >= 400 |
+| demo session | Home shows its composer and content, the Worlds list loads, one world opens, `/settings` is in the Park shell (main navigation present, no "Fixture replay" pill), and the same console and request checks hold |
+
+Only `https://<project>.web.app` or `.firebaseapp.com` is accepted. `TILO_SMOKE_ALLOW=<regex,regex>` adds URL
+patterns whose >= 400 answers are expected. The demo session replays recorded runs: nothing is sent, started or
+paid. The spec skips itself when `TILO_SMOKE_URL` is unset and the main Playwright config ignores it, so dev and CI
+never reach the network. CX-MERGE-A runs it as the last step of a Hosting release; a red case blocks calling the
+release done. It is no part of `just check` or `just test`.
+
+## Web push certificate egress (FR-CHN-17f)
+
+Before activating web push, include HTTPS egress from `tilo-channels` to `www.googleapis.com` for
+`https://www.googleapis.com/oauth2/v1/certs` (`tilo_channels.push_verifier.CERT_URL`). The internal push route
+uses these public certificates to verify Google's signed caller token; a cold or expired certificate cache
+cannot authenticate the caller if that fetch is blocked. No additional IAM role is needed for this public read.
+Keep the four delivery hosts in `config/web_push.yaml` allowed too. The certificate host belongs only in the
+runtime network egress rules: do not add it to `allowed_endpoint_hosts`, which restricts subscription destinations.
+This runbook records a prerequisite; network/IAM changes remain a separately reviewed user infrastructure action.
 
 ## Never
 

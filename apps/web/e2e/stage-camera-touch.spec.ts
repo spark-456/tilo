@@ -17,8 +17,8 @@
 import { type Page, expect, test } from "@playwright/test";
 import { gotoStage, readCamera } from "./support/camera";
 
-// A world address, not "/": the S-01 Start panel covers the stage centre, where these gestures land.
-const STAGE_URL = "/world/w_village_basic";
+// The stage address (WEB-CUTOVER: `/` is the Park Home), so nothing covers the stage centre where these gestures land.
+const STAGE_URL = "/world/w_village_basic/stage";
 import { DESKTOP } from "./support/viewports";
 
 test.use({ viewport: DESKTOP, reducedMotion: "reduce", hasTouch: true });

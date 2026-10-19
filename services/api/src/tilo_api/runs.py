@@ -7,29 +7,48 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import dataclasses
 import logging
 import math
 import threading
+import time
 import unicodedata
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import tilo_planning.plangraph as plangraph
 import tilo_policy
 from fastapi import APIRouter, Depends, HTTPException, Request
-from tilo_connectors import Outbox, OutboxRefused
+from tilo_connectors import Outbox, OutboxRefused, RetryPolicy
 from tilo_harness.config import load_agents_config
 from tilo_harness.executor import UnitOutcome, run_plan
 from tilo_harness.must_ask import MustAsk
 from tilo_harness.question_wait import AlreadyAnswered, QuestionWait
 from tilo_harness.validator import repo_validator
-from tilo_memory.artifacts import Scope
+from tilo_memory.artifacts import NewVersion, Origin, Scope
+from tilo_metering.flags import FlagStore
+from tilo_people.stores import PeopleStores
 from tilo_planning.compiler import DELIVER, PlanInputs
+from tilo_providers.diagnostics import failure_context, log_caught
 
-from tilo_api import deps, events
-from tilo_api.cards import AlreadyCommitted, CardStore, _card_errors
+from tilo_api import deps, events, grounding, item_documents, side_effect_fields, team_access, team_store
+from tilo_api.access import Mode
+from tilo_api.cards import (
+    OWNER_ONLY_ACTIONS,
+    AlreadyCommitted,
+    CardStore,
+    _card_errors,
+    answering_principal,
+    get_channels_caller,
+)
+from tilo_api.connector_rpc import NO_DRAFT, ConnectorRpcStub
+from tilo_api.office_screen import office_text
+from tilo_api.skills_route import pin_matched_skill
+
+DESTINATION_CHANGED = "the email goes somewhere other than its draft, so it is not the same item"
 
 logger = logging.getLogger("tilo_api.runs")
 router = APIRouter()
@@ -81,26 +100,180 @@ class Seams:
     artifacts: Any  # tilo_memory.artifacts.ArtifactStore (ADR-0018 T4)
     redactor: Callable[[str], str]  # the shared secret redactor the store was given
     open_archive: Callable[..., Any]  # (*, org_id, run_id) -> the run's tilo_archive.RunArchive
+    team: Callable[
+        [], Any
+    ]  # the team's settings (FR-ACC-01; team_store.team_reader): no default, every path passes one
+    people: Callable[[], PeopleStores | None] | None = None  # owner time zone for code-stamped deliverable date
+    grounding: Callable[[], Any] | None = None  # RT-01: opens per-account grounding for this run's mode and meter
 
 
-def run_seams(request: Request) -> Seams | None:
-    """The seams as the app wires them, overrides included; if any cannot be built, no run starts."""
+_CLOCK_SEAMS = frozenset({"plan_compiler", "unit_runner"})  # the seams whose prompts state the date
+_MODE_SEAMS = frozenset({"plan_compiler", "unit_runner", "must_ask_providers"})  # the seams that build a Router
+
+
+def run_seams(
+    request: Request,
+    mode: Annotated[Mode, Depends(deps.get_work_mode)],
+    switches: Annotated[FlagStore, Depends(deps.get_switches)] = None,  # type: ignore[assignment]
+) -> Seams | None:
+    """The seams as the app wires them, overrides included; if any cannot be built, no run starts. The model
+    seams get this request's mode (SEC-15), so a judge's run is live and everyone else's is replay, and its SEC-16
+    meter (GOLIVE-935): every live call of the plan and the run is a unit on the uid ledger. Deployed, a live
+    request that cannot be metered (the tick has no person's uid) builds replay seams, never unmetered live ones."""
     overrides = request.app.dependency_overrides
+    meter = deps.meter_for(request, mode, switches)
+    mode = deps._live_or_replay(mode, meter)
     names = "plan_compiler layout_builder unit_runner action_resolver skill_registry connector_registry"
     names += " connector_adapters outbox_store event_writer must_ask_providers artifact_store redactor run_archive"
+
+    from tilo_api import ephemeral  # noqa: PLC0415
+
+    demo = None if ephemeral.has_no_person(request) else ephemeral.for_request(request)  # the tick has no person
+    mine = (  # the storage seams a demo run takes from its own bundle; connector adapters stay empty: it sends nothing
+        {}
+        if demo is None
+        else {
+            "outbox_store": demo.outbox, "event_writer": demo.writer, "artifact_store": demo.artifacts,
+            "redactor": demo.redactor, "run_archive": demo.open_archive, "connector_adapters": {},
+        }
+    )  # fmt: skip
+
+    def build(name: str) -> Any:
+        seam = getattr(deps, f"get_{name}")
+        if seam in overrides:
+            return overrides[seam]()
+        if name in mine:
+            return mine[name]
+        if name == "artifact_store":
+            return seam(mode=mode)
+        if name in _CLOCK_SEAMS:  # one clock for the whole API: the override a test installs reaches the run too
+            today = overrides[deps.get_today]() if deps.get_today in overrides else deps.get_today()
+            return seam(mode, today, meter=meter) if meter is not None else seam(mode, today)
+        if name in _MODE_SEAMS:  # a seam written before the meter still gets the call it knows when there is none
+            return seam(mode, meter=meter) if meter is not None else seam(mode)
+        return seam()
+
     try:
-        return Seams(*(overrides.get(seam, seam)() for seam in (getattr(deps, f"get_{n}") for n in names.split())))
+        built = dict(
+            zip(
+                [f.name for f in dataclasses.fields(Seams) if f.name not in {"team", "people", "grounding"}],
+                map(build, names.split()),
+                strict=True,
+            )
+        )
+        built["artifacts"] = screened_by_run(built["artifacts"], mode, meter)
+        return Seams(
+            **built,
+            team=team_store.team_reader(overrides),
+            people=deps.get_people_provider(request),
+            grounding=grounding.opener(request, mode=mode, meter=meter),
+        )
     except Exception as exc:
         logger.warning("the run seams are not wired, so no run starts: %s", type(exc).__name__)
         return None
 
 
+def screened_by_run(artifacts: Any, mode: Mode, meter: Any) -> Any:
+    """RESULT-LIVE: the shared store screens through `deps.get_safety(mode)` with no request, so no meter, which
+    deployed is replay: a miss, every run output `unscreened` (AR-07) and none of it ever opens. A live, metered run
+    screens what it stores with its own metered safety provider (SEC-16), as its tool results already are."""
+    if hasattr(artifacts, "with_upload_text"):  # DOCS-OUT: a rendered Office file is screened as its parsed text
+        artifacts = artifacts.with_upload_text(office_text)
+    if mode != "live" or meter is None:
+        return artifacts
+    return artifacts.with_screener(deps.get_safety(mode, meter=meter))
+
+
+def _tool_access(seams: Any, connector: str, action: str, tier: str, skill_ids: Any = ()) -> None:
+    """FR-ACC-01/02: the team's level for this tool, lowered by the unit's skills' `tool_access` (never raised); a
+    refusal or a store that cannot be read fails the step."""
+    try:
+        lowest = team_access.skill_level(seams.skills, skill_ids, connector) if skill_ids else None
+        access = team_access.tool_check(
+            seams.team(), connector, action, tier, registry=seams.connectors, skill_level=lowest
+        )
+    except Exception as exc:
+        log_caught(exc, __name__, locals())
+        raise _GateFailed("tool access could not be checked") from exc
+    if access == "block":
+        raise _GateFailed("tool access does not allow this step")
+
+
+def _taught_outline(plan: dict[str, Any], steps: list[dict[str, Any]] | None, registry: Any) -> dict[str, Any]:
+    """Turn the pinned taught version into validated units; the Director cannot replace the person's saved order."""
+    if not steps:
+        return plan
+    units: list[dict[str, Any]] = []
+    for index, step in enumerate(steps, start=1):
+        tool, action = step.get("tool"), step.get("action")
+        writer = (tool, action) == ("writer", "compose")
+        declared = (
+            None
+            if writer
+            else next((row for row in registry.get(tool).get("actions", []) if row.get("id") == action), None)
+        )
+        if not writer and declared is None:
+            raise ValueError("a taught step is no longer declared")
+        side_effect = bool(declared and declared.get("gate_type") == "approval")
+        units.append(
+            {
+                "id": f"U{index}",
+                "unit_type": "taught_step",
+                "title": str(step.get("text") or "Run taught step")[:80],
+                "role": "writer" if writer or step.get("verb") in ("draft", "write") else "specialist",
+                "district": "D1",
+                "skills": [],
+                "connectors": [] if writer else [tool],
+                "actions": [action] if side_effect else [],
+                "depends_on": [] if index == 1 else [f"U{index - 1}"],
+            }
+        )
+    if not any(unit["actions"] for unit in units):
+        delivery = next((unit for unit in plan["units"] if unit.get("unit_type") == "deliver"), None)
+        units.append(
+            {
+                "id": f"U{len(units) + 1}",
+                "unit_type": "deliver",
+                "title": str((delivery or {}).get("title") or "Deliver the finished work")[:80],
+                "role": "writer",
+                "district": "D1",
+                "skills": [],
+                "connectors": [],
+                "actions": [],
+                "depends_on": [units[-1]["id"]],
+            }
+        )
+    by_id = {unit["id"]: unit for unit in units}
+    gates = []
+    for number, unit in enumerate((unit for unit in units if unit["actions"]), start=1):
+        action = unit["actions"][0]
+        gate = {"id": f"G{number}", "action_type": action, "guards": [unit["id"]], "policy_ref": None}
+        gate["risk_tier"] = plangraph._floor_tier(  # noqa: SLF001 - same deterministic plan rule as the compiler
+            gate, by_id, tilo_policy.load_risk_table(), {name: registry.get(name) for name in registry.ids()}
+        )
+        gates.append(gate)
+    return {**plan, "units": units, "gates": gates}
+
+
 def start_run(store: deps.Store, task: deps.TaskRecord, *, approach: dict, budget_cap: float, seams: Seams) -> None:
-    with store.runs_guard:  # one run per world
-        if task.world_id in store.runs:
+    store.settle(task.world_id)  # the queued events go out first, so `world.started` follows them
+    with store.runs_guard:  # one run per world, in any process: a started world's stream says so (ADR-0026 decision 5)
+        started = any(e["type"] == "world.started" for e in store.events.get(task.world_id, []))
+        if task.world_id in store.runs or started:
             return
         run = store.runs[task.world_id] = Run(store, task, approach, budget_cap, seams)
     threading.Thread(target=run.main, name=f"run-{task.world_id}", daemon=True).start()
+
+
+def _clip_reason(reason: str) -> str:
+    """world.failed data.reason: one line, at most 140 characters."""
+    line = " ".join(str(reason).split()) or "the work stopped"
+    return line if len(line) <= 140 else line[:139] + "…"
+
+
+def _unit_reason(outcome: Any) -> str | None:
+    """RUN-FAIL-1: a failed unit's plain stop line: its own `reason`, else its code-written summary."""
+    return getattr(outcome, "reason", None) or getattr(outcome, "summary", None) or None
 
 
 def _plain(card: dict) -> dict:
@@ -119,18 +292,54 @@ class _NoCards:
         raise RuntimeError("a world with no run holds no cards")
 
 
+class _ObservedWait(QuestionWait):
+    """The run's `QuestionWait`, which also says when a unit is asleep waiting for a person's answer (FR-AGT-14e)."""
+
+    def __init__(self, run: Run) -> None:
+        super().__init__(run)
+        self._run = run
+
+    async def wait_for(self, card: dict[str, Any], *, lead: str, director: str, district: str | None) -> Any:
+        with self._run.asleep():
+            return await super().wait_for(card, lead=lead, director=director, district=district)
+
+
 class Run:
     """Also the executor's writer (`emit`, `org_id`, `world_id`, `recorded_version`) and its CardStore's (`write`):
     both end at the single writer."""
+
+    owner_started: frozenset[str] = OWNER_ONLY_ACTIONS  # FR-MTG-09: no plan names it, only the owner starts it
 
     def __init__(self, store: deps.Store, task: deps.TaskRecord, approach: dict, cap: float, seams: Seams) -> None:
         self.store, self.seams, self.cap, self.approach = store, seams, cap, copy.deepcopy(approach)
         self.org_id = deps.ORG_ID  # the run's artifact Scope is (org_id, world_id, owner); never a request's
         self.scope: Scope | None = None  # set when the run starts
-        self.world_id, self.run_id, self.owner, self.brief = task.world_id, task.run_id, task.owner, task.brief
+        self.world_id, self.run_id, self.owner = task.world_id, task.run_id, task.owner
+        self.brief = copy.deepcopy(task.brief)
+        for pick in task.maker_picks:
+            self.brief["deliverables"][pick["deliverable"]]["make_with"] = pick["make_with"]
+        self.skill = task.skill  # SKILL-ROUTE: what the start-plan card named; a library skill is pinned in `_prepare`
+        self.skill_plan = copy.deepcopy(task.skill_plan)
+        self.intake_answers = (
+            tuple(  # (the Director's question, the person's answer) for the units' prompts (UNIT-PROMPT)
+                (q.text, str(task.answers[q.field]))
+                for q in task.questions
+                if task.answers.get(q.field) and q.field not in task.edits
+            )
+        )
+        guesses = {q.field: q.suggested_answers for q in task.questions}  # the Director's own proposals (model output)
+        self.person_answers: dict[str, str] = {}  # L6c: only what the person typed, never a guess of the Director's
+        for field_, value in {**task.answers, **task.edits}.items():
+            own = (
+                side_effect_fields.own_answer(value, guesses=guesses.get(field_, ()), draft=task.draft.get(field_))
+                if isinstance(value, str) and (field_ in task.edits or field_ in guesses)
+                else None
+            )
+            if own:
+                self.person_answers[field_] = own
         self.approaches = copy.deepcopy(task.approaches or [])
         self.cards = CardStore(clock=_CLOCK, writer=self, world_owners={self.world_id: self.owner})
-        self.question_wait = QuestionWait(self)  # a unit that asked a person waits here for the answer (FR-HIL-10)
+        self.question_wait = _ObservedWait(self)  # a unit that asked a person waits here for the answer (FR-HIL-10)
         self.plan: dict[str, Any] = {}
         self.layout: dict[str, Any] = {}
         self.levels: dict[str, str] = {}
@@ -145,6 +354,28 @@ class Run:
         self._built: dict[str, dict] = {}  # event id -> the event as first built, resent as is on an exact retry
         self.failure: str | None = None
         self._failed = False
+        # What `wait_until_parked_or_done` looks at (FR-AGT-14e). Written from the run's thread, read from any thread.
+        self._ended = threading.Event()  # the run's thread has finished, whichever way out
+        self._seen = threading.Lock()
+        self._unit_of: dict[str, str] = {}  # worker -> the unit it was assigned
+        self._started: set[str] = set()  # units that were assigned
+        self._live: set[str] = set()  # assigned and not yet retired
+        self._handed: set[str] = set()  # units that handed their result over (their dependents may start)
+        self._asleep = 0  # live units waiting for a person: a gate card or a question
+        self._alerted: set[str] = set()
+        self._alert_lock = threading.Lock()
+        self._drafted: dict[tuple[str, int], str] = {}  # LC-10: (artifact id, version) -> content hash at its draft
+        self._documents: dict[tuple[str, int, str], tuple[dict[str, Any], str, str | None]] = {}  # (body, kind) -> pin
+        self._asking: dict[str, tuple[str, tuple[str, ...]]] = {}  # fields card id -> (action, the missing fields)
+        self._supplied: dict[str, dict[str, str]] = {}  # fields card id -> what the person typed (never logged)
+        self._supplied_for_unit: dict[str, dict[str, str]] = {}  # unit id -> recipients the person typed (never logged)
+        self.fields_lock = threading.Lock()  # the fields route stages and answers one card at a time
+        self.adapters: dict[str, Any] = {  # a live connector's stub is bound to this run (its reader, sink, owner)
+            name: adapter.bound(self._read_pinned, self._part_sink, self.owner)
+            if hasattr(adapter, "bound")
+            else adapter
+            for name, adapter in seams.adapters.items()
+        }
 
     def now(self) -> datetime:
         return datetime.now(UTC)
@@ -169,6 +400,8 @@ class Run:
             "credits": kw.get("credits", 0), "summary": summary[:140], "cause": kw.get("cause"), "vis": vis,
             "authz": kw.get("authz"), "data": data,
         }  # fmt: skip
+        if kw.get("trace") is not None:  # the call's own columns (WT-05: tool, latency_ms, archive_ref); else null ones
+            event["trace"] = kw["trace"]
         if not kw.get("event_id"):
             return self.seams.writer.append(self.world_id, event)
         same = ("type", "actor", "target", "data", "authz", "cause")
@@ -179,9 +412,10 @@ class Run:
             self._built[event["id"]] = copy.deepcopy(event)
         try:
             return self.seams.writer.append(self.world_id, event)
-        except Exception:
+        except Exception as caught_error:
             # An id already committed under other content means an earlier answer won although its caller saw a
             # failure (any other error, an identical committed event included, is the caller's to retry).
+            log_caught(caught_error, __name__, locals())
             stream = list(self.store.events.get(self.world_id, []))
             committed = next((e for e in stream if e["id"] == event["id"]), None)
             if committed is None or all(committed[k] == event[k] for k in same):
@@ -215,15 +449,68 @@ class Run:
             if defaulted:  # an answer already committed this card's question: the deadline closes the card as well
                 self._close_defaulted()
             raise
+        self._observe(type, actor, target, data)
         if defaulted:
             self._close_defaulted()  # the harness applied a deadline default: close that card here too (BQ-208)
         return event
 
+    def _observe(self, type_: str, actor: str, target: str, data: dict) -> None:
+        """Which units are at work: assigned, handed over and retired are the executor's own events."""
+        with self._seen:
+            if type_ == "agent.assigned":
+                self._unit_of[target] = data["unit"]
+                self._started.add(data["unit"])
+                self._live.add(data["unit"])
+            elif type_ == "agent.handoff" and actor in self._unit_of:
+                self._handed.add(self._unit_of[actor])
+            elif type_ == "agent.retired":
+                self._live.discard(self._unit_of.get(target, ""))
+
+    @contextmanager
+    def asleep(self) -> Iterator[None]:
+        """A live unit is waiting for a person (a gate card or a question) from here until the block ends."""
+        with self._seen:
+            self._asleep += 1
+        try:
+            yield
+        finally:
+            with self._seen:
+                self._asleep -= 1
+
+    def _quiet(self) -> bool:
+        """Nothing goes on until a person answers: someone waits for one, every live unit is that waiting, and no unit
+        is about to start (not started, every dependency handed over). A paused world is winding down, not waiting."""
+        if self.paused():
+            return False
+        with self._seen:
+            if self._asleep == 0 or len(self._live) != self._asleep:
+                return False
+            units = self.plan.get("units", [])
+            return not any(
+                u["id"] not in self._started and all(d in self._handed for d in u["depends_on"]) for u in units
+            )
+
+    def wait_until_parked_or_done(
+        self, timeout_s: float, *, clock: Callable[[], float] = time.monotonic, poll_s: float = 0.25
+    ) -> Literal["done", "parked", "timeout"]:
+        """FR-AGT-14e: for a Cloud Tasks delivery, which holds a request only while the run works. "done": the run's
+        thread has ended. "parked": the run is quiet at a person (see `_quiet`), never while a unit computes.
+        "timeout": `timeout_s` of `clock()` passed. The run itself is untouched either way."""
+        deadline = clock() + timeout_s
+        while True:
+            if self._ended.is_set():
+                return "done"
+            if self._quiet():
+                return "parked"
+            if clock() >= deadline:
+                return "timeout"
+            self._ended.wait(poll_s)
+
     def _close_defaulted(self) -> None:
         try:
             self.cards.tick()
-        except Exception:  # the resolution is committed; a card that failed to close stays in tick's work set
-            logger.warning("a card could not be closed after its deadline default", exc_info=True)
+        except Exception as caught_error:
+            log_caught(caught_error, __name__, locals())
 
     def committed(self, event_id: str) -> dict | None:
         """The event of this run already committed under `event_id`, if any (QuestionWait asks, #338)."""
@@ -267,60 +554,139 @@ class Run:
         if part["type"] == "approval.resolved":
             self.resolved[card_id] = committed
 
-    def _fail(self, reason: str, unit: str | None) -> None:
+    def _fail(self, reason: str, unit: str | None, *, summary: str | None = None) -> None:
+        reason = _clip_reason(reason)
         try:
             if not (self._failed or self.paused()):
                 self._failed = True
+                # RUN-FAIL-1: every failure is one ERROR line with its plain, code-written reason (never silent)
+                logger.error("run %s failed (unit %s): %s", self.run_id, unit or "none", reason)
                 self.put(
-                    "world.failed", "system", self.world_id, f"Stopped: {reason}", {"reason": reason, "unit": unit}
+                    "world.failed",
+                    "system",
+                    self.world_id,
+                    summary or f"Stopped: {reason}",
+                    {"reason": reason, "unit": unit},
                 )
-        except Exception:
-            logger.exception("run %s could not record its failure", self.run_id)
+        except Exception as caught_error:
+            log_caught(caught_error, __name__, locals())
 
     def main(self) -> None:
         """Every way out ends in a terminal event (or the pause) and leaves no entry of the run waiting to send."""
         try:
-            asyncio.run(self._execute())
+            with failure_context(run_id=self.run_id, world_id=self.world_id):
+                asyncio.run(self._execute())
         except RunStopped:
             pass
         except BaseException as exc:  # the outbox re-raises a BaseException from a send; the run still ends
-            logger.exception("run %s stopped on an error", self.run_id)
+            log_caught(exc, __name__, locals())
             self._abandon_unsent()
             self._fail("an internal error stopped the work", None)
             if isinstance(exc, KeyboardInterrupt):
                 raise
         finally:
             self._abandon_unsent()
+            self._ended.set()
 
     def _outbox(self) -> Outbox:
         """The run dispatches and records only its own world's entries, and claims none once the world is paused
         (FR-WLD-07)."""
         return Outbox(
-            self.seams.outbox_store, self.seams.adapters, emit=self._record_transfer, clock=events.now,
-            world_id=self.world_id, halted=self.paused,
+            self.seams.outbox_store, self.adapters, emit=self._record_transfer, clock=events.now,
+            world_id=self.world_id, halted=self.paused, alert=lambda part: self._record_alert(part["data"]["alert_id"]),
+            retry=RetryPolicy() if any(isinstance(a, ConnectorRpcStub) for a in self.adapters.values()) else None,
         )  # fmt: skip
 
+    def _read_pinned(self, ref: dict[str, Any]) -> bytes:
+        return bytes(self.seams.artifacts.read(self.scope, ref))  # hash-checked (AR-01)
+
+    def read_pinned(self, ref: dict[str, Any]) -> bytes:
+        """The bytes of an item this run pinned, hash-checked (AR-01); for the owner's show-me."""
+        return self._read_pinned(dict(ref))
+
+    def _part_sink(self, part: Mapping[str, Any]) -> None:
+        """What connectors' answer carried (ADR-0032 decision 7): an alert is recorded, a connection part abandons."""
+        from tilo_api.meeting_host import on_connection_event  # noqa: PLC0415
+
+        if part["type"] == "alert.raised":
+            self._record_alert(part["data"]["alert_id"])
+        else:
+            on_connection_event(part, outbox_store=self.seams.outbox_store, owner_of=self._owner_of)
+
+    def _owner_of(self, world_id: str) -> str | None:
+        world = self.store.load_world(world_id)
+        return None if world is None else world.owner
+
+    _alert_summary = "A person must check whether the item went out."
+
+    def _record_alert(self, alert_id: str) -> None:
+        """One `alert.raised` per alert id, ids only (FR-AGT-13): a possibly-sent item is never only a parked alert."""
+        with self._alert_lock:
+            send = self.sends.get(alert_id) or next(iter(self.sends.values()), None)
+            if alert_id in self._alerted or send is None:
+                return
+            self.put(
+                "alert.raised", send["worker"], send["island"], self._alert_summary,
+                {"alert_id": alert_id, "card_id": None}, district=send["district"], cause=send["cause"],
+                severity="needs_you", check_pause=False,
+            )  # fmt: skip
+            self._alerted.add(alert_id)
+
+    def _may_have_sent(self, outbox_id: str) -> bool:
+        return outbox_id in self._alerted or bool(self.seams.outbox_store.retry_state(outbox_id).get("ambiguous"))
+
+    def _keeps_ambiguous(self, entry: Mapping[str, Any]) -> bool:
+        """A live Google send (a stub) that may have gone out is never failed: only a person settles it (FR-AGT-13)."""
+        return isinstance(self.adapters.get(entry["connector"]), ConnectorRpcStub)
+
     def _abandon_unsent(self) -> None:
-        for outbox_id, send in self.sends.items():
-            entry = self.seams.outbox_store.get(outbox_id)
-            if "committed" not in send and entry is not None and entry["state"] in ("queued", "scheduled", "sending"):
-                try:
-                    self._outbox().abandon(outbox_id)
-                except Exception:
-                    logger.warning("run %s left entry %s to its sender", self.run_id, outbox_id)
+        """A live entry that may have gone out is never failed: it stays, with one alert."""
+        store = self.seams.outbox_store
+        for outbox_id, send in list(self.sends.items()):
+            entry = store.get(outbox_id)
+            if "committed" in send or entry is None or entry["state"] not in ("queued", "scheduled", "sending"):
+                continue
+            keeps = self._keeps_ambiguous(entry)
+            try:
+                if keeps and self._may_have_sent(outbox_id):
+                    self._record_alert(outbox_id)
+                else:
+                    self._outbox().abandon(outbox_id, keep_ambiguous=keeps)
+            except OutboxRefused:
+                if keeps:  # a lease nobody released, or a send in flight: it may have gone out, a person checks
+                    self._record_alert(outbox_id)
+            except Exception:
+                logger.warning("run %s left entry %s to its sender", self.run_id, outbox_id)
+
+    def _compile(self, context: PlanInputs) -> dict:
+        return self.seams.compiler(
+            brief=copy.deepcopy(self.brief), approach=self.approach, budget_cap=self.cap, context=context
+        )
+
+    def _must_ask(self, config: Any) -> MustAsk | None:
+        return MustAsk(
+            self.seams.must_ask_providers, config=config, card_sink=self._store_card, owner=self.owner,
+            covered_actions={p["action_type"] for p in self.store.policies.values() if p.get("owner") == self.owner},
+            brief=copy.deepcopy(self.brief), intake_answers=self.intake_answers,  # RUN-FAIL-1: the whole task
+        )  # fmt: skip
 
     def _prepare(self) -> Any:
         """Compile, validate, lay out. Returns the agents config, or None when no run may start."""
         registry = self.seams.connectors
+        try:  # the policy context and the PI-11 history are read across all of the owner's worlds
+            self.store.load_owner(self.owner, settle=True)
+        except Exception as exc:
+            logger.warning("run %s: the owner's records could not be read (%s)", self.run_id, type(exc).__name__)
+            self._fail("the owner's records could not be read", None)
+            return None
         try:
             context = PlanInputs(
                 approaches=copy.deepcopy(self.approaches), owner=self.owner, skills=dict(self.seams.skills.catalog()),
                 connectors={c: registry.get(c) for c in registry.ids()}, risk_table=tilo_policy.load_risk_table(),
                 policies=dict(self.store.policies),
             )  # fmt: skip
-            plan = self.seams.compiler(
-                brief=copy.deepcopy(self.brief), approach=self.approach, budget_cap=self.cap, context=context
-            )
+            plan = pin_matched_skill(self._compile(context), self.skill, set(context.skills))
+            plan = _taught_outline(plan, self.skill_plan, registry)
         except Exception as exc:
             logger.warning("run %s: no plan (%s)", self.run_id, type(exc).__name__)
             self._fail("the Director could not plan this task", None)
@@ -332,15 +698,64 @@ class Run:
         if violations:
             self._fail("the plan broke " + ", ".join(sorted({v.rule_id for v in violations})), None)
             return None
+        if self.owner_started & {action for unit in plan["units"] for action in unit["actions"]}:
+            self._fail("the plan names an action only its owner can start", None)  # FR-MTG-09: never a planned unit
+            return None
         try:
             self.layout, config = self.seams.layout_builder(plan, world_id=self.world_id), load_agents_config()
-        except Exception:
+            if not isinstance(self.layout, dict) or not isinstance(self.layout.get("semantic"), dict):
+                raise ValueError("layout has no semantic map")
+            semantic = self.layout["semantic"]
+            self.levels = {d["id"]: level["id"] for level in semantic["levels"] for d in level["districts"]}
+            self.director = next((a["id"] for a in semantic["agents"] if a["rank"] == "director"), "system")
+            record = self.store.worlds.get(self.world_id)
+            if record is None and hasattr(self.store, "load_world"):
+                record = self.store.load_world(self.world_id)
+            if record is not None:
+                record.layout = self.layout  # before `world.started`: the event writer validates against it (ADR-0026)
+                try:
+                    self.store.commit(worlds={self.world_id: record}, evict=False)  # durable: the layout is stored too
+                except Exception as caught_error:
+                    log_caught(caught_error, __name__, locals())
+                    record.layout = None  # the record stays cached, as it was, for the run's `world.failed`
+                    raise
+            else:
+                record = deps.WorldRecord(owner=self.owner, districts={}, run_id=self.run_id, layout=self.layout)
+                self.store.worlds[self.world_id] = record
+                try:
+                    self.store.commit(worlds={self.world_id: record}, evict=False)
+                except Exception as caught_error:
+                    log_caught(caught_error, __name__, locals())
+                    record.layout = None
+                    raise
+        except Exception as caught_error:
+            logger.warning("run %s: invalid layout (%s)", self.run_id, type(caught_error).__name__)
             self._fail("the world could not be laid out", None)
             return None
-        self.plan, semantic = plan, self.layout["semantic"]
-        self.levels = {d["id"]: level["id"] for level in semantic["levels"] for d in level["districts"]}
-        self.director = next((a["id"] for a in semantic["agents"] if a["rank"] == "director"), "system")
+        self.plan = plan
         return config
+
+    def _record_plan(self, cause: str | None) -> None:
+        """PRD 7.2: the compiled plan is recorded once, before the work starts (`world.planned`: tier, approach,
+        unit count, the approach's estimate). A page waiting on it ("Step n of m", the planning card) used to wait
+        for ever, because no run wrote it. Recording it is best effort: a missing record never stops the work."""
+        try:
+            agents = len(self.layout["semantic"]["agents"])
+            tier = "outpost" if agents <= 2 else "village" if agents <= 6 else "town" if agents <= 15 else "city"
+            units = len(self.plan["units"])
+            estimate = self.approach["credits"]
+            data = {
+                "tier": tier,
+                "approach": self.approach["id"],
+                "unit_count": max(1, units),
+                "credits": {"min": estimate["min"], "max": estimate["max"]},
+            }
+            summary = f"The Director planned {units} unit{'' if units == 1 else 's'}."
+            self.put("world.planned", self.director, self.world_id, summary, data, cause=cause)
+        except RunStopped:
+            raise
+        except Exception as exc:
+            log_caught(exc, __name__, locals())
 
     async def _execute(self) -> None:
         config = self._prepare()
@@ -349,6 +764,8 @@ class Run:
         try:  # the run's own Scope and raw archive (ADR-0018 T4); never named by a request
             self.scope = scope = Scope(org_id=self.org_id, world_id=self.world_id, owner=self.owner)
             archive = self.seams.open_archive(org_id=self.org_id, run_id=self.run_id)
+            bind = getattr(self.seams.runner, "bind_run", None)
+            self._bound_runner = bind(self, archive) if bind is not None else self.seams.runner
         except Exception as exc:
             logger.warning("run %s: no artifact scope or archive (%s)", self.run_id, type(exc).__name__)
             self._fail("the run's item store could not be opened", None)
@@ -356,11 +773,9 @@ class Run:
         stream = self.store.events.get(self.world_id, [])
         granted = next((e["id"] for e in reversed(stream) if e["type"] == "budget.granted"), None)
         summary = f"Work started with a budget of {self.cap:g} credits."
+        self._record_plan(granted)
         self.put("world.started", self.director, self.world_id, summary, {"budget_cap": self.cap}, cause=granted)
-        must_ask = MustAsk(
-            self.seams.must_ask_providers, config=config, card_sink=self._store_card, owner=self.owner,
-            covered_actions={p["action_type"] for p in self.store.policies.values() if p.get("owner") == self.owner},
-        )  # fmt: skip
+        must_ask = self._must_ask(config)
         planned = asyncio.ensure_future(
             run_plan(
                 self.plan,
@@ -368,7 +783,7 @@ class Run:
                 writer=self,
                 config=config,
                 skills=self.seams.skills,
-                runner=self.seams.runner,
+                runner=self._bound_runner,
                 must_ask=must_ask,
                 question_wait=self.question_wait,
                 artifacts=self.seams.artifacts,
@@ -376,6 +791,8 @@ class Run:
                 archive=archive,
                 redact=self.seams.redactor,
                 before_handoff=self.before_handoff,
+                brief=copy.deepcopy(self.brief),
+                intake_answers=self.intake_answers,
             )  # fmt: skip
         )
         while not planned.done():  # a unit waiting for a person must not outlive a pause
@@ -388,12 +805,48 @@ class Run:
             return
         if stopped := result.failed + result.held + result.skipped:
             reason = "a step was held, so the work stopped" if result.held and not result.failed else None
-            self._fail(self.failure or reason or "a unit failed, so the work stopped", stopped[0])
+            answers = [e for e in self.store.events.get(self.world_id, []) if e["type"] == "question.answered"]
+            declined = bool(
+                result.held and answers and answers[-1]["data"].get("answered_by") in ("person", "team_lead")
+            )
+            failed = result.outcomes.get(stopped[0])  # a unit's own plain stop line, if code wrote one (FR-AGT-12)
+            ran = failed is not None and not failed.success and stopped[0] not in result.held
+            own = _unit_reason(failed) if ran else None
+            self._fail(
+                "declined" if declined else self.failure or own or reason or "a unit failed, so the work stopped",
+                stopped[0],
+                summary="Stopped by you." if declined else None,
+            )
             return
         credits = math.fsum(e["credits"] for e in self.store.events.get(self.world_id, []))  # the meter (HR-1)
         data = {"credits_used": credits, "deliverable_count": len(self.delivered)}
         cause = self.delivered[-1] if self.delivered else None
+        await self._remember_deliverables()  # before world.completed: nothing is written to a finished world
         self.put("world.completed", self.director, self.world_id, "The work is done.", data, cause=cause)
+
+    async def _remember_deliverables(self) -> None:
+        """RT-01 / RT-09: the run's clean outputs become the owner's own passages (never a team's unless the world is
+        shared with one); one `memory.saved` says how many. Off unless TILO_RETRIEVAL=1; failures never end the run."""
+        if self.seams.grounding is None:
+            return
+        delivered = {
+            e["data"]["artifact"]["artifact_id"]
+            for e in self.store.events.get(self.world_id, [])
+            if e["type"] == "artifact.delivered"
+        }  # only what the run delivered, never a unit's intermediates
+
+        open_grounding = self.seams.grounding
+
+        def index() -> int:
+            opened = open_grounding()
+            return 0 if opened is None else int(opened.index_deliverables(self.world_id, delivered))
+
+        try:
+            if held := await asyncio.to_thread(index):  # embedding calls never block the event loop
+                item = {"layer": "artifact_memory", "item_count": held}
+                self.put("memory.saved", self.director, self.world_id, "Saved to your account memory.", item, vis=[])
+        except Exception as exc:
+            logger.warning("run %s: grounding event not written (%s)", self.run_id, type(exc).__name__)
 
     def _store_card(self, card: dict) -> None:
         """The question card goes to this run's CardStore with its unit's district, before anything
@@ -410,6 +863,9 @@ class Run:
         """The executor stored and announced the unit's items (ADR-0018 T4). A unit with actions stops at its gate (the
         item to send is its first announced version); a `deliver` unit with none delivers in Tilo. False fails it."""
         self.produced[unit["id"]] = [(unit, dict(ref), made) for ref, made in announced]
+        check_app = getattr(getattr(self, "_bound_runner", None), "before_handoff", None)
+        if check_app is not None and not await check_app(unit, worker, announced):
+            return False
         try:
             for action in unit["actions"]:
                 if not announced:
@@ -429,25 +885,59 @@ class Run:
         connector = next((c for c in unit["connectors"] if self._action(c, action)), None)
         if gate is None or connector is None:
             raise _GateFailed(f"no gate or connector for {action}")
-        try:
-            brief, unit_copy = copy.deepcopy(self.brief), copy.deepcopy(unit)
-            to = self.seams.resolver(unit=unit_copy, action_type=action, item=dict(item), brief=brief)
-            recipients, destination, known = to["recipients"], to["destination"], to.get("known_recipients")
-        except Exception as exc:
-            raise _GateFailed("the send has no recipients") from exc
-        if not (isinstance(destination, str) and destination.strip() and isinstance(recipients, list) and recipients
+        live = bool(item_documents.kind_of(action)) and isinstance(self.adapters.get(connector), ConnectorRpcStub)
+        takes_answers = getattr(self.seams.resolver, "takes_answers", False)  # only the production resolver
+        supplied: dict[str, str] = self._supplied_for_unit.setdefault(unit["id"], {}) if takes_answers else {}
+        for _ in range(3):  # a missing recipient is asked of the person (a needs-you card), then resolved again
+            try:
+                brief, unit_copy = copy.deepcopy(self.brief), copy.deepcopy(unit)
+                extra = (  # only the production resolver is given the person's structured answers
+                    {"answers": dict(self.person_answers), "supplied": dict(supplied)} if takes_answers else {}
+                )
+                to = self.seams.resolver(unit=unit_copy, action_type=action, item=dict(item), brief=brief, **extra)
+                recipients, destination, known = to["recipients"], to["destination"], to.get("known_recipients")
+                fields = to.get("fields")
+                declared: Mapping[str, Any] = fields if isinstance(fields, Mapping) else {}  # declared, never inferred
+                break
+            except side_effect_fields.Missing as exc:
+                if not live:  # nothing to ask for where nothing live can send
+                    raise _GateFailed("the send has no recipients") from exc
+                supplied |= await self._ask_fields(unit, worker, action, exc.fields, exc.reason)
+            except Exception as exc:
+                log_caught(exc, __name__, locals())
+                raise _GateFailed("the send has no recipients") from exc
+        else:
+            raise _GateFailed("the send has no recipients")
+        reaches_no_one = live and action in item_documents.NO_RECIPIENT_ACTIONS  # a save or an own-calendar event
+        if not ((destination is None and live or isinstance(destination, str) and destination.strip())  # a new mail
+                and isinstance(recipients, list) and (recipients or reaches_no_one)
                 and all(isinstance(r, str) and r.strip() for r in recipients)):  # fmt: skip
             raise _GateFailed("the send has no recipients or no destination")  # fails closed, before any gate
+        line, body_ref = None, dict(item)
+        if live and action == "create_event" and recipients:  # LC-09: the guest-less action refuses a guest first
+            raise _GateFailed(item_documents.NO_GUESTS)
+        if live:
+            item, line = await self._item_document(unit, worker, action, item, made, destination, declared)
+            ref = dict(item)  # the card, the entry and the hash pin all name the document the person approves
         try:  # AR-07, OB-05, BQ-264: from the stored record, never a default; only a `clean` verdict clears the flag
-            flagged = self.seams.artifacts.head(self.scope, item).record["screening"] != "clean"
+            stored = self.seams.artifacts.head(self.scope, item).record
+            flagged = stored["screening"] != "clean" or (  # the body's verdict stays with the pin (OB-05)
+                self.seams.artifacts.head(self.scope, body_ref).record["screening"] != "clean"
+            )
         except Exception as exc:
+            log_caught(exc, __name__, locals())
             raise _GateFailed("the item to send is not in the run's store") from exc
+        self._draft_first(connector, action, item)  # LC-10: before any card a send that could not go would raise
         facts = tilo_policy.SideEffectFacts(
             recipients=tuple(recipients), known_recipients=tuple(known or ()), safety_flags=flagged
         )
         proposal = tilo_policy.Proposal(self.world_id, action, connector, district, destination, facts, item, 0, None)
+        table = tilo_policy.load_risk_table()
+        assessed = max(table.assess(action, facts).tier, gate["risk_tier"], key=_TIERS.index)
+        skills = unit.get("skills") or ()
+        _tool_access(self.seams, connector, action, assessed, skills)  # FR-ACC-01/02: before the engine; only refuses
         decision = tilo_policy.decide(
-            proposal, table=tilo_policy.load_risk_table(), policies=list(self.store.policies.values()),
+            proposal, table=table, policies=list(self.store.policies.values()),
             world_owner=self.owner, applied=self._applied(), now=events.now(),
         )  # fmt: skip
         if decision.outcome == "draft_only":  # an owner's L0 policy: nothing leaves Tilo (PRD 10.4, BQ-90)
@@ -457,7 +947,7 @@ class Run:
         irreversible = self._action(connector, action)["irreversible"]  # type: ignore[index]
         card_id, outbox_id = events.new_part_id(), events.new_part_id()
         card = self._gate_card(unit, worker, card_id, gate["id"], connector, action, tier, irreversible)
-        exact = self._exact(connector, action, destination, recipients)
+        exact = self._exact(connector, action, destination, recipients, line)
         if len(exact) > _EXACT_MAX:  # never cut: a cut would hide a recipient from the person approving
             raise _GateFailed("the send names too many recipients to show on one card")
         card["gate"]["action"] |= {"item": ref, "destination": destination, "exact": exact}
@@ -473,16 +963,18 @@ class Run:
         self.requested[card_id] = requested
         if self.cards.submit(card, outbox_id=outbox_id, district=district).outcome != "accepted":
             raise _GateFailed("the gate card was refused")
-        while (answered := self._answered_card(card_id)) is None:  # a person's approve on any card of this gate
-            if self.paused():
-                raise RunStopped
-            await asyncio.sleep(_POLL_S)
+        with self.asleep():  # FR-AGT-14e: a person's approve on any card of this gate
+            while (answered := self._answered_card(card_id)) is None:
+                if self.paused():
+                    raise RunStopped
+                await asyncio.sleep(_POLL_S)
         resolved, requested = self.resolved[answered], self.requested[answered]  # the answered card's own proposal
         outbox_id = requested["data"]["outbox_id"]  # a share re-raised the gate under a fresh reservation (FR-HIL-12)
         if self.paused():
             raise RunStopped
         if tilo_policy.open_gate(requested, resolved, world_owner=self.owner).outcome != "run":
             raise _GateFailed("the gate did not open")
+        _tool_access(self.seams, connector, action, assessed, skills)  # again at dispatch: a tool turned Off meanwhile
         created = events.now()
         entry = {
             "id": outbox_id, "idempotency_key": f"{self.run_id}:{unit['id']}:{action}:1", "world_id": self.world_id,
@@ -501,6 +993,8 @@ class Run:
             "event_id": events.new_part_id(),  # resent unchanged if the outbox retries the transfer
         }  # fmt: skip
         transfer = await self._send(entry, evidence)
+        if action == "create_draft":
+            self._drafted[(item["artifact_id"], item["version"])] = stored["content_sha256"]
         format_ = _FORMATS.get(action, "in_app")  # artifact.delivered: a format kept in Tilo has outbox_id null
         data = {"artifact": item, "format": format_, "outbox_id": outbox_id if format_ == "email" else None}
         self._deliver(unit, worker, item, data, transfer["id"])
@@ -510,11 +1004,27 @@ class Run:
         ours = {card_id, *(c for c, origin in list(self.reraised.items()) if origin == card_id)}
         return next((c for c in list(self.resolved) if c in ours), None)
 
-    def _deliver(self, unit: dict, worker: str, item: dict, data: dict, cause: str) -> None:
+    def _dock(self) -> str | None:
+        """The layout's Delivery Dock (WORLD-LIVE), or None for a world laid out without one."""
+        return next(
+            (b["id"] for lv in self.layout["semantic"]["levels"] for d in lv["districts"] for b in d["buildings"]
+             if b.get("common_type") == "delivery_dock"), None)  # fmt: skip
+
+    def _deliver(self, unit: dict, worker: str, item: dict, data: dict, cause: str, *, here: str | None = None) -> None:
+        """WORLD-LIVE: the worker carries the item to the Delivery Dock, then it is recorded delivered, then the dock
+        records the handover (building.completed); an older world with no dock records the delivery alone."""
+        dock, district = self._dock(), unit["district"]
+        here = here or self._building(unit)
+        if dock is not None and dock != here:
+            self.put("agent.moved", worker, dock, "The agent carried the item to the Delivery Dock.", {"from": here},
+                     district=district, cause=cause)  # fmt: skip
         delivered = self.put(
             "artifact.delivered", worker, item["artifact_id"], "The item was delivered.", data,
-            district=unit["district"], cause=cause,
+            district=district, cause=cause,
         )  # fmt: skip
+        if dock is not None:
+            self.put("building.completed", worker, dock, "The Delivery Dock handed an item over.",
+                     {"unit_type": "delivery", "unit_count": 1}, district=district, cause=delivered["id"])  # fmt: skip
         self.titles[item["artifact_id"]] = unit["title"]
         self.delivered.append(delivered["id"])
 
@@ -524,17 +1034,25 @@ class Run:
         nothing and says so (deliverable_count 0)."""
         seen = {e["data"]["artifact"]["artifact_id"] for e in self.store.events.get(self.world_id, [])
                 if e["type"] == "artifact.delivered"}  # fmt: skip
+        sites = {e["data"]["artifact"]["artifact_id"] for e in self.store.events.get(self.world_id, [])
+                 if e["type"] == "artifact.created" and e["data"].get("media_type") == "text/html"}  # fmt: skip
         for source in (unit["id"], *unit["depends_on"]):
             for producer, item, made in self.produced.get(source, []):
                 if item["artifact_id"] in seen:
                     continue
                 seen.add(item["artifact_id"])
                 data = {"artifact": item, "format": "in_app", "outbox_id": None}
-                self._deliver(producer, worker, item, data, made)
+                if item["artifact_id"] in sites:  # WEB-1, WS-14: a native website says where it was made
+                    data = {"artifact": item, "format": "website", "outbox_id": None, "make_with": "native"}
+                self._deliver(producer, worker, item, data, made, here=self._building(unit))
 
     async def _send(self, entry: dict, evidence: dict[str, Any]) -> dict:
         """Enqueue with the person's authz, then dispatch until the outbox records the entry sent."""
         outbox = self._outbox()
+        self._draft_first(entry["connector"], entry["action_type"], entry["item"])
+        hand = getattr(self.adapters.get(entry["connector"]), "hand_evidence", None)
+        if hand is not None:  # the live stub posts the case this enqueue checked (HB-04)
+            hand(entry["id"], evidence)
         try:
             outbox.enqueue(entry, evidence)
         except OutboxRefused as exc:
@@ -550,7 +1068,28 @@ class Run:
             if state in ("failed", "cancelled"):
                 break
         self._abandon_unsent()  # given up: the entry never sends later in a failed world
+        if self._keeps_ambiguous(entry) and self._may_have_sent(entry["id"]):  # say what is known, not "unsent"
+            raise _GateFailed("the item may have gone out; a person must check")
         raise _GateFailed("the send could not be confirmed")
+
+    def _draft_first(self, connector: str, action: str, item: dict[str, Any]) -> None:
+        """ADR-0035 LC-10: a live `send_email` goes only when this world holds a `sent` `create_draft` entry for the
+        same item (artifact id, version) whose content is still the hash the draft carried; else one fixed reason."""
+        if action != "send_email" or not isinstance(self.adapters.get(connector), ConnectorRpcStub):
+            return
+        pinned = self._drafted.get((item["artifact_id"], item["version"]))
+        try:
+            head = self.seams.artifacts.head(self.scope, item)
+            drafted = any(
+                e["world_id"] == self.world_id and e["action_type"] == "create_draft" and e["state"] == "sent"
+                and e["item"] == item for e in self.seams.outbox_store.all_entries()
+            )  # fmt: skip
+            ok = drafted and pinned is not None and head is not None and head.record["content_sha256"] == pinned
+        except Exception as caught_error:
+            log_caught(caught_error, __name__, locals())
+            ok = False
+        if not ok:
+            raise _GateFailed(NO_DRAFT)
 
     def _record_transfer(self, transfer: dict) -> None:
         """The outbox's own data.transfer for one of this run's entries (the outbox is scoped to this world)."""
@@ -564,10 +1103,7 @@ class Run:
     def _gate_card(self, unit: dict, worker: str, card_id: str, gate_id: str, connector: str, action: str,
                    tier: str, irreversible: bool) -> dict:  # fmt: skip
         """The deterministic gate card (PRD 10.3): from the plan gate, the connector action and the send."""
-        building = next(
-            b["id"] for level in self.layout["semantic"]["levels"] for d in level["districts"]
-            for b in d["buildings"] if unit["id"] in b["plan_units"]
-        )  # fmt: skip
+        building = self._building(unit)
         name, undo = self.seams.connectors.get(connector)["name"], "cannot" if irreversible else "can"
         return {
             "id": card_id, "world_id": self.world_id, "run_id": self.run_id, "kind": "gate", "rung": "gate",
@@ -587,11 +1123,156 @@ class Run:
             "consent": None,
         }  # fmt: skip
 
-    def _exact(self, connector: str, action: str, destination: str, recipients: list[str]) -> str:
-        """What the send does, from the action, connector, destination and recipients only; no model-written text
-        (a unit's title is not trusted to describe what is sent)."""
+    def _exact(
+        self, connector: str, action: str, destination: str | None, recipients: list[str], line: str | None
+    ) -> str:
+        """What the send does, from the action, connector, destination, recipients and the document's own declared
+        fields only; no model-written text (a unit's title is not trusted to describe what is sent)."""
         name = self.seams.connectors.get(connector)["name"]
-        return f"{action} by {name} to {', '.join(recipients)} (destination {destination})."
+        to = f" to {', '.join(recipients)}" if recipients else ""
+        where = f" (destination {destination})" if destination is not None else ""
+        return f"{action} by {name}{to}{where}." + (f" {line}." if line else "")
+
+    def _building(self, unit: dict) -> str:
+        return next(
+            b["id"] for level in self.layout["semantic"]["levels"] for d in level["districts"]
+            for b in d["buildings"] if unit["id"] in b["plan_units"]
+        )  # fmt: skip
+
+    async def _item_document(
+        self, unit: dict, worker: str, action: str, body: dict, made: str, destination: str | None, declared: Mapping
+    ) -> tuple[dict[str, Any], str]:
+        """ADR-0035 L6b: the L5 document of this action, a new version of the unit's artifact that is pinned, hashed and
+        approved (CR-12). The same body and kind give the same version, so a draft and its send pin one content. A
+        missing declared field asks the person (nothing is enqueued); nothing is ever inferred from the text."""
+        kind = item_documents.kind_of(action) or ""
+        key = (body["artifact_id"], body["version"], kind)
+        if action == "send_email" and key not in self._documents:
+            raise _GateFailed(NO_DRAFT)  # LC-10: no draft step made this content, so no question is asked for a send
+        if key in self._documents and self._documents[key][2] != destination:
+            raise _GateFailed(DESTINATION_CHANGED)  # a send goes where its draft went, or it is not the same item
+        if key not in self._documents:
+            try:
+                stored = self.seams.artifacts.head(self.scope, body).record  # type: ignore[union-attr]
+                content, fields = self._read_pinned(body), dict(declared)
+            except Exception as exc:
+                log_caught(exc, __name__, locals())
+                raise _GateFailed("the item to send is not in the run's store") from exc
+            origin = {"kind": stored["origin"]["kind"]}
+            try:
+                while isinstance(
+                    built := item_documents.build_document(
+                        action,
+                        fields,
+                        body=content,
+                        media_type=stored["media_type"],
+                        origin=origin,
+                        threaded=destination is not None,
+                    ),
+                    item_documents.Needs,
+                ):
+                    fields |= await self._ask_fields(unit, worker, action, built.fields)
+            except item_documents.DocumentRefused as exc:
+                raise _GateFailed(exc.reason) from None
+            parent = {"artifact_id": body["artifact_id"], "version": self.recorded_version(body["artifact_id"])}
+            new = NewVersion(
+                media_type="application/json", content=built, run_id=self.run_id, parent=parent,
+                origin=Origin(kind="unit", unit=unit["id"], agent=worker),
+                idempotency_key=f"{self.run_id}:{unit['id']}:{100 + item_documents.ORDER.index(kind)}:0",
+            )  # fmt: skip
+            try:
+                version = await asyncio.to_thread(self.seams.artifacts.put, self.scope, new)
+                self.put(
+                    "artifact.versioned", worker, version.artifact_id, "The agent made a new version of an item.",
+                    {"artifact": version.ref, "previous_version": parent["version"]},
+                    district=unit["district"], cause=made,
+                )  # fmt: skip
+            except RunStopped:
+                raise
+            except Exception as exc:
+                log_caught(exc, __name__, locals())
+                raise _GateFailed("the document to send could not be stored") from exc
+            try:  # the card's line is read back from the stored (redacted) bytes, not from what was built
+                line = item_documents.summary(self._read_pinned(version.ref))
+            except Exception as exc:
+                log_caught(exc, __name__, locals())
+                raise _GateFailed("the document to send could not be read back") from exc
+            self._documents[key] = (version.ref, line, destination)
+        ref, line, _ = self._documents[key]
+        return ref, line
+
+    async def _ask_fields(
+        self, unit: dict, worker: str, action: str, missing: tuple[str, ...], reason: str | None = None
+    ) -> dict[str, str]:
+        """A needs-you card names the fields the document lacks; the person supplies them on the fields route, which
+        answers the card (`provide`). A hold, a default or an answer with nothing supplied fails the step."""
+        names, card_id = ", ".join(missing), events.new_part_id()
+        card = {
+            "id": card_id, "world_id": self.world_id, "run_id": self.run_id, "kind": "needs_you", "rung": "needs_you",
+            "header": {"building": self._building(unit), "agent": worker},
+            "what_happened": f"{unit['title']}: needs {names}."[:140],
+            "why_it_matters": (f"{reason}. " if reason else "")[:120]
+            + "Nothing is sent or saved until you add it. Tilo does not make it up from the text.",
+            "options": [
+                {"id": "provide", "label": "Add it", "suggested": True, "irreversible": False,
+                 "reason": "You add it here; the finished item then comes back for your approval."},
+                {"id": "hold", "label": "Hold", "suggested": False, "irreversible": False},
+            ],
+            "add_context": False, "actions": ["show_me"], "answer_channels": ["web", "mobile_web"],
+            "created_at": events.now(), "timeout": _GATE_TIMEOUT_S, "safe_default": "hold",
+            "gate": None, "consent": None,
+        }  # fmt: skip
+        if _card_errors(card):
+            raise _GateFailed("the question card was refused")
+        self._asking[card_id] = (action, missing)
+        try:
+            try:
+                self._store_card(card)
+            except RuntimeError as exc:
+                raise _GateFailed("the question card was refused") from exc
+            district = next(d for level in self.layout["semantic"]["levels"] for d in level["districts"]
+                            if d["id"] == unit["district"])  # fmt: skip
+            answer = await self.question_wait.wait_for(card, lead=district["lead"], director=self.director,
+                                                       district=unit["district"])  # fmt: skip
+        finally:
+            with self.fields_lock:
+                self._asking.pop(card_id, None)  # nothing is supplied for a card that is over, whichever way it ended
+                supplied = self._supplied.pop(card_id, None)
+        if answer.option != "provide":
+            supplied = None
+        if supplied is None:
+            raise _GateFailed(f"needs {names}: nothing was added")
+        return supplied
+
+    def asked_fields(self, card_id: str) -> tuple[str, ...] | None:
+        """The field names an open fields card waits for (the form's labels); None for a card this run did not ask."""
+        asking = self._asking.get(card_id)
+        return asking[1] if asking else None
+
+    def stage_fields(self, card_id: str, fields: Any) -> dict[str, str]:
+        """The fields route's check, before it answers the card: LookupError for a card this run did not ask,
+        ValueError(plain reason) for what the document would refuse. The values are kept for the waiting step only."""
+        action, missing = self._asking.get(card_id) or ("", ())
+        if not action:
+            raise LookupError(card_id)
+        asked = fields if isinstance(fields, Mapping) else {}
+        try:
+            got = item_documents.check_fields(action, {k: v for k, v in asked.items() if k != "recipient"})
+            if "recipient" in asked:
+                got["recipient"] = side_effect_fields.check_recipient(action, asked["recipient"])
+        except item_documents.DocumentRefused as exc:
+            raise ValueError(exc.reason) from None
+        if set(got) != set(missing) or set(fields) != set(missing):
+            raise ValueError("needs " + ", ".join(missing))
+        if card_id in self._supplied:
+            raise LookupError(card_id)  # another caller's values are already waiting for this card's answer
+        self._supplied[card_id] = got
+        return got
+
+    def unstage_fields(self, card_id: str, staged: dict[str, str]) -> None:
+        """Takes back only the values this caller staged."""
+        if self._supplied.get(card_id) is staged:
+            del self._supplied[card_id]
 
     def _action(self, connector: str, action: str) -> dict | None:
         declared = self.seams.connectors.get(connector)["actions"] if connector in self.seams.connectors else []
@@ -611,14 +1292,27 @@ def get_card_store(world_id: str, store: Annotated[deps.Store, Depends(deps.get_
     return CardStore(clock=_CLOCK, writer=_NoCards(), world_owners=owners)
 
 
+def world_owner(world_id: str, store: Annotated[deps.Store, Depends(deps.get_store)]) -> str | None:
+    """The path world's record owner; no record, no owner."""
+    return world.owner if (world := store.worlds.get(world_id)) is not None else None
+
+
 def answer_guard(
     world_id: str,
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     store: Annotated[deps.Store, Depends(deps.get_store)],
+    from_channels: Annotated[bool, Depends(get_channels_caller)],
+    card_store: Annotated[CardStore, Depends(get_card_store)],
 ) -> None:
-    """Pause all is final for the run (BQ-90): an answer in a paused world changes nothing."""
+    """Pause all is final for the run (BQ-90): an answer in a paused world changes nothing. The card's world's pause
+    decides (BQ-XWORLD-8), checked only for a principal who may answer there, so anyone else gets the route's 404."""
     world = store.worlds.get(world_id)
-    if principal.world_id == world_id and world is not None and world.paused:
+    if world is None or not world.paused:
+        return
+    actor = answering_principal(
+        principal, world_id, record_owner=world.owner, cards=card_store, from_channels=from_channels
+    )
+    if actor is not None:
         raise HTTPException(status_code=409, detail="This world is paused; nothing it holds is sent.")
 
 
@@ -627,22 +1321,40 @@ def get_delivery(
     world_id: str,
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     store: Annotated[deps.Store, Depends(deps.get_store)],
+    people: Annotated[Callable[[], PeopleStores | None], Depends(deps.get_people_provider)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
 ) -> dict[str, Any]:
-    """Issue #80's DeliveryResult, for the world's owner only, once `world.completed` is written."""
+    """Issue #80's DeliveryResult, for the world's owner and, on purpose (ADR-0040 decision 4), for a team reader of a
+    share in force, who gets it from the events they already see (never a `vis: []` one), once `world.completed`."""
     world = store.worlds.get(world_id)
     owner = world.owner if world is not None else None
-    if principal.world_id != world_id or (principal.role, principal.user_id) != ("owner", owner):
-        raise HTTPException(status_code=404)
     stream = store.events.get(world_id, [])
+    try:  # the owner by membership: a world-bound session or an unbound sign-in that owns it (LIVE-LAYOUT)
+        deps.member_world(principal, store, world_id)
+        reads_as_owner = (principal.role, principal.user_id) == ("owner", owner)
+    except HTTPException:
+        reads_as_owner = False
+    if not reads_as_owner:
+        _, viewer = deps.team_reader(principal, store, people, clock, world_id)  # the one unknown-world 404 otherwise
+        stream = [
+            e
+            for e in stream
+            if e.get("vis") == "all" or (isinstance(e.get("vis"), list) and set(e["vis"]) & set(viewer.districts))
+        ]
     completed = next((e for e in stream if e["type"] == "world.completed"), None)
     if completed is None:
         raise HTTPException(status_code=409, detail="Nothing is delivered until the work is done.")
     titles = run.titles if (run := store.runs.get(world_id)) else {}
     delivered = [(e["data"]["artifact"], e["data"]["format"]) for e in stream if e["type"] == "artifact.delivered"]
-    artifacts = [
-        {"id": a["artifact_id"], "title": titles.get(a["artifact_id"], "Delivered item"), "kind": kind,
-         "version": a["version"]}
-        for a, kind in delivered
-    ]  # fmt: skip
+    made: dict[tuple[str, int], dict[str, Any]] = {}  # WS-11: what the harness recorded after the store committed
+    for e in stream:
+        if e["type"] in _RECORDS:
+            made[(e["data"]["artifact"]["artifact_id"], e["data"]["artifact"]["version"])] = e["data"]
+    artifacts = []
+    for a, kind in delivered:
+        row = {"id": a["artifact_id"], "title": titles.get(a["artifact_id"], "Delivered item"), "kind": kind,
+               "version": a["version"]}  # fmt: skip
+        record = made.get((a["artifact_id"], a["version"]), {})
+        artifacts.append(row | {k: record[k] for k in ("media_type", "content_sha256") if record.get(k)})
     credits = completed["data"]["credits_used"]
     return {"world_id": world_id, "artifacts": artifacts, "credits_used": credits, "time_saved": None}  # FR-MTR-02

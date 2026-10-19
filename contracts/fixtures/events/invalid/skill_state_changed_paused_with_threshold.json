@@ -1,0 +1,36 @@
+{
+  "v": "1.0",
+  "id": "01JB6Z00000000000000SK0004",
+  "seq": 4,
+  "ts": "2026-10-09T09:00:00.000Z",
+  "world_id": "w_desk_priya",
+  "run_id": "r_desk_priya_1",
+  "type": "skill.state_changed",
+  "actor": "u_priya",
+  "target": "u_priya",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "Priya marked a skill saved.",
+  "cause": null,
+  "vis": [],
+  "authz": null,
+  "data": {
+    "skill": "tsk_01JB6Z0000000000000000INV",
+    "version": 1,
+    "change": "paused",
+    "good_runs": 0,
+    "threshold": 5
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

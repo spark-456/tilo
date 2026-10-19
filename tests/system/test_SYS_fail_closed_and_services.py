@@ -15,7 +15,17 @@ from _sys_lib import Server, free_port
 pytestmark = pytest.mark.system
 
 # Not behind a sign-in by design: liveness, the generated API description and the docs.
-OPEN = {"/health", "/healthz", "/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc"}
+# /health/deps and /healthz/deps: X-HEALTH-1, public by the owner's decision (14 Oct), booleans and fixed kinds only.
+OPEN = {
+    "/health",
+    "/healthz",
+    "/health/deps",
+    "/healthz/deps",
+    "/openapi.json",
+    "/docs",
+    "/docs/oauth2-redirect",
+    "/redoc",
+}
 
 # service name -> (ASGI app, the routes besides OPEN it serves, with who may call them)
 SERVICES = {
@@ -28,6 +38,21 @@ SERVICES = {
 }
 # sandbox-web is the public practice site the browser worker drives (PRD 6.5): its pages are open on purpose.
 PUBLIC_BY_DESIGN = {"sandbox-web": {"/manifest.json"}}
+# Cloud Scheduler / Cloud Tasks call this one with a Google OIDC token, never a person's sign-in. It checks its
+# config first and answers 503 (tilo-api: `not_configured`; harness: `unavailable`) while no audience/caller is set
+# (the production default, fail closed). The 401/403 for a missing, bad or wrong-caller token needs a wired verifier and
+# store, which no real process has here: the services' own tests drive it (test_FR_AGT_14_schedule_routes.py).
+TICK = "/internal/schedules/tick"
+# FR-PA-06b (the owner's decision, 13 Oct 2026): the plate digest's mail links are public to the gate, because a mail
+# click has no sign-in; the signed single-use token is the credential. Unconfigured (no signing key) the route is 503.
+LINK_ROUTES = {("GET", "/l/{token}"), ("POST", "/l/{token}")}
+# WEB-2 (ADR-0050 WS-10, the owner's decision): the website preview shell is the same fixed bytes for everyone, holds no
+# data and is served under a sandbox CSP; the web app writes the page into it. Public by design, never a person's data.
+PREVIEW_SHELL = ("GET", "/preview/website")
+
+
+def _refuses_anonymous(method: str, path: str, status: int) -> bool:
+    return status in ({401, 403, 503} if path == TICK else {401, 403})
 
 
 def _operations(app: str) -> list[tuple[str, str]]:
@@ -67,17 +92,32 @@ def test_SYS_SEC_05_a_service_route_that_is_not_public_by_design_refuses_an_anon
             if path in OPEN or path in PUBLIC_BY_DESIGN.get(name, set()) or path.startswith("/s/"):
                 continue
             response = httpx.request(method, server.url + _fill(path), json={} if method == "POST" else None)
-            assert response.status_code in {401, 403}, f"{name} {method} {path} answered {response.status_code}"
+            assert _refuses_anonymous(method, path, response.status_code), (
+                f"{name} {method} {path} answered {response.status_code}"
+            )
+            if path == TICK:  # unconfigured means closed, not open: it never reaches the token or any side effect
+                assert response.status_code == 503, f"{name} {path} answered {response.status_code}"
     finally:
         server.stop()
 
 
 def test_SYS_SEC_05_tilo_api_without_dev_mode_serves_nothing_that_needs_a_person(prod_api):
-    ops = [(m, p) for m, p in _operations("tilo_api:app") if p not in OPEN]
+    served = [(m, p) for m, p in _operations("tilo_api:app") if p not in OPEN]
+    assert LINK_ROUTES <= set(served), "the mail-link routes are the named exception"
+    for method, path in sorted(LINK_ROUTES):  # no signing key here: closed, not open, and never a sign-in 401
+        answer = httpx.request(method, prod_api.url + _fill(path), timeout=15)
+        assert answer.status_code == 503, f"{method} {path} answered {answer.status_code}"
+    if PREVIEW_SHELL in served:  # public shell: answers its fixed page under a sandbox CSP, nothing else
+        shell = httpx.get(prod_api.url + PREVIEW_SHELL[1], timeout=15)
+        assert shell.status_code == 200 and "sandbox" in shell.headers.get("content-security-policy", ""), (
+            shell.status_code
+        )
+    ops = [r for r in served if r not in LINK_ROUTES and r != PREVIEW_SHELL]
     assert ("POST", "/intake") in ops and ("GET", "/worlds/{world_id}/events") in ops, "the route list was read"
     for method, path in ops:
         response = httpx.request(method, prod_api.url + _fill(path), json={} if method == "POST" else None, timeout=15)
-        assert response.status_code == 401, f"{method} {path} answered {response.status_code} with no sign-in"
+        expected = 503 if path == TICK else 401  # the tick has no sign-in to ask for: it fails closed, unconfigured
+        assert response.status_code == expected, f"{method} {path} answered {response.status_code} with no sign-in"
         assert "Traceback" not in response.text and "NotImplementedError" not in response.text, (
             f"{method} {path} leaks a server error body"
         )

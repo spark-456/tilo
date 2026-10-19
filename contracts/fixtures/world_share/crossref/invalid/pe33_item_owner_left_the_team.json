@@ -1,0 +1,145 @@
+{
+  "rule": "PE-33",
+  "note": "The item's owner is no longer in the team.",
+  "now": "2026-10-06T10:00:00.000Z",
+  "persons": {
+    "u_owner": {
+      "id": "u_owner",
+      "org_id": "org_example",
+      "display_name": "Asha Rao",
+      "aliases": ["Asha"],
+      "email": "asha@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "email",
+      "org_role": "owner",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_priya": {
+      "id": "u_priya",
+      "org_id": "org_example",
+      "display_name": "Priya Nair",
+      "aliases": ["Priya", "PN"],
+      "email": "priya@example.com",
+      "time_zone": "Asia/Kolkata",
+      "preferred_channel": "email",
+      "org_role": "member",
+      "memberships": [],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_sam": {
+      "id": "u_sam",
+      "org_id": "org_example",
+      "display_name": "Sam Iyer",
+      "aliases": ["Sam"],
+      "email": "sam@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "mobile_web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_ops",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    },
+    "u_sam_launch": {
+      "id": "u_sam_launch",
+      "org_id": "org_example",
+      "display_name": "Sam Iyer",
+      "aliases": ["Sam L"],
+      "email": "sam@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "mobile_web",
+      "org_role": "member",
+      "memberships": [
+        {
+          "team": "tm_launch",
+          "assigned_by": {
+            "by": "u_owner",
+            "at": "2026-10-05T09:00:00.000Z"
+          }
+        }
+      ],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-05T09:00:00.000Z"
+      }
+    }
+  },
+  "record": {
+    "kind": "work_item",
+    "data": {
+      "id": "wi_launch_checklist",
+      "org_id": "org_example",
+      "owner": "u_priya",
+      "title": "Draft the launch checklist",
+      "due": null,
+      "due_text": null,
+      "status": "open",
+      "source": {
+        "kind": "manual",
+        "ref": null,
+        "evidence": []
+      },
+      "created_by": {
+        "by": "person",
+        "ref": "u_priya",
+        "at": "2026-10-05T13:00:00.000Z"
+      },
+      "assigned_by": null,
+      "confirmed_by": null,
+      "snoozed_until": null,
+      "flagged": false,
+      "history": [
+        {
+          "at": "2026-10-05T13:00:00.000Z",
+          "by": "u_priya",
+          "change": "created",
+          "status": "open"
+        }
+      ],
+      "created_at": "2026-10-05T13:00:00.000Z",
+      "updated_at": "2026-10-05T13:00:00.000Z",
+      "world_id": "w_launch_plan"
+    }
+  },
+  "world_owner": "u_owner",
+  "world_share": {
+    "id": "ws_9428789b45d2dee29fadd2e05feb7410",
+    "org_id": "org_example",
+    "world_id": "w_launch_plan",
+    "team": "tm_launch",
+    "granted_by": {
+      "by": "u_owner",
+      "at": "2026-10-05T12:00:00.000Z"
+    },
+    "revoked": null
+  },
+  "request": {
+    "actor": "u_sam_launch",
+    "action": "read_team",
+    "view": "team"
+  }
+}

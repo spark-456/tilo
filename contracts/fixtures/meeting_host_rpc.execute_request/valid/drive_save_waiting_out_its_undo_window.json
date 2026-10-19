@@ -1,0 +1,127 @@
+{
+  "entry": {
+    "id": "01JB5VQ0000000000000009403",
+    "idempotency_key": "r_followups_1:U3:save_file:1",
+    "world_id": "w_followups",
+    "run_id": "r_followups_1",
+    "action_type": "save_file",
+    "connector": "google_drive",
+    "recipients": [],
+    "attachments": [],
+    "item": {
+      "artifact_id": "art_q3_report",
+      "version": 3
+    },
+    "destination": "fld_tilo_reports",
+    "modifiers": [],
+    "risk_tier": "T1",
+    "authz": {
+      "by": "person",
+      "ref": "u_owner",
+      "at": "2026-10-09T09:32:09.500Z"
+    },
+    "undo_window_s": 60,
+    "scheduled_at": "2026-10-09T09:33:10.000Z",
+    "state": "scheduled",
+    "created_at": "2026-10-09T09:32:10.000Z"
+  },
+  "evidence": {
+    "reserved_by": {
+      "v": "1.0",
+      "id": "01JB5VQ0000000000000000060",
+      "seq": 60,
+      "ts": "2026-10-09T09:31:10.000Z",
+      "world_id": "w_followups",
+      "run_id": "r_followups_1",
+      "type": "approval.requested",
+      "actor": "A_s1",
+      "target": "G3",
+      "level": "L1",
+      "district": "D1",
+      "item": null,
+      "severity": "gate",
+      "credits": 0,
+      "summary": "The save file is ready. It needs your approval.",
+      "cause": "01JB5VQ0000000000000000059",
+      "vis": "all",
+      "authz": null,
+      "data": {
+        "gate_id": "G3",
+        "card_id": "01JB5VQ0000000000000009560",
+        "outbox_id": "01JB5VQ0000000000000009403",
+        "action_type": "save_file",
+        "risk_tier": "T1",
+        "irreversible": false,
+        "item": {
+          "artifact_id": "art_q3_report",
+          "version": 3
+        },
+        "approver": null,
+        "team_lead": null
+      },
+      "trace": {
+        "model_role": null,
+        "profile": null,
+        "tokens_in": null,
+        "tokens_out": null,
+        "tool": null,
+        "latency_ms": null,
+        "archive_ref": null
+      }
+    },
+    "authorised_by": {
+      "v": "1.0",
+      "id": "01JB5VQ0000000000000000063",
+      "seq": 63,
+      "ts": "2026-10-09T09:32:09.500Z",
+      "world_id": "w_followups",
+      "run_id": "r_followups_1",
+      "type": "approval.resolved",
+      "actor": "u_owner",
+      "target": "G3",
+      "level": "L1",
+      "district": "D1",
+      "item": null,
+      "severity": "info",
+      "credits": 0,
+      "summary": "You approved the save file.",
+      "cause": "01JB5VQ0000000000000000062",
+      "vis": "all",
+      "authz": {
+        "by": "person",
+        "ref": "u_owner",
+        "at": "2026-10-09T09:32:09.500Z"
+      },
+      "data": {
+        "gate_id": "G3",
+        "card_id": "01JB5VQ0000000000000009560",
+        "outbox_id": "01JB5VQ0000000000000009403",
+        "option": "approve",
+        "channel": "web",
+        "pin_verified": false
+      },
+      "trace": {
+        "model_role": null,
+        "profile": null,
+        "tokens_in": null,
+        "tokens_out": null,
+        "tool": null,
+        "latency_ms": null,
+        "archive_ref": null
+      }
+    },
+    "world_owner": "u_owner",
+    "policy": null,
+    "team_lead": null,
+    "instruction": null,
+    "earlier_applied": []
+  },
+  "items": [
+    {
+      "artifact_id": "art_q3_report",
+      "version": 3,
+      "content_sha256": "d0d3fcc62d04d249b0d742ab06738ad857c53faac8e362289a0a0a221237bca3",
+      "content_b64": "RmFrZSByZXBvcnQgYm9keSBmb3IgdGVzdHMu"
+    }
+  ]
+}

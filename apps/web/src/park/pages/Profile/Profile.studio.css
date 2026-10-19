@@ -1,0 +1,278 @@
+/* UI-STUDIO-5 Settings (design/studio-v2 "Tilo S Settings", canvas section 11): values read from the artboard's
+   inline styles. Only under the Studio theme, so the Park (Metropolis) look of Profile.css is unchanged. Colours
+   are role tokens (light and dark); the theme previews keep their own colours (they are pictures of a theme).
+   No transition, animation or keyframes (HR-1..7). Every tap target is 44px or more. */
+[data-park][data-theme="studio"] [data-testid="park-page-profile"] > .park-sheet {
+  max-width: 1232px;
+  margin: 0 auto;
+  padding: 8px 8px 64px;
+  gap: 28px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+[data-park][data-theme="studio"] .park-profile-head {
+  gap: 20px;
+}
+[data-park][data-theme="studio"] .park-profile-avatar {
+  width: 88px;
+  height: 88px;
+  background: var(--lilacSoft);
+  color: var(--lilacInk);
+  font-size: 30px;
+  font-weight: 700;
+  box-shadow: none;
+}
+[data-park][data-theme="studio"] .park-profile-name {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -1.4px;
+  line-height: 1.1;
+}
+[data-park][data-theme="studio"] .park-profile-sub {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink2);
+}
+[data-park][data-theme="studio"] .park-profile-connect {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+/* ---- The section nav (240px) beside one card ---- */
+[data-park][data-theme="studio"] .park-profile-layout.park-profile-layout--wide {
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 40px;
+}
+[data-park][data-theme="studio"] .park-profile-nav {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+[data-park][data-theme="studio"] .park-profile-tab {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink2);
+  font-size: 15px;
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-profile-tab:hover {
+  background: var(--rowHover);
+}
+[data-park][data-theme="studio"] .park-profile-tab.park-profile-tab--on {
+  background: var(--sunk);
+  color: var(--ink);
+}
+[data-park][data-theme="studio"] .park-profile-tab:focus-visible,
+[data-park][data-theme="studio"] .park-profile-time:focus-visible,
+[data-park][data-theme="studio"] .park-profile-mopt:focus-visible,
+[data-park][data-theme="studio"] .park-profile-scene:focus-visible,
+[data-park][data-theme="studio"] .park-profile-connect:focus-visible,
+[data-park][data-theme="studio"] .park-profile-btn:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---- Cards ---- */
+[data-park][data-theme="studio"] .park-profile-card,
+[data-park][data-theme="studio"] .park-profile-unavailable,
+[data-park][data-theme="studio"] .park-profile-modelkey {
+  gap: 20px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park][data-theme="studio"] .park-profile-card.park-profile-card--list {
+  gap: 8px;
+}
+[data-park][data-theme="studio"] .park-profile-card.park-profile-card--billing {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+[data-park][data-theme="studio"] .park-profile-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+[data-park][data-theme="studio"] .park-profile-blurb {
+  font-size: 15px;
+  font-weight: 500;
+}
+[data-park][data-theme="studio"] .park-profile-group {
+  font-size: 15px;
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-profile-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+[data-park][data-theme="studio"] .park-profile-input {
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 14px;
+  background: var(--field);
+  font-size: 15.5px;
+  font-weight: 500;
+}
+[data-park][data-theme="studio"] .park-profile-help,
+[data-park][data-theme="studio"] .park-profile-note,
+[data-park][data-theme="studio"] .park-profile-ssub,
+[data-park][data-theme="studio"] .park-profile-msub {
+  font-weight: 500;
+  color: var(--ink3);
+}
+[data-park][data-theme="studio"] .park-profile-btn {
+  min-height: 48px;
+  border-radius: 14px;
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-profile-btn.park-profile-btn--quiet {
+  border: 1px solid var(--lineStrong);
+  background: var(--card);
+  color: var(--ink);
+}
+[data-park][data-theme="studio"] .park-profile-small,
+[data-park][data-theme="studio"] .park-profile-signout {
+  min-height: 44px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+/* ---- Appearance: three looks, Motion, the scene ---- */
+[data-park][data-theme="studio"] .park-profile-times {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+[data-park][data-theme="studio"] .park-profile-time {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: none;
+}
+[data-park][data-theme="studio"] .park-profile-time.park-profile-time--on {
+  border: 1px solid var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
+}
+[data-park][data-theme="studio"] .park-profile-swatch {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 8px;
+  height: 120px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+[data-park][data-theme="studio"] .park-profile-block.park-profile-block--a {
+  width: 50%;
+  height: 10px;
+  border-radius: 4px;
+}
+[data-park][data-theme="studio"] .park-profile-block.park-profile-block--b {
+  width: 100%;
+  height: 34px;
+  border-radius: 8px;
+}
+[data-park][data-theme="studio"] .park-profile-block.park-profile-block--c {
+  width: 36px;
+  height: 24px;
+  border-radius: 6px;
+}
+[data-park][data-theme="studio"] .park-profile-tname {
+  font-size: 15px;
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-profile-tsub {
+  font-weight: 500;
+}
+[data-park][data-theme="studio"] .park-profile-motion {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  max-width: 420px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--sunk);
+}
+[data-park][data-theme="studio"] .park-profile-mopt {
+  height: 44px;
+  border-radius: 10px;
+  color: var(--ink3);
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-profile-mopt.park-profile-mopt--on {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+[data-park][data-theme="studio"] .park-profile-motion-help {
+  font-weight: 500;
+  color: var(--ink3);
+}
+[data-park][data-theme="studio"] .park-profile-scene {
+  font-weight: 600;
+}
+
+/* ---- Spending and limits, Ask before ---- */
+[data-park][data-theme="studio"] .park-profile-cap {
+  border-radius: 18px;
+  background: var(--sunk);
+}
+[data-park][data-theme="studio"] .park-profile-captitle {
+  font-weight: 600;
+}
+[data-park][data-theme="studio"] .park-profile-capvalue {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+[data-park][data-theme="studio"] .park-profile-cap .park-profile-bar {
+  background: var(--lineStrong);
+}
+[data-park][data-theme="studio"] .park-profile-cap .park-profile-fill {
+  background: var(--ink);
+}
+[data-park][data-theme="studio"] .park-profile-stitle {
+  font-weight: 600;
+}
+
+/* ---- A phone: the nav wraps above the card, the head stacks ---- */
+@media (max-width: 560px) {
+  [data-park][data-theme="studio"] [data-testid="park-page-profile"] > .park-sheet {
+    padding: 0 0 48px;
+    gap: 20px;
+  }
+  [data-park][data-theme="studio"] .park-profile-avatar {
+    width: 64px;
+    height: 64px;
+    font-size: 22px;
+  }
+  [data-park][data-theme="studio"] .park-profile-name {
+    font-size: 28px;
+  }
+  [data-park][data-theme="studio"] .park-profile-card,
+  [data-park][data-theme="studio"] .park-profile-unavailable,
+  [data-park][data-theme="studio"] .park-profile-modelkey {
+    padding: 20px 16px;
+  }
+  [data-park][data-theme="studio"] .park-profile-times {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/skill.rated.schema.json",
+  "x-version": "1.0.0",
+  "title": "SkillRatedData",
+  "description": "data of skill.rated (registry 1.4.0, ADR-0034, FR-SKL-05): the person whose run it was rated it. It copies the rating record without its note. A thumbs down may name the wrong step. The event goes in the rater's Desk world (TS-11).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["skill", "version", "run_id", "thumb", "wrong_step"],
+  "properties": {
+    "skill": { "$ref": "../../taught_skill.schema.json#/$defs/id" },
+    "version": { "type": "integer", "minimum": 1 },
+    "run_id": { "$ref": "../../common.schema.json#/$defs/run_id" },
+    "thumb": { "$ref": "../../taught_skill.schema.json#/$defs/thumb" },
+    "wrong_step": {
+      "anyOf": [{ "$ref": "../../taught_skill.schema.json#/$defs/step_number" }, { "type": "null" }]
+    }
+  },
+  "if": { "properties": { "thumb": { "const": "up" } }, "required": ["thumb"] },
+  "then": { "properties": { "wrong_step": { "type": "null" } } }
+}

@@ -106,6 +106,8 @@ def classify(error: BaseException) -> str:
     text = " ".join(str(link) for link in _chain(error)).lower()
     if "ReplayMissError" in names:
         return "replay_miss"
+    if "OutputTruncatedError" in names:  # by class, before any text check: the reply is never read
+        return "truncated"
     if 400 in statuses:  # before the text checks: a 400's own words ("is disabled", "not_found") never decide its code
         return "rejected"
     if "DefaultCredentialsError" in names or "default credentials" in text or 401 in statuses:
@@ -213,7 +215,10 @@ def run_vertex_smoke(
             raise SmokeRefused(error.code, str(error)) from None
 
     report = SmokeReport([], 0.0, float(max_total_credits), max_output_tokens, "replay" if replay else "live")
-    router = Router(config, fixtures_dir=Path(fixtures_dir) if fixtures_dir else _REPO_ROOT / "fixtures")
+    # role_thinking=False: the smoke sends no thinking level at all (THINKING_MINIMUM), not the role's configured one
+    router = Router(
+        config, fixtures_dir=Path(fixtures_dir) if fixtures_dir else _REPO_ROOT / "fixtures", role_thinking=False
+    )
     for role in SMOKE_ROLES:
         primary = config.roles[role].primary
         request = GenerateRequest(

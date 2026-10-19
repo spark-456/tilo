@@ -484,7 +484,10 @@ def test_FR_PA_07_sec_03_static_check_the_draft_reply_module_has_no_send_path() 
 
 def test_FR_PA_07_sec_03_static_check_only_the_autopilot_reaches_the_outbox() -> None:
     plate_module()
-    allowed = {"autopilot.py", "autopilot_state.py"}
+    # web_push.py (FR-CHN-17, security review 7c, 13 Oct) is the one other outbox caller: its only enqueue sits after
+    # policy.decide, the L3 decision check, schema checks and autopilot_gate.opens (web_push.py ~430-457), and its only
+    # caller is push_feed.py. Any further module that calls the outbox still fails this test.
+    allowed = {"autopilot.py", "autopilot_state.py", "web_push.py"}
     offenders = {
         path.name
         for path in SRC.glob("*.py")

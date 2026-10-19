@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/pinboard_item.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "PinboardItem",
-  "description": "One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of \"get in touch\" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` (\"added by Tilo from ...\"); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored.",
+  "description": "One entry on a pinboard (FR-PB-01 to -07). A personal entry is private to `scope.user`: no owner, no mention, never proposed (PE-01). A team entry is read by the members of `scope.team` once `active`; until then only `set_up_by` sees it (PE-02). `set_up_by` is the accountable person shown in the table and the target of \"get in touch\" (PE-09); for an entry Tilo made it is the person who confirmed or owns the meeting. Tilo's entries carry a `source` (\"added by Tilo from ...\"); a Tilo-made team entry is `active` only with `confirmed_by` (PE-07, PE-08). `url` is https with no user info, query or fragment, and passes the secret redactor before it is stored. `placement` (1.1.0, ADR-0038) is optional presentation only: where the entry sits on the board of its own scope. It is no access grant and it never changes the scope or the title (PE-36).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -153,6 +153,9 @@
     },
     "updated_at": {
       "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "placement": {
+      "$ref": "#/$defs/placement"
     }
   },
   "if": {
@@ -236,6 +239,33 @@
     }
   },
   "$defs": {
+    "placement": {
+      "description": "ADR-0038, FR-PB: where one entry sits on the board of its own scope, left out until it is placed and never null (ADR-0011). board and column are short ids of a presentation place inside that scope, never a user, team or access grant, and the scope itself is not here. order is a sort key inside one board and column across the entries of the scope, lowest first and ties by pin id ascending, so a move writes this one entry and never renumbers another, which may belong to someone else. A move changes this object only: not the title, the content, the scope, the owner, the status, the history or updated_at (PE-36).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["board", "column", "order"],
+      "properties": {
+        "board": {
+          "$ref": "#/$defs/place_id"
+        },
+        "column": {
+          "$ref": "#/$defs/place_id"
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9999
+        }
+      }
+    },
+    "place_id": {
+      "description": "A board or column id: lower-case letters, digits and underscore, starting with a letter, at most 32 characters.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,31}$",
+      "not": {
+        "pattern": "\\n"
+      }
+    },
     "scope_personal": {
       "type": "object",
       "additionalProperties": false,

@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div data-screen-label="Skills" style="background:var(--sheet);border:1px solid var(--gBd);border-radius:28px;box-shadow:var(--sh);padding:28px 32px 40px;display:flex;flex-direction:column;gap:30px">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0;max-width:640px">
+      <div style="display:flex;align-items:baseline;gap:12px"><h1 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:36px;letter-spacing:-.8px;line-height:1.05">Skills</h1><span style="font-size:15px;font-weight:700;color:var(--ink3)">{{ total }}</span></div>
+      <p style="margin:0;font-size:15.5px;font-weight:600;color:var(--ink2);text-wrap:pretty">Teach your agents new work, help them get better, and choose which tools they may touch. Every repeat of a skill gets faster and cheaper.</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <sc-for list="{{ sum }}" as="c" hint-placeholder-count="3"><span style="height:30px;padding:0 12px;border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};font-size:13.5px;font-weight:800;display:flex;align-items:center;white-space:nowrap">{{ c.t }}</span></sc-for>
+      <button onClick="{{ openTeach }}" style="height:42px;padding:0 18px 0 14px;border:0;border-radius:12px;background:var(--hero);color:#FFFFFF;font-size:15px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap" style-hover="filter:brightness(1.08)">{{ icPlus }}Teach a skill</button>
+    </div>
+  </div>
+
+  <section ref="{{ teachRef }}" aria-label="Teach a skill" style="background:var(--card);border:1px solid var(--line2);border-radius:24px;overflow:hidden">
+    <div style="display:flex;gap:18px;align-items:center;padding:20px 24px 18px;border-bottom:1px solid var(--line2);flex-wrap:wrap">
+      <div style="width:64px;height:64px;border-radius:20px;background:var(--heroSoft);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ teacher }}</div>
+      <div style="flex:1 1 300px;min-width:0">
+        <h2 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:24px;letter-spacing:-.4px;line-height:1.15">Teach Tilo something new</h2>
+        <div style="font-size:14.5px;font-weight:600;color:var(--ink2);margin-top:4px;line-height:1.45">Show it once. Tilo repeats it, you check the result, and it becomes a skill your agents can reuse.</div>
+      </div>
+      <ol aria-label="Steps" style="flex:1 1 420px;margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+        <sc-for list="{{ tSteps }}" as="s" hint-placeholder-count="4">
+          <li><button onClick="{{ s.go }}" disabled="{{ s.locked }}" aria-current="{{ s.cur }}" style="width:100%;display:flex;flex-direction:column;gap:8px;align-items:flex-start;background:transparent;border:0;padding:0;cursor:pointer;text-align:left;opacity:{{ s.op }};color:var(--ink)">
+            <span style="height:5px;width:100%;border-radius:99px;background:{{ s.bar }};transition:background-color .4s ease"></span>
+            <span style="display:flex;gap:7px;align-items:center;font-size:13px;font-weight:800;color:{{ s.fg }};white-space:nowrap"><span style="width:20px;height:20px;border-radius:99px;background:{{ s.dot }};color:{{ s.dotFg }};display:flex;align-items:center;justify-content:center;font-size:11.5px;transition:background-color .3s">{{ s.n }}</span>{{ s.label }}</span>
+          </button></li>
+        </sc-for>
+      </ol>
+    </div>
+
+    <sc-if value="{{ t.isShow }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:22px 24px 24px;display:flex;flex-direction:column;gap:18px;animation:tiloFade .4s cubic-bezier(.2,.8,.2,1) both">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:10px">
+          <sc-for list="{{ methods }}" as="m" hint-placeholder-count="4">
+            <button onClick="{{ m.pick }}" aria-pressed="{{ m.on }}" style="display:flex;gap:12px;align-items:flex-start;padding:13px 14px;border-radius:16px;border:2px solid {{ m.bd }};background:{{ m.bg }};text-align:left;cursor:pointer;color:var(--ink);transition:border-color .2s,background-color .2s">
+              <span style="width:36px;height:36px;border-radius:11px;background:{{ m.tile }};color:{{ m.ic }};display:flex;align-items:center;justify-content:center;flex:none">{{ m.icon }}</span>
+              <span style="min-width:0;line-height:1.35"><span style="display:block;font-weight:800;font-size:14.5px">{{ m.name }}</span><span style="display:block;font-size:13px;color:var(--ink2);font-weight:600">{{ m.desc }}</span></span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:18px;align-items:stretch">
+          <div style="min-width:0;display:flex;flex-direction:column">
+            <sc-if value="{{ t.screenish }}" hint-placeholder-val="{{ true }}">
+              <div style="flex:1;min-height:290px;background:var(--toast);color:var(--toastInk);border-radius:20px;overflow:hidden;display:flex;flex-direction:column">
+                <div style="height:40px;display:flex;align-items:center;gap:7px;padding:0 14px;border-bottom:1px solid rgba(127,127,140,.25)">
+                  <span style="width:10px;height:10px;border-radius:99px;background:#E2483D"></span><span style="width:10px;height:10px;border-radius:99px;background:#F0A500"></span><span style="width:10px;height:10px;border-radius:99px;background:#3BB273"></span>
+                  <span style="flex:1;margin-left:10px;height:24px;border-radius:8px;background:rgba(127,127,140,.2);font-size:12.5px;font-weight:700;display:flex;align-items:center;padding:0 10px;opacity:.85">{{ t.url }}</span>
+                </div>
+                <div style="flex:1;padding:16px;display:flex;flex-direction:column;gap:10px">
+                  <sc-for list="{{ mockRows }}" as="r" hint-placeholder-count="4">
+                    <div style="height:38px;border-radius:12px;background:rgba(127,127,140,.16);display:flex;align-items:center;gap:10px;padding:0 12px;box-shadow:{{ r.ring }};transition:box-shadow .3s">
+                      <span style="width:22px;height:22px;border-radius:99px;background:rgba(127,127,140,.32)"></span>
+                      <span style="height:8px;border-radius:99px;background:rgba(127,127,140,.4);width:{{ r.w }}"></span>
+                      <span style="flex:1"></span>
+                      <span style="height:8px;width:40px;border-radius:99px;background:rgba(127,127,140,.3)"></span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid rgba(127,127,140,.25)">
+                  <sc-if value="{{ t.recording }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800">{{ recDot }}{{ t.recLabel }}</div></sc-if>
+                  <sc-if value="{{ t.notRecording }}" hint-placeholder-val="{{ true }}"><div style="font-size:13.5px;font-weight:700;opacity:.8">{{ t.screenHint }}</div></sc-if>
+                  <div style="flex:1"></div>
+                  <button onClick="{{ t.capture }}" disabled="{{ t.captureOff }}" style="height:40px;padding:0 16px;border:0;border-radius:12px;background:{{ t.capBg }};color:#FFFFFF;font-weight:800;font-size:14.5px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;transition:background-color .3s">{{ icRecord }}{{ t.captureLabel }}</button>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ t.isDescribe }}" hint-placeholder-val="{{ false }}">
+              <div style="flex:1;min-height:290px;display:flex;flex-direction:column;gap:10px">
+                <textarea aria-label="Describe the task" value="{{ t.desc }}" onChange="{{ t.onDesc }}" style="flex:1;min-height:210px;resize:none;border:1px solid var(--line);border-radius:18px;background:var(--field);padding:16px 18px;font-size:15px;line-height:1.55;font-weight:600;color:var(--ink);outline:none;box-sizing:border-box"></textarea>
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                  <div style="flex:1 1 220px;font-size:13px;color:var(--ink2);font-weight:600">Write it like you’d explain it to a new colleague. Tilo asks if anything is unclear.</div>
+                  <button onClick="{{ t.capture }}" style="height:40px;padding:0 16px;border:0;border-radius:12px;background:var(--hero);color:#FFFFFF;font-weight:800;font-size:14.5px;cursor:pointer;white-space:nowrap">Read my description</button>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ t.isUpload }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ t.capture }}" style="flex:1;min-height:290px;border:2px dashed {{ t.dropBd }};border-radius:20px;background:{{ t.dropBg }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;color:var(--ink);padding:24px;transition:background-color .3s,border-color .3s">
+                <span style="width:52px;height:52px;border-radius:16px;background:var(--card);color:var(--heroInk);display:flex;align-items:center;justify-content:center">{{ icUpload }}</span>
+                <span style="font-size:17px;font-weight:800">{{ t.dropTitle }}</span>
+                <span style="font-size:13.5px;color:var(--ink2);font-weight:600;max-width:340px;text-align:center;line-height:1.45">{{ t.dropSub }}</span>
+              </button>
+            </sc-if>
+          </div>
+          <div style="min-width:0;background:var(--sunk);border-radius:20px;padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span style="font-weight:800;font-size:15px">What Tilo has picked up</span><span style="font-size:13px;font-weight:800;color:var(--ink2)">{{ t.capCount }}</span></div>
+            <sc-for list="{{ captured }}" as="c" hint-placeholder-count="0">
+              <div style="display:grid;grid-template-columns:26px minmax(0,1fr);gap:12px;align-items:start;background:var(--card);border-radius:14px;padding:11px 13px;animation:tiloFade .4s cubic-bezier(.2,.8,.2,1) both">
+                <span style="width:26px;height:26px;border-radius:9px;background:var(--heroSoft);color:var(--heroInk);font-weight:800;font-size:12.5px;display:flex;align-items:center;justify-content:center">{{ c.n }}</span>
+                <span style="font-size:14px;font-weight:700;line-height:1.4;padding-top:3px">{{ c.t }}</span>
+              </div>
+            </sc-for>
+            <sc-if value="{{ t.noneYet }}" hint-placeholder-val="{{ true }}">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:16px;color:var(--ink2);font-size:14px;font-weight:600"><div>{{ waitingAgent }}</div>Steps appear here as Tilo watches.</div>
+            </sc-if>
+            <div style="flex:1"></div>
+            <input aria-label="Skill name" value="{{ t.name }}" onChange="{{ t.onName }}" style="height:44px;border:1px solid var(--line);border-radius:12px;background:var(--field);padding:0 14px;font-size:15px;font-weight:700;color:var(--ink);outline:none"></input>
+            <button onClick="{{ t.next }}" disabled="{{ t.nextOff }}" style="height:46px;border:0;border-radius:13px;background:{{ t.nextBg }};color:{{ t.nextFg }};font-weight:800;font-size:15px;cursor:pointer;transition:background-color .3s">Show me Tilo’s version</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ t.isLearn }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:22px 24px 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:22px;animation:tiloFade .4s cubic-bezier(.2,.8,.2,1) both">
+        <div style="min-width:0;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:4px">
+            <div style="width:44px;height:44px;border-radius:14px;background:var(--heroSoft);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ talkAgent }}</div>
+            <div style="background:var(--heroSoft);border-radius:4px 18px 18px 18px;padding:11px 15px;font-size:14.5px;font-weight:600;line-height:1.45">Here’s how I’d do <b>{{ t.name }}</b>. Change anything that looks wrong, and tell me where to stop and ask you.</div>
+          </div>
+          <sc-for list="{{ plan }}" as="p" hint-placeholder-count="4">
+            <div style="display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:12px;align-items:center;border:1px solid var(--line);border-radius:16px;padding:11px 13px">
+              <span style="width:28px;height:28px;border-radius:9px;background:var(--sunk);font-weight:800;font-size:12.5px;display:flex;align-items:center;justify-content:center">{{ p.n }}</span>
+              <span style="min-width:0;line-height:1.35"><span style="display:block;font-weight:800;font-size:14.5px">{{ p.t }}</span><span style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink2);font-weight:700;margin-top:3px">{{ p.icon }}{{ p.tool }}</span></span>
+              <button role="switch" aria-checked="{{ p.ask }}" onClick="{{ p.toggle }}" style="display:flex;align-items:center;gap:8px;border:0;background:transparent;cursor:pointer;font-size:12.5px;font-weight:800;color:{{ p.askFg }};white-space:nowrap">Ask me first<span style="width:40px;height:24px;border-radius:999px;background:{{ p.track }};padding:3px;box-sizing:border-box;display:flex;transition:background-color .25s"><span style="width:18px;height:18px;border-radius:999px;background:#FFFFFF;box-shadow:0 1px 2px rgba(0,0,0,.2);transform:{{ p.knob }};transition:transform .25s cubic-bezier(.3,1.3,.5,1)"></span></span></button>
+            </div>
+          </sc-for>
+        </div>
+        <div style="min-width:0;display:flex;flex-direction:column;gap:14px">
+          <div style="background:var(--amberSoft);border:1px solid var(--amberLine);border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;gap:12px;align-items:center"><div style="width:42px;height:42px;border-radius:13px;background:var(--card);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ puzzledAgent }}</div><div style="line-height:1.35"><div style="font-size:12px;font-weight:800;color:var(--amberInk);letter-spacing:.5px">ONE QUESTION</div><div style="font-weight:800;font-size:15px">Some invoices arrive as a link, not a PDF. What should I do?</div></div></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <sc-for list="{{ qOpts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.pick }}" aria-pressed="{{ o.on }}" style="height:36px;padding:0 13px;border-radius:999px;border:1px solid {{ o.bd }};background:{{ o.bg }};color:{{ o.fg }};font-weight:800;font-size:13.5px;cursor:pointer;white-space:nowrap;transition:background-color .2s,color .2s">{{ o.label }}</button></sc-for>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+            <sc-for list="{{ est }}" as="m" hint-placeholder-count="3"><div style="background:var(--sunk);border-radius:14px;padding:10px 13px;line-height:1.3"><div style="font-size:12px;font-weight:700;color:var(--ink3)">{{ m.k }}</div><div style="font-size:18px;font-weight:800">{{ m.v }}</div></div></sc-for>
+          </div>
+          <div style="font-size:13.5px;color:var(--ink2);font-weight:600;line-height:1.5">Tilo tries this once on a real invoice from today. Nothing is posted without your OK while the skill is learning.</div>
+          <div style="flex:1"></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button onClick="{{ t.back }}" style="height:44px;padding:0 18px;border-radius:12px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-weight:800;font-size:14.5px;cursor:pointer">Back</button>
+            <button onClick="{{ t.next }}" style="flex:1;height:44px;border:0;border-radius:12px;background:var(--hero);color:#FFFFFF;font-weight:800;font-size:15px;cursor:pointer">Let Tilo try it</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ t.isTry }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:22px 24px 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:22px;animation:tiloFade .4s cubic-bezier(.2,.8,.2,1) both">
+        <div style="min-width:0;min-height:300px;background:var(--heroSoft);border-radius:22px;position:relative;display:flex;align-items:flex-end;justify-content:center;gap:4px;padding:0 20px 30px;overflow:hidden">
+          <div style="position:absolute;left:16px;top:16px;right:16px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+            <span style="height:30px;padding:0 12px;border-radius:999px;background:var(--card);font-size:13px;font-weight:800;display:flex;align-items:center">Practice run · Northline invoice #2291</span>
+            <span style="height:30px;padding:0 12px;border-radius:999px;background:{{ run.pillBg }};color:{{ run.pillFg }};font-size:13px;font-weight:800;display:flex;align-items:center">{{ run.pill }}</span>
+          </div>
+          <div>{{ run.art }}</div>
+          <div>{{ run.agent }}</div>
+        </div>
+        <div style="min-width:0;display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ runSteps }}" as="s" hint-placeholder-count="4">
+            <div style="border:1px solid {{ s.bd }};background:{{ s.bg }};border-radius:16px;padding:11px 13px;display:flex;flex-direction:column;gap:10px;transition:background-color .3s,border-color .3s">
+              <div style="display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:12px;align-items:center">
+                <span style="width:28px;height:28px;border-radius:99px;background:{{ s.dot }};color:{{ s.dotFg }};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px;transition:background-color .3s">{{ s.mark }}</span>
+                <span style="font-weight:800;font-size:14.5px;line-height:1.35">{{ s.t }}</span>
+                <span style="font-size:12.5px;font-weight:800;color:{{ s.stFg }};white-space:nowrap">{{ s.st }}</span>
+              </div>
+              <sc-if value="{{ s.waiting }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-left:40px;animation:tiloFade .35s cubic-bezier(.2,.8,.2,1) both">
+                  <div style="flex:1 1 200px;font-size:13.5px;font-weight:600;color:var(--ink2)">Add <b style="color:var(--ink)">Northline Components · £1,240.00 · due 9 Oct</b> to Invoices 2026?</div>
+                  <button onClick="{{ run.approve }}" style="height:36px;padding:0 14px;border:0;border-radius:11px;background:#F0A500;color:#1F1D2B;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap">Yes, add it</button>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <sc-if value="{{ run.done }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--okSoft);border-radius:18px;padding:13px 15px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;animation:tiloFade .4s cubic-bezier(.2,.8,.2,1) both">
+              <div style="flex:1 1 220px;line-height:1.4"><div style="font-weight:800;font-size:15px;color:var(--okInk)">Matched your way of doing it</div><div style="font-size:13.5px;color:var(--okInk);font-weight:600">4 of 4 steps · 1 min 08s · £0.38</div></div>
+              <button onClick="{{ t.back }}" style="height:40px;padding:0 14px;border-radius:12px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-weight:800;font-size:14px;cursor:pointer">Fix a step</button>
+              <button onClick="{{ t.next }}" style="height:40px;padding:0 16px;border:0;border-radius:12px;background:var(--hero);color:#FFFFFF;font-weight:800;font-size:14px;cursor:pointer">Looks right</button>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ t.isSave }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:22px 24px 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:22px;animation:tiloFade .4s cubic-bezier(.2,.8,.2,1) both">
+        <sc-if value="{{ t.notSaved }}" hint-placeholder-val="{{ true }}">
+          <div style="min-width:0;display:flex;flex-direction:column;gap:16px">
+            <label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:800;color:var(--ink2)">Skill name</span><input value="{{ t.name }}" onChange="{{ t.onName }}" style="height:46px;border:1px solid var(--line);border-radius:12px;background:var(--field);padding:0 14px;font-size:16px;font-weight:800;color:var(--ink);outline:none"></input></label>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:800;color:var(--ink2)">Who can use it</span><div style="display:flex;gap:2px;padding:3px;border-radius:12px;background:var(--seg);flex-wrap:wrap"><sc-for list="{{ scopes }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.pick }}" style="flex:1;height:36px;padding:0 14px;border:0;border-radius:9px;background:{{ o.bg }};box-shadow:{{ o.sh }};color:{{ o.fg }};font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:800;color:var(--ink2)">When it runs</span><div style="display:flex;gap:2px;padding:3px;border-radius:12px;background:var(--seg);flex-wrap:wrap"><sc-for list="{{ trigs }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.pick }}" style="flex:1;height:36px;padding:0 14px;border:0;border-radius:9px;background:{{ o.bg }};box-shadow:{{ o.sh }};color:{{ o.fg }};font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">{{ o.label }}</button></sc-for></div></div>
+          </div>
+          <div style="min-width:0;display:flex;flex-direction:column;gap:14px">
+            <div style="background:var(--heroSoft);border-radius:18px;padding:14px 16px;display:flex;gap:14px;align-items:center">
+              <div style="width:48px;height:48px;border-radius:15px;background:var(--card);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ talkAgent }}</div>
+              <div style="font-size:14px;font-weight:600;line-height:1.45">It starts as <b>Learning</b>. I’ll ask before adding rows until we’ve had 5 good runs together, then you can mark it trusted.</div>
+            </div>
+            <div style="flex:1"></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button onClick="{{ t.back }}" style="height:44px;padding:0 18px;border-radius:12px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-weight:800;font-size:14.5px;cursor:pointer">Back</button>
+              <button onClick="{{ t.save }}" style="flex:1;height:44px;border:0;border-radius:12px;background:var(--hero);color:#FFFFFF;font-weight:800;font-size:15px;cursor:pointer">Save skill</button>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ t.saved }}" hint-placeholder-val="{{ false }}">
+          <div style="grid-column:1 / -1;display:flex;align-items:center;gap:20px;flex-wrap:wrap;background:var(--okSoft);border-radius:22px;padding:18px 22px;animation:tiloFade .4s cubic-bezier(.2,.8,.2,1) both">
+            <div style="width:76px;height:76px;border-radius:22px;background:var(--card);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ happyAgent }}</div>
+            <div style="flex:1 1 300px;line-height:1.4"><div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:22px;color:var(--okInk)">“{{ t.name }}” is now a skill</div><div style="font-size:14.5px;color:var(--okInk);font-weight:600">{{ t.savedSub }}</div></div>
+            <button onClick="{{ t.view }}" style="height:42px;padding:0 16px;border:0;border-radius:12px;background:var(--hero);color:#FFFFFF;font-weight:800;font-size:14.5px;cursor:pointer">View in library</button>
+            <button onClick="{{ t.reset }}" style="height:42px;padding:0 16px;border-radius:12px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-weight:800;font-size:14.5px;cursor:pointer">Teach another</button>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+  </section>
+
+  <section aria-label="Help your agents get better" style="display:flex;flex-direction:column;gap:16px">
+    <div><h2 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:24px;letter-spacing:-.4px">Help your agents get better</h2><div style="font-size:14.5px;font-weight:600;color:var(--ink2);margin-top:3px">A minute here saves hours of rework later. Answer once and every agent using the skill learns it.</div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:18px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+        <div style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:18px 18px 16px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><h3 style="margin:0;font-size:17px;font-weight:800">Questions agents saved up</h3><span style="font-size:13px;font-weight:800;color:{{ qLeftC }}">{{ qLeft }}</span></div>
+          <sc-for list="{{ asks }}" as="a" hint-placeholder-count="3">
+            <div style="border-radius:16px;background:{{ a.bg }};padding:13px 14px;display:flex;flex-direction:column;gap:10px;transition:background-color .3s">
+              <div style="display:flex;gap:12px;align-items:flex-start">
+                <div style="width:40px;height:40px;border-radius:12px;background:var(--card);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ a.agent }}</div>
+                <div style="min-width:0;line-height:1.4"><div style="font-size:12.5px;font-weight:800;color:var(--ink3)">{{ a.skill }}</div><div style="font-size:14.5px;font-weight:700;text-wrap:pretty">{{ a.q }}</div></div>
+              </div>
+              <sc-if value="{{ a.open }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;padding-left:52px"><sc-for list="{{ a.opts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.pick }}" style="height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap;transition:border-color .2s,color .2s" style-hover="border-color:var(--hero);color:var(--heroInk)">{{ o.label }}</button></sc-for></div>
+              </sc-if>
+              <sc-if value="{{ a.done }}" hint-placeholder-val="{{ false }}"><div style="padding-left:52px;font-size:13.5px;font-weight:800;color:var(--okInk);display:flex;align-items:center;gap:6px;animation:tiloFade .35s cubic-bezier(.2,.8,.2,1) both">{{ icCheckS }}{{ a.doneT }}</div></sc-if>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:18px 18px 8px;display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px;flex-wrap:wrap"><h3 style="margin:0;font-size:17px;font-weight:800">Rate recent runs</h3><span style="font-size:13px;font-weight:700;color:var(--ink3)">Thumbs down lets you fix the step</span></div>
+          <sc-for list="{{ rates }}" as="r" hint-placeholder-count="4">
+            <div style="border-top:1px solid var(--line2);padding:10px 0;display:flex;flex-direction:column;gap:10px">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center">
+                <div style="min-width:0"><div style="font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div><div style="font-size:13px;color:var(--ink2);font-weight:600">{{ r.meta }}</div></div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <sc-if value="{{ r.fixed }}" hint-placeholder-val="{{ false }}"><span style="font-size:12.5px;font-weight:800;color:var(--okInk);margin-right:4px">Fix saved</span></sc-if>
+                  <button aria-label="Good run" aria-pressed="{{ r.isUp }}" onClick="{{ r.up }}" style="width:38px;height:38px;border-radius:12px;border:1px solid {{ r.upBd }};background:{{ r.upBg }};color:{{ r.upFg }};cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background-color .2s,transform .25s cubic-bezier(.34,1.5,.5,1)" style-active="transform:scale(.9)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11v9H4v-9h3zm0 0l4-8c1.7 0 3 1.3 3 3v3h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.8 20H7"></path></svg></button>
+                  <button aria-label="Something went wrong" aria-pressed="{{ r.isDown }}" onClick="{{ r.down }}" style="width:38px;height:38px;border-radius:12px;border:1px solid {{ r.dnBd }};background:{{ r.dnBg }};color:{{ r.dnFg }};cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background-color .2s,transform .25s cubic-bezier(.34,1.5,.5,1)" style-active="transform:scale(.9)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg)"><path d="M7 11v9H4v-9h3zm0 0l4-8c1.7 0 3 1.3 3 3v3h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.8 20H7"></path></svg></button>
+                </div>
+              </div>
+              <sc-if value="{{ r.fixing }}" hint-placeholder-val="{{ false }}">
+                <div style="background:var(--sunk);border-radius:16px;padding:13px;display:flex;flex-direction:column;gap:10px;animation:tiloFade .35s cubic-bezier(.2,.8,.2,1) both">
+                  <div style="font-size:13.5px;font-weight:800">Which step went wrong?</div>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ r.steps }}" as="s" hint-placeholder-count="3"><button onClick="{{ s.pick }}" style="height:32px;padding:0 12px;border-radius:999px;border:1px solid {{ s.bd }};background:{{ s.bg }};color:{{ s.fg }};font-weight:800;font-size:13px;cursor:pointer">{{ s.label }}</button></sc-for></div>
+                  <textarea aria-label="What should it do instead" value="{{ fixText }}" onChange="{{ onFixText }}" placeholder="What should it do instead?" rows="2" style="resize:none;border:1px solid var(--line);border-radius:12px;background:var(--field);padding:10px 12px;font-size:14px;font-weight:600;color:var(--ink);outline:none"></textarea>
+                  <div style="display:flex;gap:8px;justify-content:flex-end">
+                    <button onClick="{{ r.cancel }}" style="height:36px;padding:0 14px;border-radius:10px;background:transparent;border:0;color:var(--ink2);font-weight:800;font-size:14px;cursor:pointer">Cancel</button>
+                    <button onClick="{{ r.saveFix }}" style="height:36px;padding:0 16px;border:0;border-radius:10px;background:var(--hero);color:#FFFFFF;font-weight:800;font-size:14px;cursor:pointer">Save fix</button>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+        <div style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:18px;display:flex;flex-direction:column;gap:12px">
+          <h3 style="margin:0;font-size:17px;font-weight:800">Ready for your review</h3>
+          <sc-for list="{{ reviews }}" as="v" hint-placeholder-count="2">
+            <div style="border:1px solid {{ v.bd }};border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:12px;background:{{ v.bg }};transition:border-color .3s,background-color .3s">
+              <div style="display:flex;gap:12px;align-items:center">
+                <div style="width:48px;height:48px;border-radius:15px;background:var(--sunk);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ v.agent }}</div>
+                <div style="min-width:0;line-height:1.35;flex:1"><div style="font-weight:800;font-size:15px">{{ v.name }}</div><div style="font-size:13px;color:var(--ink2);font-weight:600">{{ v.meta }}</div></div>
+              </div>
+              <div role="img" aria-label="{{ v.meta }}" style="display:flex;gap:3px;align-items:flex-end;height:24px"><sc-for list="{{ v.bars }}" as="b" hint-placeholder-count="10"><span style="flex:1;height:{{ b.h }};border-radius:4px;background:{{ b.c }}"></span></sc-for></div>
+              <sc-if value="{{ v.open }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button onClick="{{ v.trust }}" style="height:38px;padding:0 14px;border:0;border-radius:11px;background:var(--hero);color:#FFFFFF;font-weight:800;font-size:14px;cursor:pointer">Mark as trusted</button>
+                  <button onClick="{{ v.keep }}" style="height:38px;padding:0 14px;border-radius:11px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-weight:800;font-size:14px;cursor:pointer">Keep learning</button>
+                </div>
+              </sc-if>
+              <sc-if value="{{ v.closed }}" hint-placeholder-val="{{ false }}"><div style="font-size:13.5px;font-weight:800;color:{{ v.resFg }};animation:tiloFade .35s cubic-bezier(.2,.8,.2,1) both">{{ v.result }}</div></sc-if>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:18px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><h3 style="margin:0;font-size:17px;font-weight:800">Who helped this month</h3><span style="font-size:13px;font-weight:700;color:var(--ink3)">September</span></div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+            <div style="background:var(--okSoft);border-radius:16px;padding:11px 14px;line-height:1.25"><div style="font-size:12.5px;font-weight:800;color:var(--okInk)">Mistakes since July</div><div style="font-size:24px;font-weight:800;color:var(--okInk)">−38%</div></div>
+            <div style="background:var(--heroSoft);border-radius:16px;padding:11px 14px;line-height:1.25"><div style="font-size:12.5px;font-weight:800;color:var(--heroInk)">Answers and fixes</div><div style="font-size:24px;font-weight:800;color:var(--heroInk)">{{ helpTotal }}</div></div>
+          </div>
+          <sc-for list="{{ helpers }}" as="p" hint-placeholder-count="4">
+            <div style="display:grid;grid-template-columns:38px minmax(0,1fr) 88px;gap:12px;align-items:center">
+              <div style="width:38px;height:38px;border-radius:999px;background:{{ p.c }};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#1F1D2B">{{ p.init }}</div>
+              <div style="min-width:0;line-height:1.3"><div style="font-weight:800;font-size:14.5px">{{ p.name }}</div><div style="font-size:12.5px;color:var(--ink2);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.impact }}</div></div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><span style="font-size:12.5px;font-weight:800">{{ p.n }}</span><span style="width:100%;height:6px;border-radius:99px;background:var(--track);overflow:hidden"><span style="display:block;height:100%;width:{{ p.w }};background:var(--hero);border-radius:99px;transition:width .5s cubic-bezier(.2,.8,.2,1)"></span></span></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="Learned skills" style="display:flex;flex-direction:column;gap:16px">
+    <div><h2 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:24px;letter-spacing:-.4px">Learned skills</h2><div style="font-size:14.5px;font-weight:600;color:var(--ink2);margin-top:3px">Pick one to see its steps, cost per run and tool access.</div></div>
+    <div style="display:grid;grid-template-columns:{{ cols }};gap:18px;align-items:start">
+      <div style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:10px;display:flex;flex-direction:column;gap:2px;min-width:0">
+        <div style="padding:6px 6px 10px"><div style="height:38px;box-sizing:border-box;border-radius:11px;background:var(--sunk);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--ink2)">{{ icSearch }}<input aria-label="Search skills" value="{{ q }}" onChange="{{ onQ }}" placeholder="Search skills" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:14px;font-weight:600;color:var(--ink)"></input></div></div>
+        <sc-for list="{{ list }}" as="s" hint-placeholder-count="6">
+          <button onClick="{{ s.pick }}" aria-pressed="{{ s.on }}" style="display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 10px 8px 8px;border:0;border-radius:16px;background:{{ s.bg }};color:var(--ink);text-align:left;cursor:pointer;transition:background-color .2s" style-hover="background:var(--rowHover)">
+            <span style="width:44px;height:44px;border-radius:13px;background:{{ s.tile }};display:flex;align-items:flex-end;justify-content:center;overflow:hidden">{{ s.agent }}</span>
+            <span style="min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.name }}</span><span style="font-size:12.5px;font-weight:700;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.sub }}</span></span>
+            <span style="display:flex;flex-direction:column;align-items:flex-end;gap:3px"><span style="height:22px;padding:0 8px;border-radius:7px;background:{{ s.chipBg }};color:{{ s.chipFg }};font-size:11.5px;font-weight:800;display:flex;align-items:center;white-space:nowrap">{{ s.stl }}</span><span style="font-size:12px;font-weight:700;color:var(--ink3);white-space:nowrap">{{ s.cost }}</span></span>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:22px 24px 24px;display:flex;flex-direction:column;gap:22px;min-width:0">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div style="display:flex;gap:14px;align-items:center;min-width:0">
+            <div style="width:60px;height:60px;border-radius:18px;background:{{ cur.tile }};display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ cur.agent }}</div>
+            <div style="min-width:0;line-height:1.3"><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--ink3)">{{ cur.eyebrow }}</div><h3 style="margin:0;font-size:22px;font-weight:800;letter-spacing:-.3px">{{ cur.name }}</h3><div style="font-size:13.5px;font-weight:600;color:var(--ink2)">Owned by {{ cur.owner }} · learned from {{ cur.from }}</div></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button onClick="{{ cur.test }}" style="height:38px;padding:0 14px 0 12px;border:0;border-radius:11px;background:var(--hero);color:#FFFFFF;font-size:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:7px;white-space:nowrap">{{ icPlay }}{{ cur.testL }}</button>
+            <button onClick="{{ cur.pause }}" style="height:38px;padding:0 14px;border-radius:11px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">{{ cur.pauseL }}</button>
+            <button onClick="{{ cur.edit }}" style="height:38px;padding:0 14px;border-radius:11px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">Edit steps</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">
+          <sc-for list="{{ cur.stats }}" as="m" hint-placeholder-count="4"><div style="background:var(--sunk);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:3px;min-width:0"><span style="font-size:12px;font-weight:700;color:var(--ink3)">{{ m.k }}</span><span style="font-size:18px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.v }}</span></div></sc-for>
+        </div>
+        <sc-if value="{{ cur.hasCost }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13.5px;font-weight:800"><span>Cost per run</span><span style="color:var(--okInk)">{{ cur.drop }}</span></div>
+            <div style="height:8px;border-radius:99px;background:var(--track);overflow:hidden"><div style="height:100%;width:{{ cur.w }};background:var(--ok);border-radius:99px;transition:width .5s cubic-bezier(.2,.8,.2,1)"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:var(--ink2)"><span>First run {{ cur.first }}</span><span>Now {{ cur.now }}</span></div>
+          </div>
+        </sc-if>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <h4 style="margin:0;font-size:15px;font-weight:800">Steps</h4>
+          <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ cur.steps }}" as="s" hint-placeholder-count="4"><li style="display:flex;gap:12px;align-items:flex-start;font-size:14.5px;font-weight:600;line-height:1.45"><span style="width:24px;height:24px;border-radius:99px;background:var(--heroSoft);color:var(--heroInk);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">{{ s.n }}</span>{{ s.t }}</li></sc-for>
+          </ol>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;justify-content:space-between"><h4 style="margin:0;font-size:15px;font-weight:800">Tool access for this skill</h4><a href="#connectors" onClick="{{ goConnectors }}" style="font-size:13.5px">Manage connectors</a></div>
+          <sc-for list="{{ cur.access }}" as="t" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line2);flex-wrap:wrap">
+              <span style="width:28px;height:28px;border-radius:8px;background:var(--sunk);color:{{ t.c }};font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;flex:none">{{ t.mono }}</span>
+              <span style="flex:1;min-width:120px;font-size:14px;font-weight:800">{{ t.name }}</span>
+              <div role="radiogroup" aria-label="{{ t.name }} access" style="display:flex;gap:2px;padding:3px;border-radius:10px;background:var(--seg)">
+                <sc-for list="{{ t.levels }}" as="l" hint-placeholder-count="4"><button role="radio" aria-checked="{{ l.on }}" onClick="{{ l.pick }}" style="height:28px;padding:0 10px;border:0;border-radius:7px;background:{{ l.bg }};box-shadow:{{ l.sh }};color:{{ l.fg }};font-size:12.5px;font-weight:800;cursor:pointer;transition:background-color .2s;white-space:nowrap">{{ l.label }}</button></sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <h4 style="margin:0;font-size:15px;font-weight:800">Used in</h4>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <sc-for list="{{ cur.used }}" as="u" hint-placeholder-count="1"><button onClick="{{ u.open }}" style="height:32px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--btn2);color:var(--ink);font-size:13.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap">{{ u.name }}{{ icChev }}</button></sc-for>
+            <sc-if value="{{ cur.unused }}" hint-placeholder-val="{{ false }}"><span style="font-size:13.5px;font-weight:600;color:var(--ink3)">Not used in any world yet.</span></sc-if>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="Tools" style="display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div><h2 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:24px;letter-spacing:-.4px">Tools</h2><div style="font-size:14.5px;font-weight:600;color:var(--ink2);margin-top:3px">The most any agent may do in each app. New tools start read-only. Team rules still apply.</div></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;font-weight:700;color:var(--ink2)"><span><b style="color:var(--ink)">Read</b> looks, never changes</span><span><b style="color:var(--ink)">Draft</b> prepares, you send</span><span><b style="color:var(--ink)">Act</b> does it, within limits</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:14px">
+      <sc-for list="{{ tools }}" as="t" hint-placeholder-count="8">
+        <div style="background:var(--card);border:1px solid var(--line2);border-radius:20px;padding:15px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;gap:12px;align-items:center">
+            <div style="width:40px;height:40px;border-radius:12px;background:{{ t.tile }};color:{{ t.ic }};display:flex;align-items:center;justify-content:center;flex:none;transition:background-color .3s,color .3s">{{ t.icon }}</div>
+            <div style="min-width:0;line-height:1.3"><div style="font-weight:800;font-size:15px">{{ t.name }}</div><div style="font-size:12.5px;color:var(--ink2);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.used }}</div></div>
+          </div>
+          <div role="radiogroup" aria-label="{{ t.name }} access" style="position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--seg);border-radius:12px;padding:3px">
+            <div style="position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / 4);border-radius:9px;background:var(--tabOn);box-shadow:0 1px 3px rgba(31,29,43,.16);transform:translateX({{ t.x }});transition:transform .4s cubic-bezier(.34,1.3,.5,1)"></div>
+            <sc-for list="{{ t.levels }}" as="l" hint-placeholder-count="4"><button role="radio" aria-checked="{{ l.on }}" onClick="{{ l.pick }}" style="position:relative;height:32px;border:0;background:transparent;color:{{ l.fg }};font-weight:800;font-size:13px;cursor:pointer;transition:color .25s">{{ l.label }}</button></sc-for>
+          </div>
+          <div style="font-size:13px;color:var(--ink2);font-weight:600;line-height:1.4;min-height:36px">{{ t.hint }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    ready: !!(window.TiloApp && window.TiloApp.ready()), sel: null, q: '', ans: {}, acc: {}, tacc: {}, rate: {}, fixing: null, fixStep: null, fixText: '', fixed: {}, rev: {}, paused: {}, live: null,
+    method: 'record', stage: 0, cap: 0, rec: false, name: 'Log new supplier invoices', desc: 'When an invoice email arrives in the Accounts inbox, open the PDF, copy the supplier, amount and due date into the “Invoices 2026” sheet, then label the email “Logged”.',
+    ask: { 2: true }, qAns: null, run: -1, waiting: false, runDone: false, scope: 'team', trig: 'arrive', saved: false
+  };
+  teachRef = React.createRef();
+  componentDidMount() { if (!this.state.ready) this.t = setInterval(() => { if (window.TiloApp && window.TiloApp.ready()) { clearInterval(this.t); this.setState({ ready: true }); } }, 50); }
+  componentWillUnmount() { clearInterval(this.t); clearInterval(this.capT); clearInterval(this.runT); }
+  scrollTeach() { const el = this.teachRef.current; if (el) window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - 96), behavior: 'smooth' }); }
+  startCapture() {
+    if (this.state.method === 'describe' || this.state.method === 'upload') { this.setState({ cap: 4 }); return; }
+    clearInterval(this.capT); this.setState({ rec: true, cap: 0 });
+    this.capT = setInterval(() => { const c = this.state.cap + 1; if (c >= 4) { clearInterval(this.capT); this.setState({ cap: 4, rec: false }); } else this.setState({ cap: c }); }, 900);
+  }
+  startRun() {
+    clearInterval(this.runT); this.setState({ run: 0, waiting: false, runDone: false });
+    this.runT = setInterval(() => { const s = this.state; if (s.waiting || s.runDone) return; if (s.ask[s.run]) { this.setState({ waiting: true }); return; } this.advance(); }, 900);
+  }
+  advance() { const n = this.state.run + 1; if (n >= 4) { clearInterval(this.runT); this.setState({ run: 4, runDone: true, waiting: false }); } else this.setState({ run: n, waiting: false }); }
+  renderVals() {
+    const h = React.createElement, app = this.props.app || {}, TA = window.TiloApp, D = TA && TA.data;
+    if (!D) return {};
+    const K = this.state.ready ? TA.kit(h) : null, S = this.state, night = !!app.night, go = app.go || (() => {}), toast = app.toast || (() => {});
+    const icon = (n, s) => K ? K.icon(n, s) : null, A = (a, s) => K ? K.agent(a, s, night) : null, up = p => this.setState(p);
+    const seg = on => ({ bg: on ? 'var(--tabOn)' : 'transparent', sh: on ? '0 1px 3px rgba(31,29,43,.16)' : 'none', fg: on ? 'var(--ink)' : 'var(--ink2)' });
+    const money = v => v == null ? '—' : '£' + v.toFixed(2);
+    const TILE = { builder: 'var(--orangeSoft)', research: 'var(--blueSoft)', connector: 'var(--pinkSoft)', delivery: 'var(--greenSoft)', tester: 'var(--amberSoft)', browser: 'var(--schSoft)', finance: 'var(--heroSoft)' };
+    const ST = { trusted: ['Trusted', 'var(--okSoft)', 'var(--okInk)'], learning: ['Learning', 'var(--heroSoft)', 'var(--heroInk)'], review: ['Needs an answer', 'var(--amberTile)', 'var(--amberInk)'], paused: ['Paused', 'var(--chip)', 'var(--ink2)'], draft: ['Draft', 'var(--chip)', 'var(--ink2)'] };
+    const worlds = D.worlds(app.dec, app.added), L = D.learn;
+
+    const skills = D.skills.map(s => {
+      let x = { ...s };
+      if (s.id === 'log' && S.live) x = { ...x, st: 'learning', runs: 1, rate: 100, last: 'Just now', first: .38, now: .38, name: S.live.name, from: 'taught by you', owner: 'Alex Morgan' };
+      if (S.rev[s.id] === 'trusted') x.st = 'trusted';
+      if (s.st === 'review' && S.ans[s.id]) x.st = 'learning';
+      return { ...x, stShown: S.paused[s.id] ? 'paused' : x.st };
+    });
+    const sel = S.sel || (app.params && app.params.id) || skills[0].id, cur = skills.find(s => s.id === sel) || skills[0];
+    const list = skills.filter(s => !S.q || s.name.toLowerCase().includes(S.q.toLowerCase())).map(s => {
+      const on = s.id === cur.id, st = ST[s.stShown];
+      return { name: s.name, sub: s.team + ' · ' + (s.used.length ? 'used in ' + s.used.length + (s.used.length === 1 ? ' world' : ' worlds') : 'not used yet'), on, bg: on ? 'var(--rowOn)' : 'transparent',
+        stl: st[0], chipBg: st[1], chipFg: st[2], cost: s.now != null ? money(s.now) + ' a run' : 'Not run yet', tile: TILE[s.role] || 'var(--sunk)',
+        agent: A({ role: s.role, expr: s.stShown === 'paused' ? 'sleepy' : s.stShown === 'review' ? 'needs' : s.stShown === 'trusted' ? 'delighted' : 'neutral' }, 38), pick: () => up({ sel: s.id }) };
+    });
+    const asksSrc = D.skills.filter(s => s.ask);
+    const asks = asksSrc.map(s => { const a = S.ans[s.id]; return { skill: s.name, q: s.ask.q, open: !a, done: !!a, doneT: '“' + (a || '') + '” · every agent now knows', bg: a ? 'var(--okSoft)' : 'var(--sunk)',
+      agent: A({ role: s.role, expr: a ? 'delighted' : 'puzzled' }, 36), opts: s.ask.a.map(label => ({ label, pick: () => { up({ ans: { ...S.ans, [s.id]: label } }); toast('Thanks. Every agent using “' + s.name + '” now knows'); } })) }; });
+    const qLeftN = asksSrc.filter(s => !S.ans[s.id]).length;
+    const CON = n => D.connectors.find(c => c.name === n) || (n === 'Google Sheets' ? D.connectors.find(c => c.id === 'gdrive') : n === 'Google Workspace' ? D.connectors.find(c => c.id === 'gmail') : n === 'BambooHR' ? D.connectors.find(c => c.id === 'bamboo') : null);
+    const access = cur.tools.map(([n, lv]) => {
+      const v = (S.acc[cur.id] && S.acc[cur.id][n] != null) ? S.acc[cur.id][n] : lv, c = CON(n);
+      return { name: n, mono: n === 'Web' ? 'W' : c ? c.mono : n[0], c: c ? c.col : 'var(--ink2)', levels: D.LEVELS.map((label, i) => ({ label, on: v === i, ...seg(v === i), fg: v === i ? (i === 3 ? 'var(--redInk)' : 'var(--ink)') : 'var(--ink2)', pick: () => { up({ acc: { ...S.acc, [cur.id]: { ...(S.acc[cur.id] || {}), [n]: i } } }); toast(n + ' access set to ' + label + (i === 3 ? '. Team rules still apply' : '')); } })) };
+    });
+
+    const rates = L.rates.map(r => { const v = S.rate[r.id], fixing = S.fixing === r.id;
+      return { name: r.name, meta: r.meta, isUp: v === 'up', isDown: v === 'down', fixing, fixed: !!S.fixed[r.id] && !fixing,
+        upBg: v === 'up' ? 'var(--okSoft)' : 'var(--btn2)', upBd: v === 'up' ? 'var(--ok)' : 'var(--line)', upFg: v === 'up' ? 'var(--okInk)' : 'var(--ink2)',
+        dnBg: v === 'down' ? 'var(--redSoft)' : 'var(--btn2)', dnBd: v === 'down' ? 'var(--red)' : 'var(--line)', dnFg: v === 'down' ? 'var(--redInk)' : 'var(--ink2)',
+        up: () => this.setState(s => ({ rate: { ...s.rate, [r.id]: 'up' }, fixing: s.fixing === r.id ? null : s.fixing })),
+        down: () => this.setState({ rate: { ...S.rate, [r.id]: 'down' }, fixing: r.id, fixStep: null, fixText: '' }),
+        cancel: () => up({ fixing: null }),
+        saveFix: () => { this.setState(s => ({ fixing: null, fixed: { ...s.fixed, [r.id]: true } })); toast('Fix saved. The next run uses it'); },
+        steps: r.steps.map((label, i) => { const on = S.fixStep === i; return { label, pick: () => up({ fixStep: i }), bg: on ? 'var(--redSoft)' : 'var(--card)', bd: on ? 'var(--red)' : 'var(--line)', fg: on ? 'var(--redInk)' : 'var(--ink)' }; }) };
+    });
+    const reviews = L.reviews.map(v => { const s = D.skills.find(x => x.id === v.id), r = S.rev[v.id];
+      return { name: s.name, meta: v.meta, open: !r, closed: !!r, agent: A({ role: s.role, expr: r === 'trusted' ? 'delighted' : 'neutral' }, 44),
+        result: r === 'trusted' ? 'Trusted. Tilo stops asking before routine steps.' : 'Still learning. Tilo checks again after 5 more runs.', resFg: r === 'trusted' ? 'var(--okInk)' : 'var(--heroInk)',
+        bd: r === 'trusted' ? 'var(--ok)' : 'var(--line)', bg: r === 'trusted' ? 'var(--okSoft)' : 'transparent',
+        bars: v.bars.map((b, i) => ({ h: b ? (12 + (i * 7) % 12) + 'px' : '24px', c: b ? 'var(--ok)' : 'var(--red)' })),
+        trust: () => { this.setState(st => ({ rev: { ...st.rev, [v.id]: 'trusted' } })); toast('“' + s.name + '” is trusted'); }, keep: () => this.setState(st => ({ rev: { ...st.rev, [v.id]: 'learning' } })) }; });
+    const mine = Object.keys(S.ans).length + Object.keys(S.fixed).length + Object.keys(S.rate).length;
+    const HP = L.helpers.map(p => ({ ...p, n: p.n + (p.you ? mine : 0) })), maxH = Math.max(...HP.map(p => p.n));
+    const helpers = HP.map(p => ({ name: p.name + (p.you ? ' (you)' : ''), init: p.init, c: p.c, impact: p.impact, n: String(p.n), w: Math.round(p.n / maxH * 100) + '%' }));
+    const LV = D.LEVELS, tone = ['var(--chip)', 'var(--schSoft)', 'var(--heroSoft)', 'var(--amberSoft)'], ink = ['var(--ink2)', 'var(--sch)', 'var(--heroInk)', 'var(--amberInk)'];
+    const tools = L.tools.map(([k, name, ic, used, def, hints]) => { const v = S.tacc[k] != null ? S.tacc[k] : def;
+      return { name, used, hint: hints[v], tile: tone[v], ic: ink[v], icon: icon(ic, 19), x: (v * 100) + '%',
+        levels: LV.map((label, j) => ({ label, on: j === v, fg: j === v ? ink[j] : 'var(--ink2)', pick: () => { up({ tacc: { ...S.tacc, [k]: j } }); toast(name + ': ' + hints[j]); } })) }; });
+
+    const stage = S.stage;
+    const reach = [true, S.cap >= 4, S.cap >= 4, S.runDone];
+    const tSteps = ['Show it', 'Tilo’s version', 'Try run', 'Save'].map((label, i) => ({ label, n: String(i + 1), locked: !reach[i] || S.saved, op: reach[i] ? '1' : '.5', cur: i === stage ? 'step' : undefined,
+      bar: i < stage ? 'var(--ok)' : i === stage ? 'var(--hero)' : 'var(--track)', fg: i === stage ? 'var(--ink)' : 'var(--ink2)', dot: i < stage ? 'var(--ok)' : i === stage ? 'var(--hero)' : 'var(--track)', dotFg: i <= stage ? '#FFFFFF' : 'var(--ink2)',
+      go: () => { if (i === 2 && stage !== 2) this.startRun(); up({ stage: i }); } }));
+    const MT = {
+      record: { name: 'Record my screen', desc: 'Do it once while Tilo watches', icon: 'screen', url: 'mail.northwind.co/accounts', hint: 'Do the task as normal. Tilo notes each step.', start: 'Start recording' },
+      guided: { name: 'Guided walkthrough', desc: 'Click through it in Tilo’s browser', icon: 'eye', url: 'Tilo browser · Accounts inbox', hint: 'Tilo highlights what it sees and asks as you go.', start: 'Start walkthrough' },
+      describe: { name: 'Describe it', desc: 'Explain in words, Tilo tries it', icon: 'pen' },
+      upload: { name: 'Upload an example', desc: 'A finished doc, video or sheet', icon: 'upload' }
+    };
+    const methods = Object.keys(MT).map(k => { const on = S.method === k; return { name: MT[k].name, desc: MT[k].desc, icon: icon(MT[k].icon, 18), on, bd: on ? 'var(--hero)' : 'var(--line)', bg: on ? 'var(--heroSoft)' : 'var(--card)', tile: on ? 'var(--card)' : 'var(--sunk)', ic: on ? 'var(--heroInk)' : 'var(--ink2)', pick: () => { clearInterval(this.capT); up({ method: k, cap: 0, rec: false }); } }; });
+    const CAP = {
+      record: ['Opened the new email from Northline in the Accounts inbox', 'Downloaded the attached PDF invoice', 'Copied supplier, amount and due date into “Invoices 2026”', 'Labelled the email “Logged”'],
+      guided: ['Opened the newest invoice in the Accounts inbox', 'Opened the PDF in the preview', 'Pasted supplier, amount and due date into “Invoices 2026”', 'Moved the email to the Logged folder'],
+      describe: ['Watch the Accounts inbox for invoice emails', 'Open the attached PDF', 'Copy supplier, amount and due date into “Invoices 2026”', 'Label the email “Logged”'],
+      upload: ['Found 3 sheets in invoice-log-example.xlsx', 'Columns: supplier, invoice number, amount, due date', 'Each row matches one email in the Accounts inbox', 'Emails with a row are labelled “Logged”']
+    };
+    const screenish = S.method === 'record' || S.method === 'guided';
+    const PLAN = [['Check the Accounts inbox for new supplier invoices', 'Gmail · Read', 'mail'], ['Read supplier, invoice number, amount and due date from the PDF', 'Files · Read', 'doc'], ['Add a row to “Invoices 2026”', 'Google Sheets · Act', 'chart'], ['Label the email “Logged”', 'Gmail · Act', 'tag']];
+    const askCount = PLAN.filter((_, i) => S.ask[i]).length;
+    const t = {
+      isShow: stage === 0, isLearn: stage === 1, isTry: stage === 2, isSave: stage === 3, screenish, isDescribe: S.method === 'describe', isUpload: S.method === 'upload',
+      url: screenish ? MT[S.method].url : '', screenHint: S.cap >= 4 ? 'Got it. 4 steps captured.' : screenish ? MT[S.method].hint : '',
+      recording: S.rec, notRecording: !S.rec, recLabel: 'REC 00:0' + (2 + S.cap * 2),
+      capture: () => this.startCapture(), captureOff: S.rec, capBg: S.rec ? 'var(--red)' : S.cap >= 4 ? '#1E8A4C' : '#5A3FE0',
+      captureLabel: S.rec ? 'Recording…' : S.cap >= 4 ? 'Record again' : screenish ? MT[S.method].start : '',
+      desc: S.desc, onDesc: e => up({ desc: e.target.value }),
+      dropBd: S.cap >= 4 ? 'var(--ok)' : 'var(--line)', dropBg: S.cap >= 4 ? 'var(--okSoft)' : 'var(--sunk)',
+      dropTitle: S.cap >= 4 ? 'invoice-log-example.xlsx' : 'Drop an example here', dropSub: S.cap >= 4 ? '3 sheets · 128 rows · Tilo read the pattern' : 'A finished spreadsheet, document or short screen video. Or click to use a sample.',
+      capCount: S.cap + ' of 4', noneYet: S.cap === 0,
+      name: S.name, onName: e => up({ name: e.target.value }),
+      nextOff: S.cap < 4, nextBg: S.cap >= 4 ? 'var(--hero)' : 'var(--track)', nextFg: S.cap >= 4 ? '#FFFFFF' : 'var(--ink2)',
+      next: () => { const n = stage + 1; if (n === 2) this.startRun(); up({ stage: n }); },
+      back: () => { clearInterval(this.runT); up({ stage: Math.max(0, stage - 1), run: -1, waiting: false, runDone: false }); },
+      notSaved: !S.saved, saved: S.saved,
+      savedSub: (S.scope === 'team' ? 'Shared with Northwind Ops' : 'Just for you') + ' · ' + { ask: 'runs when you ask', weekday: 'runs every weekday at 09:00', arrive: 'runs when an invoice arrives' }[S.trig] + ' · starts as Learning',
+      save: () => { up({ saved: true, live: { name: S.name }, sel: 'log' }); toast('Saved “' + S.name + '”. It’s live for ' + (S.scope === 'me' ? 'you' : 'the team')); },
+      view: () => { up({ sel: 'log' }); },
+      reset: () => { clearInterval(this.runT); clearInterval(this.capT); up({ stage: 0, cap: 0, rec: false, run: -1, waiting: false, runDone: false, saved: false, qAns: null, name: 'Log new supplier invoices' }); }
+    };
+    const plan = PLAN.map((p, i) => { const on = !!S.ask[i]; return { n: String(i + 1), t: p[0], tool: p[1], icon: icon(p[2], 12), ask: on, askFg: on ? 'var(--amberInk)' : 'var(--ink2)', track: on ? '#F0A500' : 'var(--track)', knob: on ? 'translateX(16px)' : 'none', toggle: () => this.setState(s => ({ ask: { ...s.ask, [i]: !s.ask[i] } })) }; });
+    const qOpts = ['Open the link', 'Ask me each time', 'Skip and flag it'].map(label => { const on = S.qAns === label; return { label, on, pick: () => up({ qAns: label }), bg: on ? 'var(--toast)' : 'var(--card)', fg: on ? 'var(--toastInk)' : 'var(--ink)', bd: on ? 'var(--toast)' : 'var(--line)' }; });
+    const runSteps = PLAN.map((p, i) => {
+      const done = S.run > i || S.runDone, c = S.run === i && !S.runDone, wait = c && S.waiting;
+      return { t: p[0], waiting: wait, mark: done ? icon('check', 12) : String(i + 1), st: done ? 'Done' : wait ? 'Asking you' : c ? 'Working…' : 'Waiting',
+        stFg: done ? 'var(--okInk)' : wait ? 'var(--amberInk)' : c ? 'var(--heroInk)' : 'var(--ink3)', bg: wait ? 'var(--amberSoft)' : c ? 'var(--heroSoft)' : 'transparent', bd: wait ? 'var(--amberLine)' : c ? 'transparent' : 'var(--line)',
+        dot: done ? 'var(--ok)' : wait ? '#F0A500' : c ? 'var(--hero)' : 'var(--track)', dotFg: done || c ? '#FFFFFF' : wait ? '#1F1D2B' : 'var(--ink2)' };
+    });
+    const run = { done: S.runDone, approve: () => this.advance(),
+      pill: S.runDone ? 'Finished' : S.waiting ? 'Waiting for you' : 'Step ' + (Math.max(0, S.run) + 1) + ' of 4',
+      pillBg: S.runDone ? 'var(--okSoft)' : S.waiting ? '#F0A500' : 'var(--card)', pillFg: S.runDone ? 'var(--okInk)' : S.waiting ? '#1F1D2B' : 'var(--heroInk)',
+      art: K ? K.building('desk', S.runDone ? 'complete' : S.waiting ? 'needs' : 'active', 'analysis', 150, night) : null,
+      agent: A({ role: 'builder', rank: 'lead', expr: S.runDone ? 'delighted' : S.waiting ? 'needs' : 'focused', ring: S.waiting, facing: 'R' }, 96) };
+
+    const nTrusted = skills.filter(s => s.st === 'trusted').length, nLearning = skills.filter(s => s.st === 'learning').length, nHelp = qLeftN + L.reviews.filter(v => !S.rev[v.id]).length;
+    const pct = cur.first ? Math.round((1 - cur.now / cur.first) * 100) : 0;
+    return {
+      total: skills.length + ' skills', icPlus: icon('plus', 15), icSearch: icon('search', 15), icPlay: icon('play', 13), icChev: icon('chevR', 12), icCheckS: icon('check', 12), icUpload: icon('upload', 22), icRecord: icon('record', 15),
+      sum: [{ t: nTrusted + ' trusted', bg: 'var(--okSoft)', fg: 'var(--okInk)' }, { t: nLearning + ' learning', bg: 'var(--heroSoft)', fg: 'var(--heroInk)' }, { t: nHelp ? nHelp + ' need your help' : 'Nothing waiting', bg: nHelp ? 'var(--amberTile)' : 'var(--chip)', fg: nHelp ? 'var(--amberInk)' : 'var(--ink2)' }],
+      openTeach: () => { this.scrollTeach(); if (S.saved) t.reset(); },
+      teachRef: this.teachRef, tSteps, methods, captured: CAP[S.method].slice(0, S.cap).map((x, i) => ({ n: String(i + 1), t: x })), mockRows: [62, 48, 70, 40].map((w, i) => ({ w: w + '%', ring: S.rec && S.cap === i ? '0 0 0 3px #F0A500' : 'none' })),
+      t, plan, qOpts, runSteps, run, est: [{ k: 'Each run', v: '~£0.40' }, { k: 'Time', v: '~1 min' }, { k: 'Stops to ask', v: askCount === 0 ? 'Never' : askCount + (askCount === 1 ? ' step' : ' steps') }],
+      scopes: [['me', 'Just me'], ['team', 'Northwind Ops']].map(([v, label]) => ({ label, ...seg(S.scope === v), pick: () => up({ scope: v }) })),
+      trigs: [['ask', 'When I ask'], ['weekday', 'Weekdays 09:00'], ['arrive', 'When an invoice arrives']].map(([v, label]) => ({ label, ...seg(S.trig === v), pick: () => up({ trig: v }) })),
+      recDot: h('span', { style: { width: 10, height: 10, borderRadius: 99, background: '#E2483D', display: 'inline-block', animation: 'tiloPulse 1s ease-in-out infinite' } }),
+      teacher: A({ role: 'research', rank: 'lead', expr: S.saved ? 'delighted' : S.rec || stage === 2 ? 'focused' : 'talking' }, 58),
+      talkAgent: A({ role: 'builder', rank: 'lead', expr: 'talking' }, 40), puzzledAgent: A({ role: 'builder', expr: 'puzzled' }, 38),
+      waitingAgent: A({ role: 'research', expr: S.rec ? 'focused' : 'neutral' }, 58), happyAgent: A({ role: 'builder', rank: 'lead', expr: 'delighted' }, 70),
+      asks, qLeft: qLeftN ? qLeftN + ' waiting' : 'All answered', qLeftC: qLeftN ? 'var(--amberInk)' : 'var(--okInk)',
+      rates, fixText: S.fixText, onFixText: e => up({ fixText: e.target.value }), reviews, helpers, helpTotal: String(41 + mine), tools,
+      q: S.q, onQ: e => up({ q: e.target.value }), list,
+      cols: (app.vw || 1440) >= 1080 ? 'minmax(320px,.9fr) minmax(0,1.5fr)' : 'minmax(0,1fr)',
+      goConnectors: e => { e.preventDefault(); go('connectors'); },
+      cur: {
+        name: cur.name, owner: cur.owner, from: cur.from || '—', tile: TILE[cur.role] || 'var(--sunk)', eyebrow: (cur.team + ' · ' + ST[cur.stShown][0]).toUpperCase(),
+        agent: A({ role: cur.role, expr: 'focused' }, 52),
+        stats: [{ k: 'Runs', v: String(cur.runs) }, { k: 'Success', v: cur.rate != null ? cur.rate + '%' : '—' }, { k: 'Last run', v: cur.last }, { k: 'Improved', v: cur.improved }],
+        hasCost: cur.first != null, first: money(cur.first), now: money(cur.now), drop: pct > 0 ? pct + '% cheaper than the first run' : 'Same as the first run', w: cur.first ? Math.max(6, Math.round(cur.now / cur.first * 100)) + '%' : '0%',
+        steps: cur.steps.map((x, i) => ({ n: String(i + 1), t: x })), access,
+        used: cur.used.map(id => { const w = worlds.find(x => x.id === id); return { name: w ? w.short : id, open: () => go('world', { id }) }; }), unused: !cur.used.length,
+        testL: cur.st === 'draft' ? 'Try run' : 'Test run', pauseL: S.paused[cur.id] ? 'Resume' : 'Pause',
+        test: () => { if (cur.st === 'draft') { up({ method: 'describe', cap: 4, stage: 2 }); this.startRun(); this.scrollTeach(); } else toast('Test run started on yesterday’s data. Results in about a minute'); },
+        pause: () => { const p = !S.paused[cur.id]; up({ paused: { ...S.paused, [cur.id]: p } }); toast(p ? '“' + cur.name + '” is paused. Worlds using it will ask you instead' : '“' + cur.name + '” is running again'); },
+        edit: () => toast('Step editor opens here. Changes are versioned')
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

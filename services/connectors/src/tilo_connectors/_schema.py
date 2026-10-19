@@ -58,6 +58,12 @@ def approach_validator() -> jsonschema.protocols.Validator:  # plan.schema.json#
 
 
 @functools.lru_cache(maxsize=1)
+def authz_validator() -> jsonschema.protocols.Validator:  # common.schema.json#/$defs/authz (SEC-11)
+    ref = {"$ref": "https://contracts.tilo.example/common.schema.json#/$defs/authz"}
+    return jsonschema.Draft202012Validator(ref, registry=_registry())
+
+
+@functools.lru_cache(maxsize=1)
 def manifest_validator() -> jsonschema.protocols.Validator:
     """Without uniqueItems on parents and inputs: jsonschema compares those pairwise (O(n^2)), so
     provenance.build_manifest refuses a repeated (artifact_id, version) first, in O(n) (#187)."""
@@ -66,3 +72,30 @@ def manifest_validator() -> jsonschema.protocols.Validator:
         schema["properties"][field].pop("uniqueItems", None)
     cls = jsonschema.validators.validator_for(schema, default=jsonschema.Draft202012Validator)
     return cls(schema, registry=_registry())
+
+
+@functools.lru_cache(maxsize=1)
+def calendar_entry_validator() -> (
+    jsonschema.protocols.Validator
+):  # the JSON Schema, not the generated models (they drop if/then)
+    schema = _load_json(_CONTRACTS_DIR / "calendar_entry.schema.json")
+    return jsonschema.Draft202012Validator(schema, registry=_registry())
+
+
+@functools.lru_cache(maxsize=1)
+def agenda_item_validator() -> jsonschema.protocols.Validator:  # calendar_entry.schema.json#/$defs/agenda_item
+    ref = {"$ref": "https://contracts.tilo.example/calendar_entry.schema.json#/$defs/agenda_item"}
+    return jsonschema.Draft202012Validator(ref, registry=_registry())
+
+
+@functools.lru_cache(maxsize=8)
+def host_rpc_validator(name: str) -> jsonschema.protocols.Validator:
+    """One `$defs` entry of meeting_host_rpc.schema.json (ADR-0032): send_request, user_request, send_answer, ..."""
+    ref = {"$ref": f"https://contracts.tilo.example/meeting_host_rpc.schema.json#/$defs/{name}"}
+    return jsonschema.Draft202012Validator(ref, registry=_registry())
+
+
+@functools.lru_cache(maxsize=8)
+def common_validator(name: str) -> jsonschema.protocols.Validator:  # common.schema.json#/$defs/<name>
+    ref = {"$ref": f"https://contracts.tilo.example/common.schema.json#/$defs/{name}"}
+    return jsonschema.Draft202012Validator(ref, registry=_registry())

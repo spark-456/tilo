@@ -1,0 +1,29 @@
+# COST-FAST-1 (user decision 8 Oct): Quick mode of POST /intake. One cheap call on the `assistant` role answers a
+# simple question; real work is offered to Thinking. Read by tilo_api.quick_rules on every call. No model id here:
+# the role (config/models*.yaml) names the model, and a missing role closes Quick with 503 (never the Director).
+# The word lists are the whole rules classifier (services/api/tests/API_COST_FAST_1.md): it is deterministic, costs
+# nothing, and only SUGGESTS. A text no rule reads goes to one JSON-mode classifier call on the same role.
+# Words are compared after NFKC, control and format characters removed, casefold; "what's" counts as "what".
+
+version: 1
+
+role: assistant
+budget_credits: 0.5 # one Quick ask in all, the classifier call and the answer call together (PL-03)
+answer_max_chars: 8000 # a longer reply is cut
+answer_max_output_tokens: 600 # EFF-03: below the role's 1000; the answer call asks for no more
+classifier_max_output_tokens: 40 # the verdict is one short JSON object
+thinking_level: minimal
+max_words: 30 # a longer text is never decided "simple" by a rule
+
+words:
+  fillers: [please, can, could, would, will, you, kindly, tilo, hey, hi, ok, okay, now, just]
+  simple_openers: [what, who, whom, whose, why, when, where, which, how, is, are, was, were, does, do, did, has, have, define, convert, explain, calculate, compute, translate, spell, pronounce]
+  simple_phrases: [[give, me, a, synonym], [give, me, an, antonym], [give, me, a, definition], [give, me, an, example], [give, me, the, meaning]]
+  deictic: [this, these, those, my, our, mine, above, attached, here] # refers to something Quick cannot see: the model decides
+  clause_breaks: [and, then, also, plus]
+  sequence: [first, then, next, finally, afterwards, lastly, secondly, thirdly]
+  recurrence: [every, whenever] # a standing instruction ("every Monday ..."): a side effect that repeats
+  side_effect_verbs: [send, post, delete, remove, erase, book, reserve, buy, purchase, order, pay, publish, upload, share, forward, reply, cancel, invite, schedule, submit, transfer, tweet, message, email, call, notify, remind, archive, unsubscribe, approve, sign, install, deploy, push, rename, move]
+  production_verbs: [create, make, build, write, draft, prepare, produce, generate, design, compile, put, turn]
+  deliverable_nouns: [deck, slide, slides, slideshow, presentation, powerpoint, pptx, report, pdf, spreadsheet, workbook, xlsx, excel, csv, docx, proposal, brochure, newsletter, infographic, website, webpage, dashboard]
+  tool_words: [search, google, browse, internet, web, inbox, calendar, research, latest, news, weather, url, drive, folder, files]

@@ -1,8 +1,12 @@
 """tilo_providers.google_adapter — Google Gen AI SDK adapter (PL-02, PRD 6.4,
 6.5). Wraps `google.genai.Client` against Agent Platform / Vertex, through
 the global endpoint, behind `ModelProvider`. Structured output maps onto
-`GenerateContentConfig(response_mime_type=..., response_schema=...)`;
-SDK/transport errors map onto `tilo_providers.errors`.
+`GenerateContentConfig(response_mime_type=..., response_json_schema=...)`: the JSON Schema field, never
+`response_schema`, which is the SDK's OpenAPI-subset `Schema` type and rejects ordinary JSON Schema (`uniqueItems`,
+a list `type`) while the request body is built, before anything is sent. The schema goes out as a sanitized copy
+(`schema_subset.to_gemini_schema`: Gemini answers 400 to `default`, `pattern`, `maxLength`...).
+SDK/transport errors map onto `tilo_providers.errors`; a request the SDK refuses to build (pydantic
+`ValidationError`) is a `RequestError`.
 
 Imports `google.genai`/`.types`/`.errors` via `importlib.import_module`
 rather than `from google import genai`, so the module works whether that
@@ -20,14 +24,90 @@ import re
 from collections.abc import Iterator, Mapping
 from typing import Any
 
+import pydantic
 from tilo_contracts import ProvidersProfile
 
-from tilo_providers.errors import ProviderError, SafetyError, map_http_status, map_transport_error
-from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
+from tilo_providers.diagnostics import log_caught
+from tilo_providers.errors import (
+    OutputTruncatedError,
+    ProviderError,
+    RequestError,
+    SafetyError,
+    map_http_status,
+    map_transport_error,
+    truncated_message,
+)
+from tilo_providers.interfaces import (
+    Capability,
+    EmbedRequest,
+    EmbedResponse,
+    GenerateRequest,
+    GenerateResponse,
+    ModelProvider,
+    PriceQuote,
+    cached_tokens_or_none,
+)
+from tilo_providers.media import check_parts
+from tilo_providers.schema_subset import to_gemini_schema
+
+_NO_FIELD = object()
+
+
+def _audio_tokens(details: Any, input_tokens: int) -> int | None:
+    """LW-06: the audio part of the input tokens, from the per-modality counts; None (unknown) when the response gave
+    no usable breakdown, so a malformed count can never become a price (ADR-0029 decision 1)."""
+    if not isinstance(details, list):
+        return None
+    total = 0
+    for item in details:
+        count = getattr(item, "token_count", None)
+        if str(getattr(getattr(item, "modality", None), "value", getattr(item, "modality", None))) != "AUDIO":
+            continue
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            return None
+        total += count
+    return total if total <= input_tokens else None
 
 
 def _genai_module(name: str) -> Any:
     return importlib.import_module(name)
+
+
+MAX_CODE_RUNS = 8  # GOOGLE-MAX: runs kept per reply
+MAX_CODE_FIELD_CHARS = 4000  # GOOGLE-MAX: code and output kept per run (a run is evidence, not a data channel)
+
+
+def _enum_text(value: Any) -> str:
+    return str(getattr(value, "value", value) or "")
+
+
+def _code_runs_and_text(response: Any) -> tuple[list[dict[str, str]] | None, str | None]:
+    """GOOGLE-MAX: Gemini code execution comes back as `executable_code` then `code_execution_result` parts. Returns the
+    runs (code, outcome, output; capped) and the reply's own text, or (None, None) when no part ran code. The text is
+    joined here because the SDK's `response.text` logs a warning for a reply with non-text parts."""
+    candidates = getattr(response, "candidates", None) or []
+    content = getattr(candidates[0], "content", None) if candidates else None
+    parts = getattr(content, "parts", None)
+    if not isinstance(parts, list):
+        return None, None
+    runs: list[dict[str, str]] = []
+    texts: list[str] = []
+    ran = False
+    for part in parts:
+        code, result = getattr(part, "executable_code", None), getattr(part, "code_execution_result", None)
+        if code is not None:
+            ran = True
+            language = _enum_text(getattr(code, "language", None))
+            body = str(getattr(code, "code", "") or "")[:MAX_CODE_FIELD_CHARS]
+            runs.append({"language": language, "code": body, "outcome": "", "output": ""})
+        elif result is not None:
+            ran = True
+            if runs:
+                runs[-1]["outcome"] = _enum_text(getattr(result, "outcome", None))
+                runs[-1]["output"] = str(getattr(result, "output", "") or "")[:MAX_CODE_FIELD_CHARS]
+        elif isinstance(getattr(part, "text", None), str) and not getattr(part, "thought", False):
+            texts.append(part.text)
+    return (runs[:MAX_CODE_RUNS], "".join(texts) or None) if ran else (None, None)
 
 
 # Finish reasons the SDK uses to mark a *generated* response as blocked
@@ -67,12 +147,21 @@ def validate_google_settings(project: str, location: str, environ: Mapping[str, 
         )
     if not _PROJECT_RE.fullmatch(project):
         raise GoogleSettingsError("project_invalid", "GOOGLE_CLOUD_PROJECT is not a valid project id")
+    refuse_service_account_key(environ)
+
+
+def refuse_service_account_key(environ: Mapping[str, str] | None = None) -> None:
+    """Refuses a service-account key file as ADC (user ADC only); shared with the Model Armor adapter."""
+    environ = os.environ if environ is None else environ
     explicit = environ.get(_CREDENTIALS_VAR)
     path = explicit or _well_known_adc_path(environ)  # ADC reads the variable's file, else gcloud's well-known one
     try:
         with open(path, encoding="utf-8") as handle:  # only the `type` field is read; ADC reports anything else
             content = json.load(handle)
-    except (OSError, ValueError):
+    except FileNotFoundError:  # normal on Cloud Run: the attached identity answers, there is no ADC file to inspect
+        content = None
+    except (OSError, ValueError) as caught_error:
+        log_caught(caught_error, __name__, locals())
         content = None
     if isinstance(content, dict) and content.get("type") == "service_account":
         where = _CREDENTIALS_VAR if explicit else "the gcloud well-known ADC file"
@@ -95,6 +184,15 @@ class _RedactedAPIError(Exception):
         self.code = code
 
 
+class _ClientSideFailure(Exception):
+    """Stands in for a pydantic error from the SDK as the `__cause__` of a mapped error: its class name, no values."""
+
+
+# One request may not wait longer than this: a live run of 8 Oct 2026 hung 300-425 s on verifier and narrator calls
+# that never answered (no usage, an unmapped failure). The SDK takes milliseconds; a timeout maps to a retryable 504.
+REQUEST_TIMEOUT_MS = 120_000
+
+
 class GoogleModelProvider(ModelProvider):
     def __init__(
         self,
@@ -104,6 +202,7 @@ class GoogleModelProvider(ModelProvider):
         location: str,
         client: Any | None = None,
         price: PriceQuote | None = None,
+        live_permitted: bool = False,
     ) -> None:
         self._profile = profile
         self._profile_id = profile_id
@@ -111,43 +210,101 @@ class GoogleModelProvider(ModelProvider):
         self._location = location
         self._price = price
         if client is None:
-            # EFF-01: reachable directly (not only via RecordReplayProvider).
-            if os.environ.get("LIVE") != "1":
+            # EFF-01: reachable directly (not only via RecordReplayProvider). `live_permitted` is the SEC-15
+            # injected permission (the deployed-judge path); it is never read from the environment.
+            if os.environ.get("LIVE") != "1" and not live_permitted:
                 raise ProviderError(
                     "PL-02/EFF-01: refusing to build a real network client without LIVE=1 (inject client= for tests)"
                 )
             validate_google_settings(project, location)  # before any client exists
             genai = _genai_module("google.genai")
-            client = genai.Client(vertexai=True, project=project, location=location)
+            http_options = _genai_module("google.genai.types").HttpOptions(timeout=REQUEST_TIMEOUT_MS)
+            client = genai.Client(vertexai=True, project=project, location=location, http_options=http_options)
         self._client = client
 
+    def _schema_for_send(self, schema: dict[str, Any]) -> dict[str, Any]:
+        """A sanitized copy: Gemini accepts a subset of JSON Schema and answers 400 to the rest (`schema_subset`)."""
+        return to_gemini_schema(schema)
+
+    def _tools_for_send(self, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """RUN-FAIL-1: `GenerateRequest.tools` holds OpenAI-style `{"type": "function", "function": {...}}` specs
+        (the harness tool loop writes them; the OpenAI-compatible adapter sends them as they are). The Gen AI SDK
+        refuses that shape before sending, so every tool-using unit failed on Vertex. Function specs become ONE
+        Gemini tool of function declarations (parameters sanitized like a response schema); others pass as they are."""
+        declarations: list[dict[str, Any]] = []
+        others: list[dict[str, Any]] = []
+        for tool in tools:
+            function = tool.get("function") if tool.get("type") == "function" else None
+            if not isinstance(function, Mapping):
+                others.append(tool)
+                continue
+            declaration: dict[str, Any] = {"name": function.get("name")}
+            if function.get("description"):
+                declaration["description"] = function["description"]
+            if isinstance(function.get("parameters"), Mapping):
+                declaration["parameters_json_schema"] = to_gemini_schema(dict(function["parameters"]))
+            declarations.append(declaration)
+        return [{"function_declarations": declarations}, *others] if declarations else others
+
+    def _check_code_execution(self, tools: list[dict[str, Any]]) -> None:
+        """GOOGLE-MAX: `{"code_execution": {}}` is Gemini's sandboxed Python tool. Only a profile that declares the
+        `code_execution` capability may send it, and it takes no options: refused before anything is sent."""
+        for tool in tools:
+            if "code_execution" not in tool:
+                continue
+            if tool["code_execution"] != {}:
+                raise RequestError("GOOGLE-MAX: the code_execution tool takes no options")
+            if Capability.CODE_EXECUTION.value not in self._profile.caps:
+                raise RequestError(
+                    f"GOOGLE-MAX: profile {self._profile_id!r} does not declare the code_execution capability"
+                )
+
+    def _thinking_for_send(self, level: str) -> str:
+        """Vertex answers HTTP 400 to thinking level "minimal" (live, 5 Oct 2026; packages/providers/CLAUDE.md, "the
+        smoke sends no `thinking_level`"), so it goes out as "low". This adapter is Vertex-only, so no other
+        endpoint needs "minimal"; the OpenAI-compatible adapter ignores thinking levels and is untouched."""
+        return "low" if level == "minimal" else level
+
     def _config(self, request: GenerateRequest) -> Any | None:
+        kwargs = self._config_kwargs(request)
+        return _genai_module("google.genai.types").GenerateContentConfig(**kwargs) if kwargs else None
+
+    def _config_kwargs(self, request: GenerateRequest) -> dict[str, Any]:
+        """The `GenerateContentConfig` fields for `request`; `schema_probe` edits a copy of these."""
         kwargs: dict[str, Any] = {}
+        # X-LOGS-1 / RUN-COST-PROGRESS: always opt out of SDK automatic function calling. With no tools there is nothing
+        # to execute (and a warning to avoid); with tools Tilo runs its own capped loop (config/tool_loop.yaml), so the
+        # SDK must never call a function or re-send the conversation by itself.
+        kwargs["automatic_function_calling"] = {"disable": True}
         if request.system is not None:
             kwargs["system_instruction"] = request.system
         if request.tools is not None:
-            kwargs["tools"] = request.tools
+            self._check_code_execution(request.tools)
+            kwargs["tools"] = self._tools_for_send(request.tools)
         if request.max_output_tokens is not None:
             kwargs["max_output_tokens"] = request.max_output_tokens
         if request.response_schema is not None:
             # PL-02 structured output: a schema implies JSON output.
             kwargs["response_mime_type"] = "application/json"
-            kwargs["response_schema"] = request.response_schema
+            kwargs["response_json_schema"] = self._schema_for_send(request.response_schema)  # not `response_schema`
         elif request.json_mode:
             kwargs["response_mime_type"] = "application/json"
-        if not kwargs and request.thinking_level is None:
-            return None
-        types_mod = _genai_module("google.genai.types")
         if request.thinking_level is not None and Capability.THINKING.value in self._profile.caps:
             # A profile without the capability (e.g. a fallback) would answer a thinking config with a 400: omit it.
-            kwargs["thinking_config"] = types_mod.ThinkingConfig(thinking_level=request.thinking_level.upper())
-        return types_mod.GenerateContentConfig(**kwargs) if kwargs else None
+            kwargs["thinking_config"] = _genai_module("google.genai.types").ThinkingConfig(
+                thinking_level=self._thinking_for_send(request.thinking_level).upper()
+            )
+        return kwargs
 
     def _map_error(self, error: Exception) -> Exception:
         errors_mod = _genai_module("google.genai.errors")
         if isinstance(error, errors_mod.APIError):
             message = self.redact(str(getattr(error, "message", error)))  # a server message can echo a token
             return map_http_status(error.code, message)
+        if isinstance(error, pydantic.ValidationError):
+            # The SDK refused to build the request (nothing was sent): rejected, not unknown. Class name only: the
+            # validation text echoes the schema and prompt values it was given.
+            return RequestError(f"PL-02: the Gen AI SDK refused to build the request ({type(error).__name__})")
         # The SDK's transport is httpx too, so this maps the same as
         # openai_compat_adapter's (mapping must not depend on the adapter).
         return map_transport_error(error) or error
@@ -159,6 +316,8 @@ class GoogleModelProvider(ModelProvider):
             if isinstance(error, _genai_module("google.genai.errors").APIError):
                 # The raw SDK error carries the unredacted server message: keep only its code and redacted text.
                 mapped.__cause__ = _RedactedAPIError(getattr(error, "code", None), str(mapped))
+            elif isinstance(error, pydantic.ValidationError):
+                mapped.__cause__ = _ClientSideFailure(type(error).__name__)  # the raw error carries input values
             else:
                 mapped.__cause__ = error
         return mapped
@@ -179,13 +338,26 @@ class GoogleModelProvider(ModelProvider):
             # success instead of a safety block.
             raise SafetyError(f"blocked by safety filter: finish_reason={finish_reason!r}")
 
+        usage_metadata = getattr(response, "usage_metadata", None)
+        if str(getattr(finish_reason, "value", finish_reason)) == "MAX_TOKENS":
+            # The reply hit its output cap (thinking tokens count against it): empty or cut off, never a reply.
+            # Vertex leaves a visible-output count out when it is 0 (so 0 with usage present, None with no usage); a
+            # missing thinking count stays None: the model did not report one.
+            output = thoughts = prompt = None
+            if usage_metadata is not None:
+                output = getattr(usage_metadata, "candidates_token_count", None) or 0
+                thoughts = getattr(usage_metadata, "thoughts_token_count", None)
+                prompt = getattr(usage_metadata, "prompt_token_count", None)  # billed too (FR-MTR-01)
+            raise OutputTruncatedError(
+                truncated_message(output, thoughts), output_tokens=output, thinking_tokens=thoughts, input_tokens=prompt
+            )
+
         tool_calls: list[dict[str, Any]] | None = None
         function_calls = getattr(response, "function_calls", None)
         if function_calls:
             tool_calls = [{"name": call.name, "args": call.args} for call in function_calls]
 
         usage: dict[str, int] | None = None
-        usage_metadata = getattr(response, "usage_metadata", None)
         if usage_metadata is not None:
             # Thinking tokens are billed as output, so metering counts them there (FR-MTR-01).
             # Vertex leaves a count None when thinking used the whole output cap: that is zero, never a crash.
@@ -195,15 +367,37 @@ class GoogleModelProvider(ModelProvider):
                 "output_tokens": (usage_metadata.candidates_token_count or 0) + thoughts,
                 "total_tokens": usage_metadata.total_token_count or 0,
             }
+            # EFF-04: the API leaves a zero cached count out, so present usage with a None count is a reported 0.
+            # An object with no such field at all (not the SDK's model) reports nothing: unknown.
+            cached = getattr(usage_metadata, "cached_content_token_count", _NO_FIELD)
+            cached = cached_tokens_or_none(0 if cached is None else cached, usage["input_tokens"])
+            if cached is not None:
+                usage["cached_tokens"] = cached
+            audio = _audio_tokens(getattr(usage_metadata, "prompt_tokens_details", None), usage["input_tokens"])
+            if audio is not None:
+                usage["audio_tokens"] = audio
 
-        return GenerateResponse(text=response.text, profile_id=self._profile_id, tool_calls=tool_calls, usage=usage)
+        code_runs, code_text = _code_runs_and_text(response)
+        text = code_text if code_runs is not None else response.text
+        return GenerateResponse(
+            text=text, profile_id=self._profile_id, tool_calls=tool_calls, usage=usage, code_runs=code_runs
+        )
+
+    def _contents(self, request: GenerateRequest) -> Any:
+        """The prompt as is, or (LW-06) one user turn of `inline_data` parts then the prompt. The bytes ride only in
+        this request body; URI parts and anything off the media allow-list are refused first (`check_parts`)."""
+        if not check_parts(request.parts):
+            return request.prompt
+        media = [{"inline_data": {"mime_type": p.mime_type, "data": p.data}} for p in request.parts or ()]
+        return [{"role": "user", "parts": [*media, {"text": request.prompt}]}]
 
     def generate(self, request: GenerateRequest) -> GenerateResponse:
         try:
             response = self._client.models.generate_content(
-                model=self._profile.model, contents=request.prompt, config=self._config(request)
+                model=self._profile.model, contents=self._contents(request), config=self._config(request)
             )
         except Exception as error:
+            log_caught(error, __name__, locals())
             failure = self._failure(error)
         else:
             return self._map_response(response)
@@ -213,31 +407,55 @@ class GoogleModelProvider(ModelProvider):
         failure: Exception | None = None
         try:
             chunks = self._client.models.generate_content_stream(
-                model=self._profile.model, contents=request.prompt, config=self._config(request)
+                model=self._profile.model, contents=self._contents(request), config=self._config(request)
             )
             for chunk in chunks:
                 yield self._map_response(chunk)
         except Exception as error:
+            log_caught(error, __name__, locals())
             failure = self._failure(error)
         if failure is not None:
             raise failure
 
-    def embed(self, request: Any) -> Any:
-        contents = request["input"] if isinstance(request, dict) else request
+    def embed(self, request: EmbedRequest) -> EmbedResponse:
+        typed = isinstance(request, EmbedRequest)
+        contents = request.texts if typed else request["input"] if isinstance(request, dict) else request
+        kwargs: dict[str, Any] = {"model": self._profile.model, "contents": contents}
+        if typed:
+            kwargs["config"] = _genai_module("google.genai.types").EmbedContentConfig(
+                task_type="RETRIEVAL_DOCUMENT" if request.task == "document" else "RETRIEVAL_QUERY",
+                output_dimensionality=request.dimensions,
+            )
         try:
-            response = self._client.models.embed_content(model=self._profile.model, contents=contents)
+            # Vertex accepts one input per gemini-embedding-001 request; keep the typed
+            # batch API by making one call for each text (Google's embedding docs).
+            if typed and self._profile.model == "gemini-embedding-001":
+                responses = [self._client.models.embed_content(**(kwargs | {"contents": [text]})) for text in contents]
+                vectors = [item.values for response in responses for item in response.embeddings]
+            else:
+                response = self._client.models.embed_content(**kwargs)
+                vectors = [item.values for item in response.embeddings]
         except Exception as error:
+            log_caught(error, __name__, locals())
             failure = self._failure(error)
         else:
             # `.values` is the float vector; `list(item)` would iterate the
             # pydantic model's *fields* instead.
-            return {"vectors": [item.values for item in response.embeddings], "profile_id": self._profile_id}
+            if typed:
+                if len(vectors) != len(request.texts) or any(
+                    len(vector or []) != request.dimensions for vector in vectors
+                ):
+                    raise ProviderError("RT-05: embedding response has the wrong shape")
+                return EmbedResponse(vectors=vectors, profile_id=self._profile_id)
+            # older provider tests still exercise the pre-RT-05 raw shape (as FakeModelProvider does)
+            return {"vectors": vectors, "profile_id": self._profile_id}  # type: ignore[return-value]
         raise failure
 
     def count_tokens(self, text: str) -> int:
         try:
             response = self._client.models.count_tokens(model=self._profile.model, contents=text)
         except Exception as error:
+            log_caught(error, __name__, locals())
             failure = self._failure(error)
         else:
             return response.total_tokens  # type: ignore[no-any-return]

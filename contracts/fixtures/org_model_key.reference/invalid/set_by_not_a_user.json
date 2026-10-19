@@ -1,0 +1,15 @@
+{
+  "bundle_id": "openai-compat-example",
+  "status": "active",
+  "secret_version": 1,
+  "set_by": "owner@example.com",
+  "set_at": "2026-10-13T09:30:00.000Z",
+  "rotated_at": null,
+  "day_cap_credits": 500,
+  "fallback_to_tilo": false,
+  "refusals": 0,
+  "last_error": null,
+  "last_used_at": null,
+  "consent_version": 1,
+  "rev": 1
+}

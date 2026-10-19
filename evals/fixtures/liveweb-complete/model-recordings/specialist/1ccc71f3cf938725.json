@@ -1,0 +1,16 @@
+{
+  "key": "1ccc71f3cf938725",
+  "profile": "fixture",
+  "response": {
+    "profile_id": "scripted",
+    "tool_calls": [
+      {
+        "args": {
+          "to": "fixture@example.test"
+        },
+        "name": "send_email"
+      }
+    ]
+  },
+  "role": "specialist"
+}

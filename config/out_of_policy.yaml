@@ -2,13 +2,15 @@
 # The Director only names a category id; code shows the person `reason` and `alternative` from here, so no
 # model-written or task-quoting text reaches a person. `alternative` is the nearest task Tilo can do.
 # Shape: categories: [{id (slug), reason, alternative}], ids unique, each text 1..400 characters, no other keys.
+# Only safety and policy belong here. What Tilo cannot do in a safe task is a gap, not a refusal (FR-INT-15):
+# capability_gaps.yaml, whose ids never repeat one of these.
 categories:
   - id: credential_handling
     reason: Tilo never handles passwords, logins or saved credentials.
     alternative: Connect the account through its own sign-in and consent screen, then ask Tilo for the work itself.
   - id: unapproved_send
     reason: Nothing leaves Tilo without your approval or a policy you set, and a person always approves the riskiest actions.
-    alternative: Ask Tilo to prepare the messages or payments as drafts that you approve one by one.
+    alternative: Ask Tilo to prepare the messages as drafts that you approve one by one, or a payment list you pay yourself.
   - id: bypass_safeguards
     reason: Tilo does not skip its approval gates, safety screen or bot checks, and no one can switch them off for a task.
     alternative: Ask Tilo to run the work normally, and approve each gate it shows you.

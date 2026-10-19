@@ -53,7 +53,7 @@ def _bad_outputs():
         "empty_content": [unit_output(b"")],
         "over_the_2_mb_text_cap": [unit_output(b"x" * 2_000_001)],
         "content_is_text_not_bytes": [unit_output("not bytes")],
-        "media_type_not_one_of_the_nine": [unit_output(ARTICLE, "text/html")],
+        "media_type_not_one_of_the_nine": [unit_output(ARTICLE, "image/svg+xml")],
         "a_unit_never_makes_a_file": [unit_output(b"%PDF-1.7", "application/pdf")],
         "eleven_outputs_over_the_cap_of_ten": [unit_output(ARTICLE + bytes([i])) for i in range(11)],
         "parent_the_store_does_not_hold": [unit_output(parent={"artifact_id": "art_nope", "version": 1})],

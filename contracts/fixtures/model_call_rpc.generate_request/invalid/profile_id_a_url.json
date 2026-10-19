@@ -1,0 +1,9 @@
+{
+  "org_id": "org_example",
+  "slot": "models",
+  "run_id": "r_demo01",
+  "profile_id": "https://api.example.com/v1",
+  "request": {
+    "prompt": "Summarise the attached notes in three bullet points."
+  }
+}

@@ -2,7 +2,8 @@
 provider layer's router (PL-01), which checks the reply's shape against `plan.schema.json#/$defs/approach`.
 Whether the set is usable is deterministic code: every pair differs on at least 2 of the 5 dimensions (PG-08),
 ranges are ordered (PG-09) and ids are unique (PG-07). A set that breaks a rule is sent back once through the
-router with the problems named; if it still breaks one it is rejected, never returned."""
+router with the problems named; if it still breaks one it is rejected, never returned. Too many skips for the room
+that gap lines leave is not a model matter (COST-FAST-2, PRD 6.6): `trim_skips` cuts them in code, no second call."""
 
 from __future__ import annotations
 
@@ -10,20 +11,26 @@ import itertools
 import json
 import math
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import date
 from typing import Annotated, Any
 
 import pydantic
 from tilo_contracts import PlanApproach
+from tilo_providers.clock import real_today, time_facts
 from tilo_providers.interfaces import Capability, GenerateRequest
 from tilo_providers.prompts import load_prompt, neutralise_marker
-from tilo_providers.router import Router, RouterError, RouterResult
+from tilo_providers.router import Deadline, Router, RouterError, RouterResult
 
 from tilo_planning.brief import DIRECTOR_ROLE
 from tilo_planning.events import build_event
+from tilo_planning.gaps import Gap
 
 DIMENSIONS = ("depth", "sources", "parallelism", "verification", "output_format")
 MIN_DIFFERING = 2
+MAX_SKIPS = 5  # plan.schema.json approach.skips maxItems
+APPROACHES_THINKING = "medium"  # weighing 2-3 approaches needs some thought; the default (high) is billed as output
 
 
 class ApproachProposalError(Exception):
@@ -63,8 +70,9 @@ def _credit_ok(value: Any, *, positive: bool) -> bool:
     return value > 0 if positive else value >= 0
 
 
-def problems(approaches: list[dict[str, Any]]) -> list[str]:
-    """Every PG-07/08/09 rule the set breaks, in words the Director can act on. Empty when the set is usable."""
+def problems(approaches: list[dict[str, Any]], *, skip_room: int = MAX_SKIPS) -> list[str]:
+    """Every PG-07/08/09 rule the set breaks, in words the Director can act on, plus the skips room that code-written
+    FR-INT-15 gap lines leave. Empty when the set is usable."""
     found = []
     ids = [a["id"] for a in approaches]
     if len(set(ids)) != len(ids):
@@ -80,7 +88,17 @@ def problems(approaches: list[dict[str, Any]]) -> list[str]:
             found.append(f"PG-09: {_label(a['id'])} has credits that are not finite or a maximum that is not above 0")
         elif a["time"]["min_s"] > a["time"]["max_s"] or credits["min"] > credits["max"]:
             found.append(f"PG-09: {_label(a['id'])} has a range whose minimum is above its maximum")
+    for a in approaches:
+        if (n := len(a.get("skips", []))) > skip_room:
+            found.append(f"skips: {_label(a['id'])} lists {n} skips; list at most {skip_room}")
     return found
+
+
+def trim_skips(approaches: list[dict[str, Any]], room: int) -> list[dict[str, Any]]:
+    """COST-FAST-2: keep each approach's first `room` skips in the model's order and drop the tail. Pure (a new list;
+    the input is untouched), stable and idempotent; nothing else about an approach changes, so distinctness (PG-08),
+    ranges (PG-09) and ids (PG-07) are unaffected and a schema-valid approach stays schema-valid."""
+    return [{**a, "skips": list(a.get("skips", []))[: max(room, 0)]} for a in approaches]
 
 
 def _data(text: str, marker: str) -> str:
@@ -88,15 +106,20 @@ def _data(text: str, marker: str) -> str:
     return neutralise_marker(text, marker)
 
 
-def _ask(router: Router, prompt: str, budget: float | None) -> tuple[RouterResult, list[dict[str, Any]]]:
+def _ask(
+    router: Router, prompt: str, budget: float | None, deadline: Deadline | None
+) -> tuple[RouterResult, list[dict[str, Any]]]:
     request = GenerateRequest(
         system=load_prompt(DIRECTOR_ROLE, "approaches_system.md"),
         prompt=prompt,
         json_mode=True,
         response_schema=_Reply.model_json_schema(),
+        thinking_level=APPROACHES_THINKING,
     )
     try:
-        run = router.generate(DIRECTOR_ROLE, request, budget=budget, required_capability=Capability.JSON)
+        run = router.generate(
+            DIRECTOR_ROLE, request, budget=budget, required_capability=Capability.JSON, deadline=deadline
+        )
     except RouterError as error:
         raise ApproachProposalError(f"FR-INT-06: no approaches from the Director: {error}") from error
     if run.outcome != "ok" or run.response is None:
@@ -109,21 +132,47 @@ def _ask(router: Router, prompt: str, budget: float | None) -> tuple[RouterResul
 
 
 def propose_approaches(
-    brief: dict[str, Any], *, router: Router, base: dict[str, Any], seq: int, budget: float | None = None
+    brief: dict[str, Any],
+    *,
+    router: Router,
+    base: dict[str, Any],
+    seq: int,
+    budget: float | None = None,
+    gaps: Sequence[Gap] = (),
+    today: date | None = None,
+    deadline: Deadline | None = None,
 ) -> ApproachesResult:
-    """`base` holds the event's v/ts/world_id/run_id/actor; the event gets `seq`. The brief goes in as data."""
+    """`base` holds the event's v/ts/world_id/run_id/actor; the event gets `seq`. The brief goes in as data. FR-INT-15:
+    the model is told its skips room (5 minus the gaps); on a usable set code puts the gap lines first in every
+    approach's `skips`, so the plan names what was not done. The model never sees or writes those lines."""
+    room = MAX_SKIPS - len(gaps)  # at least 2: extract_brief keeps at most MAX_GAPS (3)
     brief_text = _data(json.dumps(brief, ensure_ascii=False, indent=2), "BRIEF")
-    run, approaches = _ask(router, load_prompt(DIRECTOR_ROLE, "approaches_task.md", {"brief": brief_text}), budget)
+    facts = time_facts(today or real_today(), brief.get("deadline"))  # a calendar fact from the clock, not a guess
+    prompt = load_prompt(DIRECTOR_ROLE, "approaches_task.md", {"brief": brief_text, "skip_room": room, **facts})
+    run, approaches = _ask(router, prompt, budget, deadline)
+    approaches = trim_skips(approaches, room)  # over the room: cut in code, never a repair call (COST-FAST-2)
     runs = [run]
-    if found := problems(approaches):  # one repair through the router, then reject
+    if found := problems(approaches, skip_room=room):  # PG-07/08/09 only: one repair, then reject
         previous = _data(json.dumps({"approaches": approaches}, ensure_ascii=False, indent=2), "PREVIOUS")
         listed = _data("\n".join(f"- {p}" for p in found), "PROBLEMS")
-        variables = {"problems": listed, "brief": brief_text, "previous": previous}
+        variables = {"problems": listed, "brief": brief_text, "previous": previous, **facts}
         remaining = None if budget is None else run.budget
-        run, approaches = _ask(router, load_prompt(DIRECTOR_ROLE, "approaches_repair.md", variables), remaining)
+        run, approaches = _ask(
+            router, load_prompt(DIRECTOR_ROLE, "approaches_repair.md", variables), remaining, deadline
+        )
         runs.append(run)
-        if found := problems(approaches):
+        approaches = trim_skips(approaches, room)
+        if found := problems(approaches, skip_room=room):
             raise ApproachProposalError(f"FR-INT-06: approaches still break the rules after one repair: {found}")
+    if gaps:
+        lines = [g.skip_line() for g in gaps]
+        try:
+            approaches = [
+                PlanApproach.model_validate({**a, "skips": [*lines, *a["skips"]]}).model_dump(mode="json")
+                for a in approaches
+            ]
+        except pydantic.ValidationError as error:
+            raise ApproachProposalError("FR-INT-15: the gap lines do not fit the approaches' skips") from error
     count = len(approaches)
     event = build_event(
         base, seq=seq, type="plan.approaches_proposed", target=base["world_id"], item=None, severity="needs_you",

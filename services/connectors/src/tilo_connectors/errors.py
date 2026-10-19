@@ -41,6 +41,31 @@ class ProviderUnavailable(AdapterError):
     """5xx or a TransportError, still after the attempts: ambiguous, the provider may have acted."""
 
 
+class CanvaApiError(AdapterError):
+    """Canva answered with this HTTP status (FR-CON-19). Fixed text plus the status: never a body or a token."""
+
+    def __init__(self, status: int) -> None:
+        super().__init__(f"Canva answered {status}")
+        self.status = status
+
+
+class SyncTokenExpired(AdapterError):
+    """Google answered 410 to a request that carried a sync token (FR-CAL-08): the next sync lists in full."""
+
+    status = 410
+
+
+class CalendarConfigError(ValueError):
+    """config/personal.yaml or the google_calendar entry is refused whole (FR-CAL-08). Names a key, never a value."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message[:500])
+
+
+class CalendarSyncRefused(ValueError):
+    """register(): a bad id, or the person is registered already under another org or world."""
+
+
 class BuildPartnerConfigError(ValueError):
     """config/build_partners.yaml is refused whole (FR-CON-16, API_FR_CON_16_17_20.md). Names a key, never a value."""
 
@@ -81,3 +106,19 @@ class BriefTooLong(HandoffRefused):
         self.max_url_length = max_url_length
         self.truncated = False
         self.alternatives = (RouteOffer("mcp", False, "unavailable until FR-CON-18"),)
+
+
+class MeetingHostConfigError(ValueError):
+    """The meeting_host config or declaration is refused whole (FR-MTG-09). Names a key, never a value."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message[:500])
+
+
+class MeetingHostRefused(ValueError):
+    """A bot-hosted meeting is refused (MH-01..MH-07; MH-20, MH-21 for join_link). Names the rule and ids only:
+    never a title, an address, a time, a URL or a token."""
+
+    def __init__(self, rule: str, detail: str) -> None:
+        super().__init__(f"{rule}: {detail}"[:500])
+        self.rule = rule

@@ -20,6 +20,7 @@ application_default_credentials.json
 
 # Build output and caches
 dist/
+dist-e2e/
 build/
 out/
 coverage/
@@ -35,11 +36,18 @@ htmlcov/
 playwright-report/
 test-results/
 blob-report/
+apps/web/e2e/__artifacts__/
 
 # Local dev eval replay output (just eval); evals/results.md is the committed pass record (PRD 19.5)
 evals/results.local.md
+evals/nightly.local.md
+evals/metrics.local.md
+# Vertex AI Gen AI evaluation runs (VERTEX-EVAL-1): the local pairs file and report
+evals/vertex-eval/
 # Live generator output (issue #272 b): one folder per run; the user promotes a case into evals/bank/ by PR
 evals/generated/
+# just live-run (PL-LIVE-E2E): recordings of runs on a typed topic are the user's own text, never committed
+evals/bank/live/adhoc/
 
 # Terraform state and plans (state lives in a GCS backend)
 .terraform/

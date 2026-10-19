@@ -1,0 +1,1189 @@
+/* Tilo T Landing styles (FT-UX-2, matching design/tilo-t "Tilo T Landing.dc.html").
+   Uses Tilo T design tokens (var(--...)); no inline style attributes (CSP style-src 'self').
+   No @keyframes, animation or transition in this file (HR-1..7: motion goes in motion.css). */
+
+.landing-t-section {
+  max-width: 1232px;
+  margin: 0 auto;
+  padding: 110px 32px 0;
+  box-sizing: border-box;
+}
+
+.landing-t-grid-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 56px;
+  align-items: center;
+}
+
+.landing-t-lead {
+  max-width: 520px;
+  margin: 0;
+  font-size: 19px;
+  color: var(--ink2);
+}
+
+.landing-t-lead-side {
+  max-width: 360px;
+  margin: 0;
+  font-size: 17px;
+  color: var(--ink2);
+}
+
+.landing-t-split-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+/* ---- Section 1: One line in ---- */
+.landing-t-oneline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 40px;
+  align-items: center;
+}
+
+.landing-t-oneline__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.landing-t-quote-box {
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 20px;
+  box-shadow: var(--sh2);
+  padding: 16px 18px;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: -0.4px;
+}
+
+.landing-t-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-family: var(--mono, "Geist Mono", ui-monospace, monospace);
+  font-size: 12.5px;
+  color: var(--ink3);
+}
+
+.landing-t-scorecard {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: var(--sh3);
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transform: rotate(1.2deg);
+}
+
+.landing-t-scorecard__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.landing-t-scorecard__sub {
+  font-size: 13px;
+  color: var(--ink3);
+  font-weight: 600;
+  flex: 1;
+}
+
+.landing-t-scorecard__pdf {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.landing-t-scorecard__title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+}
+
+.landing-t-scorecard__note {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--ink2);
+}
+
+.landing-t-scorecard__buddy {
+  position: absolute;
+  left: -24px;
+  bottom: -20px;
+}
+
+.landing-t-table {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+.landing-t-table-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr 1fr;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.landing-t-table-row--head {
+  border-top: 0;
+  background: var(--sunk);
+  font-weight: 700;
+  color: var(--ink2);
+  font-size: 12.5px;
+}
+
+.landing-t-table-cell--dim {
+  color: var(--ink2);
+}
+
+.landing-t-bold {
+  font-weight: 700;
+}
+
+/* ---- Common Pills ---- */
+.landing-t-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 99px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.landing-t-pill--mint {
+  background: var(--mintSoft);
+  color: var(--mintInk);
+}
+
+.landing-t-pill--pri {
+  background: var(--priSoft);
+  color: var(--priInk);
+  font-family: var(--mono, "Geist Mono", ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.landing-t-pill--sunk {
+  background: var(--sunk);
+  color: var(--ink2);
+  font-family: var(--mono, "Geist Mono", ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.landing-t-pill--lime {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.landing-t-pill--card {
+  border: 1px solid var(--line2);
+  background: var(--card);
+  color: var(--ink);
+}
+
+/* ---- Section 2: How it works ---- */
+.landing-t-how-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.landing-t-how-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: var(--sh1);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.landing-t-how-card h3 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+}
+
+.landing-t-how-card p {
+  margin: 0;
+  color: var(--ink2);
+}
+
+.landing-t-how-preview {
+  height: 180px;
+  border-radius: 20px;
+  background: var(--sunk);
+  padding: 18px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.landing-t-how-preview--city {
+  background: var(--cityBg);
+  justify-content: flex-end;
+}
+
+.landing-t-how-box {
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: var(--sh1);
+  padding: 12px 14px;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.landing-t-how-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.landing-t-how-chips span {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 99px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+
+.landing-t-chip--dashed {
+  border: 1px dashed var(--line2) !important;
+  border-radius: 10px !important;
+  font-weight: 500 !important;
+}
+
+.landing-t-how-cost {
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: var(--sh1);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.landing-t-how-cost strong {
+  font-size: 18px;
+  display: block;
+}
+
+.landing-t-how-cost small {
+  font-size: 12px;
+  color: var(--ink3);
+  display: block;
+}
+
+.landing-t-btn-sm {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: var(--pri);
+  color: var(--onPri);
+  font-weight: 700;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.landing-t-btn-act {
+  height: 52px;
+  padding: 0 24px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: var(--pri);
+  color: var(--onPri);
+  box-shadow: 0 3px 0 var(--priH, var(--priLip));
+  font: inherit;
+  font-family: var(--fH);
+  font-weight: 700;
+  font-size: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.landing-t-how-status {
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: var(--sh1);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---- Section 3: Meet the team ---- */
+.landing-t-team-stage {
+  border-radius: 36px;
+  background: var(--cityBg);
+  border: 1px solid var(--cityLine);
+  padding: 56px 40px 24px;
+  box-sizing: border-box;
+}
+
+.landing-t-team-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.landing-t-team-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.landing-t-speech {
+  max-width: 170px;
+  min-height: 58px;
+  padding: 10px 12px;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--card);
+  box-shadow: var(--sh2);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.landing-t-team-avatar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.landing-t-team-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.3;
+}
+
+.landing-t-team-meta strong {
+  font-size: 16px;
+}
+
+.landing-t-team-meta span {
+  font-size: 13px;
+  color: var(--ink2);
+}
+
+/* ---- Section 4: One box, two speeds ---- */
+.landing-t-speeds-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.landing-t-speed-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: var(--sh1);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.landing-t-speed-card h3 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  line-height: 1.1;
+}
+
+.landing-t-speed-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.landing-t-chat-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+}
+
+.landing-t-chat-bubbles {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.landing-t-bubble-user {
+  align-self: flex-end;
+  background: var(--pri);
+  color: var(--onPri);
+  border-radius: 16px 16px 4px 16px;
+  padding: 10px 14px;
+  font-size: 15px;
+}
+
+.landing-t-bubble-agent {
+  align-self: flex-start;
+  background: var(--sunk);
+  border-radius: 16px 16px 16px 4px;
+  padding: 10px 14px;
+  font-size: 15px;
+}
+
+.landing-t-world-preview {
+  height: 220px;
+  border-radius: 20px;
+  background: var(--cityBg);
+  padding: 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.landing-t-world-preview__empty {
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  background: var(--sunk);
+}
+
+/* ---- Section 5: Safety ---- */
+.landing-t-safety__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.landing-t-gate-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: var(--sh2);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.landing-t-gate-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--ink3);
+  font-weight: 600;
+}
+
+.landing-t-gate-card__title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+  line-height: 1.15;
+}
+
+.landing-t-gate-card__warning {
+  background: var(--amberSoft);
+  border: 1px solid var(--amberLine);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.landing-t-gate-card__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.landing-t-gate-card__no {
+  color: var(--redInk);
+  font-weight: 600;
+  padding: 0 16px;
+}
+
+/* ---- Section 6: Skills ---- */
+.landing-t-btn-outline {
+  height: 52px;
+  padding: 0 22px;
+  border-radius: 16px;
+  border: 1px solid var(--line2);
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+  flex: none;
+}
+
+.landing-t-skills-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.landing-t-skill-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: var(--sh1);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.landing-t-skill-meta strong {
+  display: block;
+  font-size: 17px;
+  margin-bottom: 4px;
+}
+
+.landing-t-skill-meta p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink2);
+}
+
+.landing-t-icon-tile {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.landing-t-icon-tile--sky {
+  background: var(--skySoft);
+  color: var(--skyInk);
+}
+
+.landing-t-icon-tile--teal {
+  background: var(--tealSoft);
+  color: var(--tealInk);
+}
+
+.landing-t-icon-tile--lilac {
+  background: var(--lilacSoft);
+  color: var(--lilacInk);
+}
+
+.landing-t-icon-tile--pri {
+  background: var(--priSoft);
+  color: var(--priInk);
+}
+
+/* ---- Section 7: Meetings & Section 8: Teams & Section 9: Agenda ---- */
+.landing-t-card-box {
+  position: relative;
+  border-radius: 32px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 360px;
+  box-sizing: border-box;
+}
+
+.landing-t-meetings-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.landing-t-minutes-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.landing-t-meetings-followups {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.landing-t-card-foot {
+  margin-top: auto;
+  font-size: 12px;
+  color: var(--ink3);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.landing-t-teams-activity {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.landing-t-team-activity-item {
+  height: 40px;
+  padding: 0 14px 0 6px;
+  border-radius: 99px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.landing-t-avatar-chip {
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.landing-t-avatar-chip--sky {
+  background: var(--skySoft);
+  color: var(--skyInk);
+}
+
+.landing-t-avatar-chip--teal {
+  background: var(--tealSoft);
+  color: var(--tealInk);
+}
+
+.landing-t-avatar-chip--lilac {
+  background: var(--lilacSoft);
+  color: var(--lilacInk);
+}
+
+.landing-t-dim-note {
+  font-size: 13px;
+  color: var(--ink3);
+  margin: 8px 0 0;
+}
+
+.landing-t-day-strip {
+  display: flex;
+  gap: 8px;
+}
+
+.landing-t-day-slot {
+  flex: 1;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.landing-t-day-slot--sel {
+  border-color: var(--ink);
+}
+
+.landing-t-day-slot strong {
+  font-size: 14px;
+}
+
+.landing-t-day-slot small {
+  font-size: 12px;
+  color: var(--ink3);
+}
+
+.landing-t-pins-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.landing-t-pin {
+  min-height: 110px;
+  padding: 14px;
+  border-radius: 6px 6px 18px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.3;
+  box-sizing: border-box;
+}
+
+.landing-t-pin strong {
+  font-size: 15px;
+}
+
+.landing-t-pin span {
+  color: var(--ink2);
+}
+
+.landing-t-pin--amber {
+  background: var(--amberSoft);
+  transform: rotate(-2deg);
+}
+
+.landing-t-pin--pri {
+  background: var(--priSoft);
+  transform: rotate(1.5deg);
+  box-shadow: var(--sh2);
+}
+
+.landing-t-pin--sky {
+  background: var(--skySoft);
+  transform: rotate(-1deg);
+}
+
+/* ---- Section 10: Connectors ---- */
+.landing-t-apps-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.landing-t-app-tile {
+  height: 120px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.landing-t-app-status--mint {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mintInk);
+}
+
+.landing-t-app-status--dim {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+
+/* ---- Section 11: Audiences ---- */
+.landing-t-audiences-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.landing-t-audience-card {
+  border-radius: 28px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.landing-t-audience-card--dark {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: transparent;
+}
+
+.landing-t-audience-card--dark .landing-rules__tick {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.landing-t-audience-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.landing-t-audience-head h3 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+}
+
+/* ---- Section 12: Why Tilo ---- */
+.landing-t-why-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.landing-t-why-card {
+  border-radius: 28px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.landing-t-why-card h3 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+}
+
+.landing-t-why-card p {
+  margin: 0;
+  color: var(--ink2);
+}
+
+.landing-t-why-preview {
+  height: 150px;
+  border-radius: 18px;
+  background: var(--sunk);
+  padding: 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.landing-t-why-preview--center {
+  background: var(--amberSoft);
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  gap: 12px;
+}
+
+.landing-t-why-preview--cap {
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+}
+
+.landing-t-cap-bar {
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.landing-t-progress {
+  height: 10px;
+  border-radius: 9px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.landing-t-progress-fill {
+  height: 100%;
+  border-radius: 9px;
+  background: var(--ink);
+  width: 63%;
+}
+
+.landing-t-cap-note {
+  font-size: 13px;
+  color: var(--ink2);
+}
+
+/* ---- Section 13: A day in your town ---- */
+.landing-t-day-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.landing-t-day-stop {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.landing-t-day-pill {
+  align-self: flex-start;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.landing-t-day-pill--pink {
+  background: var(--pinkSoft);
+  color: var(--pinkInk);
+}
+
+.landing-t-day-pill--pri {
+  background: var(--priSoft);
+  color: var(--priInk);
+}
+
+.landing-t-day-pill--mint {
+  background: var(--mintSoft);
+  color: var(--mintInk);
+}
+
+.landing-t-day-pill--lilac {
+  background: var(--lilacSoft);
+  color: var(--lilacInk);
+}
+
+.landing-t-day-pill--sky {
+  background: var(--skySoft);
+  color: var(--skyInk);
+}
+
+.landing-t-day-pill--dark {
+  background: var(--ink);
+  color: var(--card);
+  border-color: transparent;
+}
+
+.landing-t-day-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--sh1);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 150px;
+  box-sizing: border-box;
+}
+
+.landing-t-day-card--dark {
+  background: var(--ink);
+  color: var(--card);
+  border-color: transparent;
+}
+
+.landing-t-day-card p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink2);
+}
+
+.landing-t-day-card--dark p {
+  color: var(--ink3);
+}
+
+.landing-t-day-meta {
+  margin-top: auto;
+  font-size: 11.5px;
+  color: var(--ink3);
+}
+
+/* ---- Section 14: Marquee ---- */
+.landing-t-marquee-wrap {
+  padding: 90px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.landing-t-marquee-title {
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink3);
+  padding-bottom: 8px;
+}
+
+.landing-t-marquee-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 16px;
+  scrollbar-width: none;
+}
+
+.landing-t-marquee-pill {
+  height: 56px;
+  padding: 0 24px;
+  border-radius: 99px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  flex: none;
+}
+
+.landing-t-marquee-pill--lime {
+  background: var(--lime);
+  color: var(--ink);
+  border-color: transparent;
+}
+
+/* ---- Section 15: Close ---- */
+.landing-t-close-card {
+  border-radius: 36px;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 72px 64px;
+  display: flex;
+  align-items: center;
+  gap: 48px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.landing-t-close-copy {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.landing-t-close-copy h2 {
+  margin: 0;
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -2.8px;
+  color: var(--bg);
+}
+
+.landing-t-close-copy p {
+  margin: 0;
+  font-size: 19px;
+  color: var(--ink3);
+  max-width: 520px;
+}
+
+.landing-t-close-demo {
+  color: var(--bg);
+  text-decoration-color: var(--lime);
+}
+
+.landing-t-close-buddy {
+  flex: none;
+}
+
+.landing-t-dot--mint {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--mint);
+  display: inline-block;
+}
+
+.landing-t-dot--amber {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--amber);
+  display: inline-block;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 1024px) {
+  .landing-t-team-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+  }
+  .landing-t-day-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .landing-t-skills-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .landing-t-apps-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .landing-t-section {
+    padding-top: 60px;
+  }
+  .landing-t-grid-2,
+  .landing-t-oneline,
+  .landing-t-speeds-grid,
+  .landing-t-audiences-grid,
+  .landing-t-how-grid,
+  .landing-t-why-grid,
+  .landing-t-day-grid,
+  .landing-t-skills-grid,
+  .landing-t-apps-grid,
+  .landing-t-pins-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .landing-t-team-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .landing-t-close-card {
+    flex-direction: column;
+    padding: 36px 24px;
+    gap: 24px;
+  }
+  .landing-t-close-copy h2 {
+    font-size: 36px;
+  }
+}

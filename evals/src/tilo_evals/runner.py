@@ -29,6 +29,24 @@ def _one_line(text: str) -> str:
 
 
 @dataclass
+class CacheTally:
+    """One role's input tokens in one case or pass (EFF-04, ADR-0022 decision 8). `known_in` and `cached` come from
+    the events that carry `trace.tokens_cached`; `all_in` is every event's `tokens_in`; `unknown_events` counts the
+    events without the count, which leave the rate and lower the coverage."""
+
+    known_in: int = 0
+    cached: int = 0
+    all_in: int = 0
+    unknown_events: int = 0
+
+    def add(self, other: "CacheTally") -> None:
+        self.known_in += other.known_in
+        self.cached += other.cached
+        self.all_in += other.all_in
+        self.unknown_events += other.unknown_events
+
+
+@dataclass
 class CaseRunResult:
     case: Case
     passed: bool | None  # None: only autorater checks, still pending
@@ -38,6 +56,9 @@ class CaseRunResult:
     roles: dict[str, str] = field(default_factory=dict)  # model_role -> profile name, never a model id
     cause: str | None = None
     pending_autoraters: list[str] = field(default_factory=list)
+    events: tuple[dict[str, Any], ...] = ()  # the replayed outcome, kept for the EV metrics (metrics.py)
+    outputs: dict[str, Any] = field(default_factory=dict)
+    cache: dict[str, CacheTally] = field(default_factory=dict)  # model_role -> cached-token tally (EFF-04)
 
 
 @dataclass
@@ -91,12 +112,21 @@ def _select(
 def _evaluate(case: Case, outcome: Any) -> CaseRunResult:
     role_costs: dict[str, float] = {}
     roles: dict[str, str] = {}
+    cache: dict[str, CacheTally] = {}
     for event in outcome.events:
         trace = event.get("trace") or {}
         if role := trace.get("model_role"):
             role_costs[role] = role_costs.get(role, 0.0) + float(event.get("credits") or 0.0)
             if trace.get("profile"):
                 roles[role] = trace["profile"]
+            tally, tokens_in = cache.setdefault(role, CacheTally()), trace.get("tokens_in")
+            tokens_in = tokens_in if isinstance(tokens_in, int) and not isinstance(tokens_in, bool) else 0
+            tally.all_in += tokens_in
+            if "tokens_cached" in trace:  # the executor refused any bad count, so this is a whole number
+                tally.known_in += tokens_in
+                tally.cached += trace["tokens_cached"]
+            else:
+                tally.unknown_events += 1
     results: list[dict[str, Any]] = []
     pending: list[str] = []
     cause: str | None = None
@@ -113,7 +143,10 @@ def _evaluate(case: Case, outcome: Any) -> CaseRunResult:
         if not result.passed and cause is None:  # one line, bounded: a cause can echo recorded text
             cause = _one_line(result.cause or f"{name} failed")
     passed = None if not results and pending else cause is None
-    return CaseRunResult(case, passed, results, outcome.credits or 0.0, role_costs, roles, cause, pending)
+    return CaseRunResult(
+        case, passed, results, outcome.credits or 0.0, role_costs, roles, cause, pending,
+        tuple(outcome.events), dict(outcome.outputs), cache,
+    )  # fmt: skip
 
 
 def run_pass(

@@ -1,0 +1,8 @@
+{
+  "user_id": "u_owner",
+  "tool": "search_email",
+  "args": {
+    "query": "from:ana@example.org newer_than:7d is:unread",
+    "max_results": 5
+  }
+}

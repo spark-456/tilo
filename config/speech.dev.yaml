@@ -1,0 +1,9 @@
+# DEV speech config (FR-MTG-11, EFF-01): the vendor is the deterministic fake, so a meet-bot test or a bot started by hand
+# without LIVE=1 transcribes offline. meet-bot/bot/providers.py reads this file unless LIVE=1 (then config/speech.yaml)
+# or TILO_SPEECH_FILE says otherwise. Same shape and loader as config/speech.yaml (tilo_providers.speech.load_speech_config).
+speech:
+  vendor: fake
+  profile: speech-fake
+  model: fake-speech
+  max_bytes: 15728640
+  max_duration_ms: 7200000

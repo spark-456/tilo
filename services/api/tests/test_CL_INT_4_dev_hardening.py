@@ -71,3 +71,14 @@ def test_CL_INT_4_dev_writer_override_rechecks_the_environment_per_call(monkeypa
     monkeypatch.setenv("CLOUD_RUN_JOB", "x")
     with pytest.raises(dev.DevModeRefused):
         app.dependency_overrides[deps.get_event_writer]()
+
+
+def test_CL_INT_4_the_dev_port_is_8080_unless_an_unprivileged_port_is_named():
+    from tilo_api import dev
+
+    assert dev.dev_port({}) == 8080
+    assert dev.dev_port({"TILO_API_DEV_PORT": ""}) == 8080
+    assert dev.dev_port({"TILO_API_DEV_PORT": "8181"}) == 8181
+    for bad in ("80", "99999", "abc", "-8181", "8181 "):
+        with pytest.raises(dev.DevModeRefused):
+            dev.dev_port({"TILO_API_DEV_PORT": bad})

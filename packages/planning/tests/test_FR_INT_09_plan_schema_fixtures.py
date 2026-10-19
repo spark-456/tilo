@@ -31,9 +31,14 @@ def test_FR_INT_09_fixture_dirs_are_not_empty() -> None:
 @pytest.mark.parametrize("name", VALID_FIXTURES)
 def test_FR_INT_09_valid_plan_fixtures_pass(name, risk_table, fake_connectors, fake_skills, fake_policies) -> None:
     plan = load_plan_fixture("valid", name)
+    changes: dict[str, list[str]] = {}  # PG-13 (MROOM-H2a): a revision fixture's change is confirmed by the world
+    for unit in plan["units"]:
+        if "change" in unit:
+            changes.setdefault(unit["change"], []).append(unit["revises"])
     violations = validate_plan(
-        plan, risk_table=risk_table, connectors=fake_connectors, skills=fake_skills, policies=fake_policies
-    )
+        plan, risk_table=risk_table, connectors=fake_connectors, skills=fake_skills, policies=fake_policies,
+        changes=changes or None,
+    )  # fmt: skip
     assert violations == [], f"{name}: expected a valid plan, got {[v.rule_id for v in violations]}"
 
 

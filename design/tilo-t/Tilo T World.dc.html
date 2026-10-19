@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<script src="./tilo-t.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" data-screen-label="World" style="position:relative;width:100%;height:{{ rootH }};overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:15px;line-height:1.5">
+
+<sc-if value="{{ desk }}" hint-placeholder-val="{{ true }}">
+  <dc-import name="Tilo T Nav" active="worlds" theme="{{ theme }}" hint-size="100%,64px"></dc-import>
+  <div style="height:64px;box-sizing:border-box;padding:0 24px;display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--line);background:var(--card)">
+    <a href="#" aria-label="Back to worlds" style="width:40px;height:40px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink2);flex:none">{{ iBack }}</a>
+    <div style="display:flex;flex-direction:column;line-height:1.25;min-width:0">
+      <div style="display:flex;align-items:center;gap:10px"><h1 style="margin:0;font-weight:700;font-size:19px;letter-spacing:-.4px;white-space:nowrap">Plan our team offsite in Porto</h1><span style="height:26px;padding:0 10px 0 8px;border-radius:99px;background:{{ st.bg }};color:{{ st.fg }};font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="width:7px;height:7px;border-radius:9px;background:{{ st.dot }}"></span>{{ st.t }}</span></div>
+      <span style="font-size:12.5px;color:var(--ink3)">{{ meta }}</span>
+    </div>
+    <div style="flex:1"></div>
+    <div style="width:220px;display:flex;flex-direction:column;gap:5px;flex:none">
+      <div style="display:flex;justify-content:space-between;font-size:12.5px;white-space:nowrap"><span><strong>{{ cr }}</strong> <span style="color:var(--ink3)">of 120 credits</span></span><span style="color:var(--ink3)">asks before more</span></div>
+      <div style="height:6px;border-radius:9px;background:var(--sunk);overflow:hidden"><div style="height:100%;width:{{ crPct }};background:var(--ink);border-radius:9px;transition:width .6s ease"></div></div>
+    </div>
+    <span role="button" onClick="{{ togglePlay }}" style="height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;cursor:pointer;flex:none">{{ playIc }}{{ playLabel }}</span>
+    <span role="button" style="height:40px;padding:0 14px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;flex:none">{{ iPeople }}Share</span>
+  </div>
+</sc-if>
+
+<div style="position:absolute;left:0;top:{{ cityT }};width:{{ cityW }};height:{{ cityH }};overflow:hidden;background:var(--cityBg)">
+  <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:24px"><dc-import name="Tilo T State" kind="loading" layout="world" caption="Opening your world" hint-size="100%,600px"></dc-import></div>
+  </sc-if>
+  <sc-if value="{{ scene }}" hint-placeholder-val="{{ true }}">
+  <div style="position:absolute;left:0;top:0;width:1000px;height:772px;transform-origin:0 0;transform:{{ cam }};transition:transform .9s cubic-bezier(.2,.8,.2,1)">
+    {{ ground }}
+    <sc-for list="{{ blds }}" as="b" hint-placeholder-count="0">
+      <div onMouseEnter="{{ b.enter }}" onMouseLeave="{{ leave }}" style="position:absolute;left:{{ b.l }};top:{{ b.t }};width:{{ b.w }};height:{{ b.h }};z-index:{{ b.z }}">
+        <sc-if value="{{ b.cons }}"><div style="width:100%;height:100%;transform-origin:50% 100%;animation:tRise 2.4s cubic-bezier(.2,.8,.2,1) both;filter:{{ b.fx }}">{{ b.el }}</div></sc-if>
+        <sc-if value="{{ b.fin }}"><div style="width:100%;height:100%;animation:{{ b.anim }};filter:{{ b.fx }}">{{ b.el }}</div></sc-if>
+      </div>
+    </sc-for>
+    <sc-if value="{{ planning }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:{{ tbl.l }};top:{{ tbl.t }};width:120px;height:80px;z-index:60">
+        <div style="position:absolute;left:14px;top:40px;width:4px;height:34px;background:var(--ink2);border-radius:2px"></div><div style="position:absolute;right:14px;top:40px;width:4px;height:34px;background:var(--ink2);border-radius:2px"></div><div style="position:absolute;left:58px;top:52px;width:4px;height:28px;background:var(--ink2);border-radius:2px"></div>
+        <div style="position:absolute;left:0;top:10px;width:120px;height:62px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);background:var(--card)"></div>
+        <div style="position:absolute;left:16px;top:18px;width:88px;height:46px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);background-color:var(--bp);background-image:linear-gradient(var(--bpLine) 1px,transparent 1px),linear-gradient(90deg,var(--bpLine) 1px,transparent 1px);background-size:8px 8px"></div>
+      </div>
+      <div style="position:absolute;left:{{ planCard.l }};top:{{ planCard.t }};width:270px;z-index:900;transform:scale({{ inv }});transform-origin:0 0;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--sh2);display:flex;flex-direction:column;gap:8px">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">DIRECTOR · DRAFTING THE PLAN</span>
+        <sc-for list="{{ planLines }}" as="p" hint-placeholder-count="3"><span style="display:flex;gap:8px;font-size:13.5px;line-height:1.35;animation:tPop .3s ease-out both;animation-delay:{{ p.d }}"><span style="font-family:var(--mono);font-size:11.5px;color:var(--ink3);flex:none;padding-top:1px">{{ p.n }}</span>{{ p.t }}</span></sc-for>
+        <span style="height:12px;width:70%;border-radius:9px;background-color:var(--bp);background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.6) 50%,transparent 70%);background-size:700px 100%;background-repeat:no-repeat;animation:tShim 1.4s linear infinite"></span>
+        <span style="font-size:12px;color:var(--ink3)">Buildings appear once the plan is final.</span>
+      </div>
+    </sc-if>
+    <sc-for list="{{ agents }}" as="a" hint-placeholder-count="0">
+      <div onMouseEnter="{{ a.enter }}" onMouseLeave="{{ leave }}" style="position:absolute;left:{{ a.l }};top:{{ a.t }};width:44px;height:52px;z-index:{{ a.z }};transition:{{ mvT }};cursor:pointer">
+        <div style="position:absolute;left:5px;bottom:-3px;width:34px;height:9px;border-radius:50%;background:#000000;opacity:.12"></div>
+        <dc-import name="Tilo S Buddy" role="{{ a.role }}" mood="{{ a.mood }}" look="{{ a.look }}" size="52" delay="{{ a.dl }}" hint-size="44px,52px"></dc-import>
+        <sc-if value="{{ a.tool }}"><span style="position:absolute;left:50%;top:-4px;width:0;height:0;transform:scale({{ linv }})"><span style="position:absolute;left:-14px;top:-28px;width:28px;height:28px;border-radius:99px;background:var(--card);border:1px solid var(--line2);color:var(--ink);display:flex;align-items:center;justify-content:center;animation:tToolBob 1.6s ease-in-out infinite">{{ a.tool }}</span></span></sc-if>
+        <sc-if value="{{ a.hand }}"><a href="#needs" style="position:absolute;left:50%;top:-8px;transform:translate(-50%,-100%) scale({{ linv }});transform-origin:50% 100%;height:30px;padding:0 10px;border-radius:99px;background:var(--amber);color:#1A1407;font-size:12px;font-weight:800;display:flex;align-items:center;gap:5px;white-space:nowrap;animation:tPulse 1.4s ease-out infinite">{{ iHand }}Needs you</a></sc-if>
+      </div>
+    </sc-for>
+    <sc-for list="{{ labels }}" as="b" hint-placeholder-count="0">
+      <div onClick="{{ b.focus }}" style="position:absolute;left:{{ b.x }};top:{{ b.y }};z-index:950;transform:translate(-50%,-100%) scale({{ linv }});transform-origin:50% 100%;height:30px;padding:0 4px 0 4px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer;animation:tFade .4s ease-out both">
+        <span style="width:22px;height:22px;border-radius:99px;background:var(--sunk);color:var(--ink);display:flex;align-items:center;justify-content:center">{{ b.ic }}</span>
+        <span style="font-size:12.5px;font-weight:600">{{ b.name }}</span>
+        <span style="height:22px;padding:0 8px;border-radius:99px;background:{{ b.cbg }};color:{{ b.cfg }};border:1px {{ b.cbs }} {{ b.cbd }};box-sizing:border-box;font-size:11px;font-weight:700;display:flex;align-items:center">{{ b.chip }}</span>
+      </div>
+    </sc-for>
+    <sc-for list="{{ bubbles }}" as="m" hint-placeholder-count="0">
+      <div onClick="{{ m.toggle }}" style="position:absolute;left:{{ m.x }};top:{{ m.y }};z-index:980;width:212px;transform:translate({{ m.tx }},-100%) scale({{ linv }});transform-origin:{{ m.or }};cursor:pointer">
+        <div style="background:var(--card);border:1px solid var(--line2);border-radius:16px;padding:9px 12px;display:flex;flex-direction:column;gap:3px;animation:tPop .24s cubic-bezier(.2,.8,.2,1) both;box-shadow:var(--sh2)">
+          <span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.3px">{{ m.k }}</span>
+          <span style="font-size:13px;line-height:1.4;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:{{ m.clamp }};overflow:hidden">{{ m.text }}</span>
+          <span style="font-size:11.5px;font-weight:700;color:var(--ink2)">{{ m.more }}</span>
+        </div>
+        <div style="width:12px;height:12px;margin:-7px 0 0 {{ m.tl }};background:var(--card);border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);transform:rotate(45deg)"></div>
+      </div>
+    </sc-for>
+    <sc-if value="{{ parcel }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:0;top:0;z-index:990;width:34px;height:34px;border-radius:10px;background:var(--lime);color:#0B0B0C;border:1px solid #0B0B0C;display:flex;align-items:center;justify-content:center;offset-path:{{ parcelPath }};offset-rotate:0deg;animation:tParcel 1.6s cubic-bezier(.45,0,.2,1) both">{{ iParcel }}</div>
+    </sc-if>
+    <sc-if value="{{ confetti }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:{{ dockX }};top:{{ dockY }};z-index:995;width:0;height:0">
+        <sc-for list="{{ conf }}" as="c" hint-placeholder-count="0"><span style="position:absolute;left:0;top:0;width:{{ c.w }};height:{{ c.h }};border-radius:2px;background:{{ c.c }};--cx:{{ c.x }};--cy:{{ c.y }};animation:tConfetti 1.8s cubic-bezier(.2,.7,.3,1) {{ c.d }} both"></span></sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ hoverA }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:{{ ha.x }};top:{{ ha.y }};z-index:1000;pointer-events:none;width:270px;transform:translate(26px,-100%) scale({{ inv }});transform-origin:0 100%;background:var(--card);border:1px solid var(--line2);border-radius:18px;box-shadow:var(--sh3);padding:14px;display:flex;flex-direction:column;gap:10px;animation:tPop .2s ease-out both">
+        <div style="display:flex;align-items:center;gap:10px"><span style="width:40px;height:40px;border-radius:12px;background:var(--sunk);display:flex;align-items:flex-end;justify-content:center;overflow:hidden"><dc-import name="Tilo S Buddy" role="{{ ha.role }}" mood="idle" size="34" hint-size="29px,34px"></dc-import></span><span style="display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:15px">{{ ha.title }}</span><span style="font-size:12.5px;color:var(--ink3)">{{ ha.job }}</span></span></div>
+        <div style="padding:8px 10px;border-radius:12px;background:var(--sunk);font-size:13px;line-height:1.4"><span style="font-weight:700">Now: </span>{{ ha.now }}</div>
+        <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">LAST 3 ACTIONS</span><sc-for list="{{ ha.acts }}" as="x" hint-placeholder-count="3"><span style="display:flex;gap:8px;font-size:12.5px;line-height:1.35"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3);flex:none;width:30px">{{ x.t }}</span>{{ x.s }}</span></sc-for></div>
+        <span style="height:36px;border-radius:10px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:700">{{ iFollow }}Follow this agent</span>
+      </div>
+    </sc-if>
+    <sc-if value="{{ hoverB }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:{{ hb.x }};top:{{ hb.y }};z-index:1000;pointer-events:none;width:260px;transform:translate(-50%,-100%) scale({{ inv }});transform-origin:50% 100%;background:var(--card);border:1px solid var(--line2);border-radius:18px;box-shadow:var(--sh3);padding:14px;display:flex;flex-direction:column;gap:8px;animation:tPop .2s ease-out both">
+        <span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">{{ hb.by }}</span>
+        <span style="font-weight:700;font-size:15px">{{ hb.name }}</span>
+        <span style="font-size:13px;color:var(--ink2);line-height:1.4"><strong style="color:var(--ink)">Produced: </strong>{{ hb.makes }}</span>
+        <span style="height:36px;border-radius:10px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">Open what it made</span>
+      </div>
+    </sc-if>
+    <sc-for list="{{ notes }}" as="n" hint-placeholder-count="0">
+      <span style="position:absolute;left:{{ n.ax }};top:{{ n.ay }};z-index:1100;width:{{ n.len }};height:0;border-top:1.5px dashed #0B0B0C;transform-origin:0 0;transform:rotate({{ n.ang }});pointer-events:none"></span>
+      <span style="position:absolute;left:{{ n.ax }};top:{{ n.ay }};z-index:1101;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:99px;background:#C8F23A;border:2px solid #0B0B0C;box-sizing:border-box;pointer-events:none"></span>
+      <span style="position:absolute;left:{{ n.tx }};top:{{ n.ty }};z-index:1102;width:220px;transform:translate({{ n.sx }},-50%) scale({{ inv }});transform-origin:{{ n.or }};background:#0B0B0C;color:#F4F4F2;border-radius:10px;padding:7px 10px;font-family:var(--mono);font-size:11px;line-height:1.4;pointer-events:none"><span style="color:#C8F23A">{{ n.ev }}</span> {{ n.t }}</span>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ desk }}" hint-placeholder-val="{{ true }}">
+    <span style="position:absolute;left:16px;top:16px;height:34px;padding:0 12px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><span style="width:8px;height:8px;border-radius:9px;background:{{ st.dot }};animation:{{ liveDot }}"></span>{{ liveLabel }}</span>
+    <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;right:16px;top:16px;width:300px;box-sizing:border-box;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 14px;display:flex;flex-direction:column;gap:2px;animation:tSlideR .3s ease-out both">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">{{ toast.ev }} · {{ toast.t }}</span><span style="font-size:13.5px;line-height:1.4">{{ toast.s }}</span>
+      </div>
+    </sc-if>
+  </sc-if>
+  <sc-if value="{{ failed }}" hint-placeholder-val="{{ false }}">
+    <div role="alert" style="position:absolute;left:50%;top:{{ failT }};transform:translateX(-50%);width:min(440px,calc(100% - 32px));box-sizing:border-box;background:var(--card);border:1px solid var(--redInk);border-radius:20px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;z-index:5">
+      <div style="display:flex;align-items:center;gap:10px"><span style="width:34px;height:34px;border-radius:10px;background:var(--redSoft);color:var(--redInk);display:flex;align-items:center;justify-content:center;flex:none">{{ iAlert }}</span><span style="display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:15px">Stopped at Flight research</span><span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">world.failed · 4:01 pm</span></span></div>
+      <span style="font-size:14px;color:var(--ink2);line-height:1.45">The airline site blocked automated search after 3 tries. Nothing was booked or paid. 31 of 120 credits used; the venue shortlist is kept.</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><span role="button" style="height:44px;padding:0 16px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px">{{ iRefresh }}Try again</span><span role="button" style="height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600;font-size:14px">Use a different flight site</span></div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ desk }}" hint-placeholder-val="{{ true }}">
+    <div style="position:absolute;left:16px;bottom:16px;height:52px;box-sizing:border-box;padding:0 6px;border-radius:16px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:8px">
+      <span role="button" aria-label="{{ playLabel }}" onClick="{{ togglePlay }}" style="width:40px;height:40px;border-radius:11px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;cursor:pointer">{{ playIc }}</span>
+      <div role="radiogroup" aria-label="Speed" style="display:flex;gap:2px;padding:3px;border-radius:11px;background:var(--sunk)">
+        <sc-for list="{{ speeds }}" as="s" hint-placeholder-count="3"><span role="radio" aria-checked="{{ s.on }}" onClick="{{ s.pick }}" style="height:34px;padding:0 10px;border-radius:9px;display:flex;align-items:center;font-size:12.5px;font-weight:700;background:{{ s.bg }};color:{{ s.fg }};cursor:pointer;white-space:nowrap">{{ s.t }}</span></sc-for>
+      </div>
+      <div style="width:220px;display:flex;flex-direction:column;gap:4px;padding:0 8px">
+        <div style="position:relative;height:6px;border-radius:9px;background:var(--sunk)"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ scrub }};border-radius:9px;background:var(--ink);transition:width .4s ease"></div></div>
+        <span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);white-space:nowrap">event {{ evN }} of {{ evT }} · {{ evName }}</span>
+      </div>
+    </div>
+    <div style="position:absolute;right:16px;bottom:16px;display:flex;gap:8px;align-items:center">
+      <span role="button" onClick="{{ cycleFollow }}" style="height:44px;padding:0 12px;border-radius:14px;background:var(--card);border:1px solid {{ followBd }};display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">{{ iFollow }}{{ followLabel }}</span>
+      <div style="display:flex;border-radius:14px;background:var(--card);border:1px solid var(--line);overflow:hidden">
+        <span role="button" aria-label="Zoom out" onClick="{{ zoomOut }}" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--line);cursor:pointer">{{ iMinus }}</span>
+        <span role="button" aria-label="Zoom in" onClick="{{ zoomIn }}" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer">{{ iPlus }}</span>
+      </div>
+      <span role="button" onClick="{{ fit }}" style="height:44px;padding:0 12px;border-radius:14px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer">{{ iFit }}Fit city</span>
+    </div>
+  </sc-if>
+</div>
+
+<sc-if value="{{ desk }}" hint-placeholder-val="{{ true }}">
+  <aside style="position:absolute;right:0;top:128px;width:440px;height:772px;box-sizing:border-box;border-left:1px solid var(--line);background:var(--card);display:flex;flex-direction:column">
+    <div role="tablist" style="padding:14px 18px 0;display:flex;gap:4px;border-bottom:1px solid var(--line)">
+      <sc-for list="{{ lenses }}" as="t" hint-placeholder-count="3"><span role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="height:44px;padding:0 12px;display:flex;align-items:center;gap:7px;font-weight:700;font-size:14px;color:{{ t.fg }};border-bottom:2px solid {{ t.bd }};margin-bottom:-1px;cursor:pointer">{{ t.t }}<sc-if value="{{ t.dot }}"><span style="width:7px;height:7px;border-radius:9px;background:var(--lime);border:1px solid #0B0B0C"></span></sc-if></span></sc-for>
+      <div style="flex:1"></div>
+      <span style="align-self:center;font-family:var(--mono);font-size:11px;color:var(--ink3)">{{ lensHint }}</span>
+    </div>
+    <div style="flex:1;min-height:0;overflow:auto;padding:16px 18px 20px;box-sizing:border-box">
+      <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T State" kind="loading" layout="list" caption="Reading the story" hint-size="100%,500px"></dc-import></sc-if>
+      <sc-if value="{{ lensResult }}" hint-placeholder-val="{{ false }}"><div style="animation:tSlideR .42s cubic-bezier(.2,.8,.2,1) both"><dc-import name="Tilo T Result" closable="{{ false }}" hint-size="100%,1100px"></dc-import></div></sc-if>
+      <sc-if value="{{ lensStory }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <sc-if value="{{ waiting }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid var(--amberLine);background:var(--amberSoft);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--amberInk)">{{ iHand }}The Messenger needs your yes<span style="margin-left:auto;font-family:var(--mono);font-size:10.5px;font-weight:500">approval.requested</span></div>
+              <span style="font-weight:700;font-size:17px;line-height:1.3;letter-spacing:-.2px">Send the invite email to 12 people from your Gmail?</span>
+              <span style="font-size:13px;color:var(--ink2)">Risk: medium. People will see this and it can’t be unsent. Cost: 1 credit.</span>
+              <div style="display:flex;gap:6px"><span role="button" style="flex:1;height:44px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px">Approve</span><span role="button" style="height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);background:var(--card);display:flex;align-items:center;font-weight:600;font-size:14px">Edit</span><a href="#needs" style="height:44px;padding:0 12px;border-radius:12px;display:flex;align-items:center;font-weight:600;font-size:14px">Open in Needs you</a></div>
+            </div>
+          </sc-if>
+          <sc-for list="{{ story }}" as="s" hint-placeholder-count="6">
+            <div onClick="{{ s.focus }}" style="display:flex;gap:12px;padding:10px;margin:0 -10px;border-radius:14px;background:{{ s.bg }};cursor:pointer" style-hover="background:var(--sunk)">
+              <span style="width:32px;height:32px;border-radius:10px;background:{{ s.col }};display:flex;align-items:center;justify-content:center;flex:none"><span style="width:20px;height:11px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:5px"><span style="width:3px;height:4px;border-radius:2px;background:#1F1D2B"></span><span style="width:3px;height:4px;border-radius:2px;background:#1F1D2B"></span></span></span>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:14px;line-height:1.45;text-wrap:pretty">{{ s.text }}</span>
+                <span style="display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--ink3)"><span style="font-family:var(--mono)">{{ s.t }}</span><sc-if value="{{ s.now }}"><span style="height:18px;padding:0 6px;border-radius:99px;background:var(--lime);color:#0B0B0C;font-weight:700;display:flex;align-items:center">Now</span></sc-if><sc-if value="{{ s.where }}"><span style="display:flex;align-items:center;gap:4px;font-weight:600;color:var(--ink2)">{{ iPin }}{{ s.where }}</span></sc-if></span>
+              </div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ storyMore }}"><span style="font-size:13px;font-weight:700;color:var(--ink2);padding:4px 0">{{ storyMore }}</span></sc-if>
+        </div>
+      </sc-if>
+      <sc-if value="{{ lensTrace }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;font-family:var(--mono);font-size:12px">
+          <div style="display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:10px;padding:0 0 8px;color:var(--ink3);font-size:10.5px;letter-spacing:.4px"><span>TIME</span><span>EVENT · DETAIL</span><span style="text-align:right">CR</span></div>
+          <sc-for list="{{ trace }}" as="r" hint-placeholder-count="10">
+            <div style="display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span style="color:var(--ink3)">{{ r.t }}</span><span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-weight:600;color:var(--ink)">{{ r.ev }}</span><span style="color:var(--ink2);font-family:var(--fB);font-size:12.5px">{{ r.d }}</span></span><span style="text-align:right;color:var(--ink2)">{{ r.cr }}</span></div>
+          </sc-for>
+          <div style="display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:10px;padding:10px 0;border-top:1.5px solid var(--ink);font-weight:700"><span></span><span>Total so far</span><span style="text-align:right">{{ cr }}</span></div>
+        </div>
+      </sc-if>
+    </div>
+  </aside>
+</sc-if>
+
+<sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}">
+  <div style="position:absolute;left:0;right:0;top:0;padding:0 0 10px;background:linear-gradient(var(--bg) 60%,transparent)">
+    <div style="height:44px;padding:0 26px;display:flex;align-items:center;justify-content:space-between;font-size:15px;font-weight:600"><span>9:41</span><span style="width:24px;height:11px;border-radius:3px;border:1.5px solid var(--ink);box-sizing:border-box"></span></div>
+    <div style="padding:0 12px;display:flex;align-items:center;gap:8px">
+      <a href="#" aria-label="Back" style="width:44px;height:44px;border-radius:14px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none">{{ iBack }}</a>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25"><span style="font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Team offsite in Porto</span><span style="font-size:12px;color:var(--ink3)">{{ cr }} of 120 credits</span></div>
+      <span style="height:28px;padding:0 10px 0 8px;border-radius:99px;background:{{ st.bg }};color:{{ st.fg }};font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;flex:none"><span style="width:7px;height:7px;border-radius:9px;background:{{ st.dot }}"></span>{{ st.t }}</span>
+    </div>
+  </div>
+  <div style="position:absolute;right:12px;top:112px;display:flex;flex-direction:column;gap:8px">
+    <span role="button" aria-label="Follow an agent" onClick="{{ cycleFollow }}" style="width:44px;height:44px;border-radius:14px;background:var(--card);border:1px solid {{ followBd }};display:flex;align-items:center;justify-content:center">{{ iFollow }}</span>
+    <span role="button" aria-label="Zoom in" onClick="{{ zoomIn }}" style="width:44px;height:44px;border-radius:14px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center">{{ iPlus }}</span>
+    <span role="button" aria-label="Zoom out" onClick="{{ zoomOut }}" style="width:44px;height:44px;border-radius:14px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center">{{ iMinus }}</span>
+    <span role="button" aria-label="Fit city" onClick="{{ fit }}" style="width:44px;height:44px;border-radius:14px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center">{{ iFit }}</span>
+  </div>
+  <div style="position:absolute;left:0;right:0;bottom:0;height:{{ sheetH }};box-sizing:border-box;background:var(--card);border-top:1px solid var(--line2);border-radius:24px 24px 0 0;display:flex;flex-direction:column;animation:{{ sheetAnim }}">
+    <span style="width:40px;height:5px;border-radius:9px;background:var(--line2);margin:8px auto 4px;flex:none"></span>
+    <div style="padding:0 12px;display:flex;align-items:center;gap:8px;flex:none">
+      <div role="tablist" style="flex:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;padding:3px;border-radius:12px;background:var(--sunk)">
+        <sc-for list="{{ lenses }}" as="t" hint-placeholder-count="3"><span role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:700;background:{{ t.pbg }};color:{{ t.fg }}">{{ t.t }}<sc-if value="{{ t.dot }}"><span style="width:6px;height:6px;border-radius:9px;background:var(--lime);border:1px solid #0B0B0C"></span></sc-if></span></sc-for>
+      </div>
+      <span role="button" aria-label="{{ playLabel }}" onClick="{{ togglePlay }}" style="width:44px;height:44px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;flex:none">{{ playIc }}</span>
+    </div>
+    <div style="flex:1;min-height:0;overflow:hidden;padding:12px 16px 34px;box-sizing:border-box">
+      <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T State" kind="loading" layout="list" caption="Reading the story" hint-size="100%,300px"></dc-import></sc-if>
+      <sc-if value="{{ lensResult }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T Result" closable="{{ false }}" hint-size="100%,1100px"></dc-import></sc-if>
+      <sc-if value="{{ lensStory }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <sc-if value="{{ waiting }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid var(--amberLine);background:var(--amberSoft);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:8px;margin-bottom:6px">
+              <span style="font-weight:700;font-size:15px;line-height:1.3">Send the invite email to 12 people?</span>
+              <div style="display:flex;gap:6px"><span style="flex:1;height:44px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px">Approve</span><span style="height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);background:var(--card);display:flex;align-items:center;font-weight:600;font-size:14px">Review</span></div>
+            </div>
+          </sc-if>
+          <sc-for list="{{ storyM }}" as="s" hint-placeholder-count="4">
+            <div onClick="{{ s.focus }}" style="display:flex;gap:10px;padding:8px;margin:0 -8px;border-radius:12px;background:{{ s.bg }}">
+              <span style="width:28px;height:28px;border-radius:9px;background:{{ s.col }};display:flex;align-items:center;justify-content:center;flex:none"><span style="width:18px;height:10px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:4px"><span style="width:3px;height:4px;border-radius:2px;background:#1F1D2B"></span><span style="width:3px;height:4px;border-radius:2px;background:#1F1D2B"></span></span></span>
+              <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-size:13.5px;line-height:1.4">{{ s.text }}</span><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3)">{{ s.t }}</span></span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ lensTrace }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;font-family:var(--mono);font-size:11.5px">
+          <sc-for list="{{ traceM }}" as="r" hint-placeholder-count="6"><div style="display:grid;grid-template-columns:38px minmax(0,1fr) 30px;gap:8px;padding:7px 0;border-top:1px solid var(--line)"><span style="color:var(--ink3)">{{ r.t }}</span><span style="display:flex;flex-direction:column;min-width:0"><span style="font-weight:600">{{ r.ev }}</span><span style="color:var(--ink2);font-family:var(--fB);font-size:12px">{{ r.d }}</span></span><span style="text-align:right">{{ r.cr }}</span></div></sc-for>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;live&quot;,&quot;planning&quot;,&quot;running&quot;,&quot;waiting&quot;,&quot;done&quot;,&quot;failed&quot;,&quot;loading&quot;],&quot;default&quot;:&quot;live&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;lens&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;story&quot;,&quot;trace&quot;,&quot;result&quot;],&quot;default&quot;:&quot;story&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;hover&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;agent&quot;,&quot;building&quot;],&quot;default&quot;:&quot;none&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;annotate&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;reduced&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = { i: null, play: null, speed: '1x', lens: null, focus: null, follow: null, zoom: 0, hov: null, exp: null };
+  componentDidMount() {
+    this.w = setInterval(() => { if (window.TiloR && window.TiloCity && window.TiloT) { clearInterval(this.w); this.forceUpdate(); } }, 60);
+    this.loop();
+  }
+  componentWillUnmount() { clearInterval(this.w); clearTimeout(this.tm); }
+  isLive() { return (this.props.state ?? 'live') === 'live'; }
+  loop() {
+    clearTimeout(this.tm);
+    if (!this.isLive()) return;
+    const sp = this.state.speed, ms = sp === '2x' ? 1100 : sp === 'catch' ? 260 : 2200;
+    this.tm = setTimeout(() => {
+      const playing = this.state.play ?? true;
+      if (playing) {
+        const i = this.state.i ?? 0, last = 26;
+        if (i >= last) { this.setState({ i: 0, lens: null }); this.tm = setTimeout(() => this.loop(), 3000); return; }
+        const ni = i + 1;
+        this.setState({ i: ni, speed: sp === 'catch' && ni >= last ? '1x' : sp, lens: ni === 25 ? 'result' : this.state.lens });
+      }
+      this.loop();
+    }, (this.state.i ?? 0) >= 26 ? 6000 : ms);
+  }
+  renderVals() {
+    const h = React.createElement, R = window.TiloR ? window.TiloR(h) : null, T = window.TiloT, ic = (n, s) => T ? T.ic(h, n, s) : null;
+    const p = this.props, theme = p.theme ?? 'studio', device = p.device ?? 'desktop', desk = device === 'desktop', phone = !desk;
+    const mode = p.state ?? 'live', live = mode === 'live', loading = mode === 'loading', failed = mode === 'failed', reduced = !!p.reduced, annotate = !!p.annotate;
+    const fixed = { planning: 1, running: 13, waiting: 21, delivered: 25, done: 26, failed: 14, loading: 0 };
+    const S0 = this.state;
+    const SW = 1000, K = 1.15, CELL = 48 * K, C = .866, Sx = .5, OX = 500, OY = 148;
+    const iso = (x, y) => [OX + (x - y) * C * CELL, OY + (x + y) * Sx * CELL];
+    const AG = { director: ['director', 'Director', 'Tilo Director', 'Plans the work and checks it'], research: ['research', 'Researcher', 'Tilo Researcher', 'Finds and checks facts'], browser: ['browser', 'Browser', 'Tilo Browser', 'Uses websites for you'], money: ['finance', 'Money keeper', 'Tilo Money keeper', 'Prices and budgets'], writer: ['designer', 'Writer', 'Tilo Writer', 'Words that sound like you'], messenger: ['connector', 'Messenger', 'Tilo Messenger', 'Talks to your apps'] };
+    const BL = {
+      hall: ['townhall', 'hall', [3, .6], [3, 2], 'Offsite plan', 'pen', 'director', 'The plan in 5 parts, checked against your request'],
+      venue: ['library', 'research', [6.4, .6], [2, 2], 'Venue research', 'search', 'research', 'Venue shortlist: 4 venues, 9 sources'],
+      flights: ['browser', 'learning', [.8, 3.5], [2, 1], 'Flight research', 'plane', 'browser', '12 flight options, best €142 return'],
+      budget: ['appstudio', 'accounts', [5.4, 4.2], [2, 1], 'Budget sheet', 'sheet', 'money', 'Budget sheet: €14,280 of €16,000'],
+      agenda: ['workshop', 'analysis', [2.4, 5], [2, 2], 'Agenda draft', 'calendar', 'writer', '3-day agenda, 1 page'],
+      invites: ['connector', 'mail', [7.9, 4.3], [1, 1], 'Invite email', 'mail', 'messenger', 'Invite email to 12 people'],
+      dock: ['dock', 'delivery', [6.3, 7.5], [2, 1], 'Result hall', 'parcel', null, 'Your offsite plan, all in one place']
+    };
+    const RC = { director: '#E8643F', research: '#3F7FE0', browser: '#2BA3B8', finance: '#3E9A7C', designer: '#A45DB8', connector: '#D9588C' };
+    const TOOLB = { venue: 'search', flights: 'browser', budget: 'sheet', agenda: 'pen', invites: 'mail', hall: 'eye' };
+    let E = [
+      ['3:54', 'agent.spawned', 'director', null, 'hall', 'The Director picked up your request.', 'director#1 · planner', 0],
+      ['3:54', 'memory.hit', 'director', null, 'hall', 'Tilo remembered your last offsite: the team liked walkable venues and no early flights.', 'offsite-2025 prefs · 2 hits', 1],
+      ['3:55', 'world.planned', 'director', null, 'hall', 'The Director drew up a plan in 5 parts: venue, flights, budget, agenda and invites.', 'plan v1 · 6 buildings · est. 96 cr', 4],
+      ['3:55', 'district.created', 'director', null, null, null, 'research, money, words', 0],
+      ['3:55', 'building.planned', 'director', null, null, null, '6 plots reserved', 0],
+      ['3:55', 'world.started', 'director', null, 'hall', 'Work started with a cap of 120 credits.', 'budget 120 cr', 0],
+      ['3:56', 'agent.spawned', 'director', null, 'hall', 'Five helpers joined: Researcher, Browser, Money keeper, Writer and Messenger.', '5 agents', 2],
+      ['3:56', 'agent.assigned', 'director', null, null, null, 'each agent → its building', 0],
+      ['3:57', 'building.constructing', 'research', null, 'venue', 'The Researcher started looking for venues by the river.', 'venue · tool=web.search', 6],
+      ['3:58', 'building.constructing', 'browser', null, 'flights', 'The Browser is checking flights from London, Berlin and Lisbon.', 'flights · tool=browser', 9],
+      ['4:00', 'artifact.created', 'research', null, 'venue', 'The Researcher shortlisted 4 venues under €180 a night.', 'venue-shortlist.doc', 14],
+      ['4:00', 'building.completed', 'research', null, 'venue', null, 'venue ✓', 0],
+      ['4:01', 'agent.handoff', 'research', 'money', 'budget', 'The Researcher handed the shortlist to the Money keeper.', 'research → money · shortlist', 1, '4 venues under €180 a night, all walkable to the river. Can you cost them for 12 people, 2 nights?'],
+      ['4:01', 'question.routed', 'browser', 'director', 'hall', 'The Browser asked the Director about Berlin flights.', 'browser → director', 1, 'Two people fly from Berlin. The direct flight is €40 more each. Worth it?'],
+      ['4:02', 'building.constructing', 'money', null, 'budget', 'The Money keeper started the budget sheet.', 'budget · tool=sheets', 5],
+      ['4:04', 'artifact.created', 'browser', null, 'flights', 'The Browser found 12 flights. Best: TAP direct at €142 return.', 'flights.table · 12 rows', 18],
+      ['4:04', 'building.completed', 'browser', null, 'flights', null, 'flights ✓', 0],
+      ['4:05', 'agent.handoff', 'browser', 'money', 'budget', 'The Browser handed 12 flights to the Money keeper.', 'browser → money · flights', 1, 'Flights for all 12 come to €2,140, with the direct Berlin flight included.'],
+      ['4:06', 'building.completed', 'money', null, 'budget', 'Budget done: €14,280 of €16,000.', 'budget.sheet ✓', 12],
+      ['4:07', 'building.constructing', 'writer', null, 'agenda', 'The Writer is drafting a 3-day agenda.', 'agenda · tool=docs', 4],
+      ['4:08', 'building.completed', 'writer', null, 'agenda', 'Agenda drafted: one workshop day and a free morning.', 'agenda.doc ✓', 8],
+      ['4:09', 'approval.requested', 'messenger', null, 'invites', 'The Messenger wrote the invite and needs your yes to email 12 people.', 'gmail.send × 12 · risk=medium', 3],
+      ['4:10', 'approval.resolved', 'messenger', null, 'invites', 'You approved. The invites are ready to go from your Gmail.', 'approved by Maya', 0],
+      ['4:10', 'building.completed', 'messenger', null, 'invites', null, 'invites ✓', 2],
+      ['4:11', 'artifact.reviewed', 'director', null, 'hall', 'The Director checked everything against your request.', 'review · 0 issues', 3],
+      ['4:12', 'artifact.delivered', 'director', null, 'dock', 'Your offsite plan arrived at the Result hall.', 'offsite-plan · 5 parts', 1],
+      ['4:12', 'world.completed', 'director', null, 'dock', 'Done in 18 minutes, using 76 of 120 credits.', 'world ✓ · 18 min', 0]
+    ];
+    if (failed) E = E.slice(0, 14).concat([['4:01', 'agent.blocked', 'browser', null, 'flights', 'The airline site blocked the Browser after 3 tries.', 'browser · HTTP 429 ×3', 2], ['4:01', 'world.failed', 'director', null, 'flights', 'The world stopped. Nothing was booked or paid.', 'world ✗ · reason=site_blocked', 0]]);
+    const last = E.length - 1;
+    let i = live ? (S0.i ?? 0) : (fixed[mode] ?? 13);
+    if (p.at != null) i = +p.at;
+    if (failed) i = last;
+    i = Math.min(i, last);
+    const done = !failed && i >= 26, waiting = !failed && i === 21;
+    const ev = E[i];
+    const bState = (id) => {
+      const rng = { hall: [2, 5, 99, 24], venue: [4, 8, 10, 11], flights: [4, 9, 15, 16], budget: [4, 14, 99, 18], agenda: [4, 19, 99, 20], invites: [4, 21, 22, 23], dock: [4, 25, 25, 26] }[id];
+      if (i < rng[0]) return null;
+      let s = i < rng[1] ? 'planned' : i < rng[3] ? (i >= rng[2] ? 'operational' : 'constructing') : 'completed';
+      if (id === 'invites' && i === 21) s = 'needs';
+      if (id === 'invites' && i === 22) s = 'operational';
+      if (id === 'hall' && s === 'constructing') s = 'operational';
+      if (id === 'dock' && i === 25) s = 'operational';
+      if (failed) { if (id === 'flights') s = 'failed'; else if (s === 'constructing' || s === 'operational') s = id === 'hall' ? 'stopped' : 'stopped'; }
+      return s;
+    };
+    const stand = id => { const b = BL[id]; return [b[2][0] + b[3][0] * .5, b[2][1] + b[3][1] + .5]; };
+    const near = (q, side) => side === 'l' ? [q[0] - .15, q[1] + .8] : [q[0] + .8, q[1] - .15];
+    const HOME = { director: 'hall', research: 'venue', browser: 'flights', money: 'budget', writer: 'agenda', messenger: 'invites' };
+    const ids = Object.keys(AG);
+    const posOf = (id) => {
+      if (done) { const j = ['research', 'browser', 'director', 'money', 'writer', 'messenger'].indexOf(id); return [[5.7, 8.9], [6.3, 9.15], [6.95, 9.3], [7.6, 9.25], [8.2, 9.1], [8.8, 8.9]][j]; }
+      if (id === 'director') return i < 2 ? [4.4, 1.3] : stand('hall');
+      if (i < 6) return null;
+      if (i === 6) { const j = ids.indexOf(id); return [3.1 + j * .55, 3.0]; }
+      if (id === 'research' && i >= 12) return near(stand('budget'), 'l');
+      if (id === 'browser' && i === 13) return near(stand('hall'), 'r');
+      if (id === 'browser' && i >= 17 && !failed) return near(stand('budget'), 'r');
+      return stand(HOME[id]);
+    };
+    const talkWin = E.map((e, k) => ({ e, k })).filter(o => (o.e[1] === 'agent.handoff' || o.e[1] === 'question.routed') && o.k <= i && o.k >= i - 2);
+    const moodOf = id => {
+      if (done) return 'happy';
+      if (failed) return id === 'browser' ? 'sad' : 'idle';
+      if (id === 'director' && i < 2) return 'think';
+      for (const o of talkWin) { if (o.e[2] === id) return 'talk'; if (o.e[3] === id) return 'listen'; }
+      if (id === 'messenger' && i === 21) return 'hand';
+      if (id === 'director' && i === 24) return 'work';
+      const hb = HOME[id]; if (bState(hb) === 'constructing') return 'work';
+      return 'idle';
+    };
+    const vw = desk ? 1000 : 390, vh = desk ? 772 : 844;
+    const fitZ = desk ? 1 : .56, fitX = desk ? 0 : (390 - 560) / 2, fitY = desk ? 0 : 70;
+    const z0 = fitZ * Math.pow(1.35, S0.zoom);
+    let cam = [fitX, fitY, fitZ], tgt = null;
+    const fb = S0.focus ?? (p.focus || null), fa = S0.follow;
+    if (fa) { const q = posOf(fa); if (q) tgt = iso(q[0], q[1]); }
+    else if (fb && BL[fb]) { const b = BL[fb]; tgt = iso(b[2][0] + b[3][0] / 2, b[2][1] + b[3][1] / 2); tgt = [tgt[0], tgt[1] - 30]; }
+    if (tgt) { const z = desk ? 1.6 : .95; const cx = vw / 2, cy = desk ? vh / 2 - 30 : 300; cam = [cx - tgt[0] * z, cy - tgt[1] * z, z]; }
+    else if (S0.zoom) { const z = z0, cx = vw / 2, cy = desk ? vh / 2 : 300, sx = (cx - fitX) / fitZ, sy = (cy - fitY) / fitZ; cam = [cx - sx * z, cy - sy * z, z]; }
+    const inv = (1 / cam[2]).toFixed(3), linv = ((desk ? 1 : .74) / cam[2]).toFixed(3);
+    const px = v => v.toFixed(1) + 'px';
+    const P2 = a => a.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ');
+    const rect = (x0, y0, x1, y1) => [iso(x0, y0), iso(x1, y0), iso(x1, y1), iso(x0, y1)];
+    const g = [];
+    const E0 = rect(-.5, -.5, 9.5, 9.5);
+    g.push(h('polygon', { key: 'sl', points: P2([E0[3], E0[2], [E0[2][0], E0[2][1] + 16], [E0[3][0], E0[3][1] + 16]]), style: { fill: 'var(--groundL)' } }));
+    g.push(h('polygon', { key: 'sr', points: P2([E0[2], E0[1], [E0[1][0], E0[1][1] + 16], [E0[2][0], E0[2][1] + 16]]), style: { fill: 'var(--groundR)' } }));
+    g.push(h('polygon', { key: 'tp', points: P2(E0), style: { fill: 'var(--ground)', stroke: 'var(--line2)', strokeWidth: 1 } }));
+    for (let k = 0; k <= 9; k++) { const a = iso(k, -.5), b = iso(k, 9.5), c = iso(-.5, k), d = iso(9.5, k); g.push(h('path', { key: 'gx' + k, d: `M${a[0]} ${a[1]}L${b[0]} ${b[1]}M${c[0]} ${c[1]}L${d[0]} ${d[1]}`, style: { stroke: 'var(--line)', strokeWidth: .8, opacity: .8 } })); }
+    [[-.5, 2.75, 9.5, 3.2], [4.65, 3.2, 5.1, 9.5], [5.1, 6.85, 9.5, 7.3]].forEach((r, k) => g.push(h('polygon', { key: 'rd' + k, points: P2(rect(r[0], r[1], r[2], r[3])), style: { fill: 'var(--road)' } })));
+    Object.keys(BL).forEach(id => { const s = bState(id); if (s !== 'planned') return; const b = BL[id]; g.push(h('polygon', { key: 'pl' + id, points: P2(rect(b[2][0] + .1, b[2][1] + .1, b[2][0] + b[3][0] - .1, b[2][1] + b[3][1] - .1)), style: { fill: 'var(--card)', fillOpacity: .55, stroke: 'var(--ink2)', strokeWidth: 1.4, strokeDasharray: '6 5', animation: 'tMarch 1.2s linear infinite' } })); });
+    const ground = h('svg', { width: 1000, height: 772, viewBox: '0 0 1000 772', style: { position: 'absolute', left: 0, top: 0, overflow: 'visible' }, 'aria-hidden': true }, g);
+    const CH = { planned: ['Planned', 'transparent', 'var(--ink2)', 'dashed', 'var(--line2)'], constructing: ['Building', 'var(--lime)', '#0B0B0C', 'solid', 'var(--limeD)'], operational: ['Working', 'var(--ink)', 'var(--card)', 'solid', 'var(--ink)'], completed: ['Done', 'var(--mintSoft)', 'var(--mintInk)', 'solid', 'transparent'], needs: ['Needs you', 'var(--amber)', '#1A1407', 'solid', 'transparent'], failed: ['Failed', 'var(--redSoft)', 'var(--redInk)', 'solid', 'var(--redInk)'], stopped: ['Stopped', 'var(--sunk)', 'var(--ink2)', 'solid', 'transparent'] };
+    const RS = { constructing: 'construction', operational: 'active', completed: 'complete', needs: 'needs', failed: 'construction', stopped: 'construction' };
+    const blds = [], labels = [], bpos = {};
+    const enterB = id => () => { if (this.state.hov !== 'b:' + id) this.setState({ hov: 'b:' + id }); }, leave = () => { if (this.state.hov) this.setState({ hov: null }); };
+    Object.keys(BL).forEach(id => {
+      const s = bState(id); const b = BL[id];
+      const ctr = iso(b[2][0] + b[3][0] / 2, b[2][1] + b[3][1] / 2);
+      if (!s) return;
+      let top = ctr[1] - 6;
+      if (s !== 'planned' && R) {
+        const rs = RS[s]; let el = R.bld(b[0], rs, 100, b[1]);
+        const vb = String(el.props.viewBox).split(' ').map(Number), hh = Math.round(vb[3] * K * 10) / 10;
+        el = R.bld(b[0], rs, hh, b[1]);
+        const o = iso(b[2][0], b[2][1]), l = o[0] + vb[0] * K, t = o[1] + vb[1] * K;
+        top = t + (rs === 'complete' || rs === 'needs' ? 22 : 4);
+        blds.push({ el, l: px(l), t: px(t), w: px(vb[2] * K), h: px(hh), z: Math.round((b[2][0] + b[3][0] + b[2][1] + b[3][1]) * 10), cons: s === 'constructing', fin: s !== 'constructing', fx: done ? 'none' : 'var(--cityFx)', anim: done ? 'tLight .8s ease-out both' : 'tFade .4s ease-out both', enter: enterB(id) });
+      }
+      bpos[id] = [ctr[0], top];
+      const c = CH[s];
+      labels.push({ x: px(ctr[0]), y: px(top), name: b[4], ic: ic(b[5], 13), chip: c[0], cbg: c[1], cfg: c[2], cbs: c[3], cbd: c[4], focus: () => this.setState({ focus: id, follow: null }) });
+    });
+    const agents = [], apos = {};
+    ids.forEach((id, j) => {
+      const q = posOf(id); if (!q) return; const s = iso(q[0], q[1]); apos[id] = s;
+      const mood = moodOf(id); let look = 'c';
+      for (const o of talkWin) { const other = o.e[2] === id ? o.e[3] : o.e[3] === id ? o.e[2] : null; if (other) { const oq = posOf(other); if (oq) look = iso(oq[0], oq[1])[0] < s[0] ? 'l' : 'r'; } }
+      const hb = HOME[id];
+      const tool = mood === 'work' ? ic(id === 'director' ? 'eye' : TOOLB[hb], 15) : null;
+      agents.push({ role: AG[id][0], mood, look, dl: String(-j * .5), l: px(s[0] - 22), t: px(s[1] - 50), z: Math.round((q[0] + q[1]) * 10) + 2, tool, hand: mood === 'hand', enter: () => { if (this.state.hov !== 'a:' + id) this.setState({ hov: 'a:' + id }); } });
+    });
+    const bubbles = talkWin.map(o => { const s = apos[o.e[2]]; if (!s) return null; const k = o.k, ex = S0.exp === k; const to = AG[o.e[3]][1]; const rs = apos[o.e[3]], left = rs && rs[0] > s[0]; return { tx: left ? '-86%' : '-14%', or: left ? '86% 100%' : '14% 100%', tl: left ? '172px' : '24px', x: px(s[0] + 2), y: px(s[1] - 60), k: (o.e[1] === 'agent.handoff' ? 'HANDOFF → ' : 'QUESTION → ') + to.toUpperCase(), text: o.e[8], clamp: ex ? 6 : 2, more: ex ? 'Show less' : 'Read all', toggle: () => this.setState({ exp: ex ? null : k }) }; }).filter(Boolean);
+    const story = E.slice(0, i + 1).map((e, k) => ({ e, k })).filter(o => o.e[5]).reverse().map(o => ({ t: o.e[0], text: o.e[5], role: AG[o.e[2]][0], col: RC[AG[o.e[2]][0]], where: o.e[4] ? BL[o.e[4]][4] : '', now: o.k === i && !done && !failed, bg: o.k === i ? 'var(--sunk)' : 'transparent', focus: () => this.setState({ focus: o.e[4], follow: null }) }));
+    const trace = E.slice(0, i + 1).reverse().map(e => ({ t: e[0], ev: e[1], d: e[6], cr: e[7] ? String(e[7]) : '·' }));
+    const cr = E.slice(0, i + 1).reduce((a, e) => a + e[7], 0);
+    const hov = S0.hov ?? (p.hover === 'agent' ? 'a:browser' : p.hover === 'building' ? 'b:venue' : null);
+    let ha = null, hb = null;
+    if (hov && hov[0] === 'a') { const id = hov.slice(2), s = apos[id]; if (s) { const acts = E.slice(0, i + 1).filter(e => e[2] === id && e[5]).slice(-3).reverse().map(e => ({ t: e[0], s: e[5] })); const nowE = E.slice(0, i + 1).filter(e => e[2] === id && e[5]).pop(); ha = { x: px(s[0]), y: px(s[1] - 30), role: AG[id][0], title: AG[id][2], job: AG[id][3], now: nowE ? nowE[5] : 'Waiting for work.', acts }; } }
+    if (hov && hov[0] === 'b') { const id = hov.slice(2), q = bpos[id]; if (q) { const b = BL[id]; hb = { x: px(q[0]), y: px(q[1] - 40), name: b[4], makes: b[7], by: b[6] ? 'BUILT BY ' + AG[b[6]][1].toUpperCase() : 'YOUR RESULTS LAND HERE' }; } }
+    const dk = BL.dock, dc = iso(dk[2][0] + 1, dk[2][1] + .5), hc = iso(4.5, 1.6);
+    const parcelPath = `path('M ${hc[0].toFixed(0)} ${(hc[1] - 40).toFixed(0)} Q ${((hc[0] + dc[0]) / 2 + 60).toFixed(0)} ${(Math.min(hc[1], dc[1]) - 140).toFixed(0)} ${dc[0].toFixed(0)} ${(dc[1] - 40).toFixed(0)}')`;
+    const conf = Array.from({ length: 22 }, (_, k) => { const a = (k / 22) * Math.PI * 2, r = 80 + (k * 37) % 90; return { w: (6 + k % 3 * 2) + 'px', h: (k % 2 ? 6 : 10) + 'px', c: ['#C8F23A', '#F5A524', '#34C47C', '#9FCFE0', '#E8643F', '#0B0B0C'][k % 6], x: (Math.cos(a) * r).toFixed(0) + 'px', y: (Math.sin(a) * r * .7 - 90).toFixed(0) + 'px', d: (k % 5 * .05).toFixed(2) + 's' }; });
+    const planLines = i < 1 ? [['1', 'Find a venue by the river for 12'], ['2', 'Flights from London, Berlin and Lisbon']] : [['1', 'Find a venue by the river for 12 (you liked walkable last time)'], ['2', 'Flights from London, Berlin and Lisbon, nothing before 8 am'], ['3', 'Budget under €16,000'], ['4', 'A 3-day agenda with a free morning']];
+    const hallC = iso(4.5, 1.6);
+    const NOTE = {
+      1: [[hallC[0] - 10, hallC[1] - 50, -250, -60, 'no event yet', 'Director thinks at the drafting table. A status loop, not progress.'], [hallC[0] + 200, hallC[1] - 10, 60, 120, 'stream', 'each plan line appears as the Director writes it. Plots wait for world.planned.']],
+      13: [['b', 'budget', -40, 150, 'building.constructing', 'scaffold rises 2.4 s, ease-out (.2,.8,.2,1). Agent works beside it.'], ['m0', 0, -260, -40, 'agent.handoff', 'sender walks to receiver 1.2 s ease-in-out, faces it, bubble pops 240 ms.'], ['m1', 0, 160, -70, 'question.routed', 'asker walks to the one who knows, bubble shows the real question.'], ['b', 'agenda', -250, 40, 'building.planned', 'dashed plot + label fade in 400 ms. Dashes march while it waits.'], ['b', 'venue', 120, -60, 'building.completed', 'finished building settles, ✓ pin pops 300 ms.'], ['a', 'money', 150, 40, 'agent.working', 'tool icon (sheet) bobs 1.6 s while the tool call runs.']],
+      21: [['a', 'messenger', 120, -80, 'approval.requested', 'raised hand + amber chip pulse 1.4 s until approval.resolved. Click opens Needs you.'], ['b', 'flights', -60, -120, 'building.completed', 'roof + pin stay; city stays muted so status colours pop.']],
+      26: [['d', 0, -300, -60, 'artifact.delivered', 'parcel arcs from the Hall to the Result hall 1.6 s, then the Result panel slides in 420 ms.'], ['d', 1, 120, -140, 'world.completed', 'buildings regain full colour 800 ms; confetti once, never on a loop.']],
+      15: [['b', 'flights', 80, -120, 'world.failed', 'construction stops, chip turns red, reason card drops in 300 ms.'], ['a', 'browser', -260, 40, 'agent.blocked', 'agent looks down (sad pose). No retry animation until you press Try again.']]
+    }[failed ? 15 : (i === 15 ? -1 : i)] || [];
+    const notes = annotate ? NOTE.map(n => {
+      let ax, ay;
+      if (n[0] === 'b') { const q = bpos[n[1]]; if (!q) return null; ax = q[0]; ay = q[1] + 30; }
+      else if (n[0] === 'a') { const q = apos[n[1]]; if (!q) return null; ax = q[0]; ay = q[1] - 24; }
+      else if (n[0] === 'm0' || n[0] === 'm1') { const b = bubbles[n[0] === 'm0' ? 0 : 1]; if (!b) return null; ax = parseFloat(b.x); ay = parseFloat(b.y) - 40; }
+      else if (n[0] === 'd') { ax = dc[0]; ay = dc[1] - (n[1] ? 70 : 30); }
+      else { ax = n[0]; ay = n[1]; }
+      const dx = n[n.length - 4 + 0] , dy = n[n.length - 3];
+      const tx = ax + dx, ty = ay + dy, len = Math.hypot(dx, dy), ang = Math.atan2(dy, dx) * 180 / Math.PI;
+      return { ax: px(ax), ay: px(ay), tx: px(tx), ty: px(ty), len: px(len), ang: ang.toFixed(1) + 'deg', sx: dx < 0 ? '-100%' : '0', or: dx < 0 ? '100% 50%' : '0 50%', ev: n[n.length - 2], t: n[n.length - 1] };
+    }).filter(Boolean) : [];
+    const ST = failed ? ['Failed', 'var(--redSoft)', 'var(--redInk)', 'var(--red)'] : done ? ['Done', 'var(--mintSoft)', 'var(--mintInk)', 'var(--mint)'] : waiting ? ['Waiting for you', 'var(--amberSoft)', 'var(--amberInk)', 'var(--amber)'] : i < 2 ? ['Planning', 'var(--bp)', 'var(--bpInk)', 'var(--bpInk)'] : ['Running', 'var(--priSoft)', 'var(--priInk)', 'var(--limeD)'];
+    const playing = live ? (S0.play ?? true) : false;
+    const lensDefault = done ? 'result' : (p.lens ?? 'story');
+    const lens = S0.lens ?? lensDefault;
+    const delivered = !failed && i >= 25;
+    const lenses = [['story', 'Story'], ['trace', 'Trace'], ['result', 'Result']].map(([k, t]) => ({ t, on: lens === k ? 'true' : 'false', fg: lens === k ? 'var(--ink)' : (k === 'result' && !delivered ? 'var(--ink3)' : 'var(--ink2)'), bd: lens === k ? 'var(--ink)' : 'transparent', pbg: lens === k ? 'var(--card)' : 'transparent', dot: k === 'result' && delivered && lens !== 'result', pick: () => { if (k === 'result' && !delivered) return; this.setState({ lens: k }); } }));
+    const speeds = [['1x', '1×'], ['2x', '2×'], ['catch', 'Catch up']].map(([k, t]) => ({ t, on: S0.speed === k ? 'true' : 'false', bg: S0.speed === k ? 'var(--card)' : 'transparent', fg: S0.speed === k ? 'var(--ink)' : 'var(--ink2)', pick: () => { this.setState({ speed: k }, () => this.loop()); } }));
+    const followOrder = [null, 'research', 'browser', 'money', 'writer', 'messenger', 'director'];
+    const fIdx = followOrder.indexOf(S0.follow);
+    const tl = (i <= 1 ? 1 : 0);
+    const sheetBig = lens === 'result';
+    return {
+      theme, desk, phone, loading, scene: !loading, failed, waiting, planning: i < 2 && !loading,
+      rootH: desk ? '900px' : '844px', cityT: desk ? '128px' : '0px', cityW: desk ? '1000px' : '390px', cityH: desk ? '772px' : '844px', failT: desk ? '70px' : '120px',
+      cam: `translate(${cam[0].toFixed(1)}px,${cam[1].toFixed(1)}px) scale(${cam[2].toFixed(3)})`, inv, linv,
+      ground, blds, labels, agents, bubbles, leave, mvT: reduced ? 'opacity .3s ease' : 'left 1.2s cubic-bezier(.45,0,.2,1), top 1.2s cubic-bezier(.45,0,.2,1)',
+      tbl: { l: px(iso(4.7, 2.1)[0] - 60), t: px(iso(4.7, 2.1)[1] - 40) }, planCard: desk ? { l: px(hallC[0] + 60), t: px(hallC[1] - 150) } : { l: px(hallC[0] - 400), t: px(hallC[1] + 90) }, planLines: planLines.map(([n, t], k) => ({ n, t, d: (k * .15) + 's' })),
+      parcel: !failed && i === 25 && !reduced, parcelPath, confetti: !failed && i === 26 && !reduced, conf, dockX: px(dc[0]), dockY: px(dc[1] - 40),
+      hoverA: !!ha, ha: ha || { acts: [] }, hoverB: !!hb, hb: hb || {}, notes,
+      st: { t: ST[0], bg: ST[1], fg: ST[2], dot: ST[3] }, meta: `Started 3:54 pm · 6 agents · ${Object.keys(BL).filter(k => bState(k) === 'completed').length} of 7 buildings done`,
+      cr: String(cr), crPct: Math.min(100, cr / 120 * 100).toFixed(0) + '%',
+      liveLabel: failed ? 'Stopped · world.failed' : done ? 'Done · world.completed' : waiting ? 'Paused for you · approval.requested' : playing ? 'Live · replaying recorded events' : live ? 'Paused' : 'Live',
+      liveDot: playing && !done ? 'tGlow 1.4s ease-in-out infinite' : 'none',
+      toast: i >= 0 && ev ? { ev: ev[1], t: ev[0], s: ev[5] || ev[6] } : null,
+      togglePlay: () => { if (!live) return; this.setState({ play: !playing }, () => this.loop()); },
+      playIc: ic(playing ? 'pause' : 'play', 18), playLabel: playing ? 'Pause' : 'Resume',
+      speeds, scrub: ((i + 1) / E.length * 100).toFixed(0) + '%', evN: String(i + 1), evT: String(E.length), evName: ev ? ev[1] : '',
+      followLabel: S0.follow ? 'Following ' + AG[S0.follow][1] : 'Follow an agent', followBd: S0.follow ? 'var(--ink)' : 'var(--line)',
+      cycleFollow: () => this.setState({ follow: followOrder[(fIdx + 1) % followOrder.length], focus: null }),
+      zoomIn: () => this.setState({ zoom: Math.min(3, S0.zoom + 1), focus: null, follow: null }), zoomOut: () => this.setState({ zoom: Math.max(-1, S0.zoom - 1), focus: null, follow: null }), fit: () => this.setState({ zoom: 0, focus: null, follow: null }),
+      lenses, lensStory: !loading && lens === 'story', lensTrace: !loading && lens === 'trace', lensResult: !loading && lens === 'result', lensHint: lens === 'story' ? 'click a line to fly there' : lens === 'trace' ? 'credits per step' : 'readable output',
+      story: story.slice(0, 8), storyMore: story.length > 8 ? 'Show all ' + story.length + ' lines' : '', trace, storyM: story.slice(0, 4), traceM: trace.slice(0, 7),
+      sheetH: sheetBig ? '600px' : '330px', sheetAnim: sheetBig ? 'tSlideUp .42s cubic-bezier(.2,.8,.2,1) both' : 'none',
+      iBack: ic('back', 18), iPeople: ic('people', 16), iHand: ic('hand', 14), iParcel: ic('parcel', 18), iFollow: ic('follow', 18), iMinus: ic('minus', 18), iPlus: ic('plus', 18), iFit: ic('fit', 18), iAlert: ic('alert', 18), iRefresh: ic('refresh', 18), iPin: ic('pin', 12)
+    };
+  }
+}
+</script>
+</body>
+</html>

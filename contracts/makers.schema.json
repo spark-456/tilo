@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/makers.schema.json",
+  "x-version": "1.0.0",
+  "title": "MakersConfig",
+  "description": "config/makers.yaml (ADR-0050; FR-CON-16, FR-CON-17, FR-CON-19): where each deliverable can be made. For a format listed in formats the start plan offers native (made in Tilo: always first, never listed here) and then each partner in order; a format not listed is made natively with no choice shown. Code applies MK-01 to MK-08 (makers.rules.md); a model never picks. Every key is required and no other key is allowed. The loader also checks what the schema cannot: a connector partner is declared in config/connectors.yaml or config/canva.yaml with that action as T3 and gated, and an mcp partner is a tool of config/mcp.yaml's allowlist with that action type; it refuses the whole file otherwise.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "formats", "large_site", "preselect_suggested"],
+  "properties": {
+    "v": { "const": "1.0" },
+    "formats": {
+      "description": "The formats that offer a choice, keyed by deliverable format, each with at least one partner (MK-01).",
+      "type": "object",
+      "propertyNames": { "$ref": "common.schema.json#/$defs/deliverable_format" },
+      "additionalProperties": { "$ref": "#/$defs/format_options" }
+    },
+    "large_site": { "$ref": "#/$defs/large_site" },
+    "preselect_suggested": {
+      "description": "MK-05: true selects a suggested ready partner before Start (the person can switch back to native); false always selects native first.",
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "format_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["partners"],
+      "properties": {
+        "partners": {
+          "description": "The partner options after native, in display order.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/partner" }
+        }
+      }
+    },
+    "partner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["make_with", "action"],
+      "properties": {
+        "make_with": {
+          "$ref": "common.schema.json#/$defs/make_with",
+          "not": { "const": "native" }
+        },
+        "action": {
+          "description": "The action that makes the deliverable there: the connector's T3, gated action (build_handoff, create_design) or the MCP tool's action type. Picking the partner authorises nothing; this action keeps its own card (MK-07).",
+          "$ref": "common.schema.json#/$defs/action_type"
+        }
+      }
+    },
+    "large_site": {
+      "description": "MK-03: a website deliverable is large when its brief text names more than max_native_pages pages or one of the needs. The brief text is the goal, the deliverable's title and each constraint, lower-cased with whitespace collapsed; a need matches as whole words; a page count is a number (digits, or a word from one to twenty) directly before page or pages, a space or hyphen between.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_native_pages", "needs"],
+      "properties": {
+        "max_native_pages": {
+          "description": "The most pages one self-contained HTML file is asked to hold (in-page sections or tabs).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "needs": {
+          "description": "Lower-case phrases of one to four words naming a need a single file with no network cannot meet (sign-in, a database, payments).",
+          "type": "array",
+          "maxItems": 60,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/need" }
+        }
+      }
+    },
+    "need": {
+      "description": "Lower-case words separated by one space or hyphen.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+([ -][a-z0-9]+){0,3}$"
+    }
+  }
+}

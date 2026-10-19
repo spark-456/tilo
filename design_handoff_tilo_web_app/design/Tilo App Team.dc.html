@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div data-screen-label="Team" style="background:var(--sheet);border:1px solid var(--gBd);border-radius:28px;box-shadow:var(--sh);padding:28px 32px 36px;display:flex;flex-direction:column;gap:22px">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <div style="display:flex;align-items:baseline;gap:12px"><h1 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:36px;letter-spacing:-.8px;line-height:1.05">Team</h1><span style="font-size:15px;font-weight:700;color:var(--ink3)">{{ count }}</span></div>
+      <p style="margin:0;font-size:15.5px;font-weight:600;color:var(--ink2)">Who can start work, who signs off, and the rules every agent follows.</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <div style="height:42px;width:280px;max-width:100%;box-sizing:border-box;border-radius:12px;background:var(--field);border:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--ink2)">{{ icMail }}<input aria-label="Invite by email" value="{{ email }}" onChange="{{ onEmail }}" onKeyDown="{{ onEmailKey }}" placeholder="name@northwind.co" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:14.5px;font-weight:600;color:var(--ink)"></input></div>
+      <button onClick="{{ invite }}" style="height:42px;padding:0 18px;border:0;border-radius:12px;background:var(--hero);color:#FFFFFF;font-size:15px;font-weight:800;cursor:pointer;opacity:{{ inviteOp }};white-space:nowrap" style-hover="filter:brightness(1.08)">Invite</button>
+    </div>
+  </div>
+
+  <section aria-label="Members" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:14px 18px 6px;min-width:0">
+    <div style="overflow-x:auto;overflow-y:hidden">
+      <div style="min-width:820px">
+        <div style="display:grid;grid-template-columns:minmax(0,1.6fr) 150px 110px 110px 100px 44px;column-gap:16px;align-items:center;height:36px;font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--ink3)"><span>PERSON</span><span>ROLE</span><span>SPEND LIMIT</span><span>HELPED TILO</span><span>ACTIVE</span><span></span></div>
+        <sc-for list="{{ people }}" as="p" hint-placeholder-count="5">
+          <div style="border-top:1px solid var(--line2)">
+            <div style="display:grid;grid-template-columns:minmax(0,1.6fr) 150px 110px 110px 100px 44px;column-gap:16px;align-items:center;min-height:64px">
+              <div style="display:flex;align-items:center;gap:12px;min-width:0">
+                <span style="width:40px;height:40px;border-radius:999px;background:{{ p.av }};border:1.5px dashed {{ p.avBd }};box-sizing:border-box;color:#1F1D2B;font-size:13.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">{{ p.initials }}</span>
+                <div style="min-width:0;line-height:1.35"><div style="font-size:14.5px;font-weight:800;display:flex;align-items:center;gap:8px">{{ p.name }}<sc-if value="{{ p.you }}" hint-placeholder-val="{{ false }}"><span style="height:20px;padding:0 7px;border-radius:6px;background:var(--heroSoft);color:var(--heroInk);font-size:11.5px;font-weight:800;display:flex;align-items:center">You</span></sc-if><sc-if value="{{ p.isBackup }}" hint-placeholder-val="{{ false }}"><span style="height:20px;padding:0 7px;border-radius:6px;background:var(--okSoft);color:var(--okInk);font-size:11.5px;font-weight:800;display:flex;align-items:center">Backup approver</span></sc-if></div><div style="font-size:13px;font-weight:600;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.sub }}</div></div>
+              </div>
+              <select aria-label="{{ p.roleLabel }}" value="{{ p.role }}" onChange="{{ p.setRole }}" disabled="{{ p.locked }}" style="width:100%;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--field);color:var(--ink);font-size:14px;font-weight:800;padding:0 10px;cursor:pointer;opacity:{{ p.selOp }}">
+                <option value="Owner">Owner</option><option value="Approver">Approver</option><option value="Member">Member</option><option value="Viewer">Viewer</option>
+              </select>
+              <span style="font-size:14px;font-weight:800">{{ p.limit }}</span>
+              <span style="display:flex;align-items:center;gap:8px"><span style="font-size:14px;font-weight:800">{{ p.helped }}</span><span style="flex:1;max-width:48px;height:6px;border-radius:99px;background:var(--track);overflow:hidden"><span style="display:block;height:100%;width:{{ p.helpW }};background:var(--hero);border-radius:99px"></span></span></span>
+              <span style="font-size:13.5px;font-weight:700;color:{{ p.actC }}">{{ p.active }}</span>
+              <button onClick="{{ p.more }}" aria-label="{{ p.moreL }}" aria-expanded="{{ p.open }}" style="width:36px;height:36px;border:0;border-radius:10px;background:{{ p.moreBg }};color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background-color .2s" style-hover="background:var(--chip)">{{ p.moreIc }}</button>
+            </div>
+            <sc-if value="{{ p.open }}" hint-placeholder-val="{{ false }}">
+              <div style="margin:0 0 14px 52px;padding:14px 16px;border-radius:16px;background:var(--sunk);display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px 24px;animation:tiloFade .3s cubic-bezier(.2,.8,.2,1) both">
+                <sc-for list="{{ p.facts }}" as="f" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;gap:4px;min-width:0"><span style="font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--ink3)">{{ f.k }}</span><span style="font-size:14px;font-weight:700;line-height:1.4">{{ f.v }}</span></div></sc-for>
+                <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+                  <sc-if value="{{ p.pending }}" hint-placeholder-val="{{ false }}"><button onClick="{{ p.resend }}" style="height:34px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--btn2);color:var(--ink);font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap">Resend invite</button></sc-if>
+                  <sc-if value="{{ p.canRemove }}" hint-placeholder-val="{{ false }}"><button onClick="{{ p.remove }}" style="height:34px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--btn2);color:var(--redInk);font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap">{{ p.removeL }}</button></sc-if>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section ref="{{ covRef }}" aria-label="Approval coverage" style="background:var(--card);border:{{ covBd }};border-radius:22px;padding:18px 20px 8px;display:flex;flex-direction:column;min-width:0;transition:border-color .4s">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:10px">
+      <div style="line-height:1.35"><h2 style="margin:0;font-size:17px;font-weight:800">Who signs off, and how fast</h2><div style="font-size:13.5px;font-weight:600;color:var(--ink2)">Average wait this month, from the Ledger. Alex can approve anything as owner.</div></div>
+      <a href="#ledger" onClick="{{ goLedger }}" style="font-size:13.5px">See wait times</a>
+    </div>
+    <sc-for list="{{ coverage }}" as="c" hint-placeholder-count="4">
+      <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 110px minmax(150px,auto);gap:14px;align-items:center;padding:12px 0;border-top:1px solid var(--line2)">
+        <span style="font-size:14.5px;font-weight:800;min-width:0">{{ c.what }}</span>
+        <span style="display:flex;align-items:center;gap:8px;min-width:0"><span style="display:flex">
+          <sc-for list="{{ c.who }}" as="w" hint-placeholder-count="1"><span title="{{ w.name }}" style="width:30px;height:30px;border-radius:99px;background:{{ w.c }};border:2px solid var(--pop);margin-right:-6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#1F1D2B">{{ w.i }}</span></sc-for>
+        </span><span style="font-size:13px;font-weight:700;color:var(--ink2);margin-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.names }}</span></span>
+        <span style="font-size:13.5px;font-weight:800;color:{{ c.waitC }};white-space:nowrap">{{ c.wait }}</span>
+        <span style="display:flex;justify-content:flex-end">
+          <sc-if value="{{ c.single }}" hint-placeholder-val="{{ false }}">
+            <select aria-label="{{ c.addLabel }}" value="" onChange="{{ c.addBackup }}" style="height:34px;border-radius:10px;border:1px solid var(--amberLine);background:var(--amberSoft);color:var(--amberInk);font-size:13.5px;font-weight:800;padding:0 10px;cursor:pointer">
+              <option value="">Add a backup…</option>
+              <sc-for list="{{ c.opts }}" as="o" hint-placeholder-count="2"><option value="{{ o.id }}">{{ o.name }}</option></sc-for>
+            </select>
+          </sc-if>
+          <sc-if value="{{ c.covered }}" hint-placeholder-val="{{ true }}"><span style="font-size:13px;font-weight:800;color:var(--okInk);display:flex;align-items:center;gap:6px">{{ icCheckS }}Covered</span></sc-if>
+        </span>
+      </div>
+    </sc-for>
+  </section>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px;align-items:start">
+    <section aria-label="Approval rules" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:18px 20px 8px;display:flex;flex-direction:column;min-width:0">
+      <div style="display:flex;align-items:center;gap:12px;padding-bottom:10px"><div style="width:44px;height:44px;border-radius:13px;background:var(--amberTile);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ askAgent }}</div><div style="line-height:1.35"><h2 style="margin:0;font-size:17px;font-weight:800">When agents stop and ask</h2><div style="font-size:13.5px;font-weight:600;color:var(--ink2)">These rules apply in every world.</div></div></div>
+      <sc-for list="{{ rules }}" as="r" hint-placeholder-count="5">
+        <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid var(--line2)">
+          <div style="flex:1;min-width:0;line-height:1.4"><div style="font-size:14.5px;font-weight:800">{{ r.when }}</div><div style="font-size:13px;font-weight:600;color:var(--ink2)">{{ r.who }}</div></div>
+          <button role="switch" aria-checked="{{ r.on }}" aria-label="{{ r.when }}" onClick="{{ r.toggle }}" style="width:44px;height:26px;border:0;border-radius:99px;background:{{ r.track }};padding:3px;cursor:pointer;display:flex;flex:none;transition:background-color .2s"><span style="width:20px;height:20px;border-radius:99px;background:#FFFFFF;box-shadow:0 1px 3px rgba(31,29,43,.3);transform:{{ r.knob }};transition:transform .25s cubic-bezier(.3,1.3,.5,1)"></span></button>
+        </div>
+      </sc-for>
+    </section>
+
+    <section aria-label="What each role can do" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:18px 20px 12px;display:flex;flex-direction:column;min-width:0">
+      <h2 style="margin:0 0 10px;font-size:17px;font-weight:800">What each role can do</h2>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) repeat(4,72px);align-items:center;height:32px;font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--ink3)"><span></span><sc-for list="{{ roles }}" as="r" hint-placeholder-count="4"><span style="text-align:center">{{ r }}</span></sc-for></div>
+      <sc-for list="{{ matrix }}" as="m" hint-placeholder-count="8">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) repeat(4,72px);align-items:center;min-height:40px;border-top:1px solid var(--line2)">
+          <span style="font-size:14px;font-weight:700">{{ m.label }}</span>
+          <sc-for list="{{ m.cells }}" as="c" hint-placeholder-count="4"><span style="display:flex;justify-content:center"><span style="width:26px;height:26px;border-radius:8px;background:{{ c.bg }};color:{{ c.fg }};display:flex;align-items:center;justify-content:center">{{ c.mark }}</span></span></sc-for>
+        </div>
+      </sc-for>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { email: '', people: null, rules: null, open: null, backups: {}, flash: false };
+  covRef = React.createRef();
+  componentDidMount() { this.focus(); }
+  componentDidUpdate(p) { const a = p.app && p.app.params, b = this.props.app && this.props.app.params; if ((a && a.focus) !== (b && b.focus)) this.focus(); }
+  componentWillUnmount() { clearTimeout(this.ft); clearTimeout(this.ft2); }
+  focus() {
+    const pr = this.props.app && this.props.app.params; if (!pr || !pr.focus) return;
+    this.ft = setTimeout(() => { const el = this.covRef.current; if (el) window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + window.scrollY - 110), behavior: 'smooth' }); this.setState({ flash: true }); this.ft2 = setTimeout(() => this.setState({ flash: false }), 1800); }, 280);
+  }
+  renderVals() {
+    const h = React.createElement, app = this.props.app || {}, TA = window.TiloApp, D = TA && TA.data;
+    if (!D) return {};
+    const K = TA.ready() ? TA.kit(h) : null, S = this.state, night = !!app.night, toast = app.toast || (() => {}), go = app.go || (() => {});
+    const icon = (n, s) => K ? K.icon(n, s) : null, T = D.team;
+    const people = S.people || T.people, rules = S.rules || Object.fromEntries(T.rules.map(r => [r[0], r[3]]));
+    const LIM = { Owner: 'No limit', Approver: '£1,000', Member: '£250', Viewer: '—' };
+    const setPeople = f => this.setState(s => ({ people: f(s.people || T.people) }));
+    const valid = /.+@.+\..+/.test(S.email.trim());
+    const invite = () => { const v = S.email.trim(); if (!valid) { toast('Enter a work email to invite'); return; } setPeople(ps => [...ps, { id: 'i' + Date.now(), pending: true, email: v, role: 'Member' }]); this.setState({ email: '' }); toast('Invite sent to ' + v); };
+    const backups = { ...S.backups }; if (app.prefs && app.prefs.backup && !backups.share) backups.share = app.prefs.backup;
+    const byId = id => people.find(p => p.id === id);
+    const HL = D.learn ? D.learn.helpers : [], hmax = Math.max(1, ...HL.map(x => x.n));
+    const coverage = T.coverage.map(c => {
+      const ids = c.who.concat(backups[c.id] ? [backups[c.id]] : []), ws = ids.map(byId).filter(Boolean), single = ws.length < 2;
+      const opts = people.filter(p => !p.pending && p.id !== 'am' && p.role !== 'Viewer' && !ids.includes(p.id)).map(p => ({ id: p.id, name: p.name }));
+      return { what: c.what, who: ws.map(p => ({ i: p.name.split(' ').map(s => s[0]).join(''), c: p.c, name: p.name })), names: ws.map(p => p.name.split(' ')[0]).join(', ') + (single ? ' only' : ''),
+        wait: backups[c.id] && c.slow ? 'About 20 min' : c.wait, waitC: c.slow && !backups[c.id] ? 'var(--amberInk)' : 'var(--ink)', single, covered: !single, addLabel: 'Add a backup for ' + c.what, opts,
+        addBackup: e => { const v = e.target.value; if (!v) return; const p = byId(v); this.setState(s => ({ backups: { ...s.backups, [c.id]: v } })); if (c.id === 'share' && app.setPref) app.setPref('backup', v); toast(p.name + ' is now a backup for ' + c.what.toLowerCase()); } };
+    });
+    const people2 = people.map(p => {
+      const name = p.pending ? p.email : p.name, first = p.pending ? p.email : p.name.split(' ')[0], open = S.open === p.id, hp = HL.find(x => x.id === p.id);
+      const owns = p.pending ? [] : D.skills.filter(s => s.owner === p.name).map(s => s.name), worlds = p.pending ? [] : D.worlds(app.dec, app.added).filter(w => w.owner === p.name).map(w => w.short);
+      const signs = coverage.filter((c, i) => T.coverage[i].who.concat(backups[T.coverage[i].id] ? [backups[T.coverage[i].id]] : []).includes(p.id)).map(c => c.what);
+      return {
+        name, sub: p.pending ? 'Invite sent · just now' : p.email + ' · ' + p.dept, you: !!p.you, locked: !!p.you, selOp: p.you ? '.7' : '1', role: p.role, roleLabel: 'Role for ' + name, pending: !!p.pending,
+        initials: p.pending ? '?' : p.name.split(' ').map(s => s[0]).join(''), av: p.pending ? 'transparent' : p.c, avBd: p.pending ? 'var(--line)' : 'transparent',
+        limit: p.pending ? '—' : (p.limit && p.role === 'Approver' ? p.limit : LIM[p.role]), active: p.pending ? 'Pending' : p.active, actC: p.active === 'Now' ? 'var(--okInk)' : 'var(--ink2)',
+        helped: hp ? String(hp.n) : '0', helpW: hp ? Math.round(hp.n / hmax * 100) + '%' : '0%', isBackup: Object.values(backups).includes(p.id),
+        open, moreBg: open ? 'var(--chip)' : 'transparent', moreIc: icon(open ? 'chevD' : 'more', 15), moreL: (open ? 'Hide details for ' : 'Show details for ') + name,
+        more: () => this.setState({ open: open ? null : p.id }),
+        facts: p.pending ? [{ k: 'INVITED AS', v: p.role }, { k: 'SENT', v: 'Just now · expires in 7 days' }] : [
+          { k: 'SIGNS OFF', v: p.role === 'Owner' ? 'Everything, as owner' : signs.length ? signs.join(', ') : 'Nothing yet' },
+          { k: 'OWNS SKILLS', v: owns.length ? owns.join(', ') : 'None' },
+          { k: 'OWNS WORLDS', v: worlds.length ? worlds.join(', ') : 'None' },
+          { k: 'HELPED TILO', v: hp ? hp.impact : 'No answers or fixes yet' }],
+        canRemove: !p.you, removeL: p.pending ? 'Cancel invite' : 'Remove from team',
+        resend: () => toast('Invite sent again to ' + p.email),
+        remove: () => { setPeople(ps => ps.filter(q => q.id !== p.id)); this.setState({ open: null }); toast(p.pending ? 'Invite cancelled' : first + ' was removed. Their worlds move to you'); },
+        setRole: e => { const v = e.target.value; setPeople(ps => ps.map(q => q.id === p.id ? { ...q, role: v, limit: undefined } : q)); toast(name + ' is now ' + (v === 'Approver' || v === 'Owner' ? 'an ' : 'a ') + v); }
+      };
+    });
+    return {
+      count: people.length + ' people', email: S.email, onEmail: e => this.setState({ email: e.target.value }), onEmailKey: e => { if (e.key === 'Enter') invite(); }, invite, inviteOp: valid ? '1' : '.6',
+      icMail: icon('mail', 16), icCheckS: icon('check', 12), roles: T.roles, people: people2, coverage,
+      covRef: this.covRef, covBd: S.flash ? '2px solid #F0A500' : '1px solid var(--line2)', goLedger: e => { e.preventDefault(); go('ledger'); },
+      rules: T.rules.map(([k, when, who]) => { const on = !!rules[k]; return { when, who, on, track: on ? 'var(--ok)' : 'var(--track)', knob: on ? 'translateX(18px)' : 'none', toggle: () => this.setState({ rules: { ...rules, [k]: !on } }) }; }),
+      matrix: T.matrix.map(([label, bits]) => ({ label, cells: [1, 2, 4, 8].map(b => (bits & b) ? { bg: 'var(--okSoft)', fg: 'var(--ok)', mark: icon('check', 13) } : { bg: 'transparent', fg: 'var(--track)', mark: icon('dot', 9) }) })),
+      askAgent: K ? K.agent({ role: 'builder', expr: 'needs' }, 38, night) : null
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+# Build and push the nightly eval job image (EFF-05b). Run it with `just build-evals-image`, BEFORE the first
+# `terraform apply` of infra/envs/dev/eval_nightly.tf and again whenever evals or their packages change.
+# Pushes asia-southeast1-docker.pkg.dev/$PROJECT_ID/tilo/evals:<build id> and :latest; the Cloud Run job
+# tilo-eval-nightly runs `:latest` (Terraform owns the job; no step here touches Cloud Run, so tilo-cloudbuild needs
+# no new grant: it already holds artifactregistry.writer on repo `tilo`). Same build identity, builder image,
+# logging mode and 45-minute cap as the root cloudbuild.yaml. No keys, no secrets. tilo-dev only.
+timeout: 2700s
+serviceAccount: projects/$PROJECT_ID/serviceAccounts/tilo-cloudbuild@$PROJECT_ID.iam.gserviceaccount.com
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  - id: build-and-push
+    name: gcr.io/cloud-builders/docker:20.10.24
+    entrypoint: bash
+    env:
+      - DOCKER_BUILDKIT=1 # evals/Dockerfile.dockerignore is honoured only by BuildKit
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        image="asia-southeast1-docker.pkg.dev/$PROJECT_ID/tilo/evals"
+        docker build --file evals/Dockerfile --tag "$$image:$BUILD_ID" --tag "$$image:latest" .
+        docker push "$$image:$BUILD_ID"
+        docker push "$$image:latest"

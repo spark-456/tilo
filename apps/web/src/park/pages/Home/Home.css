@@ -1,0 +1,1635 @@
+/* The Home page in the Studio layout (UI-STUDIO-2), from the inline styles of design/studio-v2 "Tilo S Home"
+   (canvas section 02, 1440 light and dark). One column under the nav: the greeting, the ask box, then Your worlds and
+   Chat history beside the Needs you and spend column. Every selector sits under [data-park] and a park-home- class;
+   colours are role tokens (config/themes/studio.json; the Metropolis theme falls back to its own roles), except the
+   README's #F0A500 / #1F1D2B (needs), #FFFFFF and the #5A3FE0 focus ring. No motion (HR-1, HR-2): hover is a
+   state, never a lift. Night comes from the tokens. */
+
+/* ---- the page: one centred column ----
+   POLISH-1: 1296 wide and an 8px side gutter are the shell's --park-page-max and --park-page-pad, the same as Worlds and
+   Team, so the left edge is 80px at 1440 on all three. */
+[data-park] .park-home-root {
+  box-sizing: border-box;
+  max-width: 1296px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 120px 8px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  color: var(--ink);
+  overflow-x: hidden;
+}
+/* the sample banner is pinned under the nav on Home (sample.css): the column starts below it */
+[data-park] .park-shell__main:has(.park-first-run-banner--home) .park-home-root {
+  padding-top: 172px;
+}
+[data-park] .park-home-root button,
+[data-park] .park-home-root input {
+  font-family: inherit;
+}
+
+/* ---- the greeting and its crew ---- */
+[data-park] .park-home-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+[data-park] .park-home-hero {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+[data-park] .park-home-date {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  color: var(--ink3);
+}
+[data-park] .park-home-h1 {
+  margin: 0;
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -2px;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-home-summary {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--ink2);
+  text-wrap: pretty;
+}
+[data-park] .park-home-crew {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 0 16px 6px;
+}
+[data-park] .park-home-crew__floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--sunk);
+}
+[data-park] .park-home-crew .park-buddy {
+  position: relative;
+}
+
+/* the amber "Needs you" pill under the summary, and the state that replaces it */
+[data-park] .park-home-needs {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 5px 4px 4px;
+  border: 1px solid var(--amberLine);
+  border-radius: 999px;
+  background: var(--amberSoft);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-home-needs__tile {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--amberTile);
+}
+[data-park] .park-home-needs__bold {
+  font-weight: 700;
+}
+[data-park] .park-home-needs__review {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #f0a500;
+  color: #1f1d2b;
+  font-size: 14px;
+  font-weight: 700;
+}
+[data-park] .park-home-caught {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px 6px 6px;
+  border-radius: 999px;
+  background: var(--okSoft);
+  font-size: 15px;
+  font-weight: 600;
+}
+[data-park] .park-home-caught__disc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  background: var(--ok);
+  color: #ffffff;
+}
+
+/* ---- the ask box ---- */
+[data-park] .park-home-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+[data-park] .park-home-panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park] .park-home-panel:focus-within {
+  border-color: var(--focus, #5a3fe0);
+  box-shadow: var(--sh), 0 0 0 2px var(--heroSoft);
+}
+[data-park] .park-home-input-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+[data-park] .park-home-logo {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--sunk);
+}
+[data-park] .park-home-panel .park-home-input {
+  flex: 1;
+  min-width: 0;
+  height: 64px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.8px;
+}
+[data-park] .park-home-input::placeholder {
+  color: var(--ink3);
+}
+[data-park] .park-home-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+[data-park] .park-home-effort .park-seg {
+  box-sizing: border-box;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--sunk);
+}
+[data-park] .park-home-effort .park-seg__item {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-park] .park-home-effort .park-seg__thumb {
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  border-radius: 10px;
+  /* !important: SegmentedControl sets its own width inline; this track has 4px padding and two items */
+  width: calc((100% - 8px) / 2) !important;
+}
+[data-park] .park-home-hint {
+  flex: 1;
+  min-width: 180px;
+  text-align: right;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink3);
+}
+[data-park] .park-home-start {
+  flex: none;
+  height: 52px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--priFill, var(--heroFill));
+  color: var(--onPri, #ffffff);
+  box-shadow: 0 3px 0 var(--priLip, var(--heroFill));
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+[data-park] .park-home-start:hover,
+[data-park] .park-home-confirm:hover {
+  filter: brightness(1.08);
+}
+/* "Size of job" behind Options (JUDGE-FIRST-RUN F7) */
+[data-park] .park-home-options {
+  flex: none;
+  max-width: 100%;
+}
+[data-park] .park-home-options__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--ink2);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+[data-park] .park-home-options__now {
+  color: var(--ink3);
+  font-weight: 500;
+}
+[data-park] .park-home-options__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 4px 4px;
+}
+[data-park] .park-home-options__help {
+  margin: 0;
+  max-width: 390px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink3);
+}
+[data-park] .park-home-size {
+  position: relative;
+  width: 390px;
+  max-width: 100%;
+}
+[data-park] .park-home-size .park-seg {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px;
+  border-radius: 14px;
+}
+[data-park] .park-home-size .park-seg__item {
+  height: 36px;
+  font-size: 14px;
+}
+[data-park] .park-home-size .park-seg__thumb {
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  border-radius: 10px;
+  /* !important: SegmentedControl sets its own width inline ((100% - 6px) / N); this track has 4px padding */
+  width: calc((100% - 8px) / 3) !important;
+}
+/* files: the attach button and the chips (WEB-W1) */
+[data-park] .park-home-intake {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--ink2);
+  font-size: 14px;
+}
+[data-park] .park-home-intake__label {
+  font-size: 12px;
+}
+[data-park] .park-home-intake__status {
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--chip);
+}
+[data-park] .park-home-intake textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--field);
+  color: var(--ink);
+}
+[data-park] .park-home-intake ul {
+  max-height: 192px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-home-attach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+[data-park] .park-home-attach__note {
+  font-size: 13px;
+  color: var(--ink3);
+}
+[data-park] .park-home-attach [aria-disabled="true"] {
+  color: var(--ink3);
+  cursor: not-allowed;
+}
+[data-park] .park-home-attach__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-home-attach__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 290px;
+  min-height: 48px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-park] .park-home-attach__kind {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--redSoft);
+  color: var(--redInk);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+[data-park] .park-home-attach__remove {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--ink3);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+/* the answer, the drafting line, the plan card and the chips under the ask box */
+[data-park] .park-home-quick {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px;
+  border-radius: 16px;
+  background: var(--heroSoft);
+  color: var(--ink);
+}
+[data-park] .park-home-quick__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+[data-park] .park-home-quick__sample {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-home-quick__text {
+  margin: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  font-size: 16px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-home-quick__cost {
+  font-size: 13px;
+  color: var(--ink2);
+}
+[data-park] .park-home-quick--note {
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  font-size: 15px;
+}
+[data-park] .park-home-quick--note > span {
+  flex: 1;
+  min-width: 0;
+}
+[data-park] .park-home-tier {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+[data-park] .park-home-drafting {
+  box-sizing: border-box;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 18px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  font-size: 15px;
+  font-weight: 500;
+}
+[data-park] .park-home-drafting__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-park] .park-home-plan {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 20px 20px 24px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park] .park-home-plan--starting {
+  position: relative;
+  overflow: hidden;
+  transform-origin: center bottom;
+}
+[data-park] .park-home-run-blueprint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  border: 2px dashed var(--bpInk);
+  border-radius: inherit;
+  background-color: var(--bp);
+  --bp-grid-v: linear-gradient(var(--bpLine) 1px, transparent 1px);
+  --bp-grid-h: linear-gradient(90deg, var(--bpLine) 1px, transparent 1px);
+  background-image: var(--bp-grid-v), var(--bp-grid-h);
+  background-size: 16px 16px;
+  color: var(--bpInk);
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+[data-park] .park-home-start-status {
+  margin: 0;
+  color: var(--ink2);
+  font-weight: 700;
+  text-align: center;
+}
+[data-park] .park-home-plan__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+[data-park] .park-home-plan__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+[data-park] .park-home-plan .park-home-tier,
+[data-park] .park-home-run .park-home-tier {
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+[data-park] .park-home-plan__query {
+  min-width: 0;
+  font-size: 17px;
+  font-weight: 700;
+  /* A3: a long unbroken task wraps inside the card and stops at three lines (the full text is the title) */
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+[data-park] .park-home-plan__sample {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink3);
+}
+[data-park] .park-home-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  font-size: 14px;
+  color: var(--ink2);
+}
+[data-park] .park-home-meta__k {
+  color: var(--ink3);
+}
+[data-park] .park-home-meta__v {
+  color: var(--ink);
+  font-weight: 700;
+}
+[data-park] .park-home-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+[data-park] .park-home-makers {
+  display: grid;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+[data-park] .park-home-maker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+}
+[data-park] .park-home-maker legend {
+  width: 100%;
+  font-size: 13px;
+  font-weight: 700;
+}
+[data-park] .park-home-maker__option {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+[data-park] .park-home-maker__option label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+[data-park] .park-home-maker__option small {
+  color: var(--ink3);
+}
+[data-park] .park-home-maker__option a {
+  color: var(--link, var(--ink));
+  font-weight: 700;
+  text-decoration: none;
+}
+[data-park] .park-home-step {
+  display: flex;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--ink2);
+}
+[data-park] .park-home-step__n {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--sunk);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+[data-park] .park-home-plan__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+[data-park] .park-home-confirm {
+  height: 48px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--priFill, var(--heroFill));
+  color: var(--onPri, #ffffff);
+  box-shadow: 0 3px 0 var(--priLip, var(--heroFill));
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+[data-park] .park-home-change {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+[data-park] .park-home-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+[data-park] .park-home-chip {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+/* SIMPLE-RUN-1: the one confirm card's changeable assumption lines */
+[data-park] .park-home-run__edit {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-park] .park-home-run__edit input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+[data-park] .park-home-run__link {
+  min-height: 24px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--heroInk);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+[data-park] .park-home-run__link:focus-visible,
+[data-park] .park-home-run__edit input:focus-visible {
+  outline: 2px solid var(--heroInk);
+  outline-offset: 2px;
+}
+/* the budget meter and the "Repeat weekly" option of the confirm card */
+[data-park] .park-home-meter {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--track);
+}
+[data-park] .park-home-meter__band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 99px;
+  background: var(--heroSoft);
+}
+[data-park] .park-home-meter__cap {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--heroFill);
+}
+[data-park] .park-home-repeat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink2);
+}
+[data-park] .park-home-repeat__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  cursor: pointer;
+}
+[data-park] .park-home-repeat__toggle input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  border: 1px solid var(--lineStrong, var(--line));
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--onPri, #1f1d2b);
+}
+[data-park] .park-home-repeat__toggle input[type="checkbox"]::before {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+}
+[data-park] .park-home-repeat__toggle input[type="checkbox"]:checked {
+  border-color: var(--heroFill);
+  background: var(--heroFill);
+}
+[data-park] .park-home-repeat__toggle input[type="checkbox"]:checked::before {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+[data-park] .park-home-repeat__toggle input[type="checkbox"]:focus-visible {
+  outline: 3px solid var(--focus, var(--heroInk));
+  outline-offset: 2px;
+}
+[data-park] .park-home-repeat__fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+[data-park] .park-home-repeat__fields select,
+[data-park] .park-home-repeat__fields input[type="time"] {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+}
+[data-park] .park-home-repeat__fields select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 132px;
+  padding-right: 34px;
+}
+[data-park] .park-home-repeat__select {
+  position: relative;
+  display: inline-flex;
+}
+[data-park] .park-home-repeat__select::after {
+  content: "⌄";
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  color: var(--ink2);
+  font-size: 16px;
+  pointer-events: none;
+}
+[data-park] .park-home-repeat__hint {
+  color: var(--ink3);
+}
+
+/* ---- Your worlds and Chat history beside the side column ---- */
+[data-park] .park-home-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: start;
+  gap: 32px;
+}
+[data-park] .park-home-maincol {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+[data-park] .park-home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+[data-park] .park-home-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+[data-park] .park-home-section__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+[data-park] .park-home-section__sub {
+  font-size: 15px;
+  color: var(--ink3);
+}
+[data-park] .park-home-h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+}
+[data-park] .park-home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+[data-park] .park-home-link::after {
+  content: "→";
+  color: var(--heroInk);
+}
+[data-park] .park-home-link:hover {
+  color: var(--ink2);
+}
+[data-park] .park-home-none {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 14px;
+  background: var(--sunk);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink3);
+}
+[data-park] .park-home-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+[data-park] .park-home-live {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--sh);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-home-live:hover {
+  border-color: var(--lineStrong, var(--line));
+}
+[data-park] .park-home-live__art {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 150px;
+  margin: 8px 8px 0;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--sunk);
+}
+[data-park] .park-home-live__pic {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 12px;
+}
+[data-park] .park-home-pill {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px 0 8px;
+  border-radius: 99px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--sh);
+  font-size: 13px;
+  font-weight: 700;
+}
+[data-park] .park-home-pill__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--ink3);
+}
+[data-park] .park-home-pill--run {
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+[data-park] .park-home-pill--run .park-home-pill__dot {
+  background: var(--lime, var(--hero));
+}
+[data-park] .park-home-pill--done,
+[data-park] .park-home-pill--scheduled {
+  background: var(--sunk);
+  color: var(--ink2);
+}
+[data-park] .park-home-pill--needs {
+  background: var(--amberSoft);
+  color: var(--amberInk);
+}
+[data-park] .park-home-pill--needs .park-home-pill__dot {
+  background: var(--amber);
+}
+[data-park] .park-home-live__foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+[data-park] .park-home-live__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+[data-park] .park-home-live__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-home-live__sub {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink3);
+}
+[data-park] .park-home-live__sub--needs {
+  color: var(--amberInk);
+}
+[data-park] .park-home-ring {
+  position: relative;
+  flex: none;
+  width: 48px;
+  height: 48px;
+}
+[data-park] .park-home-ring svg {
+  display: block;
+  transform: rotate(-90deg);
+}
+[data-park] .park-home-ring__track {
+  fill: none;
+  stroke: var(--sunk);
+  stroke-width: 5;
+}
+[data-park] .park-home-ring__fill {
+  fill: none;
+  stroke: var(--priFill, var(--hero));
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+[data-park] .park-home-ring__fill--needs {
+  stroke: var(--amber);
+}
+[data-park] .park-home-ring__pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+}
+[data-park] .park-home-history {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park] .park-home-history__face {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--lime, var(--hero));
+}
+[data-park] .park-home-history__visor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 22px;
+  height: 13px;
+  border-radius: 5px;
+  background: #ffffff;
+}
+[data-park] .park-home-history__visor span {
+  width: 2.5px;
+  height: 4px;
+  border-radius: 2px;
+  background: #1f1d2b;
+}
+[data-park] .park-home-history__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.4;
+}
+[data-park] .park-home-history__title {
+  font-size: 15.5px;
+  font-weight: 600;
+}
+[data-park] .park-home-history__line {
+  font-size: 14px;
+  color: var(--ink3);
+}
+
+/* ---- the side column: Needs you, Up next today, Just finished, spend and the spend tiles ---- */
+[data-park] .park-home-today {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 52px;
+}
+[data-park] .park-home-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park] .park-home-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+[data-park] .park-home-head__gap {
+  flex: 1;
+}
+[data-park] .park-home-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+[data-park] .park-home-count {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 99px;
+  background: #f0a500;
+  color: #1f1d2b;
+  font-size: 13px;
+  font-weight: 800;
+}
+[data-park] .park-home-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+[data-park] .park-home-tray {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  margin: 0 -8px;
+  padding: 8px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-home-tile {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--sunk);
+}
+[data-park] .park-home-tile--needs {
+  background: var(--amberSoft);
+}
+[data-park] .park-home-tray__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+[data-park] .park-home-tray__title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+[data-park] .park-home-tray__sub {
+  font-size: 13px;
+  color: var(--ink3);
+}
+[data-park] .park-home-tray__go {
+  color: var(--ink3);
+  font-size: 18px;
+}
+[data-park] .park-home-event {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 0 -8px;
+  padding: 8px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-home-event__time {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-home-event__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 10px;
+}
+[data-park] .park-home-event__body--work {
+  border-left: 3px solid var(--hero);
+}
+[data-park] .park-home-event__body--personal {
+  border-left: 3px solid var(--ok);
+}
+[data-park] .park-home-event__body--tilo {
+  border-left: 3px solid var(--sch);
+}
+[data-park] .park-home-event__title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+[data-park] .park-home-event__sub {
+  font-size: 13px;
+  color: var(--ink3);
+}
+[data-park] .park-home-done {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 20px;
+  background: var(--okSoft);
+}
+[data-park] .park-home-done__face {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--card);
+}
+[data-park] .park-home-done__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+[data-park] .park-home-done__label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--okInk);
+}
+[data-park] .park-home-done__name {
+  font-size: 15px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-home-spend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+[data-park] .park-home-spend__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+[data-park] .park-home-spend .park-home-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+[data-park] .park-home-spend__link {
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+[data-park] .park-home-spend__link::after {
+  content: " →";
+  color: var(--heroInk);
+}
+[data-park] .park-home-spend__figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+[data-park] .park-home-spend__amount {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -1px;
+}
+[data-park] .park-home-spend__of {
+  font-size: 14px;
+  color: var(--ink3);
+}
+[data-park] .park-home-spend__bar {
+  display: flex;
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--sunk);
+}
+[data-park] .park-home-spend__spent {
+  background: var(--lime, var(--hero));
+}
+[data-park] .park-home-spend__waiting {
+  background: var(--amber);
+}
+[data-park] .park-home-spend__note {
+  font-size: 14px;
+  color: var(--ink2);
+}
+[data-park] .park-home-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+/* POLISH-1: five tiles in two columns leave one alone: the last tile of an odd count takes the whole row. */
+[data-park] .park-home-kpis > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+[data-park] .park-home-tray:hover,
+[data-park] .park-home-event:hover,
+[data-park] .park-home-spend:hover,
+[data-park] .park-home-chip:hover,
+[data-park] .park-home-change:hover {
+  background: var(--rowHover);
+}
+
+/* ---- focus: a 3px ring on every control of the page ---- */
+[data-park] .park-home-root button:focus-visible,
+[data-park] .park-home-root a:focus-visible,
+[data-park] .park-home-root input:focus-visible,
+[data-park] .park-home-root select:focus-visible,
+[data-park] .park-home-needs:focus-visible,
+[data-park] .park-home-link:focus-visible,
+[data-park] .park-home-live:focus-visible,
+[data-park] .park-home-tray:focus-visible,
+[data-park] .park-home-event:focus-visible,
+[data-park] .park-home-spend:focus-visible,
+[data-park] .park-home-chip:focus-visible,
+[data-park] .park-home-start:focus-visible,
+[data-park] .park-home-confirm:focus-visible,
+[data-park] .park-home-change:focus-visible,
+[data-park] .park-home-options__summary:focus-visible {
+  outline: 3px solid var(--focus, #5a3fe0);
+  outline-offset: 2px;
+}
+
+/* ---- JUDGE-FIRST-RUN F6: still loading shapes (no motion) ---- */
+[data-park] .park-home-skeleton {
+  display: block;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--track);
+}
+[data-park] .park-home-skeleton--short {
+  width: 30%;
+}
+[data-park] .park-home-skeleton--mid {
+  width: 60%;
+}
+[data-park] .park-home-hero--loading {
+  width: min(560px, 100%);
+}
+[data-park] .park-home-skeleton--wide {
+  width: 85%;
+  height: 40px;
+}
+
+/* ---- legal links (WEB-LEGAL): a quiet line at the end of the page ---- */
+[data-park] .park-home-legal {
+  align-self: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  font-size: 12px;
+  color: var(--ink3);
+}
+[data-park] .park-home-legal a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  color: var(--ink2);
+  text-decoration: none;
+}
+
+/* ---- under 1180px: one column, the side column under Your worlds ---- */
+@media (max-width: 1179px) {
+  [data-park] .park-home-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-park] .park-home-today {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    padding-top: 0;
+  }
+  [data-park] .park-home-kpis {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+/* POLISH-1: in three columns five tiles end 3 + 2 with a gap: a six-column grid lets the last two share the row. */
+@media (min-width: 841px) and (max-width: 1179px) {
+  [data-park] .park-home-kpis {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  [data-park] .park-home-kpis > * {
+    grid-column: span 2;
+  }
+  [data-park] .park-home-kpis > :nth-child(4):nth-last-child(2),
+  [data-park] .park-home-kpis > :nth-child(5):last-child {
+    grid-column: span 3;
+  }
+}
+
+/* ---- a phone (390x844): one scrolling column, nothing placed by an offset, every target 44px ---- */
+@media (max-width: 840px) {
+  [data-park] .park-home-root {
+    padding: 96px 16px 112px;
+    gap: 24px;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  [data-park] .park-home-crew {
+    display: none;
+  }
+  [data-park] .park-home-h1 {
+    font-size: 36px;
+    letter-spacing: -1.2px;
+  }
+  [data-park] .park-home-summary {
+    font-size: 16px;
+  }
+  [data-park] .park-home-panel {
+    gap: 14px;
+    padding: 16px;
+  }
+  [data-park] .park-home-input-row {
+    gap: 12px;
+  }
+  [data-park] .park-home-logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+  [data-park] .park-home-panel .park-home-input {
+    height: 52px;
+    font-size: 19px;
+    letter-spacing: -0.3px;
+  }
+  [data-park] .park-home-hint {
+    flex: 1 1 100%;
+    order: 3;
+    text-align: left;
+  }
+  [data-park] .park-home-start {
+    margin-left: auto;
+  }
+  [data-park] .park-home-cards,
+  [data-park] .park-home-today {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-park] .park-home-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  [data-park] .park-home-h2 {
+    font-size: 24px;
+  }
+  [data-park] .park-home-plan {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-park] .park-home-plan__query,
+  [data-park] .park-home-step > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  [data-park] .park-home-run__link,
+  [data-park] .park-home-run__edit input,
+  [data-park] .park-home-change {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  [data-park] .park-home-run__link {
+    flex: none;
+  }
+  [data-park] .park-home-legal a {
+    position: relative;
+  }
+  /* the links stay 24px tall to the eye; their touch target reaches 44px (WCAG 2.2 target size) */
+  [data-park] .park-home-legal a::after {
+    content: "";
+    position: absolute;
+    inset: -10px -6px;
+  }
+}
+
+/* POLISH-1: the 390px placeholder ("e.g. Summarise this week's feedback") was cut at "fe"; 16px with no tracking fits. */
+[data-park] .park-home-brief {
+  display: grid;
+  gap: 12px;
+}
+[data-park] .park-home-brief__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+[data-park] .park-home-brief__head p {
+  margin: 4px 0 0;
+}
+[data-park] .park-home-brief section {
+  border-top: 1px solid currentColor;
+  padding-top: 10px;
+}
+[data-park] .park-home-brief h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+[data-park] .park-home-brief ul {
+  margin: 0;
+  padding-left: 20px;
+}
+[data-park] .park-home-brief li {
+  margin: 5px 0;
+}
+[data-park] .park-home-brief button {
+  min-height: 44px;
+  min-width: 44px;
+  cursor: pointer;
+}
+[data-park] .park-home-brief__cites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: .8rem;
+  opacity: 0.78;
+}
+@media (max-width: 600px) {
+  [data-park] .park-home-brief__head {
+    flex-direction: column;
+  }
+}
+[data-park] .park-home-brief-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 0;
+}
+[data-park] .park-home-brief-row > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-park] .park-home-brief-row .park-home-brief-row__link {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+[data-park] .park-home-brief-row button {
+  min-height: 44px;
+  min-width: 44px;
+  flex: none;
+}
+[data-park] .park-home-brief-row .park-home-brief-row__link {
+  flex: 1;
+}
+@media (max-width: 430px) {
+  [data-park] .park-home-brief-row {
+    align-items: flex-start;
+  }
+  /* 16px keeps iOS from zooming the page when the task box is focused */
+  [data-park] .park-home-panel .park-home-input {
+    font-size: 16px;
+    letter-spacing: 0;
+  }
+}

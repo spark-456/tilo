@@ -307,6 +307,7 @@ def run_units(
     verifier: Any = None,
     runner: Any = None,
     config_overrides: dict[str, Any] | None = None,
+    run_kwargs: dict[str, Any] | None = None,
 ) -> Ran:
     """Runs one plan with a unit per key of `script` (worker A_s<i> for the i-th), all in district D1."""
     from tilo_harness.executor import run_plan
@@ -329,6 +330,7 @@ def run_units(
     rig = rig or make_rig(tmp_path / "archive" if with_archive else None, world_id=world_id)
     runner = runner or OutputRunner(script, lambda: store.read_events(ORG, world_id))
     kwargs: dict[str, Any] = {"verifier": verifier} if verifier is not None else {}
+    kwargs |= run_kwargs or {}
     if with_store:
         kwargs |= {"artifacts": rig.store, "scope": rig.scope, "redact": rig.redactor}
         if rig.archive is not None:

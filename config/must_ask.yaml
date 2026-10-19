@@ -1,0 +1,8 @@
+# What the model-judged must-ask layer (FR-AGT-05, PRD 8.3) does with an ambiguity or a trade-off (BQ-ASSUME-1).
+# assume: go on with the model's suggested option and record one "Assumed: ..." line the person can see, the
+#   same form intake uses for a skipped question (SIMPLE-RUN: too many questions lead to a weak product).
+# ask: stop and show a needs-you card, as before.
+# Never affected by this switch: repeated failure, an action above T1 in config/autonomy.yaml, T3 (always a
+# person), and a model-raised sensitive_step (money, personal data, legal terms, outside communication).
+# Any value other than assume or ask is treated as ask.
+model_questions: assume

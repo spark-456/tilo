@@ -8,25 +8,51 @@ no network or paid call, and it is a stand-in for sign-in and Firestore, never a
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import threading
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
+from tilo_channels.web_push import SubscriptionStore
+from tilo_harness.schedule_store import InMemoryScheduleStore
 from tilo_harness.validator import repo_validator
+from tilo_metering import InMemoryFlagStore, LedgerEntry
+from tilo_metering.flags import process_flags
+from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, dev_run, events
+from tilo_api.feedback import InMemoryFeedbackStore
+from tilo_api.skill_store import MemorySkillStore
 
 ENV_FLAG = "TILO_API_DEV"  # "1" turns dev mode on; nothing else does
 ENV_ORIGINS = "TILO_API_DEV_ORIGINS"  # comma-separated allowed browser origins
+ENV_FORCE_REPLAY = "TILO_DEV_FORCE_REPLAY"  # "1" (dev mode only, tests only): start with `replay_only` set (NFR-22/24)
 DEFAULT_ORIGIN = "http://localhost:5173"  # the Vite dev server
 DEV_OWNER = "u_dev_owner"  # the one dev principal (common.schema.json user_id)
-PORT = 8080
+ENV_PORT = "TILO_API_DEV_PORT"  # a second local API beside another one (an unprivileged port); default 8080
+DEFAULT_PORT = 8080
+
+
+def dev_port(env: Mapping[str, str] | None = None) -> int:
+    """The one loopback port the dev server answers on, and the only one its Host check accepts. A value that is not an
+    unprivileged port number is refused, never guessed."""
+    raw = (os.environ if env is None else env).get(ENV_PORT)
+    if raw is None or raw == "":
+        return DEFAULT_PORT
+    if not raw.isdigit() or not 1024 <= int(raw) <= 65535:
+        raise DevModeRefused(f"{ENV_PORT} must be a port number from 1024 to 65535, not {raw!r}")
+    return int(raw)
+
+
+PORT = dev_port()
 ENV_MODELS = "TILO_MODELS_FILE"  # `main` points it at the dev models file unless the user already chose one
 DEV_MODELS = Path(__file__).resolve().parents[4] / "config" / "models.dev.yaml"  # a fake Director, CL-INT-5
 
@@ -63,7 +89,7 @@ class _LocalHostOnly:
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] in ("http", "websocket"):
             host = next((v.decode("latin-1") for k, v in scope["headers"] if k == b"host"), "")
-            if not _HOST_RE.match(host):
+            if not _HOST_RE.fullmatch(host):
                 if scope["type"] == "http":
                     await PlainTextResponse("Invalid host header", status_code=400)(scope, receive, send)
                 else:
@@ -82,17 +108,62 @@ def cors_origins(env: Mapping[str, str] | None = None) -> list[str]:
     return origins
 
 
+class DevLedger:
+    """The dev stand-in for the Treasury's ledger (DEV-HARNESS-1c), behind the one seam production will use
+    (`deps.get_ledger`). It is fed only by cost events the dev writer has newly committed: one `commit` entry per event
+    that carries credits, in the credits the event recorded (priced from config/prices.dev.yaml by the dev unit
+    runner), so the cost routes and the credits the UI reads off the events can be compared. It prices nothing."""
+
+    def __init__(self) -> None:
+        self._entries: list[LedgerEntry] = []
+        self._ids: set[str] = set()
+        self._lock = threading.Lock()
+
+    def record(self, event: Mapping[str, Any], owner: str) -> None:
+        credits = event.get("credits")
+        if isinstance(credits, bool) or not isinstance(credits, int | float) or credits <= 0:
+            return
+        item = event.get("item")
+        entry = LedgerEntry(
+            kind="commit", run=event["run_id"], user=owner, org=deps.ORG_ID, at=datetime.fromisoformat(event["ts"]),
+            step=item if isinstance(item, str) else None, credits=float(credits), usage=dev_run.UNIT_USAGE,
+        )  # fmt: skip
+        with self._lock:
+            self._entries.append(entry)
+
+    def append(self, entry: LedgerEntry) -> None:
+        """The writer seam (`deps.get_ledger_writer`, ticket T3): Quick, a room turn or a metered unit in dev mode."""
+        self.append_once(None, entry)
+
+    def append_once(self, entry_id: str | None, entry: LedgerEntry) -> None:
+        refuse_if_unsafe()
+        with self._lock:
+            if entry_id is not None and entry_id in self._ids:
+                return
+            self._entries.append(entry)
+            if entry_id is not None:
+                self._ids.add(entry_id)
+
+    def entries(self) -> tuple[LedgerEntry, ...]:
+        refuse_if_unsafe()
+        with self._lock:
+            return tuple(self._entries)
+
+
 class DevEventWriter:
     """Stands in for the harness's single writer (PRD 15.3) over the in-memory store: stamps `v`, `seq` (strictly
     increasing after whatever the API itself wrote), `ts`, `world_id`, `run_id` and the null trace; validates the
     result against the contract before it is stored; idempotent by event `id`. It never defaults `vis`: an event
     without one is refused, so nothing built against dev mode can widen who sees it."""
 
-    def __init__(self, store: deps.Store) -> None:
-        self._store, self._lock = store, threading.Lock()
+    def __init__(self, store: deps.Store, ledger: DevLedger | None = None) -> None:
+        self._store, self._ledger, self._lock = store, ledger, threading.Lock()
+
+    def _guard(self) -> None:
+        refuse_if_unsafe()
 
     def append(self, world_id: str, event: dict) -> dict:
-        refuse_if_unsafe()
+        self._guard()
         world = self._store.worlds.get(world_id)
         if world is None:
             raise deps.EventRejected(f"unknown world {world_id!r}")
@@ -116,7 +187,81 @@ class DevEventWriter:
             if problems := repo_validator().problems(stamped):
                 raise deps.EventRejected("; ".join(problems[:3]))
             committed.append(stamped)
+            if self._ledger is not None:
+                self._ledger.record(stamped, world.owner)  # newly committed only: a repeat returned above
             return stamped
+
+
+class DevDeskWorlds:
+    """One Desk world per person over the in-memory `Store`: `w_desk_<user id without "u_">`, owned by that person with
+    no districts, made on first use (idempotent). A user id that cannot make a valid world id raises."""
+
+    def __init__(self, store: deps.Store) -> None:
+        self._store, self._lock = store, threading.Lock()
+
+    def desk_world(self, org_id: str, user_id: str) -> str:
+        refuse_if_unsafe()
+        suffix = user_id[2:] if user_id.startswith("u_") else ""
+        if re.fullmatch(r"[0-9A-Za-z_]{1,43}", suffix) is None:
+            raise ValueError("no Desk world for this user id")
+        world_id = f"w_desk_{suffix}"
+        run_id = "r_desk_" + hashlib.sha256(f"{org_id}:{user_id}".encode()).hexdigest()[:24]  # one run per Desk
+        with self._lock:
+            held = self._store.worlds.setdefault(world_id, deps.WorldRecord(owner=user_id, districts={}, run_id=run_id))
+            if getattr(held, "owner", None) != user_id:
+                raise ValueError("that Desk world belongs to someone else")  # never adopted (as `desk.ensure_desk`)
+        return world_id
+
+    def desk_owner(self, world_id: str) -> str | None:
+        refuse_if_unsafe()
+        return getattr(self._store.worlds.get(world_id), "owner", None)
+
+
+class _NoSources:
+    """Dev plate sources and source owners: nothing to join and no owner to name (a stand-in, never a second store)."""
+
+    def cards(self, user_id: str) -> tuple[()]:
+        refuse_if_unsafe()
+        return ()
+
+    runs = mail = cards
+
+    def owner_of(self, kind: str, ref: str) -> None:
+        refuse_if_unsafe()
+
+
+def _dev_people() -> dict[Callable[..., Any], Callable[[], Any]]:
+    """One in-memory `PeopleStores` per install, holding the dev owner as an org owner of `deps.ORG_ID` (PPL-11a)."""
+    stores, none = PeopleStores.in_memory(), _NoSources()
+    stamp = {"by": DEV_OWNER, "at": "2026-09-29T09:30:00.000Z"}
+    stores.persons.create(
+        {
+            "id": DEV_OWNER, "org_id": deps.ORG_ID, "display_name": "Dev Owner", "aliases": [],
+            "email": "dev-owner@example.com", "time_zone": "Asia/Kolkata", "preferred_channel": "web",
+            "org_role": "owner", "memberships": [], "created_by": stamp,
+        }
+    )  # fmt: skip
+
+    def get_stores() -> PeopleStores:
+        refuse_if_unsafe()
+        return stores
+
+    def get_none() -> _NoSources:
+        refuse_if_unsafe()
+        return none
+
+    skills = MemorySkillStore()  # taught skills (SKILLS-2): in memory, like the people stores
+
+    def get_skills() -> MemorySkillStore:
+        refuse_if_unsafe()
+        return skills
+
+    return {
+        deps.get_people_stores: get_stores,
+        deps.get_plate_sources: get_none,
+        deps.get_source_owners: get_none,
+        deps.get_skill_store: get_skills,
+    }
 
 
 def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
@@ -125,13 +270,21 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
     origins = cors_origins(env)
     store = deps.Store()
     store.policies["pol_dev_send"] = dev_run.dev_send_policy(DEV_OWNER)  # the dev run goes straight to its gate card
-    writer = DevEventWriter(store)
+    ledger = DevLedger()
+    writer = DevEventWriter(store, ledger)
+    if (os.environ if env is None else env).get(ENV_FORCE_REPLAY) == "1":
+        flags = process_flags()
+        if not isinstance(flags, InMemoryFlagStore):  # never flip a shared (Firestore-backed) switch from a dev box
+            raise DevModeRefused(f"{ENV_FORCE_REPLAY}=1 needs the in-process flag store")
+        flags.set("replay_only", True, reason=f"{ENV_FORCE_REPLAY} (dev mode)")  # the real switch's flag
 
     def principal(request: Request) -> deps.Principal:
         refuse_if_unsafe()
         # The one owner is a member of whichever of its own worlds the path names; an unknown world is
-        # the same 404 as ever, because the route looks the world up in the store.
-        return deps.Principal(user_id=DEV_OWNER, role="owner", world_id=request.path_params.get("world_id"))
+        # the same 404 as ever, because the route looks the world up in the store. The dev owner is the person at the
+        # keyboard: a full web sign-in session (BQ-XWORLD-10).
+        world_id = request.path_params.get("world_id")
+        return deps.Principal(user_id=DEV_OWNER, role="owner", world_id=world_id, full_session=True)
 
     def get_store() -> deps.Store:
         refuse_if_unsafe()
@@ -145,12 +298,52 @@ def install(app: FastAPI, env: Mapping[str, str] | None = None) -> None:
         return writer
 
     app.dependency_overrides[deps.get_event_writer] = get_writer
+    app.dependency_overrides[deps.get_ledger] = ledger.entries  # the cost routes' seam (FR-MTR-10, BQ-MTR10-4)
+    app.dependency_overrides[deps.get_ledger_writer] = lambda: ledger  # and the write seam (T3): one dev memory
+    from tilo_api import dev_tick, schedules  # noqa: PLC0415 (they import this module)
+
+    schedule_store = InMemoryScheduleStore()  # per install: dev never reads TILO_SCHEDULES_STORE or a real project
+
+    def get_schedule_store() -> InMemoryScheduleStore:
+        refuse_if_unsafe()
+        return schedule_store
+
+    app.dependency_overrides[schedules.get_schedule_store] = get_schedule_store
+    app.include_router(dev_tick.router)  # POST /dev/schedules/tick: registered here and nowhere else
+    desks = DevDeskWorlds(store)
+
+    def get_desks() -> DevDeskWorlds:
+        refuse_if_unsafe()
+        return desks
+
+    app.dependency_overrides[deps.get_desk_worlds] = get_desks  # the Desk worlds of the work-item events (PE-12)
     app.dependency_overrides.update(dev_run.overrides())  # fake unit runner, recipient and send (CL-INT-5c)
+    feedback = InMemoryFeedbackStore()  # BQ-FEEDBACK-1: kept in memory, never read back
+
+    def get_feedback() -> InMemoryFeedbackStore:
+        refuse_if_unsafe()
+        return feedback
+
+    app.dependency_overrides[deps.get_feedback_store] = get_feedback
+    push = SubscriptionStore()  # FR-CHN-17b: in memory, never sent (the fake push is the default in dev)
+
+    def get_push() -> SubscriptionStore:
+        refuse_if_unsafe()
+        return push
+
+    app.dependency_overrides[deps.get_push_store] = get_push
+    app.dependency_overrides.update(_dev_people())  # in-memory people stores, the dev owner an org owner
+    from tilo_api import meeting_room  # noqa: PLC0415
+
+    app.dependency_overrides.update(
+        meeting_room.dev_overrides()
+    )  # MROOM-A1: a free fake room model, an in-memory archive
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
-        allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type"],
+        allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+        allow_headers=["Content-Type", "Idempotency-Key", "X-Firebase-AppCheck"],  # SEC-10: the web client's token
+        expose_headers=["Retry-After"],
     )  # no credentials: the dev principal reads no cookie or header
     app.add_middleware(_LocalHostOnly)  # added last, so it runs first
 

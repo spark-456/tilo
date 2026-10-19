@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<style>body{margin:0}</style>
+</helmet>
+<div data-screen-label="Meet tile" style="position:relative;width:320px;height:240px;overflow:hidden;background:{{ bg }};font-family:'Geist',sans-serif">
+  <sc-if value="{{ guides }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:0;right:0;top:30px;height:180px;border-top:1px dashed {{ gc }};border-bottom:1px dashed {{ gc }};z-index:9;pointer-events:none"></div><span style="position:absolute;right:6px;top:14px;font-family:'Geist Mono',monospace;font-size:9px;color:{{ gc }};z-index:9">16:9 safe</span></sc-if>
+  <div style="position:absolute;left:50%;top:38px;margin-left:-64px;width:128px;height:150px;transform-origin:50% 100%;animation:{{ tilt }}">
+    <dc-import name="Tilo S Buddy" size="150" mood="{{ mood }}" hint-size="127px,150px"></dc-import>
+  </div>
+  <sc-if value="{{ listen }}" hint-placeholder-val="{{ false }}">
+    <span style="position:absolute;left:60px;top:78px;width:30px;height:30px;border-radius:99px;border:3px solid {{ arc }};border-right-color:transparent;border-bottom-color:transparent;transform:rotate(-45deg);animation:tSound 1.6s ease-out infinite"></span>
+    <span style="position:absolute;left:50px;top:68px;width:50px;height:50px;border-radius:99px;border:3px solid {{ arc }};border-right-color:transparent;border-bottom-color:transparent;transform:rotate(-45deg);animation:tSound 1.6s ease-out .3s infinite"></span>
+  </sc-if>
+  <div style="position:absolute;left:30px;right:30px;top:166px;height:28px;clip-path:polygon(8% 0,92% 0,100% 100%,0 100%);background:{{ deskT }}"></div>
+  <div style="position:absolute;left:30px;right:30px;top:194px;height:16px;background:{{ deskF }}"></div>
+  <div style="position:absolute;left:200px;top:160px;width:44px;height:16px;clip-path:polygon(18% 0,100% 0,82% 100%,0 100%);background:#FFFFFF;border-bottom:2px solid {{ deskF }}"></div>
+  <div style="position:absolute;left:84px;top:156px;width:16px;height:18px;border-radius:3px 3px 5px 5px;background:#C8F23A"></div>
+  <span style="position:absolute;left:12px;top:38px;height:20px;padding:0 8px;border-radius:99px;background:rgba(11,11,12,.72);color:#FFFFFF;font-size:10px;font-weight:600;display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:9px;background:#C8F23A"></span>{{ status }}</span>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:320,&quot;height&quot;:240},&quot;pose&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;idle&quot;,&quot;listen&quot;,&quot;think&quot;,&quot;speak&quot;,&quot;happy&quot;,&quot;sad&quot;],&quot;default&quot;:&quot;idle&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;guides&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const pose = this.props.pose ?? 'idle', dark = !!this.props.dark;
+    const M = { idle: 'idle', listen: 'listen', think: 'think', speak: 'talk', happy: 'happy', sad: 'sad' };
+    const S = { idle: 'Tilo · notetaker', listen: 'Listening', think: 'Thinking', speak: 'Speaking', happy: 'All noted', sad: 'Lost the audio' };
+    return {
+      mood: M[pose] || 'idle', listen: pose === 'listen', status: S[pose] || 'Tilo', tilt: pose === 'listen' ? 'none' : 'none',
+      bg: dark ? '#141416' : '#ECFBC2', deskT: dark ? '#2A2A2F' : '#FFFFFF', deskF: dark ? '#1C1C1F' : '#D5D5D0', arc: dark ? '#C8F23A' : '#0B0B0C',
+      guides: !!this.props.guides, gc: dark ? '#97979D' : '#6B6B70'
+    };
+  }
+}
+</script>
+</body>
+</html>

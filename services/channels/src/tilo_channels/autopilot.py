@@ -18,7 +18,7 @@ import copy
 import hashlib
 import logging
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields, replace
 from typing import Any, Protocol
 
 import tilo_policy
@@ -50,6 +50,7 @@ from tilo_channels.drafting import (
     _addresses,
     _base,
 )
+from tilo_channels.participants import Participant, read_participants
 
 __all__ = ["ACTION_TYPE", "Autopilot", "CancelPending", "DraftContext", "Outbox", "Outcome", "Preview", "clean_text"]
 __all__ += ["CardStore", "StopQueue", "t3_content_signal", "DECISION_MAX_AGE_S"]
@@ -69,10 +70,12 @@ _TUPLES = ("options", "to", "cc", "findings", "questions", "modifiers")
 @dataclass(frozen=True)
 class DraftContext:
     instruction_id: str
-    thread_id: str
+    thread_id: str | None  # None: a new, thread-less email (FR-MTG-08); nothing reads a thread for it
     instruction: str
     mailbox: str
     mode: str = "reply"
+    # CHN-GATE-E (ADR-0025): filled by `Autopilot._card` from its own reader, never by a caller; never stored or sent
+    participants: tuple[Participant, ...] = field(default=(), repr=False)  # names and addresses stay out of any repr
 
 
 class AutonomyPolicy(Protocol):
@@ -141,6 +144,7 @@ class Autopilot:
         self._drafter, self._reader, self._contacts, self._emit = drafter, reader, contacts, emit
         self._policy, self._cards, self._clock, self._stops = policy, cards, clock, stops
         self._world_id = world_id
+        self._run_id = run_id
         self._ledger = Ledger(
             cards=cards, outbox=outbox, clock=clock, world_id=world_id, run_id=run_id, connector=connector, stops=stops
         )
@@ -175,6 +179,10 @@ class Autopilot:
         """Whether `user_id` is this world's owner: the check `preview` makes first, for callers that must not draft
         for anyone else (FR-PA-07). No behaviour of the card path changes."""
         return self._owns(user_id)
+
+    def matches_scope(self, *, world_id: str, run_id: str, owner: str) -> bool:
+        """Server adapters bind previews to the stored world/run and real owner (never bench evidence)."""
+        return not self._fake and (self._world_id, self._run_id, self._world_owner()) == (world_id, run_id, owner)
 
     def _get(self, user_id: str, card_id: str) -> dict[str, Any] | None:
         """The stored card as it stands: an L2 card's newest decision, or L1 once its decision was dropped."""
@@ -313,6 +321,9 @@ class Autopilot:
         card_id = _card_id(user_id, context.instruction_id)
         doc = self._cards.get(user_id, card_id)
         if doc is None:  # one atomic record fixes tier, level and entry id before any enqueue; first writer wins
+            context = replace(  # a caller's participants are thrown away (ADR-0025): only this reader names anybody
+                context, participants=read_participants(self._reader, user_id, context.thread_id, context.mailbox)
+            )
             doc = self._decision(user_id, card_id, context, result, instructed)
             if self._cards.create(user_id, card_id, doc):
                 if "approval_requested" in doc:  # once: only the instance whose create won emits the gate
@@ -390,7 +401,8 @@ class Autopilot:
             "references": draft.references if draft else "",
         }
         if ready and draft is not None:
-            modifiers = ["money_or_legal"] if t3_content_signal(draft.body) else []  # hidden characters too
+            vouched = t3_content_signal(draft.body, self._names(context, draft))  # hidden characters too
+            modifiers = ["money_or_legal"] if vouched else []
             modifiers += ["safety_flag"] if self._flagged(user_id, context, result) else []
             modifiers += ["new_recipients"] if self._adds_recipient(user_id, context, draft) else []
             modifiers += ["attachments"] if draft.attachments else []
@@ -422,6 +434,14 @@ class Autopilot:
                 doc["approval_requested"] = requested_part(doc, doc["outbox_id"])
         return doc
 
+    @staticmethod
+    def _names(context: DraftContext, draft: Draft) -> frozenset[str]:
+        """ADR-0025: the name words of the participants that are this draft's own To or Cc and the mailbox, and no one
+        else's, so a name a sender chose only ever goes back to that sender."""
+        mailbox = _address(context.mailbox)
+        wanted = {_base(a) for raw in (*draft.to, *draft.cc, mailbox) if isinstance(raw, str) and (a := _address(raw))}
+        return frozenset(w for p in context.participants if _base(p.address) in wanted for w in p.names)
+
     def _flagged(self, user_id: str, context: DraftContext, result: DraftResult) -> bool:
         """BQ-183: the passed result's flags or those of the draft FR-CHN-10 stored for the instruction, if any."""
         stored = self._drafter.stored(user_id, context.instruction_id)
@@ -446,8 +466,9 @@ class Autopilot:
         mailbox = _address(context.mailbox)
         own = _base(mailbox) if mailbox else None  # a non-ASCII mailbox vouches for nothing
         try:
-            listed = self._reader.get_thread(user_id, context.thread_id).get("messages")
-        except Exception:  # any read failure only narrows what is known
+            thread_id = context.thread_id
+            listed = self._reader.get_thread(user_id, thread_id).get("messages") if thread_id else []
+        except Exception:  # any read failure, or no thread, only narrows what is known
             listed = []
         for message in [m for m in (listed if isinstance(listed, list) else []) if isinstance(m, dict)][-MAX_MESSAGES:]:
             sender = _addresses(message.get("from"))[:1]

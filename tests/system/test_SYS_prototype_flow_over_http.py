@@ -152,6 +152,47 @@ def test_SYS_SEC_06_the_dev_server_answers_only_its_own_host_and_only_the_web_or
     assert "access-control-allow-origin" not in evil.headers
 
 
+# Routes added after the prototype flow, driven here as one real HTTP call each in dev mode (one fixed owner, no
+# Firestore, no Google config): the call must answer with the status that route gives for an unknown id, an empty
+# body or a missing config, never a 5xx other than the by-design 503 `not_configured`. Their deep behaviour is
+# covered by the owning service's own tests; this suite proves each is mounted, reachable and fails closed.
+PROBES = {
+    "GET /access": {503}, "POST /access/declaration": {503}, "GET /costs": {503}, "GET /worlds/{world_id}/costs": {503},
+    "GET /worlds": {200}, "GET /cards": {200},
+    "POST /worlds/{world_id}/cards/{card_id}/share": {422}, "DELETE /worlds/{world_id}/shares/{share_id}": {404},
+    "GET /share/{token}": {404}, "POST /share/{token}/answer": {422},
+    "POST /v1/assistant/ask": {422}, "GET /v1/meetings/{meeting_id}/quotes": {422},
+    "GET /v1/work-items/{work_item_id}/quote": {404}, "GET /v1/plate": {200},
+    "POST /v1/meetings": {422}, "POST /v1/meetings/{meeting_id}/confirm": {404},
+    "GET /v1/meetings/{meeting_id}": {404}, "POST /v1/meetings/{meeting_id}/edit": {422},
+    "GET /v1/meetings/{meeting_id}/minutes": {404}, "POST /v1/meetings/{meeting_id}/world": {503},
+    "POST /v1/meetings/{meeting_id}/host": {503}, "POST /v1/meetings/{meeting_id}/delete": {404},
+    "POST /v1/people": {422}, "POST /v1/people/first": {422}, "POST /v1/people/{person_id}/memberships": {422},
+    "POST /v1/people/{person_id}/memberships/remove": {422}, "POST /v1/people/{person_id}/role": {422},
+    "POST /v1/work-items": {422}, "GET /v1/work-items": {200}, "GET /v1/work-items/{work_item_id}": {404},
+    "POST /v1/work-items/{work_item_id}/confirm": {404}, "POST /v1/work-items/{work_item_id}/edit": {422},
+    "POST /v1/work-items/{work_item_id}/snooze": {422}, "POST /v1/work-items/{work_item_id}/done": {404},
+    "POST /v1/work-items/{work_item_id}/reopen": {404}, "POST /v1/work-items/{work_item_id}/not-mine": {404},
+    "POST /v1/work-items/{work_item_id}/put-back": {404},
+    "GET /schedules": {200}, "POST /schedules": {422}, "GET /schedules/{schedule_id}": {404},
+    "PATCH /schedules/{schedule_id}": {404}, "DELETE /schedules/{schedule_id}": {404},
+    "POST /internal/schedules/tick": {503},  # public by design, fails closed: no OIDC audience/caller configured
+    "POST /worlds/{world_id}/skill-proposals": {503},
+    "GET /worlds/{world_id}/skill-proposals": {403}, "GET /worlds/{world_id}/skill-proposals/{proposal_id}": {403},
+    "POST /worlds/{world_id}/skill-proposals/{proposal_id}/approve": {403},
+    "POST /worlds/{world_id}/skill-proposals/{proposal_id}/reject": {403},
+}  # fmt: skip
+
+
+def test_SYS_every_later_route_answers_over_http_the_way_its_contract_says(dev_api):
+    for route, allowed in PROBES.items():
+        method, path = route.split(" ")
+        url = dev_api + path.replace("{", "x_").replace("}", "")
+        response = httpx.request(method, url, json={} if method in {"POST", "PATCH"} else None, timeout=15)
+        assert response.status_code in allowed, f"{route} answered {response.status_code}, expected {sorted(allowed)}"
+        assert "Traceback" not in response.text, f"{route} leaks a server error body"
+
+
 def test_SYS_every_route_the_api_serves_is_driven_by_this_suite(dev_api):
     """A new route fails here until a system test drives it (or this list says why not)."""
     driven = {
@@ -161,7 +202,7 @@ def test_SYS_every_route_the_api_serves_is_driven_by_this_suite(dev_api):
         "POST /worlds/{world_id}/cards/{card_id}/answer", "GET /worlds/{world_id}/layout",
         "GET /worlds/{world_id}/delivery", "POST /worlds/{world_id}/pause",
         "POST /worlds/{world_id}/autopilot/stop", "POST /policies/{policy_id}/revoke",
-    }  # fmt: skip
+    } | set(PROBES)  # fmt: skip
     # Team Lead console (FR-HIL-10): needs a team_lead principal, which dev mode (one fixed owner) has none of.
     not_drivable = {"GET /worlds/{world_id}/console", "POST /worlds/{world_id}/console/cards/{card_id}/answer"}
     spec = httpx.get(f"{dev_api}/openapi.json").json()

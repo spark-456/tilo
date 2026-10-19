@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="position:relative;width:100%;min-height:100%;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:16px;line-height:1.5">
+  <dc-import name="Tilo S Nav" active="agenda" theme="{{ theme }}" hint-size="100%,72px"></dc-import>
+  <main style="max-width:1296px;margin:0 auto;padding:40px 32px 64px;display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;align-items:flex-end;gap:16px">
+      <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+        <h1 style="margin:0;font-family:var(--fH);font-weight:700;font-size:48px;line-height:1.05;letter-spacing:-2px">Agenda</h1>
+        <p style="margin:0;font-size:18px;color:var(--ink2)">Tilo prepares a brief before each meeting and takes notes in the ones you invite it to.</p>
+      </div>
+      <div style="display:flex;gap:4px;padding:4px;border-radius:16px;background:var(--sunk)"><span style="height:40px;padding:0 16px;border-radius:12px;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.12);display:flex;align-items:center;font-weight:600;font-size:14.5px">My week</span><span style="height:40px;padding:0 16px;border-radius:12px;display:flex;align-items:center;font-weight:600;font-size:14.5px;color:var(--ink2)">Team</span></div>
+      <div style="display:flex;align-items:center;gap:4px"><span style="width:44px;height:44px;border-radius:14px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;justify-content:center">‹</span><span style="height:44px;padding:0 16px;border-radius:14px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;font-weight:600;font-size:14.5px">13 – 17 Oct</span><span style="width:44px;height:44px;border-radius:14px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;justify-content:center">›</span></div>
+      <span style="height:44px;padding:0 16px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;font-weight:700;font-size:14.5px">Today</span>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start">
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);overflow:hidden">
+        <div style="display:grid;grid-template-columns:64px repeat(5,minmax(0,1fr));border-bottom:1px solid var(--line)">
+          <span></span>
+          <sc-for list="{{ days }}" as="d" hint-placeholder-count="5">
+            <div style="padding:14px 12px;display:flex;align-items:baseline;gap:8px;border-left:1px solid var(--line)"><span style="font-size:13px;font-weight:600;color:var(--ink3)">{{ d.d }}</span><span style="min-width:30px;height:30px;padding:0 6px;box-sizing:border-box;border-radius:99px;display:inline-flex;align-items:center;justify-content:center;font-family:var(--fH);font-weight:700;font-size:17px;background:{{ d.bg }};color:{{ d.fg }}">{{ d.n }}</span></div>
+          </sc-for>
+        </div>
+        <div style="position:relative;display:grid;grid-template-columns:64px repeat(5,minmax(0,1fr));grid-template-rows:repeat(18,34px);background:repeating-linear-gradient(180deg,transparent 0 67px,var(--line) 67px 68px)">
+          <sc-for list="{{ hours }}" as="h" hint-placeholder-count="9"><span style="grid-column:1;grid-row:{{ h.r }};padding:0 10px;font-family:var(--mono);font-size:11px;color:var(--ink3);text-align:right;transform:translateY(-7px)">{{ h.t }}</span></sc-for>
+          <sc-for list="{{ cols }}" as="c" hint-placeholder-count="5"><span style="grid-column:{{ c.c }};grid-row:1 / span 18;border-left:1px solid var(--line);background:{{ c.bg }}"></span></sc-for>
+          <sc-for list="{{ events }}" as="e" hint-placeholder-count="10">
+            <div style="grid-column:{{ e.c }};grid-row:{{ e.r }};margin:3px 4px;border-radius:12px;background:{{ e.bg }};color:{{ e.fg }};border:{{ e.bd }};box-shadow:{{ e.ring }};padding:6px 10px;display:flex;flex-direction:column;gap:2px;overflow:hidden;z-index:1">
+              <span style="font-size:13px;font-weight:700;line-height:1.3">{{ e.t }}</span>
+              <span style="font-family:var(--mono);font-size:10.5px;opacity:.85">{{ e.time }}</span>
+              <sc-if value="{{ e.tilo }}"><span style="align-self:flex-start;margin-top:2px;height:20px;padding:0 6px 0 3px;border-radius:99px;background:var(--card);color:var(--ink);font-size:10.5px;font-weight:700;display:flex;align-items:center;gap:4px"><span style="width:14px;height:14px;border-radius:5px;background:var(--lime);display:flex;align-items:center;justify-content:center"><span style="width:8px;height:5px;border-radius:2px;background:#FFFFFF"></span></span>{{ e.tilo }}</span></sc-if>
+            </div>
+          </sc-for>
+          <div style="grid-column:4;grid-row:12;position:relative;z-index:2"><div style="position:absolute;left:-4px;right:0;top:22px;height:2px;background:var(--red)"><span style="position:absolute;left:-5px;top:-4px;width:10px;height:10px;border-radius:99px;background:var(--red)"></span></div></div>
+        </div>
+      </div>
+      <aside style="display:flex;flex-direction:column;gap:16px">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh2);padding:22px;display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3)">WED 15 OCT · 11:00 – 12:00</span><span style="font-family:var(--fH);font-weight:700;font-size:24px;letter-spacing:-.6px;line-height:1.2">Supplier call · Voltway</span></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><span style="height:30px;padding:0 10px 0 3px;border-radius:99px;background:var(--sunk);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><span style="width:24px;height:24px;border-radius:99px;background:var(--lilacSoft);color:var(--lilacInk);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center">OB</span>Oskar</span><span style="height:30px;padding:0 10px 0 3px;border-radius:99px;background:var(--sunk);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><span style="width:24px;height:24px;border-radius:99px;background:var(--lilacSoft);color:var(--lilacInk);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center">MR</span>You</span><span style="height:30px;padding:0 10px 0 3px;border-radius:99px;background:var(--sunk);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><span style="width:24px;height:24px;border-radius:7px;background:var(--lime);display:flex;align-items:center;justify-content:center"><span style="width:13px;height:8px;border-radius:3px;background:#FFFFFF"></span></span>Tilo</span></div>
+          <div style="border-radius:18px;background:var(--sunk);padding:16px;display:flex;flex-direction:column;gap:8px">
+            <span style="font-weight:700;font-size:15px">Tilo’s brief</span>
+            <sc-for list="{{ brief }}" as="b" hint-placeholder-count="3"><span style="display:flex;gap:10px;font-size:14.5px;line-height:1.45"><span style="color:var(--ink3)">•</span>{{ b }}</span></sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <span style="font-size:13px;font-weight:600;color:var(--ink3);padding-bottom:4px">During the call, Tilo will</span>
+            <sc-for list="{{ sw }}" as="s" hint-placeholder-count="3"><div style="min-height:44px;display:flex;align-items:center;gap:12px;font-size:14.5px"><span style="flex:1">{{ s.t }}</span><span style="width:40px;height:24px;border-radius:99px;background:{{ s.tb }};display:flex;align-items:center;padding:3px;box-sizing:border-box;justify-content:{{ s.tj }}"><span style="width:18px;height:18px;border-radius:99px;background:#FFFFFF"></span></span></div></sc-for>
+          </div>
+          <span style="height:48px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;font-weight:700">Open the full brief</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <span style="font-weight:700;font-size:15px;padding:0 4px">Tilo suggests</span>
+          <sc-for list="{{ sugg }}" as="g" hint-placeholder-count="2">
+            <div style="background:var(--card);border:1px dashed var(--line2);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px">
+              <span style="font-weight:600;font-size:15px;line-height:1.4">{{ g.t }}</span>
+              <span style="font-size:13.5px;color:var(--ink3)">{{ g.s }}</span>
+              <div style="display:flex;gap:6px"><span style="height:40px;padding:0 14px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;font-weight:700;font-size:14px">{{ g.a }}</span><span style="height:40px;padding:0 14px;border-radius:12px;display:flex;align-items:center;font-weight:600;font-size:14px;color:var(--ink2)">Dismiss</span></div>
+            </div>
+          </sc-for>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1000},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'studio';
+    const row = (h, dur) => { const s = 1 + Math.round((h - 9) * 2); return s + ' / span ' + Math.round(dur * 2); };
+    const C = { sky: ['var(--skySoft)', 'var(--skyInk)'], lilac: ['var(--lilacSoft)', 'var(--lilacInk)'], pink: ['var(--pinkSoft)', 'var(--pinkInk)'], amber: ['var(--amberSoft)', 'var(--amberInk)'], mint: ['var(--mintSoft)', 'var(--mintInk)'], lime: ['var(--priSoft)', 'var(--priInk)'], ghost: ['transparent', 'var(--ink2)'] };
+    const ev = [[2, 9.5, .5, 'Stand-up', '9:30', 'sky'], [2, 14, 1, 'Launch review', '14:00 – 15:00', 'lilac', 'Takes notes'], [3, 9.5, .5, 'Stand-up', '9:30', 'sky'], [3, 10, 1.5, 'Focus: launch page', '10:00 – 11:30', 'lime'], [3, 15, .5, '1:1 with Jo', '15:00', 'pink'], [4, 9.5, .5, 'Stand-up', '9:30', 'sky'], [4, 11, 1, 'Supplier call · Voltway', '11:00 – 12:00', 'amber', 'Joins', true], [4, 16, 1, 'Pack for Gokarna', '16:00 – 17:00', 'mint'], [5, 9.5, .5, 'Stand-up', '9:30', 'sky'], [5, 12, 1, 'Brightcell demo', '12:00 – 13:00', 'sky', 'Joins'], [5, 14, 2, 'Focus time?', 'Tilo suggests', 'ghost'], [6, 9.5, .5, 'Stand-up', '9:30', 'sky'], [6, 16, .5, 'Friday update', 'Tilo writes it', 'lime', 'Writes']].map(([c, h, d, t, time, k, tilo, sel]) => ({ c: String(c), r: row(h, d), t, time, tilo: tilo || '', bg: C[k][0], fg: C[k][1], bd: k === 'ghost' ? '1.5px dashed var(--line2)' : 'none', ring: sel ? '0 0 0 2px var(--ink)' : 'none' }));
+    return {
+      theme, events: ev,
+      days: [['Mon', '13'], ['Tue', '14'], ['Wed', '15'], ['Thu', '16'], ['Fri', '17']].map(([d, n], i) => ({ d, n, bg: i === 2 ? 'var(--ink)' : 'transparent', fg: i === 2 ? 'var(--card)' : 'var(--ink)' })),
+      cols: [2, 3, 4, 5, 6].map(c => ({ c: String(c), bg: c === 4 ? 'var(--hover)' : 'transparent' })),
+      hours: [9, 10, 11, 12, 13, 14, 15, 16, 17].map(h => ({ r: String(1 + (h - 9) * 2), t: h + ':00' })),
+      brief: ['Oskar offered £71 a pack on the phone last week, the quote says £78.', 'Ask about the 2-year warranty, the other two offer 3.', 'Their sample costs £86. You haven’t approved it yet.'],
+      sw: [['Take notes and share them after', true], ['Draft a follow-up email (asks you first)', true], ['Add action items to the world', true]].map(([t, on]) => ({ t, tb: on ? 'var(--ink)' : 'var(--line2)', tj: on ? 'flex-end' : 'flex-start' })),
+      sugg: [{ t: 'Block 2 hours for focus on Thursday afternoon', s: 'You have 6 meetings this week and the launch page is due Friday.', a: 'Add to calendar' }, { t: 'Move the Brightcell demo to 1 pm', s: 'Lin is in Singapore. Noon is 7 pm for her.', a: 'Suggest new time' }]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -45,6 +45,17 @@ def test_FR_AGT_05_FR_HIL_10_the_recorded_sensitive_step_replies_are_the_three_p
     assert [t["id"] for t in MODEL_SENSITIVE] == ["ASK-10", "ASK-11", "ASK-12"]
 
 
+def test_CX_WEB_ROUTE_1_handoff_card_uses_plain_maker_name(tmp_path) -> None:
+    async def go():
+        run, wait, _runner, cards, _clock, _store = _setup(tmp_path, actions=["build_handoff"])
+        card = await _asked(run, _runner, cards)
+        assert card["what_happened"] == "Hand this to Lovable to build?"
+        await asyncio.to_thread(wait.write, answered_part(card, option="o1"))
+        await asyncio.wait_for(run, 20)
+
+    asyncio.run(go())
+
+
 @pytest.mark.parametrize("swapped", [False, True], ids=["as_recorded", "markers_swapped"])
 @pytest.mark.parametrize("task", MODEL_SENSITIVE, ids=lambda t: t["id"])
 def test_FR_AGT_05_FR_HIL_10_picking_the_suggested_option_holds_with_no_second_card(tmp_path, task, swapped) -> None:

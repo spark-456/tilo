@@ -1,6 +1,6 @@
 """Event contract checks for `just contracts-check` (ticket P0-03, FR-WLD-03).
 
-Registry-driven rules EV-01 to EV-15 from contracts/event.rules.md, applied to the event fixtures,
+Registry-driven rules EV-01 to EV-16 from contracts/event.rules.md, applied to the event fixtures,
 the fixture streams and contracts/events/registry.yaml itself. The harness validator (P0-09) runs
 the same rules on every event before it is written. `validate(key, instance)` returns JSON Schema
 error messages for contracts/<key>.schema.json.
@@ -90,6 +90,9 @@ def event_problems(event: Any, registry: dict[str, Any], validate: Validate) -> 
         problems.append("EV-13: vis must include the district the event renders in")
     if event["type"] == "artifact.delivered" and data.get("outbox_id") is not None and event["cause"] is None:
         problems.append("EV-14: a delivery that left Tilo is caused by its data.transfer out")
+    trace = event["trace"]  # the schema made tokens_in an integer wherever tokens_cached is present
+    if "tokens_cached" in trace and trace["tokens_cached"] > trace["tokens_in"]:
+        problems.append("EV-16: trace.tokens_cached is at most trace.tokens_in")
     return problems
 
 

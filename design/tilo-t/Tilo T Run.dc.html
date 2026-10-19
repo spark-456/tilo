@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-t.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}</style>
+</helmet>
+<div data-theme="{{ theme }}" data-screen-label="Run start" style="position:relative;width:100%;height:{{ H }};overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--fB)">
+  <dc-import name="Tilo T Nav" active="home" device="{{ navD }}" theme="{{ theme }}" hint-size="100%,64px"></dc-import>
+  <div style="position:absolute;left:0;right:0;top:{{ top }};bottom:0">
+    <div style="position:absolute;inset:0;animation:tRunWorld 6s ease-in-out infinite;animation-delay:{{ dl }};animation-play-state:{{ ps }};background:var(--cityBg)">
+      <div style="position:absolute;left:50%;top:{{ plotY }};width:{{ gS }};height:{{ gS }};margin-left:{{ gM }};margin-top:{{ gM }};transform:scaleY(.58) rotate(45deg);background:var(--ground);border:1px solid var(--line2);border-radius:6px;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:56px 56px"></div>
+      <div style="position:absolute;left:50%;top:{{ plotY }};width:170px;height:170px;margin:-85px 0 0 -85px;transform:scaleY(.58) rotate(45deg)"><div style="width:100%;height:100%;border:2.5px dashed #0B0B0C;border-radius:10px;background:rgba(200,242,58,.35);box-shadow:0 0 0 10px rgba(200,242,58,.18);animation:tRunPlot 6s ease-out infinite;animation-delay:{{ dl }};animation-play-state:{{ ps }}"></div></div>
+      <div style="position:absolute;left:50%;top:{{ plotY }};margin:-150px 0 0 -40px;animation:tRunDir 6s ease-out infinite;animation-delay:{{ dl }};animation-play-state:{{ ps }}">
+        <dc-import name="Tilo S Buddy" mood="think" size="104" hint-size="88px,104px"></dc-import>
+      </div>
+      <div style="position:absolute;left:50%;top:{{ plotY }};width:120px;height:60px;margin:-30px 0 0 -14px">
+        <div style="position:absolute;inset:0;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);background:var(--card);animation:tRunDir 6s ease-out infinite;animation-delay:{{ dl }};animation-play-state:{{ ps }}"></div>
+      </div>
+      <div style="position:absolute;left:{{ planL }};top:{{ planT }};width:300px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:9px;animation:tRunDir 6s ease-out infinite;animation-delay:{{ dl }};animation-play-state:{{ ps }}">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">DIRECTOR · DRAFTING THE PLAN</span>
+        <span style="font-size:14px;display:flex;gap:8px;animation:tRunL1 6s ease-out infinite;animation-delay:{{ dl }};animation-play-state:{{ ps }}"><span style="font-family:var(--mono);color:var(--ink3)">1</span>Find a venue by the river for 12</span>
+        <span style="font-size:14px;display:flex;gap:8px;animation:tRunL2 6s ease-out infinite;animation-delay:{{ dl }};animation-play-state:{{ ps }}"><span style="font-family:var(--mono);color:var(--ink3)">2</span>Flights from 3 cities</span>
+        <span style="font-size:14px;display:flex;gap:8px;animation:tRunL3 6s ease-out infinite;animation-delay:{{ dl }};animation-play-state:{{ ps }}"><span style="font-family:var(--mono);color:var(--ink3)">3</span>Budget under €16,000</span>
+        <span style="height:10px;width:60%;border-radius:9px;background-color:var(--bp);background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.6) 50%,transparent 70%);background-size:700px 100%;background-repeat:no-repeat;animation:tShim 1.4s linear infinite"></span>
+      </div>
+    </div>
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;padding-top:{{ hp }};gap:22px;animation:tRunHome 6s ease-in-out infinite;animation-delay:{{ dl }};animation-play-state:{{ ps }}">
+      <h1 style="margin:0;font-weight:700;font-size:{{ hs }};letter-spacing:-2px;line-height:1;text-align:center">What should your team do?</h1>
+    </div>
+    <div style="position:absolute;left:50%;top:{{ cardT }};width:{{ cardW }};margin-left:{{ cardM }};perspective:1200px">
+      <div style="position:relative;background:var(--card);border:1px solid var(--line2);border-radius:24px;padding:18px 18px 14px;display:flex;flex-direction:column;gap:14px;transform-origin:50% 0;animation:tRunCard 6s cubic-bezier(.6,0,.2,1) infinite;animation-delay:{{ dl }};animation-play-state:{{ ps }};box-shadow:var(--sh3)">
+        <span style="font-weight:600;font-size:21px;letter-spacing:-.4px">Plan our team offsite in Porto for 12 people, mid-May, under €16k</span>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="height:34px;padding:0 12px;border-radius:99px;border:1px solid var(--line);font-size:13px;font-weight:600;display:flex;align-items:center">Make a world</span><span style="height:34px;padding:0 12px;border-radius:99px;border:1px solid var(--line);font-size:13px;font-weight:600;display:flex;align-items:center">About 90 credits</span><div style="flex:1"></div><span style="height:48px;padding:0 20px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px;animation:tRunBtn 6s ease-out infinite;animation-delay:{{ dl }};animation-play-state:{{ ps }}">Run {{ iPlay }}</span></div>
+        <div style="position:absolute;inset:0;border-radius:24px;background-color:var(--bp);background-image:linear-gradient(var(--bpLine) 1px,transparent 1px),linear-gradient(90deg,var(--bpLine) 1px,transparent 1px);background-size:16px 16px;border:2px dashed var(--bpInk);display:flex;align-items:center;justify-content:center;gap:10px;color:var(--bpInk);font-family:var(--mono);font-size:15px;letter-spacing:.5px;animation:tRunBp 6s ease-in-out infinite;animation-delay:{{ dl }};animation-play-state:{{ ps }}">{{ iCity }}BLUEPRINT · OFFSITE IN PORTO</div>
+      </div>
+    </div>
+  </div>
+  <sc-if value="{{ cap }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;left:16px;bottom:16px;max-width:420px;background:#0B0B0C;color:#F4F4F2;border-radius:12px;padding:10px 12px;font-family:var(--mono);font-size:12px;line-height:1.45"><span style="color:#C8F23A">{{ capE }}</span> {{ cap }}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;frame&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;live&quot;,&quot;1&quot;,&quot;2&quot;,&quot;3&quot;,&quot;4&quot;],&quot;default&quot;:&quot;live&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloT) this.t = setInterval(() => { if (window.TiloT) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const T = window.TiloT, ic = (n, s) => T ? T.ic(React.createElement, n, s) : null;
+    const f = String(this.props.frame ?? 'live'), d = (this.props.device ?? 'desktop') === 'desktop';
+    const at = { '1': .55, '2': 1.55, '3': 2.6, '4': 5.7 }[f];
+    const CAP = { '1': ['user · Run', 'You press Run. The button dips 90 ms.'], '2': ['transition', 'The prompt card tilts back and turns into a blueprint, 0.8 s ease-in-out.'], '3': ['transition', 'The blueprint flies into the empty plot of a new world, 1 s, then the plot glows lime.'], '4': ['agent.spawned · stream', 'The Director appears at the drafting table; plan lines arrive as it writes them. Plots appear on world.planned.'] }[f];
+    return {
+      theme: this.props.theme ?? 'studio', H: d ? '900px' : '844px', navD: d ? 'desktop' : 'phone', top: d ? '64px' : '96px',
+      dl: at != null ? (-at) + 's' : '0s', ps: at != null ? 'paused' : 'running',
+      plotY: d ? '640px' : '560px', gS: d ? '760px' : '420px', gM: d ? '-380px' : '-210px', planL: d ? 'calc(50% + 120px)' : '24px', planT: d ? '380px' : '80px',
+      hp: d ? '110px' : '40px', hs: d ? '56px' : '34px', cardT: d ? '210px' : '130px', cardW: d ? '720px' : '350px', cardM: d ? '-360px' : '-175px',
+      cap: CAP ? CAP[1] : '', capE: CAP ? CAP[0] : '', iPlay: ic('play', 16), iCity: ic('city', 20)
+    };
+  }
+}
+</script>
+</body>
+</html>

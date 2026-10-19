@@ -32,9 +32,9 @@ email-body result is reused when fresh and a fit check and the Verifier accept i
   records never deleted, incomplete registry refused before any delete, done = fresh re-read (`verify_erasure`).
 - Artifacts (FR-MEM-06/12): `ArtifactStore` over create-only `MetaBackend`/`BlobBackend` (memory, local dir
   `TILO_ARTIFACT_DIR`). Ids matched whole (`fullmatch`) before any key; other scope reads as absent; caps
-  before hashing; redactor error fails the put; screening only from the screener verdict; restore = exact
+  before hashing; redactor error fails the put; screening from the screener verdict, raised only by `screening_hint='flagged'`; restore = exact
   copy; record before blob (a blob always has a listed record); a blobless record is repaired only after
   `GRACE` (else `ArtifactBusy`); `retention()` is `gcs_artifacts`. Firestore/GCS backends: ticket T8.
 
 ## Requirement IDs
-FR-MEM-01, FR-MEM-02, FR-MEM-03, FR-MEM-06, FR-MEM-09, FR-MEM-12.
+FR-MEM-01, FR-MEM-02, FR-MEM-03, FR-MEM-06, FR-MEM-09, FR-MEM-12; RT-01..03, RT-06..08, RT-10 (`chunks.py`/`chunks_backends.py`, ADR-0049: per-account passages; `search(org, caller)` queries each readable scope with the filter inside it, then re-checks every hit via `SourceRules`; injected `Embedder`, no model call here); WEB-1 `website_check.check_website` (WS-02..08, stdlib; AR-10: the store runs it on every `text/html` version, unit origin only, after the redactor, before hashing); FR-MEM-10 `import_version` (a bundle's version under the importer's Scope: ids and bytes kept, `sources` dropped, a `clean` claim screened again).

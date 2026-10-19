@@ -1,0 +1,12 @@
+{
+  "session": "s_01JB7A0000000000000000BRW1",
+  "world_id": "w_example",
+  "run_id": "r_example_1",
+  "unit_id": "U3",
+  "allow_hosts": ["shop.example.com", "*.example.org"],
+  "start_url": "https://shop.example.com/",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  }
+}

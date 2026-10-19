@@ -1,0 +1,11 @@
+.env
+debug/
+out/
+profile/
+.venv/
+__pycache__/
+.pytest_cache/
+C:/
+# Git Bash stores a stray "C:" folder as "C" + U+F03A.
+/C/
+agenda.md

@@ -1,0 +1,322 @@
+// ParkProvider: one store, one wrapped Api and the viewport for the whole Park app. `useApp()` builds the
+// AppCtx a page receives (README "The `app` prop"); `useParkApi()` is the Api a page calls, which notes
+// where every result came from so the shell can say whether it shows sample data.
+import {
+  type ReactNode,
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import {
+  API_URL,
+  appCheckToken,
+  authToken,
+  civilToday,
+  sessionView,
+} from "../../api/ClientProvider";
+export { endSession } from "../../api/signOut"; // FR-UX-10: the shell's Sign out, through the one api seam
+export { useSessionAuth } from "../../api/sessionAuth"; // FR-UX-10: who is signed in, for the account menu
+import { HttpClient } from "../../api/http";
+import { API_METHODS, type Api, type ApiMethod } from "../api/index";
+import { carryOneStep } from "../api/oneStep";
+import { carryQuizReader } from "../api/quizApps";
+import { carryResultReader } from "../api/results";
+import { withToday } from "../api/sampleDates";
+import { parkApi, withSession } from "../api/select";
+import { carrySkillFixer } from "../api/skillFixes";
+import { copyApi, withSwr } from "../api/swr";
+import type { ApiResult, Source } from "../api/types";
+import { type FirstRun, createFirstRun } from "../sample/firstRun";
+import type { AppCtx } from "./AppCtx";
+import { FieldsContext, type FieldsFor } from "./fieldsContext";
+import { type Pin, screenPins } from "./pins";
+import { navigatePark, useParkRoute } from "./router";
+import { type ParkStore, type Schedule, createParkStore, realSchedule } from "./store";
+
+export interface ParkProviderProps {
+  api?: Api;
+  worldClient?: HttpClient | null;
+  navigate?: (to: string) => void;
+  schedule?: Schedule;
+  viewport?: Viewport;
+  /** ADR-0035 L6d: the fields calls of a world's cards. Default: the signed-in person's own API on a configured
+   * deployment (never a demo session), none otherwise; a test hands one in. */
+  fields?: FieldsFor | null;
+  /** QA-DEMO-1: a demo session on a configured deployment (anonymous sign-in): its data is recorded sample data, so a
+   * start and an approval are explained, never simulated. Default: no injected Api, a url and an anonymous session. */
+  demo?: boolean;
+  children: ReactNode;
+}
+
+interface Held {
+  store: ParkStore;
+  api: Api;
+  worldClient: HttpClient | null;
+  schedule: Schedule;
+  /** The default Api is the fixture one, so every page will read sample data (no injected Api, no url). */
+  expectsSample: boolean;
+  /** QA-DEMO-1: a demo session on a configured deployment (see `ParkProviderProps.demo`). */
+  demo: boolean;
+  firstRun: FirstRun;
+  /** Bumps when a background read found newer data than a page was shown (see `api/swr.ts`). */
+  fresh: { subscribe: (listener: () => void) => () => void; version: () => number };
+}
+
+interface Viewport {
+  vw: number;
+  vh: number;
+}
+
+interface PinsChannel {
+  raw: readonly Pin[];
+  set: (pins: readonly Pin[]) => void;
+}
+
+const HeldContext = createContext<Held | null>(null);
+// The backdrop (shell/CityBackdrop) reports the scene's pin points here; useApp turns them into `pins`.
+const PinsContext = createContext<PinsChannel | null>(null);
+const ViewportContext = createContext<Viewport>({ vw: 0, vh: 0 });
+
+type AnyCall = (...args: unknown[]) => Promise<ApiResult<unknown>>;
+
+/** The same Api, each method reporting the `source` of every result it resolves with. */
+function noting(api: Api, note: (source: Source) => void): Api {
+  const calls = api as unknown as Record<ApiMethod, AnyCall>;
+  const wrapped = Object.fromEntries(
+    API_METHODS.map((name) => [
+      name,
+      (...args: unknown[]) =>
+        calls[name](...args).then((result) => {
+          note(result.source);
+          return result;
+        }),
+    ]),
+  );
+  return carryResultReader(
+    api,
+    carrySkillFixer(api, carryOneStep(api, carryQuizReader(api, wrapped as unknown as Api))),
+  );
+}
+
+const EMPTY_PINS: AppCtx["pins"] = [];
+const NO_RAW_PINS: readonly Pin[] = [];
+const windowSize = () => ({ vw: window.innerWidth, vh: window.innerHeight });
+
+/** The fields calls over the API the Park pages use: one `HttpClient` with the same tokens, none for a demo session. */
+function liveFieldsFor(): FieldsFor | null {
+  const baseUrl = API_URL?.trim();
+  if (!baseUrl) return null;
+  const http = new HttpClient({ baseUrl, appCheckToken, authToken });
+  return (worldId) => (sessionView.demo() ? null : http.cardsOf(worldId));
+}
+
+export function ParkProvider({
+  api,
+  worldClient,
+  navigate,
+  schedule,
+  viewport,
+  fields,
+  demo: demoProp,
+  children,
+}: ParkProviderProps) {
+  const [fieldsFor] = useState<FieldsFor | null>(() =>
+    fields !== undefined ? fields : api === undefined ? liveFieldsFor() : null,
+  );
+  const [held] = useState<Held>(() => {
+    // SEC-10, SEC-15: the live Api's requests carry the App Check token and the sign-in token; none on local hosts or in fixture mode.
+    const built = api ?? parkApi({ VITE_TILO_API_URL: API_URL }, appCheckToken, authToken);
+    const keyed = api === undefined && API_URL?.trim() ? withSession(built, sessionView) : built;
+    // The sample company's dates follow today; an Api handed in by a test is left exactly as it is.
+    const today = api === undefined ? withToday(keyed, civilToday) : keyed;
+    // Page reads are stale-while-revalidate for a signed-in person on the live Api (a test's Api is left as it is).
+    const listeners = new Set<() => void>();
+    let version = 0;
+    const fresh = {
+      subscribe: (listener: () => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      version: () => version,
+    };
+    const raw =
+      api === undefined && API_URL?.trim()
+        ? withSwr(
+            today,
+            () => sessionView.identity()?.email ?? null,
+            () => {
+              version += 1;
+              for (const listener of [...listeners]) listener();
+            },
+            () => Date.now(),
+          )
+        : today;
+    let store: ParkStore | null = null;
+    const wrapped = noting(raw, (source) => store?.noteSource(source));
+    const timer = schedule ?? realSchedule;
+    const demo = demoProp ?? (api === undefined && Boolean(API_URL?.trim()) && sessionView.demo());
+    store = createParkStore({
+      api: wrapped,
+      navigate: navigate ?? navigatePark,
+      schedule: timer,
+      demo,
+    });
+    const expectsSample = api === undefined && (!API_URL || sessionView.demo());
+    const firstRun = createFirstRun(wrapped, store, expectsSample);
+    const readWorlds = wrapped.getWorlds;
+    wrapped.getWorlds = (...args) => {
+      const ticket = firstRun.ticket();
+      return readWorlds(...args).then(
+        (result) => {
+          firstRun.note(result, ticket);
+          return result;
+        },
+        (error: unknown) => {
+          firstRun.fail(ticket);
+          throw error;
+        },
+      );
+    };
+    return {
+      store,
+      api: wrapped,
+      schedule: timer,
+      worldClient:
+        worldClient !== undefined
+          ? worldClient
+          : api === undefined && API_URL?.trim() && !sessionView.demo()
+            ? new HttpClient({ baseUrl: API_URL, appCheckToken, authToken })
+            : null,
+      expectsSample,
+      demo,
+      firstRun,
+      fresh,
+    };
+  });
+  const [win, setWin] = useState(windowSize);
+  useEffect(() => {
+    if (viewport) return;
+    const onResize = () =>
+      setWin((prev) => {
+        const next = windowSize();
+        return prev.vw === next.vw && prev.vh === next.vh ? prev : next;
+      });
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [viewport]);
+  useEffect(
+    () => () => {
+      held.firstRun.dispose();
+      held.store.dispose();
+    },
+    [held],
+  ); // no timer or first-run read outlives the app
+  const size = viewport ?? win;
+  const sized = useMemo(() => ({ vw: size.vw, vh: size.vh }), [size.vw, size.vh]);
+  const [raw, setRaw] = useState<readonly Pin[]>(NO_RAW_PINS);
+  const channel = useMemo(() => ({ raw, set: setRaw }), [raw]);
+  return (
+    <HeldContext.Provider value={held}>
+      <FieldsContext.Provider value={fieldsFor}>
+        <ViewportContext.Provider value={sized}>
+          <PinsContext.Provider value={channel}>{children}</PinsContext.Provider>
+        </ViewportContext.Provider>
+      </FieldsContext.Provider>
+    </HeldContext.Provider>
+  );
+}
+
+/** UI-10: legacy Settings can use Park preferences before its shell cutover lands. */
+export const useHasParkProvider = (): boolean => useContext(HeldContext) !== null;
+
+function useHeld(): Held {
+  const held = useContext(HeldContext);
+  if (!held) throw new Error("ParkProvider is missing");
+  return held;
+}
+
+export const useParkStore = (): ParkStore => useHeld().store;
+export const useParkApi = (): Api => {
+  const held = useHeld();
+  const version = useSyncExternalStore(held.fresh.subscribe, held.fresh.version);
+  // A new object when fresh data arrived: a page's load effect lists the api, so it re-reads (from the cache, at once).
+  return useMemo(() => (version === 0 ? held.api : copyApi(held.api)), [held.api, version]);
+};
+export const useFirstRunController = (): FirstRun => useHeld().firstRun;
+/** World-specific routes share the existing authenticated client; demo sessions have none. */
+export const useWorldClient = (): HttpClient | null => useHeld().worldClient;
+/** The provider's timer: a page that waits (the Home composer's 900 ms) goes through it, never setTimeout. */
+export const useSchedule = (): Schedule => useHeld().schedule;
+
+/** QA-DEMO-1: this is a demo session (recorded sample data): starts and approvals are explained, never simulated. */
+export const useDemoSession = (): boolean => useHeld().demo;
+
+/** True when the Sample data chip is going to show (the fixture Api is the default), so its place can be kept. */
+export const useExpectsSample = (): boolean => useHeld().expectsSample;
+
+/** For the city backdrop: where the three map pins sit on the scene (1600x1000). */
+export function useReportPins(): (pins: readonly Pin[]) => void {
+  const channel = useContext(PinsContext);
+  if (!channel) throw new Error("ParkProvider is missing");
+  return channel.set;
+}
+
+export function useApp(): AppCtx {
+  const { store } = useHeld();
+  const { vw, vh } = useContext(ViewportContext);
+  const rawPins = useContext(PinsContext)?.raw ?? NO_RAW_PINS;
+  const pins = useMemo(
+    () => (rawPins.length === 0 ? EMPTY_PINS : screenPins(rawPins, vw, vh)),
+    [rawPins, vw, vh],
+  );
+  const state = useSyncExternalStore(store.subscribe, store.getState);
+  const route = useParkRoute();
+  const page = route?.page ?? "home";
+  const params = route?.params;
+  const { dec, needsLeft, added, time, motion, prefs } = state;
+  return useMemo(
+    () => ({
+      page,
+      params: params ?? {},
+      go: store.go,
+      dec,
+      decide: store.decide,
+      needsLeft,
+      added,
+      addWorld: store.addWorld,
+      toast: store.toast,
+      time,
+      night: time === "night",
+      motion,
+      setPref: store.setPref,
+      prefs,
+      vw,
+      vh,
+      pins,
+      ready: true,
+    }),
+    [store, page, params, dec, needsLeft, added, time, motion, prefs, vw, vh, pins],
+  );
+}
+
+/**
+ * The `app` a page receives: `useApp()` with `go` sending a world through the loader first (README: opening
+ * a world always runs the WorldLoader), everything else (a world without an id too: the worlds list) straight to its page. `useApp().go` itself stays
+ * immediate, so the shell has one way to jump without the loader.
+ */
+export function usePageApp(): AppCtx {
+  const app = useApp();
+  const { store } = useHeld();
+  return useMemo(
+    () => ({
+      ...app,
+      go: (page, params) =>
+        page === "world" && params?.id ? store.openWorld(params.id) : store.go(page, params),
+    }),
+    [app, store],
+  );
+}

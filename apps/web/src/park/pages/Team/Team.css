@@ -1,0 +1,1037 @@
+/* WEB-10 Team page. Values are read from design "Tilo App Team.dc.html" (user's prototype, ADR-0003a).
+   Every selector sits under [data-park]; classes carry the park-team- prefix; colours are tokens.
+   No transition, animation or keyframes: the details fade, the hover fades and the 1.8 s flash timer
+   arrive with WEB-3b (BQ-WEB-3). */
+
+[data-park] .park-team-root {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* ---- heading and invite ---- */
+[data-park] .park-team-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+[data-park] .park-team-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+[data-park] .park-team-titlerow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+[data-park] .park-team-h1 {
+  margin: 0;
+  font-family: "Nunito", sans-serif;
+  font-weight: 900;
+  font-size: 36px;
+  letter-spacing: -0.8px;
+  line-height: 1.05;
+}
+[data-park] .park-team-h1:focus {
+  outline: none;
+}
+[data-park] .park-team-count {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-team-intro {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-team-invite {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+[data-park] .park-team-invite-wrap {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+[data-park] .park-team-invite-confirm {
+  position: static;
+  display: grid;
+  gap: 10px;
+  width: min(100%, 420px);
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-park] .park-team-invite-confirm p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+[data-park] .park-team-invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+[data-park] .park-team-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  height: 42px;
+  width: 280px;
+  max-width: 100%;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  color: var(--ink2);
+}
+[data-park] .park-team-field:focus-within {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}
+[data-park] .park-team-input {
+  min-height: 24px;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+[data-park] .park-team-input::placeholder {
+  color: var(--ink3);
+}
+
+/* ---- cards ---- */
+[data-park] .park-team-card {
+  box-sizing: border-box;
+  min-width: 0;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+}
+[data-park] .park-team-members {
+  padding: 14px 18px 6px;
+}
+[data-park] .park-team-cover-card,
+[data-park] .park-team-rules,
+[data-park] .park-team-matrix,
+[data-park] .park-team-empty {
+  display: flex;
+  flex-direction: column;
+}
+[data-park] .park-team-cover-card {
+  padding: 18px 20px 8px;
+  scroll-margin-top: 110px;
+}
+[data-park] .park-team-cover-card[data-flash="true"] {
+  border: 2px solid #f0a500;
+}
+[data-park] .park-team-rules {
+  padding: 18px 20px 8px;
+}
+[data-park] .park-team-matrix {
+  padding: 18px 20px 12px;
+}
+[data-park] .park-team-empty {
+  padding: 18px 20px;
+}
+[data-park] .park-team-two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 18px;
+  align-items: start;
+}
+[data-park] .park-team-cardhead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 10px;
+}
+[data-park] .park-team-cardhead--split {
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+[data-park] .park-team-heading {
+  line-height: 1.35;
+}
+[data-park] .park-team-h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+[data-park] .park-team-h2--matrix {
+  margin: 0 0 10px;
+}
+[data-park] .park-team-hint {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-team-link {
+  display: inline-flex;
+  align-items: center;
+  min-width: 24px;
+  min-height: 24px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--heroInk);
+  text-decoration: none;
+}
+[data-park] .park-team-link:hover {
+  color: var(--hero);
+}
+
+/* ---- members table (scrolls sideways inside its card) ---- */
+[data-park] .park-team-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  /* QA-DEMO-1 M5: edge shadows that show there is more to the side (they follow the scroll position) */
+  background:
+    linear-gradient(to right, var(--card) 30%, transparent) left center / 32px 100% no-repeat local,
+    linear-gradient(to left, var(--card) 30%, transparent) right center / 32px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(31, 29, 43, 0.22), transparent) left center / 10px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(31, 29, 43, 0.22), transparent) right center / 10px 100% no-repeat scroll;
+}
+/* The same cue as words, for anyone the shadow does not reach: only where the table is wider than its card.
+   Generated content, so the page's own text (pinned by the copy test) is unchanged. */
+@media (max-width: 900px) {
+  [data-park] .park-team-members::before {
+    content: "Swipe sideways to see roles and spend limits.";
+    display: block;
+    margin: 0 0 8px;
+    color: var(--ink3);
+    font-size: 12.5px;
+    font-weight: 700;
+  }
+}
+[data-park] .park-team-table {
+  min-width: 820px;
+}
+/* Real table elements, laid out as blocks and grids so the design's column templates apply. */
+[data-park] .park-team-blk {
+  display: block;
+  width: 100%;
+  border-collapse: collapse;
+}
+[data-park] :where(.park-team-blk) th,
+[data-park] :where(.park-team-blk) td {
+  padding: 0;
+  font-weight: inherit;
+  text-align: left;
+}
+[data-park] .park-team-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) 150px 110px 110px 100px 44px;
+  column-gap: 16px;
+  align-items: center;
+}
+[data-park] .park-team-head {
+  height: 36px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: var(--ink3);
+}
+[data-park] .park-team-person {
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-team-row {
+  min-height: 64px;
+}
+[data-park] .park-team-who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+[data-park] .park-team-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1.5px dashed transparent;
+  color: #1f1d2b;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+[data-park] .park-team-avatar--pending {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--ink);
+}
+[data-park] .park-team-id {
+  min-width: 0;
+  line-height: 1.35;
+}
+[data-park] .park-team-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 800;
+}
+[data-park] .park-team-tag {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+[data-park] .park-team-tag--you {
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+[data-park] .park-team-tag--ok {
+  background: var(--okSoft);
+  color: var(--okInk);
+}
+[data-park] .park-team-sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-park] .park-team-select {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+[data-park] .park-team-select:disabled {
+  opacity: 0.7;
+}
+[data-park] .park-team-select--backup {
+  width: auto;
+  height: 34px;
+  border: 1px solid var(--amberLine);
+  background: var(--amberSoft);
+  color: var(--amberInk);
+  font-size: 13.5px;
+}
+[data-park] .park-team-strong {
+  font-size: 14px;
+  font-weight: 800;
+}
+[data-park] .park-team-helped {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-park] .park-team-track {
+  flex: 1;
+  max-width: 48px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+[data-park] .park-team-fill {
+  display: block;
+  height: 100%;
+  background: var(--hero);
+  border-radius: 99px;
+}
+[data-park] .park-team-active {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-team-active--now {
+  color: var(--okInk);
+}
+[data-park] .park-team-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink2);
+  cursor: pointer;
+}
+[data-park] .park-team-more:hover,
+[data-park] .park-team-more[aria-expanded="true"] {
+  background: var(--chip);
+}
+[data-park] .park-team-root button:focus-visible,
+[data-park] .park-team-root a:focus-visible,
+[data-park] .park-team-root input:focus-visible,
+[data-park] .park-team-root select:focus-visible,
+[data-park] .park-team-matrix:focus-visible,
+[data-park] .park-team-select:focus-visible,
+[data-park] .park-team-more:focus-visible,
+[data-park] .park-team-btn:focus-visible {
+  outline: 3px solid var(--focus, #5a3fe0);
+  outline-offset: 2px;
+}
+
+/* ---- member details ---- */
+[data-park] .park-team-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px 24px;
+  margin: 0 0 14px 52px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--sunk);
+}
+[data-park] .park-team-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+[data-park] .park-team-fact-k {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--ink3);
+}
+[data-park] .park-team-fact-v {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+[data-park] .park-team-actions {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+[data-park] .park-team-btn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--btn2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+[data-park] .park-team-btn--red {
+  color: var(--redInk);
+}
+
+/* ---- coverage ---- */
+[data-park] .park-team-cover {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 110px minmax(150px, auto);
+  gap: 14px;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-team-what {
+  min-width: 0;
+  font-size: 14.5px;
+  font-weight: 800;
+}
+[data-park] .park-team-covwho {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+[data-park] .park-team-avs {
+  display: flex;
+}
+[data-park] .park-team-av {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 99px;
+  border: 2px solid var(--pop);
+  margin-right: -6px;
+  font-size: 11px;
+  font-weight: 900;
+  color: #1f1d2b;
+}
+[data-park] .park-team-names {
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-park] .park-team-wait {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--ink);
+  white-space: nowrap;
+}
+[data-park] .park-team-wait--slow {
+  color: var(--amberInk);
+}
+[data-park] .park-team-act {
+  display: flex;
+  justify-content: flex-end;
+}
+[data-park] .park-team-covered {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--okInk);
+}
+
+/* ---- rules and role matrix ---- */
+[data-park] .park-team-tile {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--amberTile);
+  overflow: hidden;
+}
+[data-park] .park-team-rule {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-team-ruletext {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+}
+[data-park] .park-team-ruleby {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-team-rulelog {
+  margin: 0;
+  padding: 0 0 0 18px;
+}
+[data-park] .park-team-mrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(4, 72px);
+  align-items: center;
+}
+[data-park] .park-team-mhead {
+  height: 32px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  color: var(--ink3);
+}
+[data-park] .park-team-mbody {
+  min-height: 40px;
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-team-mlabel {
+  font-size: 14px;
+  font-weight: 700;
+}
+[data-park] .park-team-mcell {
+  display: flex;
+  justify-content: center;
+}
+[data-park] .park-team-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--track);
+}
+[data-park] .park-team-check--on {
+  background: var(--okSoft);
+  color: var(--ok);
+}
+
+/* UI-10 W9: keep the dense tables scrollable inside their card, and stack coverage on phones. */
+@media (max-width: 600px) {
+  [data-park] .park-team-root {
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  [data-park] [data-testid="park-page-team"] .park-team-card {
+    max-width: 100%;
+    overflow: hidden;
+  }
+  [data-park] [data-testid="park-page-team"] .park-team-scroll {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  [data-park] [data-testid="park-page-team"] .park-team-cover {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  [data-park] [data-testid="park-page-team"] .park-team-act {
+    justify-content: flex-start;
+  }
+  [data-park] [data-testid="park-page-team"] .park-team-matrix {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  [data-park] [data-testid="park-page-team"] .park-team-mrow {
+    min-width: 360px;
+  }
+  [data-park] [data-testid="park-page-team"] .park-team-invite {
+    min-width: 0;
+    max-width: 100%;
+  }
+  [data-park] [data-testid="park-page-team"] .park-team-titlerow {
+    flex-wrap: wrap;
+  }
+}
+
+/* UI-10 W19 and FT-UX-1: phone controls and primary actions meet 44px minimum tap targets. */
+@media (max-width: 600px) {
+  [data-park] .park-team-invite button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  [data-park] .park-team-link {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  [data-park] .park-team-more {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  [data-park] .park-team-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  [data-park] .park-team-select {
+    min-height: 44px;
+  }
+}
+
+/* LIVE-P2-A (QA row 26): below 480 px the members table is a card per person (no 820 px sideways scroller): the name
+   and the details button on the first line, then role, spend limit, helped and last active, each with its label. */
+@media (max-width: 480px) {
+  [data-park] .park-team-members::before {
+    content: none;
+  }
+  [data-park] .park-team-table {
+    min-width: 0;
+  }
+  /* the column headings stay in the accessibility tree (they name the cells) but not on the screen */
+  [data-park] .park-team-head {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  [data-park] .park-team-row.park-team-grid {
+    grid-template-columns: minmax(0, 1fr) 44px;
+    column-gap: 8px;
+    row-gap: 8px;
+    min-height: 0;
+    padding: 12px 0;
+  }
+  [data-park] .park-team-row > td:nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  [data-park] .park-team-row > td:nth-child(6) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  [data-park] .park-team-row > td:nth-child(n + 2):nth-child(-n + 5) {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  [data-park] .park-team-row > td:nth-child(2) {
+    grid-row: 2;
+  }
+  [data-park] .park-team-row > td:nth-child(3) {
+    grid-row: 3;
+  }
+  [data-park] .park-team-row > td:nth-child(4) {
+    grid-row: 4;
+  }
+  [data-park] .park-team-row > td:nth-child(5) {
+    grid-row: 5;
+  }
+  [data-park] .park-team-row > td:nth-child(3)::before {
+    content: "Spend limit";
+  }
+  [data-park] .park-team-row > td:nth-child(4)::before {
+    content: "Helped Tilo";
+  }
+  [data-park] .park-team-row > td:nth-child(5)::before {
+    content: "Active";
+  }
+  [data-park] .park-team-row > td:nth-child(n + 3):nth-child(-n + 5)::before {
+    color: var(--ink3);
+    font-size: 12.5px;
+    font-weight: 700;
+  }
+  [data-park] .park-team-sub {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* ---- UI-STUDIO-5: the live page's two columns, directory table, side cards and helpers (Studio look in
+   Team.studio.css) ---- */
+[data-park] .park-team-studio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
+  gap: 24px;
+  align-items: start;
+}
+[data-park] .park-team-main,
+[data-park] .park-team-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+[data-park] .park-team-directory {
+  padding: 0;
+  overflow: hidden;
+}
+[data-park] .park-team-dirtable {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 14.5px;
+}
+[data-park] .park-team-dirhead th {
+  padding: 14px 20px;
+  background: var(--sunk);
+  color: var(--ink3);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+[data-park] .park-team-dirrow td {
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+  color: var(--ink2);
+  vertical-align: middle;
+}
+[data-park] .park-team-dirwho {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: var(--ink);
+}
+[data-park] .park-team-dirnote {
+  margin: 0;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+  color: var(--ink3);
+}
+[data-park] .park-team-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--line2);
+  border-radius: 24px;
+  background: var(--card);
+  color: var(--ink);
+}
+[data-park] .park-team-sidetitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+}
+[data-park] .park-team-sidetitle.park-team-sidetitle--sm {
+  font-size: 15px;
+}
+[data-park] .park-team-sideline,
+[data-park] .park-team-sidenote {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink2);
+}
+[data-park] .park-team-alwayslist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-team-always {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--sunk);
+  line-height: 1.3;
+}
+[data-park] .park-team-alwaystitle {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+[data-park] .park-team-alwayssub {
+  font-size: 13px;
+  color: var(--ink3);
+}
+[data-park] .park-team-summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-park] .park-team-helpers {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+[data-park] .park-team-helpershead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+[data-park] .park-team-helperstitle {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+}
+[data-park] .park-team-helpersnote {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+[data-park] .park-team-helpergrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-team-helper {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
+}
+[data-park] .park-team-helperart {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  flex: none;
+}
+[data-park] .park-team-helpertext {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+[data-park] .park-team-helpername {
+  font-size: 16px;
+  font-weight: 800;
+}
+[data-park] .park-team-helperwhat {
+  font-size: 13.5px;
+  color: var(--ink3);
+}
+@media (max-width: 1099px) {
+  [data-park] .park-team-studio {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+[data-park] .park-team-own {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px;
+  overflow: hidden;
+}
+[data-park] .park-team-ownhead,
+[data-park] .park-team-ownrowhead,
+[data-park] .park-team-createactions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+[data-park] .park-team-ownhead {
+  justify-content: space-between;
+}
+[data-park] .park-team-ownhint,
+[data-park] .park-team-ownrowhead span,
+[data-park] .park-team-ownempty span,
+[data-park] .park-team-ownnote {
+  margin: 4px 0 0;
+  color: var(--ink3);
+  font-size: 13px;
+}
+[data-park] .park-team-create {
+  padding: 16px;
+  border: 1px solid var(--line2);
+  border-radius: 18px;
+  background: var(--sunk);
+}
+[data-park] .park-team-createlabel {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 750;
+}
+[data-park] .park-team-createactions .park-team-input {
+  min-width: 0;
+  flex: 1;
+}
+[data-park] .park-team-ownempty {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 28px 18px;
+  border: 1px dashed var(--line2);
+  border-radius: 18px;
+  text-align: center;
+}
+[data-park] .park-team-ownempty p {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 750;
+}
+[data-park] .park-team-ownmark,
+[data-park] .park-team-ownavatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--heroSoft);
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 850;
+}
+[data-park] .park-team-ownlist {
+  display: grid;
+  gap: 12px;
+}
+[data-park] .park-team-ownrow {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line2);
+  border-radius: 18px;
+  background: var(--card);
+}
+[data-park] .park-team-ownrow h3 {
+  margin: 0;
+}
+[data-park] .park-team-ownpeople {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-team-ownpeople li {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: var(--sunk);
+  color: var(--ink2);
+  font-size: 12px;
+}
+[data-park] .park-team-ownperson {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-park] .park-team-ownperson .park-team-select {
+  min-height: 44px;
+  padding: 4px 28px 4px 8px;
+  font-size: 12px;
+}
+[data-park] .park-team-ownnote:empty {
+  display: none;
+}
+@media (max-width: 600px) {
+  [data-park] .park-team-ownhead,
+  [data-park] .park-team-createactions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

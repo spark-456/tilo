@@ -25,7 +25,19 @@ import {
 } from "./art/ground";
 import { P } from "./art/iso";
 import type { Pt } from "./art/iso";
-import { buildingTag, districtTag, islandTag, makePill, policyTag } from "./art/labels";
+import {
+  buildingTag,
+  completedTag,
+  districtTag,
+  drawTool,
+  failedTag,
+  islandTag,
+  makeBubble,
+  makePill,
+  needsTag,
+  policyTag,
+  sessionTag,
+} from "./art/labels";
 import { type PinKind, drawPin } from "./art/pins";
 import { type Frame, type FrameBuilding, type FrameRect, standZone } from "./frame";
 import { BUILDING_STATE, ISLAND_STATE } from "./runSummary";
@@ -78,15 +90,21 @@ export interface WorldLayer {
   readonly labels: Container;
   /** The selection ring: redrawn only when the selection or the ringed thing's place changes. */
   readonly ring: Graphics;
+  /** WORLD-LIVE: speech bubbles and tool icons, above the ring (a separate layer: the tag layer keeps only tags). */
+  readonly speech: Container;
   readonly items: Map<string, Item>;
   readonly figures: Map<string, { g: Graphics; key: string }>;
   readonly tags: Map<string, { c: Container; text: string }>;
   /** Rank tags over the characters, made only in Professional density. */
   readonly agentTags: Map<string, { c: Container; text: string }>;
+  /** WORLD-LIVE: a handoff note's speech bubble over its speaker, and the tool icon over a working agent. */
+  readonly bubbles: Map<string, { c: Container; text: string }>;
+  readonly tools: Map<string, Graphics>;
   /** The display density, read when something is drawn. */
   readonly density: () => Density;
   readonly size: () => { width: number; height: number };
   /** How much the name tags are enlarged so they read on a small screen (1 on a full-size stage). */
+  shadows?: boolean;
   tagScale: number;
   staticKey: string;
   groundKey: string;
@@ -107,7 +125,8 @@ export function createLayer(
   const pins = new Graphics();
   const labels = new Container();
   const ring = new Graphics();
-  content.addChild(ground, objects, pins, labels, ring);
+  const speech = new Container(); // WORLD-LIVE: bubbles and tool icons, over everything else
+  content.addChild(ground, objects, pins, labels, ring, speech);
   world.addChild(content);
   return {
     content,
@@ -116,10 +135,13 @@ export function createLayer(
     pins,
     labels,
     ring,
+    speech,
     items: new Map(),
     figures: new Map(),
     tags: new Map(),
     agentTags: new Map(),
+    bubbles: new Map(),
+    tools: new Map(),
     density,
     size,
     tagScale: 1,
@@ -172,7 +194,7 @@ type Zone = { x0: number; x1: number; y0: number; y1: number };
 const TAG_GAP = 4;
 /** A tag slides at most this far to clear the figures; further and it would sit over another
  * building, so it stays where it was. */
-const SLIDE_MAX = 40;
+const SLIDE_MAX = 90;
 /** What a resting figure covers in front of a building (Friendly's size, the larger): half its width
  * either side of its feet, its height up (the same 30 units the rank tag sits above). */
 const FIGURE_HALF_W = 18;
@@ -255,6 +277,8 @@ const PIN: Readonly<Record<string, PinKind | undefined>> = {
   operational: "active",
   completed: "complete",
   archived: "skipped",
+  needs: "needs",
+  failed: "blocked",
 };
 const GATE_PIN: Readonly<Record<string, PinKind>> = {
   closed: "lock",
@@ -275,7 +299,10 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
   ]);
   const mode = layer.density();
   const narrow = isNarrow(layer);
-  layer.tagScale = narrow ? Math.max(1, READABLE_TAG_PX / (layer.content.scale.x * TAG_PX)) : 1;
+  const camZoom = layer.content.parent?.scale?.x ?? 1;
+  const invZoom = camZoom > 0 ? 1 / camZoom : 1;
+  layer.tagScale =
+    (narrow ? Math.max(1, READABLE_TAG_PX / (layer.content.scale.x * TAG_PX)) : 1) * invZoom;
   const key = JSON.stringify([
     groundKey,
     frame.buildings,
@@ -294,7 +321,7 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
     for (const p of frame.plates) drawPlate(g, p.rect, p.lift);
     for (const d of frame.districts) drawDistrict(g, d.rect, d.tint, d.lift);
     for (const r of frame.roads) drawRoad(g, r.points, r.lift);
-    for (const b of frame.bridges) drawBridge(g, b.points, b.kind, b.state, b.lift);
+    for (const b of frame.bridges) drawBridge(g, b.points, b.kind, b.state, b.lift, b.active);
   }
 
   const seen = new Set<string>(); // items kept this frame; the rest are removed
@@ -337,12 +364,26 @@ export function renderStatic(layer: WorldLayer, frame: Frame) {
     });
     const kind = PIN[b.status];
     if (kind) pinned.push(() => drawPin(layer.pins, it.top, kind, { tint: b.tint }));
+    const inSession = b.inSession;
+    const tagFn = inSession
+      ? sessionTag
+      : b.status === "needs"
+        ? needsTag
+        : b.status === "failed"
+          ? failedTag
+          : b.status === "completed"
+            ? completedTag
+            : buildingTag;
     tag(
       layer,
       live,
       b.id,
-      named(b.name, word(BUILDING_STATE, b.status), mode, narrow),
-      buildingTag,
+      inSession
+        ? narrow
+          ? "In session"
+          : `${b.name} · In session`
+        : named(b.name, word(BUILDING_STATE, b.status), mode, narrow),
+      tagFn,
       [it.top[0], it.top[1] - (kind ? 50 : 14)],
       restZones,
     );
@@ -425,26 +466,36 @@ export function renderAgents(
   layer: WorldLayer,
   frame: Frame,
   positions: ReadonlyMap<string, { x: number; y: number }>,
+  lit: readonly string[] = [],
 ) {
   const shown = new Set<string>();
   const mode = layer.density();
   const scale = agentScale(mode);
   const rankTags = mode === "professional" && !isNarrow(layer);
+  const hasLit = lit.length > 0;
   for (const agent of frame.agents) {
     const p = positions.get(agent.id);
     if (!p) continue;
-    const key = `${agent.rank}:${agent.tint}`;
+    const isLit = !hasLit || lit.includes(agent.id);
+    const alpha = isLit ? 1 : 0.45;
+    const shadows = layer.shadows !== false;
+    const hand = Boolean(agent.hand);
+    const key = `${agent.rank}:${agent.tint}:${shadows}:${hand ? 1 : 0}`;
     let fig = layer.figures.get(agent.id);
     if (!fig || fig.key !== key) {
       fig?.g.destroy();
       const g = new Graphics();
-      drawAgent(g, agent.rank, agent.tint);
+      drawAgent(g, agent.rank, agent.tint, shadows, hand);
+      // FR-WLD-13: the rig never changes during a walk; rasterize its many faces once.
+      // Position/depth still follow the caller's recorded choreography on every frame.
+      g.cacheAsTexture({ resolution: 2, antialias: true });
       layer.objects.addChild(g);
       fig = { g, key };
       layer.figures.set(agent.id, fig);
     }
     fig.g.scale.set(scale); // read at draw time: a density switch is one redraw, never an event
     fig.g.position.set(p.x, p.y);
+    fig.g.alpha = alpha;
     // In front of the building it stands at, behind one nearer the viewer.
     fig.g.zIndex = p.y + agent.level * LEVEL_RISE + agent.level * 4000 + 16;
     fig.g.visible = true;
@@ -466,10 +517,47 @@ export function renderAgents(
         layer.agentTags.set(agent.id, rank);
       }
       rank.c.position.set(p.x, p.y - 30 * scale - 12);
+      rank.c.alpha = alpha;
+    }
+    const head = p.y - 30 * scale - (rankTags ? 26 : 14); // above the rank tag when there is one
+    // WORLD-LIVE: the tool icon, there only while agent.working is the agent's latest event.
+    let tool = layer.tools.get(agent.id);
+    if (agent.working && !tool) {
+      tool = new Graphics();
+      drawTool(tool);
+      layer.speech.addChild(tool);
+      layer.tools.set(agent.id, tool);
+    }
+    if (tool) {
+      tool.visible = agent.working;
+      tool.position.set(p.x + 16 * scale, p.y - 30 * scale);
+      tool.scale.set(Math.max(1, layer.tagScale));
+    }
+    // WORLD-LIVE: the handoff note, there only until the speaker's next event; it names who got it.
+    const said = agent.say;
+    const heading = said ? (said.head ?? `To ${said.to}`) : "";
+    const wording = said ? `${heading}\n${said.text}` : "";
+    let bubble = layer.bubbles.get(agent.id);
+    if (bubble && bubble.text !== wording) {
+      bubble.c.destroy({ children: true });
+      layer.bubbles.delete(agent.id);
+      bubble = undefined;
+    }
+    if (said && !bubble) {
+      bubble = { c: makeBubble(heading, said.text), text: wording };
+      layer.speech.addChild(bubble.c);
+      layer.bubbles.set(agent.id, bubble);
+    }
+    if (bubble) {
+      bubble.c.visible = true;
+      bubble.c.scale.set(Math.max(1, layer.tagScale));
+      bubble.c.position.set(p.x, head);
     }
   }
   for (const [id, fig] of layer.figures) if (!shown.has(id)) fig.g.visible = false;
   for (const [id, rank] of layer.agentTags) rank.c.visible = rankTags && shown.has(id);
+  for (const [id, tool] of layer.tools) if (!shown.has(id)) tool.visible = false;
+  for (const [id, bubble] of layer.bubbles) if (!shown.has(id)) bubble.c.visible = false;
 }
 
 /** FR-WLD-06: outlines the selected agent (an ellipse at its drawn place), building, district or
@@ -480,8 +568,16 @@ export function renderSelection(
   frame: Frame,
   positions: ReadonlyMap<string, { x: number; y: number }>,
   id: string | null,
+  lit: readonly string[] = [],
 ) {
   const g = layer.ring.clear();
+  // TILO-T-WORLD: an agent the pointer is over, or a clicked message names, lights up (a soft disc and a ring).
+  for (const agent of lit) {
+    const at = frame.agents.some((a) => a.id === agent) ? positions.get(agent) : undefined;
+    if (!at) continue;
+    g.ellipse(at.x, at.y - 2, 26, 15).fill({ color: tokens.color.brand.primary, alpha: 0.22 });
+    g.ellipse(at.x, at.y - 2, 26, 15).stroke({ width: 2, color: tokens.color.brand.primary });
+  }
   if (id === null) return;
   const at = frame.agents.some((a) => a.id === id) ? positions.get(id) : undefined;
   if (at) {

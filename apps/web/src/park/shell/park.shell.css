@@ -1,0 +1,1147 @@
+/* Park City shell (WEB-3b): the city backdrop, the top nav, the notifications popover, the account menu,
+   the sample-data chip, the world loader, the boot splash and the page column. Every number is measured on
+   the reference (design_handoff_tilo_web_app/design/Tilo App.dc.html inline styles); colours come from the
+   tokens. Every selector sits under [data-park]. Motion is of two kinds, both with honesty-scan entries in
+   test-support/honestyScan.ts: the city's ambient cars and walkers (WEB-MOTION-1, BQ-WEB-3), and the shell's own
+   chrome (WEB-MOTION-2: the boot splash, the page swap, the progress bar, the world card), which moves only
+   because a person acted. Transform, opacity, background-color and color only (the last two were approved on 8 Oct,
+   BQ-WEB-MOTION-3a), never a layout property; reduced motion switches all of it off at the end of the file. Glass blur is on the nav only (README "Performance"). */
+
+/* The city's movers (the engine puts the animation on each layer; reference Tilo App.dc.html keyframes).
+   The walker's two frames flip by opacity instead of the reference's background-position (walkFrame). */
+@keyframes mvXY {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(var(--dx), var(--dy));
+  }
+}
+@keyframes waddle {
+  0%,
+  100% {
+    transform: rotate(-6deg) translateY(0);
+  }
+  25% {
+    transform: rotate(0deg) translateY(-2.5px);
+  }
+  50% {
+    transform: rotate(6deg) translateY(0);
+  }
+  75% {
+    transform: rotate(0deg) translateY(-2.5px);
+  }
+}
+@keyframes walkFrame {
+  0% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Chrome motion (README "Interactions and motion"; reference Tilo App.dc.html keyframes). */
+@keyframes tiloSlide {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+@keyframes tiloFade {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Laid out but not shown: the shell under the boot splash, and the ghost that holds the chip's place.
+   Hidden elements are not painted, so nothing here can count as a layout shift when it appears. */
+[data-park] .park-shell__booting {
+  visibility: hidden;
+}
+
+/* ---- Page column ---- */
+/* A page change (README "Page change"): the old page goes out in 200 ms (opacity 0, up 4px), the swap puts the
+   new one at opacity 0 and down 10px with no transition, then it comes in (opacity .24s, transform .38s).
+   data-phase is set by the shell (motion.ts); a settled page has no data-phase and no transform. */
+[data-park] .park-shell__main {
+  position: relative;
+  z-index: 1;
+  transition: opacity 0.24s ease, transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* Out of sight, so out of reach: no click lands on a page that is fading out, waiting or not yet in. */
+[data-park] .park-shell__main[data-phase="out"],
+[data-park] .park-shell__main[data-phase="pre"],
+[data-park] .park-shell__main[data-phase="wait"],
+[data-park] .park-shell__main[data-phase="hold"] {
+  pointer-events: none;
+}
+[data-park] .park-shell__main[data-phase="out"] {
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+[data-park] .park-shell__main[data-phase="pre"] {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: none;
+}
+/* An instant swap between Home and another page: out of sight for 40 ms (not painted, so the new box is no
+   layout shift), then shown at once. */
+[data-park] .park-shell__main[data-phase="hold"] {
+  visibility: hidden;
+}
+/* README: content column max-width 1320, padding 100px 24px 56px (the top clears the fixed nav). */
+[data-park] .park-shell__page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 100px 24px 56px;
+}
+[data-park] .park-shell__column {
+  max-width: 1320px;
+  margin: 0 auto;
+}
+[data-park] .park-shell__main h1 {
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+[data-park]
+  .park-shell__main
+  :where(a[href], button, input, select, textarea, summary):focus-visible {
+  outline: 3px solid var(--focus, #5a3fe0);
+  outline-offset: 2px;
+}
+/* POLISH-1: one page container for Home, Worlds and Team (and Connectors, which already uses these numbers): the
+   content is at most 1296 wide with an 8px inner gutter, so its left edge is the same on every page (80px at 1440).
+   A phone's page gutter is 16, the same as Home's own. */
+[data-park] {
+  --park-page-max: 1296px;
+  --park-page-pad: 8px;
+}
+/* POLISH-2: a phone docks the Tilo bubble bottom right (52px, 72px up) and every page keeps this much room under its
+   last line, so the bubble never covers content; shell/TiloBubble also lifts it over elements marked
+   data-park-floating. Wider windows reserve nothing (the bubble is draggable there). */
+[data-park] {
+  --park-dock-space: 0px;
+}
+@media (max-width: 560px) {
+  [data-park] {
+    --park-dock-space: 80px;
+  }
+  [data-park] .park-shell__page {
+    padding-right: 16px;
+    padding-bottom: calc(56px + var(--park-dock-space, 0px));
+    padding-left: 16px;
+  }
+}
+/* Worlds sits on the page like Team and Connectors (design/studio-v2): no outer white shell, the same container, so its
+   left edge matches Home. Here, not in Worlds.css, whose static test allows park-worlds- classes only. */
+[data-park][data-theme="studio"] [data-testid="park-page-worlds"] > .park-sheet {
+  max-width: var(--park-page-max, 1296px);
+  margin: 0 auto;
+  padding: 8px var(--park-page-pad, 8px) 64px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+@media (max-width: 560px) {
+  [data-park][data-theme="studio"] [data-testid="park-page-worlds"] > .park-sheet {
+    padding: 0 0 48px;
+  }
+}
+
+/* ---- City backdrop: fixed, full-bleed, behind everything, never clickable ---- */
+[data-park] .park-shell__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--ground);
+}
+[data-park] .park-shell__scene {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1600px;
+  height: 1000px;
+  margin: -500px 0 0 -800px;
+  transform-origin: 50% 50%;
+}
+/* Paused (under the veil, in a hidden tab): every mover holds its place. !important beats the shorthand
+   the engine writes inline. */
+[data-park] .park-shell__backdrop[data-paused] .park-shell__scene * {
+  animation-play-state: paused !important;
+}
+/* Sprite cap (narrow window or weak device): every second mover layer is not drawn. This relies on the
+   scene's root div holding the static pictures as <img> and ONLY movers as div children, one per car or
+   walker (nth-of-type counts divs only); engines/park.sprite-cap.test.ts pins that structure. */
+[data-park] .park-shell__backdrop[data-lite] .park-shell__scene > div > div:nth-of-type(even) {
+  display: none;
+}
+/* --veil dims the city on every page but Home (the opacity is set inline). */
+[data-park] .park-shell__veil {
+  position: absolute;
+  inset: 0;
+  background: var(--veil);
+}
+
+/* ---- Top nav ---- */
+[data-park] .park-shell__nav {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  top: 14px;
+  height: 62px;
+  z-index: 30;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--gBd);
+  border-radius: 22px;
+  background: var(--gBg);
+  -webkit-backdrop-filter: var(--gFx);
+  backdrop-filter: var(--gFx);
+  box-shadow: var(--sh);
+  color: var(--ink);
+  font-family: "Nunito Sans", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+[data-park] .park-shell__nav button {
+  font-family: inherit;
+}
+[data-park] .park-shell__logo {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  color: var(--logo);
+  text-decoration: none;
+}
+[data-park] .park-shell__logomark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: var(--hero);
+}
+[data-park] .park-shell__visor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 22px;
+  height: 12px;
+  border-radius: 5px;
+  background: #ffffff;
+}
+[data-park] .park-shell__eye {
+  width: 3px;
+  height: 3px;
+  border-radius: 9px;
+  background: #1f1d2b;
+}
+[data-park] .park-shell__wordmark {
+  color: var(--logo);
+  font-family: "Nunito", sans-serif;
+  font-size: 27px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+}
+/* The six tabs scroll sideways inside the nav when they do not fit. */
+[data-park] .park-shell__tabs {
+  display: flex;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+/* QA-DEMO-1 B2: below 840px one button names the current page and opens a menu of the six (TopNav `compact`). */
+[data-park] .park-shell__pages {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+[data-park] .park-shell__pagebtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  /* A fixed basis, so a longer or shorter page name never moves the chevron (no layout shift across a page change);
+     it still gives way to the tools on a 320 px screen. */
+  flex: 0 1 132px;
+  min-width: 0;
+  max-width: 100%;
+  height: 40px;
+  padding: 0 8px 0 12px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--heroSoft);
+  color: var(--heroInk);
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+[data-park] .park-shell__pagelabel {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The amber dot says decisions wait (the number is in the menu and the button's name). */
+[data-park] .park-shell__pagedot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+  background: #f0a500;
+  box-shadow: 0 0 0 2px var(--pop);
+}
+[data-park] .park-shell__pagebtn svg {
+  flex: none;
+}
+[data-park] .park-popover.park-shell__pagemenu {
+  left: 16px;
+  right: auto;
+}
+[data-park] .park-shell__tab {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  position: relative;
+  isolation: isolate;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  text-decoration: none;
+}
+[data-park] .park-shell__tab--on,
+[data-park] .park-shell__tab--on:hover {
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+/* STUDIO-INT: between the page menu (below 840px) and a roomy bar, the tabs that do not fit sit in a More menu
+   (shell/navFit.ts holds the same numbers). The More button is a tab that opens a menu under itself. */
+[data-park] .park-shell__more {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+[data-park] .park-shell__more svg {
+  flex: none;
+}
+[data-park] .park-popover.park-shell__moremenu {
+  left: var(--park-more-left, 16px);
+}
+@media (max-width: 1199px) {
+  [data-park] .park-shell__tab {
+    padding: 0 10px;
+  }
+}
+/* The amber badge: #F0A500 with #1F1D2B in both themes (README "Hard-coded on purpose"). */
+[data-park] .park-shell__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 99px;
+  background: #f0a500;
+  color: #1f1d2b;
+  font-size: 12px;
+  font-weight: 900;
+}
+[data-park] .park-shell__tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+[data-park] .park-shell__iconbtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  isolation: isolate;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+[data-park] .park-shell__iconbtn--on {
+  background: var(--chip);
+}
+[data-park] .park-shell__bell {
+  position: relative;
+}
+[data-park] .park-shell__unread {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 99px;
+  background: #f0a500;
+  box-shadow: 0 0 0 2px var(--pop);
+  color: #1f1d2b;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+[data-park] .park-shell__avatar {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  margin-left: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: 0 0 0 2px var(--pop), 0 0 0 3.5px var(--line);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+[data-park] .park-shell__avatar--ring {
+  box-shadow: 0 0 0 2px var(--pop), 0 0 0 4px var(--hero);
+}
+/* The 3px progress bar on the nav's bottom edge, 22px in from each side (the nav is fixed at left and right 16,
+   top 14, 62 high, so the bar's top is 14 + 62 + 1 - 3). It sits beside the nav, not in it: the nav's glass blur
+   must not be under a moving layer. The opacity is set inline. */
+[data-park] .park-shell__bar {
+  position: fixed;
+  left: 38px;
+  right: 38px;
+  top: 74px;
+  z-index: 31;
+  pointer-events: none;
+  height: 3px;
+  border-radius: 99px;
+  overflow: hidden;
+  transition: opacity 0.3s ease;
+}
+/* The fill is always full width and scaled from its left edge (the shell sets the scaleX): it never animates width. */
+[data-park] .park-shell__barfill {
+  width: 100%;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--hero);
+  transform-origin: 0 50%;
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* Empty again (the bar has hidden): back to zero at once, not as a slide you cannot see. */
+[data-park] .park-shell__barfill--rest {
+  transition: none;
+}
+
+/* Focus ring (README "Interactions and motion"): 3px #5A3FE0, offset 2px. */
+[data-park] .park-shell__nav button:focus-visible,
+[data-park] .park-shell__nav a:focus-visible,
+[data-park] .park-shell__nrow:focus-visible,
+[data-park] .park-shell__settings:focus-visible {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}
+
+/* ---- Sample data chip: a named information icon when the nav is tight ---- */
+[data-park] .park-shell__sample {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 24px;
+  min-height: 24px;
+  margin: 0 6px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+[data-park] .park-shell__sampledot {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink2);
+}
+[data-park] .park-shell__samplebox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 10px;
+}
+[data-park] .park-shell__samplenote {
+  margin: 0;
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+@media (max-width: 560px) {
+  [data-park] .park-shell__sample {
+    margin: 0;
+  }
+  [data-park] .park-shell__sampledot {
+    display: flex;
+  }
+  /* Visually hidden, still the button's name. */
+  [data-park] .park-shell__samplelabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+/* W14 / UI-10: reserve the actual target in flex layout; negative margins overlapped Your context. */
+@media (max-width: 430px) {
+  [data-park] .park-shell__sample {
+    padding: 0;
+    margin: 0;
+  }
+  /* The invisible boot ghost must never take a tap meant for the next button. */
+  [data-park] .park-shell__sample.park-shell__booting {
+    pointer-events: none;
+  }
+  [data-park] .park-shell__sample .park-chip {
+    height: auto;
+    padding: 0;
+    background: transparent;
+  }
+}
+
+@media (max-width: 430px) {
+  [data-park] .park-shell__nav {
+    /* P0-08b W4: reserve Home's whole label beside W14's full sample target at 390px. */
+    gap: 8px;
+  }
+  /* W-AXE-1b: recover the dot target padding from tool gaps, never from hit areas. */
+  [data-park] .park-shell__tools {
+    gap: 0;
+  }
+}
+/* QA-DEMO-1 B2: at 320 the page button needs room: the nav's gaps and the tool buttons give back a little. */
+@media (max-width: 360px) {
+  [data-park] .park-shell__nav {
+    gap: 8px;
+    padding: 0 6px 0 8px;
+  }
+  [data-park] .park-shell__tools {
+    gap: 0;
+  }
+  [data-park] .park-shell__iconbtn {
+    width: 34px;
+  }
+  [data-park] .park-shell__avatar {
+    width: 34px;
+    height: 34px;
+    margin-left: 4px;
+  }
+  [data-park] .park-shell__pagebtn {
+    padding: 0 8px 0 10px;
+    font-size: 14px;
+  }
+}
+
+/* POLISH-1: from 361px up every nav control is a 44x44 target on a phone (PRD 18.1). min-* so the Studio sheet's
+   40px widths (studio.css) give way; the look stays, only the box grows. At 360 and below QA-DEMO-1 B2's tighter
+   boxes keep the page button's room. */
+@media (min-width: 361px) and (max-width: 560px) {
+  [data-park] .park-shell__logo,
+  [data-park] .park-shell__iconbtn,
+  [data-park] .park-shell__sample,
+  [data-park] .park-shell__avatar {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  [data-park] .park-shell__logo {
+    justify-content: center;
+  }
+}
+
+/* ---- Notifications popover (392 wide, right 60 as measured) ---- */
+[data-park] .park-popover.park-shell__notif {
+  right: 60px;
+}
+@media (max-width: 450px) {
+  /* The reference keeps right 60 and runs off the left edge here; the popover stays on screen. */
+  [data-park] .park-popover.park-shell__notif {
+    right: 16px;
+  }
+}
+[data-park] .park-shell__pophead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 6px;
+}
+[data-park] .park-shell__poptitle {
+  font-size: 16px;
+  font-weight: 800;
+}
+[data-park] .park-shell__settings {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--heroInk);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+[data-park] .park-shell__nrow {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  isolation: isolate;
+  padding: 10px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+[data-park] .park-shell__ntile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+}
+[data-park] .park-shell__ntile--needs {
+  background: var(--amberTile);
+  color: var(--amberInk);
+}
+[data-park] .park-shell__ntile--done {
+  background: var(--okSoft);
+  color: var(--ok);
+}
+[data-park] .park-shell__ntile--warn {
+  background: var(--redSoft);
+  color: var(--red);
+}
+[data-park] .park-shell__ntext {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+[data-park] .park-shell__ntitle {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+[data-park] .park-shell__nsub {
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 600;
+}
+[data-park] .park-shell__ntime {
+  align-self: flex-start;
+  padding-top: 2px;
+  color: var(--ink3);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* ---- Account menu header (the rows are the Menu component's) ---- */
+[data-park] .park-shell__who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 12px;
+}
+[data-park] .park-shell__whoav {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: #e6e1f8;
+  color: #1f1d2b;
+  font-size: 15px;
+  font-weight: 800;
+}
+[data-park] .park-shell__whotext {
+  min-width: 0;
+  line-height: 1.3;
+}
+[data-park] .park-shell__whoname {
+  font-size: 15px;
+  font-weight: 800;
+}
+[data-park] .park-shell__whomail {
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 600;
+}
+[data-park] .park-shell__whoorg {
+  color: var(--ink3);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+[data-park] .park-shell__concept {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px 12px;
+}
+[data-park] .park-shell__concept p {
+  margin: 0;
+}
+[data-park] .park-shell__rule {
+  height: 1px;
+  margin: 0 6px 4px;
+  background: var(--line2);
+}
+
+/* ---- World loader: the card inside the scrim (the scrim is the ModalScrim component) ---- */
+[data-park] .park-shell__card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-sizing: border-box;
+  width: 400px;
+  max-width: calc(100vw - 48px);
+  padding: 22px 24px 24px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--pop);
+  box-shadow: var(--shPop);
+  color: var(--ink);
+  font-family: "Nunito Sans", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+[data-park] .park-shell__cardhead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+[data-park] .park-shell__cardtext {
+  min-width: 0;
+  line-height: 1.3;
+}
+[data-park] .park-shell__eyebrow {
+  color: var(--ink3);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+}
+[data-park] .park-shell__cardname {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+[data-park] .park-shell__cardmeta {
+  color: var(--ink2);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+[data-park] .park-shell__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+[data-park] .park-shell__step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink3);
+  font-size: 14px;
+  font-weight: 700;
+}
+[data-park] .park-shell__step--on {
+  color: var(--ink);
+}
+[data-park] .park-shell__mark {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 99px;
+  background: transparent;
+  color: #ffffff;
+}
+[data-park] .park-shell__mark--done {
+  background: var(--ok);
+}
+[data-park] .park-shell__mark--next {
+  background: var(--track);
+}
+/* The world card: the wrapper only catches animationend; when the last step is done the scrim fades over 280 ms
+   (the card inside it leaves with it) and the shell drops it at the animation's end. */
+[data-park] .park-shell__wl {
+  display: contents;
+}
+[data-park] .park-scrim:has(> .park-shell__card--leaving) {
+  animation: tiloFade 0.28s ease forwards;
+  pointer-events: none; /* a card on its way out takes no click */
+}
+[data-park] .park-shell__lbar {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+[data-park] .park-shell__lfill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--hero);
+}
+
+/* ---- Boot splash ---- */
+[data-park] .park-shell__boot {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  background: var(--paper);
+  font-family: "Nunito Sans", sans-serif;
+}
+/* Ready: the splash fades over .45s (README Boot) and the shell drops it at animationend. */
+[data-park] .park-shell__boot--out {
+  pointer-events: none;
+  animation: tiloFade 0.45s ease forwards;
+}
+/* W14 / UI-10: fade the paper only, never loading text through an interactive page. */
+[data-park] .park-shell__boot--out > * {
+  visibility: hidden;
+}
+[data-park] .park-shell__bootlogo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+[data-park] .park-shell__bootmark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: var(--hero);
+}
+[data-park] .park-shell__bootvisor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 36px;
+  height: 20px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+[data-park] .park-shell__bootdot {
+  width: 5px;
+  height: 5px;
+  border-radius: 9px;
+  background: #1f1d2b;
+}
+[data-park] .park-shell__bootword {
+  line-height: 1; /* the row stays 56px tall in the fallback face and in Nunito: nothing recentres when it loads */
+  color: var(--logo);
+  font-family: "Nunito", sans-serif;
+  font-size: 48px;
+  font-weight: 900;
+  letter-spacing: -1.2px;
+}
+[data-park] .park-shell__bootstate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+[data-park] .park-shell__boottrack {
+  width: 200px;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+[data-park] .park-shell__bootfill {
+  width: 42%;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--hero);
+  animation: tiloSlide 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+[data-park] .park-shell__boottext {
+  line-height: 20px; /* fixed, so the fallback face and Nunito Sans give the same height (no shift when it loads) */
+  color: var(--ink2);
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+/* ---- Micro-interactions (WEB-MOTION-3, FR-UX-12) ----
+   Hover, press, slide and enter feedback from the handoff (README "Interactions and motion"; the inline styles of
+   design_handoff_tilo_web_app/design/Tilo App *.dc.html). Every rule here is a transition on transform or opacity,
+   and starts from something a person did (a pointer over a control, a press, a click that
+   opens a menu, an action in flight). Nothing shows or implies an agent, a run or a decision. Page and component
+   stylesheets may not hold motion, so the page's controls are reached from the page outlet (.park-shell__main).
+   Colour fades (user approved 8 Oct, BQ-WEB-MOTION-3a) are background-color and color only, on the exact list pinned
+   in motion3.micro.css.test.ts. The reference's box-shadow, filter (the primary button's brightness) and width fades
+   are not built: they would animate paint or layout. The Home glass chip does not lift for the same reason (it
+   carries a backdrop-filter). */
+
+/* The nav's hover wash fades the element's own background-color over .2s, as in the reference. The tab you are on
+   keeps its fill (heroSoft); a focused control gets the same wash as a hovered one. */
+[data-park] .park-shell__tab {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+[data-park] .park-shell__iconbtn,
+[data-park] .park-shell__nrow {
+  transition: background-color 0.2s ease;
+}
+[data-park] .park-shell__tab:not(.park-shell__tab--on):hover,
+[data-park] .park-shell__tab:not(.park-shell__tab--on):focus-visible,
+[data-park] .park-shell__iconbtn:hover,
+[data-park] .park-shell__iconbtn:focus-visible {
+  background: var(--chip);
+}
+[data-park] .park-shell__nrow:hover,
+[data-park] .park-shell__nrow:focus-visible {
+  background: var(--rowHover);
+}
+
+/* Lifts on hover: cards, tiles and pins rise on transform .3s cubic-bezier(.2,.8,.2,1). */
+[data-park] .park-shell__main .park-worlds-card,
+[data-park] .park-shell__main .park-home-pin__card,
+[data-park] .park-shell__main .park-connectors-tile {
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+[data-park] .park-shell__main .park-worlds-card:hover {
+  transform: translateY(-3px);
+}
+[data-park] .park-shell__main .park-connectors-tile:hover {
+  transform: translateY(-2px);
+}
+/* The pinboard note straightens and lifts with a spring; the agenda event lifts 1px. */
+[data-park] .park-shell__main .park-agenda-pin {
+  transition: transform 0.45s cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+[data-park] .park-shell__main .park-agenda-event {
+  transition: transform 0.2s ease;
+}
+
+/* Press: the Home start button sinks 2px (its own :active), a shared button 1px, over .15s. */
+[data-park] .park-shell__main .park-home-start,
+[data-park] .park-shell__main .park-btn {
+  transition: transform 0.15s ease;
+}
+[data-park] .park-shell__main .park-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* The sliding thumb of a segmented control and the knobs of the switches (the component sets the end state). */
+[data-park] .park-shell__main .park-seg--sliding .park-seg__thumb {
+  transition: transform 0.4s cubic-bezier(0.34, 1.3, 0.5, 1);
+}
+[data-park] .park-shell__main .park-switch__knob,
+[data-park] .park-shell__main .park-profile-knob,
+[data-park] .park-shell__main .park-skills-ask-knob,
+[data-park] .park-shell__main .park-agenda-knob {
+  transition: transform 0.25s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+
+/* Colour fades of the handoff (user approved 8 Oct): the switch tracks recolour as the knob travels, list rows wash
+   on hover, the Worlds and Agenda chips fill when chosen, the sliding segmented text recolours. Paint only. */
+[data-park] .park-shell__main .park-switch,
+[data-park] .park-shell__main .park-profile-switch,
+[data-park] .park-shell__main .park-agenda-track,
+[data-park] .park-shell__main .park-skills-ask-track,
+[data-park] .park-shell__main .park-home-live,
+[data-park] .park-shell__main .park-home-event,
+[data-park] .park-shell__main .park-home-spend,
+[data-park] .park-shell__main .park-ledger-run,
+[data-park] .park-shell__main .park-ledger-arow-btn,
+[data-park] .park-shell__main .park-row--action {
+  transition: background-color 0.2s ease;
+}
+[data-park] .park-shell__main .park-agenda-filter,
+[data-park] .park-shell__main .park-worlds-tab {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+[data-park] .park-shell__main .park-seg--sliding .park-seg__item {
+  transition: color 0.25s ease;
+}
+
+/* A toast, a popover or a menu comes in: from a few px up and transparent, over .25s (the shell's Enter component
+   holds data-enter="pre" for one style flush, then "in"). The wrapper has no box. */
+[data-park] .park-shell__enter {
+  display: contents;
+}
+[data-park] .park-shell__enter > .park-toast {
+  transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+[data-park] .park-shell__enter > .park-popover {
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* WEB-W2 (issue 933): the sample banner sits where the toast's top 92 lands, so while the banner is on the page the
+   toast rises from the bottom instead, above the run bar (fixed, 16px up, about 44px tall). One place at a time,
+   never over the bar or the banner, at 1440 and 390. */
+[data-park]:has(.park-first-run-banner) .park-toast:not(.park-toast--inline) {
+  top: auto;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+}
+[data-park]:has(.park-first-run-banner) .park-shell__enter[data-enter="pre"] > .park-toast {
+  transform: translateX(-50%) translateY(8px);
+}
+/* LIVE-P2-A (QA row 24): on a World page the bottom edge is the map legend, so the toast sits under the sample banner
+   there instead of over the legend. */
+[data-park]:has(.park-first-run-banner):has(.park-world-legend:not([hidden]))
+  .park-toast:not(.park-toast--inline) {
+  top: 152px;
+  bottom: auto;
+}
+[data-park]:has(.park-first-run-banner):has(.park-world-legend:not([hidden]))
+  .park-shell__enter[data-enter="pre"]
+  > .park-toast {
+  transform: translateX(-50%) translateY(-8px);
+}
+[data-park] .park-shell__enter[data-enter="pre"] > .park-toast {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-8px);
+}
+[data-park] .park-shell__enter[data-enter="pre"] > .park-popover {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* Reduced motion (README): no animation and no transition at all in the shell's chrome or the page's controls.
+   The shell also skips its own waits (motion.ts), so a page swaps at once and a splash or card goes the moment it
+   is done. The person's 'still' (Profile > Appearance, data-motion on the root) is the same list. */
+/* ---- Run bar (RUN-INDICATOR): a pill at the bottom while a recorded run is in progress or held ----
+   Fixed and only as wide as its text, so nothing around it is covered or blocked; above the page (z 1), below the
+   nav (30). It has no motion rule of its own: Thinking Tilo uses a saved image, and
+   the still look (reduced motion, 'still', or a held run) is a dot. */
+[data-park] .park-shell__runbar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 25;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  max-width: calc(100vw - 32px);
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shPop);
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+}
+[data-park] .park-shell__runbar-label {
+  flex: none;
+}
+[data-park] .park-shell__runbar-sep {
+  flex: none;
+  color: var(--ink3);
+}
+[data-park] .park-shell__runbar-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink2);
+  font-weight: 600;
+}
+[data-park] .park-shell__runbar-dot {
+  display: block;
+  flex: none;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border-radius: 99px;
+  background: var(--hero);
+}
+/* Held: a pause mark (two bars), so the state is not told by colour alone. */
+[data-park] .park-shell__runbar-dot--held {
+  width: 16px;
+  height: 16px;
+  border-radius: 0;
+  background: transparent;
+  border-left: 5px solid var(--ink2);
+  border-right: 5px solid var(--ink2);
+}
+
+/* Reduced motion (README): no animation and no transition at all in the shell's chrome. The shell also skips
+   its own waits (motion.ts), so a page swaps at once and a splash or card goes the moment it is done. */
+@media (prefers-reduced-motion: reduce) {
+  [data-park] .park-shell__main,
+  [data-park] .park-shell__main *,
+  [data-park] .park-shell__bar,
+  [data-park] .park-shell__barfill,
+  [data-park] .park-shell__bootfill,
+  [data-park] .park-shell__boot--out,
+  [data-park] .park-shell__tab,
+  [data-park] .park-shell__iconbtn,
+  [data-park] .park-shell__nrow,
+  [data-park] .park-shell__enter > .park-toast,
+  [data-park] .park-shell__enter > .park-popover,
+  [data-park] .park-scrim:has(> .park-shell__card--leaving) {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+[data-park][data-motion="still"] .park-shell__main,
+[data-park][data-motion="still"] .park-shell__main *,
+[data-park][data-motion="still"] .park-shell__bar,
+[data-park][data-motion="still"] .park-shell__barfill,
+[data-park][data-motion="still"] .park-shell__bootfill,
+[data-park][data-motion="still"] .park-shell__boot--out,
+[data-park][data-motion="still"] .park-shell__tab,
+[data-park][data-motion="still"] .park-shell__iconbtn,
+[data-park][data-motion="still"] .park-shell__nrow,
+[data-park][data-motion="still"] .park-shell__enter > .park-toast,
+[data-park][data-motion="still"] .park-shell__enter > .park-popover,
+[data-park][data-motion="still"] .park-scrim:has(> .park-shell__card--leaving) {
+  animation: none !important;
+  transition: none !important;
+}

@@ -1,0 +1,6 @@
+{
+  "q": "inv",
+  "kinds": ["skill", "taught_skill"],
+  "cursor": "c_20",
+  "limit": 50
+}

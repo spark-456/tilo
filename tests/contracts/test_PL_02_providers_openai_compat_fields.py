@@ -204,7 +204,9 @@ def test_PL_02_nvidia_nim_example_profile_fixture_validates(repo_root, registry)
 
 def test_PL_02_providers_schema_version_bumped_to_minor_1_1_0(repo_root):
     schema = load_schema(repo_root, "providers")
-    assert schema.get("x-version") == "1.1.0", (
-        "PL-02: contracts/providers.schema.json must bump x-version to 1.1.0 for this additive "
+    version = tuple(int(p) for p in str(schema.get("x-version")).split("."))
+    # 1.1.0 for this change; later minors are additive (1.2.0: audio_input and the speech role, ADR-0027).
+    assert version >= (1, 1, 0) and version[0] == 1, (
+        "PL-02: contracts/providers.schema.json must bump x-version to 1.1.0 or a later 1.x for this additive "
         f"change (ADR-0002 section 2: 'additive change is minor'), got {schema.get('x-version')!r}"
     )

@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/mentions.schema.json",
+  "x-version": "1.0.0",
+  "title": "Mentions",
+  "description": "The @ picker of the chat composer and the Home prompt box (ADR-0051, MN-01 to MN-10 in mentions.rules.md): one page of GET /v1/mentions. Each option names a typed reference (ref) the person may tag; a message carries only refs (ids), never content, and tilo-api resolves every ref again with the sender's own permissions before use (MN-02). Not the pinboard @mention of a teammate (mention.schema.json).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["items", "next_cursor"],
+  "properties": {
+    "items": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/option" } },
+    "next_cursor": { "anyOf": [{ "$ref": "#/$defs/cursor" }, { "type": "null" }] }
+  },
+  "$defs": {
+    "kind": {
+      "description": "skill: a library skill (skills/). taught_skill: one the person or a team taught (ADR-0034). file: a stored artifact version. drive_file and drive_folder: Drive items the person picked (drive.file, ADR-0048). world: a world (project). person: a teammate (id and display name only, PE-20). connector: a connected tool. tool: one action of a connector (a function).",
+      "type": "string",
+      "enum": [
+        "skill",
+        "taught_skill",
+        "file",
+        "drive_file",
+        "drive_folder",
+        "world",
+        "person",
+        "connector",
+        "tool"
+      ]
+    },
+    "cursor": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,200}$" },
+    "drive_id": {
+      "description": "Google Drive's opaque file or folder id.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{10,128}$"
+    },
+    "list_request": {
+      "description": "The query of GET /v1/mentions. q matches labels case-insensitively by code (no model); kinds empty means all kinds.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["q", "kinds", "cursor", "limit"],
+      "properties": {
+        "q": { "type": "string", "maxLength": 64, "pattern": "^[^\\r\\n]*$" },
+        "kinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 9,
+          "items": { "$ref": "#/$defs/kind" }
+        },
+        "cursor": { "anyOf": [{ "$ref": "#/$defs/cursor" }, { "type": "null" }] },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 50 }
+      }
+    },
+    "ref": {
+      "description": "One typed reference. A file pins the version the picker showed.",
+      "oneOf": [
+        { "$ref": "#/$defs/skill_ref" },
+        { "$ref": "#/$defs/taught_skill_ref" },
+        { "$ref": "#/$defs/file_ref" },
+        { "$ref": "#/$defs/drive_file_ref" },
+        { "$ref": "#/$defs/drive_folder_ref" },
+        { "$ref": "#/$defs/world_ref" },
+        { "$ref": "#/$defs/person_ref" },
+        { "$ref": "#/$defs/connector_ref" },
+        { "$ref": "#/$defs/tool_ref" }
+      ]
+    },
+    "skill_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "skill" },
+        "id": { "$ref": "common.schema.json#/$defs/skill_id" }
+      }
+    },
+    "taught_skill_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "taught_skill" },
+        "id": { "$ref": "taught_skill.schema.json#/$defs/id" }
+      }
+    },
+    "file_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "version"],
+      "properties": {
+        "kind": { "const": "file" },
+        "id": { "$ref": "common.schema.json#/$defs/artifact_id" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "drive_file_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": { "kind": { "const": "drive_file" }, "id": { "$ref": "#/$defs/drive_id" } }
+    },
+    "drive_folder_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": { "kind": { "const": "drive_folder" }, "id": { "$ref": "#/$defs/drive_id" } }
+    },
+    "world_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "world" },
+        "id": { "$ref": "common.schema.json#/$defs/world_id" }
+      }
+    },
+    "person_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "person" },
+        "id": { "$ref": "common.schema.json#/$defs/user_id" }
+      }
+    },
+    "connector_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "connector" },
+        "id": { "$ref": "common.schema.json#/$defs/connector_id" }
+      }
+    },
+    "tool_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "tool" },
+        "id": { "$ref": "common.schema.json#/$defs/action_type" }
+      }
+    },
+    "refs": {
+      "description": "The refs one message carries: the multipart field refs of POST /intake (a JSON array), in the order the chips appear (MN-01).",
+      "type": "array",
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/ref" }
+    },
+    "option": {
+      "description": "One picker row. label and detail are written by tilo-api from the record (a teammate's display name only, PE-20) and are for display: the message sends back only ref (MN-08). scope: mine (the person's own), team (built or shared by one of the person's current teams) or library (Tilo's skill library). state: ready, needs_setup (the connector is not connected; the run will ask) or limited (a Drive folder: Tilo reads only files picked or made by Tilo in it).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "label", "detail", "scope", "state"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/ref" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^[^\\r\\n]+$" },
+        "detail": { "anyOf": [{ "$ref": "#/$defs/detail" }, { "type": "null" }] },
+        "scope": { "type": "string", "enum": ["mine", "team", "library"] },
+        "state": { "type": "string", "enum": ["ready", "needs_setup", "limited"] }
+      }
+    },
+    "detail": { "type": "string", "maxLength": 120, "pattern": "^[^\\r\\n]*$" },
+    "ref_error": {
+      "description": "The 422 body when a ref cannot be used. A ref the sender may not read gets exactly the same body as one that does not exist (MN-02).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error", "index"],
+      "properties": {
+        "error": { "const": "ref_unavailable" },
+        "index": { "type": "integer", "minimum": 0, "maximum": 9 }
+      }
+    }
+  }
+}

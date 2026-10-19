@@ -1,0 +1,1117 @@
+import {
+  type ChangeEvent,
+  type ReactNode,
+  Suspense,
+  lazy,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+// The Park "World" page (STUDIO-3, design/studio-v2 "Tilo S World.dc.html"; first WEB-6 "Tilo App World.dc.html"):
+// one world. The title block with its progress and buttons, the run's status banner, then the city on the left and
+// the Story / Steps / Result tabs on the right (Story: what the team did, from the recorded events or the list's
+// activity, with the decisions it waits on; Steps: the plan in order, or Districts / Run history; Result: the
+// delivered output with Download and Share), then spend, facts, skills, tools and the meeting hall. The worlds, plans,
+// decisions, skills and connectors come through useParkApi(); pausing is page state and writes nothing
+// (docs/park-designed-not-in-prd/World.md). A decision is taken with app.decide (the store toasts it with
+// Undo), navigation inside the Park app is app.go, and the links to the live stage and its lenses are real
+// addresses the browser follows, but only for a world whose data came from the live API: a sample world has no
+// recorded run, so the same elements are disabled with the reason (docs/park-designed-not-in-prd/World.md).
+import { HOST_NOT_CONNECTED_TEXT } from "../../api/hostCopy";
+import { createRoomClient } from "../../api/live/meetingHall";
+import { downloadResult, hasResultReader } from "../../api/results";
+import type {
+  ApiResult,
+  BuildHandoff,
+  Connector,
+  Decision,
+  Plan,
+  Skill,
+  World,
+} from "../../api/types";
+import type { AppCtx } from "../../app/AppCtx";
+import { NotFound } from "../../app/NotFound";
+import { markPendingWorld } from "../../app/PendingWorldRoute";
+import { useDemoSession, useParkApi, useWorldClient } from "../../app/context";
+import { PageTitle } from "../../app/pageTitle";
+import { RECORDED_RUN_PATH, stagePath } from "../../app/router";
+import {
+  SLACK_NOTE_MAX,
+  type SlackShareRequest,
+  capSlackNote,
+  focusablesIn,
+  handleSlackDialogKeyDown,
+  slackConnectorState,
+} from "../../app/slackShare";
+import { useStaged } from "../../app/useStaged";
+import { Button, PageSheet } from "../../components";
+import { SampleBadge, SampleNote } from "../../sample/SampleBadge";
+import { icon } from "../../shell/kit";
+import { Activity, Districts, Result, RunHistory } from "./Lower";
+import { MapToast, ZoomableMap, latestLine } from "./MapChrome";
+import { MeetingHall } from "./MeetingHall";
+import {
+  EmptyPanel,
+  RunStepList,
+  RunStory,
+  TabPanel,
+  type WorldTab,
+  WorldTabs,
+  stepsCount,
+} from "./Panels";
+import { RecordedWorldArt } from "./RecordedWorldArt";
+import { DeliveryDock, useSharedResult } from "./ResultPanel";
+import { RunProgressCard } from "./RunProgressCard";
+import { AssumedChips, RunResult, RunStatus } from "./RunStatus";
+import { ShareLine } from "./ShareLine";
+import { FactsCard, GoLink, LovableCard, SpendCard, WaitingCard } from "./Side";
+import { SkillProposals } from "./SkillProposals";
+import { ShareWithTeam } from "./TeamShare";
+import { MissingWorld, TeamItems, TeamWorld } from "./TeamWorld";
+import { runProgress } from "./runProgress";
+import { runView } from "./runView";
+import { loadedSkillNames } from "./skillRunVisible";
+import { useRunEvents } from "./useRunEvents";
+import "./World.css";
+import "./World.studio.css";
+import { labelledCityArt, rowArt, singleArt } from "./worldArt";
+import {
+  LEGEND,
+  STOPPED,
+  agentsWord,
+  canPause,
+  decisionsWord,
+  heroTagOf,
+  isRecordedRunning,
+  metaLine,
+  skillsAndTools,
+  stateLook,
+  withRunState,
+} from "./worldModel";
+
+// WORLD-LIVE: a real run is drawn by the live stage (the same one as /world/:id/stage), a chunk of its own; a browser
+// with no WebGL2 keeps the recorded text map and the Story, which is what "no WebGL2" has always meant here.
+const LiveStageEmbed = lazy(() => import("../../../worldView/LiveStageEmbed"));
+const LiveChat = lazy(() =>
+  import("../../../worldView/LiveStageEmbed").then((m) => ({ default: m.LiveChat })),
+);
+const FailureCard = lazy(() =>
+  import("../../../worldView/LiveStageEmbed").then((m) => ({ default: m.FailureCard })),
+);
+const canDrawStage = (): boolean => {
+  try {
+    return document.createElement("canvas").getContext("webgl2") !== null;
+  } catch {
+    return false;
+  }
+};
+
+interface Loaded {
+  worlds: World[];
+  /** True when the world list came from the live API (`source: "live"`): only then does a world have a stage. */
+  live: boolean;
+  plans: Record<string, Plan>;
+  decisions: Decision[];
+  skills: Skill[];
+  connectors: Connector[];
+  /** The side reads that failed or are not built: each card says so itself, the page still opens from the worlds. */
+  gaps: { plans: boolean; decisions: boolean; skills: boolean; connectors: boolean };
+  handoffs: BuildHandoff[];
+}
+
+const NOT_YET = "Not available yet";
+
+/** Runs one side read: its failure is a gap in that card, never the whole page. */
+const optional = <T,>(read: Promise<ApiResult<T>>): Promise<ApiResult<T> | null> =>
+  read.then(
+    (r) => r,
+    () => null,
+  );
+
+/** S-05's first building (screens/meta.ts): a Park plan's own building ids are not stage ids. */
+const INSPECT_BUILDING = "B1";
+
+/** A sample (fixture) world has no run behind it: the live view and lenses are not offered, this one line says why. */
+const NO_STAGE = "Live view is for real runs";
+const NO_RUN_YET = "This run has recorded no events yet, so there is nothing to open";
+const NO_STAGE_ID = "park-world-nostage";
+const NO_SLACK_ID = "park-world-noslack";
+
+/**
+ * A link to the stage or one of its lenses. With a stage it is a plain link the browser follows. Without one
+ * (a sample world) it is the same element and class, disabled: no href, aria-disabled, and the reason as its
+ * title and, once per page, as visually hidden text it is described by.
+ */
+function StageLink({
+  href,
+  className,
+  children,
+  reason = NO_STAGE,
+}: { href: string | null; className?: string; children: ReactNode; reason?: string }) {
+  if (href !== null) {
+    return (
+      <a className={className} href={href}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    // biome-ignore lint/a11y/useValidAnchor: a disabled link has no destination, so no href
+    <a
+      className={className}
+      // biome-ignore lint/a11y/useSemanticElements: the disabled-link pattern: role="link" + aria-disabled
+      role="link"
+      tabIndex={0} // UI-10 B4: still reachable by keyboard, so the reason it is off can be read
+      aria-disabled="true"
+      aria-describedby={NO_STAGE_ID}
+      title={reason}
+    >
+      {children}
+    </a>
+  );
+}
+
+/** The world art in the map: a City's plan, a Town's row, or a Village's single building. */
+function MapArt({
+  w,
+  plans,
+  app,
+}: { w: World; plans: Record<string, Plan>; app: AppCtx }): ReactNode {
+  if (w.tier === "City") {
+    const plan = w.plan ? plans[w.plan] : undefined;
+    // Building names on a map wide enough to read them (the artboard's labelled city); district tags always.
+    return w.plan && plan ? labelledCityArt(plan, app.night, (app.vw || 1440) >= 760) : null;
+  }
+  return (
+    <div className="park-world-bigart">
+      {w.tier === "Town" && w.row ? rowArt(w.row, app.night) : singleArt(w, app.night)}
+    </div>
+  );
+}
+
+/** A side card whose read is not built or failed: its own plain line, nothing sample in its place. */
+function NotYetCard({ title }: { title: string }) {
+  return (
+    <section className="park-world-spend" aria-label={title}>
+      <div className="park-world-spendhead">
+        <span className="park-world-spendtitle">{title}</span>
+      </div>
+      <div className="park-world-spendnote">{NOT_YET}</div>
+    </section>
+  );
+}
+
+function Frame({ children, worldId }: { children?: ReactNode; worldId?: string }) {
+  return (
+    <div className="park-world-root" data-testid="park-page-world" data-world-id={worldId}>
+      <PageSheet>{children}</PageSheet>
+    </div>
+  );
+}
+
+// UI-10 B1: no run-now route and no result file exist yet, so a sample says it did nothing and a live world's
+// button says why it is off. Neither claims a run started or a result opened (HR-1).
+const SAMPLE_RUN = "Sample only: nothing was started. This demo world has no runner behind it.";
+const SAMPLE_OPEN =
+  "Sample only: nothing was opened. This demo world has no result file behind it.";
+const RUN_OFF = "Starting a run from this page is not connected yet. No run would start.";
+const OPEN_OFF = "This result has no file linked yet, so there is nothing to open.";
+
+export function WorldPage({ app }: { app: AppCtx }) {
+  const api = useParkApi();
+  const worldClient = useWorldClient();
+  const demo = useDemoSession(); // QA-DEMO-1: the sample company: labelled, and approving records nothing
+  const [roomClient] = useState(createRoomClient);
+  const [canDraw] = useState(canDrawStage);
+  const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
+  const [paused, setPaused] = useState<Record<string, boolean>>({});
+  // STUDIO-3: the chosen tab; until a person picks one, Story (or Result once a run's result is delivered).
+  const [tab, setTab] = useState<WorldTab | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [slackOpen, setSlackOpen] = useState(false);
+  const [slackChannel, setSlackChannel] = useState("");
+  const [slackNote, setSlackNote] = useState("");
+  const [slackPendingByWorld, setSlackPendingByWorld] = useState<Record<string, SlackShareRequest>>(
+    {},
+  );
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // The map and head first, then the side cards, then the lower part: one task each (WEB-MOTION-2).
+  const part = useStaged(3);
+  const { dec, added } = app;
+  // UI-10 B8: a real run (the HTTP API, not a demo) is read from its recorded events; any other client leaves it be.
+  // Only a world the list carries as the person's own, and not one started on this page: nothing is asked for an
+  // id the list does not know (the missing-world rule) and a teammate's world is read through its share.
+  const listed =
+    loaded !== null && loaded !== "failed" && loaded.live
+      ? loaded.worlds.find((x) => x.id === app.params.id)
+      : undefined;
+  const runId =
+    worldClient !== null &&
+    listed !== undefined &&
+    listed.access !== "team" &&
+    !added.some((a) => a.id === listed.id)
+      ? listed.id
+      : null;
+  const runEvents = useRunEvents(worldClient, runId);
+  // WORLD-LIVE: the run's result is read once, when it is recorded delivered, for the Delivery Dock and the Result tab.
+  const result = useSharedResult(api, runId, runEvents);
+
+  const lastDeliveredRef = useRef<number | null>(null);
+  useEffect(() => {
+    const del = runEvents.find((e) => e.type === "artifact.delivered");
+    if (del && del.seq !== lastDeliveredRef.current) {
+      lastDeliveredRef.current = del.seq;
+      setTab("result");
+    }
+  }, [runEvents]);
+
+  useEffect(() => {
+    let live = true;
+    const handoffRead =
+      typeof api.getBuildHandoff === "function"
+        ? api.getBuildHandoff().then(
+            (r) => r.data,
+            (err: unknown) => {
+              if (
+                err &&
+                typeof err === "object" &&
+                (err as { code?: unknown }).code === "not_built"
+              ) {
+                return [];
+              }
+              throw err;
+            },
+          )
+        : Promise.resolve([]);
+    Promise.all([
+      api.getWorlds(dec, added),
+      optional(api.getPlans(dec)),
+      optional(api.getDecisions()),
+      optional(api.getSkills()),
+      optional(api.getConnectors()),
+      handoffRead,
+    ]).then(
+      ([worlds, plans, decisions, skills, connectors, handoffs]) => {
+        if (!live) return;
+        setLoaded({
+          worlds: worlds.data,
+          live: worlds.source === "live",
+          plans: plans?.data ?? {},
+          decisions: decisions?.data ?? [],
+          skills: skills?.data ?? [],
+          connectors: connectors?.data ?? [],
+          gaps: {
+            plans: plans === null,
+            decisions: decisions === null,
+            skills: skills === null,
+            connectors: connectors === null,
+          },
+          handoffs,
+        });
+      },
+      () => {
+        if (live) setLoaded("failed");
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, dec, added]);
+
+  useEffect(() => {
+    if (!slackOpen) return;
+    const first = focusablesIn(dialogRef.current)[0];
+    first?.focus();
+  }, [slackOpen]);
+
+  if (loaded === null) return <Frame />;
+  // BQ-CTX-TEAMWORLD (BQ-TEAMWORLD-8): the list says whose a live world is. `access: "team"` is a teammate's, read
+  // only (the API's 404 for one since lapsed is the ordinary missing world); an id the list does not carry is a
+  // missing world too, never a guess.
+  const wanted = app.params.id;
+  if (loaded !== "failed" && loaded.live && worldClient && wanted) {
+    const listed = loaded.worlds.find((x) => x.id === wanted);
+    if (listed?.access === "team")
+      return <TeamWorld client={worldClient} worldId={wanted} app={app} />;
+    if (!listed && !added.some((x) => x.id === wanted))
+      return <MissingWorld worldId={wanted} app={app} />;
+  }
+  const world =
+    loaded === "failed"
+      ? undefined
+      : (loaded.worlds.find((x) => x.id === wanted) ??
+        (wanted
+          ? undefined
+          : (loaded.worlds.find((x) => !added.some((a) => a.id === x.id)) ?? loaded.worlds[0])));
+  if (loaded !== "failed" && wanted && !world) {
+    return (
+      <>
+        <PageTitle title="Not found" />
+        <NotFound go={app.go} />
+      </>
+    );
+  }
+  if (loaded === "failed" || !world) {
+    return (
+      <Frame>
+        <h1 className="park-world-h1" tabIndex={-1}>
+          World
+        </h1>
+        <p className="park-world-meta">World data is unavailable</p>
+      </Frame>
+    );
+  }
+
+  // WORLD-USEFUL: for a real run the recorded events say what state it is in, not the list read at page open.
+  const trackRun = runId !== null && runId === world.id;
+  const view = trackRun && runEvents.length > 0 ? runView(runEvents) : null;
+  const w = view ? withRunState(world, view, runProgress(runEvents).agents) : world;
+  const isCity = w.tier === "City";
+  const isTown = w.tier === "Town";
+  // Live run navigation follows the recorded run, regardless of the world's size.
+  const showRunViews = loaded.live || isCity;
+  const isPaused = view?.phase === "paused" || Boolean(paused[w.id]);
+  const mine = loaded.decisions.filter((d) => d.world === w.id);
+  const slackPending = slackPendingByWorld[w.id] ?? null;
+  const handoff = loaded.handoffs.find((h) => h.world === w.id) ?? null;
+  const open = mine.filter((d) => !dec[d.k]).length + (slackPending ? 1 : 0);
+  const look = view?.phase === "failed" ? STOPPED : stateLook(w, isPaused);
+  const { skills, tools } = skillsAndTools(w, loaded.skills, loaded.connectors);
+  const runSkillNames = trackRun ? loadedSkillNames(runEvents, loaded.skills) : [];
+  const slackState = slackConnectorState(loaded.connectors);
+  const wide = (app.vw || 1440) >= 1060;
+  const id = encodeURIComponent(w.id);
+  // A world has a stage only when its data came from the live API; a world started on this page is local state.
+  const startedHere = added.some((a) => a.id === w.id);
+  // UI-10 B8: for a real run the stage and its lenses open only once the run has recorded an event.
+  const hasStage = loaded.live && !startedHere && (!trackRun || runEvents.length > 0);
+  const noStage = trackRun ? NO_RUN_YET : NO_STAGE;
+  const stage = (to: string): string | null => (hasStage ? to : null);
+  // POLISH-2: a sample world offers no live view or lens links at all (greyed out they read as broken); one chip says why.
+  // A real run with no events yet keeps its disabled links: they switch on with its first event.
+  const sampleOnly = showRunViews && !hasStage && !trackRun;
+  const real = hasStage && !demo; // a live world of a real account: its toasts may claim real outcomes
+  const recorded = isRecordedRunning(w, real);
+  // UI-10 B2: pausing keeps the decision count (the cards still say "before agents continue"); a recording says so.
+  const chip = isPaused
+    ? w.st === "needs" && app.needsLeft > 0
+      ? `Paused · ${decisionsWord(app.needsLeft)}`
+      : look[0]
+    : w.st === "needs" && app.needsLeft > 0
+      ? decisionsWord(app.needsLeft)
+      : look[0];
+
+  const togglePause = () => {
+    if (loaded.live && worldClient && !w.sample) {
+      if (isPaused) {
+        worldClient.startAgain(w.id).then(
+          (next) => {
+            markPendingWorld(next.world_id);
+            app.go("world", { id: next.world_id });
+          },
+          () => app.toast("This run could not continue. Try again."),
+        );
+      } else {
+        worldClient.pauseWorld(w.id).then(
+          () => {
+            setPaused((current) => ({ ...current, [w.id]: true }));
+            app.toast("Paused. No spend while paused");
+          },
+          () => app.toast("This run could not be paused. Try again."),
+        );
+      }
+      return;
+    }
+    setPaused((p) => ({ ...p, [w.id]: !isPaused }));
+    // Issue 932: a sample world has no run behind it, so the toast says what happened: this page only.
+    app.toast(
+      real
+        ? isPaused
+          ? "Resumed. Agents are back at work"
+          : "Paused. No spend while paused"
+        : isPaused
+          ? "Sample only: resumed on this page. Nothing real changed."
+          : "Sample only: paused on this page. Nothing real changed.",
+    );
+  };
+  const share = () => {
+    try {
+      // document.URL is the address as location.href gives it; the park static checks keep `location` to router.ts
+      Promise.resolve(navigator.clipboard.writeText(document.URL)).catch(() => undefined);
+    } catch {
+      // no clipboard here: the toast still says what the button is for
+    }
+    app.toast(
+      real
+        ? "Link copied. Only your team can open it"
+        : "Link copied. This is a sample world, so there is nothing real to share.",
+    );
+  };
+  const changeDirection = async (instruction: string) => {
+    if (!worldClient) throw new Error("World client unavailable");
+    const next = await worldClient.startAgain(w.id, instruction);
+    markPendingWorld(next.world_id);
+    app.go("world", { id: next.world_id });
+  };
+
+  const openSlackDialog = (trigger: HTMLButtonElement) => {
+    if (!slackState.connected) return;
+    triggerRef.current = trigger;
+    setSlackChannel((cur) =>
+      cur && slackState.channels.includes(cur) ? cur : (slackState.channels[0] ?? ""),
+    );
+    setSlackNote("");
+    setSlackOpen(true);
+  };
+
+  const closeSlackDialog = () => {
+    setSlackOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  const submitSlackApproval = () => {
+    const channel = slackChannel || slackState.channels[0];
+    if (!channel) return;
+    const req: SlackShareRequest = {
+      worldId: w.id,
+      worldName: w.name,
+      channel,
+      note: capSlackNote(slackNote),
+      sample: !loaded.live,
+    };
+    setSlackPendingByWorld((prev) => ({ ...prev, [w.id]: req }));
+    setSlackOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  // STUDIO-3: the header's progress block. A real run's words come from its events (runView, runProgress); any
+  // other world's from the list. Nothing is estimated: no time left, no cap the data does not carry.
+  const live = trackRun && runEvents.length > 0 ? runProgress(runEvents) : null;
+  const progressHead = view
+    ? view.phase === "failed"
+      ? "Stopped"
+      : view.percent !== null
+        ? `${view.percent}% done`
+        : look[0]
+    : w.prog != null
+      ? `${w.prog}% done`
+      : look[0];
+  const progressSub =
+    view && view.total !== null && view.begun > 0
+      ? `Step ${view.begun} of ${view.total}`
+      : !view && !recorded && w.prog != null && w.nextL
+        ? `${w.nextL} ${w.nextV}`
+        : "";
+  const spentLine = live
+    ? `${Math.round(live.credits * 10) / 10} credits used`
+    : w.spend
+      ? `${w.spend} spent so far${w.of ? ` · ${w.of}` : ""}`
+      : "";
+  const steps = trackRun ? stepsCount(runEvents) : null;
+  const stepsDoneCount = steps ? steps.done : Math.round(((w.prog ?? 0) * 7) / 100);
+  const stepsTotalCount = steps ? steps.of : 7;
+  const stepPct =
+    stepsTotalCount > 0
+      ? Math.min(100, Math.round((stepsDoneCount / stepsTotalCount) * 100))
+      : (w.prog ?? 0);
+  const rawCredits = live
+    ? live.credits
+    : w.spendV || (w.spend ? Number.parseInt(w.spend.replace(/\D/g, "") || "0", 10) : 0);
+  const creditsUsed = Math.round(rawCredits * 10) / 10;
+  const creditsCap = typeof w.budget === "number" ? Math.round(w.budget * 10) / 10 : 120;
+  const creditsPct =
+    creditsCap > 0 ? Math.min(100, Math.round((creditsUsed / creditsCap) * 100)) : 0;
+  // WORLD-DESIGN: the artboard's card on the map says the newest recorded line, or nothing.
+  const toastLine = latestLine(trackRun ? runEvents : null, w.activity);
+  const shown: WorldTab = tab ?? (view?.deliverable ? "result" : "story");
+  const delivered = trackRun && view !== null && view.deliverable;
+  // TILO-T-WORLD: the agents' conversations are a tab of a real run once it has recorded events.
+  const chatOn = trackRun && hasStage && !w.sample;
+
+  // A finished quick task's own Result card already carries Share to Slack: the row does not repeat it.
+  const slackInResult = !trackRun && !isCity && !isTown && w.st === "finished";
+  const shareRow = (
+    <div className="park-world-sharerow">
+      <Button
+        variant={delivered ? "primary" : "secondary"}
+        size="sm"
+        icon={icon("share", 16)}
+        onClick={share}
+      >
+        Share
+      </Button>
+      {slackInResult ? null : (
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={!slackState.connected}
+          aria-disabled={!slackState.connected ? "true" : undefined}
+          aria-describedby={!slackState.connected ? NO_SLACK_ID : undefined}
+          title={
+            !slackState.connected ? slackState.disabledReason : "Share this world link to Slack"
+          }
+          onClick={(e) => openSlackDialog(e.currentTarget)}
+        >
+          Share to Slack
+        </Button>
+      )}
+      {loaded.live && worldClient && !w.sample ? (
+        <ShareWithTeam client={worldClient} worldId={w.id} worldName={w.name} />
+      ) : null}
+      {!slackState.connected ? (
+        <span id={NO_SLACK_ID} className="park-world-sr">
+          {slackState.disabledReason}
+        </span>
+      ) : null}
+    </div>
+  );
+
+  return (
+    <Frame worldId={w.id}>
+      <PageTitle title={w.name} />
+      <div className="park-world-head">
+        <nav aria-label="Breadcrumb" className="park-world-crumb">
+          <GoLink className="park-world-back" href="/worlds" onGo={() => app.go("worlds")}>
+            {icon("arrowL", 15)}
+            <span className="park-world-backtext">All worlds</span>
+          </GoLink>
+        </nav>
+        <div className="park-world-titles">
+          <div className="park-world-eyebrowrow">
+            <span className="park-world-eyebrow">
+              {[w.tier, w.tool].filter(Boolean).join(" · ").toUpperCase()}
+            </span>
+            {recorded && !isPaused ? (
+              <span className="park-world-sub">Recorded sample state, not live</span>
+            ) : null}
+          </div>
+          <div className="park-world-titleline">
+            <h1 className="park-world-h1" tabIndex={-1} title={w.name}>
+              {w.name}
+            </h1>
+            {w.sample || demo ? <SampleBadge /> : null}
+            <span className="park-world-sizechip">
+              {icon("city", 13)}
+              {w.tier}
+            </span>
+            <span className="park-world-chip" style={{ background: look[1], color: look[2] }}>
+              <span className="park-world-dot" style={{ background: look[3] }} />
+              {chip}
+            </span>
+          </div>
+          <div className="park-world-metalist">
+            <p className="park-world-meta">
+              {w.sample
+                ? `Recorded ${w.started}`
+                : metaLine(w.owner, w.started, live ? live.agents : w.agents)}
+            </p>
+            {runSkillNames.map((name) => (
+              <p key={name} className="park-world-meta">
+                Uses skill: {name}
+              </p>
+            ))}
+            {w.sample ? <SampleNote /> : null}
+            {demo && !w.sample ? (
+              <span className="park-sample-note">
+                Sample data from a demo session. Approving here records nothing.
+              </span>
+            ) : null}
+            {loaded.live && worldClient && !w.sample ? (
+              <ShareLine client={worldClient} worldId={w.id} />
+            ) : null}
+          </div>
+        </div>
+        <div className="park-world-headspacer" />
+        <div className="park-world-headstepbar">
+          <span className="park-world-headsteptext">
+            <strong>{`${stepsDoneCount} of ${stepsTotalCount}`}</strong>{" "}
+            <span className="park-world-headsub">steps done</span>
+          </span>
+          <div className="park-world-headbar-track">
+            <div className="park-world-headbar-fill" style={{ width: `${stepPct}%` }} />
+          </div>
+        </div>
+        <div className="park-world-headcreditsbar">
+          <span className="park-world-headsteptext">
+            <strong>{creditsUsed}</strong>{" "}
+            <span className="park-world-headsub">of {creditsCap} credits</span>
+          </span>
+          <div className="park-world-headbar-track">
+            <div className="park-world-headbar-fill" style={{ width: `${creditsPct}%` }} />
+          </div>
+        </div>
+        <div className="park-world-headprog">
+          <div className="park-world-proghead">
+            <span className="park-world-progtitle">{progressHead}</span>
+            {progressSub ? <span className="park-world-progsub">{progressSub}</span> : null}
+          </div>
+          <div className="park-world-progwrap">
+            <div className="park-world-track">
+              <div
+                className="park-world-fill"
+                style={{ width: `${w.prog ?? 0}%`, background: look[4] }}
+              />
+            </div>
+            <span className="park-world-proglabel">{w.prog != null ? `${w.prog}%` : w.nextV}</span>
+          </div>
+          {spentLine ? <div className="park-world-spentline">{spentLine}</div> : null}
+        </div>
+        <div className="park-world-actions">
+          {canPause(w) || isPaused ? (
+            <Button
+              variant="secondary"
+              icon={icon(isPaused ? "play" : "pause", 14)}
+              onClick={togglePause}
+              aria-label={isPaused ? "Resume run" : "Pause run"}
+              {...(w.sample ? { disabled: true, title: "A recorded replay cannot be paused" } : {})}
+            >
+              {isPaused ? "Resume" : "Pause"}
+            </Button>
+          ) : null}
+          <Button
+            variant="secondary"
+            icon={icon("more", 14)}
+            onClick={() => setMoreOpen((o) => !o)}
+            aria-expanded={moreOpen}
+            aria-label="More"
+          >
+            More
+          </Button>
+          {showRunViews && !sampleOnly ? (
+            <StageLink className="park-world-live" href={stage(stagePath(w.id))} reason={noStage}>
+              {icon("play", 14)}Open live view
+            </StageLink>
+          ) : null}
+          {w.sample ? (
+            // UI-10 B7: a demo session has no API client, so the sample world's own stage is "Not found" there; the
+            // recorded run that exists plays instead (the stage labels it "Fixture replay").
+            <a className="park-world-live" href={demo ? RECORDED_RUN_PATH : stagePath(w.id)}>
+              {icon("play", 14)}Watch the replay
+            </a>
+          ) : null}
+        </div>
+      </div>
+
+      {trackRun && worldClient ? (
+        <RunStatus
+          view={view ?? runView([])}
+          events={runEvents}
+          {...(loaded.live && !w.sample
+            ? {
+                again: {
+                  start: () => worldClient.startAgain(w.id).then((r) => ({ worldId: r.world_id })),
+                  open: (id: string) => {
+                    markPendingWorld(id);
+                    app.go("world", { id });
+                  },
+                  newTask: () => app.go("home"),
+                },
+              }
+            : {})}
+        />
+      ) : null}
+      {slackOpen ? (
+        // biome-ignore lint/a11y/useKeyWithClickEvents: Escape already closes the dialog (its onKeyDown); the backdrop click is the pointer shortcut
+        <div
+          className="park-world-slackbackdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeSlackDialog();
+          }}
+        >
+          <div
+            ref={dialogRef}
+            // biome-ignore lint/a11y/useSemanticElements: custom modal dialog with focus trap and role="dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Share to Slack"
+            className="park-world-slackdialog"
+            onKeyDown={(e) => handleSlackDialogKeyDown(e, dialogRef.current, closeSlackDialog)}
+          >
+            <div className="park-world-slackhead">
+              <div className="park-world-slacktitle">Share to Slack</div>
+              <div className="park-world-slacksub">{`${w.name} · ${slackState.account}`}</div>
+              {real ? null : (
+                <p className="park-sample-note">
+                  <SampleBadge /> Nothing is sent to Slack: this is recorded sample data.
+                </p>
+              )}
+            </div>
+            <label className="park-world-slackfield">
+              <span className="park-world-slacklabel">Channel</span>
+              <select
+                aria-label="Slack channel"
+                className="park-world-slackselect"
+                value={slackChannel}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => setSlackChannel(e.target.value)}
+              >
+                {slackState.channels.map((ch) => (
+                  <option key={ch} value={ch}>
+                    {ch}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="park-world-slackfield">
+              <span className="park-world-slacklabel">
+                {`Note (optional, up to ${SLACK_NOTE_MAX} characters)`}
+              </span>
+              <textarea
+                aria-label="Optional note"
+                className="park-world-slacknote"
+                rows={3}
+                maxLength={SLACK_NOTE_MAX}
+                value={slackNote}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                  setSlackNote(capSlackNote(e.target.value))
+                }
+              />
+            </label>
+            <div className="park-world-slackcount" aria-live="polite">
+              {`${slackNote.length} / ${SLACK_NOTE_MAX}`}
+            </div>
+            <div className="park-world-slackactions">
+              <Button variant="needs" size="sm" onClick={submitSlackApproval}>
+                Ask for approval
+              </Button>
+              <Button variant="secondary" size="sm" onClick={closeSlackDialog}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div
+        className="park-world-top"
+        style={{
+          gridTemplateColumns: wide ? "minmax(0,3fr) minmax(0,2fr)" : "minmax(0,1fr)",
+        }}
+      >
+        <div className="park-world-mapcard">
+          <div
+            className={
+              trackRun && canDraw
+                ? "park-world-map park-world-map--live"
+                : isCity
+                  ? "park-world-map"
+                  : "park-world-map park-world-map--art"
+            }
+          >
+            {trackRun && canDraw ? (
+              <Suspense fallback={null}>
+                <LiveStageEmbed
+                  worldId={w.id}
+                  onReview={() => setTab("story")}
+                  onChangeDirection={changeDirection}
+                />
+              </Suspense>
+            ) : trackRun ? (
+              <RecordedWorldArt events={runEvents} />
+            ) : isCity ? (
+              <ZoomableMap key={w.id} controls={Boolean(w.plan && loaded.plans[w.plan])}>
+                <MapArt w={w} plans={loaded.plans} app={app} />
+              </ZoomableMap>
+            ) : (
+              <MapArt w={w} plans={loaded.plans} app={app} />
+            )}
+            {isCity && loaded.gaps.plans ? (
+              <p className="park-world-meta">City map: {NOT_YET}</p>
+            ) : null}
+            <div className="park-world-tag">{heroTagOf(w)}</div>
+            {isPaused ? (
+              <div className="park-world-overlay">
+                <div className="park-world-pill">
+                  {icon("pause", 15)}Paused · agents are waiting
+                </div>
+              </div>
+            ) : null}
+            {showRunViews && !sampleOnly ? (
+              <nav aria-label="Run views" className="park-world-lenses">
+                <StageLink href={stage(`/world/${id}/story`)} reason={noStage}>
+                  Story
+                </StageLink>
+                <StageLink href={stage(`/world/${id}/trace`)} reason={noStage}>
+                  Trace
+                </StageLink>
+                <StageLink href={stage(`/world/${id}/delivery`)} reason={noStage}>
+                  Delivery
+                </StageLink>
+                <StageLink
+                  href={stage(`/world/${id}/inspect/${INSPECT_BUILDING}`)}
+                  reason={noStage}
+                >
+                  Inspect
+                </StageLink>
+              </nav>
+            ) : null}
+            {isCity ? (
+              <div className="park-world-legend" data-park-floating="">
+                {LEGEND.map(([colour, label]) => (
+                  <span key={label} className="park-world-legenditem">
+                    <span className="park-world-swatch" style={{ background: colour }} />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          {toastLine ? <MapToast line={toastLine} onReview={() => setTab("story")} /> : null}
+          {trackRun && runEvents.length > 0 ? (
+            <DeliveryDock
+              result={result}
+              worldId={w.id}
+              worldName={w.name}
+              delivered={delivered}
+              failed={view?.phase === "failed"}
+            />
+          ) : null}
+          {showRunViews && !hasStage ? (
+            // QA-DEMO-1 m3: the reason the lens links and "Open live view" are off is words on the page, not a tooltip
+            <p id={NO_STAGE_ID} className="park-world-nostage">
+              {noStage}
+            </p>
+          ) : null}
+        </div>
+
+        <div
+          className="park-world-panels"
+          data-tall={shown === "result" || shown === "chat" || moreOpen ? "true" : "false"}
+        >
+          <span className="park-world-sheethandle" aria-hidden="true" />
+          <div className="park-world-tabrow">
+            <WorldTabs
+              on={shown}
+              onPick={(t) => {
+                setMoreOpen(false);
+                setTab(t);
+              }}
+              counts={steps ? { steps: `${steps.done}/${steps.of}` } : {}}
+              chat={chatOn}
+            />
+            {view ? <AssumedChips assumptions={view.assumptions} /> : null}
+          </div>
+          <TabPanel tab="story" on={shown} title="Story" sub="What your team is doing, in order">
+            {part(2) ? (
+              <>
+                {view?.phase === "failed" || runEvents.some((e) => e.type === "world.failed") ? (
+                  <Suspense fallback={null}>
+                    <FailureCard
+                      events={runEvents}
+                      view={view}
+                      {...(loaded.live && !w.sample && worldClient
+                        ? {
+                            onRetry: () =>
+                              worldClient.startAgain(w.id).then((r) => {
+                                app.go("world", { id: r.world_id });
+                              }),
+                          }
+                        : {})}
+                    />
+                  </Suspense>
+                ) : null}
+                {loaded.gaps.decisions ? (
+                  <NotYetCard title="Waiting on you" />
+                ) : open > 0 ? (
+                  <WaitingCard
+                    mine={mine}
+                    dec={dec}
+                    night={app.night}
+                    onDecide={(key, text, option) =>
+                      text === undefined && option === undefined
+                        ? app.decide(key)
+                        : app.decide(key, text, option)
+                    }
+                    onLater={() => app.toast("Tilo will remind you at 16:00")}
+                    slackPending={slackPending}
+                  />
+                ) : null}
+                {handoff ? (
+                  <LovableCard
+                    handoff={handoff}
+                    dec={dec}
+                    sample={Boolean(w.sample)}
+                    onDecide={(key, text, option) =>
+                      text === undefined && option === undefined
+                        ? app.decide(key)
+                        : app.decide(key, text, option)
+                    }
+                  />
+                ) : null}
+                {trackRun ? <RunProgressCard events={runEvents} steps={false} /> : null}
+                {trackRun ? (
+                  <RunStory
+                    events={runEvents}
+                    skills={loaded.skills}
+                    onApprove={(req) => app.toast(`Approved. ${req.who} is continuing.`)}
+                    onDecline={() => app.toast("Declined. Nothing was sent.")}
+                  />
+                ) : (
+                  <Activity
+                    items={
+                      w.activity ?? [
+                        {
+                          t: w.started,
+                          rank: "director",
+                          who: "Director",
+                          text: `Started “${w.name}”.`,
+                          kind: "info",
+                        },
+                      ]
+                    }
+                    night={app.night}
+                  />
+                )}
+              </>
+            ) : null}
+          </TabPanel>
+          {chatOn ? (
+            <TabPanel tab="chat" on={shown} title="Chat" sub="How your agents talk to each other">
+              {shown === "chat" ? (
+                <Suspense fallback={null}>
+                  <LiveChat worldId={w.id} onChangeDirection={changeDirection} />
+                </Suspense>
+              ) : null}
+            </TabPanel>
+          ) : null}
+          <TabPanel
+            tab="steps"
+            on={shown}
+            title="Steps"
+            sub="The plan, in order"
+            {...(steps ? { aside: `${steps.done} of ${steps.of} done` } : {})}
+          >
+            {trackRun ? <RunStepList events={runEvents} /> : null}
+            {!trackRun && isCity ? <Districts districts={w.districts ?? []} /> : null}
+            {!trackRun && isTown ? (
+              <RunHistory
+                runs={w.runs ?? []}
+                onRunNow={() => app.toast(SAMPLE_RUN)}
+                onAgenda={() => app.go("agenda")}
+                {...(real ? { runNowOff: RUN_OFF } : {})}
+              />
+            ) : null}
+            {!trackRun && !isCity && !isTown ? (
+              <EmptyPanel
+                title="One step"
+                line="A quick task is one job for one agent: its progress is the bar above."
+              />
+            ) : null}
+          </TabPanel>
+          <TabPanel
+            tab="result"
+            on={shown}
+            title="Result"
+            sub="What this world delivered"
+            slideWhen={delivered}
+            slide={wide ? "tw-slide-r" : "tw-slide-up"}
+          >
+            {delivered ? (
+              <RunResult
+                api={api}
+                worldId={w.id}
+                events={runEvents}
+                shared={result}
+                onAskQuestion={() => setTab("chat")}
+                onChangeDirection={changeDirection}
+              />
+            ) : null}
+            {trackRun && !delivered ? (
+              <EmptyPanel
+                title={view?.phase === "failed" ? "No result" : "No result yet"}
+                line={
+                  view?.phase === "failed"
+                    ? "This run stopped before it delivered anything."
+                    : "The result shows here once the run records it as delivered."
+                }
+              />
+            ) : null}
+            {!trackRun && !isCity && !isTown ? (
+              <Result
+                w={w}
+                recorded={recorded}
+                onOpen={() => {
+                  if (!real) {
+                    app.toast(SAMPLE_OPEN);
+                    return;
+                  }
+                  void downloadResult(api, w.id).catch(() =>
+                    app.toast("The result could not be opened. Try again."),
+                  );
+                }}
+                {...(real && !hasResultReader(api) ? { openOff: OPEN_OFF } : {})}
+                onSlack={openSlackDialog}
+                slackConnected={slackState.connected}
+                slackReason={slackState.disabledReason}
+                noSlackId={NO_SLACK_ID}
+              />
+            ) : null}
+            {!trackRun && (isCity || isTown) ? (
+              <EmptyPanel
+                title="No single result"
+                line="A bigger world delivers through its districts and runs, listed under Steps."
+              />
+            ) : null}
+            {shareRow}
+          </TabPanel>
+
+          {part(3) ? (
+            <details
+              className={`park-world-more ${moreOpen ? "park-world-more--open" : "park-world-more--hidden"}`}
+              open={moreOpen}
+              onToggle={(e) => setMoreOpen(e.currentTarget.open)}
+            >
+              <summary className="park-world-more-summary">More</summary>
+              <div className="park-world-morepanel">
+                <div className="park-world-morehead">
+                  <div className="park-world-moretitles">
+                    <span className="park-world-moretitle">More</span>
+                    <span className="park-world-moresub">
+                      Things that can wait until the run is done
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="park-world-moreclose"
+                    aria-label="Close"
+                    onClick={() => setMoreOpen(false)}
+                  >
+                    {icon("x", 15)}
+                  </button>
+                </div>
+                <div className="park-world-moregrid">
+                  {loaded.live && worldClient ? (
+                    <SkillProposals client={worldClient} worldId={w.id} />
+                  ) : null}
+                  {loaded.live && worldClient && !w.sample ? (
+                    <TeamItems client={worldClient} worldId={w.id} auto={false} />
+                  ) : null}
+                  <SpendCard w={w} mine={mine} dec={dec} onLedger={() => app.go("ledger")} />
+                  <FactsCard
+                    w={w}
+                    recorded={recorded}
+                    skills={skills}
+                    tools={tools}
+                    onSkill={(skill) => app.go("skills", { id: skill })}
+                    onTools={() => app.go("connectors")}
+                  />
+                  {loaded.connectors.some(
+                    (c) => c.id === "meeting_host" && c.live?.notConfigured,
+                  ) ? (
+                    <p>{HOST_NOT_CONNECTED_TEXT}</p>
+                  ) : null}
+                  {loaded.gaps.skills || loaded.gaps.connectors ? (
+                    <NotYetCard title={loaded.gaps.skills ? "Skills" : "Tools"} />
+                  ) : null}
+                </div>
+              </div>
+            </details>
+          ) : null}
+        </div>
+      </div>
+      {hasStage && roomClient && !w.sample ? (
+        <MeetingHall key={w.id} worldId={w.id} client={roomClient} />
+      ) : null}
+    </Frame>
+  );
+}

@@ -102,9 +102,12 @@ def make_must_ask(
     *,
     covered_actions: Any = (),
     cards: list[dict[str, Any]] | None = None,
+    brief: dict[str, Any] | None = None,
+    model_questions: str = "ask",
     **config_overrides: Any,
 ) -> tuple[Any, list[dict[str, Any]], dict[str, Any]]:
-    """Returns (must_ask, cards_submitted, providers_by_role)."""
+    """Returns (must_ask, cards_submitted, providers_by_role). `model_questions` defaults to "ask" here, the
+    FR-AGT-05 behaviour these suites pin; config/must_ask.yaml's own default is "assume" (BQ-ASSUME-1)."""
     from tilo_harness.must_ask import MustAsk
 
     sunk: list[dict[str, Any]] = cards if cards is not None else []
@@ -115,6 +118,8 @@ def make_must_ask(
         card_sink=sunk.append,
         owner=OWNER,
         covered_actions=frozenset(covered_actions),
+        brief=brief,
+        model_questions=model_questions,
     )
     return must_ask, sunk, providers
 

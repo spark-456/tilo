@@ -1,14 +1,17 @@
 """The default layout builder for a run (CL-INT-2, PRD 9.1, 9.3; services/api/tests/API_CL_INT_2.md): plain
-code, no model. One level; one Director; per district a Lead and a workshop holding its units; one worker per
-unit by role; one island per connector the plan uses; one gate per plan gate, between the guarded unit's
-workshop and its connector's island. Geometry is the solver's (CL-INT-6, `tilo_world.solve`, FR-WLD-01): attached
-only after the whole layout validates against layout.schema.json; on any solver or schema failure it stays null."""
+code, no model. One level; one Director; per district a Lead and one building per unit of work, named from the
+unit's plan title (WORLD-LIVE: a district of more than three units shares them out), a Meeting Hall in the first
+district and a Delivery Dock in the last; one worker per unit by role; one island per connector the plan uses; one
+gate per plan gate, between the guarded unit's building and its connector's island. Geometry is the solver's
+(CL-INT-6, `tilo_world.solve`, FR-WLD-01): attached only after the whole layout validates against
+layout.schema.json; on any solver or schema failure it stays null."""
 
 from __future__ import annotations
 
 import functools
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -104,6 +107,65 @@ def attach_geometry(layout: dict[str, Any], plan: dict[str, Any]) -> None:
         _log.warning("layout solver failed: %s", type(exc).__name__)
 
 
+_UNIT_BUILDINGS = 3  # a district holds at most 5 buildings (layout.schema.json); two are left for the hall and the dock
+
+
+def _common(building_id: str, name: str, common_type: str) -> dict[str, Any]:
+    """A common building no unit works in (the Meeting Hall, the Delivery Dock)."""
+    return {"id": building_id, "name": name, "kind": "common", "common_type": common_type, "plan_units": []}
+
+
+_COMMON_OF_ROLE = {"specialist": "workshop", "writer": "library", "verifier": "watchtower"}
+_NAME_CHARS = re.compile(r"[^A-Za-z0-9 &'.,()/+-]+")
+
+
+def _groups(units: list[dict[str, Any]], limit: int) -> list[list[dict[str, Any]]]:
+    """The units in order, in at most `limit` runs of near-equal length (one building each when they fit)."""
+    if not units:
+        return []
+    size = -(-len(units) // limit)
+    return [units[i : i + size] for i in range(0, len(units), size)]
+
+
+def _plain_name(text: str, fallback: str, *, room: int = 24) -> str:
+    """A building name from a unit title: plain characters only, whole words where it can, 2-24 long (plain_name)."""
+    words = _NAME_CHARS.sub(" ", text).split()
+    name = ""
+    for word in words:
+        if len(f"{name} {word}".strip()) > room:
+            break
+        name = f"{name} {word}".strip()
+    name = name or " ".join(words)[:room]
+    name = name.strip(" &'.,/+-(")
+    return name if len(name) >= 2 and name[0].isalnum() and (name[-1].isalnum() or name[-1] in ").") else fallback
+
+
+def _unit_building(building_id: str, group: list[dict[str, Any]]) -> dict[str, Any]:
+    """One building for a run of units, named with the first unit's plain plan title."""
+    name = _plain_name(str(group[0].get("title", "")), "Workshop")
+    return {
+        "id": building_id,
+        "name": name,
+        "kind": "common",
+        "common_type": _COMMON_OF_ROLE.get(group[0]["role"], "workshop"),
+        "plan_units": [unit["id"] for unit in group],
+    }
+
+
+def _district_name(members: list[dict[str, Any]], n: int) -> str:
+    """A district named for the work it holds (its first unit's plan title + " team"), never "Workstream 1"; the
+    plain numbered name only when no title makes a plain one (ticket TILO-T-WORLD)."""
+    name = _plain_name(str(members[0].get("title", "")), "", room=19) if members else ""
+    return f"{name} team" if name else f"Workstream {n}"
+
+
+def _island_name(connector: str, n: int) -> str:
+    """An island named for its connector id ("google_calendar" -> "Google calendar"), else "Connector n"."""
+    words = connector.replace("_", " ").strip()
+    name = (words[:1].upper() + words[1:])[:24]
+    return name if len(name) >= 2 and name[0].isalnum() else f"Connector {n}"
+
+
 def build_layout(plan: dict[str, Any], *, world_id: str) -> dict[str, Any]:
     units = plan["units"]
     agents: list[dict[str, str]] = [{"id": "A_director", "rank": "director"}]
@@ -116,26 +178,44 @@ def build_layout(plan: dict[str, Any], *, world_id: str) -> dict[str, Any]:
     district_ids = sorted({unit["district"] for unit in units})
     building_of: dict[str, str] = {}
     districts = []
+    number = 0  # buildings are numbered B1.. across the districts, in district order
     for n, district_id in enumerate(district_ids, start=1):
         agents.append({"id": f"A_lead{n}", "rank": "lead"})
-        members = [unit["id"] for unit in units if unit["district"] == district_id]
-        building_of |= dict.fromkeys(members, f"B{n}")
-        workshop = {"id": f"B{n}", "name": "Workshop", "kind": "common", "common_type": "workshop"}
+        members = [unit for unit in units if unit["district"] == district_id]
+        last = n == len(district_ids)
+        buildings = []
+        for group in _groups(members, _UNIT_BUILDINGS):
+            number += 1
+            building = _unit_building(f"B{number}", group)
+            building_of |= dict.fromkeys(building["plan_units"], building["id"])
+            buildings.append(building)
+        if n == 1:  # where a person calls the team to talk (the meeting room): one labelled hall for the world
+            number += 1
+            buildings.append(_common(f"B{number}", "Meeting Hall", "meeting_hall"))
+        if last:  # where the finished work is handed over: the one labelled delivery spot of the world
+            number += 1
+            buildings.append(_common(f"B{number}", "Delivery Dock", "delivery_dock"))
         districts.append(
             {
                 "id": district_id,
-                "name": f"Workstream {n}",
+                "name": _district_name(members, n),
                 "icon": "inbox",
                 "lead": f"A_lead{n}",
-                "buildings": [{**workshop, "plan_units": members}],
+                "buildings": buildings,
             }
         )
 
     connector_ids = sorted({c for unit in units for c in unit["connectors"]})
     island_of = {c: f"I{n}" for n, c in enumerate(connector_ids, start=1)}
     islands = [
-        {"id": island, "name": f"Connector {island[1:]}", "conn": "api", "bridge": "road", "state": "connected"}
-        for island in island_of.values()
+        {
+            "id": island,
+            "name": _island_name(conn, int(island[1:])),
+            "conn": "api",
+            "bridge": "road",
+            "state": "connected",
+        }
+        for conn, island in island_of.items()
     ]
     gates = []
     for gate in plan["gates"]:

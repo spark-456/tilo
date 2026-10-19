@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<link rel="stylesheet" href="./tilo-w.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<script src="./tilo-t.js"></script>
+<script src="./tilo-w.js"></script>
+<style>body{margin:0;background:#E9E9E5;-webkit-font-smoothing:antialiased}a{color:#0B0B0C;text-decoration:none}a:hover{color:#46464A}</style>
+</helmet>
+<div style="width:max-content;min-height:100vh;padding:96px 96px 160px;box-sizing:border-box;background:#E9E9E5;color:#0B0B0C;font-family:'Geist',sans-serif;display:flex;flex-direction:column;gap:110px">
+
+<sc-if value="{{ notHub }}" hint-placeholder-val="{{ false }}"><a href="Tilo W Canvas.dc.html" style="font-family:'Geist Mono',monospace;font-size:16px;color:#46464A;margin-bottom:-60px">← TILO W CANVAS</a></sc-if>
+<sc-if value="{{ hub }}" hint-placeholder-val="{{ true }}">
+<section data-screen-label="Overview" style="display:flex;flex-direction:column;gap:28px;max-width:1720px">
+  <div style="display:flex;align-items:center;gap:14px"><div style="width:52px;height:52px;border-radius:16px;background:#0B0B0C;display:flex;align-items:center;justify-content:center"><div style="width:30px;height:16px;border-radius:8px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:7px"><div style="width:4px;height:4px;border-radius:9px;background:#0B0B0C"></div><div style="width:4px;height:4px;border-radius:9px;background:#0B0B0C"></div></div></div><span style="font-family:'Geist Mono',monospace;font-size:16px;color:#6B6B70">TILO T · WORLD PAGE REDESIGN · 1440 × 900 + 390 × 844 · LIGHT AND DARK</span></div>
+  <h1 style="margin:0;font-weight:700;font-size:112px;line-height:.92;letter-spacing:-5px">One glance.<br><span style="background:linear-gradient(transparent 62%,#C8F23A 62%,#C8F23A 90%,transparent 90%)">Four answers.</span></h1>
+  <p style="margin:0;font-size:24px;line-height:1.5;color:#46464A;max-width:1320px;text-wrap:pretty">The city is the hero and is never pushed down. One right rail (Story, Chat, Result, Steps) holds everything you read. Each agent keeps one colour on the map, in chat and on every card. Nothing moves unless an event really happened.</p>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">
+    <div style="border-radius:22px;background:#FFFFFF;border:1px solid #DCDCD6;padding:22px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#6B6B70">WHAT IS HAPPENING?</span><span style="font-weight:700;font-size:22px;letter-spacing:-.5px">The now line, top left</span><span style="font-size:16px;color:#46464A;line-height:1.45">The latest Story sentence, plus a lime Working chip on the one active building.</span></div>
+    <div style="border-radius:22px;background:#FFFFFF;border:1px solid #DCDCD6;padding:22px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#6B6B70">WHO IS DOING WHAT?</span><span style="font-weight:700;font-size:22px;letter-spacing:-.5px">One colour per agent</span><span style="font-size:16px;color:#46464A;line-height:1.45">Each agent stands at the building it works on. Three dots mean two agents are talking.</span></div>
+    <div style="border-radius:22px;background:#FFFFFF;border:1px solid #DCDCD6;padding:22px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#6B6B70">WHAT DO I NEED TO DO?</span><span style="font-weight:700;font-size:22px;letter-spacing:-.5px">Amber, three places</span><span style="font-size:16px;color:#46464A;line-height:1.45">The now line turns amber, the agent raises a hand, and the approval card sits at the top of Story.</span></div>
+    <div style="border-radius:22px;background:#FFFFFF;border:1px solid #DCDCD6;padding:22px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#6B6B70">WHAT DID I GET?</span><span style="font-weight:700;font-size:22px;letter-spacing:-.5px">Result opens itself</span><span style="font-size:16px;color:#46464A;line-height:1.45">The main file first, as a rich card. Everything else follows, and working files stay folded.</span></div>
+  </div>
+  <span style="font-family:'Geist Mono',monospace;font-size:14px;color:#6B6B70">FILES · Tilo W World · Tilo W Parts · Tilo W Sprite · tilo-w.css · tilo-w.js · PROMPT.md (with Tilo T: tilo-studio.css, tilo-t.css, tilo-t.js, tilo-city.js)</span>
+</section>
+<section data-screen-label="Boards" style="display:flex;flex-direction:column;gap:24px">
+  <h2 style="margin:0;font-weight:700;font-size:48px;letter-spacing:-2px">Boards</h2>
+  <div style="display:flex;flex-wrap:wrap;gap:20px;max-width:1720px">
+    <a href="Tilo W Board Desktop.dc.html" style="width:400px;border-radius:24px;background:#FFFFFF;border:1px solid #DCDCD6;padding:24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#6B6B70">01 · 10 ARTBOARDS</span><span style="font-weight:700;font-size:28px;letter-spacing:-.8px">Desktop states →</span><span style="font-size:16px;color:#46464A;line-height:1.45">Planning, Working, Needs you, Done, Failed at 1440 × 900, light and dark.</span></a>
+    <a href="Tilo W Board Phone.dc.html" style="width:400px;border-radius:24px;background:#FFFFFF;border:1px solid #DCDCD6;padding:24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#6B6B70">02 · 10 ARTBOARDS</span><span style="font-weight:700;font-size:28px;letter-spacing:-.8px">Phone states →</span><span style="font-size:16px;color:#46464A;line-height:1.45">The same five states at 390 × 844 with the bottom sheet, light and dark.</span></a>
+    <a href="Tilo W Board Interactions.dc.html" style="width:400px;border-radius:24px;background:#FFFFFF;border:1px solid #DCDCD6;padding:24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#6B6B70">03 · 14 ARTBOARDS</span><span style="font-weight:700;font-size:28px;letter-spacing:-.8px">Interactions →</span><span style="font-size:16px;color:#46464A;line-height:1.45">Hover, agent panel, chat pop-up, Convene, Meeting Hall, More, reduced motion.</span></a>
+    <a href="Tilo W Board System.dc.html" style="width:400px;border-radius:24px;background:#FFFFFF;border:1px solid #DCDCD6;padding:24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#6B6B70">04</span><span style="font-weight:700;font-size:28px;letter-spacing:-.8px">Components, tokens, motion →</span><span style="font-size:16px;color:#46464A;line-height:1.45">Sprite and walk frames, dots, cards, result cards per file type, the timings table.</span></a>
+  </div>
+</section>
+</sc-if>
+
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="2">
+  <section data-screen-label="{{ r.t }}" style="display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;align-items:baseline;gap:16px"><h2 style="margin:0;font-weight:700;font-size:48px;letter-spacing:-2px">{{ r.t }}</h2><span style="font-family:'Geist Mono',monospace;font-size:15px;color:#6B6B70">{{ r.sub }}</span></div>
+    <div style="display:flex;gap:48px;align-items:flex-start">
+      <sc-for list="{{ r.items }}" as="a" hint-placeholder-count="3">
+        <div style="display:flex;flex-direction:column;gap:12px;flex:none">
+          <div style="font-size:17px;font-weight:600;color:#46464A;display:flex;align-items:center;gap:10px"><span style="height:26px;padding:0 10px;border-radius:99px;background:{{ a.tbg }};border:1px solid {{ a.tbd }};color:{{ a.tfg }};font-family:'Geist Mono',monospace;font-size:12px;display:flex;align-items:center">{{ a.tag }}</span><span style="color:#0B0B0C">{{ a.lab }}</span><span>{{ a.note }}</span></div>
+          <div style="width:{{ a.w }};height:{{ a.h }};overflow:hidden;border-radius:{{ a.r }};border:{{ a.bd }};box-sizing:content-box;box-shadow:0 30px 70px -34px rgba(11,11,12,.45);background:#FFFFFF">
+            <dc-import name="Tilo W World" state="{{ a.state }}" theme="{{ a.theme }}" device="{{ a.device }}" overlay="{{ a.overlay }}" tab="{{ a.tab }}" agent="{{ a.agent }}" filter="{{ a.filter }}" reduced="{{ a.reduced }}" hint-size="100%,100%"></dc-import>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+</sc-for>
+
+<sc-if value="{{ sys }}" hint-placeholder-val="{{ false }}">
+<section data-screen-label="Components" style="display:flex;flex-direction:column;gap:24px">
+  <div style="display:flex;align-items:baseline;gap:16px"><h2 style="margin:0;font-weight:700;font-size:48px;letter-spacing:-2px">Components</h2><span style="font-family:'Geist Mono',monospace;font-size:15px;color:#6B6B70">Tilo W Parts · Tilo W Sprite · light and dark</span></div>
+  <sc-for list="{{ themes }}" as="th" hint-placeholder-count="1">
+    <div data-theme="{{ th.k }}" style="width:2680px;box-sizing:border-box;padding:48px;border-radius:32px;background:var(--bg);color:var(--ink);font-family:var(--fB);display:flex;flex-direction:column;gap:48px;border:1px solid var(--line)">
+      <span style="font-family:var(--mono);font-size:14px;color:var(--ink3);letter-spacing:.4px">{{ th.t }}</span>
+
+      <div style="display:flex;gap:40px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">AGENT SPRITE · ONE COLOUR PER AGENT, EVERYWHERE</span>
+          <div style="display:flex;gap:14px">
+            <sc-for list="{{ ags }}" as="g" hint-placeholder-count="7">
+              <div style="width:132px;border-radius:20px;background:var(--card);border:1px solid var(--line);padding:16px 12px 14px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:8px">
+                <dc-import name="Tilo W Sprite" col="{{ g.col }}" kind="{{ g.kind }}" scale="{{ 2.4 }}" hint-size="77px,96px"></dc-import>
+                <span style="font-weight:700;font-size:15px">{{ g.n }}</span>
+                <span style="font-size:12px;color:var(--ink2);text-align:center;line-height:1.3;min-height:32px">{{ g.role }}</span>
+                <span style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--ink2)"><span style="width:10px;height:10px;border-radius:3px;background:{{ g.col }}"></span>{{ g.tok }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">WALK CYCLE · 560 MS STRIDE · LEGS ±26°, ARMS ∓22°, BOB −3 PX, SQUASH 1.04 / .95</span>
+          <div style="display:flex;gap:14px">
+            <sc-for list="{{ frames }}" as="f" hint-placeholder-count="5">
+              <div style="width:132px;border-radius:20px;background:var(--card);border:1px solid var(--line);padding:16px 12px 14px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:8px">
+                <dc-import name="Tilo W Sprite" col="#3E9A7C" frame="{{ f.k }}" walk="{{ f.walk }}" n="{{ f.n }}" scale="{{ 2.4 }}" hint-size="77px,96px"></dc-import>
+                <span style="font-weight:700;font-size:14px">{{ f.t }}</span>
+                <span style="font-family:var(--mono);font-size:11px;color:var(--ink2)">{{ f.at }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:40px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">MOODS · ONLY WHILE THE EVENT IS TRUE</span>
+          <div style="display:flex;gap:14px">
+            <sc-for list="{{ moods }}" as="m" hint-placeholder-count="6">
+              <div style="width:132px;border-radius:20px;background:var(--card);border:1px solid var(--line);padding:16px 12px 14px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:8px">
+                <dc-import name="Tilo W Sprite" col="{{ m.col }}" mood="{{ m.k }}" scale="{{ 2.4 }}" hint-size="77px,96px"></dc-import>
+                <span style="font-weight:700;font-size:14px">{{ m.t }}</span>
+                <span style="font-family:var(--mono);font-size:11px;color:var(--ink2);text-align:center;line-height:1.35;min-height:30px">{{ m.ev }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">TALKING · 3 DOTS ONLY, NO TEXT ON THE MAP</span>
+          <div style="width:300px;height:186px;border-radius:20px;background:var(--cityBg);border:1px solid var(--line);position:relative;overflow:hidden">
+            <div style="position:absolute;left:84px;top:84px"><dc-import name="Tilo W Sprite" col="#2BA3B8" mood="talk" scale="{{ 1.8 }}" hint-size="58px,72px"></dc-import></div>
+            <div style="position:absolute;left:160px;top:84px"><dc-import name="Tilo W Sprite" col="#3F7FE0" kind="lead" mood="talk" face="l" scale="{{ 1.8 }}" hint-size="58px,72px"></dc-import></div>
+            <div style="position:absolute;left:150px;top:44px;transform:translateX(-50%) scale(1.4);height:22px;padding:0 8px;border-radius:99px;background:var(--card);border:1px solid var(--line2);box-sizing:border-box;display:flex;align-items:center;gap:4px">
+              <span style="width:5px;height:5px;border-radius:99px;background:var(--ink);animation:wDot 1.2s ease-in-out infinite"></span><span style="width:5px;height:5px;border-radius:99px;background:var(--ink);animation:wDot 1.2s ease-in-out .16s infinite"></span><span style="width:5px;height:5px;border-radius:99px;background:var(--ink);animation:wDot 1.2s ease-in-out .32s infinite"></span>
+            </div>
+          </div>
+          <span style="font-size:13px;color:var(--ink2);max-width:300px;line-height:1.45">1.2 s loop, dots 160 ms apart. Shown while a handoff or question is open, hidden while either agent walks. Click opens the pair’s chat.</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">BUILDING STATES · ONE BUILDING PER STEP</span>
+          <div style="display:flex;gap:14px">
+            <sc-for list="{{ bstates }}" as="b" hint-placeholder-count="5">
+              <div style="width:172px;border-radius:20px;background:var(--card);border:1px solid var(--line);padding:14px 12px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:10px">
+                <div style="width:148px;height:120px;display:flex;align-items:flex-end;justify-content:center">{{ b.el }}</div>
+                <span style="height:22px;padding:0 8px;border-radius:99px;background:{{ b.cbg }};color:{{ b.cfg }};border:1px {{ b.cbs }} {{ b.cbd }};box-sizing:border-box;font-size:11px;font-weight:700;display:flex;align-items:center">{{ b.chip }}</span>
+                <span style="font-family:var(--mono);font-size:11px;color:var(--ink2);text-align:center">{{ b.ev }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:40px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:16px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">HOVER CARD</span><dc-import name="Tilo W Parts" part="hover" state="working" agent="research" hint-size="280px,300px"></dc-import></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:440px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">APPROVAL CARD</span><dc-import name="Tilo W Parts" part="approval" state="needs" hint-size="440px,380px"></dc-import></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:440px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">FAILURE CARD</span><dc-import name="Tilo W Parts" part="failure" state="failed" hint-size="440px,420px"></dc-import></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:440px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">CONVENE TEAM</span><dc-import name="Tilo W Parts" part="convene" state="working" hint-size="440px,620px"></dc-import></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:384px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">CHAT POP-UP · PAIR FILTER</span><div style="height:600px"><dc-import name="Tilo W Parts" part="chat" header="{{ true }}" h="600px" state="working2" filter="pair:research,lead" hint-size="384px,600px"></dc-import></div></div>
+      </div>
+
+      <div style="display:flex;gap:40px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">AGENT PANEL</span><div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:20px"><dc-import name="Tilo W Parts" part="panel" state="working" agent="research" hint-size="100%,760px"></dc-import></div></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">CHAT · MEETING THREAD</span><div style="height:700px;border:1px solid var(--line);border-radius:24px;overflow:hidden"><dc-import name="Tilo W Parts" part="chat" h="700px" state="meeting" filter="meeting" hint-size="460px,700px"></dc-import></div></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">STORY · PLAIN</span><div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:20px"><dc-import name="Tilo W Parts" part="story" state="working2" hint-size="100%,640px"></dc-import></div></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">TRACE · TECHNICAL, SECONDARY</span><div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:20px"><dc-import name="Tilo W Parts" part="trace" state="working2" hint-size="100%,640px"></dc-import></div></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">STEPS</span><div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:20px"><dc-import name="Tilo W Parts" part="steps" state="needs" hint-size="100%,560px"></dc-import></div></div>
+      </div>
+
+      <div style="display:flex;gap:40px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">RESULT · MAIN DELIVERABLE (PDF / WORD)</span><dc-import name="Tilo W Parts" part="rMain" state="done" hint-size="100%,440px"></dc-import></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">RESULT · SHEET</span><dc-import name="Tilo W Parts" part="rSheet" state="done" hint-size="100%,320px"></dc-import></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">RESULT · SLIDES</span><dc-import name="Tilo W Parts" part="rSlides" state="done" hint-size="100%,160px"></dc-import></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">RESULT · WEBSITE</span><dc-import name="Tilo W Parts" part="rWeb" state="done" hint-size="100%,340px"></dc-import></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">RESULT · TEXT / MARKDOWN</span><dc-import name="Tilo W Parts" part="rText" state="done" hint-size="100%,340px"></dc-import></div>
+      </div>
+
+      <div style="display:flex;gap:40px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">WORKING FILES · FOLDED (DEFAULT)</span><dc-import name="Tilo W Parts" part="files" state="done" hint-size="100%,60px"></dc-import></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">WORKING FILES · OPEN</span><dc-import name="Tilo W Parts" part="files" state="done" files-open="{{ true }}" hint-size="100%,420px"></dc-import></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">WHERE IT WAS MADE · LOGO SLOTS</span><dc-import name="Tilo W Parts" part="made" state="done" hint-size="100%,140px"></dc-import></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">MORE · SECONDARY, OUT OF THE WAY</span><div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:20px"><dc-import name="Tilo W Parts" part="more" state="working" hint-size="100%,560px"></dc-import></div></div>
+        <div style="display:flex;flex-direction:column;gap:16px;width:460px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">RESULT · BEFORE DELIVERY</span><dc-import name="Tilo W Parts" part="result" state="working" hint-size="100%,180px"></dc-import></div>
+      </div>
+    </div>
+  </sc-for>
+</section>
+
+<section data-screen-label="Tokens" style="display:flex;flex-direction:column;gap:24px;width:1720px">
+  <div style="display:flex;align-items:baseline;gap:16px"><h2 style="margin:0;font-weight:700;font-size:48px;letter-spacing:-2px">Tokens</h2><span style="font-family:'Geist Mono',monospace;font-size:15px;color:#6B6B70">reuse Tilo T first · new ones live in tilo-w.css</span></div>
+  <div style="border-radius:24px;background:#FFFFFF;border:1px solid #DCDCD6;overflow:hidden">
+    <div style="display:grid;grid-template-columns:240px 200px 200px minmax(0,1fr) 110px;gap:16px;padding:14px 24px;background:#F4F4F1;font-family:'Geist Mono',monospace;font-size:12px;color:#6B6B70;letter-spacing:.4px"><span>TOKEN</span><span>LIGHT</span><span>DARK</span><span>USE</span><span>SOURCE</span></div>
+    <sc-for list="{{ tokens }}" as="t" hint-placeholder-count="12">
+      <div style="display:grid;grid-template-columns:240px 200px 200px minmax(0,1fr) 110px;gap:16px;padding:12px 24px;border-top:1px solid #E6E6E2;align-items:center;font-size:15px">
+        <span style="font-family:'Geist Mono',monospace;font-size:14px;font-weight:600">{{ t.k }}</span>
+        <span style="display:flex;align-items:center;gap:8px;font-family:'Geist Mono',monospace;font-size:13px"><span style="width:20px;height:20px;border-radius:6px;background:{{ t.l }};border:1px solid #DCDCD6;flex:none"></span>{{ t.l }}</span>
+        <span style="display:flex;align-items:center;gap:8px;font-family:'Geist Mono',monospace;font-size:13px"><span style="width:20px;height:20px;border-radius:6px;background:{{ t.d }};border:1px solid #DCDCD6;flex:none"></span>{{ t.d }}</span>
+        <span style="color:#46464A">{{ t.u }}</span>
+        <span style="height:24px;padding:0 9px;border-radius:99px;background:{{ t.sbg }};font-family:'Geist Mono',monospace;font-size:11.5px;display:flex;align-items:center;justify-self:start">{{ t.s }}</span>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section data-screen-label="Motion" style="display:flex;flex-direction:column;gap:24px;width:1720px">
+  <div style="display:flex;align-items:baseline;gap:16px"><h2 style="margin:0;font-weight:700;font-size:48px;letter-spacing:-2px">Motion</h2><span style="font-family:'Geist Mono',monospace;font-size:15px;color:#6B6B70">transform and opacity only · every row starts on a real event</span></div>
+  <div style="border-radius:24px;background:#FFFFFF;border:1px solid #DCDCD6;overflow:hidden">
+    <div style="display:grid;grid-template-columns:200px 250px minmax(0,1.4fr) 200px 220px minmax(0,1fr);gap:16px;padding:14px 24px;background:#F4F4F1;font-family:'Geist Mono',monospace;font-size:12px;color:#6B6B70;letter-spacing:.4px"><span>ELEMENT</span><span>STARTS ON</span><span>WHAT MOVES</span><span>DURATION</span><span>EASING</span><span>STOPS</span></div>
+    <sc-for list="{{ motion }}" as="m" hint-placeholder-count="12">
+      <div style="display:grid;grid-template-columns:200px 250px minmax(0,1.4fr) 200px 220px minmax(0,1fr);gap:16px;padding:13px 24px;border-top:1px solid #E6E6E2;font-size:15px;line-height:1.45">
+        <span style="font-weight:700">{{ m.e }}</span><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#24529E">{{ m.ev }}</span><span style="color:#46464A">{{ m.w }}</span><span style="font-family:'Geist Mono',monospace;font-size:13px">{{ m.d }}</span><span style="font-family:'Geist Mono',monospace;font-size:13px">{{ m.ez }}</span><span style="color:#46464A">{{ m.s }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">
+    <div style="border-radius:22px;background:#FFFFFF;border:1px solid #DCDCD6;padding:22px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#6B6B70">BUDGET</span><span style="font-size:16px;color:#46464A;line-height:1.5">Transform and opacity only, so the compositor does the work. No blur, no filter animation, shadows only on floating cards. At most one walk, one talk loop and one tool bob at once on a typical run.</span></div>
+    <div style="border-radius:22px;background:#FFFFFF;border:1px solid #DCDCD6;padding:22px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#6B6B70">HIDDEN = PAUSED</span><span style="font-size:16px;color:#46464A;line-height:1.5">An IntersectionObserver and visibilitychange set data-paused on the World root. tilo-w.css then pauses every animation underneath, and the replay timer stops.</span></div>
+    <div style="border-radius:22px;background:#FFFFFF;border:1px solid #DCDCD6;padding:22px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:13px;color:#6B6B70">REDUCED MOTION</span><span style="font-size:16px;color:#46464A;line-height:1.5">prefers-reduced-motion (or the reduced prop) turns every move into a 200 ms fade. Agents appear where they are, loops show one still frame, and the parcel and confetti are skipped.</span></div>
+  </div>
+</section>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;board&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;hub&quot;,&quot;desktop&quot;,&quot;phone&quot;,&quot;interactions&quot;,&quot;system&quot;],&quot;default&quot;:&quot;hub&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { this.w = setInterval(() => { if (window.TiloR && window.TiloCity && window.TiloW) { clearInterval(this.w); this.forceUpdate(); } }, 80); }
+  componentWillUnmount() { clearInterval(this.w); }
+  renderVals() {
+    const h = React.createElement, W = window.TiloW, R = window.TiloR ? window.TiloR(h) : null;
+    const D = { w: '1440px', h: '900px', r: '20px', bd: '1px solid #DCDCD6' }, M = { w: '390px', h: '844px', r: '48px', bd: '8px solid #0B0B0C' };
+    const TAG = { live: ['LIVE', '#C8F23A', '#0B0B0C', '#0B0B0C'], light: ['LIGHT', '#FFFFFF', '#D5D5D0', '#0B0B0C'], dark: ['DARK', '#0B0B0C', '#0B0B0C', '#F4F4F2'] };
+    const it = (o) => { const t = TAG[o.tag]; return Object.assign({ overlay: 'none', tab: null, agent: 'research', filter: null, reduced: false, theme: 'studio', device: 'desktop', note: '' }, o.device === 'phone' ? M : D, o, { tag: t[0], tbg: t[1], tbd: t[2], tfg: t[3] }); };
+    const states = [['planning', 'Planning', 'map assembling'], ['working', 'Working', 'live loop: walk, talk, hand-over'], ['needs', 'Needs you', 'approval on top of Story'], ['done', 'Done', 'parcel lands, Result opens'], ['failed', 'Failed', 'what was and wasn’t done']];
+    const row = (theme, device) => states.map(([s, l, n]) => it({ state: s, lab: l, note: n, theme, device, tag: s === 'working' ? 'live' : theme === 'studio' ? 'light' : 'dark' }));
+    const rows = [
+      { t: 'Desktop · light', sub: '1440 × 900 · stage 940 · rail 500', items: row('studio', 'desktop') },
+      { t: 'Desktop · dark', sub: 'studioDark', items: row('studioDark', 'desktop') },
+      { t: 'Phone · light', sub: '390 × 844 · stage on top, rail becomes a bottom sheet · 44 px targets', items: row('studio', 'phone') },
+      { t: 'Phone · dark', sub: 'studioDark', items: row('studioDark', 'phone') },
+      { t: 'Interactions · desktop', sub: 'hover, click, chat, convene, more', items: [
+        it({ state: 'working', overlay: 'hover', agent: 'research', lab: 'Hover an agent', note: 'it lights up, the rest dim', tag: 'live' }),
+        it({ state: 'working', overlay: 'agent', agent: 'research', lab: 'Click an agent', note: 'panel slides over the rail', tag: 'live' }),
+        it({ state: 'working', overlay: 'chat', filter: 'pair:research,lead', lab: 'Click the 3 dots', note: 'chat pop-up for that pair', tag: 'live' }),
+        it({ state: 'working', overlay: 'convene', lab: 'Convene team', note: 'pick Lead + agents', tag: 'light' }),
+        it({ state: 'working', overlay: 'meeting', lab: 'In the Meeting Hall', note: 'agents walked in, thread in Chat', tag: 'light' }),
+        it({ state: 'working', overlay: 'more', lab: 'More', note: 'skills and work items, tucked away', tag: 'light' }),
+        it({ state: 'working', overlay: 'agent', agent: 'lead', theme: 'studioDark', lab: 'Agent panel', note: 'Kai, dark', tag: 'dark' }),
+        it({ state: 'working', reduced: true, lab: 'Reduced motion', note: 'fades only, no walking', tag: 'light' })
+      ] },
+      { t: 'Interactions · phone', sub: 'the same tabs, in the sheet', items: [
+        it({ device: 'phone', state: 'working', tab: 'chat', filter: 'pair:research,lead', lab: 'Chat', note: 'from the 3 dots', tag: 'live' }),
+        it({ device: 'phone', state: 'working', overlay: 'agent', agent: 'research', lab: 'Agent', note: 'tap a sprite', tag: 'live' }),
+        it({ device: 'phone', state: 'working', overlay: 'hover', agent: 'research', lab: 'Long-press', note: 'compact stats card', tag: 'live' }),
+        it({ device: 'phone', state: 'working', overlay: 'convene', lab: 'Convene team', note: 'in the sheet', tag: 'light' }),
+        it({ device: 'phone', state: 'needs', tab: 'steps', lab: 'Steps', note: 'plan with status', tag: 'light' }),
+        it({ device: 'phone', state: 'done', theme: 'studioDark', tab: 'chat', lab: 'Chat after delivery', note: 'dark', tag: 'dark' })
+      ] }
+    ];
+    const ags = W ? W.ORDER.map(id => { const a = W.AG[id]; return { n: a.n, role: a.role, col: a.col, kind: a.kind, tok: a.tok + ' ' + a.col }; }) : [];
+    const frames = [['contact', 'Contact', '0 ms · 280 ms'], ['down', 'Down', '70 ms'], ['pass', 'Passing', '140 ms'], ['up', 'Up', '210 ms'], ['', 'Live loop', 'walk A · infinite']].map(([k, t, at]) => ({ k, t, at, walk: k ? '' : 'A', n: k ? '3' : 'infinite' }));
+    const moods = [['idle', 'Idle', 'no event · still', '#3F7FE0'], ['work', 'Working', 'tool.called', '#E8643F'], ['talk', 'Talking', 'agent.handoff / question', '#2BA3B8'], ['think', 'Planning', 'world.planning', '#E8643F'], ['hand', 'Needs you', 'approval.requested', '#A45DB8'], ['happy', 'Delivered', 'world.completed · 3 hops', '#D9588C'], ['sad', 'Blocked', 'agent.blocked', '#3E9A7C']].map(([k, t, ev, col]) => ({ k, t, ev, col }));
+    const CH = [['plot', 'Waiting', 'building.planned', 'var(--sunk)', 'var(--ink2)', 'solid', 'transparent'], ['construction', 'Working', 'building.constructing', 'var(--lime)', '#0B0B0C', 'solid', 'var(--limeD)'], ['complete', 'Done', 'building.completed', 'var(--mintSoft)', 'var(--mintInk)', 'solid', 'transparent'], ['needs', 'Needs you', 'approval.requested', 'var(--amber)', '#1A1407', 'solid', 'transparent'], ['construction', 'Failed', 'world.failed', 'var(--redSoft)', 'var(--redInk)', 'solid', 'var(--redInk)']];
+    const plot = h('svg', { width: 140, height: 80, viewBox: '0 0 140 80' }, h('polygon', { points: '70,8 132,40 70,72 8,40', style: { fill: 'var(--card)', fillOpacity: .55, stroke: 'var(--ink2)', strokeWidth: 1.4, strokeDasharray: '6 5' } }));
+    const bstates = CH.map(([s, chip, ev, cbg, cfg, cbs, cbd]) => ({ chip, ev, cbg, cfg, cbs, cbd, el: s === 'plot' ? plot : (R ? h('div', { style: { width: 148, height: 120 } }, R.bld('library', s, 120, 'research')) : null) }));
+    const T = (k, l, d, u, s) => ({ k, l, d, u, s, sbg: s === 'new · tilo-w' ? '#ECFBC2' : '#F4F4F1' });
+    const tokens = [
+      T('--ag1 … --ag7', '#E8643F → #C9982A', 'same', 'Agent palette in join order: coral, blue, teal, green, violet, pink, ochre. Sprite, avatar, chat tint, file dot, card swatch.', 'new · tilo-w'),
+      T('--ag tint', 'color-mix 13%', 'color-mix 13%', 'Chat bubble = color-mix(in srgb, agent 13%, var(--card)). Ink text on top keeps 4.5:1.', 'new · tilo-w'),
+      T('--meBubble / --onMe', '#0B0B0C / #FFFFFF', '#C8F23A / #0A0A0B', 'Your own messages, right aligned.', 'new · tilo-w'),
+      T('--island / L / R', '#F4F4F1', '#26262A', 'Connector islands (Gmail, Drive, Web, Canva, Lovable). Logo slot sits on top.', 'new · tilo-w'),
+      T('--wStep', '560ms', '560ms', 'One walk stride (both legs).', 'new · tilo-w'),
+      T('--wWalk', 'cubic-bezier(.4,0,.6,1)', 'same', 'Travel along the path.', 'new · tilo-w'),
+      T('--wEase', 'cubic-bezier(.2,.8,.2,1)', 'same', 'Panels, pop-ups, result slide-in, camera.', 'new · tilo-w'),
+      T('--bg / --card / --sunk', '#F6F6F4 / #FFFFFF / #EEEEEB', '#0A0A0B / #141416 / #1C1C1F', 'Page, rail and cards, quiet fills.', 'Tilo T'),
+      T('--ink / --ink2 / --ink3', '#0B0B0C / #46464A / #6B6B70', '#F4F4F2 / #C2C2C6 / #97979D', 'Text. ink3 only for meta and timestamps.', 'Tilo T'),
+      T('--pri / --onPri', '#0B0B0C / #FFFFFF', '#C8F23A / #0A0A0B', 'One primary action per card.', 'Tilo T'),
+      T('--lime', '#C8F23A', '#C8F23A', 'Working chip, Now marker, parcel, unread badge.', 'Tilo T'),
+      T('--amber / Soft / Ink / Line', '#F5A524', '#F5B241', 'Needs you, everywhere it appears.', 'Tilo T'),
+      T('--mint / Soft / Ink', '#34C47C', '#3FD08A', 'Done, Delivered, Nothing was sent.', 'Tilo T'),
+      T('--red / Soft / Ink', '#E5484D', '#F06A6E', 'Failed only.', 'Tilo T'),
+      T('--bp / --bpInk', '#E6EEFB / #24529E', '#141C2C / #A2C6FF', 'Planning chip and the drafting card shimmer.', 'Tilo T'),
+      T('--ground / L / R / --road', '#E7E7E2', '#1F1F23', 'City slab, sides and roads.', 'Tilo T'),
+      T('--cityBg / --cityFx', '#EDEDE9', '#161618', 'Stage background; buildings muted while running, full colour on Done.', 'Tilo T')
+    ];
+    const MO = (e, ev, w, d, ez, s) => ({ e, ev, w, d, ez, s });
+    const motion = [
+      MO('Walk', 'agent.moved', 'Agent translates along the path. Legs ±26°, arms ∓22°, body bob −3 px, squash 1.04/.95 on contact.', '560 ms stride; travel = distance ÷ 130 px/s, 0.6–3.4 s', 'path (.4,0,.6,1); limbs ease-in-out', 'On arrival. Cycle count = travel ÷ 560 ms.'),
+      MO('Spacing', 'agent.moved', 'Every building has 3 standing slots 0.75 cells apart; the Dock and Meeting Hall have a row. Agents never share a slot.', '—', '—', '—'),
+      MO('Talking dots', 'agent.handoff · question.routed · meeting', '3 dots: opacity .3→1, translateY −2 px, 160 ms apart.', '1.2 s loop', 'ease-in-out', 'When the exchange ends or either agent walks.'),
+      MO('Hover light-up', 'pointer enter', 'Colour ring under the feet scales .6→1; other agents fade to .45.', '180 ms', 'ease-out', 'Pointer leave.'),
+      MO('Hover card', 'pointer enter', 'Fades in beside the agent at constant screen size.', '180 ms', 'ease-out', 'Pointer leave.'),
+      MO('Agent panel', 'click agent', 'Slides over the rail: translateX 32→0, opacity.', '260 ms', '(.2,.8,.2,1)', 'Back.'),
+      MO('Chat pop-up', 'click dots / Talk to', 'Open: translateY 14 px, scale .97→1, opacity. Close: reverse.', '220 ms open · 160 ms close', '(.2,.8,.2,1) · ease-in', '—'),
+      MO('Convene', 'meeting.called', 'Picked agents walk to the Meeting Hall (same walk); hall chip turns In session.', 'by distance', 'as walk', 'Meeting ends.'),
+      MO('Plot', 'building.planned', 'Dashed plot fades and scales .85→1, 120 ms stagger.', '400 ms', 'ease-out', 'Once.'),
+      MO('Construct', 'building.constructing', 'Scaffold rises from the base: scaleY .08→1.', '2.4 s', '(.2,.8,.2,1)', 'Once.'),
+      MO('Complete', 'building.completed', 'Building settles 1.035→1, check pin pops.', '300 ms', 'ease-out', 'Once.'),
+      MO('Tool icon', 'tool.called', 'Small icon above the head bobs −4 px; arms swing.', '1.6 s loop · arms 500 ms', 'ease-in-out', 'tool.returned.'),
+      MO('Needs you', 'approval.requested', 'Hand up (static), amber chip ring pings opacity .7→0, scale .9→1.6.', '1.6 s loop', 'ease-out', 'approval.resolved.'),
+      MO('Parcel', 'artifact.delivered', 'Parcel arcs from the Hall to the Dock on a motion path.', '1.6 s', '(.45,0,.2,1)', 'Lands, stays.'),
+      MO('Confetti', 'world.completed', '18 pieces translate + rotate out, fade to 0. Once.', '1.8 s after 1.5 s', '(.2,.7,.3,1)', 'Never loops.'),
+      MO('Result slide-in', 'artifact.delivered', 'Rail switches to Result; cards translateX 48→0 + opacity, 40 ms stagger.', '420 ms', '(.2,.8,.2,1)', 'Once.'),
+      MO('Camera', 'Fit · Follow · zoom', 'Scene transform translate + scale.', '900 ms', '(.2,.8,.2,1)', '—'),
+      MO('Sheet (phone)', 'tab change', 'Content fades in; panels rise 60 px.', '250–320 ms', '(.2,.8,.2,1)', '—')
+    ];
+    const board = this.props.board ?? 'hub';
+    const pickRows = { hub: [{ t: 'Highlights', sub: 'live replay · open a board for every state', items: [rows[0].items[1], rows[2].items[1], rows[1].items[3]] }], desktop: rows.slice(0, 2), phone: rows.slice(2, 4), interactions: rows.slice(4, 6), system: [] }[board] || [];
+    return { notHub: board !== 'hub', hub: board === 'hub', sys: board === 'system', rows: pickRows, themes: [{ k: 'studio', t: 'LIGHT · STUDIO' }, { k: 'studioDark', t: 'DARK · STUDIO DARK' }], ags, frames, moods, bstates, tokens, motion };
+  }
+}
+</script>
+</body>
+</html>

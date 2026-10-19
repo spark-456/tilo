@@ -1,0 +1,297 @@
+// The side column of the World page: the Waiting for you card, Spend, the Lovable handoff card, and the facts with skills and tools.
+import type { MouseEvent, ReactNode } from "react";
+import type { BuildHandoff, Dec, Decision, DecisionKey, Skill, World } from "../../api/types";
+import { DecisionFields } from "../../app/DecisionFields";
+import { QuestionAnswer } from "../../app/QuestionAnswer";
+import {
+  type SlackShareRequest,
+  slackApprovalBody,
+  slackApprovalStatusLabel,
+  slackApprovalTitle,
+} from "../../app/slackShare";
+import { Button } from "../../components";
+import { icon } from "../../shell/kit";
+import { buildLovableUrl } from "./lovableHandoff";
+import { agentArt } from "./worldArt";
+import { type ToolChip, decisionsWord, spendNoteOf, spendShare } from "./worldModel";
+
+/** A link of the reference: a real address (so it can be read and copied), but a plain click goes through app.go. */
+export function GoLink({
+  href,
+  className,
+  onGo,
+  children,
+}: {
+  href: string;
+  className: string;
+  onGo: () => void;
+  children: ReactNode;
+}) {
+  const click = (e: MouseEvent<HTMLAnchorElement>) => {
+    // Only a plain left click is ours; a modified or non-primary click is the browser's (new tab, window).
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    onGo();
+  };
+  return (
+    <a className={className} href={href} onClick={click}>
+      {children}
+    </a>
+  );
+}
+
+export interface WaitingProps {
+  mine: readonly Decision[];
+  dec: Dec;
+  night: boolean;
+  onDecide: (key: DecisionKey, text?: string, option?: string) => void;
+  onLater: () => void;
+  slackPending?: SlackShareRequest | null;
+}
+
+/** The decisions this world is waiting on; the ones already taken stay in the card with their done line. */
+export function WaitingCard({ mine, dec, night, onDecide, onLater, slackPending }: WaitingProps) {
+  const open = mine.filter((d) => !dec[d.k]).length + (slackPending ? 1 : 0);
+  return (
+    <div className="park-world-waiting">
+      <div className="park-world-waitinghead">
+        <div className="park-world-waitingtile">
+          {agentArt({ role: "builder", expr: "needs" }, 32, night)}
+        </div>
+        <div className="park-world-waitingtext">
+          <div className="park-world-waitinglabel">WAITING FOR YOU</div>
+          <div className="park-world-waitingtitle">
+            {`${decisionsWord(open)} before agents continue`}
+          </div>
+        </div>
+      </div>
+      {mine.map((d) => (
+        <div key={d.k} className="park-world-decision">
+          <div className="park-world-dtext">
+            <div className="park-world-dtitle">{d.title}</div>
+            <div className="park-world-dbody">{d.body}</div>
+          </div>
+          {dec[d.k] ? (
+            <div className="park-world-ddone">
+              {icon("check", 14)}
+              {d.done}
+            </div>
+          ) : (
+            <div className="park-world-dactions">
+              {d.provide && <DecisionFields d={d} />}
+              {d.questionOptions && <QuestionAnswer d={d} onDecide={onDecide} />}
+              {!d.questionOptions && d.yes !== "" && (
+                <Button variant="needs" size="sm" onClick={() => onDecide(d.k)}>
+                  {d.yes}
+                </Button>
+              )}
+              <Button variant="secondary" size="sm" onClick={onLater}>
+                Ask me later
+              </Button>
+            </div>
+          )}
+        </div>
+      ))}
+      {slackPending ? (
+        <div className="park-world-decision">
+          <div className="park-world-dtext">
+            <div className="park-world-dtitle">{slackApprovalTitle(slackPending.channel)}</div>
+            <div className="park-world-dbody">{slackApprovalBody(slackPending)}</div>
+          </div>
+          <div className="park-world-dpendingbadge">
+            {slackApprovalStatusLabel(slackPending.sample)}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function SpendCard({
+  w,
+  mine,
+  dec,
+  onLedger,
+}: {
+  w: World;
+  mine: readonly Decision[];
+  dec: Dec;
+  onLedger: () => void;
+}) {
+  return (
+    <div className="park-world-spend">
+      <div className="park-world-spendhead">
+        <span className="park-world-spendtitle">Spend</span>
+        <GoLink className="park-world-spendlink" href="/ledger" onGo={onLedger}>
+          Ledger
+        </GoLink>
+      </div>
+      <div className="park-world-spendrow">
+        <span className="park-world-spendvalue">{w.spend}</span>
+        <span className="park-world-spendof">{w.of ?? ""}</span>
+      </div>
+      {w.budget ? (
+        <div className="park-world-spendbar">
+          <div className="park-world-spendfill" style={{ width: `${spendShare(w).toFixed(1)}%` }} />
+        </div>
+      ) : null}
+      <div className="park-world-spendnote">{spendNoteOf(w, mine, dec)}</div>
+    </div>
+  );
+}
+
+export interface FactsProps {
+  w: World;
+  /** UI-10 B2: the world's running state is a recording (sample or demo), so its end time is not a live countdown. */
+  recorded?: boolean;
+  skills: readonly Skill[];
+  tools: readonly ToolChip[];
+  onSkill: (id: string) => void;
+  onTools: () => void;
+}
+
+export function FactsCard({ w, recorded, skills, tools, onSkill, onTools }: FactsProps) {
+  const facts: readonly (readonly [string, string])[] = [
+    ["Owner", w.owner],
+    ["Started", w.started],
+    recorded && w.nextL === "Ends"
+      ? ["Recorded state", `${w.nextL.toLowerCase()} ${w.nextV}`]
+      : [w.nextL, w.nextV],
+    ["Agents", String(w.agents)],
+  ];
+  return (
+    <div className="park-world-facts">
+      {facts.map(([k, v]) => (
+        <div key={k} className="park-world-fact">
+          <span className="park-world-factkey">{k}</span>
+          <span className="park-world-factvalue">{v}</span>
+        </div>
+      ))}
+      <div className="park-world-skillsrow park-world-skillsrow--stack">
+        <span className="park-world-rowlabel park-world-rowlabel--stack">Skills</span>
+        <div className="park-world-chips">
+          {skills.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className="park-world-skillchip park-world-chipfit"
+              onClick={() => onSkill(s.id)}
+            >
+              {icon("bolt", 12)}
+              <span className="park-world-chipname">{s.name}</span>
+            </button>
+          ))}
+          {skills.length === 0 ? (
+            <span className="park-world-noskills">Uses Tilo’s general skills</span>
+          ) : null}
+        </div>
+      </div>
+      <div className="park-world-toolsrow park-world-toolsrow--stack">
+        <span className="park-world-rowlabel park-world-rowlabel--stack">Tools</span>
+        <div className="park-world-chips">
+          {tools.map((t) => (
+            <button
+              key={t.name}
+              type="button"
+              className="park-world-toolchip park-world-chipfit"
+              onClick={onTools}
+            >
+              <span className="park-world-mono" style={{ color: t.colour }}>
+                {t.mono}
+              </span>
+              <span className="park-world-chipname">{t.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export interface LovableCardProps {
+  handoff: BuildHandoff;
+  dec: Dec;
+  onDecide: (key: DecisionKey, text?: string, option?: string) => void;
+  sample?: boolean;
+}
+
+/** FR-CON-16: "Build this in Lovable" card showing exact prompt, honest payload copy, and approval-gated link. */
+export function LovableCard({ handoff, dec, onDecide, sample = false }: LovableCardProps) {
+  const approved = Boolean(dec[handoff.decisionKey]);
+  const url = buildLovableUrl(handoff.prompt, {
+    maxPromptChars: handoff.maxPromptChars,
+    maxUrlLength: handoff.maxUrlLength,
+  });
+  const canOpen = !sample && approved && url !== null;
+
+  return (
+    <div className="park-world-lovable">
+      <div className="park-world-lovablehead">
+        <span className="park-world-lovabletitle">Build this in Lovable</span>
+        <span className="park-world-lovablesub">Nothing is sent by Tilo itself</span>
+      </div>
+      {/* A long prompt scrolls inside its own box (capped height); it is a labelled stop for the keyboard. */}
+      <pre
+        className="park-world-lovableprompt"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable block must be reachable by keyboard (axe scrollable-region-focusable)
+        tabIndex={0}
+        // biome-ignore lint/a11y/useSemanticElements: the prompt is a <pre> (its line breaks are the content), named as a region
+        role="region"
+        aria-label="The prompt that goes to Lovable, scroll to read all of it"
+      >
+        {handoff.prompt}
+      </pre>
+      <div className="park-world-lovablefiles">
+        <span className="park-world-rowlabel">Link carries the prompt shown above</span>
+        <div className="park-world-lovablesummary">
+          Approved data excerpts, when included, are part of that prompt. Files are not uploaded by
+          this link.
+        </div>
+      </div>
+      <div className="park-world-dactions">
+        {approved ? (
+          <div className="park-world-ddone">
+            {icon("check", 14)}
+            {handoff.doneLabel}
+          </div>
+        ) : (
+          <Button
+            variant="needs"
+            size="sm"
+            disabled={sample}
+            onClick={() => {
+              if (!sample) onDecide(handoff.decisionKey);
+            }}
+          >
+            {handoff.approveLabel}
+          </Button>
+        )}
+        {canOpen ? (
+          <a
+            className="park-world-lovablelink"
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {icon("arrowR", 14)}Open in Lovable
+          </a>
+        ) : (
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled
+            title={
+              sample
+                ? "A recorded sample cannot open a build handoff"
+                : url === null
+                  ? "Prompt is invalid or exceeds Lovable size limits"
+                  : "Approve the handoff card first to open in Lovable"
+            }
+          >
+            Open in Lovable
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}

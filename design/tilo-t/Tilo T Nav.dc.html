@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-t.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="font-family:var(--fB);color:var(--ink)">
+<sc-if value="{{ desk }}" hint-placeholder-val="{{ true }}">
+  <header style="height:64px;box-sizing:border-box;padding:0 24px;display:flex;align-items:center;gap:20px;background:var(--card);border-bottom:1px solid var(--line)">
+    <a href="#" aria-label="Tilo home" style="display:flex;align-items:center;gap:9px;flex:none">
+      <span style="width:32px;height:32px;border-radius:10px;background:var(--pri);display:flex;align-items:center;justify-content:center"><span style="width:20px;height:11px;border-radius:6px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:5px"><span style="width:3px;height:3px;border-radius:9px;background:#0B0B0C"></span><span style="width:3px;height:3px;border-radius:9px;background:#0B0B0C"></span></span></span>
+      <span style="font-weight:800;font-size:22px;letter-spacing:-1px">tilo</span>
+    </a>
+    <nav aria-label="Main" style="display:flex;gap:2px;min-width:0">
+      <sc-for list="{{ items }}" as="it" hint-placeholder-count="8">
+        <a href="#" aria-current="{{ it.cur }}" style="height:40px;padding:0 12px;border-radius:12px;display:flex;align-items:center;gap:7px;font-weight:600;font-size:14.5px;white-space:nowrap;background:{{ it.bg }};color:{{ it.fg }}" style-hover="background:var(--sunk)">{{ it.label }}<sc-if value="{{ it.badge }}"><span style="min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:99px;background:var(--amber);color:#1A1407;font-size:11.5px;font-weight:800;display:flex;align-items:center;justify-content:center">{{ needs }}</span></sc-if></a>
+      </sc-for>
+    </nav>
+    <div style="flex:1"></div>
+    <span title="Credits used this month" style="height:40px;padding:0 12px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;flex:none"><span style="color:var(--ink2)">{{ iCredit }}</span><span style="display:flex;flex-direction:column;gap:3px;line-height:1"><span><strong>142</strong> <span style="color:var(--ink3)">/ 400 credits</span></span><span style="width:96px;height:4px;border-radius:9px;background:var(--sunk);overflow:hidden"><span style="display:block;width:36%;height:100%;background:var(--ink)"></span></span></span></span>
+    <span aria-label="Search" style="width:40px;height:40px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink2);flex:none">{{ iSearch }}</span>
+    <span role="button" aria-pressed="{{ asstOn }}" style="height:40px;padding:0 14px 0 6px;border-radius:12px;background:{{ asstBg }};color:{{ asstFg }};border:1px solid {{ asstBd }};display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;flex:none"><dc-import name="Tilo S Buddy" size="28" mood="idle" hint-size="24px,28px"></dc-import>Ask Tilo</span>
+    <span style="width:40px;height:40px;border-radius:99px;background:var(--lilacSoft);color:var(--lilacInk);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex:none">MR</span>
+  </header>
+</sc-if>
+<sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}">
+  <div style="background:var(--card);border-bottom:1px solid var(--line)">
+    <div style="height:44px;padding:0 26px;display:flex;align-items:center;justify-content:space-between;font-size:15px;font-weight:600"><span>9:41</span><span style="display:flex;gap:6px;align-items:center"><span style="width:17px;height:10px;border-radius:2px;background:var(--ink)"></span><span style="width:24px;height:11px;border-radius:3px;border:1.5px solid var(--ink);box-sizing:border-box;padding:1px"><span style="display:block;width:70%;height:100%;background:var(--ink);border-radius:1px"></span></span></span></div>
+    <div style="height:52px;padding:0 12px 0 16px;display:flex;align-items:center;gap:10px">
+      <span style="width:30px;height:30px;border-radius:9px;background:var(--pri);display:flex;align-items:center;justify-content:center"><span style="width:18px;height:10px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:4px"><span style="width:3px;height:3px;border-radius:9px;background:#0B0B0C"></span><span style="width:3px;height:3px;border-radius:9px;background:#0B0B0C"></span></span></span>
+      <span style="font-weight:800;font-size:20px;letter-spacing:-.8px;flex:1">{{ title }}</span>
+      <span style="height:32px;padding:0 10px;border-radius:99px;border:1px solid var(--line);display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700">{{ iCreditS }}142</span>
+      <span aria-label="Ask Tilo" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center"><dc-import name="Tilo S Buddy" size="30" mood="idle" hint-size="26px,30px"></dc-import></span>
+    </div>
+  </div>
+</sc-if>
+<sc-if value="{{ tabs }}" hint-placeholder-val="{{ false }}">
+  <nav aria-label="Main" style="height:84px;box-sizing:border-box;padding:6px 8px 0;background:var(--card);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:relative">
+    <sc-for list="{{ tabItems }}" as="t" hint-placeholder-count="5">
+      <a href="#" style="height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:700;color:{{ t.fg }};position:relative"><span style="position:relative;width:48px;height:28px;border-radius:99px;background:{{ t.bg }};display:flex;align-items:center;justify-content:center">{{ t.ic }}<sc-if value="{{ t.badge }}"><span style="position:absolute;top:-3px;right:4px;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:99px;background:var(--amber);color:#1A1407;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--card)">{{ needs }}</span></sc-if></span>{{ t.label }}</a>
+    </sc-for>
+    <span style="position:absolute;left:50%;bottom:8px;width:134px;height:5px;margin-left:-67px;border-radius:9px;background:var(--ink)"></span>
+  </nav>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:64},&quot;active&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;home&quot;,&quot;chat&quot;,&quot;worlds&quot;,&quot;needs&quot;,&quot;agenda&quot;,&quot;skills&quot;,&quot;team&quot;,&quot;connectors&quot;],&quot;default&quot;:&quot;home&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;,&quot;tabs&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;assistant&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;needs&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:3,&quot;tsType&quot;:&quot;number&quot;},&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloT) this.t = setInterval(() => { if (window.TiloT) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const T = window.TiloT, ic = (n, s) => T ? T.ic(React.createElement, n, s) : null;
+    const a = this.props.active ?? 'home', d = this.props.device ?? 'desktop', on = !!this.props.assistant;
+    const items = [['home', 'Home'], ['chat', 'Chat'], ['worlds', 'Worlds'], ['needs', 'Needs you'], ['agenda', 'Agenda'], ['skills', 'Skills'], ['team', 'Team'], ['connectors', 'Connectors']].map(([k, label]) => ({ label, badge: k === 'needs', cur: k === a ? 'page' : undefined, bg: k === a ? 'var(--sunk)' : 'transparent', fg: k === a ? 'var(--ink)' : 'var(--ink2)' }));
+    const tabItems = [['home', 'Home', 'home'], ['worlds', 'Worlds', 'city'], ['chat', 'Chat', 'chat'], ['needs', 'Needs you', 'inbox'], ['more', 'More', 'more']].map(([k, label, i]) => { const s = k === a || (a !== 'home' && a !== 'worlds' && a !== 'chat' && a !== 'needs' && k === 'more'); return { label, badge: k === 'needs', ic: ic(i, 20), bg: s ? 'var(--lime)' : 'transparent', fg: s ? 'var(--ink)' : 'var(--ink3)' }; });
+    const titles = { home: 'Home', chat: 'Chat', worlds: 'Worlds', needs: 'Needs you', agenda: 'Agenda', skills: 'Skills', team: 'Team', connectors: 'Connectors', world: 'World' };
+    return {
+      theme: this.props.theme ?? 'studio', desk: d === 'desktop', phone: d === 'phone', tabs: d === 'tabs', needs: String(this.props.needs ?? 3),
+      items, tabItems, title: this.props.title ?? titles[a] ?? 'tilo', asstOn: on ? 'true' : 'false',
+      asstBg: on ? 'var(--ink)' : 'var(--lime)', asstFg: on ? 'var(--card)' : '#0B0B0C', asstBd: on ? 'var(--ink)' : 'var(--limeD)',
+      iCredit: ic('credit', 18), iCreditS: ic('credit', 15), iSearch: ic('search', 18)
+    };
+  }
+}
+</script>
+</body>
+</html>

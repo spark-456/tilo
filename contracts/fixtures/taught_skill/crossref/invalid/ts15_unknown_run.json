@@ -1,0 +1,18 @@
+{
+  "rule": "TS-15",
+  "note": "No real_run is recorded (a try run, or an invented run id).",
+  "org_id": "org_example",
+  "run": null,
+  "earlier": [],
+  "rating": {
+    "id": "01JB6Z00000000000000RAT001",
+    "skill": "tsk_01JB6Z0000000000000000INV",
+    "version": 3,
+    "run_id": "r_invoice_0007",
+    "by": "u_sam",
+    "thumb": "up",
+    "wrong_step": null,
+    "note": null,
+    "at": "2026-10-09T09:00:00.000Z"
+  }
+}

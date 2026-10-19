@@ -1,0 +1,112 @@
+id: skill-from-description
+domain: automation
+version: "1.0.0"
+description: "Turn a plain-language task description into ordered steps, ask-first gates on risky verbs, one clarifying question if ambiguous, trigger, and scope."
+author: "tilo.automation"
+reviewer: "automation.lead"
+tools_allowed: []
+tool_access: {}
+inputs:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  type: object
+  additionalProperties: false
+  required:
+    - description
+    - connected_tools
+  properties:
+    description:
+      type: string
+      minLength: 5
+      maxLength: 4000
+      description: "Plain-language description from the user explaining the repeated task they want Tilo to run."
+    connected_tools:
+      type: array
+      minItems: 1
+      maxItems: 20
+      items:
+        type: string
+        minLength: 1
+        maxLength: 80
+      description: "Identifiers of connected tools available in the user's workspace (e.g. gmail, slack, google_drive, google_calendar, stripe)."
+    is_ambiguous:
+      type: boolean
+      description: "Optional evaluation hint indicating whether a required target, recipient, or threshold is missing from the description."
+    expected_action_clauses:
+      type: array
+      items:
+        type: string
+      description: "Optional evaluation clauses used by golden tests to verify step count matches the description without invented steps."
+outputs:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  type: object
+  additionalProperties: false
+  required:
+    - title
+    - steps
+    - clarifying_question
+    - trigger
+    - scope
+  properties:
+    title:
+      type: string
+      minLength: 3
+      maxLength: 120
+    steps:
+      type: array
+      minItems: 1
+      maxItems: 15
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - verb
+          - object
+          - tool
+          - ask_me_first
+        properties:
+          verb:
+            type: string
+            minLength: 2
+            maxLength: 40
+          object:
+            type: string
+            minLength: 3
+            maxLength: 240
+          tool:
+            type: string
+            minLength: 1
+            maxLength: 80
+          ask_me_first:
+            type: boolean
+    clarifying_question:
+      type:
+        - string
+        - "null"
+      maxLength: 280
+    trigger:
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+      properties:
+        kind:
+          type: string
+          enum:
+            - on_request
+            - schedule
+            - event
+        cadence:
+          type: string
+          enum:
+            - daily
+            - weekly
+            - monthly
+        event:
+          type: string
+          minLength: 3
+          maxLength: 160
+    scope:
+      type: string
+      enum:
+        - just_me
+        - team

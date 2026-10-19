@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/work_item.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "WorkItem",
-  "description": "One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed`, is readable by no one until confirmed (PE-03; the meeting Owner sees it in the minutes), carries the meeting Owner as `assigned_by` from the start, and leaves `proposed` only with `confirmed_by`, that Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15).",
+  "description": "One thing a person has to do (FR-PA-01): from confirmed minutes, from mail the person marked, or by hand. Visible to its `owner`; the person who assigned it sees its status only, and only once it is no longer `proposed` (PE-03). An item Tilo made starts `proposed`, is readable by no one until confirmed (PE-03; the meeting Owner sees it in the minutes), carries the meeting Owner as `assigned_by` from the start, and leaves `proposed` only with `confirmed_by`, that Owner (PE-07). A model never sets `due`: code computes it from `due_text` (PE-15). An optional `world_id` (1.1.0, ADR-0040, PE-33) binds a person-made item to a world its owner may read; while a team share of that world is in force (PE-31) the members of the team read the item's team view (id, title, status, due, owner, world) when it is open or done and not flagged. Absent means personal, as every item was before 1.1.0; it is set only at creation, never changed, and a Tilo-made item never has one.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -113,6 +113,9 @@
       "description": "True when the minutes, mail or calendar text this was made from were flagged by the safety provider; never cleared by a model. Any draft, nudge, send or calendar write built from a flagged record is T3 with safety_flag (PE-21).",
       "type": "boolean"
     },
+    "world_id": {
+      "$ref": "common.schema.json#/$defs/world_id"
+    },
     "history": {
       "type": "array",
       "minItems": 1,
@@ -147,6 +150,20 @@
     "properties": {
       "confirmed_by": {
         "type": "object"
+      }
+    }
+  },
+  "dependentSchemas": {
+    "world_id": {
+      "properties": {
+        "created_by": {
+          "properties": {
+            "by": {
+              "const": "person"
+            }
+          },
+          "required": ["by"]
+        }
       }
     }
   },

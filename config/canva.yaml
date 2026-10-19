@@ -1,0 +1,30 @@
+# Canva (PRD supplement 2026-10-05 s6, SD-03; FR-CON-19): decks and documents made in the person's own Canva from
+# approved content and the company assets they granted for the task, exported back as a PDF or PPTX artifact.
+# One connector.schema.json entry, read by tilo_connectors.canva.load_canva_declaration (the registry loader).
+#
+# It is NOT listed in config/connectors.yaml yet. That file is the Director's catalogue and every registry-wide
+# invariant (a mock adapter and a real adapter per id, the connect routes, the recorded plan prompt) keys off it,
+# and Canva cannot connect until the workspace owner registers a Canva app (the user does that; Tilo never invents
+# a client id or secret). Moving this entry into connectors.yaml is the one-line activation step after that.
+# Until then `canva_status` answers "Needs the workspace owner's Canva app" and the adapter does nothing.
+#
+# Scope names follow Canva's Connect API; the person who registers the app confirms them against Canva's docs.
+# read is asked only for brand-template autofill (an Enterprise plan feature); write is the plain route; share is
+# asked only when a person approves an external share (incremental scopes). Both actions are T3: data leaves for a
+# third party (like build_handoff) and a person approves each one. They are deliberately not listed in
+# config/autonomy.yaml: an unlisted action is T3 (BQ-44), and the SEC-11 catalogue test pins the actions listed
+# there to the connectors of config/connectors.yaml, which Canva joins only on activation.
+- id: canva
+  name: Canva
+  icon: design
+  auth: oauth2
+  scopes:
+    read: ["profile:read", "brandtemplate:meta:read", "brandtemplate:content:read"]
+    write: ["design:content:write", "design:content:read", "asset:write"]
+    share: ["design:permission:write"]
+  capabilities: [read, write, share]
+  actions:
+    - {id: create_design, capability: write, description: "Make a deck or document in your Canva from approved content and the assets you granted, and export it back.", risk_tier: T3, gate_type: approval, irreversible: false}
+    - {id: share_design, capability: share, description: "Share a design made in your Canva with people outside your company.", risk_tier: T3, gate_type: approval, irreversible: true}
+  limits: {per_minute: 30, batch_size: 6}
+  data_class: {returns: [business], redact: []}

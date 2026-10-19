@@ -1,0 +1,20 @@
+{
+  "org_id": "org_example",
+  "month": "2026-10",
+  "helpers": [
+    {
+      "user": "u_priya",
+      "answers": 7,
+      "fixes": 2
+    },
+    {
+      "user": "u_sam",
+      "answers": 3,
+      "fixes": 0
+    }
+  ],
+  "mistakes": {
+    "this_month": 2,
+    "last_month": 5
+  }
+}

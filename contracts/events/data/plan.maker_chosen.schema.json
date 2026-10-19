@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/plan.maker_chosen.schema.json",
+  "x-version": "1.0.0",
+  "title": "PlanMakerChosenData",
+  "description": "data of plan.maker_chosen (ADR-0050, MK-06): at Start, where the person chose to make one deliverable whose format offers a choice in config/makers.yaml; one event per such deliverable, in brief order, in the same save as the budget grant. The actor is the person and the target the world. A choice authorises nothing: a partner's action stays T3 behind its own card (MK-07). suggested is the option code suggested (MK-04), or null when it suggested none, so the Trace shows whether the person followed it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["deliverable", "title", "format", "make_with", "label", "suggested"],
+  "properties": {
+    "deliverable": {
+      "description": "0-based position of the deliverable in the brief (a brief has at most 10).",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9
+    },
+    "title": {
+      "description": "The deliverable's title in the brief.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "format": { "$ref": "../../common.schema.json#/$defs/deliverable_format" },
+    "make_with": { "$ref": "../../common.schema.json#/$defs/make_with" },
+    "label": {
+      "description": "The chosen option's display name as the start plan showed it, e.g. Tilo, Lovable or Canva.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    },
+    "suggested": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/make_with" }, { "type": "null" }]
+    }
+  }
+}

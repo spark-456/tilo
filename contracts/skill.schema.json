@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/skill.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "Skill",
   "description": "skill.yaml in skills/<domain>/<skill-id>/ (PRD 8.2). The planner sees only id and the one-line description; the executing agent loads the full skill.",
   "type": "object",
@@ -33,6 +33,7 @@
       "uniqueItems": true,
       "items": { "$ref": "common.schema.json#/$defs/action_type" }
     },
+    "tool_access": { "$ref": "#/$defs/tool_access" },
     "inputs": { "$ref": "#/$defs/embedded_schema" },
     "outputs": { "$ref": "#/$defs/embedded_schema" },
     "description": {
@@ -44,6 +45,12 @@
     }
   },
   "$defs": {
+    "tool_access": {
+      "description": "FR-ACC-02 (1.1.0, ADR-0027): the level this skill may use each listed connector at, keyed by connector id (config/connectors.yaml or config/mcp.yaml). It can only lower the team's level for that connector: the level in force is the lower of the two (tilo_policy.access_levels.effective_level), so act here sets no further limit and no value can raise the team's. A connector left out uses the team's level. Optional: a skill without it changes nothing. It is part of the signed-off, version-pinned skill (PRD 8.2), so changing it is a new skill version.",
+      "type": "object",
+      "propertyNames": { "$ref": "common.schema.json#/$defs/connector_id" },
+      "additionalProperties": { "$ref": "common.schema.json#/$defs/tool_access_level" }
+    },
     "embedded_schema": {
       "description": "A JSON Schema (2020-12) for the skill's inputs or outputs. Deliberately open: the skill loader checks it against the 2020-12 meta-schema.",
       "type": "object",

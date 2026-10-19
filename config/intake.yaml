@@ -1,0 +1,10 @@
+# NFR-03 / NFR-22 (live defect 15 Oct 2026): how long POST /intake lets the Director draft a brief. Read by
+# tilo_api.intake_deadline on every Thinking intake. No model id here: the role (config/models*.yaml) names the models.
+# The web gives up at INTAKE_TIMEOUT_MS (apps/web/src/api/http.ts); a test keeps this deadline at least 10 s inside it
+# (sign-in checks and storing the task come after the Director). When the time is gone the answer is a plain 503
+# `intake_deadline` and nothing is stored, never a late 201.
+
+version: 1
+
+deadline_seconds: 80 # the Director's whole brief, every attempt of the cascade together
+first_attempt_share: 0.6 # a candidate with another behind it waits at most this share of the time left (0 < x < 1)

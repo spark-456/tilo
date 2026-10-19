@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TiloClient } from "../api/client";
 import { type StopResult, isStopResult } from "../api/stop";
-import { describeError } from "../screens/remote";
+import { describeError } from "../park/shared/remote";
 
 /** A client that can send the stop. Like `pauseWorld` it is not on the frozen TiloClient
  * interface (it is on HttpClient and FixtureClient), so it is detected here, never added there. */

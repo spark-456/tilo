@@ -1,0 +1,109 @@
+{
+  "tool": "search_email",
+  "outcome": "ok",
+  "connected_at": "2026-10-01T08:00:00.000Z",
+  "result": {
+    "messages": [
+      {
+        "id": "18c2f0a9b7d4e611",
+        "thread_id": "18c2f0a9b7d4e600",
+        "sender": "Ana Example <ana@example.org>",
+        "subject": "Invoice 1042 for October",
+        "date": "2026-10-15T07:12:00.000Z",
+        "snippet": "Hi, please find the October invoice attached. Payment is due on the 31st.",
+        "unread": true
+      },
+      {
+        "id": "18c2f0a9b7d4e611",
+        "thread_id": "18c2f0a9b7d4e600",
+        "sender": "Ana Example <ana@example.org>",
+        "subject": "Invoice 1042 for October",
+        "date": "2026-10-15T07:12:00.000Z",
+        "snippet": "Hi, please find the October invoice attached. Payment is due on the 31st.",
+        "unread": true
+      },
+      {
+        "id": "18c2f0a9b7d4e611",
+        "thread_id": "18c2f0a9b7d4e600",
+        "sender": "Ana Example <ana@example.org>",
+        "subject": "Invoice 1042 for October",
+        "date": "2026-10-15T07:12:00.000Z",
+        "snippet": "Hi, please find the October invoice attached. Payment is due on the 31st.",
+        "unread": true
+      },
+      {
+        "id": "18c2f0a9b7d4e611",
+        "thread_id": "18c2f0a9b7d4e600",
+        "sender": "Ana Example <ana@example.org>",
+        "subject": "Invoice 1042 for October",
+        "date": "2026-10-15T07:12:00.000Z",
+        "snippet": "Hi, please find the October invoice attached. Payment is due on the 31st.",
+        "unread": true
+      },
+      {
+        "id": "18c2f0a9b7d4e611",
+        "thread_id": "18c2f0a9b7d4e600",
+        "sender": "Ana Example <ana@example.org>",
+        "subject": "Invoice 1042 for October",
+        "date": "2026-10-15T07:12:00.000Z",
+        "snippet": "Hi, please find the October invoice attached. Payment is due on the 31st.",
+        "unread": true
+      },
+      {
+        "id": "18c2f0a9b7d4e611",
+        "thread_id": "18c2f0a9b7d4e600",
+        "sender": "Ana Example <ana@example.org>",
+        "subject": "Invoice 1042 for October",
+        "date": "2026-10-15T07:12:00.000Z",
+        "snippet": "Hi, please find the October invoice attached. Payment is due on the 31st.",
+        "unread": true
+      },
+      {
+        "id": "18c2f0a9b7d4e611",
+        "thread_id": "18c2f0a9b7d4e600",
+        "sender": "Ana Example <ana@example.org>",
+        "subject": "Invoice 1042 for October",
+        "date": "2026-10-15T07:12:00.000Z",
+        "snippet": "Hi, please find the October invoice attached. Payment is due on the 31st.",
+        "unread": true
+      },
+      {
+        "id": "18c2f0a9b7d4e611",
+        "thread_id": "18c2f0a9b7d4e600",
+        "sender": "Ana Example <ana@example.org>",
+        "subject": "Invoice 1042 for October",
+        "date": "2026-10-15T07:12:00.000Z",
+        "snippet": "Hi, please find the October invoice attached. Payment is due on the 31st.",
+        "unread": true
+      },
+      {
+        "id": "18c2f0a9b7d4e611",
+        "thread_id": "18c2f0a9b7d4e600",
+        "sender": "Ana Example <ana@example.org>",
+        "subject": "Invoice 1042 for October",
+        "date": "2026-10-15T07:12:00.000Z",
+        "snippet": "Hi, please find the October invoice attached. Payment is due on the 31st.",
+        "unread": true
+      },
+      {
+        "id": "18c2f0a9b7d4e611",
+        "thread_id": "18c2f0a9b7d4e600",
+        "sender": "Ana Example <ana@example.org>",
+        "subject": "Invoice 1042 for October",
+        "date": "2026-10-15T07:12:00.000Z",
+        "snippet": "Hi, please find the October invoice attached. Payment is due on the 31st.",
+        "unread": true
+      },
+      {
+        "id": "18c2f0a9b7d4e611",
+        "thread_id": "18c2f0a9b7d4e600",
+        "sender": "Ana Example <ana@example.org>",
+        "subject": "Invoice 1042 for October",
+        "date": "2026-10-15T07:12:00.000Z",
+        "snippet": "Hi, please find the October invoice attached. Payment is due on the 31st.",
+        "unread": true
+      }
+    ]
+  },
+  "parts": []
+}

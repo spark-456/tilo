@@ -1,0 +1,35 @@
+# Where each deliverable can be made (ADR-0050; FR-CON-16, FR-CON-17, FR-CON-19; the owner's decision of 16 Oct 2026).
+# Shape: contracts/makers.schema.json. Rules MK-01 to MK-08: contracts/makers.rules.md. Code reads this file; a model
+# never picks where a deliverable is made, and picking a partner authorises nothing (its action keeps its T3 card).
+#
+# For a format listed under `formats` the start plan shows native (made in Tilo, always first) and then each partner
+# below, in order. A partner that is not set up shows as "needs setup": never hidden, never suggested, never selected.
+# A format not listed here (docx, xlsx, markdown, ...) is made natively and no choice is shown.
+v: "1.0"
+formats:
+  website:
+    partners:
+      # FR-CON-17 link route: no key and no call to Lovable; the person sees the prompt on a T3 card first.
+      - {make_with: "connector:lovable", action: build_handoff}
+  pptx:
+    partners:
+      # FR-CON-19: shown as "needs setup" until the workspace owner registers a Canva app (config/canva.yaml).
+      - {make_with: "connector:canva", action: create_design}
+  pdf:
+    partners:
+      - {make_with: "connector:canva", action: create_design}
+
+# MK-03: a website is large (the first ready partner is suggested) when the brief names more than max_native_pages
+# pages or one of these needs, which one self-contained HTML file with no network cannot meet. Defaults the owner may
+# tune (BQ-WEBSITE-2). Lower-case, one to four words each, matched as whole words.
+large_site:
+  max_native_pages: 3
+  needs: [
+      sign in, sign up, log in, login, user accounts, user profiles, database, backend, server, checkout, payments,
+      shopping cart, online store, e-commerce, ecommerce, booking system, reservations, admin panel, cms,
+      file uploads, multi-page, multiple pages,
+    ]
+
+# MK-05: true selects a suggested ready partner before Start (the owner, 16 Oct: "use lovable for an intensive massive
+# site"); the person can switch back to native on the start plan. false always selects native first.
+preselect_suggested: true

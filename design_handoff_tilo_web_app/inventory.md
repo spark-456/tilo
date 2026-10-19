@@ -1,0 +1,354 @@
+# Copy and structure inventory
+
+Auto-extracted from each page file. Use it for exact copy strings, section order and local state. Strings with `{{ }}` in the source are computed from data in `tilo-app.js`.
+
+## Tilo App.dc.html
+- Labelled regions: Tilo home · Main · Notifications · Account menu · Notifications · Account · Loading Tilo
+- Navigates to: profile(tab)
+- Local state: `{ ready: false, boot: 'on', page: 'home', params: {}, phase: 'in', bar: 0, barOn: false, wl: null, dec: {}, added: [], menu: null, toast: null, read: false, prefs: {}, vw: 1440, vh: 900 }`
+- Static copy:
+  - tilo
+  - AM
+  - Notifications
+  - Settings
+  - Alex Morgan
+  - alex@northwind.co
+  - Northwind Ops · Team plan
+  - Loading your city
+- Toast messages (JS expressions):
+  - `k === 'depot' ? 'Approved £3,420 for Laptop Depot' : 'Supplier brief sent to 3 suppliers', 'Undo', (`
+  - `'Started “' + w.short + '”', 'Open', (`
+  - `'This is a prototype, so you stay signed in'`
+
+## Tilo App Home.dc.html
+- Labelled regions: Today · Describe your task · Size of job
+- Navigates to: world, worlds, agenda, ledger
+- Local state: `{ m: 'quick', q: '', ph: 'idle', ready: !!(window.TiloApp && window.TiloApp.ready()) }`
+- Static copy:
+  - in K1 electric scooter
+  - Review
+  - You’re all caught up
+  - Live now
+  - All worlds
+  - Up next today
+  - Agenda
+  - September spend
+  - Ledger
+  - £2,412
+  - of £8,000
+  - Forecast £6,300 · £3,420 waiting on you
+  - Change brief
+- Toast messages (JS expressions):
+  - —
+
+## Tilo App Worlds.dc.html
+- Labelled regions: Search worlds · Status · Cities · Towns · Villages
+- Navigates to: world(id), home
+- Local state: `{ f: 'all', q: '', tier: 'all', ready: !!(window.TiloApp && window.TiloApp.ready()) }`
+- Static copy:
+  - Worlds
+  - Every job Tilo is running, sized by scale: cities, towns and villages.
+  - SCALE
+  - WAITING FOR YOU
+  - K1 electric scooter
+  - Open in world
+  - You’re all caught up
+  - K1 electric scooter is moving again. Tilo will ask if anything else needs you.
+  - Cities
+  - Spend
+  - Agents
+  - Towns
+  - Villages
+  - Try another filter, or start something new from Home.
+- Toast messages (JS expressions):
+  - —
+
+## Tilo App World.dc.html
+- Labelled regions: Breadcrumb · Activity
+- Navigates to: worlds, ledger, skills(id), connectors, agenda
+- Local state: `{ paused: {}, ready: !!(window.TiloApp && window.TiloApp.ready()) }`
+- Static copy:
+  - WAITING FOR YOU
+  - Ask me later
+  - Spend
+  - Ledger
+  - Skills
+  - Uses Tilo’s general skills
+  - Tools
+  - No runs yet. The first run waits for your approval.
+  - See in Agenda
+  - Open result
+  - Share to Slack
+  - Activity
+  - Today
+- Toast messages (JS expressions):
+  - `'Tilo will remind you at 16:00'`
+  - `paused ? 'Resumed. Agents are back at work' : 'Paused. No spend while paused'`
+  - `'Link copied. Only your team can open it'`
+  - `'Run started. You’ll get a notification when it finishes'`
+  - `'Opening the result in Google Drive'`
+  - `'Shared to #ops in Slack'`
+
+## Tilo App Skills.dc.html
+- Labelled regions: Teach a skill · Steps · Describe the task · Skill name · Help your agents get better · Good run · Something went wrong · What should it do instead · Learned skills · Search skills · Tools
+- Navigates to: connectors, world
+- Local state: `{  }`
+- Static copy:
+  - Skills
+  - Teach your agents new work, help them get better, and choose which tools they may touch. Every repeat of a skill gets faster and cheaper.
+  - Teach Tilo something new
+  - Show it once. Tilo repeats it, you check the result, and it becomes a skill your agents can reuse.
+  - Write it like you’d explain it to a new colleague. Tilo asks if anything is unclear.
+  - Read my description
+  - What Tilo has picked up
+  - Steps appear here as Tilo watches.
+  - Show me Tilo’s version
+  - Here’s how I’d do
+  - . Change anything that looks wrong, and tell me where to stop and ask you.
+  - Ask me first
+  - ONE QUESTION
+  - Some invoices arrive as a link, not a PDF. What should I do?
+  - Tilo tries this once on a real invoice from today. Nothing is posted without your OK while the skill is learning.
+  - Back
+  - Let Tilo try it
+  - Practice run · Northline invoice #2291
+  - Add
+  - Northline Components · £1,240.00 · due 9 Oct
+  - to Invoices 2026?
+  - Yes, add it
+  - Matched your way of doing it
+  - 4 of 4 steps · 1 min 08s · £0.38
+  - Fix a step
+  - Looks right
+  - Skill name
+  - Who can use it
+  - When it runs
+  - It starts as
+  - Learning
+  - . I’ll ask before adding rows until we’ve had 5 good runs together, then you can mark it trusted.
+  - Save skill
+  - View in library
+  - Teach another
+  - Help your agents get better
+  - A minute here saves hours of rework later. Answer once and every agent using the skill learns it.
+  - Questions agents saved up
+  - Rate recent runs
+  - Thumbs down lets you fix the step
+  - Fix saved
+  - Which step went wrong?
+  - Cancel
+  - Save fix
+  - Ready for your review
+  - Mark as trusted
+  - Keep learning
+  - Who helped this month
+  - September
+  - Mistakes since July
+  - −38%
+  - Answers and fixes
+  - Learned skills
+  - Pick one to see its steps, cost per run and tool access.
+  - Edit steps
+  - Cost per run
+  - Steps
+  - Tool access for this skill
+  - Manage connectors
+  - Used in
+  - Not used in any world yet.
+  - Tools
+  - The most any agent may do in each app. New tools start read-only. Team rules still apply.
+  - Read
+  - looks, never changes
+  - Draft
+  - prepares, you send
+  - Act
+  - does it, within limits
+- Toast messages (JS expressions):
+  - `'Thanks. Every agent using “' + s.name + '” now knows'`
+  - `n + ' access set to ' + label + (i === 3 ? '. Team rules still apply' : '')`
+  - `'Fix saved. The next run uses it'`
+  - `'“' + s.name + '” is trusted'`
+  - `name + ': ' + hints[j]`
+  - `'Saved “' + S.name + '”. It’s live for ' + (S.scope === 'me' ? 'you' : 'the team')`
+  - `'Test run started on yesterday’s data. Results in about a minute'`
+  - `p ? '“' + cur.name + '” is paused. Worlds using it will ask you instead' : '“' + cur.name + '” is running again'`
+
+## Tilo App Ledger.dc.html
+- Labelled regions: Spend over the month · Where it goes · Group by · Cost per run · Approval wait times · What Tilo gave back · Activity · Entry type
+- Navigates to: world(id), skills(id), team(focus)
+- Local state: `{ by: 'world', k: 'all', hover: null, open: 0 }`
+- Static copy:
+  - Ledger
+  - Every cost and every decision your agents make. September 2026 · 6 days left · budget £8,000.
+  - SPEND OVER TIME
+  - On track to finish £1,700 under budget
+  - Running total for September. Hover for daily spend.
+  - Spent
+  - Forecast
+  - Even pace
+  - Budget £8,000
+  - Motor dev kit £1,140
+  - WHERE IT GOES
+  - Total
+  - £2,412
+  - COST PER RUN
+  - Repeat work gets cheaper. Invoice matching now costs 79% less.
+  - APPROVAL WAIT TIMES
+  - Most asks get a yes in 9 minutes. Sharing outside waits longest.
+  - Jin approves all outside sharing. A backup approver would cut the wait.
+  - Add a backup
+  - WHAT TILO GAVE BACK
+  - £640 saved by memory and 46 hours handed back to people
+  - Saved by memory, per week
+  - £640
+  - 1–7 Sep
+  - 8–14
+  - 15–21
+  - 22–24
+  - Hours handed back, by team
+  - 46 h
+  - Activity
+  - Nothing here this month.
+- Toast messages (JS expressions):
+  - `'August and earlier months live here'`
+  - `'Exported september-2026.csv · also synced to Xero'`
+
+## Tilo App Agenda.dc.html
+- Labelled regions: Boards · Board style · This week · Event detail
+- Navigates to: world(id)
+- Local state: `{ style: null, newVal: { team: '', me: '' }, pins: null, cals: { work: true, personal: true, tilo: true }, weekend: false, sel: 'sync', finding: false, booked: null, flags: {}, briefed: {}, done: {} }`
+- Static copy:
+  - Agenda
+  - Thursday 24 September. Pins from your team and Tilo, and a week that stays in sync.
+  - Google Calendar · synced just now
+  - Boards
+  - Anyone on the team can pin. Tilo pins action items from meetings and things that need you.
+  - Pinboard
+  - Grouped
+  - TILO SUGGESTS
+  - Not now
+  - Pin it
+  - Pin
+  - Weekend
+  - K1 Level 3 gate review · 30 min · Alex, Jin, Priya, Tom
+  - Tilo checked all four calendars. Pick a dashed slot to book it.
+  - Cancel
+  - TILO’S BRIEF
+  - Ask Tilo for a brief
+  - NOTES BY TILO
+  - FOLLOW-UPS
+  - No notes for this one.
+- Toast messages (JS expressions):
+  - `'Blocked 09:30–11:30 on Monday in Google Calendar'`
+  - `'Booked ' + s.l + '. Invites sent from Google Calendar'`
+  - `msg(!cur)`
+  - `'Tilo will brief you 15 minutes before ' + e0.t`
+
+## Tilo App Team.dc.html
+- Labelled regions: Invite by email · Members · Approval coverage · Approval rules · What each role can do
+- Navigates to: ledger
+- Local state: `{ email: '', people: null, rules: null, open: null, backups: {}, flash: false }`
+- Static copy:
+  - Team
+  - Who can start work, who signs off, and the rules every agent follows.
+  - Invite
+  - PERSON
+  - ROLE
+  - SPEND LIMIT
+  - HELPED TILO
+  - ACTIVE
+  - You
+  - Backup approver
+  - Owner
+  - Approver
+  - Member
+  - Viewer
+  - Resend invite
+  - Who signs off, and how fast
+  - Average wait this month, from the Ledger. Alex can approve anything as owner.
+  - See wait times
+  - Add a backup…
+  - When agents stop and ask
+  - These rules apply in every world.
+  - What each role can do
+- Toast messages (JS expressions):
+  - `'Enter a work email to invite'`
+  - `'Invite sent to ' + v`
+  - `p.name + ' is now a backup for ' + c.what.toLowerCase()`
+  - `'Invite sent again to ' + p.email`
+  - `p.pending ? 'Invite cancelled' : first + ' was removed. Their worlds move to you'`
+  - `name + ' is now ' + (v === 'Approver' || v === 'Owner' ? 'an ' : 'a '`
+
+## Tilo App Profile.dc.html
+- Labelled regions: Settings · Profile · Notifications · Quiet hours · Appearance · Security · Plan and billing · Download
+- Navigates to: connectors, ledger
+- Local state: `{ tab: null, form: null, notif: { decisions: [1, 1, 1], spend: [1, 1, 0], finished: [1, 0, 1], digest: [0, 1, 0], weekly: [0, 1, 1] }, quiet: true, signed: {} }`
+- Static copy:
+  - AM
+  - Profile
+  - How you appear to your team and how Tilo addresses you.
+  - Cancel
+  - Save changes
+  - Notifications
+  - Choose where Tilo reaches you. Decisions always reach you somewhere.
+  - WHEN
+  - PHONE
+  - EMAIL
+  - SLACK
+  - Quiet hours · 19:00 to 08:00
+  - Phone stays silent, except decisions over £1,000.
+  - Appearance
+  - Your city, your way. Changes apply straight away.
+  - Time of day
+  - Motion in the city
+  - Security
+  - Sign-in, devices and how approvals are confirmed.
+  - Signed in on
+  - Sign out everywhere else
+  - This device
+  - Sign out
+  - PLAN
+  - Team
+  - 5 seats, shared boards, two-person approvals. Renews 1 October.
+  - Compare plans
+  - AGENT SPEND · SEPTEMBER
+  - £2,412
+  - of £8,000
+  - Open the Ledger
+  - PAYMENT
+  - Visa ending 4242
+  - Invoices go to finance@northwind.co
+  - Update
+  - Invoices
+  - Paid
+- Toast messages (JS expressions):
+  - `'Profile saved'`
+  - `'Decisions need at least one channel'`
+  - `'Two-step settings'`
+  - `'Approval confirmation settings'`
+  - `'Signed out of ' + d.t`
+  - `'Signed out everywhere except this device'`
+  - `'Plan comparison opens here'`
+  - `'Card update is handled by our payment provider'`
+  - `'Downloaded ' + t.split(' ·')[0] + ' invoice'`
+
+## Tilo App Connectors.dc.html
+- Labelled regions: Search connectors · Connected · Available · Close
+- Navigates to: skills(id), agenda
+- Local state: `{ q: '', open: null, st: {}, lvl: {}, busy: {}, re: 0 }`
+- Static copy:
+  - Connectors
+  - The tools your agents can use, and how far each one can go.
+  - HubSpot sign-in expires in 3 days
+  - Scan competitor prices reads contacts from it. Reconnect to keep it running.
+  - Connected
+  - Add a tool
+  - Sign in with the tool. Tilo never sees your password.
+  - How far agents can go
+  - Used by
+  - Disconnect
+- Toast messages (JS expressions):
+  - `c.name + ' connected with Read access'`
+  - `cur.name + ': agents can now ' + sub.toLowerCase()`
+  - `cur.name + ' disconnected. Skills that use it will pause'`
+  - `'HubSpot reconnected for 90 days'`

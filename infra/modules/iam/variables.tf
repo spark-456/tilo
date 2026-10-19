@@ -14,5 +14,11 @@ variable "bindings" {
   type = map(object({
     role   = string
     member = string
+    # Optional IAM condition (null: unconditional).
+    condition = optional(object({
+      title       = string
+      description = string
+      expression  = string
+    }))
   }))
 }

@@ -33,7 +33,7 @@ test("S_13 lists a deliverable only once artifact.delivered is recorded (HR-1)",
 test("S_14 renders, no console errors, placeholders aria-disabled", async ({ page }) => {
   test.setTimeout(90_000);
   const problems = watchConsole(page);
-  await visit(page, "/worlds", "Worlds", async () => {
+  await visit(page, "/worlds/replays", "Worlds", async () => {
     const card = page.getByTestId("world-card");
     await expect(card).toContainText("Triage my inbox and answer the supplier about Thursday");
     await expect(card).toContainText("Replay of run #village_basic_1 recorded 29 Sep 2026"); // HR-4
@@ -49,10 +49,12 @@ test("S_14 renders, no console errors, placeholders aria-disabled", async ({ pag
   });
   await expect(page.getByRole("link", { name: "Open world" })).toHaveAttribute(
     "href",
-    "/world/w_village_basic",
+    "/world/w_village_basic/stage",
   );
   await page.locator("button.primary").click();
-  await expect(page.getByRole("heading", { level: 1, name: "What should Tilo do?" })).toBeVisible();
+  // WEB-CUTOVER: "New task" goes to "/", which is the Park Home now (S-01's "What should Tilo do?" is gone).
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Good \w+, Alex\.$/);
   expect(problems).toEqual([]);
 });
 
@@ -60,7 +62,7 @@ test("S_14 says Replaying, with no finished level, until world.completed is reco
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto("/worlds?client_delay_ms=300");
+  await page.goto("/worlds/replays?client_delay_ms=300");
   const card = page.getByTestId("world-card");
   await expect(card).toContainText("Replaying");
   await expect(card).not.toContainText("Finished");
@@ -103,7 +105,7 @@ test("S_16 renders, no console errors, placeholders aria-disabled", async ({ pag
 // UX-1: with a slow client and events arriving, nothing on S-13..S-16 moves.
 noLayoutShift([
   ["S_13", "/library", "Triage list"],
-  ["S_14", "/worlds", "Replay of run #village_basic_1"],
+  ["S_14", "/worlds/replays", "Replay of run #village_basic_1"],
   ["S_15", "/autonomy", "Authorised by you"],
   ["S_16", "/channels", "Gmail"],
 ]);

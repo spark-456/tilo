@@ -19,6 +19,7 @@ from _memory_lib import (
     as_json,
     make_event,
     message_for,
+    registered_types,
 )
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -45,7 +46,7 @@ def ids(rows) -> list[str]:
 def test_FR_MEM_03_fixture_ids_are_unique():
     """Guard for the tests below: the registered-type fixtures can be replayed as one stream."""
     events = all_fixture_events()
-    assert len(events) == 89
+    assert sorted(e["type"] for e in events) == sorted(registered_types())
     assert len({e["id"] for e in events}) == len(events)
 
 

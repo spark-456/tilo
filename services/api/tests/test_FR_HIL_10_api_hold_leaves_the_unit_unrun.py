@@ -25,6 +25,8 @@ from _agt05_lib import (
 )
 from _clint2_lib import wait_for
 
+pytestmark = pytest.mark.usefixtures("must_ask_ask_mode")  # these suites pin the cards (BQ-ASSUME-1)
+
 
 def _asked_send(rf):
     start_and_approve(rf)

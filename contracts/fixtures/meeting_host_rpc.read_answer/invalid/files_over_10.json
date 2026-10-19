@@ -1,0 +1,76 @@
+{
+  "tool": "list_files",
+  "outcome": "ok",
+  "connected_at": "2026-10-01T08:00:00.000Z",
+  "result": {
+    "files": [
+      {
+        "id": "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-",
+        "name": "Q3 plan",
+        "mime_type": "application/vnd.google-apps.document",
+        "modified_at": "2026-10-14T16:05:00.000Z"
+      },
+      {
+        "id": "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-",
+        "name": "Q3 plan",
+        "mime_type": "application/vnd.google-apps.document",
+        "modified_at": "2026-10-14T16:05:00.000Z"
+      },
+      {
+        "id": "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-",
+        "name": "Q3 plan",
+        "mime_type": "application/vnd.google-apps.document",
+        "modified_at": "2026-10-14T16:05:00.000Z"
+      },
+      {
+        "id": "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-",
+        "name": "Q3 plan",
+        "mime_type": "application/vnd.google-apps.document",
+        "modified_at": "2026-10-14T16:05:00.000Z"
+      },
+      {
+        "id": "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-",
+        "name": "Q3 plan",
+        "mime_type": "application/vnd.google-apps.document",
+        "modified_at": "2026-10-14T16:05:00.000Z"
+      },
+      {
+        "id": "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-",
+        "name": "Q3 plan",
+        "mime_type": "application/vnd.google-apps.document",
+        "modified_at": "2026-10-14T16:05:00.000Z"
+      },
+      {
+        "id": "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-",
+        "name": "Q3 plan",
+        "mime_type": "application/vnd.google-apps.document",
+        "modified_at": "2026-10-14T16:05:00.000Z"
+      },
+      {
+        "id": "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-",
+        "name": "Q3 plan",
+        "mime_type": "application/vnd.google-apps.document",
+        "modified_at": "2026-10-14T16:05:00.000Z"
+      },
+      {
+        "id": "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-",
+        "name": "Q3 plan",
+        "mime_type": "application/vnd.google-apps.document",
+        "modified_at": "2026-10-14T16:05:00.000Z"
+      },
+      {
+        "id": "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-",
+        "name": "Q3 plan",
+        "mime_type": "application/vnd.google-apps.document",
+        "modified_at": "2026-10-14T16:05:00.000Z"
+      },
+      {
+        "id": "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-",
+        "name": "Q3 plan",
+        "mime_type": "application/vnd.google-apps.document",
+        "modified_at": "2026-10-14T16:05:00.000Z"
+      }
+    ]
+  },
+  "parts": []
+}

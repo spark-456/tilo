@@ -1,0 +1,9 @@
+id: inbox-triage-draft-only
+version: "1.0.0"
+domain: productivity
+author: "Tilo Skills Library"
+reviewer: "Tilo Product Review"
+tools_allowed: ["search_email","read_email","create_draft"]
+inputs: {"type":"object","additionalProperties":false,"required":["mail_query"],"properties":{"mail_query":{"type":"string","description":"User-selected Gmail search query or specific thread."},"time_window":{"type":"string","description":"Optional time period for the triage."},"priority_rules":{"type":"array","items":{"type":"string","description":"User-specified urgency rule."}}}}
+outputs: {"type":"object","additionalProperties":false,"required":["triage","approval_required_to_save_drafts","messages_sent"],"properties":{"triage":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["message_ref","subject","priority","reason","suggested_next_step","draft_reply"],"properties":{"message_ref":{"type":"string","description":""},"subject":{"type":"string","description":""},"priority":{"type":"string","description":""},"reason":{"type":"string","description":""},"suggested_next_step":{"type":"string","description":""},"draft_reply":{"type":"string","description":"Optional reply body; empty when no draft is appropriate."}}}},"approval_required_to_save_drafts":{"type":"boolean","description":""},"messages_sent":{"type":"integer","description":"Always zero."}}}
+description: "Triage inbox and draft replies; est. max 15 credits/run (~$0.075)."

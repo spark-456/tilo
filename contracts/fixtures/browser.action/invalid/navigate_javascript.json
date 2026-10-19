@@ -1,0 +1,4 @@
+{
+  "kind": "navigate",
+  "url": "javascript:alert(1)"
+}

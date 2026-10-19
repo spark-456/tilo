@@ -1,0 +1,8 @@
+{
+  "name": "get_world",
+  "arguments": {
+    "world_id": "w_q4_supplier_deck",
+    "artifact_id": "art_deck",
+    "version": 2
+  }
+}

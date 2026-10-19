@@ -17,6 +17,7 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | jsonschema | MIT | https://pypi.org/project/jsonschema/ |
 | referencing | MIT | https://pypi.org/project/referencing/ |
 | datamodel-code-generator (generates `packages/contracts-py`) | MIT | https://pypi.org/project/datamodel-code-generator/ |
+| hatchling (workspace members' `build-system.requires`, used to build their wheels) | MIT | https://github.com/pypa/hatch/blob/master/LICENSE.txt |
 
 ## Python (`services/api`)
 
@@ -25,6 +26,10 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | fastapi | MIT | https://pypi.org/project/fastapi/ |
 | python-multipart (`tilo-api` form uploads) | Apache-2.0 | https://pypi.org/project/python-multipart/ |
 | uvicorn | BSD-3-Clause | https://pypi.org/project/uvicorn/ |
+| google-auth (`tilo_api.schedules`: OIDC verification of the Scheduler tick, FR-AGT-14; `tilo_connectors.host_auth`: HB-01 caller check, ADR-0032 T3) | Apache-2.0 | https://pypi.org/project/google-auth/ |
+| requests (the transport google-auth fetches Google's public certs with) | Apache-2.0 | https://pypi.org/project/requests/ |
+| cryptography (`tilo_api.appcheck`: RS256 verification of App Check tokens, SEC-10; already listed under `services/connectors`, now declared by `tilo-api` itself) | Apache-2.0 OR BSD-3-Clause | https://pypi.org/project/cryptography/ |
+| google-cloud-storage (`tilo_api.run_stores`: GCS artifact blobs and the raw archive, PROD-WIRE 2b) | Apache-2.0 | https://pypi.org/project/google-cloud-storage/ |
 
 ## Python (`packages/contracts-py`)
 
@@ -38,11 +43,14 @@ CLAUDE.md's "record every dependency's licence" rule. Updated whenever a depende
 | --- | --- | --- |
 | google-adk | Apache-2.0 | https://pypi.org/project/google-adk/ |
 | google-cloud-firestore | Apache-2.0 | https://pypi.org/project/google-cloud-firestore/ |
+| tzdata (the IANA zone database for `zoneinfo`; scheduled runs, FR-AGT-14) | Apache-2.0 | https://pypi.org/project/tzdata/ |
 
 `services/harness` also uses `pyyaml`, `jsonschema` and `referencing` (already listed under the
 root dev dependency group), declared as its own direct dependencies since its code imports them
 directly rather than relying only on the shared dev group. FR-AGT-01/02/03 adds the in-workspace
-`tilo-contracts` and `tilo-providers` members (not external; no new licence).
+`tilo-contracts` and `tilo-providers` members (not external; no new licence). LW-10 adds the in-workspace
+`tilo-render` member, so `reportlab` (BSD), `python-pptx` (MIT) and `pydantic` (MIT) now install in the harness image
+too; each is already listed (under `services/render` and `packages/contracts-py`), so no new licence.
 
 ## Python (`packages/providers`)
 
@@ -51,6 +59,14 @@ declared none of its own): `tilo_providers.config` uses `pydantic` (already list
 `packages/contracts-py`, via the `tilo-contracts` workspace member it imports) and `pyyaml`
 (already listed under the root dev dependency group); both are already installed into the
 shared `uv` workspace venv by `uv sync --all-packages`.
+
+FR-MTG-11 adds one direct runtime dependency to `packages/providers/pyproject.toml`:
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| google-cloud-texttospeech (`tilo_providers.cloud_tts_adapter`, imported lazily and only for a real client; licence read from the installed 2.38.0 metadata) | Apache-2.0 | https://pypi.org/project/google-cloud-texttospeech/ |
+
+Its other dependencies (`google-api-core`, `google-auth`, `grpcio`, `proto-plus`, `protobuf`) were already in `uv.lock`.
 
 ## Python (`packages/policy`)
 
@@ -65,6 +81,14 @@ Ticket P0-05 adds two direct runtime dependencies (`packages/providers/pyproject
 | google-genai (`tilo_providers.google_adapter`, PRD 6.4/6.5) | Apache-2.0 | https://pypi.org/project/google-genai/ |
 | httpx (`tilo_providers.openai_compat_adapter`, PL-02; already a root dev dependency, above) | BSD-3-Clause | https://pypi.org/project/httpx/ |
 
+Ticket FR-INT-02 (Model Armor adapter, `tilo_providers.model_armor_adapter`) declares `google-auth[requests]` directly
+(both already installed through `google-genai`):
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| google-auth (user ADC token, `google.auth.default`) | Apache-2.0 | https://pypi.org/project/google-auth/ |
+| requests (`google.auth.transport.requests`, via the `requests` extra) | Apache-2.0 | https://pypi.org/project/requests/ |
+
 `google.genai.Client(vertexai=True, ...)` is only ever constructed under `LIVE=1`
 (`tilo_providers.factory`); dev/CI tests fake the `google.genai` import path at the
 `sys.modules` boundary and never install real credentials (EFF-01).
@@ -78,6 +102,11 @@ one runtime dependency, the IANA zone database for `zoneinfo` (Windows and slim 
 | --- | --- | --- |
 | tzdata | Apache-2.0 | https://pypi.org/project/tzdata/ |
 
+## Python (`packages/logging`)
+
+`tilo-logging` (NFR-26) uses the standard library only (no external dependency). `tilo-api` and `tilo-harness`
+now depend on the in-workspace `tilo-logging` (not external). No new licence.
+
 ## Python (`services/connectors`)
 
 `tilo-connectors` declares `jsonschema` and `referencing` as runtime dependencies (ticket ST-2 /
@@ -88,6 +117,9 @@ loader. No new licence. FR-CON-02 adds `cryptography` for AES-GCM envelope encry
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | cryptography (`tilo_connectors.tokens`, FR-CON-02) | Apache-2.0 OR BSD-3-Clause | https://pypi.org/project/cryptography/ |
+| tzdata (`tilo_connectors.calendar_sync`, FR-CAL-08: the IANA zone database `zoneinfo` needs on Windows) | Apache-2.0 | https://pypi.org/project/tzdata/ |
+| google-cloud-firestore (`tilo_connectors.host_broker`: the token and revoke-retry stores, ADR-0032 T2) | Apache-2.0 | https://pypi.org/project/google-cloud-firestore/ |
+| google-cloud-kms (`tilo_connectors.host_broker`: `CloudKms` client, ADR-0032 T2; pulls `grpc-google-iam-v1`, Apache-2.0) | Apache-2.0 | https://pypi.org/project/google-cloud-kms/ |
 
 FR-CON-10 (`tilo_connectors.provenance`) adds the in-workspace `tilo-archive` and `tilo-contracts`
 (not external). No new licence.
@@ -106,7 +138,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 
 `tilo-planning` (FR-INT-01/02) depends only on the in-workspace `tilo-contracts` and
 `tilo-providers` (not external); `tilo-api` now depends on the in-workspace `tilo-planning`, and
-(CL-INT-2) on the in-workspace `tilo-policy`, `tilo-harness` and `tilo-connectors`, and (CL-INT-5d) on the in-workspace `tilo-metering`, and (CL-INT-6) on the in-workspace `tilo-world` (the layout solver; standard library only, no external dependency), and (ADR-0018 T4, FR-AGT-02) on the in-workspace `tilo-archive` and `tilo-memory` (not external). No new licence.
+(CL-INT-2) on the in-workspace `tilo-policy`, `tilo-harness` and `tilo-connectors`, and (CL-INT-5d) on the in-workspace `tilo-metering`, and (CL-INT-6) on the in-workspace `tilo-world` (the layout solver; standard library only, no external dependency), and (ADR-0018 T4, FR-AGT-02) on the in-workspace `tilo-archive` and `tilo-memory` (not external), and (PPL-11a) on the in-workspace `tilo-people` (not external). No new licence.
 
 ## Python (`services/render`)
 
@@ -114,7 +146,10 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | --- | --- | --- |
 | python-pptx | MIT | https://pypi.org/project/python-pptx/ |
 | reportlab | BSD | https://pypi.org/project/reportlab/ |
+| openpyxl (DOCS-OUT A4: xlsx deliverables and template fill; pulls et-xmlfile, MIT) | MIT | https://pypi.org/project/openpyxl/ |
 | pypdf | BSD-3-Clause | https://pypi.org/project/pypdf/ |
+
+`tilo-providers` (LW-06) also uses `pypdf` (listed above) to count the pages of an untrusted PDF part.
 
 `tilo-render` (AGR-01/02/03 / FR-CON-09) also uses `pydantic` (already listed under `packages/contracts-py`, MIT) and `pyyaml` (already listed under the root dev dependency group, MIT).
 
@@ -123,17 +158,27 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | @biomejs/biome | MIT | https://www.npmjs.com/package/@biomejs/biome |
+| firebase (Firebase JS SDK, `apps/web` runtime dependency: `firebase/app` and `firebase/app-check` for App Check with reCAPTCHA Enterprise, SEC-10; loaded on the first API call only) | Apache-2.0 | https://www.npmjs.com/package/firebase |
+| lucide-react (Skills card icons; named imports only) | ISC | https://www.npmjs.com/package/lucide-react |
 | firebase-tools (runs the Firestore emulator for `services/harness`, P0-09; also an `apps/web` devDependency at the same pinned 15.31.0 for `just deploy-web`, P0-07c) | MIT | https://www.npmjs.com/package/firebase-tools |
 | typescript | Apache-2.0 | https://www.npmjs.com/package/typescript |
 | react, react-dom, pixi.js, vite, @vitejs/plugin-react, vitest, @types/node, @types/react, @types/react-dom | MIT | https://www.npmjs.com/ |
 | vite 6.4.x (#69, replaces 5.4.x; pulls esbuild 0.25, rollup, fdir, tinyglobby, all MIT; no licence change) | MIT | https://www.npmjs.com/package/vite |
 | @playwright/test | Apache-2.0 | https://www.npmjs.com/package/@playwright/test |
 | @axe-core/playwright | MPL-2.0 | https://www.npmjs.com/package/@axe-core/playwright |
-| @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono | MIT; fonts Nunito, Nunito Sans, JetBrains Mono are OFL-1.1 | https://fonts.google.com/ |
+| @fontsource/nunito, @fontsource/nunito-sans, @fontsource/jetbrains-mono (self-hosted fonts; each installed 5.3.0 package declares OFL-1.1 and includes `LICENSE`) | OFL-1.1 | https://github.com/fontsource/font-files |
+| @fontsource/geist-sans, @fontsource/geist-mono (UI-STUDIO-1: the Studio theme's Geist and Geist Mono, self-hosted; the installed 5.3.0 packages declare OFL-1.1 and include `LICENSE`, (C) 2023 Vercel with basement.studio) | OFL-1.1 | https://github.com/fontsource/font-files |
+| design/tilo-t (TILO-T-FOUNDATION: the Tilo T design export of 16 Oct, `tilo-studio.css`, `tilo-t.css`, `tilo-t.js` icons, `Tilo S Buddy`, `Tilo T State`, the doodle tiles; our own Claude Design export, ported as tokens, keyframes, icons, Buddy, states and a gutter in `apps/web/src/design/tilo-t/`, ADR-0003. `support.js`, Claude Design's runtime, is never ported) | Own work (not third-party) | design/tilo-t/ |
 | fast-check (property tests, ticket P0-08b-player, FR-WLD-04) | MIT | https://www.npmjs.com/package/fast-check |
 | happy-dom (DOM for React component unit tests, AGW-01; dev only) | MIT | https://www.npmjs.com/package/happy-dom |
 | ajv (JSON Schema validator for the PPL-40a plate reducer test; dev only) | MIT | https://www.npmjs.com/package/ajv |
+| pixelmatch (WEB-PARITY pixel diff of design vs ours; dev/test only) | ISC | https://www.npmjs.com/package/pixelmatch |
+| pngjs (WEB-PARITY PNG decode/encode; dev/test only) | MIT | https://www.npmjs.com/package/pngjs |
+| @types/pngjs (types for pngjs; dev only) | MIT | https://www.npmjs.com/package/@types/pngjs |
 | @tilo/contracts (`packages/contracts-ts`, internal workspace package, not third-party) | n/a | `packages/contracts-ts` |
+| simple-icons (Connectors page brand SVG paths) | CC0-1.0 package; individual brand marks may carry separate rights | https://github.com/simple-icons/simple-icons/blob/develop/LICENSE.md |
+
+Connector marks identify the corresponding services only (nominative use); their owners retain their trademarks.
 
 ## JavaScript / TypeScript (`packages/contracts-ts` devDependencies)
 
@@ -149,6 +194,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | uv | MIT / Apache-2.0 | https://github.com/astral-sh/uv |
 | just | CC0-1.0 | https://github.com/casey/just |
 | pnpm | MIT | https://github.com/pnpm/pnpm |
+| Eclipse Temurin 21 JRE (`eclipse-temurin:21-jre-jammy`, test-only Firestore emulator runtime in Cloud Build) | GPL-2.0 with Classpath Exception | https://adoptium.net/docs/faq |
 | Biome | MIT | https://github.com/biomejs/biome |
 | Terraform | BUSL-1.1 (HashiCorp; run only by the user per CLAUDE.md, never `terraform apply` from an agent) | https://github.com/hashicorp/terraform |
 | pip-audit | Apache-2.0 | https://github.com/pypa/pip-audit |
@@ -193,10 +239,81 @@ Pinned in `cloudbuild.yaml`. They run only inside Google Cloud Build; nothing fr
 
 ## Fonts, icons and design assets
 
-None vendored yet. `design/source/` is read-only reference material, not a dependency; its
+The web app imports self-hosted Nunito, Nunito Sans and JetBrains Mono from the Fontsource packages
+listed above (`apps/web/src/park/tokens/fonts.ts` and `apps/web/src/main.tsx`), and Geist and Geist Mono for the
+Studio theme (`apps/web/src/park/studio/fonts.ts`); their font files ship
+with the web build. `design/source/` is read-only reference material, not a dependency; its
 licence terms are tracked in `design/source/INDEX.md`, not here.
+
+## Meeting bot: Python, browser image and operating-system tools
+
+`meet-bot/pyproject.toml` is standalone, outside the root uv workspace. Its host CLI is stdlib-only;
+the two Dockerfiles install `meet-bot/docker/requirements.txt`, and `CloudRun.Dockerfile` also installs
+`cloud-requirements.txt`. Those files reuse the provider/API dependencies recorded above; their
+direct pins track `uv.lock`, except Playwright, which matches the browser-image tag.
+
+| Component | Licence | Source |
+| --- | --- | --- |
+| playwright Python package (1.52.0; bot dev extra and both images) | Apache-2.0 | https://github.com/microsoft/playwright-python/blob/v1.52.0/LICENSE |
+| mcr.microsoft.com/playwright/python:v1.52.0-noble (both bot base images) | Apache-2.0 (Playwright); bundled browsers and Ubuntu packages retain their own licences | https://github.com/microsoft/playwright-python/tree/v1.52.0/utils/docker |
+| xvfb (both images) | X/MIT and other permissive X.Org component licences; see upstream notices | https://github.com/mirror/xserver/blob/master/COPYING |
+| pulseaudio, pulseaudio-utils (both images) | LGPL-2.1-or-later core; component exceptions apply | https://www.freedesktop.org/wiki/Software/PulseAudio/About/ |
+| fonts-noto-color-emoji (both images) | OFL-1.1 (font files) | https://github.com/googlefonts/noto-emoji/blob/main/LICENSE |
+| x11vnc (local desktop image) | GPL-2.0-or-later with OpenSSL linking exception | https://github.com/LibVNC/x11vnc/blob/master/src/x11vnc.h |
+| novnc (local desktop image) | MPL-2.0 core; BSD-2-Clause HTML/CSS, OFL-1.1 font, CC-BY-SA-3.0 images and other component notices | https://github.com/novnc/noVNC/blob/master/LICENSE.txt |
+| websockify (local desktop image) | LGPL-3.0 | https://github.com/novnc/websockify/blob/master/COPYING |
+| openbox (local desktop image) | GPL-2.0-or-later | https://github.com/danakj/openbox/blob/main/openbox/openbox.c |
+| procps (local desktop image) | GPL-2.0-or-later utilities; LGPL library components | https://github.com/procps-ng/procps |
+| espeak-ng (local desktop image; `bot/tts.py` invokes the executable) | GPL-3.0-or-later | https://github.com/espeak-ng/espeak-ng#license-information |
+
+The Cloud Run image omits the local remote-desktop tools and espeak-ng. Apt package versions and
+Python transitive dependencies are not pinned by these bot requirement files (BQ-MTG11-9); this
+ledger records declared components, not an image-specific SBOM or a redistribution clearance.
+Exact installed package notices belong to the built image (`/usr/share/doc/<package>/copyright`).
 
 ## Python (`packages/memory`)
 
 `tilo-memory` declares `jsonschema` and `referencing` as runtime dependencies (FR-MEM-06 artifact store),
 both already listed above (MIT). No new licence.
+
+## Python (`evals`)
+
+`tilo-evals` (LW-16) now depends on the in-workspace `tilo-browser` and `tilo-sandbox-web` (not external): the web-research replay case runs tilo-browser's fetch service over the sandbox-web fixtures in process. No new licence.
+## Python (`packages/redact`)
+
+`tilo-redact` (FR-MEM-05, SEC-14: the shared secret redactor) is in-workspace and has no external runtime
+dependency (standard library only). `tilo-providers` and `tilo-api` depend on it. No new licence.
+
+## Python (`services/channels`, FR-CHN-17b web push sender)
+
+`tilo-channels` declares `pywebpush` (VAPID signing and RFC 8291 payload encryption for the production
+`PushSender`; imported lazily, constructed only on Cloud Run with the mounted VAPID secret). Its tree:
+
+| Package | Licence | Source |
+| --- | --- | --- |
+| pywebpush | MPL-2.0 | https://pypi.org/project/pywebpush/ |
+| py-vapid | MPL-2.0 | https://pypi.org/project/py-vapid/ |
+| http-ece | MIT | https://pypi.org/project/http-ece/ |
+| aiohttp | Apache-2.0 AND MIT | https://pypi.org/project/aiohttp/ |
+| aiohappyeyeballs | PSF-2.0 | https://pypi.org/project/aiohappyeyeballs/ |
+| aiosignal, frozenlist, multidict, propcache, yarl | Apache-2.0 | https://pypi.org/project/aiohttp/ (its dependencies) |
+
+MPL-2.0 is file-level copyleft: Tilo ships these packages unmodified and does not copy their files, so no Tilo
+source is affected.
+
+## Park structural accessibility tests (M2-A11Y-1)
+
+| Dependency | Licence | Source |
+| --- | --- | --- |
+| axe-core | MPL-2.0 | https://github.com/dequelabs/axe-core |
+| jsdom | MIT | https://github.com/jsdom/jsdom |
+| @types/jsdom | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/jsdom |
+
+## Park connector and skill artwork (CX-LOGOS-2)
+
+| Bundled files | Licence | Pinned source |
+| --- | --- | --- |
+| `apps/web/public/park/brands/*.svg` (Gmail, Google Calendar, Google Drive, Slack, Notion, Lovable, GitHub, HubSpot, Jira, Stripe, Xero, Google Meet and Microsoft) | CC0-1.0; brand names and marks remain the respective owners' trademarks | [gilbarbara/logos](https://github.com/gilbarbara/logos/tree/4a5b550414be64d5c007574cd395d910d50e8950/logos), [licence](https://github.com/gilbarbara/logos/blob/4a5b550414be64d5c007574cd395d910d50e8950/LICENSE.txt) |
+| `apps/web/public/park/skills/*.svg` (Calendar, Envelope, Magnifying glass, Clipboard, Globe, Bar chart, Memo, People and Laptop, Color/Flat variants) | MIT, copyright Microsoft Corporation; full notice in `apps/web/public/park/skills/LICENSE.txt` | [microsoft/fluentui-emoji](https://github.com/microsoft/fluentui-emoji/tree/1ffb34c752ecf5d402f04cfb4b392c77f57c54bc/assets), [licence](https://github.com/microsoft/fluentui-emoji/blob/1ffb34c752ecf5d402f04cfb4b392c77f57c54bc/LICENSE) |
+
+Google Docs, Sheets and Slides use the already listed Simple Icons CC0 marks in their brand colours because the selected full-colour set has no matching SVG. Canva keeps its existing monogram because neither of the selected sets contains a mark. The images are local and requested only when their card is visible.

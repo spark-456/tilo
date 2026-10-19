@@ -26,6 +26,13 @@ export function setReplayPoint(worldId: string, seq: number | null): void {
   for (const listener of [...listeners]) listener();
 }
 
+/** Clears every world's replay scrub point back to the latest (FR-WLD-12 demo reset). */
+export function clearReplayPoints(): void {
+  if (points.size === 0) return;
+  points.clear();
+  for (const listener of [...listeners]) listener();
+}
+
 /** The seq a stop stands for: 0 for the start, else the seq of the event it follows. */
 export function indexToPoint(events: readonly Event[], index: number): number {
   return index <= 0 ? 0 : (events[Math.min(index, events.length) - 1]?.seq ?? 0);

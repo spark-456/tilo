@@ -6,11 +6,12 @@ tests and the round 1 file stay as they are; this file only adds."""
 from __future__ import annotations
 
 import pytest
-from _chn11_lib import USER, autopilot_module, make_bench, pair, scripted_thread
+from _chn11_lib import EXTRA_NAMES, EXTRA_WORDS, USER, VOUCHED, autopilot_module, make_bench, pair, scripted_thread
 
 
-def signal(body: str) -> frozenset[str]:
-    return autopilot_module().t3_content_signal(body)
+def signal(body: str, names: frozenset[str] = VOUCHED) -> frozenset[str]:
+    # CHN-GATE-E: a name rides L2 only when the thread vouches for it; the bench thread vouches for VOUCHED.
+    return autopilot_module().t3_content_signal(body, names=names)
 
 
 def never_auto_sent(body: str) -> None:
@@ -24,9 +25,9 @@ def never_auto_sent(body: str) -> None:
     assert bench.outbox.entries == {}, "T3 is never scheduled without a person"
 
 
-def auto_sent(body: str) -> None:
+def auto_sent(body: str, names: tuple[str, ...] = EXTRA_NAMES) -> None:
     bench = make_bench("L2")
-    thread = scripted_thread(bench)
+    thread = scripted_thread(bench, names=names)
     card = bench.ap.preview(USER, *pair(thread, body))
     assert card.tier == "T2" and card.modifiers == (), f"harmless reply made T3: {body!r}"
     assert (card.level, card.undo_window_s) == ("L2", 60) and card.outbox_id is not None
@@ -81,5 +82,5 @@ def test_CHN_GATE_C_R2_FR_CHN_11_list_only_promises_never_ride_l2(text: str) -> 
 @pytest.mark.parametrize("body", CONTROLS)
 def test_CHN_GATE_C_R2_FR_CHN_11_greeting_signature_and_repeated_names_still_ride_l2(body: str) -> None:
     assert len(body) <= 2_000
-    assert signal(body) == frozenset()
+    assert signal(body, VOUCHED | EXTRA_WORDS) == frozenset()
     auto_sent(body)

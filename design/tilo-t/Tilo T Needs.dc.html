@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-t.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" data-screen-label="Needs you" style="position:relative;width:100%;height:{{ H }};overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:15px;line-height:1.5;display:flex;flex-direction:column">
+  <dc-import name="Tilo T Nav" active="needs" device="{{ navD }}" needs="{{ nN }}" theme="{{ theme }}" hint-size="100%,64px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <div aria-hidden="true" style="flex:1 1 0;min-width:0;background-image:var(--doodle);background-size:280px 280px"></div>
+    <main style="flex:0 1 1200px;min-width:0;box-sizing:border-box;padding:{{ pad }};display:flex;flex-direction:column;gap:16px;overflow:hidden">
+      <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;flex:none">
+        <div style="flex:1;min-width:220px;display:flex;flex-direction:column"><h1 style="margin:0;font-weight:700;font-size:{{ h1 }};letter-spacing:-1.2px;line-height:1.05">Needs you</h1><span style="color:var(--ink2);font-size:14px">{{ sub }}</span></div>
+        <div role="tablist" style="display:flex;padding:3px;border-radius:12px;background:var(--sunk);overflow:hidden;max-width:100%"><sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4"><span role="tab" aria-selected="{{ t.on }}" style="height:38px;padding:0 12px;border-radius:9px;display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;background:{{ t.bg }};color:{{ t.fg }};white-space:nowrap">{{ t.t }}<span style="font-size:12px;color:var(--ink3)">{{ t.n }}</span></span></sc-for></div>
+      </div>
+      <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T State" kind="loading" layout="list" caption="Checking what needs you" hint-size="100%,520px"></dc-import></sc-if>
+      <sc-if value="{{ error }}" hint-placeholder-val="{{ false }}"><div style="border-radius:24px;background:var(--card);border:1px solid var(--line);flex:none"><dc-import name="Tilo T State" kind="error" title="Couldn’t load your approvals" body="Nothing was sent, bought or booked while this page was down. Tilo keeps waiting for you." cta="Try again" code="approvals.list · timeout · 9:31 am" hint-size="100%,400px"></dc-import></div></sc-if>
+      <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}"><div style="border-radius:24px;background:var(--card);border:1px dashed var(--line2);flex:none"><dc-import name="Tilo T State" kind="empty" mood="happy" title="Nothing needs you" body="Tilo asks here before it sends, buys, books or shares anything. You’re all caught up." cta="See what Tilo may do alone" cta2="Back to Home" hint-size="100%,420px"></dc-import></div></sc-if>
+      <sc-if value="{{ ok }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;flex:none">
+          <div style="flex:3 1 560px;min-width:0;display:flex;flex-direction:column;gap:14px">
+            <sc-for list="{{ cards }}" as="c" hint-placeholder-count="2">
+              <article style="border-radius:24px;background:var(--card);border:1px solid {{ c.bd }};padding:{{ cpad }};display:flex;flex-direction:column;gap:14px;animation:{{ c.anim }}">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                  <span style="width:36px;height:36px;border-radius:10px;background:var(--sunk);display:flex;align-items:flex-end;justify-content:center;overflow:clip;flex:none"><dc-import name="Tilo S Buddy" role="{{ c.role }}" mood="hand" size="32" hint-size="27px,32px"></dc-import></span>
+                  <span style="flex:1;min-width:160px;display:flex;flex-direction:column;line-height:1.3"><span style="font-size:13px;font-weight:700">{{ c.who }} <span style="color:var(--ink3);font-weight:500">in</span> <a href="#world" style="text-decoration:underline;text-underline-offset:3px">{{ c.world }}</a></span><span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">{{ c.ev }}</span></span>
+                  <span style="height:28px;padding:0 10px;border-radius:99px;background:{{ c.rbg }};color:{{ c.rfg }};font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:9px;background:{{ c.rdot }}"></span>{{ c.risk }}</span>
+                </div>
+                <h2 style="margin:0;font-weight:700;font-size:{{ h2 }};letter-spacing:-.5px;line-height:1.2;text-wrap:balance">{{ c.q }}</h2>
+                <div style="border-radius:16px;border:1px solid var(--line);background:var(--bg);overflow:clip">
+                  <sc-for list="{{ c.rows }}" as="r" hint-placeholder-count="2"><div style="display:flex;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:14px;align-items:baseline"><span style="width:64px;flex:none;font-size:12px;font-weight:600;color:var(--ink3)">{{ r.k }}</span><span style="flex:1;min-width:0;line-height:1.45">{{ r.v }}</span></div></sc-for>
+                  <sc-if value="{{ c.chips }}"><div style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px"><sc-for list="{{ c.chips }}" as="x" hint-placeholder-count="4"><span style="height:28px;padding:0 10px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:12.5px;font-weight:600;display:flex;align-items:center">{{ x }}</span></sc-for></div></sc-if>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;font-size:13.5px">
+                  <span style="display:flex;gap:8px;line-height:1.45"><span style="font-weight:700;flex:none">Why:</span><span style="color:var(--ink2)">{{ c.why }}</span></span>
+                  <span style="display:flex;gap:8px;line-height:1.45"><span style="font-weight:700;flex:none">Risk:</span><span style="color:var(--ink2)">{{ c.riskWhy }}</span></span>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                  <span role="button" style="height:48px;padding:0 20px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;flex:1 1 auto;justify-content:center;max-width:280px">{{ iCheck }}{{ c.yes }}</span>
+                  <span role="button" style="height:48px;padding:0 18px;border-radius:14px;border:1px solid var(--line2);display:flex;align-items:center;gap:8px;font-weight:600">{{ iPen }}Edit</span>
+                  <span role="button" style="height:48px;padding:0 16px;border-radius:14px;display:flex;align-items:center;font-weight:600;color:var(--redInk)">Decline</span>
+                  <span style="margin-left:auto;font-size:12.5px;color:var(--ink3)">{{ c.cost }}</span>
+                </div>
+              </article>
+            </sc-for>
+          </div>
+          <aside style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:12px">
+            <div style="border-radius:22px;background:var(--card);border:1px solid var(--line);padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+              <span style="font-weight:700;font-size:15px">Recently decided</span>
+              <sc-for list="{{ past }}" as="x" hint-placeholder-count="3"><div style="display:flex;gap:10px;align-items:center;font-size:13px"><span style="width:26px;height:26px;border-radius:99px;background:{{ x.bg }};color:{{ x.fg }};display:flex;align-items:center;justify-content:center;flex:none">{{ x.ic }}</span><span style="flex:1;min-width:0;line-height:1.35">{{ x.t }}<br><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3)">{{ x.m }}</span></span></div></sc-for>
+            </div>
+            <div style="border-radius:22px;background:var(--sunk);padding:14px 16px;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--ink2)"><span style="font-weight:700;color:var(--ink);display:flex;gap:6px;align-items:center">{{ iShield }}What Tilo always asks about</span>Sending to people · spending money · booking · sharing outside your team · deleting anything.<a href="#" style="font-weight:700;color:var(--ink)">Change your rules →</a></div>
+          </aside>
+        </div>
+      </sc-if>
+    </main>
+    <div aria-hidden="true" style="flex:1 1 0;min-width:0;background-image:var(--doodle);background-size:280px 280px;background-position:140px 60px"></div>
+  </div>
+  <sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T Nav" active="needs" device="tabs" needs="{{ nN }}" theme="{{ theme }}" hint-size="100%,84px"></dc-import></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ready&quot;,&quot;running&quot;,&quot;loading&quot;,&quot;empty&quot;,&quot;error&quot;],&quot;default&quot;:&quot;ready&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloT) this.t = setInterval(() => { if (window.TiloT) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const T = window.TiloT, ic = (n, s) => T ? T.ic(React.createElement, n, s) : null;
+    const p = this.props, d = (p.device ?? 'desktop') === 'desktop', s = p.state ?? 'ready', run = s === 'running';
+    const RK = { low: ['Low risk', 'var(--mintSoft)', 'var(--mintInk)', 'var(--mint)'], med: ['Medium risk', 'var(--amberSoft)', 'var(--amberInk)', 'var(--amber)'], high: ['High risk', 'var(--redSoft)', 'var(--redInk)', 'var(--red)'] };
+    const C = [
+      ['connector', 'Messenger', 'Team offsite in Porto', run ? 'approval.requested · just now' : 'approval.requested · 4:09 pm', 'med', 'Send the invite email to 12 people from your Gmail?', [['From', 'maya@raostudio.co'], ['Subject', 'Porto, 14–16 May: you’re in'], ['Message', 'Hi all, we’re off to Porto. Flights are held until Friday, rooms are at Casa do Rio, and Saturday morning is yours…']], ['Jo Park', 'Oskar Berg', 'Sam Ade', 'Lin Chen', '+ 8 more'], 'You asked for invites once flights were held. They are now.', 'People will see it straight away, and email can’t be unsent.', 'Yes, send 12 emails', '1 credit'],
+      ['finance', 'Money keeper', 'Team offsite in Porto', 'approval.requested · 4:11 pm', 'low', 'Hold 12 rooms at Casa do Rio for €4,032?', [['Amount', '€4,032 on the team card ending 4417'], ['Terms', 'Free to cancel until 1 May. Breakfast included.']], null, 'It’s the venue you picked, and holding now keeps the €168 rate.', 'Low: fully refundable until 1 May, inside your €16,000 budget.', 'Yes, hold the rooms', '2 credits'],
+      ['designer', 'Writer', 'Q3 deck', 'approval.requested · 2:40 pm', 'high', 'Share the Q3 deck with lin@partner.co?', [['Who', 'Lin Chen, outside Team Rao'], ['What', 'Q3 deck, 9 slides, including revenue numbers']], null, 'Jo asked Tilo to “send Lin the deck”.', 'Someone outside your team gets a copy with revenue figures in it.', 'Yes, share it', '0 credits']
+    ];
+    return {
+      theme: p.theme ?? 'studio', phone: !d, navD: d ? 'desktop' : 'phone', H: d ? '900px' : '844px', pad: d ? '24px 32px' : '14px 14px 110px', h1: d ? '40px' : '30px', h2: d ? '22px' : '19px', cpad: d ? '18px 20px' : '14px',
+      nN: s === 'empty' ? 0 : 3, sub: s === 'empty' ? 'All caught up' : '3 waiting · oldest from 2:40 pm · nothing happens until you decide',
+      loading: s === 'loading', error: s === 'error', empty: s === 'empty', ok: s === 'ready' || run,
+      tabs: [['All', '3'], ['Sending', '1'], ['Spending', '1'], ['Sharing', '1']].map(([t, n], i) => ({ t, n, on: i === 0 ? 'true' : 'false', bg: i === 0 ? 'var(--card)' : 'transparent', fg: i === 0 ? 'var(--ink)' : 'var(--ink2)' })),
+      cards: C.map(([role, who, world, ev, rk, q, rows, chips, why, riskWhy, yes, cost], k) => ({ role, who, world, ev, q, why, riskWhy, yes, cost, rows: rows.map(([kk, v]) => ({ k: kk, v })), chips, risk: RK[rk][0], rbg: RK[rk][1], rfg: RK[rk][2], rdot: RK[rk][3], bd: k === 0 && run ? 'var(--amber)' : 'var(--line)', anim: k === 0 && run ? 'tSlideUp .42s cubic-bezier(.2,.8,.2,1) both, tPulse 1.4s ease-out .5s 2' : 'none' })).slice(0, d ? 3 : 2),
+      past: [['Approved: email 3 suppliers for a price', 'approval.resolved · Mon · Maya', 'check', 'mint'], ['Declined: book the 7 am flight', 'approval.resolved · Sun · Maya', 'x', 'red'], ['Edited then sent: reply to Lin', 'approval.resolved · Fri · Jo', 'pen', 'sky']].map(([t, m, i, c]) => ({ t, m, ic: ic(i, 14), bg: `var(--${c}Soft)`, fg: `var(--${c}Ink)` })),
+      iCheck: ic('check', 18), iPen: ic('pen', 16), iShield: ic('shield', 16)
+    };
+  }
+}
+</script>
+</body>
+</html>

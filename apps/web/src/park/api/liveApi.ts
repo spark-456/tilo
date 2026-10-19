@@ -1,0 +1,563 @@
+// The live Api (WEB-1a, WIRE-1..3, FR-UX-13): `startWorld` makes the real intake call; `getLedger` reads `GET {base}/costs`, `getWorlds` walks `GET {base}/worlds`
+// pages, `getDecisions` walks `GET {base}/cards` pages and `decide` answers one card with one POST (the
+// person's tap, never a retry). Connectors, notifications, Team and Agenda read live endpoints.
+// Profile defaults and preferences are in-memory page choices; other methods are NotBuilt and
+// fetches nothing. With no base url nothing is fetched at all. It never imports the fixtures, so sample
+// numbers cannot pass as live (HR-1..HR-7). Failures are the shared `TiloApiError` (src/api/http.ts).
+import type { IntakeResult } from "../../api/client";
+export { peopleListsApi } from "./live/peopleLists";
+import { HttpClient, type QuickIntakeResult, TiloApiError, reasonOf } from "../../api/http";
+import { isSampleHidden, wantsSample } from "../sample/sampleChoice";
+import { coalesce } from "./coalesce";
+import { API_METHODS, type Api, type ApiMethod } from "./index";
+import { agendaFromPlate, emptyAgenda } from "./live/agendaFromPlate";
+import { connectorsFromList } from "./live/connectorsFromList";
+import {
+  type CardFeedItem,
+  answerOption,
+  decisionKey,
+  decisionsFromCards,
+  needsFields,
+} from "./live/decisionsFromCards";
+import { type CostReport, ledgerFromCosts } from "./live/ledgerFromCosts";
+import { notificationsFromFeed } from "./live/notificationsFromFeed";
+import { profileDefaults } from "./live/profileDefaults";
+import {
+  captureOfBody,
+  isLearnBody,
+  isSkillRow,
+  saveBody,
+  skillFromRow,
+  skillsOfBody,
+  versionOfBody,
+  withSkillCatalog,
+} from "./live/skillsFromApi";
+import { teamFromPeople } from "./live/teamFromPeople";
+import { type TeamView, isTeamView, requestOf } from "./live/teamLive";
+import { isUserSettings } from "./live/userSettings";
+import { worldFromIntake } from "./live/worldFromIntake";
+import { STATE_OF, type WorldListItem, worldsFromList } from "./live/worldsFromList";
+import { nameInitials } from "./nameInitials";
+import { installOneStep, oneStepOver } from "./oneStep";
+import { installQuizReader } from "./quizApps";
+import { installResultReader } from "./results";
+import { installTeamsTransport } from "./selfServeTeams";
+import { installSkillFixer } from "./skillFixes";
+import type { Dec, DecisionKey, Effort, QuickReply, TierKey, Today, User } from "./types";
+
+export class NotBuilt extends Error {
+  readonly code = "not_built";
+  constructor(method: ApiMethod) {
+    super(`${method} is not connected yet`);
+    this.name = "NotBuilt";
+  }
+}
+
+export interface LiveApiOptions {
+  /** The API origin; trailing slashes are trimmed. Without it, every method is NotBuilt. */
+  baseUrl?: string;
+  fetch?: typeof fetch;
+  /** SEC-10: the App Check token getter; the Park pages' requests carry `X-Firebase-AppCheck` like the rest of the app. */
+  appCheckToken?: (() => Promise<string | null>) | undefined;
+  /** SEC-15: the Firebase ID token getter; every Park request carries `Authorization: Bearer` like the rest of the app. */
+  authToken?: (() => Promise<string | null>) | undefined;
+}
+
+export interface Identity {
+  name: string | null;
+  email: string | null;
+}
+
+const titleCase = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1);
+
+/** The signed-in person as the Home greeting needs them: nothing but what the sign-in session holds. */
+export function userOf(who: Identity): User | null {
+  const email = who.email?.trim() ?? "";
+  const name =
+    who.name?.trim() ||
+    email
+      .split("@")[0]
+      ?.replace(/[._-]+/g, " ")
+      .trim() ||
+    "";
+  if (!name) return null;
+  const words = name.split(/\s+/).map(titleCase);
+  const first = words[0] ?? name;
+  const initials = nameInitials(name);
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+  return {
+    first,
+    name: who.name?.trim() || words.join(" "),
+    initials,
+    email,
+    title: "",
+    org: "",
+    plan: "",
+    tz,
+    lang: "",
+    hours: "",
+  };
+}
+
+/** Today from the clock: a date is true wherever it comes from. */
+export function todayOf(d: Date): Today {
+  const part = (o: Intl.DateTimeFormatOptions): string =>
+    new Intl.DateTimeFormat("en-GB", o).format(d);
+  return {
+    long: part({ weekday: "long", day: "numeric", month: "long" }).replace(",", ""),
+    short: part({ weekday: "short", day: "numeric", month: "short" }).replace(",", ""),
+    time: part({ hour: "2-digit", minute: "2-digit", hour12: false }),
+  };
+}
+
+const BAD_REPLY = "Tilo sent a reply this page could not read.";
+
+/** One Quick ask (`mode=quick`): the server's answer or offer read strictly into a Park `QuickReply`. */
+async function quickAsk(
+  http: HttpClient,
+  query: string,
+  refs: readonly import("../../api/skillRoute").SkillRef[] = [],
+): Promise<{ data: QuickReply; source: "live" }> {
+  let r: QuickIntakeResult;
+  try {
+    r = (await http.submitIntake(query, [], "quick", refs)) as QuickIntakeResult;
+  } catch (e) {
+    if (e instanceof TiloApiError) throw e;
+    throw new TiloApiError(BAD_REPLY, 200, true, true);
+  }
+  return { data: r, source: "live" };
+}
+
+const isRows = (v: unknown): boolean =>
+  Array.isArray(v) && v.every((r) => typeof r?.usd === "number");
+
+const isHistory = (v: unknown): boolean =>
+  Array.isArray(v) &&
+  v.every(
+    (e) =>
+      e &&
+      typeof e === "object" &&
+      ["world_id", "run_id", "card_id", "summary", "ts"].every((k) => typeof e[k] === "string") &&
+      ["approval.requested", "approval.resolved"].includes(e.type) &&
+      /(?:Z|[+-]\d{2}:\d{2})$/.test(e.ts) &&
+      Number.isFinite(Date.parse(e.ts)),
+  );
+const isWaits = (v: unknown): boolean =>
+  Array.isArray(v) &&
+  v.every(
+    (w) =>
+      w &&
+      typeof w === "object" &&
+      typeof w.action_type === "string" &&
+      typeof w.seconds === "number" &&
+      Number.isFinite(w.seconds) &&
+      w.seconds >= 0,
+  );
+
+/** A body that is not a cost report is an unreadable reply, never a Ledger. */
+function isCostReport(v: unknown): v is CostReport {
+  const r = v as Partial<Record<keyof CostReport, unknown>> | null;
+  const totals = r?.totals as { usd?: unknown } | null | undefined;
+  return (
+    typeof totals === "object" &&
+    totals !== null &&
+    typeof totals.usd === "number" &&
+    isRows(r?.by_profile) &&
+    isRows(r?.by_task_type) &&
+    (r?.approval_waits === undefined || isWaits(r.approval_waits)) &&
+    (r?.activity === undefined || isHistory(r.activity)) &&
+    (r?.tasks === undefined ||
+      (Array.isArray(r.tasks) &&
+        r.tasks.every(
+          (t) =>
+            t !== null &&
+            typeof t === "object" &&
+            typeof t.run_id === "string" &&
+            typeof t.usd === "number" &&
+            Number.isFinite(t.usd) &&
+            t.usd >= 0 &&
+            typeof t.completed === "boolean",
+        )))
+  );
+}
+
+/** At most 1,000 worlds, the newest (BQ-WIRE2-5): a server that never ends the walk cannot hang the page. */
+const MAX_PAGES = 10;
+
+const isItem = (v: unknown): v is WorldListItem => {
+  const i = v as Partial<Record<keyof WorldListItem, unknown>> | null;
+  return (
+    typeof i === "object" &&
+    i !== null &&
+    typeof i.world_id === "string" &&
+    typeof i.status === "string" &&
+    Object.hasOwn(STATE_OF, i.status) &&
+    (i.title === null || typeof i.title === "string") &&
+    (i.created_at === null || typeof i.created_at === "string")
+  );
+};
+
+/** A body that is not a world list page is an unreadable reply, never worlds (an unknown status too, HR-5). */
+function isWorldPage(v: unknown): v is { worlds: WorldListItem[]; next_cursor: string | null } {
+  const p = v as { worlds?: unknown; next_cursor?: unknown } | null;
+  return (
+    typeof p === "object" &&
+    p !== null &&
+    Array.isArray(p.worlds) &&
+    p.worlds.every(isItem) &&
+    (p.next_cursor === null || typeof p.next_cursor === "string")
+  );
+}
+
+const KINDS = new Set(["needs_you", "meeting", "gate", "consent"]);
+const isText = (v: unknown): v is string => typeof v === "string";
+const isTexts = (v: unknown): boolean => Array.isArray(v) && v.every(isText);
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+
+/** A card the Api can show and answer: its kind, words and options are read, the option a tap sends exists, the
+ * gate's exact action and recipients (or the consent scopes) the person sees are there, and it matches its wrapper. */
+function isFeedItem(v: unknown): v is CardFeedItem {
+  if (!isObject(v) || !isText(v.world_id) || !isText(v.card_id) || !isObject(v.card)) return false;
+  const c = v.card as Record<string, unknown>;
+  const gate = c.gate as { action?: { exact?: unknown }; recipients?: unknown } | null;
+  const consent = c.consent as { scopes?: unknown } | null;
+  return (
+    c.world_id === v.world_id &&
+    c.id === v.card_id &&
+    isText(c.kind) &&
+    KINDS.has(c.kind) &&
+    isText(c.what_happened) &&
+    isText(c.why_it_matters) &&
+    Array.isArray(c.options) &&
+    c.options.every((o) => isObject(o) && isText(o.id) && isText(o.label)) &&
+    (c.kind !== "gate" || (isText(gate?.action?.exact) && isTexts(gate?.recipients))) &&
+    (c.kind !== "consent" || isTexts(consent?.scopes)) &&
+    answerOption(c as unknown as CardFeedItem["card"]) !== null
+  );
+}
+
+/** A body that is not a card feed page is an unreadable reply, never decisions. */
+function isCardPage(v: unknown): v is { cards: CardFeedItem[]; next_cursor: string | null } {
+  const p = v as { cards?: unknown; next_cursor?: unknown } | null;
+  return (
+    isObject(p) &&
+    Array.isArray(p.cards) &&
+    p.cards.every(isFeedItem) &&
+    (p.next_cursor === null || isText(p.next_cursor))
+  );
+}
+
+/** How `decide` finds its card again: only keys this Api served (BQ-WIRE3-1). */
+interface Answerable {
+  path: string;
+  option: string;
+  question: boolean;
+}
+
+export function createLiveApi(options: LiveApiOptions = {}): Api {
+  const stubs = API_METHODS.map((m) => [m, () => Promise.reject(new NotBuilt(m))]);
+  const api = Object.fromEntries(stubs) as unknown as Api;
+  const baseUrl = options.baseUrl?.trim();
+  if (!baseUrl) return api;
+  const prefs = new Map<string, unknown>();
+  api.setPref = async (key, value) => {
+    prefs.set(key, structuredClone(value));
+    return { data: { ok: true }, source: "live" };
+  };
+  api.getProfileSettings = async () => {
+    const data = profileDefaults();
+    const quiet = prefs.get("quiet");
+    if (typeof quiet === "boolean") data.quiet.on = quiet;
+    return { data, source: "live" };
+  };
+  const http = new HttpClient({
+    baseUrl,
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+    ...(options.appCheckToken ? { appCheckToken: options.appCheckToken } : {}),
+    ...(options.authToken ? { authToken: options.authToken } : {}),
+  });
+  installSkillFixer(api, async (id, body) => {
+    const row = await http.postJson(`/v1/skills/${encodeURIComponent(id)}/fixes`, body);
+    if (!isSkillRow(row) || row.id !== id || row.version !== body.from_version + 1)
+      throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return skillFromRow(row);
+  });
+  installResultReader(api, (world, artifact) =>
+    http.getBlob(
+      `/worlds/${encodeURIComponent(world)}/result${artifact ? `?artifact=${encodeURIComponent(artifact)}` : ""}`,
+    ),
+  );
+  installTeamsTransport(http); // SELF-SERVE-TEAMS: the Team page's own-teams panel
+  installQuizReader(api, async (world, artifact) => {
+    const raw = await http.getJson(
+      `/worlds/${encodeURIComponent(world)}/apps/${encodeURIComponent(artifact)}`,
+    );
+    if (
+      !isObject(raw) ||
+      !("spec" in raw) ||
+      !isObject(raw.publishers) ||
+      !Object.values(raw.publishers).every((p) => typeof p === "string" && p.length <= 253)
+    ) {
+      throw new TiloApiError(BAD_REPLY, 200, true);
+    }
+    return { spec: raw.spec, publishers: raw.publishers as Record<string, string> };
+  });
+  // FR-SET-01/02: the signed-in person's own document (the server derives owner and org from the token). A save is
+  // one PUT, never retried; only the stored document the server answers with is `live`.
+  api.getUserSettings = async () => {
+    const body = await http.getJson("/v1/me/settings");
+    if (!isUserSettings(body)) throw new TiloApiError(BAD_REPLY, 200, true);
+    return { data: body, source: "live" };
+  };
+  api.saveUserSettings = async (update) => {
+    const body = await http.putJson("/v1/me/settings", update);
+    if (!isUserSettings(body)) throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return { data: body, source: "live" };
+  };
+  api.getLedger = async () => {
+    const report = await http.getJson("/costs");
+    if (!isCostReport(report)) throw new TiloApiError(BAD_REPLY, 200, true);
+    return { data: ledgerFromCosts(report), source: "live" };
+  };
+  api.getConnectors = async () => {
+    const data = connectorsFromList(await http.getJson("/v1/connectors"));
+    if (data === null) throw new TiloApiError(BAD_REPLY, 200, true);
+    return { data, source: "live" };
+  };
+  api.getNotifications = async () => ({
+    data: notificationsFromFeed(await http.getJson("/v1/notifications?limit=100")),
+    source: "live",
+  });
+  api.getTeam = async () => {
+    try {
+      const data = teamFromPeople(await http.getJson("/v1/people"));
+      if (!data) throw new TiloApiError(BAD_REPLY, 200, true);
+      return { data, source: "live" };
+    } catch (error) {
+      if (error instanceof TiloApiError && error.status === 404)
+        return {
+          data: { setupRequired: true, people: [], rules: [], matrix: [], roles: [], coverage: [] },
+          source: "live",
+        };
+      throw error;
+    }
+  };
+  api.getAgenda = async () => {
+    try {
+      return { data: agendaFromPlate(await http.getJson("/v1/plate")), source: "live" };
+    } catch (error) {
+      if (error instanceof TiloApiError && error.status === 404) {
+        return { data: { ...emptyAgenda(), setupRequired: true }, source: "live" };
+      }
+      throw error;
+    }
+  };
+  // JUDGE-FIRST-RUN F6: the pages, the shell and the first-run check all ask for the list when a page loads; the
+  // server is asked once while a read is out (see coalesce.ts).
+  const readWorldItems = coalesce(async (sample: string) => {
+    const items: WorldListItem[] = [];
+    let cursor: string | null = null;
+    for (let n = 0; n < MAX_PAGES && (n === 0 || cursor !== null); n++) {
+      const query = cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
+      const body = await http.getJson(`/worlds?limit=100${sample}${query}`);
+      if (!isWorldPage(body)) throw new TiloApiError(BAD_REPLY, 200, true);
+      items.push(...body.worlds);
+      cursor = body.next_cursor;
+    }
+    return items;
+  });
+  api.getWorlds = async (_dec, added) => {
+    // STARTER-1: "Show sample project"
+    const items = await readWorldItems(wantsSample() ? "&include_sample=1" : "");
+    // STARTER-1: a person's "Hide" is this browser's; the server stores nothing about it.
+    const live = worldsFromList(isSampleHidden() ? items.filter((i) => i.sample !== true) : items);
+    const liveIds = new Set(live.map((w) => w.id));
+    return { data: [...added.filter((w) => !liveIds.has(w.id)), ...live], source: "live" };
+  };
+  // Taught skills (SKILLS-3, FR-SKL-04): the library is `GET /v1/skills`; Learn has nothing served but the list.
+  api.getSkills = async () => {
+    const skills = skillsOfBody(await http.getJson("/v1/skills?include_builtin=true"));
+    if (!skills) throw new TiloApiError(BAD_REPLY, 200, true);
+    if (!skills.some((s) => s.builtin)) return { data: skills, source: "live" };
+    try {
+      return {
+        data: withSkillCatalog(skills, await http.getJson("/v1/skills/catalog")),
+        source: "live",
+      };
+    } catch {
+      return { data: skills, source: "live" };
+    }
+  };
+  api.getLearn = async () => {
+    if (!isLearnBody(await http.getJson("/v1/learn?include_builtin=true")))
+      throw new TiloApiError(BAD_REPLY, 200, true);
+    return { data: { rates: [], reviews: [], helpers: [], tools: [] }, source: "live" };
+  };
+  // One POST, no retry. A draft the server cannot take (a team scope, a timed trigger) is refused here, never sent as
+  // something else; only a 201 with the saved record is an Ack.
+  api.saveSkill = async (skill) => {
+    const body = skill.draft ? saveBody(skill.name, skill.draft) : null;
+    if (!body) {
+      throw new TiloApiError(
+        "Tilo can only save a skill for you that runs when you ask, for now.",
+        422,
+        false,
+        true,
+      );
+    }
+    if (!isSkillRow(await http.postJson("/v1/skills", body)))
+      throw new TiloApiError(BAD_REPLY, 201, true, true);
+    return { data: { ok: true }, source: "live" };
+  };
+  // Teach a skill by describing it (SKILLS-5): one POST each, no retry; only a readable answer is data.
+  api.captureSkill = async (text) => {
+    const data = captureOfBody(
+      await http.postJson("/v1/skills/captures", { method: "describe", text }),
+    );
+    if (!data) throw new TiloApiError(BAD_REPLY, 201, true, true);
+    return { data, source: "live" };
+  };
+  api.captureFile = async (file, onStored, method = "upload") => {
+    const media = await http.postFile("/v1/skills/captures/media", file);
+    if (!isObject(media) || media.readable !== true || !isObject(media.artifact))
+      throw new TiloApiError("This file could not be read as an example.", 422, false, true);
+    const { artifact_id: artifactId, version } = media.artifact;
+    if (
+      typeof artifactId !== "string" ||
+      !artifactId ||
+      typeof version !== "number" ||
+      !Number.isInteger(version) ||
+      version < 1
+    )
+      throw new TiloApiError(BAD_REPLY, 201, true, true);
+    onStored?.();
+    const data = captureOfBody(
+      await http.postJson("/v1/skills/captures", {
+        method,
+        artifact: { artifact_id: artifactId, version },
+      }),
+    );
+    if (!data) throw new TiloApiError(BAD_REPLY, 201, true, true);
+    return { data, source: "live" };
+  };
+  api.proposeVersion = async (captureId) => {
+    const path = `/v1/skills/captures/${encodeURIComponent(captureId)}/version`;
+    // TEACH-COPY: this route's 422 is `not_understood` (no step matched an app the person can use); the page says what
+    // to change instead of the generic refusal. Mapped here, so no other call's 422 changes.
+    const body = await http.postJson(path, {}).catch((e: unknown) => {
+      if (e instanceof TiloApiError && e.status === 422) {
+        throw new TiloApiError("teach_not_understood", 422, false, true, "teach_not_understood");
+      }
+      throw e;
+    });
+    const data = versionOfBody(body);
+    if (!data) throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return { data, source: "live" };
+  };
+  const served = new Map<string, Answerable>();
+  const answered: Dec = {};
+  const readCardItems = coalesce(async (_all: string) => {
+    const items: CardFeedItem[] = [];
+    let cursor: string | null = null;
+    for (let n = 0; n < MAX_PAGES && (n === 0 || cursor !== null); n++) {
+      const query = cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
+      const body = await http.getJson(`/cards?limit=100${query}`);
+      if (!isCardPage(body)) throw new TiloApiError(BAD_REPLY, 200, true);
+      items.push(...body.cards);
+      cursor = body.next_cursor;
+    }
+    return items;
+  });
+  api.getDecisions = async () => {
+    const items = await readCardItems("cards");
+    served.clear(); // a card that left the feed can no longer be answered from a stale key (BQ-WIRE3-1)
+    for (const { world_id, card_id, card } of items) {
+      if (needsFields(card)) continue; // typed in the fields form: a tap on it would answer `provide` with nothing
+      const path = `/worlds/${encodeURIComponent(world_id)}/cards/${encodeURIComponent(card_id)}/answer`;
+      served.set(decisionKey(world_id, card_id), {
+        path,
+        option: answerOption(card) as string,
+        question: card.kind === "needs_you",
+      });
+    }
+    return { data: decisionsFromCards(items), source: "live" };
+  };
+  // One POST per call: no retry, no refresh (a person answers once, HR-1..HR-7). A 404 means the session's world is
+  // not the card's world, so the page offers "Open in world" (code open_in_world; `Decision.world` is that world).
+  api.decide = async (key: DecisionKey, text?: string, option?: string) => {
+    const target = served.get(key);
+    if (!target) throw new TiloApiError("That decision is not on this page any more.", null, false);
+    let body: unknown;
+    try {
+      if ((text !== undefined || option !== undefined) && !target.question)
+        throw new TiloApiError("You can only type an answer to a question.", null, false);
+      body = await http.postJson(
+        target.path,
+        text !== undefined ? { text } : { option: option ?? target.option },
+      );
+    } catch (e) {
+      if (e instanceof TiloApiError && e.status === 404) {
+        throw new TiloApiError(e.message, 404, false, true, "open_in_world");
+      }
+      throw e;
+    }
+    const outcome = isObject(body) ? body.outcome : undefined;
+    if (outcome === "rejected")
+      throw new TiloApiError(reasonOf(200, JSON.stringify(body)), 200, false, true);
+    if (outcome !== "answered") throw new TiloApiError(BAD_REPLY, 200, true, true);
+    answered[key] = true;
+    return { data: { ok: true, dec: { ...answered } }, source: "live" };
+  };
+  // TEAM-WEB: the team view and its Owner-only writes (services/api team_routes.py). A write answers the new view;
+  // an invite answers its id only, so it is followed by a read. No retry: the server already retries a lost race.
+  const readTeam = async (): Promise<TeamView> => {
+    const body = await http.getJson("/v1/team");
+    if (!isTeamView(body)) throw new TiloApiError(BAD_REPLY, 200, true);
+    return body;
+  };
+  api.getTeamLive = async () => ({ data: await readTeam(), source: "live" });
+  api.writeTeam = async (op) => {
+    const { method, path, body } = requestOf(op);
+    const reply = await http.sendJson(method, path, body);
+    // The invite is saved once the POST answers; if the read after it fails, say "no view" (the page keeps its
+    // optimistic copy and says so) rather than fail a write that happened, which a retry would refuse (409).
+    if (op.kind === "invite") return { data: await readTeam().catch(() => null), source: "live" };
+    if (!isTeamView(reply)) throw new TiloApiError(BAD_REPLY, 200, true, true);
+    return { data: reply, source: "live" };
+  };
+
+  // The real intake call, the legacy S-01's (FR-UX-13): one POST of the text alone (the intake has no size, routine
+  // or workspace field; the size only picks the tier shown, BQ-UX13-2). A reply the page cannot read, including
+  // one without its `files`, is a TiloApiError, never a TypeError or a world. The brief goes to S-02.
+  api.startWorld = (async (
+    mode: TierKey,
+    query: string,
+    effort?: Effort,
+    files: readonly File[] = [],
+    refs: readonly import("../../api/skillRoute").SkillRef[] = [],
+  ) => {
+    // Quick (COST-FAST-1): a direct answer or an offer to switch. No world, no event, and nothing is remembered.
+    if (effort === "quick") return quickAsk(http, query, refs);
+    let intake: IntakeResult;
+    try {
+      intake = (await http.submitIntake(query, [...files], undefined, refs)) as IntakeResult;
+    } catch (e) {
+      if (e instanceof TiloApiError) throw e;
+      throw new TiloApiError(BAD_REPLY, 200, true, true);
+    }
+    if (!isText(intake?.task_id) || intake.task_id === "" || !isObject(intake.brief)) {
+      throw new TiloApiError(BAD_REPLY, 200, true, true);
+    }
+    return { data: { ok: true, world: worldFromIntake(mode, intake, query) }, source: "live" };
+  }) as Api["startWorld"];
+  // SIMPLE-RUN-1: Home's one-step start (intake, skip every question, price, approve). Not a method of the pinned
+  // `Api` type: Home reads it with `oneStepOf(api)`, and a fixture Api has none.
+  const oneStep = oneStepOver(http);
+  installOneStep(api, () => oneStep);
+  // The lifetime-cap pop-up's feedback (SEC-16): resolves only on the server's `{received: true}`.
+  api.submitFeedback = async (words: string) => {
+    await http.submitFeedback(words);
+    return { data: { ok: true }, source: "live" };
+  };
+  return api;
+}

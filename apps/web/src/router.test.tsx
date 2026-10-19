@@ -6,22 +6,13 @@ describe("PRD-18.3 flow: the router maps each flow path to its screen and unknow
     expect(matchFlowRoute("/")).toEqual({ screen: "Start" });
   });
 
-  it("maps /task/:taskId/understanding to Understanding", () => {
-    expect(matchFlowRoute("/task/123/understanding")).toEqual({
-      screen: "Understanding",
-      taskId: "123",
-    });
+  it("no longer maps /task/:taskId/understanding or /approaches (OLD-UI-OUT wave 1): they are Start", () => {
+    expect(matchFlowRoute("/task/123/understanding")).toEqual({ screen: "Start" });
+    expect(matchFlowRoute("/task/123/approaches")).toEqual({ screen: "Start" });
   });
 
-  it("maps /task/:taskId/approaches to Approaches", () => {
-    expect(matchFlowRoute("/task/123/approaches")).toEqual({
-      screen: "Approaches",
-      taskId: "123",
-    });
-  });
-
-  it("maps /world/:worldId to World", () => {
-    expect(matchFlowRoute("/world/abc")).toEqual({
+  it("maps /world/:worldId/stage to World", () => {
+    expect(matchFlowRoute("/world/abc/stage")).toEqual({
       screen: "World",
       worldId: "abc",
     });
@@ -39,7 +30,8 @@ describe("PRD-18.3 flow: the router maps each flow path to its screen and unknow
     for (const path of [
       "/task/%E0/understanding",
       "/task/%/approaches",
-      "/world/%E0%A4%A",
+      "/world/%E0%A4%A/stage",
+      "/world/%E0/stage",
       "/world/%E0/delivery",
     ]) {
       expect(matchFlowRoute(path)).toEqual({ screen: "Start" });
@@ -47,6 +39,6 @@ describe("PRD-18.3 flow: the router maps each flow path to its screen and unknow
   });
 
   it("decodes a well-formed escape", () => {
-    expect(matchFlowRoute("/world/a%20b")).toEqual({ screen: "World", worldId: "a b" });
+    expect(matchFlowRoute("/world/a%20b/stage")).toEqual({ screen: "World", worldId: "a b" });
   });
 });

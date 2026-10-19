@@ -1,0 +1,78 @@
+// The "Sample data" chip (plan section 6.1, honesty): shown in the nav whenever a result was read from the
+// fixture Api, so sample numbers never pass as live. Its popover says what the sample is. Not part of the
+// reference design (BQ-WEB honesty rule), so it is as small as it can be: the StatusChip component, and
+// at narrow widths an information icon (the name stays "Sample data" for assistive technology).
+import { useId, useState } from "react";
+import { Popover, StatusChip } from "../components";
+
+function SampleInfoIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <circle cx="10" cy="10" r="8" />
+      <path d="M10 9v5" />
+      <circle cx="10" cy="6" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** What the sample is, in the team's own name (from the user the Api returned). */
+export const sampleNote = (org: string | null): string =>
+  `${org ?? "This team"} is a fictional team. Amounts are examples (£), dates follow today.`;
+
+/** `ghost`: the same box, invisible and out of the accessibility tree, held where the chip will appear. */
+export function SampleChip({
+  ghost = false,
+  org = null,
+}: { ghost?: boolean; org?: string | null }) {
+  const [open, setOpen] = useState(false);
+  const labelId = useId();
+  if (ghost) {
+    return (
+      <span aria-hidden="true" className="park-shell__sample park-shell__booting">
+        <StatusChip tone="neutral">
+          <span className="park-shell__sampledot">
+            <SampleInfoIcon />
+          </span>
+          <span className="park-shell__samplelabel">Sample data</span>
+        </StatusChip>
+      </span>
+    );
+  }
+  return (
+    <>
+      <button
+        type="button"
+        aria-labelledby={labelId}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className="park-shell__sample"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <StatusChip tone="neutral">
+          <span className="park-shell__sampledot" aria-hidden="true">
+            <SampleInfoIcon />
+          </span>
+          <span id={labelId} className="park-shell__samplelabel">
+            Sample data
+          </span>
+        </StatusChip>
+      </button>
+      {open ? (
+        <Popover label="Sample data" width={320} onClose={() => setOpen(false)}>
+          <div className="park-shell__samplebox">
+            <span className="park-shell__poptitle">Sample data</span>
+            <p className="park-shell__samplenote">{sampleNote(org)}</p>
+          </div>
+        </Popover>
+      ) : null}
+    </>
+  );
+}

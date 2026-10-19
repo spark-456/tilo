@@ -82,10 +82,31 @@ def test_PL_02_google_adapter_conforms_to_model_provider(fake_genai_sdk):
     assert isinstance(provider, ModelProvider)
 
 
+@pytest.mark.parametrize("tools", [None, []])
+@pytest.mark.parametrize("method", ["generate", "stream"])
+def test_X_LOGS_1_tool_free_requests_explicitly_disable_afc(fake_genai_sdk, tools, method):
+    api = FakeModelsAPI(
+        generate_content_result=FakeGenerateContentResponse(text="ok"),
+        generate_content_stream_result=[FakeGenerateContentResponse(text="ok")],
+    )
+    provider = _provider(api)
+    request = GenerateRequest(prompt="hello", tools=tools)
+    result = getattr(provider, method)(request)
+    if method == "stream":
+        list(result)
+    config = api.calls[0]["config"]
+    assert config is not None
+    assert config.automatic_function_calling == {"disable": True}
+    sdk_config = real_genai_types.GenerateContentConfig(**provider._config_kwargs(request))
+    assert sdk_config.automatic_function_calling.disable is True
+
+
 def test_PL_02_google_adapter_generate_returns_structured_json_output(fake_genai_sdk):
     """PL-02 "structured output": `GenerateRequest.response_schema` must
     reach the SDK as `GenerateContentConfig(response_mime_type=
-    "application/json", response_schema=...)` -- not merely pass unmodified
+    "application/json", response_json_schema=...)` (the JSON Schema field, not the
+    OpenAPI-subset `response_schema`, which rejects ordinary JSON Schema such as
+    `uniqueItems`) -- not merely pass unmodified
     JSON text through, which a caller with no way to ask for JSON at all
     would also satisfy."""
     schema = {
@@ -106,7 +127,8 @@ def test_PL_02_google_adapter_generate_returns_structured_json_output(fake_genai
     config = call["config"]
     assert config is not None, "PL-02: structured output must reach the SDK's GenerateContentConfig"
     assert config.response_mime_type == "application/json"
-    assert config.response_schema == schema
+    assert config.response_json_schema == schema
+    assert not hasattr(config, "response_schema"), "PL-02: the OpenAPI-subset field is never used"
 
 
 def test_PL_02_google_adapter_generate_json_mode_without_a_schema(fake_genai_sdk):
@@ -120,7 +142,7 @@ def test_PL_02_google_adapter_generate_json_mode_without_a_schema(fake_genai_sdk
     config = models_api.calls[0]["config"]
     assert config is not None
     assert config.response_mime_type == "application/json"
-    assert not hasattr(config, "response_schema")
+    assert not hasattr(config, "response_schema") and not hasattr(config, "response_json_schema")
 
 
 def test_PL_02_google_adapter_generate_maps_a_tool_call(fake_genai_sdk):
@@ -316,3 +338,24 @@ def test_PL_02_google_adapter_stream_yields_chunks_that_concatenate_to_the_full_
 
     assert "".join(chunk.text for chunk in received) == "Once upon a time."
     assert all(chunk.profile_id == "flash-38" for chunk in received)
+
+
+def test_PL_02_google_adapter_real_client_has_a_request_timeout(fake_genai_sdk, monkeypatch):
+    """Live run 8 Oct 2026: verifier and narrator calls hung 300-425 s with no answer. The client the adapter builds
+    carries an HTTP timeout, so a stalled request ends (as a retryable 504) instead of hanging the run."""
+    import sys
+
+    from tilo_providers import google_adapter
+
+    seen: dict[str, object] = {}
+    genai_pkg = sys.modules["google.genai"]
+    types_mod = sys.modules["google.genai.types"]
+    monkeypatch.setattr(types_mod, "HttpOptions", lambda **kw: ("http_options", kw), raising=False)
+    monkeypatch.setattr(genai_pkg, "Client", lambda **kw: seen.update(kw) or FakeModelsAPI(), raising=False)
+
+    google_adapter.GoogleModelProvider(
+        profile=_profile(), profile_id="flash-38", project=PROJECT, location=LOCATION, live_permitted=True
+    )
+
+    assert seen["http_options"] == ("http_options", {"timeout": google_adapter.REQUEST_TIMEOUT_MS})
+    assert 0 < google_adapter.REQUEST_TIMEOUT_MS <= 180_000

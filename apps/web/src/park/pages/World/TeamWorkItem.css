@@ -1,0 +1,39 @@
+/* BQ-CTX-TEAMWORLD: the add-a-work-item form. Neutral role tokens only; nothing here moves. */
+[data-park] .park-world-additem {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+[data-park] .park-world-additem-who {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+[data-park] .park-world-additem-who legend {
+  padding: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-world-additem-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 24px;
+  font-size: 14px;
+  font-weight: 700;
+}
+[data-park] .park-world-additem-choice input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+}
+[data-park] .park-world-additem-hint {
+  display: block;
+  font-weight: 600;
+  color: var(--ink2);
+}

@@ -22,7 +22,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from tilo_api import deps
 
-CAP = 50  # not equal to any number in the scripted approaches (credits 30-45 and 90-130)
+CAP = 75  # above the 60-credit floor (BQ-BUDGET-FLOOR-2), equal to no number in the scripted approaches
 
 
 def _granted(flow, world_id):
@@ -49,12 +49,12 @@ def test_FR_INT_08_flow_cap_is_the_persons_number_not_the_approach_credits(clear
     intake = clear_flow.task_with_approaches()
     approaches = clear_flow.approaches(intake["task_id"]).json()["approaches"]
     chosen = next(a for a in approaches if a["id"] == "thorough")  # credits 90-130
-    assert chosen["credits"]["max"] != 40
+    assert chosen["credits"]["max"] != 75
 
-    assert clear_flow.approve(intake["task_id"], "thorough", 40).status_code == 200
+    assert clear_flow.approve(intake["task_id"], "thorough", 75).status_code == 200
 
     (event,) = _granted(clear_flow, intake["world_id"])
-    assert event["data"]["cap"] == 40 and event["data"]["granted"] == 40
+    assert event["data"]["cap"] == 75 and event["data"]["granted"] == 75
 
 
 def test_FR_INT_08_flow_grant_goes_through_planning_budget_with_the_config_risk_table(clear_flow, monkeypatch):
@@ -169,7 +169,8 @@ def test_FR_INT_08_flow_property_a_grant_is_exactly_a_finite_positive_cap_or_not
     if math.isfinite(cap) and 0 < cap <= deps.budget_cap_ceiling():  # above the run cap is 422 (#139, BQ-99)
         assert response.status_code == 200, response.text
         (event,) = events
-        assert event["data"]["cap"] == event["data"]["granted"] == cap
+        # a cap under the run floor is granted at the floor (BQ-BUDGET-FLOOR-1); a higher one is exactly the person's
+        assert event["data"]["cap"] == event["data"]["granted"] == max(cap, deps.min_run_grant())
     else:
         assert response.status_code in (400, 422), response.text
         assert events == []

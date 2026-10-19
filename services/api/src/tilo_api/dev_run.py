@@ -1,6 +1,6 @@
 """Local dev stand-ins for the run's seams (CL-INT-5c, 5d, EFF-01; PRD 10.3, 10.4, 14.1): a unit runner that writes one
 synthetic Markdown output per unit, paced by a delay and metered through the real PriceBook with a dev price file, one
-in-memory artifact store with a stand-in secret redactor and an empty raw archive (ADR-0018 T4), an action
+in-memory artifact store with the shared secret redactor and an empty raw archive (ADR-0018 T4), an action
 resolver with one fixed fake recipient, and mock connector adapters that only record. They let a dev run reach its gate
 card and, once the owner approves, a FAKE send through the real outbox and policy engine; nothing leaves the machine.
 `tilo_api.dev.install` wires them as dependency overrides, so request input never selects them, and each one refuses
@@ -12,7 +12,6 @@ import asyncio
 import logging
 import math
 import os
-import re
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from functools import cache
@@ -24,6 +23,7 @@ from tilo_harness.outputs import UnitOutput
 from tilo_memory.artifacts import ArtifactStore, MemoryBlobBackend, MemoryMetaBackend
 from tilo_metering.prices import PriceBook, Usage
 from tilo_providers.interfaces import GenerateResponse
+from tilo_redact import redact
 
 from tilo_api import deps
 from tilo_api.runs import MeteredOutcome
@@ -34,7 +34,7 @@ DEV_DESTINATION = "thread-dev-1"  # destination.schema: letters, digits, undersc
 DEV_RECIPIENT = "dev.recipient@example.com"  # never a known recipient, so the policy engine sees a new one (T3)
 DELAY_ENV = "TILO_DEV_UNIT_DELAY_S"  # seconds each unit takes, so "watch the world" is paced, not a burst
 DEFAULT_DELAY_S, MAX_DELAY_S = 1.5, 10.0
-_UNIT_USAGE = Usage("dev-unit", tokens_in=2000, tokens_out=600)  # fixed fake tokens, priced by config/prices.dev.yaml
+UNIT_USAGE = Usage("dev-unit", tokens_in=2000, tokens_out=600)  # fixed fake tokens, priced by config/prices.dev.yaml
 
 
 def _refuse() -> None:
@@ -60,7 +60,7 @@ def _prices() -> PriceBook:
 
 def unit_credits() -> float:
     """What one dev unit costs: fixed fake token counts priced by the real PriceBook (HR-1: the meter sums events)."""
-    return round(_prices().credits(_UNIT_USAGE, datetime.now(UTC)), 6)
+    return round(_prices().credits(UNIT_USAGE, datetime.now(UTC)), 6)
 
 
 class DevUnitRunner:
@@ -79,14 +79,11 @@ class DevUnitRunner:
         )
 
 
-_DEV_SECRET = re.compile(r"(?:sk-|AIza|ghp_|xox[abp]-)[0-9A-Za-z_-]{16,}")  # a few well-known API key shapes
-
-
 def dev_redact(text: str) -> str:
-    """Dev mode's stand-in for the shared secret redactor, which is not built yet (FR-MEM-05, BQ-109): masks a few
-    well-known key shapes. Dev units write synthetic text only; production has no redactor and starts no run."""
+    """Dev mode's redactor: the shared one (FR-MEM-05, `tilo_redact.redact`), so dev and CI run the code production runs
+    and the store's AR-07 / MF-06 refusals do not differ. Refuses when deployed or live, like the rest of dev mode."""
     _refuse()
-    return _DEV_SECRET.sub("[REDACTED]", text)
+    return redact(text)
 
 
 class _NoArchiveLines:

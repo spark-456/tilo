@@ -33,12 +33,23 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 _DEMO_PROJECT = "demo-tilo"
-_READY_TIMEOUT_S = 120.0
+_READY_TIMEOUT_S = 240.0  # a cold start of the emulator takes about 2.5 minutes
+_READY_TIMEOUT_ENV = "TILO_EMULATOR_READY_TIMEOUT_S"
+
+
+def ready_timeout_s(env: Mapping[str, str] | None = None) -> float:
+    """The ready timeout: `TILO_EMULATOR_READY_TIMEOUT_S` when it is a finite number above zero, else the default."""
+    raw = (os.environ if env is None else env).get(_READY_TIMEOUT_ENV)
+    try:
+        value = float(raw) if raw is not None else _READY_TIMEOUT_S
+    except ValueError:
+        return _READY_TIMEOUT_S
+    return value if 0 < value < float("inf") else _READY_TIMEOUT_S
 
 
 if sys.platform == "win32":
@@ -231,7 +242,7 @@ def running_emulator() -> Iterator[str]:
             job = _create_kill_on_close_job()
             _assign_to_job(job, process)
         try:
-            _wait_until_ready(host, _READY_TIMEOUT_S)
+            _wait_until_ready(host, ready_timeout_s())
             os.environ["FIRESTORE_EMULATOR_HOST"] = host
             yield host
         finally:

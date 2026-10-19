@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Fredoka:wght@500;600;700&family=Figtree:wght@500;600;700;800&family=Geist:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--priInk);text-decoration:none}a:hover{color:var(--pri)}</style>
+</helmet>
+<sc-if value="{{ desk }}" hint-placeholder-val="{{ true }}">
+  <header style="height:72px;box-sizing:border-box;padding:0 32px;display:flex;align-items:center;gap:40px;background:var(--card);border-bottom:1px solid var(--line);font-family:var(--fB);color:var(--ink)">
+    <div style="display:flex;align-items:center;gap:10px;flex:none">
+      <div style="width:36px;height:36px;border-radius:12px;background:var(--pri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;justify-content:center"><div style="width:22px;height:12px;border-radius:6px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:5px"><div style="width:3px;height:3px;border-radius:9px;background:#2A211C"></div><div style="width:3px;height:3px;border-radius:9px;background:#2A211C"></div></div></div>
+      <div style="font-family:var(--fH);font-weight:900;font-size:26px;letter-spacing:-.5px;color:var(--ink)">tilo</div>
+    </div>
+    <nav aria-label="Main" style="display:flex;gap:4px">
+      <sc-for list="{{ items }}" as="it" hint-placeholder-count="4">
+        <a href="#" style="height:44px;padding:0 16px;border-radius:14px;display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;white-space:nowrap;background:{{ it.bg }};color:{{ it.fg }}">{{ it.label }}<sc-if value="{{ it.badge }}"><span style="min-width:22px;height:22px;padding:0 6px;box-sizing:border-box;border-radius:99px;background:var(--amber);color:#2A211C;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center">3</span></sc-if></a>
+      </sc-for>
+    </nav>
+    <div style="flex:1"></div>
+    <div style="height:44px;width:300px;box-sizing:border-box;padding:0 8px 0 16px;border-radius:14px;background:var(--sunk);display:flex;align-items:center;gap:10px;color:var(--ink3);font-size:15px;font-weight:600">
+      <span style="color:var(--ink3)">{{ iSearch }}</span>
+      <span style="flex:1;white-space:nowrap">Search worlds and skills</span>
+      <span style="height:26px;padding:0 8px;border-radius:8px;background:var(--card);border:1px solid var(--line);font-size:12px;font-weight:700;display:flex;align-items:center">⌘K</span>
+    </div>
+    <div style="width:44px;height:44px;border-radius:99px;background:var(--lilacSoft);color:var(--lilacInk);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex:none;box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--line2)">MR</div>
+  </header>
+</sc-if>
+<sc-if value="{{ status }}" hint-placeholder-val="{{ false }}">
+  <div style="height:48px;box-sizing:border-box;padding:0 28px;display:flex;align-items:center;justify-content:space-between;font-family:var(--fB);font-weight:700;font-size:15px;color:var(--ink)">
+    <span>9:41</span>
+    <span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:10px;border-radius:2px;background:var(--ink)"></span><span style="width:22px;height:11px;box-sizing:border-box;border-radius:3px;border:1.5px solid var(--ink);padding:1px"><span style="display:block;width:70%;height:100%;border-radius:1px;background:var(--ink)"></span></span></span>
+  </div>
+</sc-if>
+<sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}">
+  <nav aria-label="Main" style="height:84px;box-sizing:border-box;padding:6px 8px 22px;display:flex;background:var(--card);border-top:1px solid var(--line);font-family:var(--fB)">
+    <sc-for list="{{ items }}" as="it" hint-placeholder-count="4">
+      <a href="#" style="flex:1;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:700;color:{{ it.tab }}">
+        <span style="position:relative;width:44px;height:30px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:{{ it.pill }}">{{ it.ic }}<sc-if value="{{ it.badge }}"><span style="position:absolute;top:-4px;right:0;min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:99px;background:var(--amber);color:#2A211C;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--card)">3</span></sc-if></span>
+        {{ it.label }}
+      </a>
+    </sc-for>
+  </nav>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:72},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;,&quot;status&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;active&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;home&quot;,&quot;worlds&quot;,&quot;skills&quot;,&quot;needs&quot;],&quot;default&quot;:&quot;home&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloR) this.t = setInterval(() => { if (window.TiloR && window.TiloCity) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const R = window.TiloR ? window.TiloR(React.createElement) : null;
+    const d = this.props.device ?? 'desktop', a = this.props.active ?? 'home';
+    const ic = (n, s) => R ? R.ic(n, s) : null;
+    const items = [['home', 'Home', 'hall'], ['worlds', 'Worlds', 'people'], ['skills', 'Skills', 'cap'], ['needs', 'Needs you', 'flag']].map(([k, label, i]) => {
+      const on = k === a;
+      return { label, badge: k === 'needs', ic: ic(i, 22), bg: on ? 'var(--priSoft)' : 'transparent', fg: on ? 'var(--priInk)' : 'var(--ink2)', tab: on ? 'var(--priInk)' : 'var(--ink3)', pill: on ? 'var(--priSoft)' : 'transparent' };
+    });
+    return { desk: d === 'desktop', phone: d === 'phone', status: d === 'status', items, iSearch: ic('search', 18) };
+  }
+}
+</script>
+</body>
+</html>

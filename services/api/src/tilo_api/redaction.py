@@ -9,12 +9,23 @@ from __future__ import annotations
 
 import copy
 import re
+from collections.abc import Callable
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
+from tilo_people.stores import PeopleStores
 
-from tilo_api.deps import Principal, Store, WorldRecord, get_current_principal, get_store
+from tilo_api.deps import (
+    Principal,
+    Store,
+    get_clock,
+    get_current_principal,
+    get_people_provider,
+    get_store,
+    readable_world,
+    world_layout,
+)
 from tilo_api.layout import visible_layout
 
 router = APIRouter()
@@ -50,16 +61,6 @@ _MAX_DATA_DEPTH = 60  # a scoped viewer fails closed (event dropped) past this; 
 
 def _is_owner(principal: Principal, owner: str) -> bool:
     return principal.role == "owner" and principal.user_id == owner
-
-
-def _require_member_world(principal: Principal, store: Store, world_id: str) -> WorldRecord:
-    """A membership mismatch (wrong world or none) gets the same 404 as an unknown world_id."""
-    if principal.world_id != world_id:
-        raise HTTPException(status_code=404)
-    world = store.worlds.get(world_id)
-    if world is None:
-        raise HTTPException(status_code=404)
-    return world
 
 
 def _safe_districts(value: Any) -> tuple[str, ...]:
@@ -187,11 +188,16 @@ def _scoped_event_view(event: dict, seq: int, id_map: dict[str, str], safe_distr
 @router.get("/worlds/{world_id}/events")
 def get_world_events(
     world_id: str,
+    after_seq: int | None = Query(None, ge=0),
     principal: Principal = Depends(get_current_principal),
     store: Store = Depends(get_store),
+    people: Callable[[], PeopleStores | None] = Depends(get_people_provider),
+    clock: Callable[[], str] = Depends(get_clock),
 ) -> JSONResponse:
-    world = _require_member_world(principal, store, world_id)
+    world, principal = readable_world(principal, store, people, clock, world_id)  # a team reader is a derived Viewer
     is_owner = _is_owner(principal, world.owner)
+    if is_owner:
+        store.settle(world_id)  # only after the checks: a restart's queued events and its `world.failed` (ADR-0026 5)
     safe_districts = _safe_districts(principal.districts)
 
     well_formed = [e for e in store.events.get(world_id, []) if not _is_malformed_event(e)]
@@ -201,11 +207,16 @@ def get_world_events(
         # A JSONResponse (stdlib json, not FastAPI's pydantic-based response serialization,
         # which has its own much shallower recursion/depth guard): the owner's data is returned
         # exactly as stored, however deeply nested, and must not 500 either.
-        return JSONResponse(content={"events": [_owner_event_view(e) for e in visible]})
+        events = [_owner_event_view(e) for e in visible]
+        if after_seq is not None:
+            events = [e for e in events if e.get("seq", 0) > after_seq]
+        return JSONResponse(content={"events": events})
 
     surviving = [e for e in visible if not _event_hides_district(e, safe_districts)]
     id_map = {e["id"]: f"v{i + 1}" for i, e in enumerate(surviving)}
     events = [_scoped_event_view(e, i + 1, id_map, safe_districts) for i, e in enumerate(surviving)]
+    if after_seq is not None:
+        events = [e for e in events if e.get("seq", 0) > after_seq]
     return JSONResponse(content={"events": events})
 
 
@@ -214,18 +225,19 @@ def get_world_layout(
     world_id: str,
     principal: Principal = Depends(get_current_principal),
     store: Store = Depends(get_store),
+    people: Callable[[], PeopleStores | None] = Depends(get_people_provider),
+    clock: Callable[[], str] = Depends(get_clock),
 ) -> JSONResponse:
     """FR-WLD-05, CL-INT-4: the run's layout, never invented: 404 until the run has built one. The owner gets all
     of it; anyone else only what their districts show (`visible_layout`), and 404 when that is nothing."""
-    world = _require_member_world(principal, store, world_id)
-    run = store.runs.get(world_id)
-    layout = getattr(run, "layout", None)
-    if not isinstance(layout, dict) or not layout:
-        raise HTTPException(status_code=404)
+    world, principal = readable_world(principal, store, people, clock, world_id)
+    layout = world_layout(store, world_id)
+    if layout is None:
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
     if not _is_owner(principal, world.owner):
         layout = visible_layout(layout, _safe_districts(principal.districts))
         if layout is None:
-            raise HTTPException(status_code=404)
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")
     return JSONResponse(content=copy.deepcopy(layout))
 
 
@@ -234,8 +246,10 @@ def get_world(
     world_id: str,
     principal: Principal = Depends(get_current_principal),
     store: Store = Depends(get_store),
+    people: Callable[[], PeopleStores | None] = Depends(get_people_provider),
+    clock: Callable[[], str] = Depends(get_clock),
 ) -> dict:
-    world = _require_member_world(principal, store, world_id)
+    world, principal = readable_world(principal, store, people, clock, world_id)
     is_owner = _is_owner(principal, world.owner)
     safe_districts = _safe_districts(principal.districts)
 

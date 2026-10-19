@@ -21,7 +21,8 @@ for (const [name, viewport] of Object.entries(SIZES)) {
 
     test(`PRD-17.5 accessibility: landmarks exist at ${name} size`, async ({ page }) => {
       await gotoStage(page);
-      await expect(page.getByRole("navigation")).toBeVisible();
+      // WEB-CUTOVER: a world address has a second navigation (the lens tabs), so the primary one is named.
+      await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
       await expect(page.getByRole("main")).toBeVisible();
     });
 

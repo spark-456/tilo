@@ -1,0 +1,9 @@
+id: draft-email-reply
+version: "1.0.0"
+domain: productivity
+author: "Tilo Skills Library"
+reviewer: "Tilo Product Review"
+tools_allowed: ["search_email","read_email","create_draft"]
+inputs: {"type":"object","additionalProperties":false,"required":["thread_query","reply_intent"],"properties":{"thread_query":{"type":"string","description":"A specific sender, subject, or other query to locate the email thread."},"reply_intent":{"type":"string","description":"What the reply should communicate."},"tone":{"type":"string","description":"Optional desired tone."}}}
+outputs: {"type":"object","additionalProperties":false,"required":["recipient","subject","body","facts_used","approval_required","send_performed"],"properties":{"recipient":{"type":"string","description":""},"subject":{"type":"string","description":""},"body":{"type":"string","description":""},"facts_used":{"type":"array","items":{"type":"string","description":""}},"approval_required":{"type":"boolean","description":"True until the user approves draft creation."},"send_performed":{"type":"boolean","description":"Always false."}}}
+description: "Draft an email reply; est. max 12 credits/run (~$0.060)."

@@ -29,6 +29,16 @@ def checked_id(value: Any) -> str:
     return value
 
 
+def has_token(broker: TokenBroker, user_id: str, connector: str, scope: str) -> bool:
+    """Whether a token for `scope` can be had now (SEC-02: only adapters ask the broker for one). The token is
+    dropped unread and no Google request is made; any failure, its words included, is just False."""
+    try:
+        broker.access_token_for_adapter(user_id, connector, required_scopes=[scope])
+    except Exception:  # noqa: BLE001
+        return False
+    return True
+
+
 def side_effect_marker(entry: Mapping[str, Any]) -> str:
     """A pure function of (world_id, idempotency_key): the same on every retry and every instance."""
     seed = f"{entry['world_id']}\x00{entry['idempotency_key']}".encode()
@@ -53,6 +63,13 @@ class GoogleAdapter:
         self._broker, self._transport, self._artifacts = broker, transport, artifacts
         self._owner_of, self._clock, self._emit, self._sleep = owner_of, clock, emit, sleep
         self._max_attempts = max(1, int(max_attempts))
+        self.on_result: Callable[[Mapping[str, Any]], None] | None = None  # LC-07: the execute route reads the outcome
+
+    def _done(self, result: dict[str, Any]) -> dict[str, Any]:
+        """A side effect that ended well (or was found already done, OB-03): tell the one who asked, return it."""
+        if self.on_result is not None:
+            self.on_result(result)
+        return result
 
     @property
     def id(self) -> str:

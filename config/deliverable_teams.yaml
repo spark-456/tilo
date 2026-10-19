@@ -1,0 +1,9 @@
+# GEN-06: worker ranks remain contract roles; their design jobs are unit types.
+version: 1
+formats: [pptx, docx, landing, app]
+stages:
+  - {type: design_layout, role: specialist, title: Design the visual system, after: []}
+  - {type: design_content, role: specialist, title: Design the content and slide story, after: []}
+  - {type: design_review, role: verifier, title: Review the designs and give concrete comments, after: [design_layout, design_content]}
+  - {type: design_revise_layout, role: specialist, title: Revise the visual system from review comments, after: [design_layout, design_review], revision: true}
+  - {type: design_revise_content, role: specialist, title: Revise the slide story from review comments, after: [design_content, design_review], revision: true}

@@ -1,0 +1,14 @@
+{
+  "start": "2026-10-09T09:00:00.000Z",
+  "end": "2026-10-09T09:45:00.000Z",
+  "all_day": false,
+  "title": "Send the Q4 deck",
+  "kind": "due",
+  "source": {
+    "kind": "work_item",
+    "id": "wi_q4_deck"
+  },
+  "state": "confirmed",
+  "shared": false,
+  "joinable": true
+}

@@ -1,0 +1,19 @@
+# Settings of the live autorater runs on the Vertex AI Gen AI evaluation service (VERTEX-EVAL-1, ADR-0033).
+# Schema: evals/vertex_eval.schema.json. Evals-local like generator.yaml: contracts/evals.schema.json forbids extra keys.
+#
+# max_credits: per-run cap in credits; the CLI refuses any cap above its code constant of 19 (always under 20 a run).
+max_credits: 18
+# max_cases: how many pairs `export` keeps by default.
+max_cases: 20
+# assumed_output_tokens / overhead_tokens: per judgement. The service reports no token usage, so each call is charged
+# its quote: the rubric's input tokens plus overhead_tokens (the service's own wrapper, unknown) and these output tokens.
+assumed_output_tokens: 512
+overhead_tokens: 400
+# field_chars: the longest text of each field after redaction; longer text is cut and ends " [truncated]".
+field_chars:
+  prompt: 1500
+  context: 3000
+  response: 2500
+metrics:
+  pairwise: { id: plan_pairwise, template: plan_pairwise.md }
+  groundedness: { id: plan_groundedness, template: plan_groundedness.md }

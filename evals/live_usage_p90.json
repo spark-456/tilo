@@ -1,0 +1,11 @@
+{
+  "provenance": "PROVISIONAL (8 Oct 2026, COST-AUDIT). The only model recordings in the repo (evals/bank/live/*/model-recordings) are written by a fake provider and carry flat usage of 500 output tokens for every call, so no real p90 can be computed from them. These values are set from the call shapes: the Director's JSON plan with thinking (a 4096 cap was used up by thinking alone in the first live B-007 run, BQ-PL02-1, so half the 16384 cap), a short Writer/Specialist draft, a two-sentence Lead review on the lite tier, a Narrator beat. Replace them by running `python -m tilo_evals.live_usage_p90` over the recordings of a real TILO_RECORD=1 run; the estimate takes min(p90, the role's output cap).",
+  "output_tokens_p90": {
+    "director": 8192,
+    "writer": 600,
+    "specialist": 600,
+    "verifier": 300,
+    "lead_review": 200,
+    "narrator": 400
+  }
+}

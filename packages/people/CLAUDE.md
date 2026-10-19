@@ -3,7 +3,7 @@
 ## Purpose
 People core for meetings, plates, pinboards and calendars (addendum PPL-10): the visibility oracle
 (`decide`, `read`, `project`), write checks (`check_write`), deterministic name matching and due-date
-resolution, and in-memory record stores whose interface `tilo-api` implements on Firestore.
+resolution, and in-memory record stores whose interface `tilo-api` implements on Firestore (the person store also holds the founder marker and one address reservation per person; `erase_person` refuses an unfounded org's last person, PPL-11c-FS).
 
 ## Commands
 - `uv run pytest packages/people/tests -q` (public API pinned in `tests/API.md`); `just check`
@@ -20,7 +20,7 @@ resolution, and in-memory record stores whose interface `tilo-api` implements on
 
 ## Requirement IDs
 FR-MTG-05, FR-PA-01, FR-PA-11, FR-PA-17, FR-PB-01, FR-PB-02, FR-PB-04 to FR-PB-07,
-FR-CAL-03, FR-CAL-06 (oracle half); PPL-10a to PPL-10d.
+FR-CAL-03, FR-CAL-06 (oracle half), FR-CAL-07b-1 (`free_slots`); PPL-10a to PPL-10d. ADR-0040 (TSW-1): `world_share.py` (`share_id`, `in_force`, `reader_share`), `PeopleStores.world_shares` (required), `erase_person` deletes the shares a person granted. `decide` knows `read_team` (`TEAM_ACTIONS`, `TEAM_VIEW`) and `create` of an item with a `world_id`. ADR-0044 (SELF-SERVE-TEAMS): `Directory.is_member`/`is_lead`/`counts` follow the amended Terms (owner's, founding, accepted invitation; the directory must be the whole org); `teams.py` `decide_team` ports `tests/contracts/_teams_lib.team_permits` (crossref `fixtures/person.membership/crossref/`); `read_directory` admits a pending invitee's inviter (PE-20).
 
 ## Local rules
 - Pure: no model, provider, network, randomness, logging, print or clock read under `src/`.
@@ -29,4 +29,5 @@ FR-CAL-03, FR-CAL-06 (oracle half); PPL-10a to PPL-10d.
 - Fail closed: `decide` and `check_write` never raise; unknown or malformed input refuses.
 - Never put record text (titles, names, aliases, emails, due phrases) in an error or a repr.
 - A model never resolves identity, dates or access: code only (PE-15, PE-11).
+- `check_write` lets a meeting's `world_id` go from absent to a world id as an owner `edit`, alone and once (PPL-11c S6, BQ-273); any other `world_id` change is `immutable`.
 - Change `decide` only together with the reference oracle and the crossref fixtures (architect).

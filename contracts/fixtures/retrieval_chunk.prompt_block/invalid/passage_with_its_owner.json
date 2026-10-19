@@ -1,0 +1,16 @@
+{
+  "v": "1.0",
+  "chunks": [
+    {
+      "id": "ch_a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "source": {
+        "kind": "memory_item",
+        "id": "mem_01JB5VQ0000000000000000001",
+        "version": null
+      },
+      "label": "Your note",
+      "text": "I prefer meetings before noon.",
+      "owner": "u_alex"
+    }
+  ]
+}

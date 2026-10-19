@@ -1,0 +1,29 @@
+{
+  "v": "1.0",
+  "formats": {
+    "website": {
+      "partners": [
+        {
+          "make_with": "connector:lovable",
+          "action": "build_handoff"
+        }
+      ]
+    },
+    "pptx": {
+      "partners": []
+    },
+    "pdf": {
+      "partners": [
+        {
+          "make_with": "connector:canva",
+          "action": "create_design"
+        }
+      ]
+    }
+  },
+  "large_site": {
+    "max_native_pages": 3,
+    "needs": ["sign in", "database", "checkout", "e-commerce", "multi-page"]
+  },
+  "preselect_suggested": true
+}

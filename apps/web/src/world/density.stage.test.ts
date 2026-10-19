@@ -31,6 +31,13 @@ vi.mock("./art/labels", async () => {
     districtTag: (text: string) => pill(text),
     islandTag: pill,
     policyTag: () => pill("Policy"),
+    needsTag: pill,
+    failedTag: pill,
+    completedTag: pill,
+    sessionTag: pill,
+    // WORLD-LIVE: speech bubbles and tool icons are drawn in their own layer, not among the tags.
+    makeBubble: (head: string, note: string) => pill(`${head}: ${note}`),
+    drawTool: () => undefined,
   };
 });
 

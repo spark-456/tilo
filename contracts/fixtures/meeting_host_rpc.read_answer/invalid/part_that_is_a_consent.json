@@ -1,0 +1,13 @@
+{
+  "tool": "read_events",
+  "outcome": "expired",
+  "connected_at": null,
+  "result": null,
+  "parts": [
+    {
+      "type": "connection.consented",
+      "connector": "google_calendar",
+      "user_id": "u_owner"
+    }
+  ]
+}

@@ -120,6 +120,50 @@ notification channel and three alert policies. The Cloud Run services no
 longer show an in-place diff for the API-defaulted service-level `scaling`
 block, and the `secret_accessors` output is the same before and after a refresh.
 
+### What apply will add for scheduled runs (FR-AGT-14, on top of the above)
+
+Expect **3 to add, 0 to change, 0 to destroy**: the service account
+`tilo-schedule-scheduler` (no IAM binding at all), one Cloud Scheduler job,
+`tilo-schedule-tick` (every minute, UTC, OIDC, `retry_count` 1), which POSTs
+`/internal/schedules/tick` on tilo-api, and the Firestore composite index
+`schedules` (`enabled`, `next_due`) that the due query needs. The route answers
+503 until you set `TILO_SCHEDULE_TICK_AUDIENCE`, `TILO_SCHEDULE_TICK_CALLER`
+(`tilo-schedule-scheduler@<project>.iam.gserviceaccount.com`),
+`TILO_SCHEDULES_STORE=firestore` and `TILO_FIRESTORE_PROJECT` on tilo-api (ADR-0023) AND
+production wires the api store and run seams (`deps.get_store`, the artifact store,
+redactor and run archive: today they answer 503 when deployed), so setting the variables
+alone does not make the tick work; until then the job fires into a 503. Copy the audience
+from `terraform output schedule_tick` (the `audience` field) instead of retyping the api
+URL: Cloud Run has two URL forms and a mismatch is a silent 401. Deploy the rules BEFORE
+setting `TILO_SCHEDULES_STORE=firestore`:
+`pnpm exec firebase deploy --only firestore:rules --project <project>`; they deny every
+client the `schedules` collection. Terraform only: the user applies it.
+
+### Cloud Tasks hand-off for scheduled runs (FR-AGT-14e)
+
+No Terraform change: the tick no longer starts the run on the Scheduler's request (Cloud Run
+bills request-based CPU, so a run thread there is throttled and lost on scale-to-zero). It
+hands each due slot to the existing Cloud Tasks queue `runs`, and Cloud Tasks delivers it to
+the same tick route as `tilo-tasks-invoker`, where the run executes inside that request.
+`tilo-api` (and `tilo-harness`) already hold `roles/cloudtasks.enqueuer` and `serviceAccountUser` on
+`tilo-tasks-invoker`, and api is public, so a task reaches it without any `run.invoker`.
+Two more variables on tilo-api are yours to set (the tick answers 503 until both are set):
+
+- `TILO_TASKS_CALLER` = `tilo-tasks-invoker@<project>.iam.gserviceaccount.com`
+- `TILO_RUNS_QUEUE` = `projects/<project>/locations/asia-southeast1/queues/runs`
+
+They must differ from `TILO_SCHEDULE_TICK_CALLER`: the Scheduler never gets the task mode
+and Cloud Tasks never gets the fan-out (one account for both is refused). One setting is
+not in Terraform yet: `tilo-api` needs a 1500 s request timeout (X-SCHED-1).
+A task's dispatch deadline is 1500 s and its run wait is 1440 s, leaving 60 s to answer.
+The user sets `gcloud run services update tilo-api --timeout=1500 --region asia-southeast1`
+until an infra ticket adds `timeout` to the service module (open in BQ-AGT14-5).
+The user also bounds retries:
+
+```powershell
+gcloud tasks queues update runs --location asia-southeast1 --project essential-wares-510320-f0 --max-attempts 3 --min-backoff 30s
+```
+
 ## Destroy
 
 ```powershell

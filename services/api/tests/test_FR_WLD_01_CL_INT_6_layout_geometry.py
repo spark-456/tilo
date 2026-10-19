@@ -45,21 +45,22 @@ def test_FR_WLD_01_CL_INT_6_build_layout_attaches_schema_valid_geometry(repo_roo
     layout = build_layout(make_plan(districts, units_per), world_id="w_x")
     assert layout["geometry"] is not None
     assert schema_errors(repo_root, layout) == []
-    assert [b["id"] for b in layout["geometry"]["buildings"]] == [f"B{n}" for n in range(1, districts + 1)]
+    sized = -(-units_per // 3)  # WORLD-LIVE: a district's units get up to three buildings; plus the hall and the dock
+    per_district = -(-units_per // sized)
+    expected = districts * per_district + 2
+    assert [b["id"] for b in layout["geometry"]["buildings"]] == [f"B{n}" for n in range(1, expected + 1)]
 
 
 def test_FR_WLD_01_CL_INT_6_roads_equal_the_plans_cross_building_dependencies():
     plan = make_plan(4, 2)
     roads = [(r["from"], r["to"]) for r in build_layout(plan, world_id="w_x")["geometry"]["roads"]]
-    assert roads == [
-        ("B1", "B2"),
-        ("B2", "B3"),
-        ("B3", "B4"),
-    ]  # U2->U3, U4->U5, U6->U7; same-building ones drawn nothing
+    chain = [("B1", "B2"), ("B2", "B4"), ("B4", "B5"), ("B5", "B6"), ("B6", "B7"), ("B7", "B8"), ("B8", "B9")]
+    assert roads == chain  # one building per unit (B3 is the Meeting Hall): U1->U2 .. U7->U8
     plan["units"][-1]["depends_on"].append("U1")  # a second dependency edge, backwards over the chain
     roads = [(r["from"], r["to"]) for r in build_layout(plan, world_id="w_x")["geometry"]["roads"]]
-    assert roads == [("B1", "B2"), ("B1", "B4"), ("B2", "B3"), ("B3", "B4")]
-    assert build_layout(make_plan(1, 3), world_id="w_x")["geometry"]["roads"] == []
+    assert roads == [chain[0], ("B1", "B9"), *chain[1:]]
+    one = build_layout(make_plan(1, 3), world_id="w_x")["geometry"]["roads"]
+    assert [(r["from"], r["to"]) for r in one] == [("B1", "B2"), ("B2", "B3")]
 
 
 def test_FR_WLD_01_CL_INT_6_the_same_plan_gives_identical_geometry_every_time():
@@ -112,7 +113,7 @@ def test_FR_WLD_01_CL_INT_6_scoped_viewer_still_gets_null_geometry_and_no_hidden
     response = client.get(f"/worlds/{WORLD}/layout")
     assert response.status_code == 200
     assert response.json()["geometry"] is None
-    for hidden in ("D1", "D3", "B1", "B3", "district.1", "district.3"):
+    for hidden in ("D1", "D3", "B1", "B2", "B3", "B6", "B7", "B8", "district.1", "district.3"):
         assert hidden not in response.text, hidden
 
 

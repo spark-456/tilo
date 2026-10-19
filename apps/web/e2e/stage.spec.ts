@@ -1,13 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { expectWithinPx, requireBox } from "./support/assertions";
 import { DESKTOP } from "./support/viewports";
+import { STAGE_PATH } from "./support/world";
 
 test.use({ viewport: DESKTOP });
 
 test("PRD-9.7 stage: the PixiJS canvas mounts, fills the centre stage and resizes with it", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto(STAGE_PATH);
 
   const stage = page.getByTestId("stage-frame");
   const canvas = stage.locator("canvas");

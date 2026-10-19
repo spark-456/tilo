@@ -134,6 +134,71 @@ export const ALLOWLIST: readonly AllowEntry[] = [
     reason:
       "Camera glide: the person's own pan or zoom key, never an event. One frame per eased step, ends on the target, and is instant under reduced motion (HR-2; PRD 9.7).",
   },
+  // The Park city backdrop (WEB-MOTION-1, BQ-WEB-3 decided by the user 6 Oct 2026, ADR-0003a 5): its cars and
+  // walkers are ambient scenery: anonymous pedestrians drawn with agent-style art, with no run state, label or
+  // link to any run. Nothing that shows Tilo's own agents, worlds or data animates here
+  // (src/honesty/park-ambient.allowlist.test.ts pins that); agents animate only from recorded events.
+  {
+    file: "src/park/engines/park.ts",
+    rule: "inline-motion-style",
+    reason:
+      "Ambient scenery only: the Park city's cars and anonymous pedestrians (drawn with agent-style art) carry looping keyframes (transform and opacity), with no run state, label or link to any run. Agents animate only from recorded events (HR-1).",
+  },
+  {
+    file: "src/park/engines/park.ts",
+    rule: "css-animation",
+    reason:
+      "Same ambient scenery as above, written as the animation shorthand: cars and anonymous agent-styled pedestrians that stand for no run, drawn frozen when still. Agent motion comes only from recorded events (HR-1).",
+  },
+  // The Park shell's own chrome (WEB-MOTION-2): the boot splash, the page change, the progress bar and the world
+  // card. It moves because a person opened the app, clicked a tab or opened a world, never because of an agent or
+  // a run state (src/honesty/park-transitions.allowlist.test.ts pins how narrow these entries stay).
+  {
+    file: "src/park/shell/park.shell.css",
+    rule: "css-keyframes",
+    reason:
+      "Keyframes of the Park shell. The city's ambient scenery, cars and anonymous pedestrians drawn with agent-style art that stand for no run (mvXY, waddle, walkFrame), and non-agent UI chrome that moves when a person acts: the boot splash's bar and fade and the world loader's ring and card fade (tiloSlide, tiloSpin, tiloFade). Transform and opacity only. Agents animate only from recorded events (HR-1).",
+  },
+  {
+    file: "src/park/shell/park.shell.css",
+    rule: "css-animation",
+    reason:
+      "Ambient city scenery and non-agent UI chrome. animation-play-state pauses the city's anonymous cars and pedestrians (they stand for no run) under the veil and in a hidden tab. The boot splash's sliding bar and fade and the world loader's spinning ring and card fade are chrome motion started by a click or by app state (the app booting, a world card opening); the loader card's text ('Waking N agents', step checks, a 30/60/90/100 fill) is a fixed timer ceremony started by a click and is not tied to any run state; the ring only spins while it is up. Reduced motion turns them off. Agents animate only from recorded events (HR-1).",
+  },
+  {
+    file: "src/park/shell/park.shell.css",
+    rule: "css-transition",
+    reason:
+      "UI chrome only, non-agent: the page change fade and slide, the top progress bar and its fill, the enter fade of a toast, popover or menu, and pointer-only hover and press feedback on controls and on page cards, tiles, pins and events under the page outlet (a lift or a press; it carries no run or decision state), plus the slide of a control's thumb or knob. It also covers the paint-only colour fades of the same chrome (user approved 8 Oct): the hover wash on the nav and on list rows, the track of a switch while its knob slides, a chosen chip filling, and the text colour of a segmented control, each on an exact selector list pinned in motion3.micro.css.test.ts. Each starts from a person's pointer or click or from the UI state that click set (menu open, toast shown, switch on), and animates transform, opacity, background-color or color only, never a layout property, box-shadow or filter; reduced motion and the still preference turn them off. Nothing here shows or implies an agent, a run or a decision; world, stage and agent motion is not covered, and agents animate only from recorded events (HR-1).",
+  },
+  // The signed-out landing's scroll reveal and hover lift (LANDING-2): page chrome, no agent, run or decision.
+  {
+    file: "src/landing/landing.motion.css",
+    rule: "css-transition",
+    reason:
+      "Landing page chrome only, non-agent: sections and cards fade and rise into view as they scroll on, and cards lift a few pixels under a pointer. Opacity, translate and transform only, never a layout property. Reveal.tsx marks elements only when motion is welcome (none under reduced motion); no agent picture, world or run state moves here, and agents animate only from recorded events (HR-1).",
+  },
+  // The Tilo T design layer (TILO-T-FOUNDATION, owner order 16 Oct): the design's own keyframes ported 1:1 so screen tickets can
+  // drive them from recorded events. src/design/tilo-t/motion.css holds names and values only; nothing starts one by itself
+  // except ambient decoration (Buddy idle blink and bob, the loading shimmer).
+  {
+    file: "src/design/tilo-t/motion.css",
+    rule: "css-keyframes",
+    reason:
+      "Tilo T design keyframes ported 1:1 (tsBob, tsBlink, tMarch, tRise, tParcel, tConfetti, the run-start and pool-loader storyboards and the rest), plus ttPoolFade (reduced-motion fade). The pool lap reuses tSwim on its elliptical offset-path. A keyframe only plays when a component applies its class: work animation names its recorded trigger event, and the pool animation names the pending site request or world.started/world.planned event. Ambient decoration is Buddy idle loops and loading shimmer. Transform, opacity and filter only.",
+  },
+  {
+    file: "src/design/tilo-t/motion.css",
+    rule: "css-animation",
+    reason:
+      "Class rules that start the Tilo T keyframes: Buddy moods, ambient idle loops, loading shimmer and dots, plus PoolLoader's leap/swim/sink sequence after a site request or recorded world.started lasts 300 ms; buffered task events use their recorded timestamps, and world.planned/world.failed end the swim. Animation-play-state pauses loops in a hidden tab or off-screen section. Reduced motion and the still choice stop the pool motion (leaving its fade) and Buddy loops. Work motion names its real event (HR-1).",
+  },
+  {
+    file: "src/design/tilo-t/motion.css",
+    rule: "css-transition",
+    reason:
+      "The global reduced-motion fallback from tilo-t.css makes walks, rises and flights opacity fades and stops loops; PoolLoader's page blur/scale transition starts after a site request or world.started remains pending 300 ms, then delays clearing at sink. Reduced motion changes it to an opacity fade only. No layout property animates; work movement remains event-driven (HR-1).",
+  },
 ];
 
 export interface Violation {

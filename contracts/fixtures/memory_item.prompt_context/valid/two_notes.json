@@ -1,0 +1,16 @@
+{
+  "v": "1.0",
+  "today": "2026-10-16",
+  "items": [
+    {
+      "id": "mem_01JB5VQ0000000000000000002",
+      "kind": "person",
+      "text": "My manager is Priya Raman."
+    },
+    {
+      "id": "mem_01JB5VQ0000000000000000001",
+      "kind": "preference",
+      "text": "I prefer meetings before noon."
+    }
+  ]
+}

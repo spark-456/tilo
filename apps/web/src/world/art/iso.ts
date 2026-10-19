@@ -39,9 +39,16 @@ export function box(
 export function dashed(
   g: Graphics,
   pts: readonly Pt[],
-  opts: { color: string; width?: number; dash?: number; gap?: number; closed?: boolean },
+  opts: {
+    color: string;
+    width?: number;
+    dash?: number;
+    gap?: number;
+    closed?: boolean;
+    alpha?: number;
+  },
 ): void {
-  const { color, width = 1.5, dash = 5, gap = 4, closed = true } = opts;
+  const { color, width = 1.5, dash = 5, gap = 4, closed = true, alpha = 1 } = opts;
   const loop = closed ? [...pts, pts[0] as Pt] : pts;
   let on = true;
   let left = dash;
@@ -64,7 +71,7 @@ export function dashed(
       }
     }
   }
-  g.stroke({ width, color, cap: "round", join: "round" });
+  g.stroke({ width, color, cap: "round", join: "round", alpha });
 }
 
 /** A solid polyline stroke. */

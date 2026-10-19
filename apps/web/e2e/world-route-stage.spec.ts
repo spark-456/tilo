@@ -2,6 +2,7 @@ import { type Page, expect, test } from "@playwright/test";
 import { watchConsole } from "./support/screens";
 import { DESKTOP } from "./support/viewports";
 import {
+  BARE_STAGE_PATH,
   canvasColours,
   canvasSnapshot,
   fixtureUrl,
@@ -17,7 +18,7 @@ import {
 
 test.use({ viewport: DESKTOP });
 
-const W = "/world/w_village_basic";
+const W = "/world/w_village_basic/stage";
 const FINISHED = `${W}?speed=1000`;
 
 async function finished(page: Page) {
@@ -40,11 +41,11 @@ async function fixtureAt(page: Page, seq: number): Promise<string> {
   return canvasSnapshot(page);
 }
 
-test("FR-WLD-04 world route: /world/w_village_basic draws the run, not a bare iso grid", async ({
+test("FR-WLD-04 world route: /world/w_village_basic/stage draws the run, not a bare iso grid", async ({
   page,
 }) => {
   const problems = watchConsole(page);
-  await page.goto("/");
+  await page.goto(BARE_STAGE_PATH);
   await expect(stageCanvas(page)).toBeVisible();
   const bare = await canvasColours(page);
   await page.goto(FINISHED);

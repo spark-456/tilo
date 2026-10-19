@@ -152,7 +152,8 @@ def test_FR_INT_02_safety_role_uses_only_its_primary_and_never_falls_back(tmp_pa
     with pytest.raises(ReplayMissError):
         provider.check("never recorded")
     monkeypatch.setenv("LIVE", "1")
-    with pytest.raises(ProviderConfigError, match="not built yet"):
+    monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)  # the live adapter is built; no project -> it refuses
+    with pytest.raises(ProviderConfigError, match="GOOGLE_CLOUD_PROJECT"):
         provider.check("never recorded")
 
 

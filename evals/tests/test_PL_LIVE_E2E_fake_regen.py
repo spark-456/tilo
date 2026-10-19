@@ -15,6 +15,7 @@ from __future__ import annotations
 import ast
 import importlib.util
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -86,6 +87,21 @@ def test_PL_LIVE_E2E_34_a_the_fake_path_writes_the_synthetic_marker_and_never_re
     assert report.outcome_class == "completed"
     assert (tmp_path / "out" / "SYNTHETIC").is_file()
     assert any((tmp_path / "out" / "model-recordings").rglob("*.json"))
+
+
+def test_PL_LIVE_E2E_35_the_fake_run_reaches_world_completed_within_a_minute(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The run needs tilo-api's artifact store, redactor and raw archive seams (ADR-0018 T4); the harness wires its
+    own in-memory stand-ins. Unwired, no run starts and the old 600 s wait would hide it: this one fails in 60 s."""
+    monkeypatch.setitem(live_e2e()._UNIT_TIMEOUT_S, "live", 60.0)
+    world = world_for(CASE, per_million_usd=0.75, delay_s=0.0)
+    started = time.monotonic()
+    report = _record(tmp_path, world.factory)
+    assert report.outcome_class == "completed", f"{report.outcome_class}: {report.reason} ({report.event_count} events)"
+    assert report.events[-1]["type"] == "world.completed", [e["type"] for e in report.events][-5:]
+    assert time.monotonic() - started < 60
+    assert any(e["type"] == "artifact.created" for e in report.events), "no item reached the store"
 
 
 def test_PL_LIVE_E2E_34_b_a_provider_that_is_not_a_fake_is_refused_before_any_call(tmp_path: Path) -> None:

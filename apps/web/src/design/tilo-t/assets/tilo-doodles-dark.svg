@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280" viewBox="0 0 280 280" fill="none" stroke="#F4F4F2" stroke-opacity=".075" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+<g transform="translate(30 26) rotate(-8)"><rect x="0" y="12" width="30" height="28" rx="5"></rect><rect x="5" y="18" width="20" height="11" rx="3.5"></rect><path d="M10.5 22.5v1.5M19.5 22.5v1.5"></path><path d="M8 12V7h4v5M13 12V3h4v9M18 12V7h4v5"></path><path d="M0 22h-4v9h4M30 22h4v9h-4"></path><path d="M8 40v6h5v-6M17 40v6h5v-6"></path></g>
+<g transform="translate(150 24) rotate(12)"><path d="M0 12L32 0 22 26 15 17z M15 17L32 0"></path></g>
+<path d="M108 66c10-6 18-2 30-12" stroke-dasharray="2 5"></path>
+<g transform="translate(214 66)"><path d="M0 14L14 4l14 10v18H0z M10 32v-9h8v9 M5 18h4M19 18h4"></path></g>
+<g transform="translate(96 104) rotate(6)"><rect x="0" y="4" width="30" height="26" rx="4"></rect><path d="M0 12h30 M8 0v7 M22 0v7 M7 19h3M14 19h3M21 19h3M7 24h3M14 24h3"></path></g>
+<g transform="translate(28 118)"><path d="M12 0a11 11 0 0 0-6.5 19.8c1.4 1 2.2 2.4 2.2 4V26h8.6v-2.2c0-1.6.8-3 2.2-4A11 11 0 0 0 12 0z M8 30h8"></path><path d="M12 -7v-3 M-5 10h-3 M29 10h3 M0 -2l-2-2 M24 -2l2-2"></path></g>
+<g transform="translate(188 138)"><circle cx="14" cy="14" r="4.5"></circle><circle cx="14" cy="14" r="10"></circle><path d="M14 0v4M14 24v4M0 14h4M24 14h4M4.1 4.1l2.8 2.8M21.1 21.1l2.8 2.8M4.1 23.9l2.8-2.8M21.1 6.9l2.8-2.8"></path></g>
+<g transform="translate(118 186) rotate(-10)"><rect x="0" y="0" width="32" height="22" rx="4"></rect><path d="M2 3l14 10L30 3"></path></g>
+<g transform="translate(38 196)"><path d="M0 44V14l10-6 10 6v30 M20 44V24h12v20 M-6 44h44 M6 20h3M11 20h3M6 28h3M11 28h3M6 36h3M11 36h3M25 30h3M25 36h3"></path></g>
+<g transform="translate(222 208) rotate(10) scale(.78)"><rect x="0" y="12" width="30" height="28" rx="5"></rect><rect x="5" y="18" width="20" height="11" rx="3.5"></rect><path d="M9 23q1.5-2 3 0M18 23q1.5-2 3 0"></path><path d="M8 12V7h4v5M13 12V3h4v9M18 12V7h4v5"></path><path d="M0 22h-4v9h4M30 22l5-9"></path><path d="M8 40v6h5v-6M17 40v6h5v-6"></path></g>
+<path d="M248 18l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"></path>
+<path d="M94 248l1.5 4 4 1.5-4 1.5-1.5 4-1.5-4-4-1.5 4-1.5z"></path>
+<circle cx="170" cy="108" r="2"></circle><circle cx="80" cy="82" r="1.6"></circle><circle cx="256" cy="130" r="1.6"></circle><circle cx="12" cy="176" r="1.6"></circle>
+<path d="M150 254h28a8 8 0 0 0 0-16 11 11 0 0 0-21-3 7 7 0 0 0-7 19z"></path>
+<g transform="translate(240 168) rotate(-14)"><path d="M0 0h14v12l-4 4H0z M10 16v-4h4"></path></g>
+</svg>

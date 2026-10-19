@@ -1,0 +1,32 @@
+{
+  "v": "1.0",
+  "artifact": {
+    "artifact_id": "art_timezone_site",
+    "version": 1,
+    "label": "Timezone clock site"
+  },
+  "org_id": "org_example",
+  "world_id": "w_example",
+  "run_id": "r_example_1",
+  "owner": "u_owner",
+  "media_type": "text/html",
+  "size_bytes": 524288,
+  "content_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "parents": [],
+  "origin": {
+    "kind": "unit",
+    "unit": "U3",
+    "agent": "A_w1"
+  },
+  "sources": [
+    {
+      "id": "src_timezones",
+      "archive_ref": "r_example_1/11"
+    }
+  ],
+  "screening": "clean",
+  "screened_at": "2026-10-05T09:29:59.500Z",
+  "redacted": false,
+  "idempotency_key": "r_example_1:U3:0:0",
+  "created_at": "2026-10-05T09:30:00.000Z"
+}

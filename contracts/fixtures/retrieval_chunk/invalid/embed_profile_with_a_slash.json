@@ -1,0 +1,21 @@
+{
+  "id": "ch_a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+  "org_id": "org_example",
+  "owner": "u_alex",
+  "team_id": null,
+  "world_id": null,
+  "source": {
+    "kind": "memory_item",
+    "id": "mem_01JB5VQ0000000000000000001",
+    "version": null
+  },
+  "label": "Your note",
+  "position": 0,
+  "text": "I prefer meetings before noon.",
+  "text_sha256": "3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+  "embed_profile": "models/embedding-x",
+  "dimensions": 768,
+  "screening": "clean",
+  "created_at": "2026-10-16T03:00:01.000Z",
+  "expires_at": null
+}

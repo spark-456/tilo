@@ -1,0 +1,10 @@
+{
+  "revoked_at_provider": true,
+  "parts": [
+    {
+      "type": "alert.raised",
+      "alert_id": "01JB5VQ0000000000000009420",
+      "user_id": "u_priya"
+    }
+  ]
+}

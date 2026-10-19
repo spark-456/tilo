@@ -16,9 +16,11 @@ Defaults chosen where the PRD names no pattern list (listed in the ticket report
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from _browser_lib import EMAIL, PHONE, PNG, FakeWeb, doc, fake_card_numbers, fake_secrets, node, password_box, textbox
-from hypothesis import given, settings
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 
 SECRETS = fake_secrets()
@@ -226,6 +228,12 @@ FRAGMENTS += [
 FRAGMENTS += [(CARDS[k], CARDS["plain"]) for k in ("plain", "spaced", "dashed")] + [(EMAIL, EMAIL)]
 
 
+# Hypothesis seeds 5 and 8 (issue #714) found `bearer` right before an `sk-` key: the masker takes `bearer <token>` as
+# a credential and masks the scheme word with it. The key does not survive, so this is not a leak; the property below
+# allows exactly that absorption and nothing else. Pinned so the case runs on every seed.
+@example(before="bearer", fragment=FRAGMENTS[0], after="")
+@example(before="a bearer", fragment=FRAGMENTS[0], after="b")
+@example(before="bearer", fragment=FRAGMENTS[0], after="bearer")
 @given(before=NOISE, fragment=st.sampled_from(FRAGMENTS), after=NOISE)
 @settings(max_examples=80, deadline=None)
 def test_FR_CON_07_a_secret_embedded_in_any_text_never_survives_masking(before, fragment, after):
@@ -234,7 +242,9 @@ def test_FR_CON_07_a_secret_embedded_in_any_text_never_survives_masking(before, 
     flat = out.replace(" ", "").replace("-", "") if sensitive == CARDS["plain"] else out
     assert sensitive not in flat
     assert mask(out) == out
-    assert out.startswith(before) and out.endswith(after), "text around the secret must be untouched"
+    # `bearer <token>` is one credential: a trailing scheme word of `before` may be masked with the token.
+    kept = re.sub(r"(?i)(?:^|(?<=\s))bearer\s*$", "", before)
+    assert out.startswith(kept) and out.endswith(after), "text around the secret must be untouched"
 
 
 @given(text=NOISE)

@@ -1,0 +1,12 @@
+{
+  "outcome": "retry",
+  "result": null,
+  "may_have_sent": false,
+  "parts": [
+    {
+      "type": "connection.expired",
+      "connector": "gmail",
+      "user_id": "u_owner"
+    }
+  ]
+}

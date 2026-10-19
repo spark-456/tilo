@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/appspec.schema.json",
+  "x-version": "1.0.0",
+  "title": "AppSpec",
+  "description": "A declarative app (FR-AGT-16, ADR-0029 decision 9): JSON that a unit writes and the artifact store keeps as an application/json version with origin unit, and that fixed web code renders at an owner-only route. Nothing in it is ever run as code or markup, and no link or URL comes from it. 1.0.0 has one kind, quiz: single-answer multiple-choice questions under one countdown timer, each citing the stored file it came from. Rules the schema cannot express are AS-01 to AS-04 in appspec.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "kind", "title", "theme", "timer", "questions"],
+  "properties": {
+    "v": { "const": "1.0" },
+    "kind": { "const": "quiz" },
+    "title": { "$ref": "#/$defs/title" },
+    "theme": { "$ref": "common.schema.json#/$defs/slug" },
+    "timer": { "$ref": "#/$defs/timer" },
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/question" }
+    }
+  },
+  "$defs": {
+    "title": {
+      "description": "The quiz's name, shown as plain text.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "timer": {
+      "description": "One countdown for the whole attempt, in seconds (1 minute to 6 hours). The person may pause it; at 0 the attempt is submitted. The clock is the person's own, so it emits no event.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seconds"],
+      "properties": {
+        "seconds": { "type": "integer", "minimum": 60, "maximum": 21600 }
+      }
+    },
+    "question": {
+      "description": "One question. answer is the id of the one correct option and always names an option the question has. topic is an optional tag the person can filter by.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "stem", "options", "answer", "source"],
+      "properties": {
+        "id": { "$ref": "#/$defs/question_id" },
+        "stem": { "$ref": "#/$defs/stem" },
+        "options": { "$ref": "#/$defs/options" },
+        "answer": { "$ref": "#/$defs/option_id" },
+        "topic": { "$ref": "common.schema.json#/$defs/slug" },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "dependentSchemas": {
+        "answer": {
+          "anyOf": [
+            { "properties": { "answer": { "enum": ["a", "b"] } } },
+            { "properties": { "answer": { "const": "c" }, "options": { "required": ["c"] } } },
+            { "properties": { "answer": { "const": "d" }, "options": { "required": ["d"] } } },
+            { "properties": { "answer": { "const": "e" }, "options": { "required": ["e"] } } },
+            { "properties": { "answer": { "const": "f" }, "options": { "required": ["f"] } } }
+          ]
+        }
+      }
+    },
+    "question_id": {
+      "description": "q1 to q999, unique within the spec (AS-01).",
+      "type": "string",
+      "pattern": "^q[1-9][0-9]{0,2}$"
+    },
+    "stem": {
+      "description": "The question text, shown as plain text (AS-03).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "option_id": {
+      "type": "string",
+      "enum": ["a", "b", "c", "d", "e", "f"]
+    },
+    "option_text": {
+      "description": "One choice, shown as plain text (AS-03).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "options": {
+      "description": "Two to six choices keyed a to f and shown in that order: a and b always, each later id only with the one before it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["a", "b"],
+      "properties": {
+        "a": { "$ref": "#/$defs/option_text" },
+        "b": { "$ref": "#/$defs/option_text" },
+        "c": { "$ref": "#/$defs/option_text" },
+        "d": { "$ref": "#/$defs/option_text" },
+        "e": { "$ref": "#/$defs/option_text" },
+        "f": { "$ref": "#/$defs/option_text" }
+      },
+      "dependentRequired": { "d": ["c"], "e": ["d"], "f": ["e"] }
+    },
+    "source": {
+      "description": "Where the question came from: a stored version in the spec's own world, made by a fetch or an upload (AS-02), and for a PDF the page. The web shows the publisher from that version's manifest, never from the spec (AS-03).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact"],
+      "properties": {
+        "artifact": { "$ref": "common.schema.json#/$defs/artifact_ref" },
+        "page": { "$ref": "#/$defs/page" }
+      }
+    },
+    "page": {
+      "description": "1-based page of the cited PDF.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    }
+  }
+}

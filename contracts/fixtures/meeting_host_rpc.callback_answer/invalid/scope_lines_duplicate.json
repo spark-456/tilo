@@ -1,0 +1,11 @@
+{
+  "connector": "gmail",
+  "scope_lines": ["Read a thread the task needs.", "Read a thread the task needs."],
+  "parts": [
+    {
+      "type": "connection.established",
+      "connector": "gmail",
+      "user_id": "u_priya"
+    }
+  ]
+}

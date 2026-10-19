@@ -14,6 +14,14 @@ textarea {
   font-family: inherit;
   font-size: inherit;
 }
+
+a {
+  color: var(--color-brand-primary, #5a3fe0);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
 /* PRD 9.6/18.2: stage mode is a display setting; type and targets scale by --ui-scale.
    Type: every size is one of the PRD 18.2 steps. tokens.css holds the steps in rem
    (--font-size-N); --text-N is the same step times --ui-scale, declared here because --ui-scale
@@ -485,6 +493,12 @@ textarea {
 .nav-btn:focus-visible,
 .primary:focus-visible,
 .secondary:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.repeat-weekly input:focus-visible,
+.repeat-weekly select:focus-visible,
+.flow-notice input:focus-visible {
   outline: 2px solid var(--color-brand-primary);
   outline-offset: 2px;
 }
@@ -2905,4 +2919,202 @@ html[data-density="professional"] .app-shell {
     border-top: 1px solid var(--color-surface-2);
     border-radius: var(--radius-cards) var(--radius-cards) 0 0;
   }
+}
+/* FR-WLD-12 (PRD 9.6, 18.3): Stage mode 1920x1080 presenter layout, presenter bar and reset
+   confirmation dialog. Fixed layers so opening or closing shifts nothing (CLS 0); no transitions. */
+.app-shell[data-stage-layout="1920x1080"] {
+  --bar-h: 0px;
+}
+.stage-presenter {
+  position: fixed;
+  left: calc(72px * var(--ui-scale, 1) + var(--space-16));
+  bottom: var(--space-16);
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-8) var(--space-12);
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font-size: var(--text-14);
+}
+.app-shell[data-stage-layout="1920x1080"] .stage-presenter {
+  left: var(--space-16);
+}
+.stage-presenter-badge {
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--color-brand-primary);
+  color: var(--color-surface-1);
+  font: 700 var(--text-12) / 1.2 var(--font-ui);
+}
+@media (max-width: 767px) {
+  .stage-presenter {
+    display: none;
+  }
+}
+.stage-reset-dialog {
+  position: fixed;
+  top: calc(var(--chrome-h) + var(--space-24));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 32px));
+  margin: 0;
+  padding: var(--space-16);
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-cards);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font-size: var(--text-14);
+}
+.stage-reset-dialog h2 {
+  margin: 0 0 var(--space-8);
+  font: 800 var(--text-20) / 1.2 var(--font-display);
+}
+.stage-reset-dialog h2:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.stage-reset-dialog p {
+  margin: 0 0 var(--space-12);
+  color: var(--color-ink-2);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+}
+.stage-reset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+/* FR-AGT-14 S-03 "Repeat weekly": a checkbox row, and its day, time and zone when switched on. */
+.repeat-weekly {
+  margin: 0 0 var(--space-8);
+  font: 700 var(--text-14) var(--font-ui);
+}
+.repeat-weekly-toggle,
+.repeat-weekly-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 24px;
+}
+.repeat-weekly-toggle input {
+  width: 24px;
+  height: 24px;
+}
+.repeat-weekly-fields {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+  margin: 0;
+  margin-top: var(--space-8);
+  font-weight: 600;
+}
+.repeat-weekly-fields select,
+.repeat-weekly-fields input {
+  min-height: 24px;
+  padding: var(--space-4) var(--space-8);
+  border: 1px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-1);
+  color: var(--color-ink-1);
+  font: 700 var(--text-14) var(--font-ui);
+}
+.repeat-weekly-tz,
+.repeat-weekly-hint {
+  flex: 1 0 100%;
+  color: var(--color-ink-2);
+  font-weight: 400;
+}
+@media (max-width: 767px) {
+  .repeat-weekly-toggle input,
+  .repeat-weekly-fields select,
+  .repeat-weekly-fields input {
+    min-height: 44px; /* the phone touch target */
+  }
+  .repeat-weekly-toggle input {
+    min-width: 44px;
+  }
+}
+
+/* FR-AGT-14: keyboard focus stays visible on every repeat and rename control. */
+.repeat-weekly input:focus-visible,
+.repeat-weekly select:focus-visible,
+.routine-name input:focus-visible,
+.routines-scope:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.routine-name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+.routine-name input {
+  min-width: 0;
+  width: 100%;
+}
+@media (max-width: 767px) {
+  .routines-scope .bitem {
+    flex-wrap: wrap;
+  }
+  .routines-scope .bitem-main {
+    flex-basis: 100%;
+  }
+}
+/* ADR-0035 L6c: the form of a needs-you card that asks for fields (Park tokens only). */
+.need-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+.need-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.need-field label {
+  font-weight: 700;
+  font-size: var(--text-14);
+}
+.need-field input {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  min-height: 44px;
+  padding: var(--space-8) var(--space-12);
+  border: 2px solid var(--color-ink-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-0);
+  color: var(--color-ink-1);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+}
+.need-field input[aria-invalid="true"] {
+  border-color: var(--color-signal-blocked);
+}
+.need-field input:disabled {
+  cursor: not-allowed;
+}
+.need-field input:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+.item-text {
+  box-sizing: border-box;
+  max-width: 100%;
+  max-height: 320px;
+  margin: var(--space-8) 0;
+  padding: var(--space-8) var(--space-12);
+  overflow: auto;
+  border: 2px solid var(--color-surface-2);
+  border-radius: var(--radius-controls);
+  background: var(--color-surface-0);
+  color: var(--color-ink-1);
+  font: 400 var(--text-14) / 1.4 var(--font-ui);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

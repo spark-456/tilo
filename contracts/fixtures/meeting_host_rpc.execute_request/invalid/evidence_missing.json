@@ -1,0 +1,36 @@
+{
+  "entry": {
+    "id": "01JB5VQ0000000000000009401",
+    "idempotency_key": "r_followups_1:U1:create_draft:1",
+    "world_id": "w_followups",
+    "run_id": "r_followups_1",
+    "action_type": "create_draft",
+    "connector": "gmail",
+    "recipients": ["supplier@example.org"],
+    "attachments": [],
+    "item": {
+      "artifact_id": "art_reply_draft",
+      "version": 2
+    },
+    "destination": "thr_supplier_1",
+    "modifiers": [],
+    "risk_tier": "T1",
+    "authz": {
+      "by": "person",
+      "ref": "u_owner",
+      "at": "2026-10-09T09:32:09.500Z"
+    },
+    "undo_window_s": 0,
+    "scheduled_at": "2026-10-09T09:32:10.000Z",
+    "state": "queued",
+    "created_at": "2026-10-09T09:32:10.000Z"
+  },
+  "items": [
+    {
+      "artifact_id": "art_reply_draft",
+      "version": 2,
+      "content_sha256": "ffd92921dc2f81d11f2c3bfb759f789d044843bdc89bd783c1e865d32efd7a23",
+      "content_b64": "RmFrZSByZXBseSBkcmFmdCBib2R5IGZvciB0ZXN0cy4="
+    }
+  ]
+}

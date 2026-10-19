@@ -1,0 +1,55 @@
+{
+  "owner_id": "u_alex",
+  "org_id": "org_example",
+  "version": 3,
+  "profile": {
+    "name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "email": "alex@example.com",
+    "title": "Operations lead",
+    "time_zone": "Europe/London",
+    "language": "en-GB",
+    "working_hours": {
+      "days": ["mon", "tue", "wed", "thu", "fri"],
+      "start": "08:30",
+      "end": "17:30"
+    }
+  },
+  "notifications": {
+    "decisions": {
+      "phone": true,
+      "email": true,
+      "slack": false
+    },
+    "spend": {
+      "phone": false,
+      "email": true,
+      "slack": false
+    },
+    "finished": {
+      "phone": true,
+      "email": false,
+      "slack": false
+    },
+    "digest": {
+      "phone": false,
+      "email": true,
+      "slack": false
+    },
+    "weekly": {
+      "phone": false,
+      "email": false,
+      "slack": false
+    }
+  },
+  "quiet_hours": {
+    "enabled": true,
+    "start": "19:00",
+    "end": "08:00",
+    "timezone": "Europe/London",
+    "threshold": {
+      "amount_minor": 100000,
+      "currency": "GBP"
+    }
+  },
+  "updated_at": "2026-10-12T09:30:00.000Z"
+}

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-t.js"></script>
+<style>body{margin:0}a{color:var(--ink);text-decoration:none}</style>
+</helmet>
+<aside aria-label="Ask Tilo" style="height:100%;min-height:600px;box-sizing:border-box;display:flex;flex-direction:column;font-family:var(--fB);color:var(--ink);font-size:14.5px;line-height:1.5;background:var(--card)">
+  <div style="padding:14px 16px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)">
+    <dc-import name="Tilo S Buddy" size="36" mood="{{ mood }}" hint-size="31px,36px"></dc-import>
+    <span style="flex:1;display:flex;flex-direction:column;line-height:1.25"><span style="font-weight:700;font-size:16px">Ask Tilo</span><span style="font-size:12px;color:var(--ink3)">Knows your worlds, agenda and pins</span></span>
+    <span aria-label="Close" style="width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--ink2)">{{ iX }}</span>
+  </div>
+  <div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--line)">
+    <span style="font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.4px">USING</span>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      <sc-for list="{{ ctx }}" as="c" hint-placeholder-count="3"><span style="height:32px;padding:0 6px 0 10px;border-radius:99px;background:var(--sunk);display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600"><span style="color:var(--ink2)">{{ c.ic }}</span>{{ c.t }}<span aria-label="Remove" style="width:22px;height:22px;border-radius:99px;display:flex;align-items:center;justify-content:center;color:var(--ink3)">{{ iXs }}</span></span></sc-for>
+      <span style="height:32px;padding:0 10px;border-radius:99px;border:1px dashed var(--line2);display:flex;align-items:center;font-size:12.5px;font-weight:600;color:var(--ink2)">+ Add</span>
+    </div>
+  </div>
+  <div style="flex:1;min-height:0;overflow:hidden;padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <sc-for list="{{ quick }}" as="q" hint-placeholder-count="3"><span role="button" style="min-height:44px;box-sizing:border-box;padding:0 12px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;gap:10px;font-weight:600;font-size:14px" style-hover="border-color:var(--ink)"><span style="color:var(--ink2)">{{ q.ic }}</span>{{ q.t }}</span></sc-for>
+    </div>
+    <sc-if value="{{ answer }}" hint-placeholder-val="{{ true }}">
+      <span style="align-self:flex-end;max-width:80%;background:var(--pri);color:var(--onPri);border-radius:16px 16px 4px 16px;padding:9px 13px">What needs me today?</span>
+      <div style="display:flex;flex-direction:column;gap:8px;background:var(--sunk);border-radius:16px 16px 16px 4px;padding:12px 14px">
+        <span>Three things, most urgent first:</span>
+        <sc-for list="{{ items }}" as="it" hint-placeholder-count="3">
+          <a href="#" style="display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:12px;background:var(--card);border:1px solid var(--line)"><span style="font-family:var(--mono);font-size:11.5px;color:var(--ink3);padding-top:2px">{{ it.n }}</span><span style="flex:1;display:flex;flex-direction:column;line-height:1.35"><span style="font-weight:600;font-size:13.5px">{{ it.t }}</span><span style="font-size:12px;color:var(--ink3);display:flex;align-items:center;gap:4px">{{ it.ic }}{{ it.w }}</span></span><span style="color:var(--ink3)">{{ iChev }}</span></a>
+        </sc-for>
+        <span style="font-size:12.5px;color:var(--ink2)">Your 11:00 supplier call has a brief ready. Want me to start a world to chase the 2 overdue invoices?</span>
+      </div>
+    </sc-if>
+    <sc-if value="{{ thinking }}" hint-placeholder-val="{{ false }}">
+      <span style="align-self:flex-end;max-width:80%;background:var(--pri);color:var(--onPri);border-radius:16px 16px 4px 16px;padding:9px 13px">Summarize my day</span>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="display:flex;gap:6px;flex-wrap:wrap"><span style="height:28px;padding:0 10px;border-radius:99px;background:var(--sunk);font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px">{{ iCal }}Read today’s agenda</span><span style="height:28px;padding:0 10px;border-radius:99px;border:1px solid var(--line);font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;color:var(--ink2)">{{ iCity }}Checking 3 worlds…</span></span>
+        <span style="height:64px;border-radius:14px;border:1px dashed var(--bpLine);background-color:var(--bp);background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%);background-size:700px 100%;background-repeat:no-repeat;animation:tShim 1.6s linear infinite"></span>
+      </div>
+    </sc-if>
+    <sc-if value="{{ error }}" hint-placeholder-val="{{ false }}">
+      <div role="alert" style="border-radius:14px;border:1px solid var(--redInk);padding:12px;display:flex;flex-direction:column;gap:8px"><span style="font-weight:700;color:var(--redInk);display:flex;gap:6px;align-items:center">{{ iAlert }}Couldn’t read your agenda</span><span style="font-size:13px;color:var(--ink2)">Your calendar connection expired. Reconnect it, or I can answer from your worlds only.</span><div style="display:flex;gap:6px"><span style="height:40px;padding:0 12px;border-radius:10px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;font-weight:700;font-size:13px">Reconnect</span><span style="height:40px;padding:0 12px;border-radius:10px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600;font-size:13px">Worlds only</span></div></div>
+    </sc-if>
+  </div>
+  <div style="padding:12px 16px 16px;border-top:1px solid var(--line)">
+    <div style="height:52px;box-sizing:border-box;padding:0 6px 0 14px;border-radius:14px;border:1.5px solid var(--ink);display:flex;align-items:center;gap:8px"><span style="flex:1;color:var(--ink3)">Ask about your work…</span><span aria-label="Send" style="width:40px;height:40px;border-radius:11px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center">{{ iSend }}</span></div>
+  </div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:400,&quot;height&quot;:836},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;answer&quot;,&quot;fresh&quot;,&quot;loading&quot;,&quot;error&quot;],&quot;default&quot;:&quot;answer&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloT) this.t = setInterval(() => { if (window.TiloT) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const T = window.TiloT, ic = (n, s) => T ? T.ic(React.createElement, n, s) : null;
+    const s = this.props.state ?? 'answer';
+    return {
+      answer: s === 'answer', thinking: s === 'loading', error: s === 'error', mood: s === 'loading' ? 'think' : s === 'error' ? 'sad' : s === 'answer' ? 'talk' : 'idle',
+      ctx: [['3 recent worlds', 'city'], ['Today’s agenda', 'calendar'], ['Team pins', 'pin']].map(([t, i]) => ({ t, ic: ic(i, 14) })),
+      quick: [['Summarize my day', 'sparkle'], ['What needs me?', 'inbox'], ['Start a world from this', 'city']].map(([t, i]) => ({ t, ic: ic(i, 18) })),
+      items: [['1', 'Approve the invite email to 12 people', 'Team offsite in Porto', 'city'], ['2', 'Pick a supplier: Brightcell or Voltway', 'Compare 3 suppliers · result', 'parcel'], ['3', 'Confirm Tilo can join the 2 pm review', 'Agenda · meeting', 'calendar']].map(([n, t, w, i]) => ({ n, t, w, ic: ic(i, 12) })),
+      iX: ic('x', 18), iXs: ic('x', 12), iChev: ic('chev', 16), iSend: ic('send', 18), iCal: ic('calendar', 13), iCity: ic('city', 13), iAlert: ic('alert', 16)
+    };
+  }
+}
+</script>
+</body>
+</html>

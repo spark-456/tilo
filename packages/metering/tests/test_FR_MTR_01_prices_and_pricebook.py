@@ -42,18 +42,18 @@ def test_FR_MTR_01_credits_uses_versioned_price_and_credit_usd(tmp_path):
 
 
 def test_FR_MTR_01_repo_prices_yaml_loads_and_quotes_every_profile():
-    """PL-06: config/prices.yaml is set (user-confirmed 2026-10-04), so PriceBook quotes every profile."""
+    """PL-06: config/prices.yaml is set (ADR-0029 draft, 2026-10-08), so PriceBook quotes every profile."""
     prices_path = REPO_ROOT / "config" / "prices.yaml"
     raw = yaml.safe_load(prices_path.read_text(encoding="utf-8"))
     assert raw["status"] == "set"
     assert raw["credit_usd"] == pytest.approx(0.005)  # PRD 14.1
     book = PriceBook.load(prices_path)
     assert book.credit_usd == pytest.approx(0.005)
-    at = datetime(2026, 10, 4, tzinfo=UTC)
+    at = datetime(2026, 10, 8, tzinfo=UTC)
     quote = book.quote("flash-38", at=at)
-    assert (quote.input, quote.output, quote.effective_date) == (0.75, 3.75, "2026-09-24")
-    assert "ai.google.dev" in quote.source
-    assert book.quote("lite-31", at=at).output == pytest.approx(1.50)
+    assert (quote.input, quote.output, quote.effective_date) == (0.825, 4.125, "2026-10-08")
+    assert "asia-southeast1" in quote.source
+    assert book.quote("lite-31", at=at).output == pytest.approx(1.65)
     for profile in raw["profiles"]:
         assert book.quote(profile, at=at).input >= 0
     with pytest.raises(UnpricedError):  # before the effective date, refuse rather than guess

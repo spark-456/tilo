@@ -27,7 +27,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
-from _chn10_lib import make_rig
 from _chn11_lib import (
     BENIGN,
     RUN,
@@ -42,6 +41,7 @@ from _chn11_lib import (
     OutboxRefused,
     autopilot_module,
     fake_evidence_kwargs,
+    named_rig,
     pair,
     scripted_thread,
 )
@@ -220,7 +220,7 @@ class Gate:
 
 
 def make_gate(level: str = "L2") -> Gate:
-    rig = make_rig()
+    rig = named_rig()  # CHN-GATE-E: the owner's own SENT message names "Sarah"
     outbox = GateOutbox(rig.clock)
     bench = Bench(rig, outbox, FakePolicy(level), FakeContacts(), MemoryDraftStore(), EventLog())  # type: ignore[arg-type]
     return Gate(bench, outbox)

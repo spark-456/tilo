@@ -273,11 +273,21 @@ class FakeGoogle:
                 self.live_refresh[body["refresh_token"]] = list(scopes)
         return body
 
-    def issue_code(self, scopes: list[str], *, challenge: str | None = None, redirect_uri: str | None = None) -> str:
-        """An authorisation code the user's consent produced, for `scopes` (what they granted)."""
+    def issue_code(
+        self,
+        scopes: list[str],
+        *,
+        challenge: str | None = None,
+        redirect_uri: str | None = None,
+        refresh: bool = True,
+    ) -> str:
+        """An authorisation code the user's consent produced, for `scopes` (what they granted). `refresh` False is
+        Google's incremental answer without `prompt=consent`: no refresh token in the exchange."""
         code = fake_secret("code")
         with self._lock:
-            self._codes[code] = {"scopes": list(scopes), "challenge": challenge, "redirect_uri": redirect_uri}
+            self._codes[code] = {
+                "scopes": list(scopes), "challenge": challenge, "redirect_uri": redirect_uri, "refresh": refresh,
+            }  # fmt: skip
         return code
 
     # -- the HTTP client seam -----------------------------------------------------------------
@@ -334,7 +344,7 @@ class FakeGoogle:
             reason = "PKCE verification failed"
         if reason:
             return FakeResponse(400, {"error": "invalid_grant", "error_description": f"{reason}: {d.get('code')}"})
-        return FakeResponse(200, self.token_response(grant["scopes"]))
+        return FakeResponse(200, self.token_response(grant["scopes"], refresh=grant.get("refresh", True)))
 
     def _revoke(self, d: dict[str, str]) -> FakeResponse:
         token = d.get("token", "")

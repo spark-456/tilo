@@ -3,7 +3,14 @@ import { type Page, expect, test } from "@playwright/test";
 import { watchConsole } from "./support/screens";
 import { readShifts, resetShifts, watchShifts } from "./support/shifts";
 import { DESKTOP, MOBILE } from "./support/viewports";
-import { canvasSnapshot, fixtureUrl, stageFrame, stageSeq, traceRows } from "./support/world";
+import {
+  BARE_STAGE_PATH,
+  canvasSnapshot,
+  fixtureUrl,
+  stageFrame,
+  stageSeq,
+  traceRows,
+} from "./support/world";
 
 // FR-WLD-07 (web): "Pause all stops every agent in <= 2 s and shows a veil". The veil, the HUD
 // word "Paused" and the frozen stage all come from a recorded world.paused (HR-1); events that
@@ -29,7 +36,8 @@ test.describe("FR_WLD_07 recorded pause on the stage (6-agent run)", () => {
     test.setTimeout(60_000);
     const problems = watchConsole(page);
     await watchShifts(page);
-    await page.goto(fixtureUrl("pause-6"));
+    // No world in the address (the task flow's stage): a ?fixture= replay is no run, so nothing can be paused.
+    await page.goto(fixtureUrl("pause-6", {}, BARE_STAGE_PATH));
     await expect(stageFrame(page)).toHaveAttribute("data-stage-ready", "true");
     await waitForSeq(page, 9);
     await expect(veil(page)).toHaveCount(0); // HR-1: nothing claims a pause before the event
@@ -85,7 +93,7 @@ test.describe("FR_WLD_07 recorded pause on the stage (6-agent run)", () => {
   });
 
   test("FR_WLD_07 a recorded replay cannot be paused: the control says so", async ({ page }) => {
-    await page.goto(fixtureUrl("pause-6", { seq: 5 }));
+    await page.goto(fixtureUrl("pause-6", { seq: 5 }, BARE_STAGE_PATH)); // no world in the address
     const button = page.getByTestId("pause-all");
     await expect(button).toBeVisible();
     await expect(button).toHaveAttribute("aria-disabled", "true");
@@ -102,7 +110,7 @@ test.describe("FR_WLD_07 Pause all from the world screens (fixture client)", () 
     await watchShifts(page);
     await page.setViewportSize(DESKTOP);
     // The 900 ms request latency keeps "Pausing…" on screen long enough to look at.
-    await page.goto("/world/w_village_basic?speed=10&client_delay_ms=900");
+    await page.goto("/world/w_village_basic/stage?speed=10&client_delay_ms=900");
     const hud = page.getByTestId("hud-meter");
     await expect(hud).toContainText("Working", { timeout: 20_000 });
     await expect(veil(page)).toHaveCount(0);
@@ -152,7 +160,7 @@ test.describe("FR_WLD_07 Pause all from the world screens (fixture client)", () 
   }) => {
     test.setTimeout(60_000);
     await page.setViewportSize(MOBILE);
-    await page.goto("/world/w_village_basic?speed=10");
+    await page.goto("/world/w_village_basic/stage?speed=10");
     await page.getByText("World status").click();
     const button = page.getByTestId("pause-all");
     const box = await button.boundingBox();

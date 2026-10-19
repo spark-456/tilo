@@ -1,0 +1,366 @@
+// The Park app shell (README Architecture): the city backdrop, the top nav, the notifications popover and
+// the account menu, the page outlet (the one <main>), the toast, the world loader and the boot splash.
+// It renders no `[data-park]` root (ParkApp owns that one) and reads everything from ParkProvider: the app,
+// the store and the Api. The notifications and the user come through the Api on mount, so a fixture Api
+// raises the "Sample data" chip without any page asking for data. The city's cars and walkers run on Home (cityMotion.ts).
+import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { LifetimeCapDialog } from "../../components/LifetimeCapDialog";
+import { notifications as sampleNotifications } from "../api/fixtures/notifications";
+import { nameInitials } from "../api/nameInitials";
+import type { Decision, Notification, User } from "../api/types";
+import type { PageId } from "../app/AppCtx";
+import {
+  endSession,
+  useApp,
+  useDemoSession,
+  useExpectsSample,
+  useParkApi,
+  useParkStore,
+} from "../app/context";
+import { useParkRoute, useQuizAppRoute } from "../app/router";
+import { Button, Popover, Toast } from "../components";
+import { FirstRunBanner } from "../sample/FirstRunBanner";
+import { useFirstRun } from "../sample/useFirstRun";
+import "../tokens/fonts";
+import { PoolLoader } from "../shared/poolLoader";
+import { appearanceOf } from "../studio/ThemeSwitch";
+import { AccountMenu, type AccountPerson } from "./AccountMenu";
+import { CityBackdrop } from "./CityBackdrop";
+import { ContextPanel, useContextChoice } from "./ContextPanel";
+import { Enter } from "./Enter";
+import { NotificationsPopover } from "./NotificationsPopover";
+import { RunBar } from "./RunBar";
+import { TopNav } from "./TopNav";
+import { WorldLoader } from "./WorldLoader";
+import { authInitials, useParkAuth } from "./auth";
+import { useAppearance } from "./cityMotion";
+import { loadShellFonts } from "./fonts";
+import { type Bar, useLeavingCard, useMotionOff, usePageSwap } from "./motion";
+import { useParkTour } from "./tour";
+import "./park.shell.css";
+import { themeFor } from "../tokens/themes";
+import { TiloBubble } from "./TiloBubble";
+import { type BackdropScene, backdropScene } from "./scene";
+
+const SIGN_OUT = "This is a prototype, so you stay signed in";
+const SIGNED_OUT = "You are signed out";
+const SIGN_OUT_FAILED = "Could not sign out. Try again.";
+/** Below this width the six tabs and the tools do not fit in the nav: one menu names the current page (B2). */
+const COMPACT_NAV_BELOW = 840;
+const MOBILE_NOTE = "The Tilo mobile app is a concept. It is not available yet.";
+
+/** Sign out (FR-UX-10): ends the real session when there is one; with none (a local host, the fixture world, a build
+ * with no Firebase config) the menu stays the prototype's toast. `session.signOut` never rejects, and a failed one still
+ * closes the menu; the sign-in gate takes the page from there. */
+function signOut(store: { toast: (message: string) => void; closeMenu: () => void }): void {
+  if (endSession()) store.closeMenu();
+  else store.toast(SIGN_OUT);
+}
+
+/** The bar along the nav's bottom edge while a world opens: 18% then 26 more per step, full at step 3. */
+const loaderBar = (step: number): number => (step >= 3 ? 100 : 18 + step * 26);
+
+export function AppShell({ children }: { children: ReactNode }) {
+  const app = useApp();
+  const store = useParkStore();
+  const api = useParkApi();
+  const route = useParkRoute();
+  const quizRoute = useQuizAppRoute();
+  const state = useSyncExternalStore(store.subscribe, store.getState);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationStatus, setNotificationStatus] = useState<"loading" | "ready" | "failed">(
+    "loading",
+  );
+  const [liveNotifications, setLiveNotifications] = useState(false);
+  const [decisions, setDecisions] = useState<Decision[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [connectorsOn, setConnectorsOn] = useState<number | null>(null);
+  const [ready, setReady] = useState(false);
+  const expectsSample = useExpectsSample();
+  const demo = useDemoSession();
+  const auth = useParkAuth();
+  const contextPerson = auth ? (auth.user?.email ?? "guest-session") : (user?.email ?? "device");
+  const bannerPerson = auth ? (auth.user?.email ?? null) : (user?.email ?? null);
+  const [contextOpen, toggleContext] = useContextChoice(contextPerson);
+  const tour = useParkTour();
+  const first = useFirstRun();
+  const sampleNotes =
+    first && liveNotifications && notificationStatus === "ready" && notifications.length === 0;
+  const [mobileNote, setMobileNote] = useState(false);
+  const signingOut = useRef(false);
+  const appearance = useAppearance();
+  const off = useMotionOff();
+  const viaNav = useRef(false);
+  const navTo = (to: PageId): void => {
+    viaNav.current = true;
+    store.go(to);
+  };
+
+  useEffect(() => {
+    let live = true;
+    const quiet = (): void => undefined; // a read that fails leaves the part empty; the page says why
+    setNotificationStatus("loading");
+    api
+      .getNotifications()
+      .then((r) => {
+        if (!live) return;
+        setNotifications(r.data);
+        setLiveNotifications(r.source === "live");
+        setNotificationStatus("ready");
+      })
+      .catch(() => live && setNotificationStatus("failed"));
+    api
+      .getDecisions()
+      .then((r) => {
+        if (!live) return;
+        setDecisions(r.data);
+        store.setDecisions(r.data);
+      })
+      .catch(quiet);
+    api
+      .getUser()
+      .then((r) => live && setUser(r.data))
+      .catch(quiet);
+    api
+      .getConnectors()
+      .then((r) => live && setConnectorsOn(r.data.filter((c) => c.st !== "available").length))
+      .catch(quiet);
+    return () => {
+      live = false;
+    };
+  }, [api, store]);
+
+  // The traffic schedule is solved in a worker; keep the HTML cover until it and the design fonts are ready.
+  const [scene, setScene] = useState<BackdropScene | null>(null);
+  useEffect(() => {
+    let live = true;
+    const draw = () => {
+      const next = backdropScene(appearance.time, appearance.motion);
+      void Promise.all([next.ready, loadShellFonts()]).then(() => {
+        if (!live) return;
+        setScene(next);
+        setReady(true);
+      });
+    };
+    // FT-PERF-2: prepare scene and fonts concurrently during boot cover so app is ready at minimum 1.2 s
+    draw();
+    return () => {
+      live = false;
+    };
+  }, [appearance.time, appearance.motion]);
+
+  const page = route?.page ?? null;
+  // A tab or menu click fades the old page out and the new one in. Everything else (the browser's back button, a
+  // link inside a page, a world loader's card that covers the swap, reduced motion) swaps at once.
+  const key = route
+    ? route.page === "world"
+      ? `world/${route.params.id}`
+      : route.page
+    : quizRoute
+      ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
+      : "none";
+  // QA-DEMO-1 m5: the "Mobile app" note belongs to the page it was opened on; going elsewhere closes it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `key` is the signal (the route changed)
+  useEffect(() => setMobileNote(false), [key]);
+  const swap = usePageSwap(
+    children,
+    key,
+    state.wl !== null || !viaNav.current ? "now" : off ? "wait" : "animate",
+  );
+  useEffect(() => {
+    viaNav.current = false; // every commit uses up the click
+  });
+  const { leaving, done } = useLeavingCard(state.wl, off);
+  const card = state.wl ?? leaving;
+  const inner = swap.key !== "home";
+  const bar: Bar = state.wl
+    ? { on: true, pct: loaderBar(state.wl.step) }
+    : leaving
+      ? { on: false, pct: 100 }
+      : swap.bar;
+  // Pages go to a world through the loader (README: always), everything else straight there.
+  const open = (n: Notification): void => {
+    if (n.go[0] === "world") store.openWorld(n.go[1]);
+    else store.go("connectors");
+  };
+  const toast = state.toast;
+  // With a sign-in layer the person is whoever it says (nobody while signed out); without one, the Api's user.
+  const person: AccountPerson | null = auth
+    ? auth.status === "signedIn" && auth.user
+      ? {
+          initials: nameInitials(auth.user.displayName?.trim() || authInitials(auth.user)),
+          name:
+            auth.user.displayName ?? (auth.user.isAnonymous ? "Guest" : (auth.user.email ?? "")),
+          email: auth.user.displayName ? (auth.user.email ?? "") : "",
+        }
+      : null
+    : user
+      ? {
+          initials: user.initials,
+          name: user.name,
+          email: user.email,
+          detail: [user.org.trim(), user.plan.trim() ? `${user.plan.trim()} plan` : ""]
+            .filter(Boolean)
+            .join(" · "),
+        }
+      : null;
+  const notificationCount = !state.read
+    ? liveNotifications
+      ? notifications.filter((n) => n.dec === undefined || !app.dec[n.dec]).length
+      : app.needsLeft
+    : 0;
+  // Honest: success is said only after the sign-in layer's promise resolves, a failure says it failed.
+  const signOutViaSeam = (): void => {
+    if (!auth) {
+      signOut(store);
+      return;
+    }
+    if (signingOut.current) return;
+    signingOut.current = true;
+    auth
+      .signOut()
+      .then(() => store.toast(SIGNED_OUT))
+      .catch(() => store.toast(SIGN_OUT_FAILED))
+      .finally(() => {
+        signingOut.current = false;
+      });
+  };
+  // FT-SITE-BLUR: pool on first boot only (held by #tilo-boot-cover); in-place skeletons after sign-in / demo start
+  return (
+    <PoolLoader kind="site" loading={false}>
+      <CityBackdrop
+        scene={scene}
+        vw={app.vw}
+        vh={app.vh}
+        veiled={inner || themeFor(app.prefs.theme) === "studio"}
+        lite={appearance.lite}
+        hidden={appearance.hidden}
+        loading={state.wl != null}
+      />
+      <TopNav
+        page={page}
+        needsLeft={app.needsLeft}
+        night={appearance.night}
+        menu={state.menu}
+        unread={notificationCount > 0}
+        notificationCount={notificationCount}
+        initials={
+          auth
+            ? auth.status === "signedIn"
+              ? nameInitials(auth.user?.displayName?.trim() || authInitials(auth.user))
+              : "?"
+            : (user?.initials ?? "")
+        }
+        sample={state.sources.fixture}
+        org={user?.org ?? null}
+        reserveSample={expectsSample}
+        booting={!ready}
+        bar={bar}
+        onBarFaded={swap.barFaded}
+        go={navTo}
+        onToggleTime={appearance.toggleTime}
+        onBell={() => store.toggleMenu("notif")}
+        onAvatar={() => store.toggleMenu("acct")}
+        contextOpen={contextOpen}
+        onContext={toggleContext}
+        compact={app.vw > 0 && app.vw < COMPACT_NAV_BELOW}
+        vw={app.vw}
+      />
+      {contextOpen && <ContextPanel key={contextPerson} onClose={toggleContext} />}
+      {state.menu === "notif" ? (
+        <Enter>
+          <NotificationsPopover
+            notifications={sampleNotes ? sampleNotifications : notifications}
+            sample={sampleNotes}
+            labelled={demo && !liveNotifications}
+            status={notificationStatus}
+            decisions={decisions}
+            dec={state.dec}
+            onOpen={
+              sampleNotes ? () => store.toast("This is sample data. No action is taken.") : open
+            }
+            onSettings={() => store.go("profile", { tab: "notifications" })}
+            onClose={store.closeMenu}
+          />
+        </Enter>
+      ) : null}
+      {state.menu === "acct" ? (
+        <Enter>
+          <AccountMenu
+            user={person}
+            canSignOut={!auth || auth.status === "signedIn"}
+            onMobile={() => setMobileNote(true)}
+            {...(tour ? { onTour: tour.start } : {})}
+            connectorsOn={connectorsOn}
+            go={navTo}
+            onSignOut={signOutViaSeam}
+            onClose={store.closeMenu}
+            appearance={appearanceOf(app.prefs.time)}
+            onAppearance={(next) => app.setPref("time", next)}
+          />
+        </Enter>
+      ) : null}
+      {mobileNote ? (
+        <Popover label="Mobile app" width={320} onClose={() => setMobileNote(false)}>
+          <div className="park-shell__concept">
+            <div className="park-shell__whoname">Mobile app</div>
+            <p className="park-shell__whoorg">{MOBILE_NOTE}</p>
+            <Button variant="secondary" size="sm" onClick={() => setMobileNote(false)}>
+              Close
+            </Button>
+          </div>
+        </Popover>
+      ) : null}
+      {/* The same elements on every page, so a page swap never remounts the outlet (focus stays). */}
+      <main
+        className={`park-shell__main ${ready ? "" : "park-shell__booting"}`}
+        data-boot-ready={ready ? "true" : undefined}
+        data-phase={swap.phase === "in" ? undefined : swap.phase}
+      >
+        {/* QA-DEMO-1 M1: inside the column on a page (below the fixed nav's padding), pinned under the nav on Home */}
+        {inner ? null : <FirstRunBanner first={first} page={page} person={bannerPerson} floating />}
+        <div className={inner ? "park-shell__page" : undefined}>
+          <div className={inner ? "park-shell__column" : undefined}>
+            {inner ? <FirstRunBanner first={first} page={page} person={bannerPerson} /> : null}
+            {swap.node}
+          </div>
+        </div>
+      </main>
+      {toast ? (
+        <Enter>
+          <Toast
+            message={toast.message}
+            {...(toast.actionLabel !== undefined ? { actionLabel: toast.actionLabel } : {})}
+            {...(toast.action !== undefined ? { onAction: toast.action } : {})}
+            onDismiss={store.dismissToast}
+          />
+        </Enter>
+      ) : null}
+      {state.lifetimeCap ? (
+        <LifetimeCapDialog
+          submit={async (words) => {
+            const answer = await api.submitFeedback(words);
+            // HR-1: only the server's own answer is a confirmation; a fixture answer is not.
+            if (answer.source !== "live") throw new Error("not confirmed by the server");
+          }}
+          onClose={store.dismissLifetimeCap}
+        />
+      ) : null}
+      <RunBar />
+      {/* UI-STUDIO-2: the Tilo bubble on every page but Chat, which is the same conversation full size */}
+      {ready && page !== null && page !== "chat" ? (
+        <TiloBubble page={page} vw={app.vw} vh={app.vh} go={navTo} />
+      ) : null}
+      {card ? (
+        <WorldLoader
+          launch={card}
+          dec={state.dec}
+          added={state.added}
+          night={appearance.night}
+          leaving={state.wl === null}
+          onGone={done}
+        />
+      ) : null}
+    </PoolLoader>
+  );
+}

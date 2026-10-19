@@ -1,0 +1,150 @@
+# Word lists for the "move this meeting" detector on inbound mail (FR-CAL-07 b, tilo_channels.reschedule_intent).
+# Mail is untrusted data: these lists only decide whether a mail ASKS to move a meeting. Matching is on whole words,
+# after Unicode NFKC and lower-casing, inside one sentence or clause; punctuation is ignored. English only.
+# A missing or unreadable file, or a list that is not a list of short strings, means no mail is ever a move request.
+# Shape: every key below is a list of strings (at most 60 characters each, 200 per list); other keys are ignored.
+
+# A phrase that asks to move the meeting (kind "move").
+move_phrases:
+  - reschedule
+  - rescheduling
+  - postpone
+  - postponing
+  - can we move the meeting
+  - move the meeting
+  - move our meeting
+  - move this meeting
+  - move my meeting
+  - move the call
+  - move our call
+  - move this call
+  - move the sync
+  - move our sync
+  - move the standup
+  - could we move it
+  - can we move it
+  - need to move
+  - have to move
+  - push the meeting
+  - push our meeting
+  - push the call
+  - push our call
+  - push it back
+  - bump the meeting
+  - bump our meeting
+  - shift the meeting
+  - shift our meeting
+  - different time
+  - another time
+  - alternative time
+  - later time
+  - earlier time
+  - push to
+  - find another slot
+  - another slot
+  - free earlier
+  - free later
+  - meet next week instead
+  - meet later instead
+  - meet earlier instead
+
+# A phrase that asks to cancel this meeting and book a new one (kind "cancel_and_rebook").
+cancel_and_rebook_phrases:
+  - cancel and rebook
+  - cancel and reschedule
+  - cancel and re book
+  - cancel this and rebook
+  - cancel this and send a new invite
+  - cancel and send a new invite
+  - cancel and set up a new
+  - cancel and book a new
+
+# With a move phrase, a phrase that asks for the other person's options (kind "ask_availability").
+# On its own it is not a move request (it may be a brand-new meeting).
+availability_phrases:
+  - when are you free
+  - when works for you
+  - what times work
+  - what time works
+  - share your availability
+  - send your availability
+  - your availability
+  - what is your availability
+  - which times suit
+
+# A word or phrase in the six words before a hit that makes the hit not a request (negation, condition).
+suppress_before:
+  - not
+  - dont
+  - don't
+  - do not
+  - never
+  - no need to
+  - need not
+  - without
+  - unless
+  - if
+  - in case
+  - whether
+  - ignore
+  - disregard
+  - no longer
+  - cannot
+  - can't
+  - wont
+  - won't
+
+# A subject starting with one of these is a reply or forward: its subject is not scanned.
+reply_prefixes:
+  - re
+  - fw
+  - fwd
+  - aw
+
+# A line starting with one of these ends the unquoted text (a quoted earlier message or a forward).
+quote_markers:
+  - "-----original message"
+  - "---------- forwarded message"
+  - "begin forwarded message"
+  - "from:"
+  - "sent:"
+  - "wrote:"
+
+# A line starting with one of these and ending with a "quote_line_end" is an attribution line that ends the text.
+quote_line_starts:
+  - "on "
+quote_line_ends:
+  - "wrote:"
+  - "writes:"
+
+# Day words must follow one of these words, or start a sentence, to be read as the proposed day.
+day_lead_ins:
+  - to
+  - for
+  - "on" # quoted: bare on is a YAML boolean
+  - until
+  - till
+
+# A number of minutes or hours next to one of these is a shift ("by 30 minutes"), not the length of the meeting.
+shift_words:
+  - by
+  - in
+  - another
+  - extra
+  - later
+  - earlier
+  - back
+  - ahead
+
+# A time of day after one of these words is an earliest or a latest time.
+earliest_markers:
+  - after
+  - from
+  - no earlier than
+  - earliest
+latest_markers:
+  - before
+  - by
+  - until
+  - no later than
+  - latest

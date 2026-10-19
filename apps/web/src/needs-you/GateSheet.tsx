@@ -1,19 +1,21 @@
 // S-07 gate sheet (PRD 18.3, 18.4, 10.4): the exact action, who receives it and whether it can be
-// undone, then the three fixed options Approve, Edit first and Hold (card rule CR-07). Everything
+// undone, then the three fixed options Approve, Edit and Decline. Everything
 // shown follows the gate's recorded events (HR-1): the gate counts as open only after an
 // approval.resolved that says approve (by a person or Team Lead), or a policy.applied (by a policy),
 // arrives. A person-approved gate and a policy-opened one look different and both link to the
 // authorisation (HR-7, BQ-49: a round "Policy" stamp with a check glyph in the policy colour). No
 // design export shows the policy variant.
 import type { Card, Event, Layout } from "@tilo/contracts";
-import { AppLink } from "../screens/AppLink";
+import type { ItemApi } from "../api/item";
+import { AppLink } from "../park/shared/AppLink";
 import { Chip, Soon, authzText, nameOf, stamp, words } from "../screens/kit";
 import { type Answer, CardHead, CardOptions } from "./CardView";
+import { ShowItem } from "./ShowItem";
 import { DONE, type GateRecord, isOpen, openedBy, policyLine, policyName } from "./gates";
 import { RUNG, askedBy } from "./queue";
 import { field, numField } from "./reduce";
 
-const OPTION = { approve: "Approve", edit: "Edit first", hold: "Hold" } as const;
+const OPTION = { approve: "Approve", edit: "Edit", hold: "Decline" } as const;
 const TIER = { T1: 1, T2: 2, T3: 3 } as const;
 
 interface Facts {
@@ -100,19 +102,24 @@ function GateFacts({ f }: { f: Facts }) {
               ? "Once sent, it can't be unsent."
               : "Once done, it can't be undone.",
         ],
-    ["Risk tier", f.tier === "T3" ? "T3: a person always decides this." : f.tier],
   ];
   return (
-    <dl className="gate-facts" data-testid="gate-facts">
-      {rows.map((r) =>
-        r ? (
-          <div key={r[0]}>
-            <dt>{r[0]}</dt>
-            <dd>{r[1]}</dd>
-          </div>
-        ) : null,
-      )}
-    </dl>
+    <>
+      <dl className="gate-facts" data-testid="gate-facts">
+        {rows.map((r) =>
+          r ? (
+            <div key={r[0]}>
+              <dt>{r[0]}</dt>
+              <dd>{r[1]}</dd>
+            </div>
+          ) : null,
+        )}
+      </dl>
+      <p className="section-note" data-testid="gate-risk">
+        Risk: {f.tier}
+        {f.tier === "T3" ? " · A person always decides this." : ""}
+      </p>
+    </>
   );
 }
 
@@ -158,11 +165,17 @@ function Outcome({ record }: { record: GateRecord }) {
   if (out.state === "decided") {
     const who = out.event.authz ? authzText(out.event.authz) : "Someone";
     const when = out.event.authz ? ` at ${stamp(out.event.authz.at)}` : "";
-    return (
+    return isOpen(record) ? (
+      <div className="gate-status" data-testid="gate-outcome">
+        <p>
+          Opened. {who} approved this{when}.
+        </p>
+        <p>Tilo is continuing with the next step.</p>
+      </div>
+    ) : (
       <p className="gate-status" data-testid="gate-outcome">
-        {isOpen(record)
-          ? `Opened. ${who} approved this${when}.`
-          : `Kept closed. ${who} chose ${OPTION[out.option]}${when}.`}
+        Kept closed. {who} chose {OPTION[out.option]}
+        {when}.
       </p>
     );
   }
@@ -179,12 +192,25 @@ export function GateSheet({
   card,
   layout,
   answer,
-}: { record: GateRecord; card: Card | null; layout: Layout | null; answer: Answer | null }) {
+  item = null,
+}: {
+  record: GateRecord;
+  card: Card | null;
+  layout: Layout | null;
+  answer: Answer | null;
+  /** ADR-0035 L6d: the owner-only read of the pinned item; null offline (nothing is pinned to show). */
+  item?: ItemApi | null;
+}) {
   const out = record.outcome;
   const policy: Event | null = out.state === "policy" ? out.event : null;
   const lead = policy ?? record.requested;
   const facts = factsOf(record, card);
   const policyId = policy ? field(policy, "policy_id") : null;
+  const showMe =
+    item !== null &&
+    out.state === "waiting" &&
+    card?.gate?.action.item != null &&
+    card.actions.includes("show_me");
   return (
     <article
       className="gate-sheet"
@@ -214,6 +240,7 @@ export function GateSheet({
         )
       )}
       {facts && <GateFacts f={facts} />}
+      {showMe && card && item && <ShowItem api={item} cardId={card.id} />}
       {lead && (
         <AppLink to={`/world/${encodeURIComponent(lead.world_id)}/trace`} className="pill">
           See authorisation
@@ -228,7 +255,12 @@ export function GateSheet({
             This gate does not say what it holds, so it cannot be answered here.
           </p>
         ) : card ? (
-          <CardOptions card={card} answer={answer} preselect={!needsDeliberateChoice(facts)} />
+          <CardOptions
+            card={showMe ? { ...card, actions: card.actions.filter((a) => a !== "show_me") } : card}
+            answer={answer}
+            preselect={!needsDeliberateChoice(facts)}
+            optionLabels={OPTION}
+          />
         ) : (
           <>
             <p className="section-note">

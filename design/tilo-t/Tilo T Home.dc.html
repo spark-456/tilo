@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<script src="./tilo-t.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" data-screen-label="Home" style="position:relative;width:100%;height:{{ H }};overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:15px;line-height:1.5;display:flex;flex-direction:column">
+  <dc-import name="Tilo T Nav" active="home" device="{{ navD }}" assistant="{{ asst }}" theme="{{ theme }}" hint-size="100%,64px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <div aria-hidden="true" style="flex:1 1 0;min-width:0;background-image:var(--doodle);background-size:280px 280px"></div>
+    <main style="flex:0 1 1200px;min-width:0;box-sizing:border-box;padding:{{ pad }};display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:20px;overflow:hidden">
+      <section style="position:relative;border-radius:28px;background:var(--card);border:1px solid var(--line);overflow:clip;padding:{{ heroPad }};display:flex;flex-direction:column;gap:16px">
+        <div aria-hidden="true" style="position:absolute;right:-40px;bottom:-30px;width:{{ cityW }};height:300px;opacity:.55;filter:var(--cityFx);pointer-events:none">{{ town }}</div>
+        <div aria-hidden="true" style="position:absolute;right:{{ budR }};top:26px;display:flex;gap:6px;align-items:flex-end;pointer-events:none"><dc-import name="Tilo S Buddy" role="research" mood="idle" size="44" delay="-1" hint-size="37px,44px"></dc-import><dc-import name="Tilo S Buddy" mood="idle" size="58" hint-size="49px,58px"></dc-import><dc-import name="Tilo S Buddy" role="finance" mood="idle" size="44" delay="-2" hint-size="37px,44px"></dc-import></div>
+        <div style="position:relative;display:flex;flex-direction:column;gap:4px;max-width:{{ h1W }}">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.4px">THURSDAY 16 OCTOBER</span>
+          <h1 style="margin:0;font-weight:700;font-size:{{ h1 }};line-height:1.02;letter-spacing:-1.8px;text-wrap:balance">Good morning, Maya. What should your team do?</h1>
+        </div>
+        <div style="position:relative;max-width:820px;background:var(--card);border:1.5px solid var(--ink);border-radius:22px;padding:16px 16px 12px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--sh2)">
+          <span style="font-size:{{ pS }};font-weight:500;color:var(--ink3);letter-spacing:-.3px;min-height:{{ pH }}">Describe the work, the way you’d ask a friend…</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span role="button" aria-label="Attach files" style="width:44px;height:44px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;color:var(--ink2)">{{ iFile }}</span>
+            <div role="radiogroup" aria-label="Size of the job" style="display:flex;padding:3px;border-radius:12px;background:var(--sunk)"><span role="radio" aria-checked="false" style="height:38px;padding:0 12px;border-radius:9px;display:flex;align-items:center;font-size:13.5px;font-weight:600;color:var(--ink2)">Quick answer</span><span role="radio" aria-checked="true" style="height:38px;padding:0 12px;border-radius:9px;display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.12)">{{ iCity }}Make a world</span></div>
+            <div style="flex:1"></div>
+            <span style="font-size:12.5px;color:var(--ink3)">You see the cost before it starts</span>
+            <span role="button" style="height:48px;padding:0 20px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;gap:8px;font-weight:700;font-size:15.5px">Run {{ iPlay }}</span>
+          </div>
+        </div>
+        <div style="position:relative;display:flex;gap:8px;flex-wrap:wrap;max-width:860px">
+          <sc-for list="{{ chips }}" as="c" hint-placeholder-count="4"><span role="button" style="min-height:40px;box-sizing:border-box;padding:6px 14px 6px 10px;border-radius:99px;background:var(--bg);border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;white-space:{{ chipWs }};line-height:1.25" style-hover="border-color:var(--ink)"><span style="color:var(--ink2)">{{ c.ic }}</span>{{ c.t }}</span></sc-for>
+        </div>
+      </section>
+
+      <sc-if value="{{ running }}" hint-placeholder-val="{{ false }}">
+        <a href="#world" style="display:flex;align-items:center;gap:14px;padding:10px 12px 10px 10px;border-radius:20px;background:var(--ink);color:var(--card);flex-wrap:wrap">
+          <span style="width:64px;height:48px;border-radius:12px;background:var(--cityBg);overflow:hidden;flex:none">{{ cRun }}</span>
+          <span style="flex:1;min-width:200px;display:flex;flex-direction:column;line-height:1.35"><span style="font-weight:700">Team offsite in Porto is running</span><span style="font-size:13px;opacity:.8"><span style="font-family:var(--mono)">building.constructing</span> · the Money keeper is building the budget sheet · 3 of 7 buildings done</span></span>
+          <span style="height:40px;padding:0 14px;border-radius:12px;background:var(--lime);color:#0B0B0C;display:flex;align-items:center;font-weight:700;font-size:14px">Watch it</span>
+        </a>
+      </sc-if>
+
+      <div style="display:flex;flex-wrap:wrap;gap:16px">
+        <a href="#needs" style="flex:1 1 300px;min-width:0;border-radius:22px;background:var(--amberSoft);border:1px solid var(--amberLine);padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+          <span style="display:flex;align-items:center;gap:10px"><span style="min-width:34px;height:34px;padding:0 8px;box-sizing:border-box;border-radius:11px;background:var(--amber);color:#1A1407;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px">{{ needsN }}</span><span style="font-weight:700;font-size:16px;flex:1">{{ needsT }}</span><span style="color:var(--amberInk)">{{ iChev }}</span></span>
+          <span style="font-size:14px;color:var(--ink2);line-height:1.45">{{ needsS }}</span>
+        </a>
+        <div style="flex:2 1 520px;min-width:0;border-radius:22px;background:var(--card);border:1px solid var(--line);padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:8px"><span style="color:var(--ink2)">{{ iCal }}</span><span style="font-weight:700;font-size:15px;flex:1">Today</span><a href="#agenda" style="font-size:13px;font-weight:600;color:var(--ink2)">Agenda →</a></div>
+          <div style="display:flex;gap:8px;overflow:hidden">
+            <sc-for list="{{ today }}" as="d" hint-placeholder-count="4"><div style="flex:1 0 170px;min-width:0;border-radius:14px;border:1px solid {{ d.bd }};background:{{ d.bg }};padding:9px 11px;display:flex;flex-direction:column;gap:2px"><span style="font-family:var(--mono);font-size:11.5px;color:{{ d.tc }}">{{ d.t }}</span><span style="font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.n }}</span><span style="font-size:12px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.s }}</span></div></sc-for>
+          </div>
+        </div>
+      </div>
+
+      <section style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:baseline;gap:10px"><h2 style="margin:0;font-weight:700;font-size:22px;letter-spacing:-.5px;flex:1">Recent worlds</h2><a href="#worlds" style="font-size:13.5px;font-weight:600;color:var(--ink2)">All worlds →</a></div>
+        <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T State" kind="loading" layout="grid" caption="Tilo is fetching your worlds" hint-size="100%,460px"></dc-import></sc-if>
+        <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}"><div style="border-radius:24px;border:1px dashed var(--line2);background:var(--card)"><dc-import name="Tilo T State" kind="empty" mood="happy" title="Your first world starts here" body="Type one job above, or pick an example. Tilo shows the plan and the cost before anything starts." cta="Try “Plan our team offsite”" cta2="Explore a demo town" hint-size="100%,420px"></dc-import></div></sc-if>
+        <sc-if value="{{ error }}" hint-placeholder-val="{{ false }}"><div style="border-radius:24px;border:1px solid var(--line);background:var(--card)"><dc-import name="Tilo T State" kind="error" title="Your worlds didn’t load" body="That’s on us, not you. Your worlds are safe and still running. The ask box above works as normal." cta="Try again" cta2="Status page" code="worlds.list · timeout after 8 s · 9:02 am" hint-size="100%,420px"></dc-import></div></sc-if>
+        <sc-if value="{{ ready }}" hint-placeholder-val="{{ true }}">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax({{ minC }},1fr));gap:14px">
+            <sc-for list="{{ worlds }}" as="w" hint-placeholder-count="4">
+              <a href="#world" style="border-radius:22px;background:var(--card);border:1px solid var(--line);overflow:clip;display:flex;flex-direction:column" style-hover="border-color:var(--ink)">
+                <div style="position:relative;height:{{ thH }};background:var(--cityBg);padding:6px;box-sizing:border-box"><div style="width:100%;height:100%;filter:var(--cityFx)">{{ w.city }}</div><span style="position:absolute;left:10px;top:10px;height:24px;padding:0 9px 0 7px;border-radius:99px;background:{{ w.bg }};color:{{ w.fg }};font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:9px;background:{{ w.dot }};animation:{{ w.pulse }}"></span>{{ w.st }}</span></div>
+                <div style="padding:12px 14px 14px;display:flex;flex-direction:column;gap:2px"><span style="font-weight:700;font-size:15px;line-height:1.3">{{ w.t }}</span><span style="font-size:12.5px;color:var(--ink3)">{{ w.m }}</span></div>
+              </a>
+            </sc-for>
+          </div>
+        </sc-if>
+      </section>
+
+      <section style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:baseline;gap:10px"><h2 style="margin:0;font-weight:700;font-size:22px;letter-spacing:-.5px;flex:1">Suggested skills</h2><a href="#skills" style="font-size:13.5px;font-weight:600;color:var(--ink2)">Skills →</a></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+          <sc-for list="{{ skills }}" as="s" hint-placeholder-count="4"><div style="border-radius:18px;background:var(--card);border:1px solid var(--line);padding:14px;display:flex;gap:12px;align-items:center"><span style="width:44px;height:44px;border-radius:13px;background:{{ s.bg }};color:{{ s.fg }};display:flex;align-items:center;justify-content:center;flex:none">{{ s.ic }}</span><span style="display:flex;flex-direction:column;line-height:1.35;min-width:0"><span style="font-weight:700;font-size:14.5px">{{ s.n }}</span><span style="font-size:12.5px;color:var(--ink3)">{{ s.d }}</span></span></div></sc-for>
+        </div>
+      </section>
+    </main>
+    <div aria-hidden="true" style="flex:1 1 0;min-width:0;background-image:var(--doodle);background-size:280px 280px;background-position:140px 60px"></div>
+    <sc-if value="{{ asst }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:0 0 400px;border-left:1px solid var(--line);background:var(--card);animation:tSlideR .36s cubic-bezier(.2,.8,.2,1) both"><dc-import name="Tilo T Assistant" state="{{ asstState }}" hint-size="400px,836px"></dc-import></div>
+    </sc-if>
+  </div>
+  <sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T Nav" active="home" device="tabs" theme="{{ theme }}" hint-size="100%,84px"></dc-import></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ready&quot;,&quot;running&quot;,&quot;loading&quot;,&quot;empty&quot;,&quot;error&quot;],&quot;default&quot;:&quot;ready&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;assistant&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;assistantState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;answer&quot;,&quot;fresh&quot;,&quot;loading&quot;,&quot;error&quot;],&quot;default&quot;:&quot;answer&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloR || !window.TiloT) this.t = setInterval(() => { if (window.TiloR && window.TiloCity && window.TiloT) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const h = React.createElement, R = window.TiloR ? window.TiloR(h) : null, T = window.TiloT, ic = (n, s) => T ? T.ic(h, n, s) : null;
+    const p = this.props, d = (p.device ?? 'desktop') === 'desktop', st = p.state ?? 'ready', asst = !!p.assistant;
+    const city = (k, o) => R ? R.city(k, Object.assign({ labels: false, tags: true }, o || {})) : null;
+    const C = { run: ['Running', 'var(--priSoft)', 'var(--priInk)', 'var(--limeD)', 'tGlow 1.4s ease-in-out infinite'], wait: ['Needs you', 'var(--amberSoft)', 'var(--amberInk)', 'var(--amber)', 'none'], done: ['Done', 'var(--mintSoft)', 'var(--mintInk)', 'var(--mint)', 'none'], fail: ['Stopped', 'var(--redSoft)', 'var(--redInk)', 'var(--red)', 'none'] };
+    const worlds = [['Team offsite in Porto', st === 'running' ? 'run' : 'wait', 'trip', '62 credits · started 3:54 pm'], ['Compare 3 battery suppliers', 'done', 'suppliers', '41 credits · yesterday'], ['Research 5 competitors, email a summary', 'done', 'town', '58 credits · Mon'], ['Road trip to Gokarna', 'done', 'tripDone', '31 credits · last week']].map(([t, s, k, m]) => ({ t, m, city: city(k, k === 'town' ? { seed: 5 } : null), st: C[s][0], bg: C[s][1], fg: C[s][2], dot: C[s][3], pulse: C[s][4] }));
+    return {
+      theme: p.theme ?? 'studio', phone: !d, navD: d ? 'desktop' : 'phone', asst, asstState: p.assistantState ?? 'answer', H: d ? '900px' : '844px',
+      pad: d ? '24px 32px 32px' : '14px 14px 110px', heroPad: d ? '28px 32px 22px' : '18px 16px 16px', h1: d ? '40px' : '30px', h1W: d ? '980px' : '100%', pS: d ? '21px' : '17px', pH: d ? '40px' : '48px', chipWs: d ? 'nowrap' : 'normal', cityW: d ? '560px' : '300px', budR: d ? '60px' : '-200px', minC: d ? '240px' : '160px', thH: d ? '150px' : '108px',
+      running: st === 'running', loading: st === 'loading', empty: st === 'empty', error: st === 'error', ready: st === 'ready' || st === 'running',
+      needsN: st === 'empty' ? '0' : '3', needsT: st === 'empty' ? 'Nothing needs you' : '3 things need you', needsS: st === 'empty' ? 'When Tilo wants to send, buy or book something, it asks here first.' : 'Send the invite email to 12 people · Team offsite in Porto · medium risk',
+      town: R ? R.city('town', { labels: false, tags: false, seed: 5 }) : null, cRun: city('trip'),
+      chips: [['Plan our team offsite', 'people'], ['Research 5 competitors and email me a summary', 'research'], ['Turn this PDF into 5 slides', 'file'], ['Find a dentist open on Saturdays', 'search']].map(([t, i]) => ({ t, ic: ic(i, 16) })),
+      today: [['9:30', 'Standup', 'Tilo joins, takes notes', 0], ['11:00', 'Supplier call', 'Brief ready 10:45', 1], ['14:00', 'Due: Q3 deck', 'Draft 80% done', 0], ['16:30', '1:1 with Jo', 'No prep needed', 0]].map(([t, n, s, now]) => ({ t: now ? t + ' · NEXT' : t, n, s, bd: now ? 'var(--ink)' : 'var(--line)', bg: now ? 'var(--card)' : 'var(--bg)', tc: now ? 'var(--ink)' : 'var(--ink3)' })),
+      worlds,
+      skills: [['Compare options', 'Side by side, with a winner', 'sheet', 'teal'], ['Write a friendly reply', 'Drafts in your voice', 'mail', 'lilac'], ['Meeting notes', 'Joins, writes minutes, follows up', 'people', 'sky'], ['Plan a trip', 'Routes, stays and costs', 'plane', 'amber']].map(([n, dd, i, c]) => ({ n, d: dd, ic: ic(i, 22), bg: `var(--${c}Soft)`, fg: `var(--${c}Ink)` })),
+      iFile: ic('file', 20), iCity: ic('city', 16), iPlay: ic('play', 16), iChev: ic('chev', 18), iCal: ic('calendar', 18)
+    };
+  }
+}
+</script>
+</body>
+</html>

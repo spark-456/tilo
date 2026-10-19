@@ -79,9 +79,12 @@ def test_PRD_6_4_shipped_config_loads(repo_root):
     config = load_providers_config(repo_root / "config" / "models.yaml", repo_root / "config" / "prices.yaml")
 
     assert set(config.roles) == {
+        "embed",  # RT-05: offline until the owner chooses and prices the live embedding model
         "director",
         "lead",
+        "lead_review",  # services/harness/src/tilo_harness/lead_review.py
         "specialist",
+        "skill_capture",  # ADR-0051 S1 / ADR-0034 decision 3: describe, upload and record (TS-20)
         "verifier",
         "writer",
         "narrator",
@@ -89,6 +92,13 @@ def test_PRD_6_4_shipped_config_loads(repo_root):
         "safety",  # CL-INT-1 / issue #103: the dev safety screen
         "generator",  # issue #272 (b), GEN-07: the live scenario generator
         "autorater",  # issue #272 (b), GEN-10: scores the generator's plans
+        "assistant",  # PPL-11b, FR-PA-19: the assistant panel's fallback (services/api/tests/API_PPL_11b.md)
+        "search",  # ADR-0029, PRD 12.2: every SearchProvider call (falls back to the same grounded profile)
+        "meeting",  # FR-MTG-11: the meeting bot's agenda analysis
+        "meeting_analyst",  # services/api/src/tilo_api/meeting_analysis.py
+        "meeting_fast",  # FR-MTG-11: the meeting bot's one-sentence direct answers
+        "meeting_room",  # MROOM-A1, ADR-0028: the meeting room's quick replies (`meeting` is the bot's)
+        "meeting_room_thinking",  # MROOM-A1: the room's thinking replies
     }
     assert config.roles["director"].primary == "flash-38"
     assert config.roles["director"].fallback == "flash-37"

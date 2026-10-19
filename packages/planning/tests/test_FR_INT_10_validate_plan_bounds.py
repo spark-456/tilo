@@ -13,7 +13,9 @@ from typing import Any
 
 import pytest
 from _plan_validator_lib import make_gate, make_plan, make_unit, rule_ids
-from tilo_planning import approaches, brief, compiler, plangraph
+from tilo_api import skills_capture
+from tilo_contracts import Minutes
+from tilo_planning import approaches, brief, compiler, plangraph, revision
 from tilo_planning.plangraph import MAX_PLAN_BYTES, MAX_PLAN_DEPTH, Violation, validate_plan
 from tilo_providers import conformance, schema_guard
 from tilo_providers.schema_guard import MAX_ERRORS, MESSAGE_CHARS
@@ -144,8 +146,17 @@ _ROUTER_SCHEMAS = {
     "packages/planning/src/tilo_planning/approaches.py": approaches._Reply.model_json_schema(),
     "packages/planning/src/tilo_planning/brief.py": brief.output_schema(),
     "packages/planning/src/tilo_planning/compiler.py": compiler._Reply.model_json_schema(),
+    "packages/planning/src/tilo_planning/revision.py": revision.RevisionReply.model_json_schema(),
     "packages/providers/src/tilo_providers/conformance.py": conformance._SCHEMA,
+    "services/api/src/tilo_api/meeting_analysis.py": Minutes.model_json_schema(),
+    "services/api/src/tilo_api/skills_capture.py": {
+        "oneOf": [skills_capture._CAPTURE_SCHEMA, skills_capture._VERSION_SCHEMA],
+    },
 }
+
+
+# files that only forward a schema listed above (the schema probe replays brief.output_schema())
+_FORWARDERS = {"packages/providers/src/tilo_providers/schema_probe.py"}
 
 
 def test_PL_03_every_unique_array_in_every_router_response_schema_is_linear() -> None:
@@ -154,6 +165,6 @@ def test_PL_03_every_unique_array_in_every_router_response_schema_is_linear() ->
         for top in ("packages", "services")
         for path in (REPO / top).glob("*/src/**/*.py")
         if re.search(r"\bresponse_schema=(?!\.\.\.)", path.read_text("utf-8"))
-    }
+    } - _FORWARDERS
     assert found == set(_ROUTER_SCHEMAS)  # a new response_schema is listed here
     assert sum(_assert_linear(schema_guard.validator(s), s) for s in _ROUTER_SCHEMAS.values()) >= 1

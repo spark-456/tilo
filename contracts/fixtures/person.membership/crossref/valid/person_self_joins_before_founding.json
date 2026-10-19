@@ -1,0 +1,28 @@
+{
+  "rule": null,
+  "note": "A signed-in person creates their own member record before anyone founded the org.",
+  "now": "2026-10-15T09:00:00.000Z",
+  "org_id": "org_example",
+  "persons": {},
+  "request": {
+    "actor": "u_mia",
+    "action": "self_join",
+    "person": null,
+    "team": null,
+    "record": {
+      "id": "u_mia",
+      "org_id": "org_example",
+      "display_name": "Mia Cho",
+      "aliases": ["Mia"],
+      "email": "mia@example.com",
+      "time_zone": "UTC",
+      "preferred_channel": "web",
+      "org_role": "member",
+      "memberships": [],
+      "created_by": {
+        "by": "u_mia",
+        "at": "2026-10-15T09:00:00.000Z"
+      }
+    }
+  }
+}

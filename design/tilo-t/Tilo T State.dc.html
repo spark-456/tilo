@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-t.js"></script>
+<style>body{margin:0}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="position:relative;width:100%;font-family:var(--fB);color:var(--ink)">
+<sc-if value="{{ loading }}" hint-placeholder-val="{{ true }}">
+  <div aria-busy="true" aria-live="polite" style="position:relative;display:flex;flex-direction:column;gap:16px">
+    <div style="position:absolute;left:50%;top:-6px;transform:translateX(-50%);z-index:2;height:48px;padding:0 16px 0 8px;border-radius:99px;background:var(--card);border:1px solid var(--line);box-shadow:var(--sh2);display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;white-space:nowrap"><dc-import name="Tilo S Buddy" size="36" mood="work" hint-size="31px,36px"></dc-import>{{ caption }}<span style="display:flex;gap:3px"><span style="width:5px;height:5px;border-radius:9px;background:var(--ink3);animation:tsDots 1.2s ease-in-out infinite"></span><span style="width:5px;height:5px;border-radius:9px;background:var(--ink3);animation:tsDots 1.2s ease-in-out .2s infinite"></span><span style="width:5px;height:5px;border-radius:9px;background:var(--ink3);animation:tsDots 1.2s ease-in-out .4s infinite"></span></span></div>
+    <sc-if value="{{ lGrid }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;padding-top:56px">
+        <sc-for list="{{ six }}" as="b" hint-placeholder-count="6">
+          <div style="height:200px;border-radius:20px;border:1px dashed var(--bpLine);background-color:var(--bp);background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%),linear-gradient(var(--bpLine) 1px,transparent 1px),linear-gradient(90deg,var(--bpLine) 1px,transparent 1px);background-size:700px 100%,20px 20px,20px 20px;background-repeat:no-repeat,repeat,repeat;animation:tShim 1.8s linear infinite;padding:18px;box-sizing:border-box;display:flex;flex-direction:column;gap:10px;justify-content:flex-end">
+            <span style="width:60%;height:12px;border-radius:9px;background:var(--bpLine)"></span><span style="width:40%;height:10px;border-radius:9px;background:var(--bpLine);opacity:.7"></span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ lList }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:10px;padding-top:56px">
+        <sc-for list="{{ six }}" as="b" hint-placeholder-count="6">
+          <div style="height:76px;border-radius:18px;border:1px dashed var(--bpLine);background-color:var(--bp);background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%),linear-gradient(var(--bpLine) 1px,transparent 1px),linear-gradient(90deg,var(--bpLine) 1px,transparent 1px);background-size:700px 100%,20px 20px,20px 20px;background-repeat:no-repeat,repeat,repeat;animation:tShim 1.8s linear infinite;padding:0 18px;box-sizing:border-box;display:flex;align-items:center;gap:14px">
+            <span style="width:44px;height:44px;border-radius:14px;background:var(--bpLine);flex:none"></span><span style="flex:1;display:flex;flex-direction:column;gap:8px"><span style="width:46%;height:11px;border-radius:9px;background:var(--bpLine)"></span><span style="width:28%;height:9px;border-radius:9px;background:var(--bpLine);opacity:.7"></span></span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ lSplit }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-wrap:wrap;gap:16px;padding-top:56px">
+        <div style="flex:1 1 320px;max-width:420px;display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ five }}" as="b" hint-placeholder-count="5"><div style="height:84px;border-radius:18px;border:1px dashed var(--bpLine);background-color:var(--bp);background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%);background-size:700px 100%;background-repeat:no-repeat;animation:tShim 1.8s linear infinite"></div></sc-for>
+        </div>
+        <div style="flex:2 1 420px;min-height:460px;border-radius:24px;border:1px dashed var(--bpLine);background-color:var(--bp);background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%),linear-gradient(var(--bpLine) 1px,transparent 1px),linear-gradient(90deg,var(--bpLine) 1px,transparent 1px);background-size:700px 100%,20px 20px,20px 20px;background-repeat:no-repeat,repeat,repeat;animation:tShim 1.8s linear infinite;padding:28px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+          <span style="width:30%;height:12px;border-radius:9px;background:var(--bpLine)"></span><span style="width:70%;height:22px;border-radius:9px;background:var(--bpLine)"></span><span style="width:55%;height:12px;border-radius:9px;background:var(--bpLine);opacity:.7"></span><span style="height:140px;border-radius:16px;background:var(--bpLine);opacity:.45;margin-top:8px"></span>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ lCal }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;padding-top:56px">
+        <sc-for list="{{ seven }}" as="b" hint-placeholder-count="7">
+          <div style="height:440px;border-radius:16px;border:1px dashed var(--bpLine);background-color:var(--bp);background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%),linear-gradient(var(--bpLine) 1px,transparent 1px);background-size:700px 100%,100% 44px;background-repeat:no-repeat,repeat;animation:tShim 1.8s linear infinite;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px">
+            <span style="width:50%;height:10px;border-radius:9px;background:var(--bpLine)"></span><span style="height:{{ b.h1 }};margin-top:{{ b.t1 }};border-radius:10px;background:var(--bpLine);opacity:.7"></span><span style="height:{{ b.h2 }};margin-top:{{ b.t2 }};border-radius:10px;background:var(--bpLine);opacity:.5"></span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ lWorld }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-wrap:wrap;gap:16px;padding-top:56px">
+        <div style="position:relative;flex:3 1 480px;height:600px;border-radius:24px;border:1px dashed var(--bpLine);background-color:var(--bp);background-image:linear-gradient(var(--bpLine) 1px,transparent 1px),linear-gradient(90deg,var(--bpLine) 1px,transparent 1px);background-size:24px 24px;overflow:hidden">
+          <div style="position:absolute;left:50%;top:50%;width:380px;height:380px;margin:-190px 0 0 -190px;transform:scaleY(.58) rotate(45deg);border:2px dashed var(--bpInk);border-radius:18px;opacity:.5"></div>
+          <div style="position:absolute;left:50%;top:50%;width:200px;height:200px;margin:-100px 0 0 -100px;transform:scaleY(.58) rotate(45deg);border:2px dashed var(--bpInk);border-radius:12px;opacity:.35"></div>
+          <div style="position:absolute;inset:0;background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%);background-size:700px 100%;background-repeat:no-repeat;animation:tShim 1.8s linear infinite"></div>
+        </div>
+        <div style="flex:1 1 300px;display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ five }}" as="b" hint-placeholder-count="5"><div style="height:96px;border-radius:18px;border:1px dashed var(--bpLine);background-color:var(--bp);background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%);background-size:700px 100%;background-repeat:no-repeat;animation:tShim 1.8s linear infinite"></div></sc-for>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ lChat }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:14px;padding-top:64px;max-width:760px;width:100%;margin:0 auto">
+        <sc-for list="{{ bubbles }}" as="b" hint-placeholder-count="5"><div style="align-self:{{ b.al }};width:{{ b.w }};height:{{ b.h }};border-radius:20px;border:1px dashed var(--bpLine);background-color:var(--bp);background-image:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%);background-size:700px 100%;background-repeat:no-repeat;animation:tShim 1.8s linear infinite"></div></sc-for>
+      </div>
+    </sc-if>
+  </div>
+</sc-if>
+<sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:56px 20px">
+    <div style="position:relative;width:260px;height:180px;display:flex;align-items:flex-end;justify-content:center">
+      <div style="position:absolute;left:50%;bottom:6px;width:180px;height:180px;margin-left:-90px;transform:translateY(50%) scaleY(.5) rotate(45deg);border:2px dashed var(--line2);border-radius:16px"></div>
+      <div style="position:relative;bottom:22px"><dc-import name="Tilo S Buddy" size="128" mood="{{ eMood }}" hint-size="108px,128px"></dc-import></div>
+    </div>
+    <h2 style="margin:8px 0 0;font-weight:700;font-size:28px;letter-spacing:-.8px;line-height:1.15;text-wrap:balance;max-width:520px">{{ title }}</h2>
+    <p style="margin:0;font-size:16px;color:var(--ink2);max-width:460px;text-wrap:pretty">{{ body }}</p>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;padding-top:6px">
+      <span role="button" style="height:48px;padding:0 20px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px">{{ cta }}</span>
+      <sc-if value="{{ cta2 }}"><span role="button" style="height:48px;padding:0 18px;border-radius:14px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600;font-size:15px">{{ cta2 }}</span></sc-if>
+    </div>
+  </div>
+</sc-if>
+<sc-if value="{{ error }}" hint-placeholder-val="{{ false }}">
+  <div role="alert" style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:56px 20px">
+    <div style="position:relative"><dc-import name="Tilo S Buddy" size="128" mood="sad" hint-size="108px,128px"></dc-import><span style="position:absolute;right:-14px;top:6px;width:34px;height:34px;border-radius:99px;background:var(--redSoft);color:var(--redInk);display:flex;align-items:center;justify-content:center">{{ iAlert }}</span></div>
+    <h2 style="margin:8px 0 0;font-weight:700;font-size:28px;letter-spacing:-.8px;line-height:1.15;text-wrap:balance;max-width:520px">{{ title }}</h2>
+    <p style="margin:0;font-size:16px;color:var(--ink2);max-width:460px;text-wrap:pretty">{{ body }}</p>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;padding-top:6px">
+      <span role="button" style="height:48px;padding:0 20px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px">{{ iRefresh }}{{ cta }}</span>
+      <sc-if value="{{ cta2 }}"><span role="button" style="height:48px;padding:0 18px;border-radius:14px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600;font-size:15px">{{ cta2 }}</span></sc-if>
+    </div>
+    <span style="font-family:var(--mono);font-size:12px;color:var(--ink3)">{{ code }}</span>
+  </div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1100,&quot;height&quot;:700},&quot;kind&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;loading&quot;,&quot;empty&quot;,&quot;error&quot;],&quot;default&quot;:&quot;loading&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;layout&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;grid&quot;,&quot;list&quot;,&quot;split&quot;,&quot;calendar&quot;,&quot;world&quot;,&quot;chat&quot;],&quot;default&quot;:&quot;grid&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;caption&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Tilo is fetching this page&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Nothing here yet&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;body&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;cta&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Get started&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;cta2&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;code&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;mood&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;idle&quot;,&quot;happy&quot;,&quot;think&quot;,&quot;talk&quot;],&quot;default&quot;:&quot;idle&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloT) this.t = setInterval(() => { if (window.TiloT) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const T = window.TiloT, ic = (n, s) => T ? T.ic(React.createElement, n, s) : null;
+    const k = this.props.kind ?? 'loading', l = this.props.layout ?? 'grid', p = this.props;
+    const n = c => Array.from({ length: c }, (_, i) => i);
+    return {
+      theme: p.theme, loading: k === 'loading', empty: k === 'empty', error: k === 'error',
+      lGrid: l === 'grid', lList: l === 'list', lSplit: l === 'split', lCal: l === 'calendar', lWorld: l === 'world', lChat: l === 'chat',
+      six: n(6), five: n(5),
+      seven: [[90, 40, 60, 120], [60, 10, 120, 60], [140, 80, 50, 30], [70, 20, 90, 140], [110, 60, 70, 40], [50, 30, 40, 200], [80, 100, 50, 20]].map(([h1, t1, h2, t2]) => ({ h1: h1 + 'px', t1: t1 + 'px', h2: h2 + 'px', t2: t2 + 'px' })),
+      bubbles: [['flex-end', '46%', '52px'], ['flex-start', '68%', '96px'], ['flex-start', '52%', '44px'], ['flex-end', '38%', '52px'], ['flex-start', '72%', '150px']].map(([al, w, h]) => ({ al, w, h })),
+      caption: p.caption ?? 'Tilo is fetching this page', title: p.title ?? 'Nothing here yet', body: p.body ?? '', cta: p.cta ?? 'Get started', cta2: p.cta2 ?? '', code: p.code ?? '',
+      eMood: p.mood ?? 'idle', iAlert: ic('alert', 18), iRefresh: ic('refresh', 18)
+    };
+  }
+}
+</script>
+</body>
+</html>

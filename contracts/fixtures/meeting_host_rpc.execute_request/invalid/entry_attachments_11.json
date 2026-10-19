@@ -1,0 +1,178 @@
+{
+  "entry": {
+    "id": "01JB5VQ0000000000000009405",
+    "idempotency_key": "r_followups_1:U5:send_email:1",
+    "world_id": "w_followups",
+    "run_id": "r_followups_1",
+    "action_type": "send_email",
+    "connector": "gmail",
+    "recipients": ["customer@example.org"],
+    "attachments": [
+      {
+        "artifact_id": "art_att_00",
+        "version": 1
+      },
+      {
+        "artifact_id": "art_att_01",
+        "version": 1
+      },
+      {
+        "artifact_id": "art_att_02",
+        "version": 1
+      },
+      {
+        "artifact_id": "art_att_03",
+        "version": 1
+      },
+      {
+        "artifact_id": "art_att_04",
+        "version": 1
+      },
+      {
+        "artifact_id": "art_att_05",
+        "version": 1
+      },
+      {
+        "artifact_id": "art_att_06",
+        "version": 1
+      },
+      {
+        "artifact_id": "art_att_07",
+        "version": 1
+      },
+      {
+        "artifact_id": "art_att_08",
+        "version": 1
+      },
+      {
+        "artifact_id": "art_att_09",
+        "version": 1
+      },
+      {
+        "artifact_id": "art_att_10",
+        "version": 1
+      }
+    ],
+    "item": {
+      "artifact_id": "art_status_mail",
+      "version": 1
+    },
+    "destination": "thr_customer_1",
+    "modifiers": ["attachments"],
+    "risk_tier": "T3",
+    "authz": {
+      "by": "person",
+      "ref": "u_owner",
+      "at": "2026-10-09T09:32:09.500Z"
+    },
+    "undo_window_s": 0,
+    "scheduled_at": "2026-10-09T09:32:10.000Z",
+    "state": "queued",
+    "created_at": "2026-10-09T09:32:10.000Z"
+  },
+  "evidence": {
+    "reserved_by": {
+      "v": "1.0",
+      "id": "01JB5VQ0000000000000000080",
+      "seq": 80,
+      "ts": "2026-10-09T09:31:10.000Z",
+      "world_id": "w_followups",
+      "run_id": "r_followups_1",
+      "type": "approval.requested",
+      "actor": "A_s1",
+      "target": "G5",
+      "level": "L1",
+      "district": "D1",
+      "item": null,
+      "severity": "gate",
+      "credits": 0,
+      "summary": "The send email is ready. It needs your approval.",
+      "cause": "01JB5VQ0000000000000000079",
+      "vis": "all",
+      "authz": null,
+      "data": {
+        "gate_id": "G5",
+        "card_id": "01JB5VQ0000000000000009580",
+        "outbox_id": "01JB5VQ0000000000000009405",
+        "action_type": "send_email",
+        "risk_tier": "T3",
+        "irreversible": true,
+        "item": {
+          "artifact_id": "art_status_mail",
+          "version": 1
+        },
+        "approver": null,
+        "team_lead": null
+      },
+      "trace": {
+        "model_role": null,
+        "profile": null,
+        "tokens_in": null,
+        "tokens_out": null,
+        "tool": null,
+        "latency_ms": null,
+        "archive_ref": null
+      }
+    },
+    "authorised_by": {
+      "v": "1.0",
+      "id": "01JB5VQ0000000000000000083",
+      "seq": 83,
+      "ts": "2026-10-09T09:32:09.500Z",
+      "world_id": "w_followups",
+      "run_id": "r_followups_1",
+      "type": "approval.resolved",
+      "actor": "u_owner",
+      "target": "G5",
+      "level": "L1",
+      "district": "D1",
+      "item": null,
+      "severity": "info",
+      "credits": 0,
+      "summary": "You approved the send email.",
+      "cause": "01JB5VQ0000000000000000082",
+      "vis": "all",
+      "authz": {
+        "by": "person",
+        "ref": "u_owner",
+        "at": "2026-10-09T09:32:09.500Z"
+      },
+      "data": {
+        "gate_id": "G5",
+        "card_id": "01JB5VQ0000000000000009580",
+        "outbox_id": "01JB5VQ0000000000000009405",
+        "option": "approve",
+        "channel": "web",
+        "pin_verified": false
+      },
+      "trace": {
+        "model_role": null,
+        "profile": null,
+        "tokens_in": null,
+        "tokens_out": null,
+        "tool": null,
+        "latency_ms": null,
+        "archive_ref": null
+      }
+    },
+    "world_owner": "u_owner",
+    "policy": null,
+    "team_lead": null,
+    "instruction": null,
+    "earlier_applied": []
+  },
+  "items": [
+    {
+      "artifact_id": "art_status_mail",
+      "version": 1,
+      "content_sha256": "21972f93c7bf891d174038c108643394d820356619ee438fa772ecf6c4e7d50a",
+      "content_b64": "RmFrZSBtYWlsIGJvZHkgZm9yIHRlc3RzLg=="
+    },
+    {
+      "artifact_id": "art_price_sheet",
+      "version": 1,
+      "content_sha256": "ebc4207d716c59e24f115f3f2aa236ec243236df4003abffef8394d350aca9c2",
+      "content_b64": "RmFrZSBhdHRhY2htZW50IGJ5dGVzIGZvciB0ZXN0cy4="
+    }
+  ]
+}

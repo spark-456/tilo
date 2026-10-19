@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="width:100%;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:16px;line-height:1.5">
+  <dc-import name="Tilo R Components" theme="{{ theme }}" hint-size="100%,1400px"></dc-import>
+  <div style="padding:0 48px 56px;display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:1px solid var(--line)">
+      <div style="font-size:14px;font-weight:700;color:var(--ink3);padding-top:28px">Studio additions</div>
+      <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:36px;letter-spacing:-1.2px">Your Tilo, chat, files, decisions</h2>
+    </div>
+    <section style="display:flex;flex-direction:column;gap:12px">
+      <h3 style="margin:0;font-size:14px;font-weight:800;color:var(--ink3)">Navigation · with theme switch, updates and account</h3>
+      <div style="border-radius:20px;overflow:hidden;border:1px solid var(--line)"><dc-import name="Tilo S Nav" active="chat" theme="{{ theme }}" hint-size="100%,72px"></dc-import></div>
+    </section>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:28px">
+        <section style="display:flex;flex-direction:column;gap:12px">
+          <h3 style="margin:0;font-size:14px;font-weight:800;color:var(--ink3)">Your Tilo · four moods</h3>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+            <sc-for list="{{ moods }}" as="m" hint-placeholder-count="4">
+              <div style="background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px 10px 12px;display:flex;flex-direction:column;align-items:center;gap:8px">
+                <dc-import name="Tilo S Buddy" size="130" mood="{{ m.k }}" hint-size="110px,130px"></dc-import>
+                <span style="font-weight:700;font-size:15px">{{ m.t }}</span><span style="font-size:12.5px;color:var(--ink3);text-align:center">{{ m.s }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+        <section style="display:flex;flex-direction:column;gap:12px">
+          <h3 style="margin:0;font-size:14px;font-weight:800;color:var(--ink3)">Composer · files and the two speeds</h3>
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh2);padding:18px;display:flex;flex-direction:column;gap:14px">
+            <div style="font-family:var(--fH);font-weight:600;font-size:20px;letter-spacing:-.4px">Summarise these and flag anything unusual</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <span style="height:52px;box-sizing:border-box;padding:0 8px;border-radius:14px;border:1px solid var(--line);background:var(--bg);display:flex;align-items:center;gap:10px"><span style="width:38px;height:38px;border-radius:10px;background:var(--redSoft);color:var(--redInk);font-family:var(--mono);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">PDF</span><span style="display:flex;flex-direction:column;line-height:1.25"><span style="font-size:13.5px;font-weight:600">Brightcell.pdf</span><span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">14 pages</span></span><span style="padding:0 6px;color:var(--ink3)">×</span></span>
+              <span style="height:52px;box-sizing:border-box;padding:0 8px;border-radius:14px;border:1px solid var(--line);background:var(--bg);display:flex;align-items:center;gap:10px"><span style="width:38px;height:38px;border-radius:10px;background:var(--sunk);font-family:var(--mono);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">IMG</span><span style="display:flex;flex-direction:column;line-height:1.25;width:130px"><span style="font-size:13.5px;font-weight:600">receipt.jpg</span><span style="height:3px;border-radius:99px;background:var(--sunk);margin-top:6px"><span style="display:block;height:100%;width:64%;background:var(--ink);border-radius:99px"></span></span></span></span>
+              <span style="height:52px;box-sizing:border-box;padding:0 12px;border-radius:14px;border:1px solid var(--redSoft);background:var(--redSoft);color:var(--redInk);display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600">notes.key · can’t read this type<span style="text-decoration:underline">Remove</span></span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px"><span style="height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;font-weight:600;font-size:14px">+ Attach</span><div style="display:flex;padding:3px;border-radius:12px;background:var(--sunk)"><span style="height:34px;padding:0 12px;border-radius:9px;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.12);display:flex;align-items:center;gap:6px;font-weight:600;font-size:13.5px"><span style="width:7px;height:7px;border-radius:99px;background:var(--lime);box-shadow:0 0 0 2px var(--limeK)"></span>Quick answer</span><span style="height:34px;padding:0 12px;border-radius:9px;display:flex;align-items:center;font-weight:600;font-size:13.5px;color:var(--ink3)">Make a world</span></div><div style="flex:1"></div><span style="height:44px;padding:0 20px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;font-weight:700">Ask →</span></div>
+          </div>
+        </section>
+        <section style="display:flex;flex-direction:column;gap:12px">
+          <h3 style="margin:0;font-size:14px;font-weight:800;color:var(--ink3)">Chat messages</h3>
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:12px">
+            <span style="align-self:flex-end;background:var(--pri);color:var(--onPri);border-radius:18px 18px 4px 18px;padding:10px 14px">Is £86 fair for a battery sample?</span>
+            <div style="display:flex;gap:10px"><span style="width:30px;height:30px;border-radius:9px;background:var(--lime);display:flex;align-items:center;justify-content:center;flex:none"><span style="width:18px;height:11px;border-radius:4px;background:#FFFFFF"></span></span><div style="display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">TILO · 6S · £0.01</span><span>A little high. Similar packs are £60 to £75.</span><span style="display:flex;gap:6px"><span style="height:26px;padding:0 10px;border-radius:8px;background:var(--sunk);font-size:12px;font-weight:500;display:flex;align-items:center">3 sources</span><span style="height:26px;padding:0 10px;border-radius:8px;background:var(--priSoft);color:var(--priInk);font-size:12px;font-weight:600;display:flex;align-items:center">Ask Voltway for less →</span></span></div></div>
+          </div>
+        </section>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:28px">
+        <section style="display:flex;flex-direction:column;gap:12px">
+          <h3 style="margin:0;font-size:14px;font-weight:800;color:var(--ink3)">Your Tilo bubble · drag it anywhere, ⌘J to open</h3>
+          <div style="position:relative;height:640px;border-radius:24px;background:var(--sunk);border:1px solid var(--line);overflow:hidden">
+            <dc-import name="Tilo S Bubble" theme="{{ theme }}" open="{{ yes }}" style="position:absolute;right:24px;bottom:24px" hint-size="64px,64px"></dc-import>
+            <dc-import name="Tilo S Bubble" theme="{{ theme }}" hint="{{ yes }}" style="position:absolute;left:180px;top:28px" hint-size="64px,64px"></dc-import>
+          </div>
+        </section>
+        <section style="display:flex;flex-direction:column;gap:12px">
+          <h3 style="margin:0;font-size:14px;font-weight:800;color:var(--ink3)">Steps and toasts</h3>
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:12px;display:flex;flex-direction:column;gap:4px">
+            <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:14px;background:{{ s.bg }}"><span style="width:30px;height:30px;border-radius:99px;background:{{ s.dbg }};color:{{ s.dfg }};border:{{ s.dbd }};box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">{{ s.m }}</span><span style="flex:1;font-weight:600;font-size:15px">{{ s.t }}</span><span style="font-size:12.5px;font-weight:700;color:var(--ink3)">{{ s.st }}</span></div></sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="position:relative;background:var(--ink);color:var(--card);border-radius:16px;padding:12px 12px 12px 16px;display:flex;align-items:center;gap:12px;overflow:hidden"><span style="position:absolute;top:6px;right:120px;width:7px;height:7px;border-radius:2px;background:var(--lime);transform:rotate(45deg)"></span><span style="width:28px;height:28px;border-radius:99px;background:var(--mint);color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">✓</span><span style="flex:1;font-weight:600">Road trip to Gokarna is done</span><span style="height:34px;padding:0 12px;border-radius:10px;background:var(--lime);color:#0B0B0C;display:flex;align-items:center;font-weight:700;font-size:13.5px">See result</span></div>
+            <div style="background:var(--redSoft);color:var(--redInk);border-radius:16px;padding:12px 12px 12px 16px;display:flex;align-items:center;gap:12px"><span style="width:8px;height:8px;border-radius:99px;background:var(--red)"></span><span style="flex:1;font-weight:600">Web search isn’t connected yet.</span><span style="height:34px;padding:0 12px;border-radius:10px;background:var(--card);color:var(--ink);display:flex;align-items:center;font-weight:700;font-size:13.5px">Try again</span><span style="font-weight:700;font-size:13.5px;text-decoration:underline">Continue without it</span></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:2800},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const theme = this.props.theme ?? 'studio';
+    const S = { done: ['✓', 'var(--mint)', '#FFFFFF', 'none', 'transparent', 'Done'], working: ['5', 'var(--pri)', 'var(--onPri)', 'none', 'transparent', 'Working'], needs: ['6', 'var(--amber)', '#1A1407', 'none', 'var(--amberSoft)', 'Needs you'], planned: ['7', 'transparent', 'var(--ink3)', '1.5px dashed var(--line2)', 'transparent', 'Planned'] };
+    return {
+      theme, yes: true,
+      moods: [['idle', 'Listening', 'Blinks and waits'], ['talk', 'Talking', 'Mouth and hands move'], ['think', 'Thinking', 'Looks up, dots'], ['happy', 'Done!', 'Hops and waves']].map(([k, t, s]) => ({ k, t, s })),
+      steps: [['done', 'Find quiet beaches'], ['working', 'Find food stops'], ['needs', 'Pick places to stay'], ['planned', 'Write it all up']].map(([k, t]) => ({ t, m: S[k][0], dbg: S[k][1], dfg: S[k][2], dbd: S[k][3], bg: S[k][4], st: S[k][5] }))
+    };
+  }
+}
+</script>
+</body>
+</html>

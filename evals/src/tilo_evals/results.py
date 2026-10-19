@@ -10,7 +10,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from .runner import PassResult
+from .runner import CacheTally, PassResult
 
 _SECTION = "## Pass: "
 _HEADER = "# Eval results\n\nThe latest run of each pass kind (PRD 19.5). Replayed recordings: no paid calls.\n"
@@ -25,6 +25,10 @@ def build_hash(repo_root: Path | None = None) -> str:
     except (OSError, subprocess.SubprocessError):
         return "unknown"
 
+
+# EFF-04: a role whose events with a cached count hold less than this share of its input tokens is flagged
+# "low coverage" in the report, since its rate then describes a small part of what it sent (BQ-EFF04-5).
+LOW_CACHE_COVERAGE = 0.5
 
 _COUNTS = ("ran", "passed", "failed", "pending", "not_run", "not_runnable")
 
@@ -75,6 +79,50 @@ def _cost_per_role(result: PassResult) -> dict[str, float]:
     return dict(totals)
 
 
+def _cache_per_role(result: PassResult) -> dict[str, CacheTally]:
+    totals: dict[str, CacheTally] = {}
+    for run in result.ran:
+        for role, tally in run.cache.items():
+            totals.setdefault(role, CacheTally()).add(tally)
+    return dict(sorted(totals.items()))
+
+
+def _cache_rate(tally: CacheTally) -> float | None:
+    """Sum cached over sum tokens_in of the events that carry the count; unknown (None) when there are none."""
+    return tally.cached / tally.known_in if tally.known_in else None
+
+
+def _cache_coverage(tally: CacheTally) -> float | None:
+    return tally.known_in / tally.all_in if tally.all_in else None
+
+
+def cache_hit_rate_per_role(result: PassResult) -> dict[str, dict[str, Any]]:
+    """EFF-04 / ADR-0022: {role: {rate, tokens_in, tokens_cached, coverage, unknown_events}}. `tokens_in` is the
+    input of the events that carry the count; `rate` is None (unknown) for a role with none, never 0."""
+    return {
+        role: {
+            "rate": _cache_rate(t),
+            "tokens_in": t.known_in,
+            "tokens_cached": t.cached,
+            "coverage": _cache_coverage(t),
+            "unknown_events": t.unknown_events,
+        }
+        for role, t in _cache_per_role(result).items()
+    }
+
+
+def _cache_line(role: str, tally: CacheTally) -> str:
+    rate, coverage = _cache_rate(tally), _cache_coverage(tally)
+    missing = f"{tally.unknown_events} event(s) without a count"
+    if rate is None:
+        return f"- {role}: unknown (no cached count reported; {missing}; {tally.all_in} input tokens uncounted)"
+    line = f"- {role}: {tally.cached} of {tally.known_in} input tokens cached ({rate:.1%}); coverage {coverage:.0%}"
+    line += f" of {tally.all_in} input tokens; {missing}"
+    return line + (
+        "; low coverage, read the rate with care" if coverage is not None and coverage < LOW_CACHE_COVERAGE else ""
+    )
+
+
 def summary_text(result: PassResult) -> str:
     """The CLI summary: counts first, then per case group, then why a partial pass stopped."""
     done = [r for r in result.ran if r.passed is not None]
@@ -100,6 +148,14 @@ def render_section(result: PassResult, *, build_hash: str, now_utc: str) -> str:
         lines.append(f"{len(pending)} pending autorater (not counted as passed)")
     lines += ["", "### By case group"] + [
         _group_line(g, row, result.repeated) for g, row in group_summary(result).items()
+    ]
+    lines += [
+        "",
+        "### Cache-hit rate per role",
+        "This is a provider-side hit rate, not credit saving: credits price all input tokens at the list price.",
+    ]
+    lines += [_cache_line(r, t) for r, t in _cache_per_role(result).items()] or [
+        "- none (no model events in this pass)"
     ]
     lines += ["", "### Spread"]
     if result.repeated:
@@ -151,5 +207,6 @@ def render_json(result: PassResult) -> dict[str, Any]:
         "by_group": group_summary(result),
         "cost_per_case": {r.case.id: r.cost for r in result.ran},
         "cost_per_role": _cost_per_role(result),
+        "cache_hit_rate_per_role": cache_hit_rate_per_role(result),
         "failures_by_cause": failures_by_cause(result),
     }

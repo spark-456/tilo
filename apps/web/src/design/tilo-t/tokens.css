@@ -1,0 +1,37 @@
+/* Tilo T tokens: light "studio" and dark "studioDark" (design/tilo-t/tilo-daylight.css, tilo-studio.css, tilo-t.css; our own
+   Claude Design export, ADR-0003). Values are the design's, unchanged. Two things differ from the export:
+   - the Park shell already owns --ground (its page ground), so the city ground token is --cityGround here;
+   - Park's night is data-time="night" on data-theme="studio", so that pair gets the dark values too (studioDark alone also works).
+   Park's own role tokens (src/park/tokens/themes.css) win on any name both define (they are more specific and hold the same
+   Studio values), so existing pages keep their look; this file fills the names Park lacks: bg, pri*, sh1..3, fH/fB, sky/wall/...,
+   blueprint and city ground. No motion in this file (see motion.css). */
+[data-theme="studio"]{color-scheme:light;--fH:"Geist Sans","Geist",ui-sans-serif,system-ui,sans-serif;--fB:"Geist Sans","Geist",ui-sans-serif,system-ui,sans-serif;--mono:"Geist Mono",ui-monospace,monospace;
+--bg:#F6F6F4;--card:#FFFFFF;--sunk:#EEEEEB;--field:#FFFFFF;--line:#E6E6E2;--line2:#D5D5D0;
+--ink:#0B0B0C;--ink2:#46464A;--ink3:#6B6B70;
+--pri:#0B0B0C;--priH:#3A3A3E;--priSoft:#ECFBC2;--priInk:#2F3D00;--onPri:#FFFFFF;--sun:#C8F23A;
+--mint:#34C47C;--mintSoft:#DDF6E8;--mintInk:#13693F;
+--amber:#F5A524;--amberSoft:#FFF1D4;--amberInk:#7A4F00;--amberLine:#F1D59A;
+--red:#E5484D;--redSoft:#FDE8E8;--redInk:#A8202F;
+--skySoft:#E6EEFB;--skyInk:#24529E;--lilacSoft:#EFEBFB;--lilacInk:#5536B5;--tealSoft:#E3F4F1;--tealInk:#0F6157;--pinkSoft:#FCE9F1;--pinkInk:#A0285A;
+--cityBg:#EDEDE9;--cityLine:#E0E0DB;--cityFx:saturate(.45) contrast(1.04);--scrim:rgba(11,11,12,.4);
+--sh1:0 1px 0 rgba(11,11,12,.04);
+--sh2:0 1px 2px rgba(11,11,12,.06),0 12px 32px -18px rgba(11,11,12,.25);
+--sh3:0 30px 80px -30px rgba(11,11,12,.4);
+--lime:#C8F23A;--limeD:#A6CC1F;--limeK:#5F7A08;--sceneFx:none;--hover:#F1F1EE;--sel:#EFEFEB;
+--sky:#DCE9F2;--wall:#ECEAE4;--floor:#DCD8CE;--sea:#9FCFE0;--sand:#F1E3C3;
+--bp:#E6EEFB;--bpLine:#C7D6EF;--bpInk:#24529E;--cityGround:#E7E7E2;--groundL:#DADAD4;--groundR:#CFCFC8;--road:#F4F4F1}
+[data-theme="studioDark"],[data-theme="studio"][data-time="night"]{color-scheme:dark;--fH:"Geist Sans","Geist",ui-sans-serif,system-ui,sans-serif;--fB:"Geist Sans","Geist",ui-sans-serif,system-ui,sans-serif;--mono:"Geist Mono",ui-monospace,monospace;
+--bg:#0A0A0B;--card:#141416;--sunk:#1C1C1F;--field:#1C1C1F;--line:#26262A;--line2:#36363B;
+--ink:#F4F4F2;--ink2:#C2C2C6;--ink3:#97979D;
+--pri:#C8F23A;--priH:#DAF76E;--priSoft:#262E0C;--priInk:#D8F76A;--onPri:#0A0A0B;--sun:#C8F23A;
+--mint:#3FD08A;--mintSoft:#13301F;--mintInk:#8FE8BA;
+--amber:#F5B241;--amberSoft:#33270F;--amberInk:#FFD482;--amberLine:#54401A;
+--red:#F06A6E;--redSoft:#3A1719;--redInk:#FFA6A9;
+--skySoft:#18233A;--skyInk:#A2C6FF;--lilacSoft:#251F3B;--lilacInk:#CABBFF;--tealSoft:#11302C;--tealInk:#84DCCF;--pinkSoft:#351826;--pinkInk:#FFA9CD;
+--cityBg:#161618;--cityLine:#222226;--cityFx:saturate(.4) brightness(.72);--scrim:rgba(0,0,0,.6);
+--sh1:0 0 0 1px rgba(255,255,255,.02);
+--sh2:0 0 0 1px rgba(255,255,255,.04),0 18px 40px -20px rgba(0,0,0,.8);
+--sh3:0 30px 80px -30px rgba(0,0,0,.9);
+--lime:#C8F23A;--limeD:#A6CC1F;--limeK:#5F7A08;--sceneFx:brightness(.58) saturate(.8);--hover:#1A1A1D;--sel:#202024;
+--sky:#DCE9F2;--wall:#ECEAE4;--floor:#DCD8CE;--sea:#9FCFE0;--sand:#F1E3C3;
+--bp:#141C2C;--bpLine:#24324C;--bpInk:#A2C6FF;--cityGround:#1F1F23;--groundL:#18181B;--groundR:#131316;--road:#2A2A2F}

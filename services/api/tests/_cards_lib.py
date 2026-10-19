@@ -134,6 +134,26 @@ def clone_card(
     return mutated
 
 
+REDACTED_SUMMARY_KEYS = frozenset({"id", "world_id", "kind", "created_at", "timeout", "risk_tier", "redacted"})
+
+
+def redacted_card_summary(card: dict) -> dict:
+    """BQ-XWORLD-9 (services/api/tests/API_CARDS_XWORLD.md, "Redacted cross-world reads"): what an owner session that
+    is not a full web sign-in reads of a card in a world other than its bound one. An allowlist of ids, kind, timing
+    and the gate's tier, never free text and never a risky-action detail (gate.action, recipients, consent scopes,
+    destination, options)."""
+    gate = card.get("gate")
+    return {
+        "id": card["id"],
+        "world_id": card["world_id"],
+        "kind": card["kind"],
+        "created_at": card["created_at"],
+        "timeout": card["timeout"],
+        "risk_tier": gate["risk_tier"] if isinstance(gate, dict) else None,
+        "redacted": True,
+    }
+
+
 def new_ulid(seed: str) -> str:
     """A schema-valid ULID (common.schema.json#/$defs/ulid: Crockford base32, 26 chars,
     first char 0-7) built deterministically from a short seed, for tests that just need

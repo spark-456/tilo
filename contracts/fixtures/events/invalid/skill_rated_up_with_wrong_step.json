@@ -1,0 +1,36 @@
+{
+  "v": "1.0",
+  "id": "01JB6Z00000000000000SK0006",
+  "seq": 6,
+  "ts": "2026-10-09T09:00:00.000Z",
+  "world_id": "w_desk_sam",
+  "run_id": "r_desk_sam_1",
+  "type": "skill.rated",
+  "actor": "u_sam",
+  "target": "u_sam",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "Sam rated a run of a skill: thumbs down.",
+  "cause": null,
+  "vis": [],
+  "authz": null,
+  "data": {
+    "skill": "tsk_01JB6Z0000000000000000INV",
+    "version": 3,
+    "run_id": "r_invoice_0007",
+    "thumb": "up",
+    "wrong_step": 3
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

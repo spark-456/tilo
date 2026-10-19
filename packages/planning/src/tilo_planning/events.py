@@ -15,7 +15,13 @@ def clip(text: str, limit: int) -> str:
 
 
 def build_event(
-    base: dict[str, Any], *, tool: str | None, summary: str, authz: dict[str, Any] | None = None, **fields: Any
+    base: dict[str, Any],
+    *,
+    tool: str | None,
+    summary: str,
+    authz: dict[str, Any] | None = None,
+    archive_ref: str | None = None,
+    **fields: Any,
 ) -> dict[str, Any]:
     """`base` holds v/ts/world_id/run_id/actor; `fields` the rest of the envelope (type, seq, target, ...).
     `authz` is set only on side-effect types, from a person or the policy engine's decision (BQ-01)."""
@@ -33,6 +39,6 @@ def build_event(
         "summary": clip(summary, 140),
         "vis": "all",
         "authz": authz,
-        "trace": {**trace, "tool": tool},
+        "trace": {**trace, "tool": tool, "archive_ref": archive_ref},
     }
     return Event.model_validate(raw).model_dump(mode="json", exclude_unset=True)

@@ -26,8 +26,9 @@ caller saw an error and retries) or a queued one that a retry, E2, E4 or the swe
 from __future__ import annotations
 
 import copy
+import logging
 import secrets
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -47,9 +48,17 @@ class StaleDecision(RuntimeError):
     """The L2 entry would be created outside its decision's freshness bound: nothing is enqueued, decide again."""
 
 
+_LOG = logging.getLogger("tilo_channels.autopilot_state")
+
+
+class DigestSettleFailed(Exception):  # not a RuntimeError: never an "expected" failure
+    """The digest's policy.applied failed to emit AND its entry could not be settled: it may still be sent."""
+
+
 class Outbox(Protocol):  # the names of tilo_connectors.outbox.Outbox, which tilo-channels never imports (BQ-158)
     def enqueue(self, entry: dict, evidence: dict) -> dict: ...
     def cancel(self, outbox_id: str) -> dict: ...
+    def abandon(self, outbox_id: str) -> dict: ...
     def get(self, outbox_id: str) -> dict | None: ...  # read port: a copy or None; never writes
     def get_by_idempotency_key(self, world_id: str, idempotency_key: str) -> dict | None: ...
     def revoke(self, world_id: str, idempotency_key: str) -> dict | None: ...  # never creates an entry (BQ-186)
@@ -233,3 +242,76 @@ class Ledger:
                 return stored  # the key is taken: that entry stands at any age, no fresh decision is needed (#343)
         entry = entry or self.entry_for(doc)
         return self._outbox.enqueue(entry, evidence or {"instruction_id": doc["instruction_id"], "level": doc["level"]})
+
+
+def _acquire_hold(store: Any, outbox_id: str, holder: str) -> None:
+    lock, leases = getattr(store, "_lock", None), getattr(store, "_send_leases", None)
+    if lock is not None and isinstance(leases, dict):
+        with lock:
+            leases.setdefault(outbox_id, (holder, "9999-12-31T23:59:59.999Z"))
+
+
+def _release_hold(store: Any, outbox_id: str, holder: str) -> None:
+    lock, leases = getattr(store, "_lock", None), getattr(store, "_send_leases", None)
+    if lock is not None and isinstance(leases, dict):
+        with lock:
+            if leases.get(outbox_id, (None,))[0] == holder:
+                leases.pop(outbox_id, None)
+
+
+def enqueue_digest(
+    outbox: Outbox,
+    entry: dict[str, Any],
+    *,
+    policy_applied: dict[str, Any],
+    policy: Mapping[str, Any] | None,
+    world_owner: str,
+    emit: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any] | None:
+    """Enqueues a policy-authorised L3 daily digest entry once its full OB-01 evidence opens the gate (FR-CHN-18).
+    Holds a send lease on the entry id across insert + emit so `dispatch_due` cannot claim a queued (undo_window_s=0)
+    entry before `policy.applied` settles; both different-id and same-id replays return the stored entry without
+    emitting a duplicate `policy.applied`."""
+    from tilo_channels import autopilot_gate
+
+    if not isinstance(policy, Mapping):
+        return None
+    evidence: dict[str, Any] = {"reserved_by": None, "authorised_by": copy.deepcopy(policy_applied)}
+    evidence |= {"policy": copy.deepcopy(dict(policy)), "team_lead": None, "world_owner": world_owner}
+    evidence |= {"instruction": None, "earlier_applied": []}
+    if not autopilot_gate.opens(entry, evidence):
+        return None
+    get_fn = getattr(outbox, "get", None)
+    already_stored = callable(get_fn) and get_fn(entry["id"]) is not None
+    store, holder = getattr(outbox, "_store", None), f"digest_emit:{ulid(0)}"
+    if not already_stored:
+        _acquire_hold(store, entry["id"], holder)
+    try:
+        stored = outbox.enqueue(entry, evidence)
+    except BaseException:
+        _release_hold(store, entry["id"], holder)
+        raise
+    if already_stored or emit is None or stored.get("id") != entry["id"]:  # a replay under the same key or id
+        _release_hold(store, entry["id"], holder)
+        return stored
+    try:
+        emit(copy.deepcopy(policy_applied))
+    except BaseException as exc:
+        _release_hold(store, entry["id"], holder)
+        try:  # abandon settles queued and scheduled entries alike (cancel refuses a queued one, undo window 0)
+            compensate = getattr(outbox, "abandon_before_dispatch", None)
+            if callable(compensate):
+                compensate(entry["id"])
+            else:
+                outbox.abandon(entry["id"])  # legacy ports settle, but provide no safe-retry proof
+        except Exception as err:
+            _LOG.error(
+                "digest %s: emit failed (%s) and abandon failed (%s); the entry may still be sent",
+                entry["id"],
+                type(exc).__name__,
+                type(err).__name__,
+            )
+            raise DigestSettleFailed(entry["id"]) from exc
+        raise
+    _release_hold(store, entry["id"], holder)
+    return stored

@@ -16,20 +16,22 @@ _TOLERANCE = 1e-9
 
 
 class InconsistentMemoryHit(ValueError):
-    """A `memory.hit` whose `saved` is not `origin_cost - lookup_cost` (EV-09)."""
+    """A `memory.hit` that cannot be trusted: malformed (no id, a bad cost) or `saved` is not
+    `origin_cost - lookup_cost` (EV-09). One type, so the cost routes refuse every such report with 422, never a 500
+    (BQ-MTR10-5)."""
 
 
 def _event_id(event: Mapping[str, Any]) -> str:
     event_id = event.get("id")
     if not isinstance(event_id, str) or not event_id:
-        raise ValueError("memory.hit event has no id")
+        raise InconsistentMemoryHit("memory.hit event has no id")
     return event_id
 
 
 def _cost(event: Mapping[str, Any], data: Mapping[str, Any], field: str) -> float:
     value = data.get(field)
     if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value) or value < 0:
-        raise ValueError(f"memory.hit {_event_id(event)}: {field} must be a finite non-negative number")
+        raise InconsistentMemoryHit(f"memory.hit {_event_id(event)}: {field} must be a finite non-negative number")
     return float(value)
 
 
@@ -38,7 +40,7 @@ def hit_saving(event: Mapping[str, Any]) -> float:
     event_id = _event_id(event)
     data = event.get("data")
     if not isinstance(data, Mapping):
-        raise ValueError(f"memory.hit {event_id}: data is not an object")
+        raise InconsistentMemoryHit(f"memory.hit {event_id}: data is not an object")
     origin = _cost(event, data, "origin_cost")
     lookup = _cost(event, data, "lookup_cost")
     saved = _cost(event, data, "saved")

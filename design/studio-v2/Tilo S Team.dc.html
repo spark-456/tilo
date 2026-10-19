@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="position:relative;width:100%;min-height:100%;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:16px;line-height:1.5">
+  <dc-import name="Tilo S Nav" active="team" theme="{{ theme }}" hint-size="100%,72px"></dc-import>
+  <main style="max-width:1232px;margin:0 auto;padding:48px 32px 64px;display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;align-items:flex-end;gap:16px">
+      <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+        <h1 style="margin:0;font-family:var(--fH);font-weight:700;font-size:48px;line-height:1.05;letter-spacing:-2px">Team</h1>
+        <p style="margin:0;font-size:18px;color:var(--ink2)">The people who share this space, and the helpers who work for all of you.</p>
+      </div>
+      <span style="height:52px;padding:0 22px;border-radius:16px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;gap:10px;font-family:var(--fH);font-weight:700;font-size:16px"><span style="font-size:20px;line-height:1">+</span>Invite someone</span>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:28px">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh1);overflow:hidden">
+          <div style="display:grid;grid-template-columns:minmax(0,2fr) 110px minmax(0,1.2fr) 130px 120px;gap:16px;padding:14px 20px;background:var(--sunk);font-size:13px;font-weight:600;color:var(--ink3)"><span>Person</span><span>Role</span><span>Can say yes to</span><span>Backup</span><span>Status</span></div>
+          <sc-for list="{{ people }}" as="p" hint-placeholder-count="5">
+            <div style="display:grid;grid-template-columns:minmax(0,2fr) 110px minmax(0,1.2fr) 130px 120px;gap:16px;padding:14px 20px;border-top:1px solid var(--line);align-items:center;font-size:14.5px">
+              <span style="display:flex;align-items:center;gap:12px;min-width:0"><span style="width:40px;height:40px;border-radius:99px;background:{{ p.bg }};color:{{ p.fg }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex:none">{{ p.i }}</span><span style="display:flex;flex-direction:column;line-height:1.3;min-width:0"><span style="font-weight:700">{{ p.n }}</span><span style="font-size:13px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.e }}</span></span></span>
+              <span style="font-weight:600">{{ p.role }}</span>
+              <span style="color:var(--ink2)">{{ p.can }}</span>
+              <span style="display:flex;align-items:center;gap:6px;color:var(--ink2)">{{ p.backup }}</span>
+              <span style="height:26px;padding:0 10px;border-radius:99px;background:{{ p.sbg }};color:{{ p.sfg }};font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-self:start">{{ p.st }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between"><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:28px;letter-spacing:-.8px">Your helpers</h2><span style="font-size:14px;font-weight:600;color:var(--ink3)">Tilo picks the right ones for each world</span></div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">
+            <sc-for list="{{ helpers }}" as="h" hint-placeholder-count="6">
+              <div style="background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:var(--sh1);padding:18px;display:flex;gap:14px;align-items:center">
+                <span style="width:64px;height:64px;border-radius:18px;background:{{ h.bg }};display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ h.av }}</span>
+                <span style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-weight:700;font-size:16px">{{ h.n }}</span><span style="font-size:13.5px;color:var(--ink3)">{{ h.d }}</span><span style="font-family:var(--mono);font-size:11px;color:var(--ink2);margin-top:4px">{{ h.u }}</span></span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <aside style="display:flex;flex-direction:column;gap:16px">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh1);padding:20px;display:flex;flex-direction:column;gap:14px">
+          <span style="font-family:var(--fH);font-weight:700;font-size:20px">Who can say yes</span>
+          <span style="font-size:14.5px;color:var(--ink2)">When you’re away, decisions go to your backup so nothing gets stuck.</span>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ cover }}" as="c" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--sunk)"><span style="flex:1;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:600;font-size:14.5px">{{ c.t }}</span><span style="font-size:13px;color:var(--ink3)">{{ c.s }}</span></span><span style="font-family:var(--mono);font-size:12px">{{ c.who }}</span></div></sc-for>
+          </div>
+          <div style="border-radius:14px;background:var(--amberSoft);color:var(--amberInk);padding:12px 14px;font-size:14px;font-weight:600">Ravi is away until Monday. Jo covers his approvals.</div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:12px">
+          <span style="font-weight:700;font-size:15px">Pending invites</span>
+          <div style="display:flex;align-items:center;gap:10px;font-size:14.5px"><span style="width:36px;height:36px;border-radius:99px;border:1.5px dashed var(--line2);display:flex;align-items:center;justify-content:center;color:var(--ink3)">@</span><span style="flex:1;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:600">sam@raostudio.co</span><span style="font-size:13px;color:var(--ink3)">Sent 2 days ago</span></span><span style="font-size:13.5px;font-weight:600;text-decoration:underline;text-underline-offset:3px">Resend</span></div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:10px">
+          <span style="font-weight:700;font-size:15px">Who helped Tilo learn</span>
+          <span style="font-size:14px;color:var(--ink2)">Ravi taught “Check invoices”. Jo gave 6 tips on “Write a friendly reply”.</span>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1100},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloR) this.t = setInterval(() => { if (window.TiloR && window.TiloCity) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const R = window.TiloR ? window.TiloR(React.createElement) : null;
+    const theme = this.props.theme ?? 'studio';
+    const people = [['MR', 'Maya Rao', 'maya@raostudio.co', 'Owner', 'Anything', 'Jo Park', 'Active', 'lilac', 'mint'], ['JP', 'Jo Park', 'jo@raostudio.co', 'Admin', 'Up to £500', 'Maya Rao', 'Active', 'sky', 'mint'], ['RK', 'Ravi Kumar', 'ravi@raostudio.co', 'Member', 'Up to £50', 'Jo Park', 'Away · Mon', 'amber', 'amber'], ['LT', 'Lena Tan', 'lena@raostudio.co', 'Member', 'Questions only', 'Maya Rao', 'Active', 'pink', 'mint'], ['AN', 'Ade Nwosu', 'ade@freelance.io', 'Guest', 'Nothing, view only', '—', 'Guest', 'teal', 'sunk']].map(([i, n, e, role, can, backup, st, c, s]) => ({ i, n, e, role, can, backup, st, bg: `var(--${c}Soft)`, fg: `var(--${c}Ink)`, sbg: s === 'sunk' ? 'var(--sunk)' : `var(--${s}Soft)`, sfg: s === 'sunk' ? 'var(--ink2)' : `var(--${s}Ink)` }));
+    const helpers = [['Director', 'Plans the work and keeps it on track', 'In 6 worlds', null, 'focused', 'director', 'pri'], ['Researcher', 'Finds and checks facts', 'In 5 worlds', 'research', 'delighted', null, 'sky'], ['Writer', 'Drafts replies, notes and reports', 'In 4 worlds', 'designer', 'talking', null, 'lilac'], ['Planner', 'Routes, schedules and timelines', 'In 2 worlds', 'builder', 'focused', null, 'amber'], ['Money keeper', 'Prices, invoices and budgets', 'In 3 worlds', 'finance', 'neutral', null, 'mint'], ['Messenger', 'Talks to your apps, asks first', 'In 4 worlds', 'connector', 'delighted', null, 'pink']].map(([n, d, u, role, ex, rank, c]) => ({ n, d, u, bg: `var(--${c}Soft)`, av: R ? R.agent(role, ex, 58, rank || undefined) : null }));
+    return {
+      theme, people, helpers,
+      cover: [['Spending over £50', 'You first, then Jo', 'MR → JP'], ['Sending emails', 'Whoever started the world', 'OWNER'], ['Sharing files outside', 'Only you', 'MR']].map(([t, s, who]) => ({ t, s, who }))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -210,7 +210,9 @@ def test_FR_CHN_11_inbound_aware_l2_r3_an_earlier_non_plain_message_does_not_mat
 ) -> None:
     h = make_l2(kind)
     thread = h.thread(SCHEDULING_INBOUND, earlier=(_earlier(body, subject),))
-    assert len(thread.messages) == 2
+    assert (
+        len(thread.messages) == 3
+    )  # the bench rig starts every thread with the owner's own SENT note (ADR-0025 migration)
     p, _, _ = h.preview(thread, YES)
     assert_rides_l2(h, p)
 

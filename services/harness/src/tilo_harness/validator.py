@@ -1,4 +1,4 @@
-"""Event validator: contracts/event.schema.json plus contracts/event.rules.md's EV-01..EV-15
+"""Event validator: contracts/event.schema.json plus contracts/event.rules.md's EV-01..EV-16
 (P0-09, D-11; EV-15, artifact versions the world recorded, is a stream rule like EV-10..EV-14).
 A service must not import from scripts/ (root CLAUDE.md), so this is a fresh implementation
 that agrees with scripts/contracts_events.py on every fixture in contracts/, not a reuse of it.
@@ -7,13 +7,13 @@ that agrees with scripts/contracts_events.py on every fixture in contracts/, not
 finiteness and int64 range, D-11 UTF-8 round-trip (every string value and dict key, at any
 nesting depth), schema, EV-01 (registered type), EV-02 (data schema), EV-04, EV-05, EV-06,
 EV-08, EV-09, the state-independent half of EV-13 (an event whose own district is not in its own
-vis list) and the state-independent half of EV-14 (a delivery that left Tilo with no cause at
-all). The stream- and layout-dependent rules -- EV-10 (seq/id, and the stream's world_id), EV-11
-(cause resolves), EV-12 (layout ids), the layout half of EV-13 (vis names a real district) and
-the stream half of EV-14 (an email delivery's cause must be the matching `data.transfer` out,
-same outbox_id and artifact, mirroring scripts/contracts_events.py's `_is_send_of`) -- need a
-`WorldState` and are run in addition when one is passed; `WorldWriter` is what builds and
-updates it.
+vis list), the state-independent half of EV-14 (a delivery that left Tilo with no cause at
+all) and EV-16 (trace.tokens_cached at most trace.tokens_in, ADR-0022). The stream- and
+layout-dependent rules -- EV-10 (seq/id, and the stream's world_id), EV-11 (cause resolves),
+EV-12 (layout ids), the layout half of EV-13 (vis names a real district) and the stream half
+of EV-14 (an email delivery's cause must be the matching `data.transfer` out, same outbox_id
+and artifact, mirroring scripts/contracts_events.py's `_is_send_of`) -- need a `WorldState`
+and are run in addition when one is passed; `WorldWriter` is what builds and updates it.
 """
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ import jsonschema
 import yaml
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
+from tilo_providers.diagnostics import log_caught
 
 LAYOUT_ID = re.compile(r"^(A_[0-9A-Za-z_]+|[LDBGI][0-9]{1,4})$")
 
@@ -358,6 +359,7 @@ class EventValidator:
         try:
             return [_capped(problem) for problem in self._problems(event, state)]
         except Exception as error:  # fail closed: a validator crash rejects the event, it never escapes
+            log_caught(error, __name__, locals())
             return [f"schema: (root): the event could not be validated ({type(error).__name__})"]
 
     def contract_problems(self, name: str, instance: object) -> list[str]:
@@ -366,6 +368,7 @@ class EventValidator:
         try:
             return [_capped(problem) for problem in self._schema_errors(name, instance)]
         except Exception as error:  # fail closed, same as problems()
+            log_caught(error, __name__, locals())
             return [f"(root): could not be validated against {name} ({type(error).__name__})"]
 
     def _problems(self, event: dict[str, Any], state: WorldState | None) -> list[str]:
@@ -405,6 +408,9 @@ class EventValidator:
             problems.append("EV-13: vis must include the event's own district")
         if event["type"] == "artifact.delivered" and data.get("outbox_id") is not None and event["cause"] is None:
             problems.append("EV-14: a delivery that left Tilo is caused by its data.transfer out")
+        trace = event["trace"]  # the schema made tokens_in an integer wherever tokens_cached is present
+        if "tokens_cached" in trace and trace["tokens_cached"] > trace["tokens_in"]:
+            problems.append("EV-16: trace.tokens_cached is at most trace.tokens_in")
 
         if state is not None:
             problems += self._stream_problems(event, state)

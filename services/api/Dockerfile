@@ -12,6 +12,8 @@ COPY config ./config
 COPY contracts ./contracts
 COPY prompts ./prompts
 COPY templates ./templates
+COPY skills ./skills
+COPY design/tokens.json ./design/tokens.json
 RUN uv sync --locked --no-dev --package tilo-api
 
 FROM python:3.12.15-slim-trixie AS runtime

@@ -1,0 +1,204 @@
+id: try-run-match
+domain: automation
+version: "1.0.0"
+description: "Deterministic scorer comparing a try-run recorded execution against taught steps, verifying sequence alignment and strict ask-first pause enforcement."
+author: "tilo.automation"
+reviewer: "automation.lead"
+tools_allowed: []
+inputs:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  type: object
+  additionalProperties: false
+  required:
+    - taught_steps
+    - recorded_steps
+  properties:
+    taught_steps:
+      type: array
+      minItems: 0
+      maxItems: 30
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - verb
+          - object
+          - tool
+          - ask_me_first
+        properties:
+          verb:
+            type: string
+            minLength: 2
+            maxLength: 40
+          object:
+            type: string
+            minLength: 2
+            maxLength: 240
+          tool:
+            type: string
+            minLength: 1
+            maxLength: 80
+          ask_me_first:
+            type: boolean
+      description: "The sequence of taught steps demonstrating how the task should be performed."
+    recorded_steps:
+      type: array
+      minItems: 0
+      maxItems: 50
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - verb
+          - object
+          - tool
+        properties:
+          verb:
+            type: string
+            minLength: 2
+            maxLength: 40
+          object:
+            type: string
+            minLength: 2
+            maxLength: 240
+          tool:
+            type: string
+            minLength: 1
+            maxLength: 80
+          paused:
+            type: boolean
+            description: "Whether the try run paused before executing this step."
+      description: "The sequence of steps recorded during the dry/try run."
+outputs:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  type: object
+  additionalProperties: false
+  required:
+    - status
+    - match_percent
+    - matched_steps
+    - added_steps
+    - skipped_steps
+    - paused_ask_first_steps
+    - missed_ask_first_steps
+    - failure_reason
+  properties:
+    status:
+      type: string
+      enum:
+        - pass
+        - fail
+      description: "Result status of the try run match evaluation."
+    match_percent:
+      type: number
+      minimum: 0.0
+      maximum: 100.0
+      description: "Alignment score between 0.0 and 100.0 measuring fidelity to taught sequence."
+    matched_steps:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - verb
+          - object
+          - tool
+          - ask_me_first
+        properties:
+          verb:
+            type: string
+          object:
+            type: string
+          tool:
+            type: string
+          ask_me_first:
+            type: boolean
+      description: "Taught steps correctly matched in order during the try run."
+    added_steps:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - verb
+          - object
+          - tool
+        properties:
+          verb:
+            type: string
+          object:
+            type: string
+          tool:
+            type: string
+          paused:
+            type: boolean
+      description: "Steps recorded in try run that were not present in the taught sequence."
+    skipped_steps:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - verb
+          - object
+          - tool
+          - ask_me_first
+        properties:
+          verb:
+            type: string
+          object:
+            type: string
+          tool:
+            type: string
+          ask_me_first:
+            type: boolean
+      description: "Taught steps that were omitted during the try run."
+    paused_ask_first_steps:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - verb
+          - object
+          - tool
+          - ask_me_first
+        properties:
+          verb:
+            type: string
+          object:
+            type: string
+          tool:
+            type: string
+          ask_me_first:
+            type: boolean
+      description: "Taught steps with ask_me_first=true where try run properly paused."
+    missed_ask_first_steps:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required:
+          - verb
+          - object
+          - tool
+          - ask_me_first
+        properties:
+          verb:
+            type: string
+          object:
+            type: string
+          tool:
+            type: string
+          ask_me_first:
+            type: boolean
+      description: "Taught steps with ask_me_first=true where try run failed to pause."
+    failure_reason:
+      type:
+        - string
+        - "null"
+      enum:
+        - null
+        - empty_taught_example
+        - missed_ask_first_pause
+      description: "Specific reason if evaluation status is fail."

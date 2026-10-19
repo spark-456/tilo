@@ -1,0 +1,293 @@
+{
+  "cases": [
+    {
+      "id": "mixed_attempt_with_weak_topics",
+      "input": {
+        "quiz_title": "Northbridge Imaginary Systems 101 Diagnostic Set",
+        "questions": [
+          {
+            "id": "q1",
+            "topic": "lattice_flux",
+            "answer": "b",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 1
+            }
+          },
+          {
+            "id": "q2",
+            "topic": "clockwork_valves",
+            "answer": "b",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 2
+            }
+          },
+          {
+            "id": "q3",
+            "topic": "cyclic_routing",
+            "answer": "c",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_2", "version": 1 },
+              "page": 3
+            }
+          }
+        ],
+        "responses": [
+          { "question_id": "q1", "selected": "b" },
+          { "question_id": "q2", "selected": "a" },
+          { "question_id": "q3", "selected": null }
+        ]
+      },
+      "expected_output": {
+        "score": { "correct": 1, "total": 3, "accuracy_pct": 33.33 },
+        "topic_breakdown": [
+          {
+            "topic": "lattice_flux",
+            "correct": 1,
+            "total": 1,
+            "accuracy_pct": 100.0,
+            "status": "strong"
+          },
+          {
+            "topic": "clockwork_valves",
+            "correct": 0,
+            "total": 1,
+            "accuracy_pct": 0.0,
+            "status": "weak"
+          },
+          {
+            "topic": "cyclic_routing",
+            "correct": 0,
+            "total": 1,
+            "accuracy_pct": 0.0,
+            "status": "weak"
+          }
+        ],
+        "weak_topics": ["clockwork_valves", "cyclic_routing"],
+        "next_practice_set": [
+          {
+            "topic": "clockwork_valves",
+            "recommended_count": 3,
+            "focus_note": "Review negative feedback loop stabilisation in Northbridge Past Paper 1, page 2.",
+            "source_refs": [{ "artifact_id": "art_northbridge_paper_1", "version": 1, "page": 2 }]
+          },
+          {
+            "topic": "cyclic_routing",
+            "recommended_count": 3,
+            "focus_note": "Practise 5-hub cyclic ring routing problems from Northbridge Past Paper 2, page 3.",
+            "source_refs": [{ "artifact_id": "art_northbridge_paper_2", "version": 1, "page": 3 }]
+          }
+        ],
+        "summary": "Scored 1/3 (33.33%) on Northbridge Imaginary Systems 101 Diagnostic Set. Strong in lattice_flux; weak in clockwork_valves and cyclic_routing. Next practice set: 3 questions each on clockwork_valves (art_northbridge_paper_1 v1 p.2) and cyclic_routing (art_northbridge_paper_2 v1 p.3)."
+      }
+    },
+    {
+      "id": "all_strong_attempt",
+      "input": {
+        "quiz_title": "Northbridge Lattice Flux Mini Check",
+        "questions": [
+          {
+            "id": "q1",
+            "topic": "lattice_flux",
+            "answer": "b",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 1
+            }
+          },
+          {
+            "id": "q2",
+            "topic": "clockwork_valves",
+            "answer": "b",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 2
+            }
+          }
+        ],
+        "responses": [
+          { "question_id": "q1", "selected": "b" },
+          { "question_id": "q2", "selected": "b" }
+        ]
+      },
+      "expected_output": {
+        "score": { "correct": 2, "total": 2, "accuracy_pct": 100.0 },
+        "topic_breakdown": [
+          {
+            "topic": "lattice_flux",
+            "correct": 1,
+            "total": 1,
+            "accuracy_pct": 100.0,
+            "status": "strong"
+          },
+          {
+            "topic": "clockwork_valves",
+            "correct": 1,
+            "total": 1,
+            "accuracy_pct": 100.0,
+            "status": "strong"
+          }
+        ],
+        "weak_topics": [],
+        "next_practice_set": [
+          {
+            "topic": "lattice_flux",
+            "recommended_count": 2,
+            "focus_note": "Maintain mastery with timed mixed revision from Northbridge Past Paper 1, page 1.",
+            "source_refs": [{ "artifact_id": "art_northbridge_paper_1", "version": 1, "page": 1 }]
+          }
+        ],
+        "summary": "Scored 2/2 (100.0%) on Northbridge Lattice Flux Mini Check with no weak topics identified; recommended a 2-question timed revision set from art_northbridge_paper_1 v1 p.1."
+      }
+    },
+    {
+      "id": "threshold_boundary_attempt",
+      "input": {
+        "quiz_title": "Northbridge Threshold Boundary Check",
+        "questions": [
+          {
+            "id": "q1",
+            "topic": "lattice_flux",
+            "answer": "b",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 1
+            }
+          },
+          {
+            "id": "q2",
+            "topic": "lattice_flux",
+            "answer": "c",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 1
+            }
+          },
+          {
+            "id": "q3",
+            "topic": "lattice_flux",
+            "answer": "a",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 4
+            }
+          },
+          {
+            "id": "q4",
+            "topic": "lattice_flux",
+            "answer": "d",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 4
+            }
+          },
+          {
+            "id": "q5",
+            "topic": "clockwork_valves",
+            "answer": "b",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 2
+            }
+          },
+          {
+            "id": "q6",
+            "topic": "clockwork_valves",
+            "answer": "a",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 5
+            }
+          },
+          {
+            "id": "q7",
+            "topic": "cyclic_routing",
+            "answer": "c",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_2", "version": 1 },
+              "page": 3
+            }
+          },
+          {
+            "id": "q8",
+            "topic": "cyclic_routing",
+            "answer": "b",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_2", "version": 1 },
+              "page": 3
+            }
+          },
+          {
+            "id": "q9",
+            "topic": "cyclic_routing",
+            "answer": "e",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_2", "version": 1 },
+              "page": 6
+            }
+          }
+        ],
+        "responses": [
+          { "question_id": "q1", "selected": "b" },
+          { "question_id": "q2", "selected": "c" },
+          { "question_id": "q3", "selected": "a" },
+          { "question_id": "q4", "selected": "a" },
+          { "question_id": "q5", "selected": "b" },
+          { "question_id": "q6", "selected": "c" },
+          { "question_id": "q7", "selected": "a" },
+          { "question_id": "q8", "selected": "b" },
+          { "question_id": "q9", "selected": null }
+        ]
+      },
+      "expected_output": {
+        "score": { "correct": 5, "total": 9, "accuracy_pct": 55.56 },
+        "topic_breakdown": [
+          {
+            "topic": "lattice_flux",
+            "correct": 3,
+            "total": 4,
+            "accuracy_pct": 75.0,
+            "status": "strong"
+          },
+          {
+            "topic": "clockwork_valves",
+            "correct": 1,
+            "total": 2,
+            "accuracy_pct": 50.0,
+            "status": "needs_practice"
+          },
+          {
+            "topic": "cyclic_routing",
+            "correct": 1,
+            "total": 3,
+            "accuracy_pct": 33.33,
+            "status": "weak"
+          }
+        ],
+        "weak_topics": ["cyclic_routing"],
+        "next_practice_set": [
+          {
+            "topic": "cyclic_routing",
+            "recommended_count": 3,
+            "focus_note": "Practise 5-hub cyclic ring routing problems from Northbridge Past Paper 2, pages 3 and 6.",
+            "source_refs": [
+              { "artifact_id": "art_northbridge_paper_2", "version": 1, "page": 3 },
+              { "artifact_id": "art_northbridge_paper_2", "version": 1, "page": 6 }
+            ]
+          },
+          {
+            "topic": "clockwork_valves",
+            "recommended_count": 2,
+            "focus_note": "Revisit valve feedback from Northbridge Past Paper 1, pages 2 and 5.",
+            "source_refs": [
+              { "artifact_id": "art_northbridge_paper_1", "version": 1, "page": 2 },
+              { "artifact_id": "art_northbridge_paper_1", "version": 1, "page": 5 }
+            ]
+          }
+        ],
+        "summary": "Scored 5/9 (55.56%) on Northbridge Threshold Boundary Check. Strong in lattice_flux (75%); needs practice in clockwork_valves (50%); weak in cyclic_routing (33.33%). Next practice set: 3 questions on cyclic_routing (art_northbridge_paper_2 v1 pp.3, 6) and 2 on clockwork_valves (art_northbridge_paper_1 v1 pp.2, 5)."
+      }
+    }
+  ]
+}

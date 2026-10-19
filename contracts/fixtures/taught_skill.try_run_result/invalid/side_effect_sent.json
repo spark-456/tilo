@@ -1,0 +1,18 @@
+{
+  "id": "01JB6Z00000000000000TRY001",
+  "skill": "tsk_01JB6Z0000000000000000INV",
+  "version": 3,
+  "by": "u_priya",
+  "match": 0.75,
+  "total": 4,
+  "matched": 3,
+  "asked": 2,
+  "skipped": 1,
+  "intents": 2,
+  "side_effects": 1,
+  "outcome": "completed",
+  "stopped_at": null,
+  "duration_ms": 68000,
+  "credits": 76,
+  "finished_at": "2026-10-09T09:00:00.000Z"
+}

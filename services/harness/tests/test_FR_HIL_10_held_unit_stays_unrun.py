@@ -55,7 +55,7 @@ def _setup(tmp_path, *, actions, replies=None):
     specialist = ScriptedProvider(replies or {}, default=CLEAR)
     must_ask = MustAsk(
         role_providers(specialist=specialist), config=config, card_sink=cards.append, owner=OWNER,
-        covered_actions=frozenset(),
+        covered_actions=frozenset(), model_questions="ask",  # the FR-HIL-10 cards this suite pins (BQ-ASSUME-1)
     )  # fmt: skip
     first = build_unit("U1", title=SEND_TITLE)
     first["actions"] = list(actions)

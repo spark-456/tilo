@@ -7,11 +7,13 @@
 import type { Card, Layout } from "@tilo/contracts";
 import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 import type { TiloClient } from "../api/client";
+import type { FieldsApi } from "../api/fields";
+import { describeError } from "../park/shared/remote";
 import { Placeholder } from "../screens/Placeholder";
-import { findItem } from "../screens/findItem";
 import { Chip, Soon } from "../screens/kit";
-import { describeError } from "../screens/remote";
+import { findItem } from "../world/findItem";
 import { agentNames } from "../world/runSummary";
+import { FieldsForm } from "./FieldsForm";
 import { RUNG } from "./queue";
 
 /** The state of one answer: the option sent and not yet confirmed by its closing event (HR-1). */
@@ -110,7 +112,14 @@ export function CardOptions({
   answer,
   footer,
   preselect = true,
-}: { card: Card; answer: Answer | null; footer?: ReactNode; preselect?: boolean }) {
+  optionLabels,
+}: {
+  card: Card;
+  answer: Answer | null;
+  footer?: ReactNode;
+  preselect?: boolean;
+  optionLabels?: Readonly<Record<string, string>>;
+}) {
   const group = useId();
   // `preselect` false (a T3 or irreversible gate): nothing is chosen until the person chooses.
   const [choice, setChoice] = useState<string | undefined>(
@@ -119,7 +128,9 @@ export function CardOptions({
   const [context, setContext] = useState("");
   const chosen = card.options.find((o) => o.id === choice);
   const locked = !answer || answer.pending !== null;
-  const safe = card.options.find((o) => o.id === card.safe_default)?.label ?? "the safe option";
+  const safeOption = card.options.find((o) => o.id === card.safe_default);
+  const safe =
+    (safeOption && (optionLabels?.[safeOption.id] ?? safeOption.label)) ?? "the safe option";
   const gate = card.kind === "gate";
   return (
     <>
@@ -140,7 +151,7 @@ export function CardOptions({
             />
             <span className="need-option-text">
               <span>
-                <b>{o.label}</b>
+                <b>{optionLabels?.[o.id] ?? o.label}</b>
                 {o.suggested && <Chip tone="suggested">Suggested</Chip>}
               </span>
               {o.reason && <span className="bitem-sub">{o.reason}</span>}
@@ -175,7 +186,7 @@ export function CardOptions({
               aria-busy={answer.pending !== null ? "true" : undefined}
               onClick={() => chosen && answer.send(chosen.id, context)}
             >
-              {chosen?.label ?? "Choose an option"}
+              {(chosen && (optionLabels?.[chosen.id] ?? chosen.label)) ?? "Choose an option"}
             </button>
           ) : (
             (footer ?? (chosen && <Placeholder label={chosen.label} compact />))
@@ -207,18 +218,39 @@ export function CardView({
   answer,
   footer,
   children,
+  fields = null,
 }: {
   card: Card;
   layout: Layout | null;
   answer: Answer | null;
   footer?: ReactNode;
   children?: ReactNode;
+  /** ADR-0035 L6c: a card that asks for fields (`provide`) is answered by this form, never by a tap on "Add it". */
+  fields?: FieldsApi | null;
 }) {
+  const asks =
+    fields !== null && card.kind === "needs_you" && card.options.some((o) => o.id === "provide");
+  const hold = asks && answer && card.options.some((o) => o.id === "hold") ? answer : null;
   return (
     <article className="need-card" data-testid="need-card" data-rung={card.rung}>
       <CardHead card={card} layout={layout} />
       {children}
-      <CardOptions card={card} answer={answer} footer={footer} />
+      {asks ? (
+        <>
+          <FieldsForm
+            api={fields}
+            cardId={card.id}
+            onHold={hold ? () => hold.send("hold", "") : undefined}
+          />
+          {answer?.error && (
+            <p className="need-error" role="alert">
+              {answer.error}
+            </p>
+          )}
+        </>
+      ) : (
+        <CardOptions card={card} answer={answer} footer={footer} />
+      )}
     </article>
   );
 }

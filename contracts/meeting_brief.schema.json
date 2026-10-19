@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/meeting_brief.schema.json",
+  "x-version": "1.0.0",
+  "title": "MeetingBrief",
+  "description": "The brief Tilo prepares before one meeting: the content of a `meeting_brief` artifact version (`application/json`), pinned by `meeting.brief` (ADR-0047). Not the intake brief (`brief.schema.json`). Owner-only (PE-05, MB-01). Code copies each agenda point's `title` and `minutes` from the meeting's agenda, in order (MB-04), and each `carry_over` item from a prior meeting's confirmed minutes (MB-06); a model writes only the talk points' `text`, and every talk point cites at least one agenda line or prior-minutes item (MB-05). No recipients, times, addresses or links: every text field is one link-free line, and nothing in a brief is sent anywhere. Rules MB-01 to MB-12 in `meeting_brief.rules.md`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "meeting_id", "generated_at", "flagged", "agenda_points", "carry_over"],
+  "properties": {
+    "v": {
+      "const": "1.0"
+    },
+    "meeting_id": {
+      "$ref": "common.schema.json#/$defs/meeting_id"
+    },
+    "generated_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "flagged": {
+      "description": "The safety provider flagged the model's input or reply: the panel marks the brief flagged (MB-08).",
+      "type": "boolean"
+    },
+    "agenda_points": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "$ref": "#/$defs/agenda_point"
+      }
+    },
+    "carry_over": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "$ref": "#/$defs/carry_item"
+      }
+    }
+  },
+  "$defs": {
+    "line": {
+      "description": "One line of brief text: 1 to 240 characters, the same link-free and hidden-character checks as a meeting title (PE-13, ADR-0016 decision 14). Astral format characters are the validator's (MB-11).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "[\\n\\r]"
+          },
+          {
+            "pattern": ":[/\\\\]{2}"
+          },
+          {
+            "pattern": "(?:^|[^A-Za-z0-9-])(?:[mM][eE][eE][tT]\\.[gG][oO][oO][gG][lL][eE]\\.[cC][oO][mM]|[tT][eE][aA][mM][sS]\\.[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[cC][oO][mM]|[tT][eE][aA][mM][sS]\\.[lL][iI][vV][eE]\\.[cC][oO][mM]|[zZ][oO][oO][mM]\\.[uU][sS]|[wW][eE][bB][eE][xX]\\.[cC][oO][mM]|[wW][hH][eE][rR][eE][bB][yY]\\.[cC][oO][mM])(?:[^A-Za-z0-9-]|$)"
+          },
+          {
+            "pattern": "[A-Za-z0-9-]+\\.(?![jJ][sS][/:])[A-Za-z]{2,63}(?::[0-9]{1,5})?/[^\\s/]"
+          },
+          {
+            "pattern": "(?:^|[\\u0000-\\u0022\\u0024-\\u0029\\u002B-\\u002F\\u003A-\\u007F])[\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0F]|[#*0-9][\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0D]"
+          }
+        ]
+      }
+    },
+    "item_ref": {
+      "description": "An item of a prior meeting's minutes: `ai<n>` is the action item with that `id`, `d<n>` the decision at that zero-based index of `decisions`, both in the minutes version the prior meeting pins (MB-06).",
+      "type": "string",
+      "pattern": "^(?:ai[0-9]{1,3}|d[0-9]{1,2})$",
+      "not": {
+        "pattern": "\\n"
+      }
+    },
+    "agenda_point": {
+      "description": "One agenda line of the meeting, copied by code (MB-04), with up to five talk points.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "minutes", "talk_points"],
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/line"
+        },
+        "minutes": {
+          "anyOf": [
+            {
+              "$ref": "meeting.schema.json#/$defs/agenda_minutes"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "talk_points": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/talk_point"
+          }
+        }
+      }
+    },
+    "talk_point": {
+      "description": "A point the owner may raise, written by the model and checked by code (MB-05).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "evidence"],
+      "properties": {
+        "text": {
+          "$ref": "#/$defs/line"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/source"
+          }
+        }
+      }
+    },
+    "source": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/agenda_line"
+        },
+        {
+          "$ref": "#/$defs/prior_item"
+        }
+      ]
+    },
+    "agenda_line": {
+      "description": "A line of this meeting's agenda, by zero-based index (MB-05).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "index"],
+      "properties": {
+        "kind": {
+          "const": "agenda"
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 19
+        }
+      }
+    },
+    "prior_item": {
+      "description": "An item of a prior meeting's confirmed minutes (MB-06).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "meeting_id", "item"],
+      "properties": {
+        "kind": {
+          "const": "prior"
+        },
+        "meeting_id": {
+          "$ref": "common.schema.json#/$defs/meeting_id"
+        },
+        "item": {
+          "$ref": "#/$defs/item_ref"
+        }
+      }
+    },
+    "carry_item": {
+      "description": "A decision or a still-open action item carried over from a prior meeting, its text copied by code (MB-06, MB-07). A decision cites a `d<n>` item, an open action an `ai<n>` item.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "kind", "from_meeting", "item"],
+      "properties": {
+        "text": {
+          "$ref": "#/$defs/line"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["decision", "open_action"]
+        },
+        "from_meeting": {
+          "$ref": "common.schema.json#/$defs/meeting_id"
+        },
+        "item": {
+          "$ref": "#/$defs/item_ref"
+        }
+      },
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "decision"
+          }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "properties": {
+          "item": {
+            "pattern": "^d"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "item": {
+            "pattern": "^ai"
+          }
+        }
+      }
+    }
+  }
+}

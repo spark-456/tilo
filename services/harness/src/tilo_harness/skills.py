@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
 import jsonschema
 import yaml
+from tilo_providers.diagnostics import log_caught
 
 from tilo_harness.validator import repo_validator
 
@@ -36,6 +37,8 @@ class LoadedSkill:
     version: str
     body: str
     sha256: str
+    tool_access: Mapping[str, Any] = field(default_factory=dict)  # FR-ACC-02: connector id -> level, as declared
+    tools_allowed: tuple[str, ...] = ()  # the tools the skill may use (LW-07); a unit gets these intersect its role's
 
 
 def _read_capped(path: Path) -> bytes:
@@ -51,6 +54,7 @@ def _read_skill(folder: Path) -> tuple[dict[str, Any], LoadedSkill]:
     except SkillError:
         raise
     except Exception as error:
+        log_caught(error, __name__, locals())
         raise SkillError(f"{folder.name}: cannot read skill ({type(error).__name__})") from error
 
 
@@ -64,13 +68,20 @@ def _parse_skill(folder: Path) -> tuple[dict[str, Any], LoadedSkill]:
         raise SkillError(f"{folder.name}: " + "; ".join(problems))
     if data["id"] != folder.name or data["domain"] != folder.parent.name:
         raise SkillError(f"{folder.name}: skill.yaml id/domain must match skills/<domain>/<skill-id>/")
-    for field in ("inputs", "outputs"):
+    for name in ("inputs", "outputs"):
         try:
-            jsonschema.Draft202012Validator.check_schema(data[field])
+            jsonschema.Draft202012Validator.check_schema(data[name])
         except jsonschema.SchemaError as error:
-            raise SkillError(f"{folder.name}: {field} is not a valid JSON Schema") from error
+            raise SkillError(f"{folder.name}: {name} is not a valid JSON Schema") from error
     sha256 = hashlib.sha256(raw_yaml + raw_md).hexdigest()
-    return data, LoadedSkill(id=data["id"], version=data["version"], body=body, sha256=sha256)
+    return data, LoadedSkill(
+        id=data["id"],
+        version=data["version"],
+        body=body,
+        sha256=sha256,
+        tool_access=data.get("tool_access") or {},
+        tools_allowed=tuple(data["tools_allowed"]),
+    )
 
 
 class SkillRegistry:
@@ -79,6 +90,7 @@ class SkillRegistry:
         self.problems: dict[str, str] = {}  # "<domain>/<folder>" -> why it was not loaded
         self._folders: dict[str, Path] = {}
         self._descriptions: dict[str, str] = {}
+        self._versions: dict[str, str] = {}
         for yaml_path in sorted(self.root.glob("*/*/skill.yaml")):
             folder = yaml_path.parent
             name = f"{folder.parent.name}/{folder.name}"
@@ -92,10 +104,15 @@ class SkillRegistry:
                 continue
             self._folders[data["id"]] = folder
             self._descriptions[data["id"]] = data["description"]
+            self._versions[data["id"]] = str(data["version"])
 
     def catalog(self) -> list[tuple[str, str]]:
         """What the planner sees (PRD 8.2 Selection): (id, one-line description) per skill."""
         return sorted(self._descriptions.items())
+
+    def version(self, skill_id: str) -> str | None:
+        """The version read when the registry was built (no file read); None if it is not in the registry."""
+        return self._versions.get(skill_id)
 
     def folder(self, skill_id: str) -> Path | None:
         """The skill's folder, `<root>/<domain>/<skill-id>`, or None if it is not in the registry (FR-AGT-15)."""

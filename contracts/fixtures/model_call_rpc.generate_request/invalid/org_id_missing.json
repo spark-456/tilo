@@ -1,0 +1,8 @@
+{
+  "slot": "models",
+  "run_id": "r_demo01",
+  "profile_id": "byok-large",
+  "request": {
+    "prompt": "Summarise the attached notes in three bullet points."
+  }
+}

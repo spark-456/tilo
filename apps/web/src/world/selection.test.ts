@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { EVENTS_VILLAGE_BASIC } from "../api/fixtures/events";
 import { LAYOUT_VILLAGE_BASIC } from "../api/fixtures/layout";
-import { findItem } from "../screens/findItem";
+import { findItem } from "./findItem";
 import { getSelection, involves, objectIds, select, subscribeSelection } from "./selection";
 
 const events = EVENTS_VILLAGE_BASIC;

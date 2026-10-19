@@ -1,7 +1,14 @@
 import { type Page, expect, test } from "@playwright/test";
 import { watchConsole } from "./support/screens";
 import { DESKTOP } from "./support/viewports";
-import { canvasColours, canvasSnapshot, fixtureUrl, stageCanvas, stageSeq } from "./support/world";
+import {
+  BARE_STAGE_PATH,
+  canvasColours,
+  canvasSnapshot,
+  fixtureUrl,
+  stageCanvas,
+  stageSeq,
+} from "./support/world";
 
 // Bundle B of #227 (PRD 9.1, 9.4, 18.3 S-04): the stage draws the ported isometric art, and what
 // it draws follows the layout and the recorded events only. These tests read the canvas, so they
@@ -20,7 +27,7 @@ async function shot(page: Page, seq: number): Promise<string> {
 
 test("FR-WLD-04 art: a finished run is a drawn world, not a bare iso grid", async ({ page }) => {
   const problems = watchConsole(page);
-  await page.goto("/");
+  await page.goto(BARE_STAGE_PATH);
   await expect(stageCanvas(page)).toBeVisible();
   const bare = await canvasColours(page);
   await shot(page, 44);

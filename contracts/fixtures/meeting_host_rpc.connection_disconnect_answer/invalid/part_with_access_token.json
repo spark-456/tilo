@@ -1,0 +1,11 @@
+{
+  "revoked_at_provider": true,
+  "parts": [
+    {
+      "type": "connection.revoked",
+      "connector": "gmail",
+      "user_id": "u_priya",
+      "access_token": "fake-value"
+    }
+  ]
+}

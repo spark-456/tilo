@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div data-screen-label="Worlds" style="background:var(--sheet);border:1px solid var(--gBd);border-radius:28px;box-shadow:var(--sh);padding:28px 32px 36px;display:flex;flex-direction:column;gap:22px">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <div style="display:flex;align-items:baseline;gap:12px"><h1 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:36px;letter-spacing:-.8px;line-height:1.05">Worlds</h1><span style="font-size:15px;font-weight:700;color:var(--ink3)">{{ total }}</span></div>
+      <p style="margin:0;font-size:15.5px;font-weight:600;color:var(--ink2)">Every job Tilo is running, sized by scale: cities, towns and villages.</p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div style="height:42px;width:260px;box-sizing:border-box;border-radius:12px;background:var(--field);border:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--ink2)">{{ icSearch }}<input aria-label="Search worlds" value="{{ q }}" onChange="{{ onQ }}" placeholder="Search worlds" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:14.5px;font-weight:600;color:var(--ink)"></input></div>
+      <button onClick="{{ newWorld }}" style="height:42px;padding:0 18px 0 14px;border:0;border-radius:12px;background:var(--hero);color:#FFFFFF;font-size:15px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap" style-hover="filter:brightness(1.08)">{{ icPlus }}New world</button>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div role="tablist" aria-label="Status" style="display:flex;gap:2px;padding:3px;border-radius:12px;background:var(--seg);flex-wrap:wrap">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+        <button role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="height:34px;padding:0 12px;border:0;border-radius:9px;background:{{ t.bg }};box-shadow:{{ t.sh }};color:{{ t.fg }};font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;transition:background-color .2s,color .2s;white-space:nowrap">{{ t.label }}<span style="font-size:12.5px;font-weight:700;color:var(--ink3)">{{ t.n }}</span></button>
+      </sc-for>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--ink3);margin-right:4px">SCALE</span>
+      <sc-for list="{{ scales }}" as="t" hint-placeholder-count="4">
+        <button onClick="{{ t.pick }}" aria-pressed="{{ t.on }}" style="height:34px;padding:0 12px;border:0;border-radius:9px;background:{{ t.bg }};color:{{ t.fg }};font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap;transition:background-color .2s,color .2s">{{ t.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <sc-if value="{{ hasNeeds }}" hint-placeholder-val="{{ true }}">
+    <div style="background:var(--amberSoft);border:1px solid var(--amberLine);border-radius:22px;padding:14px;display:flex;gap:14px;align-items:stretch;flex-wrap:wrap">
+      <div style="flex:0 0 220px;display:flex;align-items:center;gap:12px;padding:0 6px">
+        <div style="width:48px;height:48px;border-radius:14px;background:var(--amberTile);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ needsAgent }}</div>
+        <div style="line-height:1.3;min-width:0"><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--amberInk)">WAITING FOR YOU</div><div style="font-size:16px;font-weight:800">K1 electric scooter</div><div style="font-size:13px;font-weight:600;color:var(--ink2)">{{ paused }}</div></div>
+      </div>
+      <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="2">
+        <div style="flex:1 1 300px;min-width:0;background:var(--card);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <div style="width:34px;height:34px;border-radius:10px;background:{{ d.tile }};color:{{ d.ic }};display:flex;align-items:center;justify-content:center;flex:none">{{ d.icon }}</div>
+            <div style="min-width:0;line-height:1.4"><div style="font-weight:800;font-size:14.5px">{{ d.title }}</div><div style="font-size:13.5px;font-weight:600;color:var(--ink2);text-wrap:pretty">{{ d.body }}</div></div>
+          </div>
+          <sc-if value="{{ d.open }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;gap:8px;padding-left:46px;flex-wrap:wrap">
+              <button onClick="{{ d.approve }}" style="height:36px;padding:0 14px;border:0;border-radius:10px;background:#F0A500;color:#1F1D2B;font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap" style-hover="filter:brightness(1.05)">{{ d.yes }}</button>
+              <button onClick="{{ openK1 }}" style="height:36px;padding:0 14px;border-radius:10px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">Open in world</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ d.done }}" hint-placeholder-val="{{ false }}"><div style="padding-left:46px;font-size:13.5px;font-weight:800;color:var(--okInk);display:flex;align-items:center;gap:6px">{{ d.doneIcon }}{{ d.doneText }}</div></sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+  <sc-if value="{{ allClear }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;gap:12px;background:var(--okSoft);border-radius:18px;padding:10px 16px 10px 10px">
+      <div style="width:40px;height:40px;border-radius:12px;background:var(--card);color:var(--ok);display:flex;align-items:center;justify-content:center;flex:none">{{ icCheck }}</div>
+      <div style="line-height:1.35"><div style="font-size:15px;font-weight:800">You’re all caught up</div><div style="font-size:13.5px;font-weight:600;color:var(--ink2)">K1 electric scooter is moving again. Tilo will ask if anything else needs you.</div></div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ hasC }}" hint-placeholder-val="{{ true }}">
+    <section aria-label="Cities" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:10px"><span style="display:flex;align-items:flex-end;gap:2px;height:14px"><span style="width:4px;height:6px;border-radius:1px;background:var(--ink)"></span><span style="width:4px;height:10px;border-radius:1px;background:var(--ink)"></span><span style="width:4px;height:14px;border-radius:1px;background:var(--ink)"></span></span><span style="font-size:16px;font-weight:800">Cities</span><span style="font-size:13.5px;font-weight:700;color:var(--ink3)">{{ nC }} · big projects with districts and gates</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:18px">
+        <sc-for list="{{ cities }}" as="w" hint-placeholder-count="3">
+          <a href="{{ w.href }}" onClick="{{ w.open }}" style="height:404px;box-sizing:border-box;background:var(--card);border:1px solid var(--line2);box-shadow:{{ w.edge }};border-radius:22px;padding:18px 18px 16px;display:flex;flex-direction:column;gap:12px;color:var(--ink);font-weight:600;transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s" style-hover="transform:translateY(-3px);color:var(--ink)">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+              <div style="min-width:0;display:flex;flex-direction:column;gap:4px">
+                <div style="font-size:11.5px;font-weight:800;letter-spacing:.7px;color:var(--ink3)">{{ w.tool }}</div>
+                <div style="font-size:20px;font-weight:800;line-height:1.2;letter-spacing:-.3px;text-wrap:balance">{{ w.name }}</div>
+                <div style="font-size:13.5px;font-weight:600;color:var(--ink2)">{{ w.meta }}</div>
+              </div>
+              <span style="height:26px;padding:0 10px;border-radius:8px;background:{{ w.chipBg }};color:{{ w.chipFg }};font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:7px;white-space:nowrap;flex:none"><span style="width:7px;height:7px;border-radius:99px;background:{{ w.dot }}"></span>{{ w.stl }}</span>
+            </div>
+            <div style="flex:1;min-height:0;border-radius:16px;background:var(--sunk);position:relative;overflow:hidden">{{ w.world }}</div>
+            <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;height:6px;border-radius:99px;background:var(--track);overflow:hidden"><div style="height:100%;width:{{ w.progW }};background:{{ w.bar }};border-radius:99px"></div></div><span style="font-size:13px;font-weight:800;min-width:36px;text-align:right">{{ w.progL }}</span></div>
+            <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:12px">
+              <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:12px;font-weight:700;color:var(--ink3)">Spend</span><span style="font-size:14.5px;font-weight:800;white-space:nowrap">{{ w.spend }} <span style="font-weight:600;color:var(--ink3)">{{ w.of }}</span></span></div>
+              <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;font-weight:700;color:var(--ink3)">Agents</span><span style="font-size:14.5px;font-weight:800">{{ w.agents }}</span></div>
+              <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:12px;font-weight:700;color:var(--ink3)">{{ w.nextL }}</span><span style="font-size:14.5px;font-weight:800;white-space:nowrap">{{ w.nextV }}</span></div>
+            </div>
+          </a>
+        </sc-for>
+      </div>
+    </section>
+  </sc-if>
+
+  <sc-if value="{{ hasT }}" hint-placeholder-val="{{ true }}">
+    <section aria-label="Towns" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:10px"><span style="display:flex;align-items:flex-end;gap:2px;height:14px"><span style="width:4px;height:6px;border-radius:1px;background:var(--ink)"></span><span style="width:4px;height:10px;border-radius:1px;background:var(--ink)"></span><span style="width:4px;height:14px;border-radius:1px;background:var(--track)"></span></span><span style="font-size:16px;font-weight:800">Towns</span><span style="font-size:13.5px;font-weight:700;color:var(--ink3)">{{ nT }} · routines and small projects</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px">
+        <sc-for list="{{ towns }}" as="w" hint-placeholder-count="4">
+          <a href="{{ w.href }}" onClick="{{ w.open }}" style="height:196px;box-sizing:border-box;position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line2);box-shadow:{{ w.edge }};border-radius:20px;padding:16px 16px 16px 18px;display:flex;flex-direction:column;color:var(--ink);font-weight:600;transition:transform .3s cubic-bezier(.2,.8,.2,1)" style-hover="transform:translateY(-3px);color:var(--ink)">
+            <div style="position:absolute;right:10px;bottom:12px;display:flex;align-items:flex-end;pointer-events:none">{{ w.strip }}</div>
+            <span style="position:absolute;right:14px;top:14px;height:26px;padding:0 10px;border-radius:8px;background:{{ w.chipBg }};color:{{ w.chipFg }};font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:7px;white-space:nowrap"><span style="width:7px;height:7px;border-radius:99px;background:{{ w.dot }}"></span>{{ w.stl }}</span>
+            <div style="position:relative;max-width:60%;display:flex;flex-direction:column;gap:5px;flex:1">
+              <div style="font-size:11.5px;font-weight:800;letter-spacing:.7px;color:var(--ink3)">{{ w.tool }}</div>
+              <div style="font-size:16px;font-weight:800;line-height:1.25;text-wrap:balance">{{ w.name }}</div>
+              <div style="font-size:13px;font-weight:600;color:var(--ink2);line-height:1.35">{{ w.meta }}</div>
+              <div style="flex:1"></div>
+              <div style="display:flex;flex-direction:column;gap:1px;font-size:13px;line-height:1.35"><span style="font-weight:800">{{ w.nextL }} {{ w.nextV }}</span><span style="font-weight:600;color:var(--ink2)">{{ w.spend }} {{ w.of }}</span></div>
+            </div>
+            <sc-if value="{{ w.hasProg }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--track)"><div style="height:100%;width:{{ w.progW }};background:{{ w.bar }}"></div></div></sc-if>
+          </a>
+        </sc-for>
+      </div>
+    </section>
+  </sc-if>
+
+  <sc-if value="{{ hasV }}" hint-placeholder-val="{{ true }}">
+    <section aria-label="Villages" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:10px"><span style="display:flex;align-items:flex-end;gap:2px;height:14px"><span style="width:4px;height:6px;border-radius:1px;background:var(--ink)"></span><span style="width:4px;height:10px;border-radius:1px;background:var(--track)"></span><span style="width:4px;height:14px;border-radius:1px;background:var(--track)"></span></span><span style="font-size:16px;font-weight:800">Villages</span><span style="font-size:13.5px;font-weight:700;color:var(--ink3)">{{ nV }} · quick tasks, done in minutes</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px">
+        <sc-for list="{{ villages }}" as="w" hint-placeholder-count="4">
+          <a href="{{ w.href }}" onClick="{{ w.open }}" style="height:150px;box-sizing:border-box;background:var(--card);border:1px solid var(--line2);box-shadow:{{ w.edge }};border-radius:18px;padding:14px 14px 14px 16px;display:flex;flex-direction:column;gap:8px;color:var(--ink);font-weight:600;transition:transform .3s cubic-bezier(.2,.8,.2,1)" style-hover="transform:translateY(-3px);color:var(--ink)">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+              <div style="width:46px;height:46px;border-radius:12px;background:var(--sunk);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ w.single }}</div>
+              <span style="height:26px;padding:0 10px;border-radius:8px;background:{{ w.chipBg }};color:{{ w.chipFg }};font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:7px;white-space:nowrap;flex:none"><span style="width:7px;height:7px;border-radius:99px;background:{{ w.dot }}"></span>{{ w.stl }}</span>
+            </div>
+            <div style="font-size:14.5px;font-weight:800;line-height:1.3;text-wrap:balance">{{ w.name }}</div>
+            <div style="font-size:12.5px;font-weight:600;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:auto">{{ w.when }}</div>
+          </a>
+        </sc-for>
+      </div>
+    </section>
+  </sc-if>
+
+  <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+    <div style="border:1.5px dashed var(--line);border-radius:22px;padding:44px 24px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center"><div style="font-size:18px;font-weight:800">{{ emptyT }}</div><div style="font-size:14px;font-weight:600;color:var(--ink2)">Try another filter, or start something new from Home.</div></div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { f: 'all', q: '', tier: 'all', ready: !!(window.TiloApp && window.TiloApp.ready()) };
+  componentDidMount() { if (!this.state.ready) this.t = setInterval(() => { if (window.TiloApp && window.TiloApp.ready()) { clearInterval(this.t); this.setState({ ready: true }); } }, 50); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const h = React.createElement, app = this.props.app || {}, TA = window.TiloApp, D = TA && TA.data;
+    if (!D) return {};
+    const K = this.state.ready ? TA.kit(h) : null, S = this.state, night = !!app.night, dec = app.dec || {}, go = app.go || (() => {});
+    const icon = (n, s) => K ? K.icon(n, s) : null, up = p => this.setState(p);
+    const needsLeft = D.needsLeft(dec), all = D.worlds(dec, app.added);
+    const ORDER = { needs: 0, running: 1, scheduled: 2, finished: 3 };
+    const SM = { needs: { l: needsLeft + (needsLeft === 1 ? ' decision' : ' decisions'), dot: '#1F1D2B', bar: 'var(--amber)' }, running: { l: 'Running', dot: 'var(--run)', bar: 'var(--run)' }, scheduled: { l: 'Scheduled', dot: 'var(--sch)', bar: 'transparent' }, finished: { l: 'Ready', dot: 'var(--ok)', bar: 'var(--ok)' } };
+    const base = w => (!S.q || w.name.toLowerCase().includes(S.q.toLowerCase())) && (S.tier === 'all' || w.tier === S.tier);
+    const stOk = (w, f) => f === 'all' || w.st === f || (f === 'running' && w.st === 'needs');
+    const item = w => {
+      const m = SM[w.st], need = w.st === 'needs';
+      return {
+        name: w.name, meta: w.meta || '', tool: w.tool.toUpperCase(), stl: w.isNew ? 'Starting' : m.l,
+        chipBg: need ? '#F0A500' : 'var(--chip)', chipFg: need ? '#1F1D2B' : 'var(--ink)', dot: m.dot,
+        progW: (w.prog || 0) + '%', progL: w.prog != null ? w.prog + '%' : '—', bar: m.bar, hasProg: w.prog != null,
+        agents: String(w.agents), spend: w.spend, of: w.of || '', nextL: w.nextL, nextV: w.nextV, when: w.when || (w.nextL + ' ' + w.nextV),
+        edge: need ? '0 0 0 2px var(--amber), var(--sh)' : w.isNew ? '0 0 0 2px var(--hero)' : 'none',
+        href: '#world/' + w.id, open: e => { e.preventDefault(); go('world', { id: w.id }); },
+        world: K && w.tier === 'City' && w.plan ? K.world(w.plan, dec, night) : null,
+        strip: K && w.row ? K.strip(w, 64, night) : null,
+        single: K && w.single ? K.art(w, 36, night) : null
+      };
+    };
+    const list = all.filter(w => base(w) && stOk(w, S.f)).sort((a, b) => ORDER[a.st] - ORDER[b.st]).map(w => ({ ...item(w), tier: w.tier }));
+    const g = t => list.filter(i => i.tier === t), cities = g('City'), towns = g('Town'), villages = g('Village');
+    const count = f => all.filter(w => base(w) && stOk(w, f)).length;
+    const tabs = [['all', 'All'], ['needs', 'Needs you'], ['running', 'Running'], ['scheduled', 'Scheduled'], ['finished', 'Ready']].map(([f, label]) => ({ label, n: String(count(f)), on: S.f === f, pick: () => up({ f }), bg: S.f === f ? 'var(--tabOn)' : 'transparent', fg: S.f === f ? 'var(--ink)' : 'var(--ink2)', sh: S.f === f ? '0 1px 3px rgba(31,29,43,.16)' : 'none' }));
+    const scales = [['all', 'All sizes'], ['City', 'Cities'], ['Town', 'Towns'], ['Village', 'Villages']].map(([t, label]) => ({ label, on: S.tier === t, pick: () => up({ tier: t }), bg: S.tier === t ? 'var(--ink)' : 'var(--chip)', fg: S.tier === t ? 'var(--inv)' : 'var(--ink)' }));
+    const decisions = D.decisions.map(d => ({ title: d.title, body: d.body, yes: d.yes, open: !dec[d.k], done: !!dec[d.k], doneText: d.done, approve: () => app.decide && app.decide(d.k), icon: icon(dec[d.k] ? 'check' : d.icon, 17), doneIcon: icon('check', 14), tile: dec[d.k] ? 'var(--okSoft)' : 'var(--amberTile)', ic: dec[d.k] ? 'var(--ok)' : 'var(--amberInk)' }));
+    return {
+      total: all.length + ' worlds', q: S.q, onQ: e => up({ q: e.target.value }), icSearch: icon('search', 16), icPlus: icon('plus', 15), icCheck: icon('check', 18),
+      newWorld: () => go('home'), openK1: () => go('world', { id: 'k1' }),
+      tabs, scales, cities, towns, villages,
+      hasC: cities.length > 0, hasT: towns.length > 0, hasV: villages.length > 0, nC: String(cities.length), nT: String(towns.length), nV: String(villages.length),
+      empty: list.length === 0, emptyT: S.f === 'needs' ? 'Nothing needs you right now' : 'No worlds match',
+      decisions, hasNeeds: needsLeft > 0, allClear: needsLeft === 0, paused: needsLeft + (needsLeft === 1 ? ' building paused' : ' buildings paused'),
+      needsAgent: K ? K.agent({ role: 'builder', expr: 'needs' }, 44, night) : null
+    };
+  }
+}
+</script>
+</body>
+</html>

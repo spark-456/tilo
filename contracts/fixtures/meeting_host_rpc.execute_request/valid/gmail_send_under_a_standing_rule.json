@@ -1,0 +1,193 @@
+{
+  "entry": {
+    "id": "01JB5VQ0000000000000009402",
+    "idempotency_key": "r_followups_1:U2:send_email:1",
+    "world_id": "w_followups",
+    "run_id": "r_followups_1",
+    "action_type": "send_email",
+    "connector": "gmail",
+    "recipients": ["teammate@example.org"],
+    "attachments": [],
+    "item": {
+      "artifact_id": "art_status_update",
+      "version": 1
+    },
+    "destination": "thr_status_1",
+    "modifiers": [],
+    "risk_tier": "T2",
+    "authz": {
+      "by": "policy",
+      "ref": "pol_status_updates",
+      "at": "2026-10-09T10:20:00.000Z"
+    },
+    "undo_window_s": 60,
+    "scheduled_at": "2026-10-09T10:21:00.000Z",
+    "state": "scheduled",
+    "created_at": "2026-10-09T10:20:00.000Z"
+  },
+  "evidence": {
+    "reserved_by": null,
+    "authorised_by": {
+      "v": "1.0",
+      "id": "01JB5VQ0000000000000000093",
+      "seq": 93,
+      "ts": "2026-10-09T10:20:00.000Z",
+      "world_id": "w_followups",
+      "run_id": "r_followups_1",
+      "type": "policy.applied",
+      "actor": "pol_status_updates",
+      "target": "G2",
+      "level": "L1",
+      "district": "D1",
+      "item": null,
+      "severity": "info",
+      "credits": 0,
+      "summary": "Your standing rule opened the gate.",
+      "cause": null,
+      "vis": "all",
+      "authz": {
+        "by": "policy",
+        "ref": "pol_status_updates",
+        "at": "2026-10-09T10:20:00.000Z"
+      },
+      "data": {
+        "policy_id": "pol_status_updates",
+        "gate_id": "G2",
+        "outbox_id": "01JB5VQ0000000000000009402",
+        "action_type": "send_email",
+        "connector": "gmail",
+        "destination": "thr_status_1",
+        "district": "D1",
+        "risk_tier": "T2",
+        "level": "L3",
+        "instruction_id": null,
+        "undo_window_s": 60,
+        "item": {
+          "artifact_id": "art_status_update",
+          "version": 1
+        },
+        "credits": 2
+      },
+      "trace": {
+        "model_role": null,
+        "profile": null,
+        "tokens_in": null,
+        "tokens_out": null,
+        "tool": null,
+        "latency_ms": null,
+        "archive_ref": null
+      }
+    },
+    "world_owner": "u_owner",
+    "policy": {
+      "id": "pol_status_updates",
+      "owner": "u_owner",
+      "action_type": "send_email",
+      "scope": {
+        "connectors": ["gmail"],
+        "recipients": ["teammate@example.org"],
+        "domains": [],
+        "districts": []
+      },
+      "limits": {
+        "per_day": 5,
+        "credits": null
+      },
+      "conditions": {
+        "no_attachments": true,
+        "no_new_recipients": true,
+        "no_safety_flags": true
+      },
+      "level": "L3",
+      "undo_window_s": 60,
+      "expiry": null,
+      "notify_channel": "email",
+      "team_lead_domains": [],
+      "created_by": {
+        "by": "u_owner",
+        "at": "2026-10-09T09:30:00.000Z"
+      },
+      "changed_by": {
+        "by": "u_owner",
+        "at": "2026-10-09T10:15:00.000Z"
+      },
+      "history": [
+        {
+          "by": "u_owner",
+          "at": "2026-10-09T09:30:00.000Z",
+          "change": "Created at L2 for replies to example.org",
+          "level": "L2"
+        },
+        {
+          "by": "u_owner",
+          "at": "2026-10-09T10:15:00.000Z",
+          "change": "Raised to L3 with a limit of 5 a day",
+          "level": "L3"
+        }
+      ]
+    },
+    "team_lead": null,
+    "instruction": null,
+    "earlier_applied": [
+      {
+        "v": "1.0",
+        "id": "01JB5VQ0000000000000000090",
+        "seq": 90,
+        "ts": "2026-10-09T09:50:00.000Z",
+        "world_id": "w_followups",
+        "run_id": "r_followups_1",
+        "type": "policy.applied",
+        "actor": "pol_status_updates",
+        "target": "G6",
+        "level": "L1",
+        "district": "D1",
+        "item": null,
+        "severity": "info",
+        "credits": 0,
+        "summary": "Your standing rule opened a gate.",
+        "cause": null,
+        "vis": "all",
+        "authz": {
+          "by": "policy",
+          "ref": "pol_status_updates",
+          "at": "2026-10-09T09:50:00.000Z"
+        },
+        "data": {
+          "policy_id": "pol_status_updates",
+          "gate_id": "G6",
+          "outbox_id": "01JB5VQ0000000000000009406",
+          "action_type": "send_email",
+          "connector": "gmail",
+          "destination": "thr_status_1",
+          "district": "D1",
+          "risk_tier": "T2",
+          "level": "L3",
+          "instruction_id": null,
+          "undo_window_s": 60,
+          "item": {
+            "artifact_id": "art_status_update",
+            "version": 1
+          },
+          "credits": 2
+        },
+        "trace": {
+          "model_role": null,
+          "profile": null,
+          "tokens_in": null,
+          "tokens_out": null,
+          "tool": null,
+          "latency_ms": null,
+          "archive_ref": null
+        }
+      }
+    ]
+  },
+  "items": [
+    {
+      "artifact_id": "art_status_update",
+      "version": 1,
+      "content_sha256": "bcaeae470644094d1b8d8ef49e3b3e28e3450a18f027b50e7310ee64f2887dd2",
+      "content_b64": "RmFrZSBzdGF0dXMgdXBkYXRlIGJvZHkgZm9yIHRlc3RzLg=="
+    }
+  ]
+}

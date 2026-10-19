@@ -1,0 +1,10 @@
+{
+  "v": "1.0",
+  "kind": "quiz",
+  "title": "Digital logic practice set",
+  "theme": "metropolis",
+  "timer": {
+    "seconds": 1800
+  },
+  "questions": []
+}

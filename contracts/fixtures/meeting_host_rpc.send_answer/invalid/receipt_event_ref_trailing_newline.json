@@ -1,0 +1,17 @@
+{
+  "outcome": "sent",
+  "receipt": {
+    "world_id": "w_team_sync",
+    "outbox_id": "01JB5VQ0000000000000009310",
+    "meeting_id": "mt_weekly1",
+    "owner": "u_owner",
+    "draft": {
+      "artifact_id": "art_meeting_draft",
+      "version": 1
+    },
+    "event_ref": "859ece4955733d6aacd02ed968aede39\n",
+    "conference": "success"
+  },
+  "may_have_sent": null,
+  "parts": []
+}

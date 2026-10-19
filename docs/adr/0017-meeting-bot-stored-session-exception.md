@@ -2,7 +2,17 @@
 
 - Status: Accepted as a fallback (2026-10-05, user, confirmed in chat). Do not
   act on it unless the guest-join experiment (FR-MTG-09) fails. (Architect; user decision D-2 of the
-  addendum.) Renumbered from 0016.
+  addendum.) Renumbered from 0016. **Amended by ADR-0024 (Accepted for the hosting flow, 2026-10-06):** for bot-hosted meetings the condition
+  is lifted and Tilo holds one Calendar scope on the bot account. **ACCEPTED by the user on 7 Oct 2026 as a
+  temporary measure (ADR-0024 amendment 3 and its decision record, BQ-MTG09-15):** decision 2's session terms
+  are REPLACED, the bot keeping ONE persistent, dedicated browser profile that survives between meetings (a named volume on the demo machine, signed in once by
+  hand through noVNC; never in the image, the repository, a backup, Secret Manager or a Cloud Run
+  service; it ends at the hackathon freeze unless the user renews it). The exception is wider
+  than the per-meeting tmpfs session written below, on the preconditions in ADR-0024 amendment 3 (account
+  separation accepted as time-limited, noVNC control, admission, hardening, runbook), which also cover any
+  per-meeting sign-in of the bot account; the text below is the original, kept for history.
+  The bot account is tiloagent@gmail.com with no 2-step verification (user's choice, BQ-MTG09-19); it is also
+  the project Owner login, so "used by nothing else" below does not hold for it (ADR-0024 amendment 3(a)).
 - Deciders: user (approval, only if the condition holds), architect (proposal)
 - Requirement: FR-MTG-09, FR-MTG-11; PRD 16.1 rule 3, 3.4, 16.2
 

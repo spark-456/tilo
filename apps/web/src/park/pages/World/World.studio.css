@@ -1,0 +1,1073 @@
+/* WORLD-DESIGN (design/studio-v2 "Tilo S World.dc.html"): the page without a card around it, the card on the map that
+   says the newest recorded line, the zoom buttons, the fade at the foot of a long panel, and the phone's lens rows.
+   Colours are role tokens (day and night). Nothing here moves by itself (HR-1..7). */
+
+/* No white sheet: the map card and the story card are the only two boxes (no card inside a card). */
+[data-park] .park-world-root > .park-sheet {
+  max-width: 1296px;
+  margin: 0 auto;
+  padding: 8px 8px 64px;
+  gap: 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* In Studio/Tilo-W, progress is in the header, now-line is on stage; run status banner is only for failure */
+[data-park] .park-world-runstatus:not([data-phase="failed"]) {
+  display: none;
+}
+
+/* The latest line, top right (under the lens links when there are any) */
+[data-park] .park-world-mapcard {
+  position: relative;
+}
+[data-park] .park-world-toast {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 260px;
+  max-width: calc(100% - 40px);
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--sh);
+  color: var(--ink);
+}
+[data-park] .park-world-map:has(> .park-world-lenses) ~ .park-world-toast {
+  top: 68px;
+}
+[data-park] .park-world-toast__tile {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--sunk);
+  color: var(--ink2);
+}
+[data-park] .park-world-toast[data-kind="done"] .park-world-toast__tile {
+  background: var(--okSoft);
+  color: var(--okInk);
+}
+[data-park] .park-world-toast[data-kind="needs"] {
+  background: var(--amberSoft);
+  border: 1.5px solid var(--amber);
+  width: auto;
+  min-width: 260px;
+}
+[data-park] .park-world-toast[data-kind="needs"] .park-world-toast__tile {
+  background: var(--amberTile);
+  color: var(--amberInk);
+}
+[data-park] .park-world-toast__act {
+  margin-left: auto;
+  flex: none;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 99px;
+  background: var(--pri);
+  color: var(--onPri);
+  font-weight: 700;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
+}
+[data-park] .park-world-toast__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+[data-park] .park-world-toast__line {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+[data-park] .park-world-toast__meta {
+  color: var(--ink3);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* The picture pane (scrolls once zoomed) and the zoom buttons */
+[data-park] .park-world-pan {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+[data-park] .park-world-pan--zoomed {
+  overflow: auto;
+}
+[data-park] .park-world-zoomed {
+  position: relative;
+}
+[data-park] .park-world-zoom {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park] .park-world-zoom__btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+[data-park] .park-world-zoom__btn + .park-world-zoom__btn {
+  border-top: 1px solid var(--line);
+}
+[data-park] .park-world-zoom__btn:hover:not([aria-disabled="true"]) {
+  background: var(--sunk);
+}
+[data-park] .park-world-zoom__btn[aria-disabled="true"] {
+  color: var(--ink3);
+  cursor: not-allowed;
+}
+[data-park] .park-world-zoom__btn:focus-visible,
+[data-park] .park-world-pan--zoomed:focus-visible,
+[data-park] .park-world-panelbody:focus-visible,
+[data-park] .park-world-lovableprompt:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
+/* A long panel: a fade at its foot says there is more; a tall prompt block scrolls inside itself */
+[data-park] .park-world-panel {
+  position: relative;
+}
+[data-park] .park-world-fade {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 64px;
+  background: linear-gradient(to bottom, transparent, var(--card));
+  pointer-events: none;
+}
+[data-park] .park-world-lovableprompt {
+  max-height: 168px;
+  overflow-y: auto;
+}
+
+/* A phone: the latest line under the map, the lens links one row that scrolls sideways (44px targets), the zoom
+   at the top left (the helper button rests bottom right), and room under the page */
+@media (max-width: 760px) {
+  [data-park] .park-world-toast {
+    position: static;
+    width: auto;
+    max-width: none;
+    border: 1px solid var(--line);
+    box-shadow: none;
+  }
+  [data-park] .park-world-map {
+    padding-top: 128px;
+  }
+  [data-park] .park-world-map .park-world-lenses {
+    top: 64px;
+    right: 12px;
+    left: 12px;
+    flex-wrap: nowrap;
+    gap: 4px;
+    height: 52px;
+    max-width: none;
+    padding: 4px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+  [data-park] .park-world-map .park-world-lenses a {
+    flex: none;
+    min-height: 44px;
+    padding: 0 14px;
+    white-space: nowrap;
+  }
+  /* POLISH-2: with no lens row (a sample world) the map does not keep its 64px band empty */
+  [data-park] .park-world-map:not(:has(> .park-world-lenses)) {
+    padding-top: 116px;
+  }
+  [data-park] .park-world-map:not(:has(> .park-world-lenses)) .park-world-zoom {
+    top: 64px;
+  }
+  [data-park] .park-world-zoom {
+    top: 128px;
+    right: auto;
+    bottom: auto;
+    left: 12px;
+    flex-direction: row;
+  }
+  [data-park] .park-world-zoom__btn + .park-world-zoom__btn {
+    border-top: 0;
+    border-left: 1px solid var(--line);
+  }
+  [data-park] .park-world-root > .park-sheet {
+    padding: 0 0 32px;
+  }
+}
+
+/* ---- Tilo W (TW-1 / TW-1b): 60px header on >= 1280px, two-row header on 768–1279px, right rail, phone bottom sheet ---- */
+
+/* Tablet 768–1279px: two calm rows header, stage starts directly under it, rail below stage or narrows */
+@media (min-width: 761px) and (max-width: 1279px) {
+  [data-park] .park-world-root {
+    margin-top: -16px;
+  }
+  [data-park] .park-world-root > .park-sheet {
+    padding-top: 0;
+    gap: 12px;
+  }
+  [data-park] .park-world-head {
+    height: auto;
+    min-height: auto;
+    max-height: none;
+    box-sizing: border-box;
+    padding: 10px 16px;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto auto;
+    grid-template-rows: auto auto;
+    row-gap: 8px;
+    column-gap: 12px;
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: var(--sh);
+    z-index: 5;
+  }
+  [data-park] .park-world-back {
+    grid-row: 1;
+    grid-column: 1;
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink2);
+    flex: none;
+    padding: 0;
+  }
+  [data-park] .park-world-backtext {
+    display: none;
+  }
+  [data-park] .park-world-titles {
+    display: contents;
+  }
+  [data-park] .park-world-eyebrowrow {
+    display: none;
+  }
+  [data-park] .park-world-titleline {
+    grid-row: 1;
+    grid-column: 2 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  [data-park] .park-world-h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    margin: 0;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  [data-park] .park-world-metalist {
+    grid-row: 2;
+    grid-column: 1 / 3;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  [data-park] .park-world-meta {
+    font-size: 12.5px;
+    color: var(--ink3);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  [data-park] .park-world-headspacer {
+    display: none;
+  }
+  [data-park] .park-world-headstepbar {
+    grid-row: 2;
+    grid-column: 3;
+    width: 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: none;
+  }
+  [data-park] .park-world-headcreditsbar {
+    grid-row: 2;
+    grid-column: 4;
+    width: 130px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: none;
+  }
+  [data-park] .park-world-headsteptext {
+    font-size: 12px;
+    white-space: nowrap;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+  [data-park] .park-world-headsub {
+    color: var(--ink3);
+  }
+  [data-park] .park-world-headbar-track {
+    height: 6px;
+    border-radius: 9px;
+    background: var(--sunk);
+    overflow: hidden;
+  }
+  [data-park] .park-world-headbar-fill {
+    height: 100%;
+    border-radius: 9px;
+    background: var(--ink);
+  }
+  [data-park] .park-world-headprog {
+    display: none;
+  }
+  [data-park] .park-world-actions {
+    grid-row: 2;
+    grid-column: 5;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+  }
+  [data-park] .park-world-actions button,
+  [data-park] .park-world-actions a {
+    height: 34px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+}
+
+/* Tablet rail drops below stage at 768–1059px */
+@media (min-width: 761px) and (max-width: 1059px) {
+  [data-park] .park-world-top {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  [data-park] .park-world-panels {
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    box-shadow: var(--sh);
+    position: relative;
+  }
+}
+
+/* Tablet rail narrows at 1060–1279px */
+@media (min-width: 1060px) and (max-width: 1279px) {
+  [data-park] .park-world-panels {
+    width: 100%;
+    max-width: 420px;
+    justify-self: end;
+    box-sizing: border-box;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    box-shadow: var(--sh);
+    position: relative;
+  }
+}
+
+/* Desktop 60px header (>= 1280px) */
+@media (min-width: 1280px) {
+  [data-park] .park-world-head {
+    height: 60px;
+    min-height: 60px;
+    max-height: 60px;
+    box-sizing: border-box;
+    padding: 0 16px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: var(--sh);
+    z-index: 5;
+    flex-wrap: nowrap;
+  }
+  [data-park] .park-world-back {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink2);
+    flex: none;
+    padding: 0;
+  }
+  [data-park] .park-world-backtext {
+    display: none;
+  }
+  [data-park] .park-world-titles {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    line-height: 1.25;
+    min-width: 0;
+    flex: 1 1 280px;
+  }
+  [data-park] .park-world-eyebrowrow {
+    display: none;
+  }
+  [data-park] .park-world-titleline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+  [data-park] .park-world-h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    margin: 0;
+    line-height: 1.2;
+  }
+  [data-park] .park-world-metalist {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  [data-park] .park-world-meta {
+    font-size: 12.5px;
+    color: var(--ink3);
+    white-space: nowrap;
+    margin: 0;
+  }
+  [data-park] .park-world-headspacer {
+    flex: 1;
+    display: block;
+  }
+  [data-park] .park-world-headstepbar {
+    width: 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex: none;
+  }
+  [data-park] .park-world-headcreditsbar {
+    width: 170px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex: none;
+  }
+  [data-park] .park-world-headsteptext {
+    font-size: 12.5px;
+    white-space: nowrap;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+  [data-park] .park-world-headsub {
+    color: var(--ink3);
+  }
+  [data-park] .park-world-headbar-track {
+    height: 6px;
+    border-radius: 9px;
+    background: var(--sunk);
+    overflow: hidden;
+  }
+  [data-park] .park-world-headbar-fill {
+    height: 100%;
+    border-radius: 9px;
+    background: var(--ink);
+  }
+  [data-park] .park-world-headprog {
+    display: none;
+  }
+  [data-park] .park-world-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+  }
+  [data-park] .park-world-panels {
+    width: 100%;
+    max-width: 500px;
+    justify-self: end;
+    box-sizing: border-box;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    box-shadow: var(--sh);
+    position: relative;
+  }
+}
+
+/* More drawer inside rail */
+[data-park] .park-world-more-summary {
+  display: none;
+}
+[data-park] .park-world-more--hidden {
+  display: none;
+}
+[data-park] .park-world-more--open {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: var(--card);
+  overflow-y: auto;
+  padding: 18px 20px 24px;
+  box-sizing: border-box;
+  border-radius: inherit;
+}
+[data-park] .park-world-morehead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+[data-park] .park-world-moretitles {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  flex: 1;
+}
+[data-park] .park-world-moretitle {
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--ink);
+}
+[data-park] .park-world-moresub {
+  font-size: 12.5px;
+  color: var(--ink3);
+}
+[data-park] .park-world-moreclose {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  flex: none;
+}
+[data-park] .park-world-moreclose:hover {
+  background: var(--sunk);
+}
+
+/* Story Plain | Trace toggle */
+[data-park] .park-world-storyhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+[data-park] .park-world-storytitlewrap {
+  display: flex;
+  flex-direction: column;
+}
+[data-park] .park-world-storytitle {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+}
+[data-park] .park-world-storysub {
+  font-size: 12.5px;
+  color: var(--ink3);
+}
+[data-park] .park-world-storyviews {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--sunk);
+}
+[data-park] .park-world-storyviewbtn {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-park] .park-world-storyviewbtn--on {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--sh);
+}
+
+/* Trace table */
+[data-park] .park-world-trace {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+}
+[data-park] .park-world-tracehead {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 36px;
+  gap: 10px;
+  padding: 0 0 8px;
+  color: var(--ink3);
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+}
+[data-park] .park-world-tracecol--cr {
+  text-align: right;
+}
+[data-park] .park-world-tracerow {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 36px;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+[data-park] .park-world-tracetime {
+  color: var(--ink3);
+  font-size: 11px;
+}
+[data-park] .park-world-traceinfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+[data-park] .park-world-traceevent {
+  font-weight: 600;
+  color: var(--ink);
+}
+[data-park] .park-world-tracedetail {
+  color: var(--ink2);
+  font-family: var(--fB, "Geist Sans", sans-serif);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-tracecr {
+  text-align: right;
+  color: var(--ink2);
+}
+[data-park] .park-world-tracetotal {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 36px;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1.5px solid var(--ink);
+  font-weight: 700;
+}
+[data-park] .park-world-tracetotallabel {
+  color: var(--ink);
+}
+[data-park] .park-world-tracetotalcr {
+  text-align: right;
+  color: var(--ink);
+}
+
+/* ---- TW-6: Needs-you approval card at top of Story ---- */
+[data-park] .park-world-approval {
+  border: 1.5px solid var(--amber);
+  background: var(--amberSoft);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+[data-park] .park-world-approval-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+[data-park] .park-world-approval-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--amber);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+[data-park] .park-world-approval-avatarinner {
+  width: 18px;
+  height: 10px;
+  border-radius: 5px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+[data-park] .park-world-approval-avatareye {
+  width: 3px;
+  height: 4px;
+  border-radius: 2px;
+  background: #1f1d2b;
+}
+[data-park] .park-world-approval-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  color: var(--amberInk);
+  min-width: 0;
+}
+[data-park] .park-world-approval-who {
+  font-weight: 700;
+  font-size: 13.5px;
+}
+[data-park] .park-world-approval-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+[data-park] .park-world-approval-hand {
+  color: var(--amberInk);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+[data-park] .park-world-approval-q {
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.3;
+  letter-spacing: -0.3px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-approval-exact {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+[data-park] .park-world-approval-exactlbl {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink3);
+  letter-spacing: 0.4px;
+}
+[data-park] .park-world-approval-exacttxt {
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-approval-grid {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 4px 10px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+[data-park] .park-world-approval-actions {
+  display: flex;
+  gap: 8px;
+}
+[data-park] .park-world-approval-btn {
+  height: 44px;
+  border-radius: 12px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--line2);
+  background: var(--card);
+  color: var(--ink);
+  padding: 0 16px;
+}
+[data-park] .park-world-approval-btn--approve {
+  flex: 1;
+  background: var(--pri);
+  color: var(--onPri);
+  border: none;
+  font-weight: 700;
+}
+[data-park] .park-world-approval-btn--edit,
+[data-park] .park-world-approval-btn--decline {
+  font-weight: 600;
+}
+[data-park] .park-world-approval-done {
+  height: 44px;
+  border-radius: 12px;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--okInk);
+}
+
+/* Phone detail panel follows the stage so it can never cover the live view. */
+[data-park] .park-world-sheethandle {
+  display: none;
+}
+@media (max-width: 760px) {
+  [data-park] .park-world-panels {
+    position: relative;
+    width: 100%;
+    height: auto;
+    background: var(--card);
+    border-top: 1px solid var(--line);
+    border-radius: 24px 24px 0 0;
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    box-shadow: var(--shPop);
+    overflow: hidden;
+    padding: 0 12px 16px;
+    box-sizing: border-box;
+  }
+  [data-park] .park-world-panels[data-tall="true"] {
+    height: auto;
+    max-height: none;
+  }
+  [data-park] .park-world-sheethandle {
+    display: block;
+    width: 40px;
+    height: 5px;
+    border-radius: 99px;
+    background: var(--line2);
+    margin: 8px auto 6px;
+    flex: none;
+  }
+  [data-park] .park-world-tabs {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 2px;
+    padding: 3px;
+    border-radius: 13px;
+    background: var(--sunk);
+  }
+  [data-park] .park-world-tab {
+    min-height: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+  }
+  [data-park] .park-world-tab--on {
+    background: var(--card);
+    box-shadow: var(--sh);
+  }
+  /* 44px touch targets on phone (FT-UX-1) */
+  [data-park] .park-world-head button,
+  [data-park] .park-world-head a,
+  [data-park] .park-world-back,
+  [data-park] .park-world-moreclose,
+  [data-park] .park-world-storyviewbtn,
+  [data-park] .park-world-skillchip,
+  [data-park] .park-world-toolchip,
+  [data-park] .park-world-chipfit,
+  [data-park] .park-world-spendlink,
+  [data-park] .park-world-dactions button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  [data-park] .park-world-headstepbar,
+  [data-park] .park-world-headcreditsbar,
+  [data-park] .park-world-headspacer,
+  [data-park] .park-world-headprog {
+    display: none;
+  }
+}
+
+/* ---- TW-DARK: World page & Result tab dark mode contrast and readability (WCAG AA) ---- */
+[data-park][data-time="night"] .park-world-slackdialog,
+[data-park][data-time="night"] .park-world-resultdialog {
+  background: var(--pop);
+  color: var(--ink);
+  border-color: var(--line);
+  box-shadow: var(--shPop);
+}
+[data-park][data-time="night"] .park-world-slacktitle {
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-slacksub,
+[data-park][data-time="night"] .park-world-slacklabel,
+[data-park][data-time="night"] .park-world-slackcount {
+  color: var(--ink2);
+}
+[data-park][data-time="night"] .park-world-slackselect,
+[data-park][data-time="night"] .park-world-slacknote {
+  background: var(--field);
+  color: var(--ink);
+  border-color: var(--line);
+}
+[data-park][data-time="night"] .park-world-slackselect:focus-visible,
+[data-park][data-time="night"] .park-world-slacknote:focus-visible {
+  outline-color: var(--heroInk);
+}
+[data-park][data-time="night"] .park-world-out {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-resulttext {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+[data-park][data-time="night"] .park-world-resulttext h3,
+[data-park][data-time="night"] .park-world-resulttext h4,
+[data-park][data-time="night"] .park-world-resulttext h5,
+[data-park][data-time="night"] .park-world-resulttext h6,
+[data-park][data-time="night"] .park-world-resulttext p,
+[data-park][data-time="night"] .park-world-resulttext li {
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-resulttext pre,
+[data-park][data-time="night"] .park-world-resultpre {
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+[data-park][data-time="night"] .park-world-resulttext code {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--amberInk);
+  border: 1px solid var(--line2);
+}
+[data-park][data-time="night"] .park-world-resulttext a {
+  color: var(--heroInk);
+  text-decoration: underline;
+}
+[data-park][data-time="night"] .park-world-resulttext a:hover,
+[data-park][data-time="night"] .park-world-resulttext a:focus-visible {
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-resulttext th {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  border-color: var(--line);
+  font-weight: 700;
+}
+[data-park][data-time="night"] .park-world-resulttext td {
+  border-color: var(--line);
+  color: var(--ink);
+}
+[data-park] .park-world-resulttext:focus-visible {
+  outline: 3px solid var(--focus, #5a3fe0);
+  outline-offset: -2px;
+}
+[data-park][data-time="night"] .park-world-resulttext:focus-visible {
+  outline-color: var(--heroInk);
+}
+[data-park][data-time="night"] .park-world-step--done .park-world-stepmark {
+  background: var(--ok);
+  color: var(--inv);
+}
+[data-park][data-time="night"] .park-world-step--working .park-world-stepmark,
+[data-park][data-time="night"] .park-world-step--started .park-world-stepmark {
+  background: var(--heroFill);
+  color: #ffffff;
+}
+[data-park][data-time="night"] .park-world-lovablelink {
+  background: var(--heroFill);
+  color: #ffffff;
+}
+[data-park][data-time="night"] .park-world-back:focus-visible,
+[data-park][data-time="night"] .park-world-live:focus-visible,
+[data-park][data-time="night"] .park-world-lenses a:focus-visible,
+[data-park][data-time="night"] .park-world-spendlink:focus-visible,
+[data-park][data-time="night"] .park-world-skillchip:focus-visible,
+[data-park][data-time="night"] .park-world-toolchip:focus-visible,
+[data-park][data-time="night"] .park-world-lovablelink:focus-visible,
+[data-park][data-time="night"] .park-world-tab:focus-visible,
+[data-park][data-time="night"] .park-world-panel:focus-visible {
+  outline-color: var(--heroInk);
+}
+[data-park][data-time="night"] .park-world-tab--on {
+  background: var(--tabOn);
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-tab:not(.park-world-tab--on) {
+  color: var(--ink2);
+}
+[data-park][data-time="night"] .park-world-dock {
+  background: var(--card);
+  border-color: var(--line);
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-livenote {
+  background: var(--pop);
+  border-color: var(--line);
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-toast {
+  background: var(--pop);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+[data-park][data-time="night"] .park-world-zoom {
+  background: var(--pop);
+  border: 1px solid var(--line);
+}
+[data-park][data-time="night"] .park-world-fade {
+  background: linear-gradient(to bottom, transparent, var(--paper));
+}

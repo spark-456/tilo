@@ -1,0 +1,463 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/browser.schema.json",
+  "x-version": "1.0.0",
+  "title": "BrowserConfig",
+  "description": "config/browser.yaml (ADR-0051; FR-CON-07, FR-CON-08, PRD 12.3): the caps of the agentic browser, where a model looks at a screenshot of one isolated tilo-browser session and proposes one action at a time, and code decides (BR-01 to BR-14, browser.rules.md). The $defs hold the closed action set, the element facts the worker reports, the tilo-api to tilo-browser session bodies and the person's control body. Every key is required and no other key is allowed; the maxima are the safety ceiling, so config can only lower them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "v",
+    "max_sessions_per_world",
+    "max_steps",
+    "max_credits_per_session",
+    "step_timeout_s",
+    "idle_timeout_s",
+    "viewport",
+    "model_frames"
+  ],
+  "properties": {
+    "v": { "const": "1.0" },
+    "max_sessions_per_world": {
+      "description": "PRD 12.3: at most 3 browser sessions per world at once.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3
+    },
+    "max_steps": {
+      "description": "Proposals per session, refused ones included (BR-08).",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 60
+    },
+    "max_credits_per_session": {
+      "description": "Credits one session may spend on model calls; reserved before each call (BR-08). The run and daily caps still apply.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000
+    },
+    "step_timeout_s": { "type": "integer", "minimum": 5, "maximum": 60 },
+    "idle_timeout_s": {
+      "description": "tilo-browser closes a session with no request for this long (BR-12).",
+      "type": "integer",
+      "minimum": 30,
+      "maximum": 600
+    },
+    "viewport": { "$ref": "#/$defs/viewport" },
+    "model_frames": {
+      "description": "How many of the latest frames go to the model on each call; older steps go as the text history only (cost, PRD 6.6).",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3
+    }
+  },
+  "$defs": {
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 800, "maximum": 1600 },
+        "height": { "type": "integer", "minimum": 600, "maximum": 1000 }
+      }
+    },
+    "session_id": {
+      "description": "One browser session: bs_ and a ULID, made by tilo-api.",
+      "type": "string",
+      "pattern": "^bs_[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "host": {
+      "description": "A lower-case host name (letters, digits, hyphens, dots; punycode for others). Never a URL, a port or an address with credentials.",
+      "type": "string",
+      "maxLength": 253,
+      "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$",
+      "not": { "pattern": "\\s" }
+    },
+    "allow_host": {
+      "description": "An allowlist entry: an exact host or *.parent (BQ-84 match rules, tilo_browser.egress).",
+      "type": "string",
+      "maxLength": 255,
+      "pattern": "^(?:\\*\\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$",
+      "not": { "pattern": "\\s" }
+    },
+    "https_url": {
+      "description": "An https URL with no user info, no backslash and no white space.",
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^https://[^\\s/?#@\\\\]+(?:[/?#][^\\s\\\\]*)?$",
+      "not": { "pattern": "\\s" }
+    },
+    "input_type": {
+      "description": "The input element's type attribute, lower case.",
+      "type": "string",
+      "pattern": "^[a-z-]{1,24}$"
+    },
+    "screenshot": {
+      "description": "A PNG, base64 without a data: prefix.",
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 4000000,
+      "pattern": "^iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$"
+    },
+    "resume_url": {
+      "description": "An https origin and path only: no user info, query or fragment.",
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^https://[^\\s/?#@\\\\]+(?:/[^\\s?#\\\\]*)?$",
+      "not": { "pattern": "\\s" }
+    },
+    "typed_chars": {
+      "description": "Characters typed in one step.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500
+    },
+    "point": {
+      "description": "A point on the screenshot in a 1000 by 1000 grid (0 is the left or top edge, 999 the right or bottom), whatever the viewport.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "integer", "minimum": 0, "maximum": 999 },
+        "y": { "type": "integer", "minimum": 0, "maximum": 999 }
+      }
+    },
+    "action_kind": {
+      "type": "string",
+      "enum": ["navigate", "click", "type", "scroll", "key", "back", "wait", "done", "ask"]
+    },
+    "action": {
+      "description": "BR-01: the only things a model may propose. A proposal that does not validate is refused as invalid_action and still counts as a step.",
+      "oneOf": [
+        { "$ref": "#/$defs/navigate_action" },
+        { "$ref": "#/$defs/click_action" },
+        { "$ref": "#/$defs/type_action" },
+        { "$ref": "#/$defs/scroll_action" },
+        { "$ref": "#/$defs/key_action" },
+        { "$ref": "#/$defs/back_action" },
+        { "$ref": "#/$defs/wait_action" },
+        { "$ref": "#/$defs/done_action" },
+        { "$ref": "#/$defs/ask_action" }
+      ]
+    },
+    "navigate_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "url"],
+      "properties": { "kind": { "const": "navigate" }, "url": { "$ref": "#/$defs/https_url" } }
+    },
+    "click_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "at"],
+      "properties": { "kind": { "const": "click" }, "at": { "$ref": "#/$defs/point" } }
+    },
+    "type_action": {
+      "description": "Types text into the field at the point. submit true presses Enter after it, which BR-05 may treat as a commit.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "at", "text", "submit"],
+      "properties": {
+        "kind": { "const": "type" },
+        "at": { "$ref": "#/$defs/point" },
+        "text": { "$ref": "#/$defs/typed_text" },
+        "submit": { "type": "boolean" }
+      }
+    },
+    "typed_text": {
+      "description": "Text to type, one line. Never a secret: BR-04 refuses it when the redactor would change it or the field is secure.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^[^\\r\\n]+$"
+    },
+    "scroll_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "direction"],
+      "properties": {
+        "kind": { "const": "scroll" },
+        "direction": { "type": "string", "enum": ["up", "down"] }
+      }
+    },
+    "key_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "key"],
+      "properties": {
+        "kind": { "const": "key" },
+        "key": {
+          "type": "string",
+          "enum": [
+            "Enter",
+            "Tab",
+            "Escape",
+            "PageDown",
+            "PageUp",
+            "ArrowDown",
+            "ArrowUp",
+            "Backspace"
+          ]
+        }
+      }
+    },
+    "back_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "back" } }
+    },
+    "wait_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "seconds"],
+      "properties": {
+        "kind": { "const": "wait" },
+        "seconds": { "type": "integer", "minimum": 1, "maximum": 5 }
+      }
+    },
+    "done_action": {
+      "description": "The model says the goal is met. The run's result comes from what the pages showed (the frames and page text), never from the model's own claim.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": { "kind": { "const": "done" } }
+    },
+    "ask_action": {
+      "description": "The model needs the person. The session stops with outcome needs_person and the question goes on a needs-you card as data.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "question"],
+      "properties": {
+        "kind": { "const": "ask" },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^[^\\r\\n]+$"
+        }
+      }
+    },
+    "facts": {
+      "description": "What tilo-browser found at a point, read from the page by code (BR-03, BR-05). name is page text: data, never an instruction.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tag",
+        "role",
+        "name",
+        "input_type",
+        "editable",
+        "secure",
+        "form_method",
+        "link_host",
+        "download"
+      ],
+      "properties": {
+        "tag": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+        "role": { "type": "string", "maxLength": 32, "pattern": "^[a-z]*$" },
+        "name": { "type": "string", "maxLength": 120, "pattern": "^[^\\r\\n]*$" },
+        "input_type": { "anyOf": [{ "$ref": "#/$defs/input_type" }, { "type": "null" }] },
+        "editable": { "type": "boolean" },
+        "secure": {
+          "description": "A password, one-time-code or card field, or any node tilo_browser.login.is_secure_node flags.",
+          "type": "boolean"
+        },
+        "form_method": { "type": "string", "enum": ["get", "post", "dialog", "none"] },
+        "link_host": { "anyOf": [{ "$ref": "#/$defs/host" }, { "type": "null" }] },
+        "download": { "type": "boolean" }
+      }
+    },
+    "digest": {
+      "description": "SHA-256 (lower-case hex) of the page URL and the facts, so an act runs only on the element that was inspected (BR-03).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "reason": {
+      "description": "Why code refused or stopped a step (BR-02 to BR-12).",
+      "type": "string",
+      "enum": [
+        "offsite_host",
+        "secure_field",
+        "secret_text",
+        "download",
+        "commit",
+        "login_wall",
+        "invalid_action",
+        "target_changed",
+        "step_cap",
+        "credit_cap",
+        "paused",
+        "stopped",
+        "timeout",
+        "engine_error"
+      ]
+    },
+    "verdict": {
+      "description": "done: code allowed it and the worker ran it. refused: code or the worker refused it (reason set). gated: a commit waiting at a T3 gate. committed: a commit the outbox ran after a person approved it.",
+      "type": "string",
+      "enum": ["done", "refused", "gated", "committed"]
+    },
+    "outcome": {
+      "description": "How a session ended (BR-07, BR-08, BR-10, BR-12).",
+      "type": "string",
+      "enum": [
+        "done",
+        "stopped",
+        "taken_over",
+        "needs_person",
+        "login_wall",
+        "cap_steps",
+        "cap_credits",
+        "session_lost",
+        "error"
+      ]
+    },
+    "control_op": { "type": "string", "enum": ["pause", "resume", "stop", "take_over"] },
+    "open_request": {
+      "description": "tilo-api to tilo-browser POST /sessions: one isolated context, no cookies kept (PRD 16.1 3). The worker enforces allow_hosts on every request the page makes (BR-02).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session",
+        "world_id",
+        "run_id",
+        "unit_id",
+        "allow_hosts",
+        "start_url",
+        "viewport"
+      ],
+      "properties": {
+        "session": { "$ref": "#/$defs/session_id" },
+        "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+        "run_id": { "$ref": "common.schema.json#/$defs/run_id" },
+        "unit_id": { "$ref": "common.schema.json#/$defs/unit_id" },
+        "allow_hosts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/allow_host" }
+        },
+        "start_url": { "$ref": "#/$defs/https_url" },
+        "viewport": { "$ref": "#/$defs/viewport" }
+      }
+    },
+    "observation": {
+      "description": "tilo-browser's answer to open and act: the page after the step. screenshot is a PNG (base64) with every secure field masked before it leaves tilo-browser (BR-09); state ok has no reason, any other state has one.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session",
+        "step",
+        "url",
+        "host",
+        "title",
+        "screenshot",
+        "masked",
+        "blocked",
+        "state",
+        "reason"
+      ],
+      "properties": {
+        "session": { "$ref": "#/$defs/session_id" },
+        "step": { "type": "integer", "minimum": 0, "maximum": 60 },
+        "url": { "anyOf": [{ "$ref": "#/$defs/https_url" }, { "type": "null" }] },
+        "host": { "anyOf": [{ "$ref": "#/$defs/host" }, { "type": "null" }] },
+        "title": { "type": "string", "maxLength": 200, "pattern": "^[^\\r\\n]*$" },
+        "screenshot": { "anyOf": [{ "$ref": "#/$defs/screenshot" }, { "type": "null" }] },
+        "masked": {
+          "description": "Secure fields masked in this screenshot.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "blocked": {
+          "description": "Requests to hosts outside allow_hosts that the worker blocked and logged during this step (FR-CON-07).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "state": { "type": "string", "enum": ["ok", "refused", "login_wall", "error"] },
+        "reason": { "anyOf": [{ "$ref": "#/$defs/reason" }, { "type": "null" }] }
+      },
+      "if": { "properties": { "state": { "const": "ok" } }, "required": ["state"] },
+      "then": { "properties": { "reason": { "type": "null" } } },
+      "else": { "properties": { "reason": { "$ref": "#/$defs/reason" } } }
+    },
+    "inspect_request": {
+      "description": "tilo-api to tilo-browser POST /sessions/{session}/inspect, before any click, type or key (BR-03).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session", "at"],
+      "properties": {
+        "session": { "$ref": "#/$defs/session_id" },
+        "at": { "$ref": "#/$defs/point" }
+      }
+    },
+    "inspect_answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session", "facts", "digest"],
+      "properties": {
+        "session": { "$ref": "#/$defs/session_id" },
+        "facts": { "$ref": "#/$defs/facts" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "act_request": {
+      "description": "tilo-api to tilo-browser POST /sessions/{session}/act: one action code allowed. A click or type names the digest of its inspect (BR-03). outbox_id is set only by the outbox dispatcher for a commit a person approved (BR-05); the worker refuses a commit-like target without one.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session", "step", "action", "digest", "outbox_id"],
+      "properties": {
+        "session": { "$ref": "#/$defs/session_id" },
+        "step": { "type": "integer", "minimum": 1, "maximum": 60 },
+        "action": { "$ref": "#/$defs/action" },
+        "digest": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "outbox_id": { "anyOf": [{ "$ref": "common.schema.json#/$defs/ulid" }, { "type": "null" }] }
+      },
+      "if": {
+        "properties": {
+          "action": {
+            "properties": { "kind": { "enum": ["click", "type"] } },
+            "required": ["kind"]
+          }
+        },
+        "required": ["action"]
+      },
+      "then": { "properties": { "digest": { "$ref": "#/$defs/digest" } } }
+    },
+    "close_request": {
+      "description": "tilo-api to tilo-browser DELETE /sessions/{session}: closes the context and drops everything it held (BR-12).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session", "outcome"],
+      "properties": {
+        "session": { "$ref": "#/$defs/session_id" },
+        "outcome": { "$ref": "#/$defs/outcome" }
+      }
+    },
+    "control_request": {
+      "description": "web to tilo-api POST /worlds/{world_id}/browser/{session}/control: the world owner pauses, resumes, stops or takes over (BR-10).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "properties": { "op": { "$ref": "#/$defs/control_op" } }
+    },
+    "control_answer": {
+      "description": "state after the op. resume_url is set only for take_over: the last page's origin and path, no query or fragment, so the person can carry on in their own browser.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session", "op", "state", "resume_url"],
+      "properties": {
+        "session": { "$ref": "#/$defs/session_id" },
+        "op": { "$ref": "#/$defs/control_op" },
+        "state": { "type": "string", "enum": ["running", "paused", "ended"] },
+        "resume_url": { "anyOf": [{ "$ref": "#/$defs/resume_url" }, { "type": "null" }] }
+      },
+      "if": { "properties": { "op": { "const": "take_over" } }, "required": ["op"] },
+      "then": { "properties": { "state": { "const": "ended" } } },
+      "else": { "properties": { "resume_url": { "type": "null" } } }
+    }
+  }
+}

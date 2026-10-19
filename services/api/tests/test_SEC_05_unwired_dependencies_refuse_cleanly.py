@@ -6,12 +6,18 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from starlette.requests import HTTPConnection
 from tilo_api import app, deps
+
+
+def _signed_out_principal() -> object:
+    """`get_current_principal` takes the request (SIGNIN-FIX): one carrying no sign-in is what 'unset' means."""
+    return deps.get_current_principal(HTTPConnection({"type": "http", "headers": [], "app": app}))
 
 
 @pytest.mark.parametrize(
     ("seam", "status"),
-    [(deps.get_current_principal, 401), (deps.get_store, 503), (deps.get_event_writer, 503)],
+    [(_signed_out_principal, 401), (deps.get_store, 503), (deps.get_event_writer, 503)],
 )
 def test_SEC_05_an_unset_seam_refuses_with_a_status_not_an_exception(seam, status):
     with pytest.raises(HTTPException) as refused:

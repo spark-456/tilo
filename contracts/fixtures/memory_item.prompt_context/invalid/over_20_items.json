@@ -1,0 +1,111 @@
+{
+  "v": "1.0",
+  "today": "2026-10-16",
+  "items": [
+    {
+      "id": "mem_c00",
+      "kind": "fact",
+      "text": "Fact number 0."
+    },
+    {
+      "id": "mem_c01",
+      "kind": "fact",
+      "text": "Fact number 1."
+    },
+    {
+      "id": "mem_c02",
+      "kind": "fact",
+      "text": "Fact number 2."
+    },
+    {
+      "id": "mem_c03",
+      "kind": "fact",
+      "text": "Fact number 3."
+    },
+    {
+      "id": "mem_c04",
+      "kind": "fact",
+      "text": "Fact number 4."
+    },
+    {
+      "id": "mem_c05",
+      "kind": "fact",
+      "text": "Fact number 5."
+    },
+    {
+      "id": "mem_c06",
+      "kind": "fact",
+      "text": "Fact number 6."
+    },
+    {
+      "id": "mem_c07",
+      "kind": "fact",
+      "text": "Fact number 7."
+    },
+    {
+      "id": "mem_c08",
+      "kind": "fact",
+      "text": "Fact number 8."
+    },
+    {
+      "id": "mem_c09",
+      "kind": "fact",
+      "text": "Fact number 9."
+    },
+    {
+      "id": "mem_c10",
+      "kind": "fact",
+      "text": "Fact number 10."
+    },
+    {
+      "id": "mem_c11",
+      "kind": "fact",
+      "text": "Fact number 11."
+    },
+    {
+      "id": "mem_c12",
+      "kind": "fact",
+      "text": "Fact number 12."
+    },
+    {
+      "id": "mem_c13",
+      "kind": "fact",
+      "text": "Fact number 13."
+    },
+    {
+      "id": "mem_c14",
+      "kind": "fact",
+      "text": "Fact number 14."
+    },
+    {
+      "id": "mem_c15",
+      "kind": "fact",
+      "text": "Fact number 15."
+    },
+    {
+      "id": "mem_c16",
+      "kind": "fact",
+      "text": "Fact number 16."
+    },
+    {
+      "id": "mem_c17",
+      "kind": "fact",
+      "text": "Fact number 17."
+    },
+    {
+      "id": "mem_c18",
+      "kind": "fact",
+      "text": "Fact number 18."
+    },
+    {
+      "id": "mem_c19",
+      "kind": "fact",
+      "text": "Fact number 19."
+    },
+    {
+      "id": "mem_c20",
+      "kind": "fact",
+      "text": "Fact number 20."
+    }
+  ]
+}

@@ -1,0 +1,134 @@
+/* Tilo design tokens. Extracted from Tilo App.dc.html <helmet>.
+   Day is :root. Night is applied by data-time="night" on the app root. */
+:root{
+  --ground:#A6D78C;
+  --paper:#F1EFE9;
+  --gBg:rgba(255,255,255,.72);
+  --gBd:rgba(255,255,255,.85);
+  --gFx:blur(20px) saturate(1.5);
+  --sh:0 1px 2px rgba(31,29,43,.06),0 18px 40px -24px rgba(31,29,43,.45);
+  --shPop:0 2px 6px rgba(31,29,43,.08),0 28px 60px -20px rgba(31,29,43,.42);
+  --veil:rgba(241,239,233,.42);
+  --scrim:rgba(241,239,233,.55);
+  --sheet:rgba(250,249,246,.95);
+  --pop:#FFFFFF;
+  --ink:#1F1D2B;
+  --ink2:#4A4655;
+  --ink3:#6B6779;
+  --inv:#FFFFFF;
+  --line:rgba(31,29,43,.12);
+  --line2:rgba(31,29,43,.07);
+  --card:#FFFFFF;
+  --sunk:rgba(31,29,43,.045);
+  --field:#FFFFFF;
+  --seg:rgba(31,29,43,.06);
+  --tabOn:#FFFFFF;
+  --chip:rgba(31,29,43,.06);
+  --track:rgba(31,29,43,.1);
+  --rowHover:rgba(31,29,43,.04);
+  --rowOn:rgba(90,63,224,.08);
+  --hero:#5A3FE0;
+  --heroInk:#4A31CC;
+  --heroSoft:rgba(90,63,224,.1);
+  --logo:#5A3FE0;
+  --run:#5A3FE0;
+  --sch:#0E7C79;
+  --schSoft:rgba(14,124,121,.1);
+  --ok:#1E8A4C;
+  --okInk:#155E32;
+  --okSoft:rgba(31,127,68,.12);
+  --amber:#F0A500;
+  --amberSoft:#FFF4DA;
+  --amberLine:#F1D48C;
+  --amberInk:#7A5000;
+  --amberTile:#FFE7B0;
+  --red:#C8372D;
+  --redInk:#A52A21;
+  --redSoft:rgba(200,55,45,.1);
+  --btn2:#FFFFFF;
+  --toast:#1F1D2B;
+  --toastInk:#FFFFFF;
+  --pin:#FFFFFF;
+  --stem:rgba(255,255,255,.95);
+  --halo:rgba(255,255,255,.4);
+  --blueSoft:rgba(63,127,224,.12);
+  --blueInk:#1F5FBF;
+  --pinkSoft:#FBE4EE;
+  --orangeSoft:#FDEBDD;
+  --greenSoft:#E8F1DC;
+  --cork:#E6DAC2;
+  --corkDot:rgba(120,88,40,.16);
+  --corkFrame:#CBAA7A
+}
+
+[data-time="night"]{
+  --ground:#465A56;
+  --paper:#14163A;
+  --gBg:rgba(20,22,52,.66);
+  --gBd:rgba(255,255,255,.14);
+  --gFx:blur(20px) saturate(1.4);
+  --sh:0 1px 2px rgba(0,0,0,.3),0 18px 40px -24px rgba(0,0,0,.75);
+  --shPop:0 2px 6px rgba(0,0,0,.3),0 28px 60px -20px rgba(0,0,0,.8);
+  --veil:rgba(10,12,34,.42);
+  --scrim:rgba(10,12,34,.55);
+  --sheet:rgba(22,24,54,.95);
+  --pop:#23264F;
+  --ink:#F4F2FA;
+  --ink2:#D2CEE3;
+  --ink3:#A9A5BE;
+  --inv:#1F1D2B;
+  --line:rgba(255,255,255,.13);
+  --line2:rgba(255,255,255,.07);
+  --card:rgba(255,255,255,.055);
+  --sunk:rgba(255,255,255,.05);
+  --field:rgba(255,255,255,.07);
+  --seg:rgba(255,255,255,.08);
+  --tabOn:rgba(255,255,255,.16);
+  --chip:rgba(255,255,255,.1);
+  --track:rgba(255,255,255,.14);
+  --rowHover:rgba(255,255,255,.05);
+  --rowOn:rgba(122,98,245,.2);
+  --hero:#7A62F5;
+  --heroInk:#BCAFFF;
+  --heroSoft:rgba(122,98,245,.22);
+  --logo:#BCAFFF;
+  --run:#A493FF;
+  --sch:#5FD0CB;
+  --schSoft:rgba(95,208,203,.14);
+  --ok:#5CCB86;
+  --okInk:#86D9A2;
+  --okSoft:rgba(92,203,134,.16);
+  --amberSoft:rgba(58,42,16,.85);
+  --amberLine:rgba(247,200,92,.45);
+  --amberInk:#F7C85C;
+  --amberTile:#4A3810;
+  --red:#FF7A6E;
+  --redInk:#FF9C92;
+  --redSoft:rgba(255,122,110,.16);
+  --btn2:rgba(255,255,255,.1);
+  --toast:#F4F2FA;
+  --toastInk:#1F1D2B;
+  --pin:#FFE296;
+  --stem:rgba(255,226,150,.85);
+  --halo:rgba(255,226,150,.3);
+  --blueSoft:rgba(141,184,255,.16);
+  --blueInk:#8DB8FF;
+  --pinkSoft:rgba(217,88,140,.2);
+  --orangeSoft:rgba(217,98,43,.2);
+  --greenSoft:rgba(118,160,53,.2);
+  --cork:#3A3126;
+  --corkDot:rgba(255,220,170,.08);
+  --corkFrame:#5A4832
+}
+
+/* Motion */
+@keyframes mvXY{from{transform:translate(0,0)}to{transform:translate(var(--dx),var(--dy))}}
+@keyframes sprite2{from{background-position:0% 0}to{background-position:200% 0}}
+@keyframes waddle{0%,100%{transform:rotate(-6deg) translateY(0)}25%{transform:rotate(0deg) translateY(-2.5px)}50%{transform:rotate(6deg) translateY(0)}75%{transform:rotate(0deg) translateY(-2.5px)}}
+@keyframes tiloSpin{to{transform:rotate(360deg)}}
+@keyframes tiloSlide{0%{transform:translateX(-110%)}100%{transform:translateX(260%)}}
+@keyframes tiloPulse{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes tiloFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes tiloGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes tiloGhost{0%,100%{opacity:1}50%{opacity:.55}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

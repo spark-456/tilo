@@ -18,3 +18,6 @@ Google Cloud billing is temporarily unavailable to the team, so `tilo-dev` canno
 - CP0 cannot be fully GO: the deploy criterion stays NOT MET until billing works; "one real call" can be shown on NIM once the user adds a key.
 - A later switch to Google Cloud is configuration: apply `infra/`, set Google profiles as defaults, record new responses.
 - Live NIM responses recorded for replay must be re-recorded on Google models before submission evidence is produced.
+
+## Addendum
+- 2026-10-06, ADR-0023: the schedule store (FR-AGT-14) may open a live Firestore, but only by explicit config; the emulator and `demo-` guard of `FirestoreStore` above is unchanged.

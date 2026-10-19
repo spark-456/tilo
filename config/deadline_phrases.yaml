@@ -1,0 +1,30 @@
+# The words a person uses for a due date (SIMPLE-RUN-2, FR-INT-04). Read by tilo_planning.due_dates.parse_deadline,
+# which reads an answer to the deadline question (or a deadline chip edit) against the clock: the same treatment for
+# every text, and nothing here chooses what a run does. Compared after casefold, punctuation (other than , : / . -)
+# turned to spaces and spaces folded; an entry is the whole answer once the lead words are removed.
+# Weekday and month names are the calendar's own (English); a number word below is what "in two weeks" may use.
+
+version: 1
+
+# Taken off the front of an answer: "by Friday", "due on the 20th".
+lead_words: [by, "on", due, before, until, till, at, the, latest, no later than]
+
+# The whole answer says there is no due date: the deadline is cleared.
+no_deadline: [none, "no", no deadline, no firm deadline, n/a, na, nothing, whenever, no rush, open]
+
+today: [today, tonight, this evening, now, asap, right away, immediately, end of today, end of day, eod, cob]
+tomorrow: [tomorrow, tmrw, tmr]
+day_after_tomorrow: [day after tomorrow]
+# The coming Friday, as the "By the end of this week" answer of the deadline question does.
+end_of_week: [end of week, end of the week, end of this week, this week, the end of this week]
+end_of_next_week: [next week, end of next week, the end of next week]
+end_of_month: [end of month, end of the month, end of this month, this month]
+
+# "in 3 days", "in two weeks"; the unit words and the number words an answer may use.
+in_count:
+  day_units: [day, days]
+  week_units: [week, weeks]
+  numbers: {a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7}
+
+# "this Friday", "next Friday", "coming Friday": a weekday named with one of these words before it.
+weekday_prefixes: {this: false, next: true, coming: false} # true = strictly after today

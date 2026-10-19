@@ -13,6 +13,7 @@ own `domain` keyword stays for call-site compatibility but is never forwarded to
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import pathlib
 import random
@@ -262,6 +263,16 @@ def make_principal(
     if channel is not None:
         kwargs["channel"] = channel
     return deps.Principal(**kwargs)
+
+
+def as_full_session(principal: deps.Principal, full: bool = True) -> deps.Principal:
+    """BQ-XWORLD-10 (API_CARDS_XWORLD.md, "Session kind"): `principal` as a full web sign-in session, the server-set
+    `deps.Principal.full_session` marker. Existing fixtures that build a full web session use this. Until the field
+    exists the principal is returned unchanged (today every web principal acts as a full session); the marker's own
+    existence, default and effect are pinned, strictly, by test_S_06_xworld_session.py."""
+    if "full_session" not in {f.name for f in dataclasses.fields(deps.Principal)}:
+        return principal
+    return dataclasses.replace(principal, full_session=full)
 
 
 def as_principal(principal: deps.Principal):

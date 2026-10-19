@@ -15,6 +15,7 @@ from __future__ import annotations
 import datetime
 import hashlib
 import hmac
+import inspect
 import logging
 import math
 import re
@@ -26,10 +27,11 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 
+from tilo_api import deps
 from tilo_api.cards import (
     _STATUS,
     _USER_RE,
@@ -41,6 +43,7 @@ from tilo_api.cards import (
     session_allows,
 )
 from tilo_api.deps import Principal, get_current_principal
+from tilo_api.people_limits import write_limit
 
 logger = logging.getLogger("tilo_api.sharing")
 SHARING_CONFIG = Path(__file__).resolve().parents[4] / "config" / "sharing.yaml"
@@ -108,6 +111,17 @@ class _AnswerBody(BaseModel):
     option: str
 
 
+def _in_directory(request: Request, user_id: str) -> bool:
+    """Whether `user_id` is a person of this org in the people directory (PEOPLE-SEAMS-1, BQ-PEOPLESEAMS1-6). Deny by
+    default: a directory that is not wired, cannot be read or raises answers False, whatever the reason."""
+    try:
+        seam = request.app.dependency_overrides.get(deps.get_people_stores, deps.get_people_stores)
+        stores = seam(request) if inspect.signature(seam).parameters else seam()
+        return stores.persons.get(deps.ORG_ID, user_id) is not None  # type: ignore[no-any-return]
+    except Exception:
+        return False
+
+
 def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) -> APIRouter:
     """`worlds` is one CardStore (every world), or a dependency returning a `world_id -> WorldView` resolver."""
     router = APIRouter()
@@ -118,10 +132,10 @@ def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) 
 
     def owner_view(world_id: str, principal: Principal, resolve: Callable[[str], WorldView]) -> WorldView:
         if principal.world_id != world_id or principal.role != "owner" or principal.channel not in _WEB_CHANNELS:
-            raise HTTPException(status_code=404)  # same as an unknown world
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")  # same as an unknown world
         view = resolve(world_id)
         if principal.user_id != view.cards.owner_of(world_id):
-            raise HTTPException(status_code=404)
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")
         return view
 
     def named_link(token: str, principal: Principal) -> _Link | None:
@@ -142,12 +156,15 @@ def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) 
         world_id: str,
         card_id: str,
         body: _ShareBody,
+        request: Request,
         principal: Principal = Depends(get_current_principal),
         resolve: Callable[[str], WorldView] = Depends(get_worlds),
     ) -> JSONResponse:
         view = owner_view(world_id, principal, resolve)
         if body.approver == principal.user_id:
             return JSONResponse(status_code=422, content={"outcome": "rejected", "reason": "owner_needs_no_link"})
+        if not _in_directory(request, body.approver):  # one body for unknown, other-org and unreadable alike
+            return JSONResponse(status_code=403, content={"outcome": "rejected", "reason": "not_allowed"})
         expires = _parse_ts(view.cards.now()) + link_ttl()
         stamp = expires.isoformat(timespec="milliseconds").replace("+00:00", "Z")
         try:
@@ -179,7 +196,7 @@ def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) 
             status_code=201, content={"share_id": link.share_id, "token": token, "card_id": new_id, "expires_at": stamp}
         )
 
-    @router.delete("/worlds/{world_id}/shares/{share_id}", status_code=204)
+    @router.delete("/worlds/{world_id}/shares/{share_id}", status_code=204, dependencies=[Depends(write_limit)])
     def revoke_share(
         world_id: str,
         share_id: str,
@@ -190,7 +207,7 @@ def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) 
         with lock:
             link = by_id.get(share_id)
             if link is None or link.world_id != world_id:
-                raise HTTPException(status_code=404)
+                raise HTTPException(status_code=404, detail="Tilo could not find that.")
             link.revoked = True
         view.cards.unassign(world_id, link.card_id)  # the assignment ends with the link; the owner keeps the gate
         return Response(status_code=204)

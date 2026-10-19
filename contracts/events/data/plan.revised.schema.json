@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/plan.revised.schema.json",
+  "x-version": "1.0.0",
+  "title": "PlanRevisedData",
+  "description": "data of plan.revised (ADR-0028). The planner compiled a confirmed change (the meeting.change_requested with this proposal_id, which is this event's cause) into revision units, and the plan validator accepted the revised plan (PG-13). actor is the world's Director, target the world. run is same_run when the discussed run was still live (the units join it) and revision_run when it had finished: then this event is the first of a new run of the same world (new run_id), and budget.requested, budget.granted and world.started follow (MR-09, MR-10). credits is the revision's estimate. Not a side effect: the units' own side effects wait at gates or policies like any unit's.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["proposal_id", "run", "units", "credits"],
+  "properties": {
+    "proposal_id": { "$ref": "../../common.schema.json#/$defs/ulid" },
+    "run": { "type": "string", "enum": ["same_run", "revision_run"] },
+    "units": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/revision_unit" }
+    },
+    "credits": { "$ref": "../../common.schema.json#/$defs/credit_range" }
+  },
+  "$defs": {
+    "revision_unit": {
+      "description": "A new plan unit and the unit whose work it changes (plan.schema.json unit revises).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "revises"],
+      "properties": {
+        "id": { "$ref": "../../common.schema.json#/$defs/unit_id" },
+        "revises": { "$ref": "../../common.schema.json#/$defs/unit_id" }
+      }
+    }
+  }
+}

@@ -10,8 +10,9 @@ import type { Event, Layout } from "@tilo/contracts";
 import type { Container } from "pixi.js";
 import { subscribeDensity } from "../display/density";
 import { MAX_DURATION_MS, createChoreographer } from "./choreographer";
-import { type Frame, frameOf } from "./frame";
-import { type WorldState, applyEvent, createInitialState } from "./reducer";
+import { type Frame, type FrameAgent, type FrameSay, frameOf } from "./frame";
+import { createMobileQuality } from "./mobileQuality";
+import { type WorldState, applyEvent, createInitialState, standingAt } from "./reducer";
 import {
   type WorldLayer,
   createLayer,
@@ -22,9 +23,30 @@ import {
 import { getReplayPoint, setReplayPoint, subscribeReplay } from "./replayPoint";
 import { runEnded } from "./runSummary";
 import { getSelection, subscribeSelection } from "./selection";
+import { type Probe, getSpotlight, registerProbe, subscribeSpotlight } from "./spotlight";
 import { createWorldStore } from "./store";
+import { walkBob } from "./walkCycle";
 
 const MOVE_DURATION_MS = 600; // a plausible walk; HR-3 caps it at MAX_DURATION_MS regardless
+/** How long a handoff note's speech bubble is held, so it can be read before the speaker's next event (WORLD-LIVE). */
+const SAY_DURATION_MS = MAX_DURATION_MS;
+/** Events whose relocation is a walk; every other relocation is a plain placement (no motion). */
+const WALKS: ReadonlySet<string> = new Set([
+  "agent.moved",
+  "agent.handoff",
+  "question.routed",
+  "meeting.convened",
+  "meeting.adjourned",
+]);
+/** The longest meeting-room turn drawn in a bubble; the Meeting Hall panel keeps all of it. */
+const SAY_MAX = 160;
+/** The events whose line is spoken in a bubble over their actor (triggeredBy each: the recorded event itself). */
+const SPEAKS: ReadonlySet<string> = new Set([
+  "agent.handoff",
+  "agent.assigned",
+  "agent.help_requested",
+  "question.routed",
+]);
 const LEAD_IN_MS = 1000; // hold at seq 0 after load before the first event (see startPlayback)
 
 type Trace = ReadonlyArray<{ seq: number; type: string }>;
@@ -40,6 +62,14 @@ interface WorldOptions {
   readonly onTrace: (trace: Trace) => void;
   /** The reducer's run status after each applied event (FR-WLD-07: the veil follows "paused"). */
   readonly onStatus?: (status: Frame["status"]) => void;
+  /** True while events the run already held are folded in: nothing is spoken for a past moment (WORLD-LIVE). */
+  readonly catchingUp?: () => boolean;
+  /** The words of a meeting-room turn (they are not in the event), or null; called when the turn is recorded. */
+  readonly words?: (
+    roomId: string,
+    turn: number,
+    kind: "asked" | "replied",
+  ) => Promise<string | null>;
 }
 
 export interface RunWorldOptions extends WorldOptions {
@@ -56,6 +86,57 @@ export interface ClientWorldOptions extends Omit<WorldOptions, "onTrace"> {
 
 type Vec = { x: number; y: number };
 
+/** The agents drawn lit: the one under the pointer, and the ones a clicked message names (display state). */
+function litOf(worldId: string): string[] {
+  const { hover, lit } = getSpotlight(worldId);
+  return hover === null || lit.includes(hover) ? [...lit] : [...lit, hover];
+}
+
+/** What the page may ask the drawn stage (TILO-T-WORLD): which agent is under a point and where an id stands, in px
+ * from the stage's corner. Read from the current frame and the Pixi transforms, so it follows the camera. */
+function probeOf(
+  layer: WorldLayer,
+  frame: () => Frame | undefined,
+  places: () => ReadonlyMap<string, Vec>,
+  isWalking?: (id: string) => boolean,
+): Probe {
+  return {
+    agentAt(x, y) {
+      let best: { id: string; d: number } | null = null;
+      for (const [id, fig] of layer.figures) {
+        if (!fig.g.visible) continue;
+        try {
+          const b = fig.g.getBounds();
+          const pad = 6;
+          if (x < b.x - pad || x > b.x + b.width + pad || y < b.y - pad || y > b.y + b.height + pad)
+            continue;
+          const d = Math.hypot(x - (b.x + b.width / 2), y - (b.y + b.height / 2));
+          if (!best || d < best.d) best = { id, d };
+        } catch {
+          // a figure not yet on the stage has no bounds: it cannot be hovered
+        }
+      }
+      return best?.id ?? null;
+    },
+    locate(id) {
+      try {
+        const at = places().get(id);
+        if (at) return layer.content.toGlobal(at);
+        const f = frame();
+        const spot = [...(f?.buildings ?? []), ...(f?.districts ?? []), ...(f?.islands ?? [])].find(
+          (r) => r.id === id,
+        );
+        return spot ? layer.content.toGlobal({ x: spot.cx, y: spot.cy }) : null;
+      } catch {
+        return null;
+      }
+    },
+    isWalking(id) {
+      return isWalking ? isWalking(id) : false;
+    },
+  };
+}
+
 /** The state at one seq, drawn at once with nothing walking (P8/HR-6, FR-WLD-08): a jump to a
  * recorded moment is a replay, never an event, so there is no motion to time. */
 function staticView(layer: WorldLayer, o: WorldOptions, events: readonly Event[]) {
@@ -65,24 +146,46 @@ function staticView(layer: WorldLayer, o: WorldOptions, events: readonly Event[]
   let places = new Map<string, Vec>();
   const ring = () => {
     if (!frame) return;
-    renderSelection(layer, frame, places, getSelection(o.layout.world_id));
+    renderSelection(
+      layer,
+      frame,
+      places,
+      getSelection(o.layout.world_id),
+      litOf(o.layout.world_id),
+    );
     o.requestRender();
   };
   const offSelection = subscribeSelection(ring);
+  const offSpotlight = subscribeSpotlight(ring);
+  const offProbe = registerProbe(
+    o.layout.world_id,
+    probeOf(
+      layer,
+      () => frame,
+      () => places,
+    ),
+  );
   // A density switch redraws what is shown, in place: no callback, no event, no replay.
   const offDensity = subscribeDensity(() => {
     if (!frame) return;
     renderStatic(layer, frame);
-    renderAgents(layer, frame, places);
+    renderAgents(layer, frame, places, litOf(o.layout.world_id));
     ring();
   });
   return {
     show(seq: number) {
       const state = store.stateAt(seq);
-      frame = frameOf(o.layout, state);
+      // WORLD-LIVE: at a recorded moment only the agent that spoke in its last event has a bubble (a note is an
+      // event's, never a lasting state of the world), so a scrub does not pile every earlier note on the stage.
+      const spoke = events.find((e) => e.seq === state.seq)?.actor;
+      const whole = frameOf(o.layout, state);
+      frame = {
+        ...whole,
+        agents: whole.agents.map((a) => (a.id === spoke ? a : { ...a, say: null })),
+      };
       renderStatic(layer, frame);
       places = new Map(frame.agents.map((a) => [a.id, { x: a.cx, y: a.cy }]));
-      renderAgents(layer, frame, places);
+      renderAgents(layer, frame, places, litOf(o.layout.world_id));
       ring();
       o.onSeq(state.seq);
       o.onTrace(state.trace);
@@ -91,6 +194,8 @@ function staticView(layer: WorldLayer, o: WorldOptions, events: readonly Event[]
     },
     off() {
       offSelection();
+      offSpotlight();
+      offProbe();
       offDensity();
     },
   };
@@ -111,15 +216,38 @@ function createLive(
   const { world, requestRender, layout, reducedMotion, onSeq, onTrace } = o;
   const onStatus = o.onStatus ?? (() => undefined);
   const layer = createLayer(world, o.size);
+  const mobileQuality = createMobileQuality();
   // FR-WLD-06: the ring follows the run's one selection; choosing redraws one frame, nothing more.
   const selected = () => getSelection(layout.world_id);
   const agentIds = layout.semantic.agents.map((a) => a.id);
   let state = createInitialState(layout); // live playback folds events in one at a time
   // Professional density has no decorative motion: a walk is drawn as a jump, as under reduced motion.
   const calm = () => reducedMotion() || layer.density() === "professional";
-  const choreo = createChoreographer({ reducedMotion: calm });
+  const choreo = createChoreographer();
+  // WORLD-LIVE: a handoff note is held for a readable time by a queue of its own (a bubble is not a walk, so reduced
+  // motion does not cut it), one hold per speaker, in seq order, each starting no earlier than its event was received.
+  const talk = createChoreographer();
+  let hiddenAt: number | null = document.hidden ? performance.now() : null;
+  let hiddenTotal = 0;
+  const onVisibility = () => {
+    const now = performance.now();
+    if (document.hidden) hiddenAt ??= now;
+    else if (hiddenAt !== null) {
+      hiddenTotal += now - hiddenAt;
+      hiddenAt = null;
+    }
+  };
+  document.addEventListener("visibilitychange", onVisibility);
+  const playTime = (now = performance.now()) =>
+    now - hiddenTotal - (hiddenAt === null ? 0 : now - hiddenAt);
+  // A room's bubbles stay while the room is open (it is a conversation, not a moment); meeting.adjourned ends them.
+  const roomSay = new Map<string, FrameSay>();
+  const spoken = new Map<
+    string,
+    Array<{ seq: number; say: NonNullable<FrameAgent["say"]>; armed: boolean }>
+  >();
   const agentPos = new Map<string, Vec>(); // settled: where each actor's last completed move left it
-  const pendingTo = new Map<number, Vec>(); // by seq: where a queued move lands once it finishes
+  const pendingTo = new Map<string, Vec>(); // by "actor:seq": where a queued move lands once it finishes
   const queued = new Map<string, number>(); // moves enqueued per actor
   const completedCount = new Map<string, number>();
   const walkFrom = new Map<string, { seq: number; from: Vec }>(); // the in-flight move's start
@@ -143,7 +271,7 @@ function createLive(
       const done = choreo.completed(id);
       if (done.length > (completedCount.get(id) ?? 0)) {
         completedCount.set(id, done.length);
-        const to = pendingTo.get(done[done.length - 1] as number);
+        const to = pendingTo.get(`${id}:${done[done.length - 1]}`);
         if (to) agentPos.set(id, to);
       }
       if (done.length < (queued.get(id) ?? 0)) busy = true;
@@ -151,7 +279,7 @@ function createLive(
     const display = new Map(agentPos);
     for (const id of agentIds) {
       const act = choreo.active(id);
-      const to = act && pendingTo.get(act.seq);
+      const to = act && pendingTo.get(`${id}:${act.seq}`);
       const settled = agentPos.get(id);
       if (!act || !to || !settled) continue;
       let walk = walkFrom.get(id);
@@ -160,32 +288,89 @@ function createLive(
         walkFrom.set(id, walk);
       }
       const span = act.finish - act.start;
-      const t = span > 0 && !calm() ? Math.min(1, Math.max(0, (now - act.start) / span)) : 1;
+      const t =
+        span > 0 && layer.density() !== "professional"
+          ? Math.min(1, Math.max(0, (now - act.start) / span))
+          : 1;
+      const bob = walkBob(t, calm());
       display.set(id, {
         x: walk.from.x + (to.x - walk.from.x) * t,
-        y: walk.from.y + (to.y - walk.from.y) * t,
+        y: walk.from.y + (to.y - walk.from.y) * t + bob,
       });
     }
     lastDisplay = display;
-    renderAgents(layer, lastFrame, display);
-    renderSelection(layer, lastFrame, display, selected());
+    // WORLD-LIVE: a note is spoken, and a tool is shown, only once the agent has arrived (its recorded walks are done).
+    const arrived = (id: string) => choreo.completed(id).length >= (queued.get(id) ?? 0);
+    for (const [id, list] of spoken) {
+      for (const hold of list) {
+        if (hold.armed || !arrived(id)) continue;
+        hold.armed = true;
+        talk.enqueue({ actor: id, seq: hold.seq, receivedAtMs: now, durationMs: SAY_DURATION_MS });
+      }
+    }
+    talk.advance(now);
+    const speaking = new Map<string, FrameAgent["say"]>();
+    for (const [id, list] of spoken) {
+      const done = new Set(talk.completed(id));
+      const left = list.filter((hold) => !done.has(hold.seq));
+      spoken.set(id, left);
+      const act = talk.active(id);
+      const current = act ? left.find((hold) => hold.seq === act.seq) : undefined;
+      if (current) speaking.set(id, current.say);
+      if (left.length > 0) busy = true; // a note still waiting for its turn or being read keeps the frames coming
+    }
+    const shown: Frame = {
+      ...lastFrame,
+      agents: lastFrame.agents.map((a) => ({
+        ...a,
+        working: a.working && arrived(a.id),
+        say: speaking.get(a.id) ?? (arrived(a.id) ? (roomSay.get(a.id) ?? null) : null),
+      })),
+    };
+    renderAgents(layer, shown, display, litOf(layout.world_id));
+    renderSelection(layer, lastFrame, display, selected(), litOf(layout.world_id));
     requestRender();
     return busy;
   }
 
   function tickAnim() {
     raf = 0;
-    if (stopped || paused || scrubbed) return;
-    if (drawAgents(performance.now())) raf = requestAnimationFrame(tickAnim);
+    if (stopped || paused || scrubbed) {
+      mobileQuality.idle();
+      return;
+    }
+    const now = performance.now();
+    mobileQuality.sample(now, o.size().width);
+    layer.shadows = mobileQuality.shadows;
+    if (drawAgents(playTime(now))) raf = requestAnimationFrame(tickAnim);
+    else mobileQuality.idle();
   }
 
+  const probe = registerProbe(
+    layout.world_id,
+    probeOf(
+      layer,
+      () => lastFrame,
+      () => lastDisplay,
+      (id) => choreo.isAnimating(id),
+    ),
+  );
+  const spotlit = () => {
+    if (stopped || scrubbed) return; // a scrubbed run lights through its own static view
+    if (paused) {
+      renderAgents(layer, lastFrame, lastDisplay, litOf(layout.world_id));
+      renderSelection(layer, lastFrame, lastDisplay, selected(), litOf(layout.world_id));
+      requestRender();
+    } else drawAgents(playTime());
+  };
+  const unspot = subscribeSpotlight(spotlit);
   const unselect = subscribeSelection(() => {
     if (stopped || scrubbed) return; // a scrubbed run draws through its own static view
     // A ring redraw is a frame, not an animation; paused, the agents stay where they were drawn.
     if (paused) {
-      renderSelection(layer, lastFrame, lastDisplay, selected());
+      renderSelection(layer, lastFrame, lastDisplay, selected(), litOf(layout.world_id));
       requestRender();
-    } else drawAgents(performance.now());
+    } else drawAgents(playTime());
   });
   // FR-WLD-14: a density switch redraws the frame in place (a scrubbed run through its own view).
   const undensity = subscribeDensity(() => {
@@ -193,9 +378,9 @@ function createLive(
     renderStatic(layer, lastFrame);
     if (paused) {
       renderAgents(layer, lastFrame, lastDisplay);
-      renderSelection(layer, lastFrame, lastDisplay, selected());
+      renderSelection(layer, lastFrame, lastDisplay, selected(), litOf(layout.world_id));
       requestRender();
-    } else drawAgents(performance.now());
+    } else drawAgents(playTime());
   });
   // FR-WLD-08: a finished run can be scrubbed; the scrubber is disabled until then, so a live run
   // is never jumped around. From the first scrub the world shows stateAt(point) at once and
@@ -214,6 +399,7 @@ function createLive(
     apply(event, receivedAtMs) {
       if (stopped || event.seq <= state.seq) return; // duplicate or out of order: ignored
       const wasPaused = paused;
+      const before = state;
       state = applyEvent(state, event, layout);
       paused = state.status === "paused";
       onStatus(state.status);
@@ -237,28 +423,71 @@ function createLive(
           agentPos.set(a.id, { x: a.cx, y: a.cy }); // first reveal: appear instantly, no walk
           continue;
         }
-        if (event.actor !== a.id) continue; // this event doesn't relocate this actor
+        // This event relocates its actor, and, for a meeting room (WORLD-LIVE), every agent it called or sent back.
+        // TILO-T-WORLD: where it stands (its post once its handoff is old), not only where its last event sent it.
+        const was = before.agents[a.id];
+        const stood = was && standingAt(before, was);
+        const stands = standingAt(state, state.agents[a.id] as never);
+        if (event.actor !== a.id && stood === stands) continue;
         // HR-3: every location change for an already-visible actor goes through that actor's
         // choreographer queue in seq order (chained by finish time), never straight into
         // agentPos, so a later event can never race an earlier walk still in flight.
-        pendingTo.set(event.seq, { x: a.cx, y: a.cy });
+        pendingTo.set(`${a.id}:${event.seq}`, { x: a.cx, y: a.cy });
         queued.set(a.id, (queued.get(a.id) ?? 0) + 1);
         choreo.enqueue({
           actor: a.id,
           seq: event.seq,
-          receivedAtMs,
+          receivedAtMs: playTime(receivedAtMs),
+          // A settle (a finished agent going to its post once the talk window has passed) is a walk too: the event
+          // that closed the window is its recorded cause (TILO-T-WORLD).
           durationMs:
-            event.type === "agent.moved" ? Math.min(MOVE_DURATION_MS, MAX_DURATION_MS) : 0,
+            layer.density() !== "professional" &&
+            (WALKS.has(event.type) || (event.actor !== a.id && stood !== stands))
+              ? Math.min(MOVE_DURATION_MS, MAX_DURATION_MS)
+              : 0,
         });
       }
-      if (drawAgents(receivedAtMs) && !raf) raf = requestAnimationFrame(tickAnim);
+      if (event.type === "meeting.adjourned") roomSay.clear(); // the room is over: its bubbles go with it
+      const asked = event.type === "meeting.asked";
+      if ((asked || event.type === "meeting.replied") && o.words && !o.catchingUp?.()) {
+        // The words of a room turn are not in the event (MR-12); they are read from the room when it is recorded.
+        const d = (event.data ?? {}) as { room_id?: unknown; turn?: unknown; to?: unknown };
+        const who = asked ? d.to : event.actor;
+        if (
+          typeof d.room_id === "string" &&
+          typeof d.turn === "number" &&
+          typeof who === "string"
+        ) {
+          o.words(d.room_id, d.turn, asked ? "asked" : "replied").then(
+            (text) => {
+              if (!text || stopped || scrubbed) return;
+              const cut = text.length > SAY_MAX ? `${text.slice(0, SAY_MAX - 1).trimEnd()}…` : text;
+              roomSay.set(who, { text: cut, to: "", head: asked ? "You asked" : "Replied to you" });
+              if (!paused) drawAgents(playTime());
+            },
+            () => undefined, // no words, no bubble: nothing is made up
+          );
+        }
+      }
+      const say =
+        SPEAKS.has(event.type) && !o.catchingUp?.()
+          ? frame.agents.find((a) => a.id === event.actor)?.say
+          : null;
+      if (say) {
+        const list = spoken.get(event.actor) ?? [];
+        spoken.set(event.actor, [...list, { seq: event.seq, say, armed: false }]);
+      }
+      if (drawAgents(playTime(receivedAtMs)) && !raf) raf = requestAnimationFrame(tickAnim);
       onSeq(state.seq);
       onTrace(state.trace);
     },
     replay,
     stop() {
       stopped = true;
+      document.removeEventListener("visibilitychange", onVisibility);
       unselect();
+      unspot();
+      probe();
       undensity();
       unreplay();
       scrubbed?.off();
@@ -330,6 +559,7 @@ export function runClientWorld(opts: ClientWorldOptions): () => void {
     {
       ...opts,
       reducedMotion: () => catchingUp || opts.reducedMotion(),
+      catchingUp: () => catchingUp,
       onTrace: opts.onTrace ?? (() => undefined),
     },
     { events: () => seen, canScrub: (s) => runEnded(s.status) },

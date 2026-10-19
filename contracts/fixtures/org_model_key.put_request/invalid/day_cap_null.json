@@ -1,0 +1,7 @@
+{
+  "confirm": true,
+  "consent_version": 1,
+  "bundle_id": "openai-compat-example",
+  "day_cap_credits": null,
+  "key": "fake-model-key_0123456789.example"
+}

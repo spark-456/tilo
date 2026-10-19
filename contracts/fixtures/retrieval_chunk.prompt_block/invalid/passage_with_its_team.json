@@ -1,0 +1,16 @@
+{
+  "v": "1.0",
+  "chunks": [
+    {
+      "id": "ch_d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+      "source": {
+        "kind": "pin",
+        "id": "pb_launch_date",
+        "version": null
+      },
+      "label": "Launch date",
+      "text": "Launch moved to 2 November.",
+      "team_id": "tm_ops"
+    }
+  ]
+}

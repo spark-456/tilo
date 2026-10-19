@@ -1,0 +1,39 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000703",
+  "seq": 703,
+  "ts": "2026-10-08T10:03:00.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "meeting.replied",
+  "actor": "A_s2",
+  "target": "u_owner",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "info",
+  "credits": 0.84,
+  "summary": "The agent replied and proposed a change.",
+  "cause": "01JB5VQ0000000000000000702",
+  "vis": ["D1"],
+  "authz": null,
+  "data": {
+    "room_id": "01JB5VQ00000000000000R0001",
+    "turn": 1,
+    "mode": "quick",
+    "outcome": "failed",
+    "message_ref": "r_village_basic_1/703",
+    "units": [],
+    "artifacts": [],
+    "proposal": null
+  },
+  "trace": {
+    "model_role": "meeting",
+    "profile": "lite-31",
+    "tokens_in": 11800,
+    "tokens_out": 420,
+    "tool": null,
+    "latency_ms": 2100,
+    "archive_ref": "r_village_basic_1/703"
+  }
+}

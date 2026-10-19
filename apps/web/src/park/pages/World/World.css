@@ -1,0 +1,1718 @@
+/* World page (WEB-6): design_handoff_tilo_web_app/design/Tilo App World.dc.html, one block per element of its
+   inline styles. Every selector sits under [data-park] with a park-world- class; colours are the tokens
+   (night comes from them), with the README's hard-coded #FFFFFF on the hero fill and the #5A3FE0 focus ring.
+   The design moves in two places, left still until the WEB-3 motion restore (BQ-WEB-3): the progress and
+   spend bars (width .5s) and the Village ring (a .7s spin).
+   motion: restored in WEB-3 (BQ-WEB-3) */
+
+/* The design's boxes are sized with their borders and padding inside (rows of 44, chips of 28). */
+[data-park] .park-world-root,
+[data-park] .park-world-root * {
+  box-sizing: border-box;
+}
+[data-park] .park-world-root .park-sheet {
+  padding: 24px 32px 36px;
+}
+
+/* ---- STUDIO-3 (design/studio-v2 "Tilo S World.dc.html"): the back link, the title block with its progress, the
+   tab row, the city beside the tabs. Colours are role tokens (config/themes/studio.json): --ground is the design's
+   cityBg, --priFill/--onPri/--priLip its primary, --heroSoft/--heroInk its priSoft/priInk. ---- */
+[data-park] .park-world-crumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-world-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--ink3);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+[data-park] .park-world-back:hover {
+  color: var(--ink2);
+}
+
+/* ---- Title block: titles | progress | actions ---- */
+[data-park] .park-world-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px 32px;
+}
+[data-park] .park-world-titles {
+  display: flex;
+  flex: 1 1 360px;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+[data-park] .park-world-eyebrowrow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+[data-park] .park-world-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--ink3);
+}
+[data-park] .park-world-titleline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+[data-park] .park-world-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px 0 10px;
+  border-radius: 99px;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+[data-park] .park-world-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+}
+[data-park] .park-world-h1 {
+  min-width: 0;
+  flex: 1 1 auto;
+  margin: 0;
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: -0.6px;
+  line-height: 1.15;
+  text-wrap: balance;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+[data-park] .park-world-meta {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-world-headprog {
+  display: flex;
+  flex: 0 1 400px;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 260px;
+}
+[data-park] .park-world-proghead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 15px;
+}
+[data-park] .park-world-progtitle {
+  font-weight: 800;
+}
+[data-park] .park-world-progsub {
+  color: var(--ink3);
+  font-weight: 600;
+}
+[data-park] .park-world-spentline {
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-park] .park-world-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* The live view and replay links: quiet outlined controls (the page keeps one filled button). */
+[data-park] .park-world-live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+[data-park] .park-world-live:hover {
+  background: var(--sunk);
+  color: var(--ink);
+}
+
+/* QA-DEMO-1 m3: a disabled stage link looks disabled (muted, not pressable, no hover) and the reason is
+   written beside the lenses (.park-world-nostage) */
+[data-park] .park-world-live[aria-disabled="true"] {
+  background: var(--chip);
+  color: var(--ink3);
+  opacity: 0.55; /* issue 932: dimmed like the other disabled controls */
+  cursor: not-allowed;
+}
+[data-park] .park-world-lenses a[aria-disabled="true"] {
+  color: var(--ink3);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+[data-park] .park-world-live[aria-disabled="true"]:hover {
+  color: var(--ink3);
+  filter: none;
+}
+[data-park] .park-world-lenses a[aria-disabled="true"]:hover {
+  background: transparent;
+}
+/* POLISH-2: on a sample world it is the one chip that replaces the live view and the lenses (a quiet pill, never
+   a greyed-out control) */
+[data-park] .park-world-nostage {
+  align-self: flex-start;
+  margin: 0;
+  padding: 7px 14px;
+  border-radius: 99px;
+  background: var(--chip);
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 700;
+}
+/* the reason a stage link is disabled, for assistive technology; out of the flow, so nothing moves */
+[data-park] .park-world-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- Tab row: Story / Steps / Result, and what the run assumed ---- */
+[data-park] .park-world-tabrow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+[data-park] .park-world-tabs {
+  display: flex;
+  flex: none;
+  padding: 4px;
+  border-radius: 16px;
+  background: var(--sunk);
+  gap: 4px;
+}
+[data-park] .park-world-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink2);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+[data-park] .park-world-tab--on {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line);
+}
+[data-park] .park-world-tab__n {
+  color: var(--ink3);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+[data-park] .park-world-tab:focus-visible,
+[data-park] .park-world-back:focus-visible,
+[data-park] .park-world-live:focus-visible,
+[data-park] .park-world-panel:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---- Top grid: the city (left) and the tabs (right); columns are set inline from the window width ---- */
+[data-park] .park-world-top {
+  display: grid;
+  align-items: start;
+  gap: 24px;
+}
+[data-park] .park-world-mapcard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+[data-park] .park-world-map {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 640px;
+  padding: 64px 12px 72px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: var(--ground);
+  overflow: hidden;
+}
+[data-park] .park-world-bigart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  max-width: 100%;
+}
+/* On a narrow map the buildings shrink together (same ratio) instead of being cropped. */
+[data-park] .park-world-rowitem {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+[data-park] .park-world-bigart img,
+[data-park] .park-world-bigart svg {
+  max-width: 100%;
+  height: auto;
+}
+[data-park] .park-world-tag {
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 99px;
+  background: var(--card);
+  box-shadow: var(--sh);
+  font-size: 14px;
+  font-weight: 800;
+}
+[data-park] .park-world-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+}
+[data-park] .park-world-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: var(--pop);
+  box-shadow: var(--sh);
+  font-size: 14px;
+  font-weight: 800;
+}
+/* The links to the live stage's lenses: a card pill at the top right corner of the city. */
+[data-park] .park-world-lenses {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  max-width: calc(100% - 40px); /* UI-10 B4: never past the map's edge (the nav clipped at 320) */
+  padding: 0 4px;
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park] .park-world-lenses a {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+[data-park] .park-world-lenses a:hover {
+  background: var(--sunk);
+}
+
+/* ---- Progress (in the title block) ---- */
+[data-park] .park-world-progwrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+[data-park] .park-world-track {
+  flex: 1;
+  height: 12px;
+  border-radius: 99px;
+  background: var(--sunk);
+  overflow: hidden;
+}
+[data-park] .park-world-fill {
+  height: 100%;
+  border-radius: 99px;
+}
+[data-park] .park-world-proglabel {
+  min-width: 40px;
+  text-align: right;
+  font-size: 13.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+/* The city's legend: a card at its bottom left; each colour has its word (colour never carries meaning alone). */
+[data-park] .park-world-legend {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  max-width: calc(100% - 40px);
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--sh);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-world-legenditem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+[data-park] .park-world-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 99px;
+}
+
+/* ---- The tab panels: one card, the chosen panel shown; a long story scrolls inside it ---- */
+[data-park] .park-world-panels {
+  min-width: 0;
+}
+[data-park] .park-world-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: 640px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: var(--card);
+  overflow: hidden;
+}
+[data-park] .park-world-panel[hidden] {
+  display: none;
+}
+[data-park] .park-world-panelhead {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid var(--line);
+}
+[data-park] .park-world-paneltitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+[data-park] .park-world-panelsub {
+  color: var(--ink3);
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-park] .park-world-panelaside {
+  margin-left: auto;
+  color: var(--ink3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+[data-park] .park-world-panelbody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 20px 20px;
+  overflow-y: auto;
+}
+[data-park] .park-world-emptypanel {
+  padding: 28px 12px;
+  border: 1.5px dashed var(--lineStrong);
+  border-radius: 18px;
+  text-align: center;
+}
+[data-park] .park-world-emptytitle {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+}
+[data-park] .park-world-emptyline {
+  margin: 0;
+  color: var(--ink2);
+  font-size: 14px;
+}
+[data-park] .park-world-story,
+[data-park] .park-world-steps {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  gap: 4px;
+  list-style: none;
+}
+[data-park] .park-world-storyrow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line);
+}
+[data-park] .park-world-storytext {
+  font-size: 16px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+[data-park] .park-world-storymeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink3);
+  font-size: 13px;
+  font-weight: 600;
+}
+[data-park] .park-world-step {
+  display: flex;
+  gap: 14px;
+  padding: 12px 10px;
+  border-radius: 16px;
+}
+[data-park] .park-world-step--stopped {
+  background: var(--amberSoft);
+}
+[data-park] .park-world-stepmark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1.5px dashed var(--lineStrong);
+  border-radius: 99px;
+  color: var(--ink3);
+  font-size: 13px;
+  font-weight: 700;
+}
+[data-park] .park-world-step--done .park-world-stepmark {
+  border: 0;
+  background: var(--ok);
+  color: #ffffff;
+}
+[data-park] .park-world-step--working .park-world-stepmark,
+[data-park] .park-world-step--started .park-world-stepmark {
+  border: 0;
+  background: var(--priFill);
+  color: var(--onPri);
+}
+[data-park] .park-world-step--stopped .park-world-stepmark {
+  border: 0;
+  background: var(--amber);
+  color: #1f1d2b;
+}
+[data-park] .park-world-stepinfo {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+[data-park] .park-world-steptitle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 15.5px;
+  font-weight: 600;
+}
+[data-park] .park-world-stepline,
+[data-park] .park-world-stepdetail {
+  color: var(--ink2);
+  font-size: 14px;
+}
+[data-park] .park-world-stepdetail {
+  color: var(--ink3);
+}
+[data-park] .park-world-stepat {
+  flex: none;
+  color: var(--ink3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+[data-park] .park-world-steptag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 99px;
+  background: var(--sunk);
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 700;
+}
+[data-park] .park-world-steptag--done {
+  background: var(--okSoft);
+  color: var(--okInk);
+}
+[data-park] .park-world-steptag--working,
+[data-park] .park-world-steptag--started {
+  background: var(--heroSoft);
+  color: var(--heroInk);
+}
+[data-park] .park-world-steptag--stopped {
+  background: var(--amberSoft);
+  color: var(--amberInk);
+}
+[data-park] .park-world-sharerow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+/* The quieter tools and reference cards stay closed until requested. */
+[data-park] .park-world-more {
+  margin-top: 18px;
+}
+[data-park] .park-world-more > summary {
+  width: fit-content;
+  color: var(--ink3);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-park] .park-world-more[open] > summary {
+  margin-bottom: 12px;
+}
+[data-park] .park-world-moregrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  align-items: start;
+  gap: 18px;
+}
+@media (max-width: 760px) {
+  [data-park] .park-world-map {
+    height: 400px;
+    padding: 108px 8px 96px;
+  }
+  [data-park] .park-world-map.park-world-map--art {
+    padding-top: 108px;
+    padding-bottom: 20px;
+  }
+  [data-park] .park-world-panel {
+    max-height: none;
+  }
+  [data-park] .park-world-headprog {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  [data-park] .park-world-h1 {
+    font-size: 26px;
+  }
+  [data-park] .park-world-tabs {
+    flex: 1 1 100%;
+  }
+  [data-park] .park-world-tab {
+    flex: 1;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 8px;
+  }
+  /* A phone: the tag across the top, the lenses under it, the legend at the bottom; the art keeps the middle. */
+  [data-park] .park-world-tag {
+    left: 12px;
+    right: 12px;
+    top: 12px;
+    height: auto;
+    min-height: 32px;
+    padding: 6px 12px;
+    border-radius: 16px;
+  }
+  [data-park] .park-world-lenses {
+    top: 64px;
+    right: auto;
+    left: 12px;
+  }
+  [data-park] .park-world-legend {
+    left: 12px;
+    bottom: 12px;
+  }
+}
+
+/* ---- Side column ---- */
+[data-park] .park-world-side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+[data-park] .park-world-waiting {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--amberLine);
+  border-radius: 22px;
+  background: var(--amberSoft);
+}
+[data-park] .park-world-waitinghead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+[data-park] .park-world-waitingtile {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--amberTile);
+  overflow: hidden;
+}
+[data-park] .park-world-waitingtext {
+  line-height: 1.3;
+}
+[data-park] .park-world-waitinglabel {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: var(--amberInk);
+}
+[data-park] .park-world-waitingtitle {
+  font-size: 15px;
+  font-weight: 800;
+}
+[data-park] .park-world-decision {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--card);
+}
+[data-park] .park-world-dtext {
+  line-height: 1.4;
+}
+[data-park] .park-world-dtitle {
+  font-size: 14px;
+  font-weight: 800;
+}
+[data-park] .park-world-dbody {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  text-wrap: pretty;
+}
+[data-park] .park-world-dactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+[data-park] .park-world-ddone {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--okInk);
+}
+/* The decision buttons are the core Button with the design's own sizes: Approve 0 14, Ask me later h34. */
+[data-park] .park-world-root .park-world-dactions .park-btn--needs {
+  padding: 0 14px;
+}
+[data-park] .park-world-root .park-world-dactions .park-btn--secondary {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+
+/* ---- Spend ---- */
+[data-park] .park-world-spend {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 18px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
+}
+[data-park] .park-world-spendhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+[data-park] .park-world-spendtitle {
+  font-size: 15px;
+  font-weight: 800;
+}
+[data-park] .park-world-spendlink {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--heroInk);
+  text-decoration: none;
+}
+[data-park] .park-world-spendlink:hover {
+  color: var(--hero);
+}
+[data-park] .park-world-spendrow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+[data-park] .park-world-spendvalue {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+[data-park] .park-world-spendof {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-world-spendbar {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+[data-park] .park-world-spendfill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--hero);
+}
+[data-park] .park-world-spendnote {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ink2);
+}
+
+/* ---- Facts, skills, tools ---- */
+[data-park] .park-world-facts {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 18px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
+}
+[data-park] .park-world-fact {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line2);
+}
+[data-park] .park-world-factkey {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-world-factvalue {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 800;
+}
+[data-park] .park-world-skillsrow {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 12px 0 8px;
+}
+[data-park] .park-world-toolsrow {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 4px 0 14px;
+}
+[data-park] .park-world-rowlabel {
+  padding-top: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-world-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+[data-park] .park-world-skillchip {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--heroSoft);
+  color: var(--heroInk);
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 12.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+[data-park] .park-world-toolchip {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--btn2);
+  color: var(--ink);
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 12.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* A chip never grows past its column: a long name is cut with an ellipsis (the full name stays the label). */
+[data-park] .park-world-chipname {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-park] .park-world-mono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--sunk);
+  font-size: 10.5px;
+  font-weight: 900;
+}
+[data-park] .park-world-noskills {
+  padding-top: 5px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+
+/* ---- Lower grid ---- */
+[data-park] .park-world-lower {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  align-items: start;
+  gap: 18px;
+}
+[data-park] .park-world-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 18px 18px 10px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
+}
+[data-park] .park-world-sechead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 8px;
+}
+[data-park] .park-world-h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+[data-park] .park-world-sub {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+
+/* Districts */
+[data-park] .park-world-district {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 110px auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 4px;
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-world-dtile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+[data-park] .park-world-dinfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+[data-park] .park-world-dname {
+  font-size: 14.5px;
+  font-weight: 800;
+}
+[data-park] .park-world-dnote {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-park] .park-world-dprog {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+[data-park] .park-world-dcount {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-world-dbar {
+  height: 5px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+[data-park] .park-world-dfill {
+  display: block;
+  height: 100%;
+}
+[data-park] .park-world-dchip {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* Run history */
+[data-park] .park-world-run {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 4px;
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-world-rtile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+[data-park] .park-world-rinfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+[data-park] .park-world-rwhat {
+  font-size: 14.5px;
+  font-weight: 800;
+}
+[data-park] .park-world-rwhen {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-world-rcost {
+  font-size: 14px;
+  font-weight: 800;
+}
+[data-park] .park-world-noruns {
+  padding: 18px 4px;
+  border-top: 1px solid var(--line2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-world-runactions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 4px 8px;
+  border-top: 1px solid var(--line2);
+}
+
+/* Result */
+[data-park] .park-world-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 4px 12px;
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-world-out {
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: var(--sunk);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+[data-park] .park-world-resultactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+[data-park] .park-world-root .park-world-resultactions .park-btn--primary {
+  padding: 0 16px;
+}
+[data-park] .park-world-running {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+
+/* Activity */
+[data-park] .park-world-activity {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 10px 4px;
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-world-avatar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--sunk);
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 800;
+}
+[data-park] .park-world-ainfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.4;
+}
+[data-park] .park-world-who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink2);
+}
+[data-park] .park-world-adot {
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+}
+[data-park] .park-world-atext {
+  font-size: 14px;
+  font-weight: 600;
+  text-wrap: pretty;
+}
+[data-park] .park-world-atime {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink3);
+  white-space: nowrap;
+}
+
+/* ---- Build this in Lovable card (FR-CON-16) ---- */
+[data-park] .park-world-lovable {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 18px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
+}
+[data-park] .park-world-lovablehead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+[data-park] .park-world-lovabletitle {
+  font-size: 15px;
+  font-weight: 800;
+}
+[data-park] .park-world-lovablesub {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink3);
+}
+[data-park] .park-world-lovableprompt {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--sunk);
+  color: var(--ink);
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-lovablefiles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+[data-park] .park-world-lovablefile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--sunk);
+}
+[data-park] .park-world-lovablepath {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+}
+[data-park] .park-world-lovablesummary {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-world-lovablelink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: var(--hero);
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+[data-park] .park-world-lovablelink:hover {
+  color: #ffffff;
+  filter: brightness(1.08);
+}
+
+/* ---- Focus ring (README "Interactions and motion"): 3px #5A3FE0, offset 2px ---- */
+[data-park] .park-world-back:focus-visible,
+[data-park] .park-world-live:focus-visible,
+[data-park] .park-world-lenses a:focus-visible,
+[data-park] .park-world-spendlink:focus-visible,
+[data-park] .park-world-skillchip:focus-visible,
+[data-park] .park-world-toolchip:focus-visible,
+[data-park] .park-world-lovablelink:focus-visible {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}
+
+/* ---- Narrow windows (the design has no rule here; these keep text from overprinting or clipping) ---- */
+@media (max-width: 560px) {
+  /* UI-10 B4: the legend is a tidy 2 x 2 grid instead of three items and one orphan; the lens pill wraps inside
+     the map instead of running off it. The 440px map height is pinned to the design (park-world.spec.ts). */
+  [data-park] .park-world-legend:not([hidden]) {
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+    gap: 8px 18px;
+  }
+  [data-park] .park-world-lenses {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 32px;
+    padding: 4px;
+  }
+  [data-park] .park-world-lenses a {
+    min-height: 44px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+  }
+  /* Districts: the name and note, then the counts, then the chip, all across the columns right of the tile
+     (the design's column tracks stay; the items span them so nothing runs past the card). */
+  [data-park] .park-world-district {
+    row-gap: 8px;
+  }
+  [data-park] .park-world-dinfo--stack {
+    grid-column: 2 / -1;
+    grid-row: 1;
+  }
+  [data-park] .park-world-dprog--stack {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    min-width: 0;
+  }
+  [data-park] .park-world-dchip--stack {
+    grid-column: 2 / -1;
+    grid-row: 3;
+    justify-self: start;
+  }
+  /* A Town's row or a Village's building shrinks to the card's width, so the 440px map would be mostly empty
+     grey: the map takes the art's height (the tag keeps its corner) instead. */
+  [data-park] .park-world-map--art {
+    height: auto;
+    min-height: 240px;
+    padding: 56px 12px 20px;
+  }
+  /* Skills and Tools: the label sits above its chips, so a chip has the card's width. */
+  [data-park] .park-world-skillsrow--stack,
+  [data-park] .park-world-toolsrow--stack {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 6px;
+  }
+  [data-park] .park-world-rowlabel--stack {
+    padding-top: 0;
+  }
+  /* FT-UX-1: long chips meet 44px minimum tap targets on phone. */
+  [data-park] .park-world-chipfit {
+    height: auto;
+    min-height: 44px;
+    text-align: left;
+    display: inline-flex;
+    align-items: center;
+  }
+  [data-park] .park-world-skillchip,
+  [data-park] .park-world-toolchip {
+    min-height: 44px;
+    height: auto;
+    display: inline-flex;
+    align-items: center;
+  }
+  [data-park] .park-world-back,
+  [data-park] .park-world-spendlink {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  [data-park] .park-world-chipfit .park-world-chipname {
+    padding: 4px 0;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}
+[data-park] .park-world-proposals {
+  padding: var(--space-4);
+  color: var(--ink);
+}
+[data-park] .park-world-proposals pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Share to Slack dialog & pending approval badge (FR-UX-17) ---- */
+[data-park] .park-world-dpending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-park] .park-world-dpendingbadge {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--amberTile);
+  color: var(--amberInk);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+[data-park] .park-world-slackbackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--scrim);
+}
+[data-park] .park-world-slackcount {
+  align-self: flex-end;
+  color: var(--ink2);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+[data-park] .park-world-slackdialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--sh);
+  color: var(--ink);
+}
+[data-park] .park-world-slackhead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+[data-park] .park-world-slacktitle {
+  font-size: 18px;
+  font-weight: 800;
+}
+[data-park] .park-world-slacksub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-world-slackfield {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+[data-park] .park-world-slacklabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-world-slackselect,
+[data-park] .park-world-slacknote {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--field);
+  color: var(--ink);
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-park] .park-world-slackselect:focus-visible,
+[data-park] .park-world-slacknote:focus-visible {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}
+[data-park] .park-world-slackactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---- Team-shared worlds: the share dialog's rows (BQ-CTX-TEAMWORLD) ---- */
+[data-park] .park-world-teamlist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-world-teamrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+[data-park] .park-world-teamname {
+  font-size: 14px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-teamnote {
+  flex: 1 1 200px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+  overflow-wrap: anywhere;
+}
+
+/* ---- WORLD-USEFUL: the run status banner, assumption chips, failure and readable result ---- */
+[data-park] .park-world-runstatus {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  margin: 0 0 18px;
+  padding: 16px 20px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
+}
+[data-park] .park-world-runstatus[data-phase="failed"] {
+  border-color: var(--amber);
+}
+[data-park] .park-world-runline {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-runline {
+  display: block;
+}
+[data-park] .park-world-progress {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  height: 6px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+[data-park] .park-world-progress::-webkit-progress-bar {
+  background: var(--track);
+}
+[data-park] .park-world-progress::-webkit-progress-value {
+  background: var(--run);
+  border-radius: 99px;
+}
+[data-park] .park-world-progress::-moz-progress-bar {
+  background: var(--run);
+  border-radius: 99px;
+}
+[data-park] .park-world-runstatus[data-phase="done"] .park-world-progress::-webkit-progress-value {
+  background: var(--ok);
+}
+[data-park] .park-world-runstatus[data-phase="done"] .park-world-progress::-moz-progress-bar {
+  background: var(--ok);
+}
+[data-park] .park-world-assumed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-park] .park-world-assumedchip {
+  min-height: 28px;
+  padding: 4px 12px;
+  border-radius: 99px;
+  background: var(--chip);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-failed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+[data-park] .park-world-failreason {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--amberTile);
+  color: var(--amberInk);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-resulttext {
+  max-height: 560px;
+  overflow: auto;
+  margin: 8px 4px 12px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: var(--sunk);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-world-resulttext h3,
+[data-park] .park-world-resulttext h4,
+[data-park] .park-world-resulttext h5,
+[data-park] .park-world-resulttext h6 {
+  margin: 14px 0 6px;
+  font-size: 16px;
+  font-weight: 800;
+}
+[data-park] .park-world-resulttext p,
+[data-park] .park-world-resulttext ul,
+[data-park] .park-world-resulttext ol {
+  margin: 0 0 10px;
+}
+[data-park] .park-world-resulttext ul,
+[data-park] .park-world-resulttext ol {
+  padding-left: 22px;
+}
+[data-park] .park-world-resulttext table {
+  border-collapse: collapse;
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+[data-park] .park-world-resulttext th,
+[data-park] .park-world-resulttext td {
+  padding: 6px 10px;
+  border: 1px solid var(--line2);
+  text-align: left;
+  vertical-align: top;
+}
+[data-park] .park-world-resulttext pre,
+[data-park] .park-world-resultpre {
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+  font-family: inherit;
+}
+[data-park] .park-world-resulttext a {
+  color: var(--heroInk);
+  text-decoration: underline;
+}
+
+/* WORLD-LIVE: a real run's map is the live stage, filling the card; the tag, lenses and toast sit over it. */
+[data-park] .park-world-map--live {
+  padding: 0;
+  align-items: stretch;
+  justify-content: stretch;
+}
+[data-park] .park-world-map--live .tw-convene {
+  top: 68px;
+  left: 20px;
+}
+[data-park] .park-world-livestage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+[data-park] .park-world-livestage .stage-frame {
+  flex: 1;
+  min-width: 0;
+}
+[data-park] .park-world-livenote {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 20px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 14px;
+}
+[data-park] .park-world-livenote p {
+  margin: 0;
+}
+/* WORLD-LIVE: the labelled delivery spot under the map, and the Result panel's wider dialog. */
+[data-park] .park-world-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--card);
+  color: var(--ink);
+}
+[data-park] .park-world-dockhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+[data-park] .park-world-docktitle {
+  font-size: 14px;
+  font-weight: 800;
+}
+[data-park] .park-world-dockstate {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink2);
+}
+[data-park] .park-world-dockbody {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+[data-park] .park-world-docksummary {
+  flex: 1 1 260px;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+[data-park] .park-world-resultdialog {
+  max-width: 640px;
+  max-height: calc(100vh - 32px);
+}
+[data-park] .park-world-resultpanel-text {
+  max-height: 46vh;
+  overflow: auto;
+}
+[data-park] .park-world-resulttext code {
+  font-family: monospace;
+  font-size: 13.5px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--sunk);
+  color: var(--ink);
+}

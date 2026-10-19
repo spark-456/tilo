@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.tilo.example/person.schema.json",
-  "x-version": "1.0.0",
+  "x-version": "1.1.0",
   "title": "Person",
-  "description": "A person of an org (PRD 15.1 User entity, ADR-0015): who they are, how they are called in a meeting, how Tilo reaches them, and which teams an org owner put them in. `aliases` are names others use for them; a spoken name that matches more than one person is never assigned (PE-15). A membership counts only as people.rules.md defines it (PE-02). Contact details are never shown to teammates; `tilo-api` resolves a recipient from this record (PE-09).",
+  "description": "A person of an org (PRD 15.1 User entity, ADR-0015): who they are, how they are called in a meeting, how Tilo reaches them, and which teams they are in (an org owner's assignment, a team they founded, or a team lead's invitation they accepted, ADR-0044). `aliases` are names others use for them; a spoken name that matches more than one person is never assigned (PE-15). A membership counts only as people.rules.md defines it (PE-02). Contact details are never shown to teammates; `tilo-api` resolves a recipient from this record (PE-09).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -82,7 +82,7 @@
   },
   "$defs": {
     "membership": {
-      "description": "Membership of a team, counted only as people.rules.md defines it (PE-02).",
+      "description": "Membership of a team, counted only as people.rules.md defines it (PE-02 terms, PE-37, ADR-0044). `lead` (1.1.0) marks the team's lead; tilo-api writes it only as true, and absent means not a lead. It counts only on a membership an org owner assigned or on the founding membership the team's creator assigned to themselves. `accepted_at` (1.1.0) is when the person accepted a membership a team lead assigned them; until then that membership counts for nothing. The team's lead is not the Team Lead role of PRD 10.1 (team_lead.schema.json): it manages that team's memberships and authorises nothing else.",
       "type": "object",
       "additionalProperties": false,
       "required": ["team", "assigned_by"],
@@ -92,6 +92,12 @@
         },
         "assigned_by": {
           "$ref": "team_lead.schema.json#/$defs/assignment"
+        },
+        "lead": {
+          "type": "boolean"
+        },
+        "accepted_at": {
+          "$ref": "common.schema.json#/$defs/timestamp"
         }
       }
     }

@@ -1,0 +1,368 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/morning_brief.schema.json",
+  "x-version": "1.0.0",
+  "title": "MorningBrief",
+  "description": "A person's morning brief for one local day, `local_date` in `time_zone` (ADR-0049): the content of one version of the `application/json` artifact `art_mbrief_<yyyymmdd>` in their own Desk world. Not the intake brief (`brief.schema.json`) and not a meeting's brief (ADR-0047). Owner-only (MO-01). Code copies every meeting, mail and deadline item from the person's own calendar read, mail search and plate (MO-05, MO-06); a model only picks which mail needs a reply and writes the `suggestions` and `todo_suggestions` text, each citing items code offered (MO-07, MO-08). Every section says whether it could be read (`status`), so an empty list is never a failed read (MO-12). No recipient, address, link or body: every text is one link-free line, and the brief sends, books and authorises nothing (MO-11). $defs `settings` is the GET and PUT answer of /v1/me/brief-settings and `settings_update` the PUT body. Rules MO-01 to MO-12 are in morning_brief.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "v",
+    "owner",
+    "local_date",
+    "time_zone",
+    "generated_at",
+    "trigger",
+    "model",
+    "meetings",
+    "mail_needing_reply",
+    "deadlines",
+    "suggestions",
+    "todo_suggestions"
+  ],
+  "properties": {
+    "v": { "const": "1.0" },
+    "owner": { "$ref": "common.schema.json#/$defs/user_id" },
+    "local_date": { "$ref": "common.schema.json#/$defs/calendar_date" },
+    "time_zone": { "$ref": "user_settings.schema.json#/$defs/time_zone" },
+    "generated_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "trigger": {
+      "description": "schedule: the Scheduler tick's sweep made it at the person's brief time (MO-03); on_demand: the person asked for it now (MO-04).",
+      "type": "string",
+      "enum": ["schedule", "on_demand"]
+    },
+    "model": {
+      "description": "What happened to the one model call (MO-07): used (its reply passed the checks), skipped (nothing to read, or the allowance had no room), failed (error or timeout) or flagged (the safety provider flagged the reply). Anything but used leaves suggestions and todo_suggestions empty and the mail unsorted (schema).",
+      "type": "string",
+      "enum": ["used", "skipped", "failed", "flagged"]
+    },
+    "meetings": { "$ref": "#/$defs/meetings_section" },
+    "mail_needing_reply": { "$ref": "#/$defs/mail_section" },
+    "deadlines": { "$ref": "#/$defs/deadlines_section" },
+    "suggestions": {
+      "type": "array",
+      "maxItems": 5,
+      "items": { "$ref": "#/$defs/suggestion" }
+    },
+    "todo_suggestions": {
+      "type": "array",
+      "maxItems": 5,
+      "items": { "$ref": "#/$defs/todo" }
+    }
+  },
+  "if": { "properties": { "model": { "const": "used" } }, "required": ["model"] },
+  "then": {
+    "properties": {
+      "mail_needing_reply": { "properties": { "status": { "not": { "const": "unsorted" } } } }
+    },
+    "if": {
+      "properties": {
+        "mail_needing_reply": {
+          "properties": { "status": { "enum": ["not_connected", "unavailable"] } },
+          "required": ["status"]
+        }
+      },
+      "required": ["mail_needing_reply"]
+    },
+    "then": { "properties": { "todo_suggestions": { "maxItems": 0 } } }
+  },
+  "else": {
+    "properties": {
+      "suggestions": { "maxItems": 0 },
+      "todo_suggestions": { "maxItems": 0 },
+      "mail_needing_reply": { "properties": { "status": { "not": { "const": "ok" } } } }
+    }
+  },
+  "$defs": {
+    "title": {
+      "description": "One line of 1 to 140 characters, cleaned by code (MO-06): no leading or trailing space, no control, format, line or paragraph separator character of the Basic Multilingual Plane, no variation selector after an ASCII character, no link (`://` or host/path). Astral format characters are code's (MO-06). Untrusted data, shown as plain text.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 140,
+      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+      "not": {
+        "anyOf": [
+          { "pattern": "[\\n\\r]" },
+          { "pattern": "^\\s|\\s$" },
+          { "pattern": ":[/\\\\]{2}" },
+          { "pattern": "[A-Za-z0-9-]+\\.(?![jJ][sS][/:])[A-Za-z]{2,63}(?::[0-9]{1,5})?/[^\\s/]" },
+          {
+            "pattern": "(?:^|[\\u0000-\\u0022\\u0024-\\u0029\\u002B-\\u002F\\u003A-\\u007F])[\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0F]|[#*0-9][\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0D]"
+          }
+        ]
+      }
+    },
+    "name": {
+      "description": "A sender's display name, 1 to 80 characters, with the checks of `title` and no @: never an address (MO-06).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[^@\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+      "not": {
+        "anyOf": [
+          { "pattern": "[\\n\\r]" },
+          { "pattern": "^\\s|\\s$" },
+          { "pattern": ":[/\\\\]{2}" },
+          { "pattern": "[A-Za-z0-9-]+\\.(?![jJ][sS][/:])[A-Za-z]{2,63}(?::[0-9]{1,5})?/[^\\s/]" },
+          {
+            "pattern": "(?:^|[\\u0000-\\u0022\\u0024-\\u0029\\u002B-\\u002F\\u003A-\\u007F])[\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0F]|[#*0-9][\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0D]"
+          }
+        ]
+      }
+    },
+    "line": {
+      "description": "A suggestion's text, 1 to 240 characters, with the checks of `title`.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+      "not": {
+        "anyOf": [
+          { "pattern": "[\\n\\r]" },
+          { "pattern": "^\\s|\\s$" },
+          { "pattern": ":[/\\\\]{2}" },
+          { "pattern": "[A-Za-z0-9-]+\\.(?![jJ][sS][/:])[A-Za-z]{2,63}(?::[0-9]{1,5})?/[^\\s/]" },
+          {
+            "pattern": "(?:^|[\\u0000-\\u0022\\u0024-\\u0029\\u002B-\\u002F\\u003A-\\u007F])[\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0F]|[#*0-9][\\u034F\\u17B4\\u17B5\\u180B-\\u180D\\u180F\\uFE00-\\uFE0D]"
+          }
+        ]
+      }
+    },
+    "due_text": {
+      "description": "A to-do's due words as the model read them (by Friday), 1 to 60 characters, with the checks of `title`. Code computes a date from it only when the person confirms the to-do (PE-15).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60,
+      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u115F\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF0-\\uFFFB]+$",
+      "not": {
+        "anyOf": [
+          { "pattern": "[\\n\\r]" },
+          { "pattern": "^\\s|\\s$" },
+          { "pattern": ":[/\\\\]{2}" },
+          { "pattern": "[A-Za-z0-9-]+\\.(?![jJ][sS][/:])[A-Za-z]{2,63}(?::[0-9]{1,5})?/[^\\s/]" }
+        ]
+      }
+    },
+    "source_id": {
+      "description": "The cited record's own id, copied by code: a Google Calendar event id, a Gmail message id, or a Tilo work item, pin or world id. Letters, digits, underscore and hyphen only, so never a URL, domain or address.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,128}$",
+      "not": { "pattern": "\\n" }
+    },
+    "meeting_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "calendar_event" },
+        "id": { "$ref": "#/$defs/source_id" }
+      }
+    },
+    "mail_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "mail" },
+        "id": { "$ref": "#/$defs/source_id" }
+      }
+    },
+    "deadline_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["work_item", "pinboard_item", "world"] },
+        "id": { "$ref": "#/$defs/source_id" }
+      }
+    },
+    "cite": {
+      "description": "An item of this brief's meetings, mail_needing_reply or deadlines, by its source (MO-08).",
+      "anyOf": [
+        { "$ref": "#/$defs/meeting_source" },
+        { "$ref": "#/$defs/mail_source" },
+        { "$ref": "#/$defs/deadline_source" }
+      ]
+    },
+    "meeting": {
+      "description": "One event of the person's own primary calendar on local_date, copied by code from the calendar read (MO-05). An all-day event has dates (end exclusive); any other has UTC times. No description, location, link, organizer or guest.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "start", "end", "all_day", "attendee_count", "source"],
+      "properties": {
+        "title": { "$ref": "#/$defs/title" },
+        "start": {
+          "anyOf": [
+            { "$ref": "common.schema.json#/$defs/timestamp" },
+            { "$ref": "common.schema.json#/$defs/calendar_date" }
+          ]
+        },
+        "end": {
+          "anyOf": [
+            { "$ref": "common.schema.json#/$defs/timestamp" },
+            { "$ref": "common.schema.json#/$defs/calendar_date" }
+          ]
+        },
+        "all_day": { "type": "boolean" },
+        "attendee_count": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "source": { "$ref": "#/$defs/meeting_source" }
+      },
+      "if": { "properties": { "all_day": { "const": true } }, "required": ["all_day"] },
+      "then": {
+        "properties": {
+          "start": { "$ref": "common.schema.json#/$defs/calendar_date" },
+          "end": { "$ref": "common.schema.json#/$defs/calendar_date" }
+        }
+      },
+      "else": {
+        "properties": {
+          "start": { "$ref": "common.schema.json#/$defs/timestamp" },
+          "end": { "$ref": "common.schema.json#/$defs/timestamp" }
+        }
+      }
+    },
+    "mail": {
+      "description": "One message of the person's own inbox, copied by code from the mail search (MO-05): the sender's display name (null when it has none), the subject (null when empty after cleaning) and the receipt time (null when unreadable). Never an address, a body, a snippet or an attachment.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from_name", "subject", "received_at", "source"],
+      "properties": {
+        "from_name": { "anyOf": [{ "$ref": "#/$defs/name" }, { "type": "null" }] },
+        "subject": { "anyOf": [{ "$ref": "#/$defs/title" }, { "type": "null" }] },
+        "received_at": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
+        },
+        "source": { "$ref": "#/$defs/mail_source" }
+      }
+    },
+    "deadline": {
+      "description": "A row of the person's own plate with a due date on or before local_date plus 2 days (MO-05), copied by code: the record's title, its due date, whether it is past (`overdue`, due before local_date).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "due", "overdue", "source"],
+      "properties": {
+        "title": { "$ref": "#/$defs/title" },
+        "due": { "$ref": "common.schema.json#/$defs/calendar_date" },
+        "overdue": { "type": "boolean" },
+        "source": { "$ref": "#/$defs/deadline_source" }
+      }
+    },
+    "suggestion": {
+      "description": "A short line the model wrote about the day, citing one to five items of this brief (MO-07, MO-08). It opens or does nothing by itself.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "cites"],
+      "properties": {
+        "text": { "$ref": "#/$defs/line" },
+        "cites": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/cite" }
+        }
+      }
+    },
+    "todo": {
+      "description": "A to-do the model proposed from one message the mail search read (a bill, a delivery, an appointment): its title and due words, and that message as code copied it. It becomes a work item only when the person confirms it (MO-11).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "due_text", "mail"],
+      "properties": {
+        "title": { "$ref": "#/$defs/title" },
+        "due_text": { "anyOf": [{ "$ref": "#/$defs/due_text" }, { "type": "null" }] },
+        "mail": { "$ref": "#/$defs/mail" }
+      }
+    },
+    "meetings_section": {
+      "description": "ok: the calendar was read (items may be empty: no meetings today). not_connected: no calendar grant. unavailable: the read failed. Only ok carries items.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "items"],
+      "properties": {
+        "status": { "type": "string", "enum": ["ok", "not_connected", "unavailable"] },
+        "items": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/meeting" }
+        }
+      },
+      "if": { "properties": { "status": { "not": { "const": "ok" } } }, "required": ["status"] },
+      "then": { "properties": { "items": { "maxItems": 0 } } }
+    },
+    "mail_section": {
+      "description": "ok: the model picked these from the mail read as needing a reply. unsorted: the mail was read but the model was not used, so these are the newest unread messages, shown as unread, not as needing a reply. not_connected: no mail grant. unavailable: the read failed. not_connected and unavailable carry no items.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "items"],
+      "properties": {
+        "status": { "type": "string", "enum": ["ok", "unsorted", "not_connected", "unavailable"] },
+        "items": {
+          "type": "array",
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/mail" }
+        }
+      },
+      "if": {
+        "properties": { "status": { "enum": ["not_connected", "unavailable"] } },
+        "required": ["status"]
+      },
+      "then": { "properties": { "items": { "maxItems": 0 } } }
+    },
+    "deadlines_section": {
+      "description": "ok: the plate was read (items may be empty). unavailable: it could not be read. Only ok carries items.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "items"],
+      "properties": {
+        "status": { "type": "string", "enum": ["ok", "unavailable"] },
+        "items": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/deadline" }
+        }
+      },
+      "if": { "properties": { "status": { "const": "unavailable" } }, "required": ["status"] },
+      "then": { "properties": { "items": { "maxItems": 0 } } }
+    },
+    "settings": {
+      "description": "The answer of GET and PUT /v1/me/brief-settings for the verified principal (MO-02). With nothing stored, GET answers the defaults with updated_at null. email_rule_ready is read-only: true when the person has the standing rule that lets Tilo mail their own address (MO-10); without it the email copy sends nothing even when switched on.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_id",
+        "org_id",
+        "enabled",
+        "time",
+        "time_zone",
+        "email_copy",
+        "email_rule_ready",
+        "updated_at"
+      ],
+      "properties": {
+        "owner_id": { "$ref": "common.schema.json#/$defs/user_id" },
+        "org_id": { "$ref": "common.schema.json#/$defs/org_id" },
+        "enabled": { "type": "boolean" },
+        "time": { "$ref": "user_settings.schema.json#/$defs/clock" },
+        "time_zone": { "$ref": "user_settings.schema.json#/$defs/time_zone" },
+        "email_copy": { "type": "boolean" },
+        "email_rule_ready": { "type": "boolean" },
+        "updated_at": {
+          "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
+        }
+      }
+    },
+    "settings_update": {
+      "description": "The body of PUT /v1/me/brief-settings: the whole setting. It names no owner, org, time of saving or email_rule_ready: those are the server's (MO-02).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "time", "time_zone", "email_copy"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "time": { "$ref": "user_settings.schema.json#/$defs/clock" },
+        "time_zone": { "$ref": "user_settings.schema.json#/$defs/time_zone" },
+        "email_copy": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -31,10 +31,24 @@ _FREE_SECRETS = re.compile(
     # any case, but then the token must hold a digit or punctuation, so prose ("bearer instruments") stays
     r"|\b(?i:bearer)\s+(?=[A-Za-z0-9._~+/=-]*[\d._~+/=-])[A-Za-z0-9._~+/=-]{8,}"
     r"|\b(?i:sk)-[A-Za-z0-9_-]{20,}"
-    r"|\bgh[pousr]_[A-Za-z0-9]{30,}"
+    # No left word boundary on these two: the shape is specific enough to stand after any word (issue #720).
+    r"|gh[pousr]_[A-Za-z0-9]{30,}"
     r"|\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"
     r"|(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"
-    r"|\bya29\.[A-Za-z0-9_-]{20,}"
+    r"|ya29\.[A-Za-z0-9_-]{20,}"
+)
+# Secrets glued after a word character (page text joins a label and the secret that follows with no space: innerText
+# of neighbouring inline elements, issue #720). A second pass, run only after every shape above has been masked, so a
+# glued form can never start inside a secret the first pass masks whole and leave its tail behind. Each form is
+# narrower than its left-anchored sibling, because it can also stand inside ordinary words: a digit in the first
+# characters (bounded look-aheads, so every form stays linear), or segment lengths no real value is shorter than.
+_GLUED_SECRETS = re.compile(
+    r"(?<=\w)(?i:bearer)\s+(?=[A-Za-z0-9._~+/=-]{0,64}\d)[A-Za-z0-9._~+/=-]{8,}"
+    r"|(?<=\w)(?i:sk)-(?=[A-Za-z0-9_-]{0,63}\d)[A-Za-z0-9_-]{20,}"
+    r"|(?:AKIA|ASIA)(?=[A-Z0-9]{0,15}\d)[A-Z0-9]{16}"
+    # the header part is bounded (a run of `eyJeyJ...` stays linear) and at least 16 characters (`eyJ` + 16 is the
+    # shortest real header, `{"alg":"none"}`), so `surveyJSON.pages.length` is left alone
+    r"|(?<=[A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{16,256}\.[A-Za-z0-9_-]{3,}\.[A-Za-z0-9_-]+"
 )
 # A quoted value runs to its closing quote, an escaped quote does not close it, and with no
 # closing quote it runs to the end of the line; any length is masked whole. Linear: each
@@ -42,26 +56,39 @@ _FREE_SECRETS = re.compile(
 _QUOTED = r"([\"'])((?:(?!\2)[^\\\n]|\\.)+)(\2?)"
 # The keyword is matched directly (no prefix scan), so a long word cannot make this quadratic.
 _KEY_VALUE = re.compile(
-    r"(?i)((?:password|passwd|pwd|secret|token|api[_-]?key|otp)[\"']?\s{0,8}[=:]\s{0,8})"
+    r"(?i)((?:password|passwd|pwd|secret|token|api[_-]?key|otp)[\"']?\s{0,8}[=:]\s*+)"
     rf"(?:{_QUOTED}|([^\s&\"']+))"
 )
 # `Authorization:` and `Cookie:` values run to the end of the line. Only a known scheme word, with a
 # credential-looking value after it, stays; any other first word is the credential and is masked.
 # The scheme is possessive, so an already masked value is left alone (idempotent).
 _SCHEMES = "basic|bearer|digest|token|negotiate|ntlm|hoba|mutual|vapid|dpop|aws4-hmac-sha256"
-_AUTH_HEADER = re.compile(
-    r"(?i)(\b(?:authorization|(?:set-)?cookie)[\"']?\s{0,8}[=:]\s{0,8}+)"
-    rf"(?:{_QUOTED}|((?:(?:{_SCHEMES})[ \t]+(?=[A-Za-z0-9._~+/=\"'\[]))?+)(?!\[masked:)[^\r\n]+)"
-)
+# A `Cookie:` line can hold several pairs, so it is left alone only when every value on it is already a placeholder
+# (`Cookie: <JWT>; refresh=<v>` masks the JWT first and must still lose the refresh value). An `Authorization:` value
+# is left alone when its leading placeholder ends at whitespace or the end, so prose after a token stays.
+_ALL_MASKED = r"(?!\[masked:\w+\](?:[ \t;,]*\[masked:\w+\])*[ \t;,]*(?=[\r\n]|\Z))"
+
+
+def _header(names: str, guard: str) -> re.Pattern[str]:
+    return re.compile(
+        rf"(?i)((?:{names})[\"']?\s{{0,8}}[=:]\s*+)"
+        rf"(?:{_QUOTED}|((?:(?:{_SCHEMES})[ \t]+(?=[A-Za-z0-9._~+/=\"'\[]))?+){guard}[^\r\n]+)"
+    )
+
+
+_AUTH_HEADER = _header("authorization", r"(?!\[masked:\w+\](?=\s|\Z))")
+_COOKIE_HEADER = _header("(?:set-)?cookie", _ALL_MASKED)
 # `scheme://userinfo@` anywhere in text (a path, a query, page copy): the userinfo, of any length and
 # with at most one space, is dropped.
 _URL_USERINFO = re.compile(
     r"(?<![A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]{0,63}://)(?!\[masked:secret\]@)[^\s/?#]+(?: [^\s/?#]+)?@"
 )
+# the card pass runs first, so a card-like run in a local part is a placeholder by now: a slower form, used only then
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,8}")
-_PHONE = re.compile(r"(?<![\w+])\+\d[\d ()-]{6,24}\d")
+_EMAIL_CARD = re.compile(r"(?:[A-Za-z0-9._%+-]|\[masked:card\]){1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,8}")
+_PHONE = re.compile(r"(?<![\d+])\+\d[\d ()-]{6,24}\d")
 # Digit groups of 2+ digits joined by one space or dash; a lone digit is never part of a card layout.
-_DIGIT_RUN = re.compile(r"(?<!\w)\d{2,}(?:[ -]\d{2,})*")
+_DIGIT_RUN = re.compile(r"(?<!\d)\d{2,}(?:[ -]\d{2,})*")
 # Every secret shape the free-secret and key-value passes can match contains one of these words
 # (lower-cased); a card needs 13 digits with at most one separator between neighbours. Plain
 # `in` scans and one anchored regex are several times cheaper than running every pass on short strings.
@@ -140,14 +167,20 @@ def _mask(text: str) -> str:
         text = _URL_USERINFO.sub(r"\1[masked:secret]@", text)
     if words:
         text = _FREE_SECRETS.sub(_MASK, text)
+        glued = _GLUED_SECRETS.sub(_MASK, text)
+        # a glued secret that is now a placeholder can leave a left-anchored shape next to it (`<id>Bearer <token>`)
+        text = _FREE_SECRETS.sub(_MASK, glued) if glued != text else text
     if not ascii_only or "authorization" in low or "cookie" in low:
-        text = _AUTH_HEADER.sub(_auth, text)
+        text = _COOKIE_HEADER.sub(_auth, _AUTH_HEADER.sub(_auth, text))
     if words:
         text = _KEY_VALUE.sub(_kv, text)
+    if "://" in text:
+        # again: a userinfo that holds a secret (more than one space, say) is shorter once the passes above have run
+        text = _URL_USERINFO.sub(r"\1[masked:secret]@", text)
     if card:
         text = _mask_cards(text)
     if "@" in text:
-        text = _EMAIL.sub("[masked:email]", text)
+        text = (_EMAIL_CARD if "[masked:card]" in text else _EMAIL).sub("[masked:email]", text)
     return _PHONE.sub("[masked:phone]", text) if "+" in text else text
 
 

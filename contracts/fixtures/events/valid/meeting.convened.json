@@ -1,0 +1,38 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000701",
+  "seq": 701,
+  "ts": "2026-10-08T10:01:00.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "meeting.convened",
+  "actor": "u_owner",
+  "target": "A_l1",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "The owner called the lead and two agents into the Meeting Hall.",
+  "cause": null,
+  "vis": ["D1"],
+  "authz": null,
+  "data": {
+    "room_id": "01JB5VQ00000000000000R0001",
+    "lead": "A_l1",
+    "agents": ["A_s1", "A_s2"],
+    "as_role": "owner",
+    "run_state": "finished",
+    "credit_cap": 20,
+    "max_turns": 20
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

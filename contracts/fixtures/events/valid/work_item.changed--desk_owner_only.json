@@ -1,0 +1,34 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000902",
+  "seq": 2,
+  "ts": "2026-10-07T09:05:00.000Z",
+  "world_id": "w_desk_priya",
+  "run_id": "r_desk_priya_1",
+  "type": "work_item.changed",
+  "actor": "u_sam",
+  "target": "u_priya",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 0,
+  "summary": "Sam confirmed a work item for Priya.",
+  "cause": null,
+  "vis": [],
+  "authz": null,
+  "data": {
+    "work_item_id": "wi_budget_notes",
+    "change": "confirmed",
+    "status": "open"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

@@ -23,6 +23,13 @@ export function select(worldId: string, id: string | null): void {
   for (const listener of [...listeners]) listener();
 }
 
+/** Clears every world's selection (FR-WLD-12 demo reset). */
+export function clearSelections(): void {
+  if (chosen.size === 0) return;
+  chosen.clear();
+  for (const listener of [...listeners]) listener();
+}
+
 /** The world's selected id and a setter that toggles: choosing the selected id again clears it. */
 export function useSelection(
   worldId: string,

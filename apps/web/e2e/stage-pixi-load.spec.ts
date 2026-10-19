@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { DESKTOP } from "./support/viewports";
-import { fixtureUrl, stageCanvas, stageFrame } from "./support/world";
+import { BARE_STAGE_PATH, fixtureUrl, stageCanvas, stageFrame } from "./support/world";
 
 // NFR-01 code-splits Pixi off the landing route. A chunk that does not arrive (offline, a deploy that
 // replaced the hash, a blocker) must not leave an unexplained blank stage or an unhandled rejection:
@@ -51,7 +51,7 @@ test("NFR-01 a Pixi chunk that fails to load on a world says so, and Try again d
   expect(problems).toEqual([]);
 });
 
-test("NFR-01 a Pixi chunk that fails to load on the bare landing grid stays quiet", async ({
+test("NFR-01 a Pixi chunk that fails to load on the bare stage grid stays quiet", async ({
   page,
 }) => {
   const problems = watch(page);
@@ -60,8 +60,8 @@ test("NFR-01 a Pixi chunk that fails to load on the bare landing grid stays quie
       ? route.abort()
       : route.continue(),
   );
-  await page.goto("/");
-  await expect(page.getByLabel("Describe your task")).toBeVisible();
+  await page.goto(BARE_STAGE_PATH);
+  await expect(stageFrame(page)).toBeVisible();
   await page.waitForTimeout(2500); // past the grid's 1.5 s wait
   await expect(page.getByTestId("stage-load-failed")).toHaveCount(0);
   expect(problems).toEqual([]);

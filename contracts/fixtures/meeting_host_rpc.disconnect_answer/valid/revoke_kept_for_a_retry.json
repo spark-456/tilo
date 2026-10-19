@@ -1,0 +1,14 @@
+{
+  "revoked_at_provider": false,
+  "parts": [
+    {
+      "type": "alert.raised",
+      "alert_id": "01JB5VQ0000000000000009320"
+    },
+    {
+      "type": "connection.revoked",
+      "connector": "meeting_host",
+      "user_id": "u_owner"
+    }
+  ]
+}

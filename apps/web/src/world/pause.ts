@@ -4,7 +4,7 @@
 // bounded wait "No confirmation recorded yet" (the same rule as a Needs-you answer).
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TiloClient } from "../api/client";
-import { describeError } from "../screens/remote";
+import { describeError } from "../park/shared/remote";
 import { type RunStatus, runEnded } from "./runSummary";
 
 /** How long a sent request waits for world.paused before the control says nothing came back.

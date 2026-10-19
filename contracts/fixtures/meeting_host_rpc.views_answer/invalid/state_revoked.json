@@ -1,0 +1,10 @@
+{
+  "views": [
+    {
+      "connector": "gmail",
+      "state": "revoked",
+      "scopes": [],
+      "connected_at": null
+    }
+  ]
+}

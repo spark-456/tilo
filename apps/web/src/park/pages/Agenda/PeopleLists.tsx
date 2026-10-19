@@ -1,0 +1,164 @@
+// OLD-UI-OUT wave 3: the person's own meetings and pinboard items, read-only, as the old Meetings and Pinboards
+// screens showed them live (`GET /v1/meetings`, `GET /v1/pinboards`; ADR-0016, FR-PB-01). Same honest states as
+// there: loading, a failed read with Try again, "No ... yet", and a note when more exist than the list holds.
+// A demo session or a build with no API has no lists, so nothing is drawn.
+import { useEffect, useMemo, useState } from "react";
+import { API_URL, appCheckToken, authToken, sessionView } from "../../../api/ClientProvider";
+import type { HostState } from "../../../api/connect";
+import { liveConnectFlow } from "../../../api/connectEnv";
+import { HttpClient } from "../../../api/http";
+import { type MeetingHostApi, meetingHostApi } from "../../api/live/meetingHost";
+import { type MeetingMinutesApi, meetingMinutesApi } from "../../api/live/meetingMinutes";
+import { type PeopleList, type PeopleRow, peopleListsApi } from "../../api/live/peopleLists";
+import { MeetingBrief } from "./MeetingBrief";
+import { HostMeeting, MeetingAttend } from "./MeetingHost";
+import { MeetingMinutes } from "./MeetingMinutes";
+
+type Kind = "meetings" | "pinboards";
+type State = PeopleList | "loading" | "failed";
+
+const TITLE: Record<Kind, string> = { meetings: "Meetings", pinboards: "Pinboards" };
+const EMPTY: Record<Kind, string> = {
+  meetings: "No meetings yet.",
+  pinboards: "No pinboard items yet.",
+};
+const READ = { meetings: "getMeetings", pinboards: "getPinboards" } as const;
+const cap = (s: string): string => (s[0] ?? "").toUpperCase() + s.slice(1);
+const humanTime = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Time not supplied";
+  const time = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(
+    date,
+  );
+  return date.toDateString() === new Date().toDateString()
+    ? `Today ${time}`
+    : new Intl.DateTimeFormat(undefined, {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(date);
+};
+
+function List({
+  kind,
+  api,
+  minutes,
+  host,
+  readBrief,
+  onRows,
+}: {
+  kind: Kind;
+  api: ReturnType<typeof peopleListsApi>;
+  minutes: MeetingMinutesApi | null;
+  host: { api: MeetingHostApi; state: () => Promise<HostState> } | null;
+  readBrief: ((path: string) => Promise<unknown>) | null;
+  onRows?: (rows: PeopleRow[]) => void;
+}) {
+  const [attempt, setAttempt] = useState(0);
+  const [state, setState] = useState<State>("loading");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: attempt is the explicit retry trigger.
+  useEffect(() => {
+    let live = true;
+    setState((s) => (typeof s === "object" ? s : "loading")); // a refresh keeps the rows (and an open attend)
+    api[READ[kind]]().then(
+      (reply) => live && setState(reply.data),
+      () => live && setState("failed"),
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, kind, attempt]);
+  useEffect(() => {
+    if (kind === "meetings" && typeof state !== "string") onRows?.(state.rows);
+  }, [kind, onRows, state]);
+  return (
+    <section
+      aria-label={TITLE[kind]}
+      className="park-agenda-state park-agenda-peoplelist"
+      data-testid={`agenda-${kind}`}
+    >
+      <h2>{TITLE[kind]}</h2>
+      {host ? (
+        <HostMeeting
+          api={host.api}
+          hostState={host.state}
+          onChanged={() => setAttempt((n) => n + 1)}
+        />
+      ) : null}
+      {state === "loading" ? (
+        <output>Loading…</output>
+      ) : state === "failed" ? (
+        <div role="alert">
+          <p>Could not load this list.</p>
+          <button type="button" onClick={() => setAttempt((n) => n + 1)}>
+            Try again
+          </button>
+        </div>
+      ) : state.rows.length === 0 ? (
+        <p>{EMPTY[kind]}</p>
+      ) : (
+        <>
+          <ul>
+            {state.rows.map((row) => (
+              <li key={row.id}>
+                <strong>{row.title}</strong>
+                <p>
+                  {row.scope ? `${row.scope === "Personal" ? "Personal" : "Team"} · ` : ""}
+                  {cap(row.status)} · {humanTime(row.at)}
+                </p>
+                {row.body ? <p>{row.body}</p> : null}
+                {readBrief ? <MeetingBrief id={row.id} getJson={readBrief} /> : null}
+                {host ? (
+                  <MeetingAttend
+                    id={row.id}
+                    row={row}
+                    api={host.api}
+                    onChanged={() => setAttempt((n) => n + 1)}
+                  />
+                ) : null}
+                {minutes ? (
+                  <MeetingMinutes key={row.id} id={row.id} status={row.status} api={minutes} />
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          {state.truncated ? <p>More items are available than this view can show.</p> : null}
+        </>
+      )}
+    </section>
+  );
+}
+
+export function PeopleLists({ onMeetings }: { onMeetings?: (rows: PeopleRow[]) => void }) {
+  const demo = sessionView.demo();
+  const http = useMemo(
+    () =>
+      API_URL?.trim() && !demo
+        ? new HttpClient({ baseUrl: API_URL, appCheckToken, authToken })
+        : null,
+    [demo],
+  );
+  const api = useMemo(() => (http ? peopleListsApi(http) : null), [http]);
+  const minutes = useMemo(() => (http ? meetingMinutesApi(http) : null), [http]);
+  const readBrief = useMemo(() => (http ? (path: string) => http.getJson(path) : null), [http]);
+  // The host's state is read by the one flow the Connectors page uses, so both pages say the same thing.
+  const host = useMemo(() => {
+    const flow = http ? liveConnectFlow() : null;
+    return http && flow ? { api: meetingHostApi(http), state: () => flow.meetingHost() } : null;
+  }, [http]);
+  if (!api) return null;
+  return (
+    <>
+      <List
+        kind="meetings"
+        api={api}
+        minutes={minutes}
+        host={host}
+        readBrief={readBrief}
+        {...(onMeetings ? { onRows: onMeetings } : {})}
+      />
+    </>
+  );
+}

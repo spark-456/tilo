@@ -32,26 +32,29 @@ listed only where Google offers no narrower scope.
 
 | Service | Calls | IAM granted | Secrets (accessor) | Status |
 | --- | --- | --- | --- | --- |
-| `tilo-api` | Firestore; Cloud Tasks enqueue; Vertex AI (Router: approaches, Director); Model Armor (intake screen); `artifacts` bucket (uploads FR-INT-02, downloads PRD 6.2); Firebase ID-token and App Check verification (public keys, no IAM) | project: `datastore.user`, `cloudtasks.enqueuer`, custom role `tiloVertexGenerate` (`aiplatform.endpoints.predict` only) and `modelarmor.user` (added). Bucket `artifacts`: `objectCreator`, `objectViewer` (added). `serviceAccountUser` on `tilo-tasks-invoker` | none | mixed, see cells |
-| `tilo-harness` | Firestore; Cloud Tasks; Vertex AI; Model Armor (model output, tool output); Pub/Sub publish on `tilo-events`; buckets `archive`, `artifacts`, `snapshots`; connectors, browser, render | project: `datastore.user`, `cloudtasks.enqueuer`, `aiplatform.user`, `modelarmor.user` (added). Topic `tilo-events`: `pubsub.publisher`. `archive`: `objectCreator` (present), `objectViewer` (added). `artifacts` and `snapshots`: `objectCreator`, `objectViewer` (added). `run.invoker` on connectors, browser, render. Receives the Gmail renew and poll calls from Scheduler | none | mixed |
+| `tilo-api` | Firestore (default database only); calls connectors' `/internal/meeting-host/*` with an ID token over its VPC egress (ADR-0032); Cloud Tasks enqueue; Vertex AI (Router: approaches, Director); Model Armor (intake screen); `artifacts` bucket (uploads FR-INT-02, downloads PRD 6.2); Firebase ID-token and App Check verification (public keys, no IAM); the schedule tick (FR-AGT-14): receives the Scheduler call (api is public, the route checks its own Google OIDC token), fetches Google's public certs from googleapis.com through Private Google Access (no IAM), and reads and writes `orgs/{org}/schedules` with the `datastore.user` it already holds | project: `datastore.user` limited by an IAM condition to the (default) database, `cloudtasks.enqueuer`, custom role `tiloVertexGenerate` (`aiplatform.endpoints.predict` only) and `modelarmor.user` (added). Bucket `artifacts`: `objectCreator`, `objectViewer` (added). `serviceAccountUser` on `tilo-tasks-invoker` | none | mixed, see cells |
+| `tilo-harness` | Firestore; Cloud Tasks; Vertex AI; Model Armor (model output, tool output); Pub/Sub publish on `tilo-events`; buckets `archive`, `artifacts`, `snapshots`; connectors, browser, render | project: `datastore.user` (default database only, conditioned), `cloudtasks.enqueuer`, `aiplatform.user`, `modelarmor.user` (added). Topic `tilo-events`: `pubsub.publisher`. `archive`: `objectCreator` (present), `objectViewer` (added). `artifacts` and `snapshots`: `objectCreator`, `objectViewer` (added). `run.invoker` on connectors, browser, render. Receives the Gmail renew and poll calls from Scheduler | none | mixed |
 | `tilo-channels` | Vertex AI (triage, drafting); Model Armor (inbound mail and WhatsApp text); `tilo-api`; the Gmail push endpoint (forwards to the API) | project: custom role `tiloVertexGenerate`, `modelarmor.user` (added). Holds no Firestore, Pub/Sub or Storage role (writes through the API, SEC-12) | `whatsapp-api-token`, `channels-webhook-signing-key`, `email-action-link-signing-key` (channels only, moved from api in P0-07b: links.py issues and verifies; present); `whatsapp-webhook-verify-token`, `channel-binding-hmac-key`, `channel-number-encryption-key`, `webpush-vapid-private-key` (added) | mixed |
-| `tilo-connectors` | Firestore (token store, outbox); Cloud KMS; Google Workspace APIs with the user's OAuth token (Gmail, Drive, Calendar, Docs, Sheets, Slides) | project: `datastore.user`. Key `oauth-tokens`: `cryptoKeyEncrypterDecrypter` (added: replaces `cryptoKeyDecrypter`, because `tokens.py` wraps a fresh data key per record). `run.invoker` for harness | `workspace-oauth-client` | mixed |
+| `tilo-connectors` | Firestore (token store, outbox); Cloud KMS; Google Workspace APIs with the user's OAuth token (Gmail, Drive, Calendar, Docs, Sheets, Slides) | project: `datastore.user` (unconditional: both databases, the only account that reaches `tilo-tokens`). Key `oauth-tokens`: `cryptoKeyEncrypterDecrypter` (added: replaces `cryptoKeyDecrypter`, because `tokens.py` wraps a fresh data key per record). `run.invoker` for harness and for `tilo-api` only (ADR-0032 T5: the meeting-host RPC). One instance max (CON-D9) | `workspace-oauth-client-id`, `workspace-oauth-client-secret` | mixed |
 | `tilo-browser` | Allowlist egress proxy only; model calls for computer use are made by the harness | none (SEC-12: no Firestore, Datastore or Storage) | none | present |
-| `tilo-render` | Firestore; `artifacts` bucket; Slides and Docs go through connectors | project: `datastore.user`. Bucket `artifacts`: `objectAdmin` (only service that may overwrite) | none | present |
+| `tilo-render` | Firestore; `artifacts` bucket; Slides and Docs go through connectors | project: `datastore.user` (default database only, conditioned). Bucket `artifacts`: `objectAdmin` (only service that may overwrite) | none | present |
 | `tilo-sandbox-web` | nothing | none | none | present |
 
 Other identities:
 
 | Identity | Grants | Status |
 | --- | --- | --- |
-| `tilo-tasks-invoker` (Cloud Tasks OIDC) | `run.invoker` on harness | present |
+| `tilo-tasks-invoker` (Cloud Tasks OIDC) | `run.invoker` on harness. Also the identity of the scheduled-run hand-off (FR-AGT-14e): the tasks `tilo-api` enqueues for its own tick route carry its token, and that route checks it itself (api is public), so no further IAM | present |
 | `tilo-gmail-push` (Pub/Sub push OIDC) | `run.invoker` on channels; Pub/Sub service agent holds `serviceAccountTokenCreator` on it | added |
 | `tilo-gmail-scheduler` (Scheduler OIDC) | `run.invoker` on harness only | added |
+| `tilo-schedule-scheduler` (Scheduler OIDC, FR-AGT-14) | none: no `run.invoker` and no project role. It calls public `tilo-api`, whose tick route verifies the token itself (the first design held `run.invoker` on harness; the tick moved to api with the run, ADR-0023) | added |
 | `gmail-api-push@system.gserviceaccount.com` | `pubsub.publisher` on topic `tilo-gmail-notifications` only | added |
 | Pub/Sub service agent | custom insert-only role on dataset `tilo_ledger` | present |
 | Cloud Storage service agent | `cryptoKeyEncrypterDecrypter` on key `archive` | present |
 | `tilo-deployer` (WIF, `refs/heads/main` only) | `run.developer` per service; `serviceAccountUser` per runtime SA; Artifact Registry writer on repo `tilo`. No project role, and `deployer_project_roles` stays `[]` for dev | present |
 | `tilo-cloudbuild` (Cloud Build, `cloudbuild.yaml` runs as it; P0-07g) | Five roles, 17 bindings, no key: `roles/artifactregistry.writer` on repo `tilo`; `roles/run.developer` on each of the seven services; `roles/iam.serviceAccountUser` on each of the seven runtime SAs (not tasks-invoker, gmail, deployer or itself); `roles/logging.logWriter` at project level (the only project role); `roles/storage.objectViewer` on bucket `<project>-cloudbuild-staging` | added |
+| `tilo-eval-scheduler` (Cloud Scheduler OAuth identity; EFF-05b) | One grant: `roles/run.invoker` on the Cloud Run job `tilo-eval-nightly` only (it includes `run.jobs.run`). No project role, no `serviceAccountUser`, used for nothing else | added |
+| `tilo-eval-runner` (runtime identity of the job `tilo-eval-nightly`; EFF-05b) | None. The replay reads files in its image and writes to its log; no secret, no live switch | added |
 
 Bucket `<project>-cloudbuild-staging` (P0-07g): source staging for
 `gcloud builds submit --gcs-source-staging-dir`. Regional (`asia-southeast1`),
@@ -71,8 +74,10 @@ output; the grants by `cloudbuild_grants`.
 | Subscription `tilo-gmail-push` | Push to `tilo-channels` `POST /internal/gmail/push`, OIDC as `tilo-gmail-push`, audience = channels URL, no inactivity expiry | added |
 | Scheduler `tilo-gmail-renew` (daily 03:00 UTC) | `POST /internal/gmail/renew` on **harness** (re-watch through connectors) | added |
 | Scheduler `tilo-gmail-poll` (every 5 min) | `POST /internal/gmail/poll` on **harness** (polling fallback) | added |
-| Cloud Tasks queue `runs` | api to harness | present |
-| Scheduler jobs for the sweeper and user schedules | PRD 6.3 | deferred: no sweeper endpoint exists; add with that ticket |
+| Cloud Tasks queue `runs` | api to harness; api to api for scheduled runs (FR-AGT-14e: one task per due slot, delivered to the tick route as `tilo-tasks-invoker`) | present |
+| Scheduler `tilo-schedule-tick` (every minute, `* * * * *` UTC, `retry_count` 1) | `POST /internal/schedules/tick` on **api**, OIDC as `tilo-schedule-scheduler`, audience = api URL, no body, no query. ONE job for every user schedule (not one per user): the tick reads the due schedules from the store and hands each to Cloud Tasks exactly once per slot; the run itself executes in the task's own request (FR-AGT-14, FR-AGT-14e) | added |
+| Scheduler `tilo-eval-nightly` (daily 19:00 UTC) | OAuth `POST` to the Cloud Run Admin API `.../jobs/tilo-eval-nightly:run`: the replay smoke `python -m tilo_evals nightly` (parallelism 1, one task, 1 retry, 3600 s). Image from `evals/cloudbuild.yaml` (`just build-evals-image`) | added (EFF-05b) |
+| Scheduler job for the sweeper | PRD 6.3 | deferred: no sweeper endpoint exists; add with that ticket |
 
 Dependencies (none of these routes exist yet):
 
@@ -88,6 +93,18 @@ Dependencies (none of these routes exist yet):
   (`MailWatcher.renew_due()` / `poll_due()`). Cloud Scheduler may call an
   internal-only service. Channels never reaches connectors.
 
+- `tilo-api`: `POST /internal/schedules/tick` (FR-AGT-14b, `tilo_api.schedules`; the
+  run lives in tilo-api). It accepts two callers, `tilo-schedule-scheduler` (FR-AGT-14b)
+  and `tilo-tasks-invoker` (FR-AGT-14e); see the route requirements below. It answers
+  503 until the user sets `TILO_SCHEDULE_TICK_AUDIENCE` (copy the `audience` field of
+  `terraform output schedule_tick`), `TILO_SCHEDULE_TICK_CALLER`, `TILO_TASKS_CALLER`
+  (`tilo-tasks-invoker@<project>.iam.gserviceaccount.com`), `TILO_RUNS_QUEUE`
+  (`projects/<project>/locations/asia-southeast1/queues/runs`),
+  `TILO_SCHEDULES_STORE=firestore` and `TILO_FIRESTORE_PROJECT` on tilo-api AND
+  production wires the api store and run seams (they answer 503 when deployed today);
+  the job fires into that 503 until then. The earlier harness route stays unused (to
+  be removed in a later ticket).
+
 ## 4. Storage ownership (PRD 13.2, FR-INT-02)
 
 | Bucket | Writes | Reads | Note |
@@ -98,10 +115,10 @@ Dependencies (none of these routes exist yet):
 
 ## 5. Secret Manager slots (names only; values added by the user)
 
-Existing: `workspace-oauth-client`, `whatsapp-api-token`,
+Existing: `workspace-oauth-client` (superseded, still declared), `whatsapp-api-token`,
 `channels-webhook-signing-key`, `email-action-link-signing-key` (channels only). Added:
 `whatsapp-webhook-verify-token`, `channel-binding-hmac-key`,
-`channel-number-encryption-key`, `webpush-vapid-private-key`. No version is
+`channel-number-encryption-key`, `webpush-vapid-private-key`, and (ADR-0035 L7) `workspace-oauth-client-id`, `workspace-oauth-client-secret` (connectors only). No version is
 ever created by Terraform (PRD 16.1 rule 4).
 
 ## 6. OAuth consent screen: scopes to add once
@@ -114,22 +131,44 @@ ever created by Terraform (PRD 16.1 rule 4).
 | `https://www.googleapis.com/auth/gmail.send` | threaded send | restricted |
 | `https://www.googleapis.com/auth/drive.file` | picked files and files Tilo creates, incl. Slides, Docs and Sheets output (the Docs, Sheets and Slides APIs accept it for files the app created) | non-sensitive |
 | `https://www.googleapis.com/auth/calendar.readonly` | availability (FR-CON-14) | sensitive |
-| `https://www.googleapis.com/auth/calendar.events` | event writes | sensitive |
+| `https://www.googleapis.com/auth/calendar.events.owned` | event writes on calendars the person owns (ADR-0035; not `calendar.events`) | sensitive |
 
 Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
 
 ## 7. Console steps for the user (Terraform cannot do these)
 
-1. OAuth consent screen: add the scopes above, add test users (up to 100), set
-   the app to Testing. Create the web OAuth client; set its redirect URI to the
+1. OAuth consent screen: add the scopes above and set the app to In production
+   (the user's decision, BQ-SIGNIN-1; Testing with up to 100 test users is the
+   fallback, section 11 step 6). Create the web OAuth client; set its redirect URI to the
    public callback served by `tilo-api` (`GOOGLE_OAUTH_REDIRECT_BASE_URL`), which
    relays the code to connectors through harness. Connectors is internal-only and
    must never be made public to receive the redirect (PRD 6.5 ingress rule).
 2. Put values in the eight secrets (`gcloud secrets versions add`).
-3. Identity Platform: enable Google sign-in and anonymous sign-in; add the
-   hosting domain to authorised domains.
-4. App Check: register the web app with a reCAPTCHA Enterprise key, then switch
-   enforcement on for Firestore and Storage after the client sends tokens.
+3. Sign-in (Firebase Authentication): enable Google sign-in and anonymous sign-in
+   and check the authorised domains; the full checklist is section 11.
+4. App Check (SEC-10): done in the console, recorded here. The Firebase web app
+   `tilo-web` has app id `1:379216745263:web:8cda5846cf882c2cefc7da` and the
+   reCAPTCHA Enterprise score-based site key is
+   `6LdlsOItAAAAAEhO_aq9zmtbQue6Rni2ZDUDuRTe`. Both ids are public values (the web
+   client ships them, `apps/web/src/appcheck/config.ts`), not secrets. The web
+   `apiKey` and `projectId` are not in the repo either: the deploy build reads
+   them from `firebase apps:sdkconfig` (docs/deploy-dev.md). The browser `apiKey`
+   is "public" only if it is restricted: it is baked into the public bundle, and
+   this project also uses Gemini Developer API keys. OWNER STEP, BEFORE the first
+   `just deploy-web` that bakes the key in: in the Google Cloud console
+   (APIs and Services, Credentials) open the Firebase web key and (a) set an API
+   restriction to exactly three APIs: Firebase App Check API, Identity Toolkit API
+   and Token Service API (the last two are what Google sign-in calls, section 11),
+   (b) set website restrictions
+   to the referrers `https://essential-wares-510320-f0.web.app/*` and
+   `https://essential-wares-510320-f0.firebaseapp.com/*`, (c) confirm it cannot
+   call `generativelanguage.googleapis.com` or any other paid API. Only then run
+   `just deploy-web` with `TILO_BAKE_FIREBASE_KEY=1` set; without that variable
+   the recipe builds with no Firebase config and App Check is skipped. Enforcement is OFF
+   everywhere and stays off until the owner switches it on: in `tilo-api` by
+   `TILO_APPCHECK_ENFORCE=1` on the Cloud Run service, and for Firestore and
+   Storage in the Firebase console, only after the deployed client sends tokens
+   and the API log shows none refused.
 5. Firebase deploys stay manual (the CI deployer holds no project role). From
    the repo root, signed in as yourself (`firebase login`), with `<project>`
    the real project id:
@@ -158,8 +197,9 @@ Never requested: `mail.google.com`, `gmail.modify`, full `drive`.
 
 ## 8. Decisions taken (orchestrator, on the user's behalf)
 
-1. **channels and connectors.** Only the harness invokes connectors (test
-   unchanged); channels gets no VPC egress. Scheduler renew and poll jobs call
+1. **channels and connectors.** Harness and, since ADR-0032 T5, `tilo-api`
+   (the meeting-host RPC) invoke connectors; no one else (`cloud_run.tftest.hcl`
+   pins exactly those two, one instance); channels gets no VPC egress. Scheduler renew and poll jobs call
    harness; the Gmail push subscription calls channels, which forwards to the
    API. `tilo-gmail-scheduler` therefore holds `run.invoker` on harness, which
    is the one expected invoker set that changed in `cloud_run.tftest.hcl`.
@@ -218,6 +258,35 @@ Hard requirements from the security review for the routes the infra points at:
   can put `tilo-tasks-invoker` OIDC tokens on Cloud Tasks aimed at any harness
   path. Renew and poll reach Gmail only through connectors and iterate the
   stored watches only (`MailWatcher.renew_due` / `poll_due`).
+- Website preview shell (`GET /preview/website` on **tilo-api**, WEB-2, ADR-0050 WS-10): a public route
+  (`access.PUBLIC_ROUTES`, `appcheck.EXEMPT_ROUTES`) because a sandboxed frame loads it with no token or sign-in. It
+  is the same fixed bytes for every caller, reads nothing from the request and holds no data; its response carries
+  the sandbox CSP (`default-src 'none'`, `connect-src 'none'`, `frame-ancestors` the web origins) and no
+  `X-Frame-Options`. No IAM change.
+- Schedule tick (`POST /internal/schedules/tick` on **tilo-api**, built): api is public (`allUsers`), so
+  neither ingress nor IAM protects the route and it checks its caller itself; it verifies the
+  token (`aud` = its own URL, `email` exactly, `email_verified` true; a malformed token is
+  refused before any call to Google's cert endpoint) and answers 401 with no token, 403 for
+  any other caller (`tilo-gmail-scheduler`, `tilo-api` and the same names in another
+  project included), 503 when nothing is wired. It has TWO callers and the identity picks
+  the mode (FR-AGT-14e, BQ-AGT14-5): (1) `tilo-schedule-scheduler@<project>` (the exact
+  `TILO_SCHEDULE_TICK_CALLER`) with NO body fans out: it claims each due slot and hands it
+  to Cloud Tasks (`TILO_RUNS_QUEUE`), starts nothing, and answers 200 `{"fired": n}`;
+  (2) `tilo-tasks-invoker@<project>` (the exact `TILO_TASKS_CALLER`) with the task's JSON
+  body runs ONE run inside that request, so CPU is allocated while it works, and answers
+  200 `{"ran": 1, "state": "done" | "parked" | "timeout"}` or a 2xx `{"ran": 0, "skipped": code}`
+  for a refusal. The Scheduler never gets the Tasks mode and Cloud Tasks never gets the
+  Scheduler's: the Scheduler with a body, the Tasks identity without one, and one account
+  configured for both are refused with no side effect. The task body is untrusted (closed,
+  strict; the owner, brief and cap come from the stored schedule only). Why only these two:
+  any Google service account can mint a token with the api audience, so only the two named
+  accounts pass. A run it starts still goes through the outbox and the policy engine; every
+  T3 step waits for a person. No Terraform change: `tilo-api` (like `tilo-harness`) already holds
+  `cloudtasks.enqueuer` and `serviceAccountUser` on `tilo-tasks-invoker`, so either can mint a
+  task token for this route (an accepted trust set, BQ-AGT14-5 h), and api needs no
+  `run.invoker` for a task to reach it. The api service's request timeout must cover the
+  in-request wait (1440 s) plus the 60 s response margin; the task dispatch deadline is
+  1500 s (X-SCHED-1): see `infra/README.md`.
 - `tilo-channels` is `allUsers`, so the `tilo-gmail-push` `run.invoker` binding
   gives no protection: `/internal/gmail/push` is reachable from the internet and
   no channels route under `/internal/` may rely on ingress or IAM.
@@ -245,6 +314,7 @@ Hard requirements from the security review for the routes the infra points at:
 - `tilo-channels`: Firestore, Pub/Sub publish, Storage.
 - `tilo-api`: decrypt on `oauth-tokens`, any access to `archive`, publish on `tilo-events`.
 - Anyone but `tilo-connectors`: the `oauth-tokens` key.
+- `tilo-api`, `tilo-harness`, `tilo-render`: the `tilo-tokens` database (their `datastore.user` is limited to `(default)`).
 - `modelarmor.user` for connectors and browser (the harness screens tool output
   after it returns).
 - Service account keys (none exist) and secret versions in code.
@@ -260,3 +330,109 @@ Hard requirements from the security review for the routes the infra points at:
 7. The push route lives on `tilo-channels` (`/internal/gmail/push`, where `GmailPushEndpoint` is); renew and poll live on `tilo-harness` (`/internal/gmail/{renew,poll}`).
 8. Vertex publisher models and Model Armor have no resource-level IAM, so their grants are project-level. The internet-facing services (api, channels) get only the custom `tiloVertexGenerate` role (`aiplatform.endpoints.predict`); harness alone keeps `roles/aiplatform.user`. `roles/modelarmor.user` is project-level for api, harness and channels.
 9. The WhatsApp `channels-webhook-signing-key` slot holds the Meta app secret used by `verify_signature`.
+10. `tilo-api` rate limiting (`config/rate_limits.yaml`, `trusted_hops: 1`, SEC-10) assumes the browser calls Cloud Run (`*.run.app`) directly, so Cloud Run's front end appends one trusted hop to `X-Forwarded-For` (`browser -> run.app`). Routing API traffic through a Firebase Hosting rewrite or a Google Cloud Load Balancer adds proxy hops on the right of `X-Forwarded-For`; raise `trusted_hops` in `config/rate_limits.yaml` to match before enabling such a proxy.
+
+## 11. Sign-in with Google (Firebase Authentication): the console checklist (SEC-15)
+
+Terraform cannot do these. They turn on app sign-in (Google, and anonymous demo sessions), which
+`tilo-api` checks on every request and the web app asks for before it shows anything (BQ-SIGNIN-1..7 in
+`docs/open-questions.md`). Tilo never handles passwords (PRD 16.1). Do them in this order, for project
+`essential-wares-510320-f0`:
+
+1. Firebase console, Authentication, Get started.
+2. Authentication, Sign-in method: enable the Google provider (public-facing name `Tilo`, your support email) and save.
+3. Authentication, Sign-in method: enable the Anonymous provider (demo sessions). Never enable Email/Password or any other
+   provider: Tilo never handles passwords.
+4. Authentication, Settings, Authorized domains: check `essential-wares-510320-f0.web.app` and
+   `essential-wares-510320-f0.firebaseapp.com` are listed (they are by default; add them if not), and remove `localhost`
+   if it is there (Firebase adds it by default; the deployed project must not accept sign-ins started from a local page).
+5. Google Cloud console, APIs and Services, Credentials, the Firebase web key (the one step 4 of section 7 restricted):
+   set the API restriction to exactly three APIs: Firebase App Check API, Identity Toolkit API and Token Service API.
+   The Auth SDK calls `identitytoolkit.googleapis.com` and `securetoken.googleapis.com`, and Google refuses sign-in
+   with the key restricted to App Check alone. Keep the website restrictions (the two referrers); the key must still not
+   reach `generativelanguage.googleapis.com` or any other paid API.
+6. Google Cloud console, Google Auth Platform (OAuth consent screen), Audience: publishing status In production.
+   The user's decision (7 Oct 2026, BQ-SIGNIN-1) is In production, so the status is not a choice you make here.
+   The sign-in scopes `openid`, `email` and `profile` are non-sensitive (basic), so anyone with a Google account can
+   sign in: no test-user list, no expiry. The Gmail scopes (`gmail.readonly`, `gmail.compose`, `gmail.send`) are
+   restricted, so Google shows its unverified-app warning on every Gmail consent and caps an unverified app at
+   100 new users until Google verifies those scopes; the Gmail consent sheet (S-08) says so before the redirect. No code
+   path depends on the status, so either works. Fallback in one line: set it back to Testing and list test users; sign-ins and grants then expire after
+   about 7 days (PRD R-06).
+7. Later, an owner step, not needed to sign in: start Google verification for the restricted Gmail scopes
+   (Google Auth Platform, Verification Center), once the app is ready to be reviewed. Until it is approved the
+   unverified-app warning and the cap stay.
+8. Redeploy hosting (the Content-Security-Policy and the sign-in code ship together): `just deploy-web` with
+   `TILO_BAKE_FIREBASE_KEY=1`, then sign in on `https://essential-wares-510320-f0.web.app` and check the browser
+   console shows no Content-Security-Policy violation, before telling anyone to sign in. Also check that the
+   site-wide `frame-ancestors 'none'` and `X-Frame-Options` (rule source `**` in `firebase.json`) do not break the
+   sign-in iframe Firebase serves at the reserved path `/__/auth/iframe`: if the popup sign-in fails or the console
+   shows a refused frame, exempt `/__/auth/**` from those two headers (a separate headers rule), and re-check.
+
+After the founder has signed in once with Google, `TILO_PEOPLE_BOOTSTRAP_UID` on `tilo-api` must hold the id the API gives
+that person, which is not the Firebase uid: copy the uid (Firebase console, Authentication, Users, "User UID") and run
+`uv run python scripts/signin_user_id.py <uid>`; the printed `u_...` value goes in the variable (BQ-SIGNIN-9). Before
+`TILO_JUDGE_LIVE=1` is ever set, read BQ-SIGNIN-9 and BQ-SIGNIN-10: an anonymous demo session already gets replay models
+only, and App Check enforcement on Firebase Authentication is worth considering, since anonymous uids are free.
+
+## 12. Token database and connectors settings (ADR-0032 T5)
+
+Firestore IAM conditions name a database, never a collection, so project-wide `datastore.user` could not exclude
+`connector_tokens`. Tokens move to the database `tilo-tokens`; api, harness and render keep `datastore.user` only on
+`(default)` (condition `default-database-only`); connectors holds it unconditionally. `security_iam.tftest.hcl` pins
+this. The database has delete protection on. Its rules are Terraform's (T5b): a `google_firebaserules_ruleset` from
+`firestore.tokens.rules` (the one deny-all text, also in `firebase.json`) and the release `cloud.firestore/tilo-tokens`,
+pinned in `security_iam.tftest.hcl`. Connectors reads the database id from `TILO_TOKEN_DATABASE` and refuses `(default)`.
+
+Connectors `TILO_*` settings are set by hand (`ignore_env`, like api). The ordered steps and values: `docs/deploy-dev.md`
+("Meeting host: connectors and api settings").
+
+## 13. OAuth client for the live connectors (ADR-0035 L7)
+
+Console steps (Terraform cannot do these). APIs and Services, Credentials, then the consent screen:
+- Client type Web application. Authorised redirect URI exactly `https://essential-wares-510320-f0.web.app/oauth/google/callback`.
+  No JavaScript origin (the code exchange is server side).
+- Consent screen in Testing mode, with the section 6 scopes: `gmail.readonly`, `gmail.compose`, `gmail.send`, `drive.file`,
+  `calendar.readonly`, `calendar.events.owned`. Test users: `tilotesting@gmail.com` and the meeting bot account.
+- Testing mode expires a grant after 7 days (PRD 11.5): a connection shows `expired` and the person connects again.
+- Client id in the secret `workspace-oauth-client-id`, client secret in `workspace-oauth-client-secret` (Terraform creates
+  both empty; you add ONE version to each after the apply, in the console or with
+  `gcloud secrets versions add <name> --project <project> --data-file=-`, typing the value on stdin: never in the command
+  line). Mounted with `:latest`; rotating is a new version, then a new revision. Readable by `tilo-connectors`
+  only; `tilo-api`, which only starts a connect and calls connectors, holds no secret, KMS or `tilo-tokens` access
+  (`security_iam.tftest.hcl`). New resources: the Firestore index `outbox_transfer_pending`, the two secrets and one accessor binding each.
+
+Order: apply infra incl. the index, wait for it to be READY, run the outbox store suite once on the Firestore emulator, set
+the settings, your go, `LIVE=1` on connectors only, acceptance with `tilotesting@gmail.com`. Commands: `docs/deploy-dev.md`
+("Live connectors").
+
+## 14. The meeting bot's Live voice meter (ADR-0042, BQ-M2-4, BQ-M2-5; INERT, no IAM or Terraform change)
+
+The bot (`tilo-meet-bot`, only with `meet_bot_enabled`) meters each spoken Gemini Live reply on the SEC-16 ledger by
+calling two public routes of `tilo-api`. Access changes: none.
+
+| Identity | Holds (unchanged) | Added by the meter |
+| --- | --- | --- |
+| `tilo-meet-bot` | project roles `tiloVertexGenerate` and `serviceusage.serviceUsageConsumer` only; no Firestore, Storage, KMS or secret role (`meet_bot.tftest.hcl`); internal ingress, invokable by `tilo-api` only | Nothing. It mints a Google ID token from its metadata server for audience `TILO_API_URL` (no key, no role needed) and sends it to tilo-api |
+| `tilo-api` | section 2 | Two public routes (`access.PUBLIC_ROUTES`, `appcheck.EXEMPT_ROUTES`), each checking its own token. No role. The call arrives because tilo-api already carries `allUsers` as `run.invoker` |
+
+Route checks (code, not IAM; `TILO_VOICE_METER`, `TILO_VOICE_METER_AUDIENCE`, `TILO_VOICE_METER_CALLER` on tilo-api):
+a Google ID token whose audience is the tilo-api URL and whose account is `tilo-meet-bot` with `email_verified`. The
+three public routes of tilo-api each have their own caller and each answers 403 to the others' accounts:
+
+| Route | Caller pin | Account |
+| --- | --- | --- |
+| `POST /internal/schedules/tick` | `TILO_SCHEDULE_TICK_CALLER` (and `TILO_TASKS_CALLER` for the Tasks hand-off) | `tilo-schedule-scheduler`, `tilo-tasks-invoker` |
+| `POST /internal/meeting-voice/reserve` and `/close` | `TILO_VOICE_METER_CALLER` | `tilo-meet-bot`; equal to either pin above is 503, so one setting never opens two doors |
+
+Whose spend it is never comes from the caller: the uid and org are the attend claim's, made by the owner's own attend
+request (`meeting_voice_claims`), and a body can name neither. A fully compromised bot still holds Vertex generate and
+the ledger does not stop it (ADR-0042 context 5); project quota and the budget alert are that bound.
+
+Not granted, on purpose: `roles/datastore.user` for the bot (a condition names a database, not a collection, so it
+would reach every world and every person's ledger counter); a `run.invoker` binding for the bot on tilo-api (redundant
+while `allUsers` holds; the FR-AGT-14e guard keeps `api` out of `extra_invokers`, so if you ever drop `allUsers` it is
+one `gcloud run services add-iam-policy-binding tilo-api --member serviceAccount:tilo-meet-bot@<project>... --role
+roles/run.invoker`, `docs/deploy-dev.md` step 5); any token-creator role. The four settings are runtime env, set by hand
+(tilo-api has `ignore_env`; the service module declares no env): ordered steps, checks and rollback in
+`docs/deploy-dev.md` ("The meeting bot's Live voice meter"), values in `meet-bot/docs/CLOUD_RUN.md`.

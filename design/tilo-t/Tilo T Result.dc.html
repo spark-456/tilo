@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-t.js"></script>
+<style>body{margin:0}</style>
+</helmet>
+<div style="display:flex;flex-direction:column;gap:18px;font-family:var(--fB);color:var(--ink);font-size:15px;line-height:1.5">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="width:36px;height:36px;border-radius:11px;background:var(--lime);color:#0B0B0C;display:flex;align-items:center;justify-content:center;flex:none">{{ iParcel }}</span>
+    <span style="flex:1;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:14px">Delivered to the Result hall</span><span style="font-family:var(--mono);font-size:11.5px;color:var(--ink3)">artifact.delivered · 4:12 pm · 6 buildings</span></span>
+    <sc-if value="{{ closable }}"><span aria-label="Close result" style="width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--ink2)">{{ iX }}</span></sc-if>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <h2 style="margin:0;font-weight:700;font-size:28px;line-height:1.1;letter-spacing:-.9px;text-wrap:balance">Porto team offsite, 14–16 May</h2>
+    <p style="margin:0;color:var(--ink2);text-wrap:pretty">A riverside venue for 12, flights from three cities, a 3-day agenda and the invite email. €1,720 under budget.</p>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px">
+    <sc-for list="{{ acts }}" as="a" hint-placeholder-count="4">
+      <span role="button" style="height:44px;border-radius:12px;border:1px solid {{ a.bd }};background:{{ a.bg }};color:{{ a.fg }};display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:13.5px">{{ a.ic }}{{ a.t }}</span>
+    </sc-for>
+  </div>
+  <div style="border:1px solid var(--line);border-radius:18px;background:var(--card);overflow:hidden">
+    <div style="padding:16px 18px;display:flex;flex-direction:column;gap:4px;border-bottom:1px solid var(--line)">
+      <span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">VENUE · FROM VENUE RESEARCH</span>
+      <span style="font-weight:700;font-size:16px">Casa do Rio, Ribeira</span>
+      <span style="color:var(--ink2);font-size:14px">€168 a night · 12 rooms · 6 min walk to the workshop space</span>
+    </div>
+    <div style="padding:14px 18px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--line)">
+      <span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">FLIGHTS · FROM FLIGHT RESEARCH</span>
+      <div style="display:flex;flex-direction:column;font-size:13.5px">
+        <sc-for list="{{ flights }}" as="f" hint-placeholder-count="3">
+          <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.2fr) 60px;gap:8px;padding:7px 0;border-top:1px solid var(--line)"><span style="font-weight:600">{{ f.a }}</span><span style="color:var(--ink2)">{{ f.b }}</span><span style="text-align:right;font-weight:600">{{ f.c }}</span></div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="padding:14px 18px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--line)">
+      <span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">BUDGET · FROM BUDGET SHEET</span>
+      <div style="display:flex;justify-content:space-between;font-size:14px"><span><strong>€14,280</strong> of €16,000</span><span style="color:var(--mintInk);font-weight:600">€1,720 left</span></div>
+      <div style="height:8px;border-radius:9px;background:var(--sunk);overflow:hidden"><div style="width:89%;height:100%;background:var(--ink);border-radius:9px"></div></div>
+    </div>
+    <div style="padding:14px 18px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--line)">
+      <span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">AGENDA · FROM AGENDA DRAFT</span>
+      <sc-for list="{{ days }}" as="d" hint-placeholder-count="3"><div style="display:flex;gap:10px;font-size:14px"><span style="width:34px;font-weight:700;flex:none">{{ d.d }}</span><span style="color:var(--ink2)">{{ d.t }}</span></div></sc-for>
+    </div>
+    <div style="padding:14px 18px;display:flex;flex-direction:column;gap:6px;background:var(--sunk)">
+      <span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">EMAIL DRAFT · FROM INVITE EMAIL</span>
+      <span style="font-size:13px;color:var(--ink2)">To: 12 people on Team Rao · Subject: <strong style="color:var(--ink)">Porto, 14–16 May: you’re in</strong></span>
+      <span style="font-size:14px;line-height:1.55;text-wrap:pretty">Hi all, we’re off to Porto. Flights are held until Friday, rooms are booked at Casa do Rio, and Saturday morning is yours. Reply with any food needs by Wednesday.</span>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <span style="font-weight:700;font-size:14px">Sources <span style="color:var(--ink3);font-weight:500">· 9 checked</span></span>
+    <sc-for list="{{ sources }}" as="s" hint-placeholder-count="3"><a href="#" style="min-height:44px;box-sizing:border-box;padding:8px 12px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:500"><span style="width:24px;height:24px;border-radius:7px;background:var(--sunk);color:var(--ink2);display:flex;align-items:center;justify-content:center;flex:none">{{ s.ic }}</span><span style="flex:1;min-width:0">{{ s.t }}</span><span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">{{ s.d }}</span></a></sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:420,&quot;height&quot;:1100},&quot;closable&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloT) this.t = setInterval(() => { if (window.TiloT) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const T = window.TiloT, ic = (n, s) => T ? T.ic(React.createElement, n, s) : null;
+    return {
+      closable: !!this.props.closable, iParcel: ic('parcel', 20), iX: ic('x', 20),
+      acts: [['Open', 'eye', 0], ['Copy', 'copy', 0], ['Download', 'download', 0], ['Send', 'send', 1]].map(([t, i, p]) => ({ t, ic: ic(i, 16), bg: p ? 'var(--pri)' : 'var(--card)', fg: p ? 'var(--onPri)' : 'var(--ink)', bd: p ? 'var(--pri)' : 'var(--line2)' })),
+      flights: [['London LGW', 'TAP direct · Thu 08:40', '€156'], ['Berlin BER', 'Direct · Thu 10:15', '€198'], ['Lisbon', 'Train instead · 3 h', '€38']].map(([a, b, c]) => ({ a, b, c })),
+      days: [['Thu', 'Arrive by 2 pm, river walk, team dinner at 8'], ['Fri', 'Workshop day: roadmap and Q3 goals'], ['Sat', 'Free morning, fly home after lunch']].map(([d, t]) => ({ d, t })),
+      sources: [['Casa do Rio, rooms and rates', 'venue site', 'globe'], ['Flight options, 14 May', 'airline search', 'plane'], ['Budget sheet (Google Sheets)', 'your drive', 'sheet']].map(([t, d, i]) => ({ t, d, ic: ic(i, 14) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

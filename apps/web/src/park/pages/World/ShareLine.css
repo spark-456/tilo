@@ -1,0 +1,19 @@
+/* BQ-CTX-TEAMWORLD: the world's sharing line. Neutral role tokens only; plain text, nothing moves. */
+[data-park] .park-world-sharebadge {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 4px 0 0;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--field);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+[data-park] .park-world-sharenote {
+  font-weight: 600;
+  color: var(--ink2);
+}

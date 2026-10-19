@@ -7,6 +7,7 @@ dependencies = [
     "google-adk>=1.17.0",
     "google-cloud-firestore>=2.20.0",
     "fastapi>=0.115",
+    "tzdata>=2024.1",
     "uvicorn>=0.32",
     "pyyaml>=6.0",
     "jsonschema>=4.18",
@@ -14,18 +15,28 @@ dependencies = [
     "tilo-archive",
     "tilo-connectors",
     "tilo-contracts",
+    "tilo-logging",
     "tilo-memory",
     "tilo-policy",
     "tilo-providers",
+    "tilo-render",
+]
+
+[dependency-groups]
+dev = [
+    "tilo-metering",  # tests only: FR-MEM-11 checks the credits chain (savings, cost_report)
 ]
 
 [tool.uv.sources]
+tilo-metering = { workspace = true }
 tilo-archive = { workspace = true }
 tilo-connectors = { workspace = true }
 tilo-contracts = { workspace = true }
+tilo-logging = { workspace = true }
 tilo-memory = { workspace = true }
 tilo-policy = { workspace = true }
 tilo-providers = { workspace = true }
+tilo-render = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -31,6 +31,7 @@ class InMemoryOutboxStore:
         self._by_id: dict[str, dict] = {}
         self._by_key: dict[tuple[str, str], str] = {}
         self._send_leases: dict[str, _Lease] = {}
+        self._abandoned_before_dispatch: set[str] = set()
         self._transfer_leases: dict[str, _Lease] = {}
         self._pending_transfers: dict[str, tuple[str, dict]] = {}  # outbox_id -> (world_id, transfer)
         self._pending_alerts: dict[str, tuple[str, dict]] = {}  # outbox_id -> (world_id, alert part)
@@ -86,7 +87,9 @@ class InMemoryOutboxStore:
                 entry["state"] = "cancelled"
             return deepcopy(entry)
 
-    def _abandon(self, outbox_id: str, now: str) -> dict | None:  # unsent, no live lease -> failed, for Outbox.abandon
+    def _abandon(
+        self, outbox_id: str, now: str, keep_ambiguous: bool = False
+    ) -> dict | None:  # unsent, no live lease -> failed, for Outbox.abandon
         with self._lock:
             entry = self._by_id.get(outbox_id)
             if entry is None or entry["state"] not in ("queued", "scheduled", "sending"):
@@ -94,9 +97,49 @@ class InMemoryOutboxStore:
             expiry = self._send_leases.get(outbox_id, (None, None))[1]
             if expiry is not None and now < expiry:
                 return None
+            if keep_ambiguous and (self._retries.get(outbox_id, {}).get("ambiguous") or expiry is not None):
+                return None  # it may have gone out (a lost answer, or a lease nobody released): decided under this lock
             entry["state"] = "failed"
             self._retries.pop(outbox_id, None)
             return deepcopy(entry)
+
+    def _cancel_source(self, outbox_id: str, now: str, alert: dict) -> dict | None:
+        """X-SEC37-FU4b: refuse live leases; preserve uncertainty and alert while stopping resend."""
+        with self._lock:
+            entry = self._by_id.get(outbox_id)
+            if entry is None or entry["state"] not in ("queued", "scheduled", "sending"):
+                return None
+            expiry = self._send_leases.get(outbox_id, (None, None))[1]
+            if expiry is not None and now < expiry:
+                return None
+            ambiguous = bool(self._retries.get(outbox_id, {}).get("ambiguous") or expiry is not None)
+            entry["state"] = "failed"
+            self._send_leases.pop(outbox_id, None)
+            if ambiguous:
+                self._retries[outbox_id] = {**self._retries.get(outbox_id, {}), "ambiguous": True}
+                self._record_alert(outbox_id, entry["world_id"], alert)
+            else:
+                self._retries.pop(outbox_id, None)
+            return deepcopy(entry)
+
+    def _abandon_before_dispatch(self, outbox_id: str) -> dict | None:
+        # A terminal failure or any prior dispatch lease is never proof that nothing was sent.
+        with self._lock:
+            entry = self._by_id.get(outbox_id)
+            if (
+                entry is None
+                or entry["state"] not in ("queued", "scheduled")
+                or outbox_id in self._send_leases
+                or outbox_id in self._retries
+            ):
+                return None
+            entry["state"] = "failed"
+            self._abandoned_before_dispatch.add(outbox_id)
+            return deepcopy(entry)
+
+    def was_abandoned_before_dispatch(self, outbox_id: str) -> bool:
+        with self._lock:
+            return outbox_id in self._abandoned_before_dispatch
 
     def _claim_for_sending(
         self, outbox_id: str, holder: str, now: str, lease_seconds: float, skew_s: float = 0
@@ -111,8 +154,11 @@ class InMemoryOutboxStore:
                     return None
             if now < self._retries.get(outbox_id, {}).get("not_before", ""):  # not before the next attempt
                 return None
+            had_lease = outbox_id in self._send_leases  # still here only if it expired unreleased
             if not _try_claim(self._send_leases, outbox_id, holder, now, lease_seconds):
                 return None
+            if had_lease:  # the earlier holder never said how it ended: it may have sent
+                self._retries[outbox_id] = {**self._retries.get(outbox_id, {}), "ambiguous": True}
             entry["state"] = "sending"  # takes over an expired lease too
             return deepcopy(entry)
 

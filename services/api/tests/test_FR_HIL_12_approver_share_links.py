@@ -42,6 +42,7 @@ from _cards_lib import (
     new_ulid,
     principal,
 )
+from _peopleseams1_lib import directory
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from hypothesis import HealthCheck, given, settings
@@ -111,6 +112,8 @@ class World:
             app.include_router(cards.build_router(self.store))
             app.include_router(sharing().build_router(self.store))
             app.dependency_overrides[deps.get_current_principal] = self._principal
+            people = directory(OWNER, APPROVER, OTHER, LEAD, VIEWER)  # an Approver is named from the directory
+            app.dependency_overrides[deps.get_people_stores] = lambda: people
             self._http = TestClient(app)
         return self._http
 

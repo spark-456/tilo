@@ -1,0 +1,38 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000000706",
+  "seq": 706,
+  "ts": "2026-10-08T10:06:00.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_2",
+  "type": "plan.revised",
+  "actor": "A_dir",
+  "target": "w_village_basic",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 1.2,
+  "summary": "The Director planned one revision unit for the change.",
+  "cause": "01JB5VQ0000000000000000704",
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "proposal_id": "01JB5VQ00000000000000P0001",
+    "run": "revision_run",
+    "units": [],
+    "credits": {
+      "min": 4,
+      "max": 9
+    }
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

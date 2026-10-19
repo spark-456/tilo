@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evals.tilo.example/vertex_eval.schema.json",
+  "title": "VertexEvalSettings",
+  "description": "Settings of the live autorater runs (VERTEX-EVAL-1): evals/vertex_eval.yaml. Evals-local, like generator.schema.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["max_credits", "max_cases", "assumed_output_tokens", "overhead_tokens", "field_chars", "metrics"],
+  "properties": {
+    "max_credits": { "type": "number", "exclusiveMinimum": 0, "description": "Per-run cap in credits (the CLI also enforces a hard maximum of 19)." },
+    "max_cases": { "type": "integer", "minimum": 1 },
+    "assumed_output_tokens": { "type": "integer", "minimum": 1 },
+    "overhead_tokens": { "type": "integer", "minimum": 0 },
+    "field_chars": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prompt", "context", "response"],
+      "properties": {
+        "prompt": { "type": "integer", "minimum": 1 },
+        "context": { "type": "integer", "minimum": 1 },
+        "response": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pairwise", "groundedness"],
+      "properties": {
+        "pairwise": { "$ref": "#/$defs/metric" },
+        "groundedness": { "$ref": "#/$defs/metric" }
+      }
+    }
+  },
+  "$defs": {
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "template"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,40}$" },
+        "template": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,60}\\.md$" }
+      }
+    }
+  }
+}

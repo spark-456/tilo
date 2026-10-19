@@ -1,0 +1,41 @@
+{
+  "v": "1.0",
+  "formats": {
+    "website": {
+      "partners": [
+        {
+          "make_with": "connector:lovable",
+          "action": "build_handoff"
+        }
+      ]
+    },
+    "pptx": {
+      "partners": [
+        {
+          "make_with": "connector:canva",
+          "action": "create_design"
+        }
+      ]
+    },
+    "pdf": {
+      "partners": [
+        {
+          "make_with": "connector:canva",
+          "action": "create_design"
+        }
+      ]
+    }
+  },
+  "large_site": {
+    "max_native_pages": 3,
+    "needs": [
+      "sign in",
+      "database",
+      "checkout",
+      "e-commerce",
+      "multi-page",
+      "a site with user sign in"
+    ]
+  },
+  "preselect_suggested": true
+}

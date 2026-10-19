@@ -1,0 +1,14 @@
+{
+  "start": "2026-10-09T09:00:00.000Z",
+  "end": "2026-10-09T09:45:00.000Z",
+  "all_day": false,
+  "title": "Q4 planning",
+  "kind": "meeting",
+  "source": {
+    "kind": "meeting",
+    "id": "mt_q4_plan"
+  },
+  "state": "confirmed",
+  "shared": false,
+  "joinable": false
+}

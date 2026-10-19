@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/meeting.replied.schema.json",
+  "x-version": "1.0.0",
+  "title": "MeetingRepliedData",
+  "description": "data of meeting.replied (ADR-0028). The addressed agent answered one turn. actor is that agent (the turn's to), target the convener. The reply is one model call over that agent's own records only (MR-06): the event's trace names the meeting or meeting_thinking role and profile, and credits what the call cost. The text is in the redacted raw archive (message_ref); a failed reply has none. units and artifacts are what the reply rests on, checked by code against the agent's own grounding set before the event is written; a proposal names what would change and nothing about how (MR-11). The web shows the speaker's cue only while this event's reply is on screen.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "room_id",
+    "turn",
+    "mode",
+    "outcome",
+    "message_ref",
+    "units",
+    "artifacts",
+    "proposal"
+  ],
+  "properties": {
+    "room_id": { "$ref": "../../common.schema.json#/$defs/ulid" },
+    "turn": { "$ref": "../../meeting_room.schema.json#/$defs/turn_number" },
+    "mode": { "$ref": "../../meeting_room.schema.json#/$defs/mode" },
+    "outcome": { "$ref": "../../meeting_room.schema.json#/$defs/outcome" },
+    "message_ref": {
+      "anyOf": [{ "$ref": "../../event.schema.json#/$defs/archive_ref" }, { "type": "null" }]
+    },
+    "units": { "$ref": "../../meeting_room.schema.json#/$defs/cited_units" },
+    "artifacts": { "$ref": "../../meeting_room.schema.json#/$defs/cited_artifacts" },
+    "proposal": {
+      "anyOf": [{ "$ref": "../../meeting_room.schema.json#/$defs/proposal" }, { "type": "null" }]
+    }
+  },
+  "if": { "properties": { "outcome": { "const": "failed" } }, "required": ["outcome"] },
+  "then": {
+    "description": "A failed reply produced no text: no archive record, nothing cited, nothing proposed.",
+    "properties": {
+      "message_ref": { "type": "null" },
+      "units": { "maxItems": 0 },
+      "artifacts": { "maxItems": 0 },
+      "proposal": { "type": "null" }
+    }
+  },
+  "else": {
+    "description": "Any other reply has an archive record. proposed_change carries its proposal and every other outcome none; answered and proposed_change cite at least one of the agent's own units (HR-1).",
+    "properties": { "message_ref": { "type": "string" } },
+    "if": { "properties": { "outcome": { "const": "proposed_change" } }, "required": ["outcome"] },
+    "then": { "properties": { "proposal": { "type": "object" }, "units": { "minItems": 1 } } },
+    "else": {
+      "properties": { "proposal": { "type": "null" } },
+      "if": { "properties": { "outcome": { "const": "answered" } }, "required": ["outcome"] },
+      "then": { "properties": { "units": { "minItems": 1 } } }
+    }
+  }
+}

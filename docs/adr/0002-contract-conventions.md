@@ -256,6 +256,41 @@ places (BQ-01, BQ-02 and the gaps listed under decision 9).
     file: nothing is removed or changed, so it is additive. Two tests that pinned `== "1.1.0"` now
     check "1.2.0 or later". **Rule for parallel contract branches:** before merging a branch that
     bumps a schema, compare its `x-version` with the base's and take the next free minor.
+16. **`spend_caps.schema.json` 1.1.0 (additive, 2026-10-06, ticket SEC-16, FR-MTR-04).** A new
+    contract, named `SpendCapsConfig` through `ROOT_NAMES` (tilo-api's loaded value is its own
+    six-field `SpendCaps`), shapes `config/spend_caps.yaml`, which `CONFIG_SHAPES` adds to
+    `just contracts-check`. It is a new file because `metering.schema.json` is closed and counts
+    credits and US dollars, while SEC-16's cap is 1,000 INR per uid. Money is an integer in INR
+    minor units (paise) and `currency` is `const` INR. As in decision 13, every key is required, no
+    other key is allowed, and every cap is above zero and never null except the per-org daily cap
+    (`org_day_minor`, null for no separate cap). JSON Schema reads 1000.0 as the integer 1000, so
+    refusing a whole float is the loader's job, and so is the shipped file's `unit_reserve_minor <=
+    run_minor <= uid_lifetime_minor <= global_day_hard_minor` (checked by the SEC-16 config test). The shipped
+    values convert PRD 17.3's US dollar figures at 80 INR per US$, below the market rate, so no INR
+    cap exceeds its US$ counterpart: `run_minor` 12000 for 300 credits (US$1.50) and
+    `global_day_hard_minor` 200000 for US$25 a day. The rate limit is 240 requests per uid per 60 s,
+    because the web polls a run's events every second. This INR daily cap and `metering.yaml`'s
+    `spend.daily_usd_hard` both trip NFR-24; the first one reached wins and neither replaces the
+    other. 1.1.0 adds the required `unit_reserve_minor` (shipped 1000, 10 INR): until PL-06 prices
+    and a US$ to INR rate exist, each live unit and each Director call (intake, approaches, MustAsk)
+    reserves this flat amount and settles at it (BQ-SEC16-1). A new required key counts as minor
+    because nothing reads the file yet, as for `budget.requested` in decision 13. The SEC-16 config
+    test's key set and invalid cases were extended to match, as a one-off exception agreed with the
+    test-writer.
+    **Amendment, 8 Oct 2026 (revised 9 Oct 2026):** values set by the user: day 5,000 INR (8 Oct), then
+    "Cut the lifetime cap to 500 rupees per person. 3000 seems excessive for a free service." (9 Oct), so
+    uid 500 INR; the run cap is 150 INR, confirmed by the user the same day ("Yeah go ahead with your cost
+    analysis and new spend limits. I think it's fair", reported by the supervisor): 500 INR per run would
+    let one run spend a person's whole allowance, and 150 INR still covers the deep job estimate of 60 to
+    140 INR; BQ-SEC16-4). The day cap is above PRD 17.3's US$25 by the user's decision (BQ-SEC16-3). So is the
+    run cap (INR 150 is about US$1.88 at 80 INR per US$, against 300 credits, US$1.50), so the "no INR cap
+    exceeds its US$ counterpart" rule above no longer holds for these two. The text above stays as history.
+    The shape is unchanged: `spend_caps` 1.1.1 rewrites one description only, and the `shipped_defaults`
+    fixture carries `run_minor` 15000, `uid_lifetime_minor` 50000 and `global_day_hard_minor` 500000
+    (ordering: `unit_reserve_minor` 1000 <= run 15000 <= lifetime 50000 <= day 500000). The replay-only switch
+    at the daily cap, `unit_reserve_minor`, the null per-org cap and the rate limit are unchanged;
+    `config/spend_caps.yaml` changes with the SEC-16 beta-caps build. PRD 17.3 and the PRD supplement's
+    SEC-16 row (1,000 INR) are read-only and keep their figures.
 
 ## Consequences
 - Builders import `tilo_contracts` or `@tilo/contracts` and never hand-write these shapes.

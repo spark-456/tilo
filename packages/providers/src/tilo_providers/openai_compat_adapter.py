@@ -8,6 +8,7 @@ never folded raw into a raised error."""
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -17,8 +18,27 @@ from typing import Any
 import httpx
 from tilo_contracts import ProvidersProfile
 
-from tilo_providers.errors import ProviderError, SafetyError, map_http_status, map_transport_error
-from tilo_providers.interfaces import Capability, GenerateRequest, GenerateResponse, ModelProvider, PriceQuote
+from tilo_providers.diagnostics import log_caught
+from tilo_providers.errors import (
+    MissingCapabilityError,
+    OutputTruncatedError,
+    ProviderError,
+    SafetyError,
+    map_http_status,
+    map_transport_error,
+    truncated_message,
+)
+from tilo_providers.interfaces import (
+    Capability,
+    EmbedRequest,
+    EmbedResponse,
+    GenerateRequest,
+    GenerateResponse,
+    ModelProvider,
+    PriceQuote,
+    cached_tokens_or_none,
+)
+from tilo_providers.media import check_parts, provider_takes
 
 _CLEAN_TOKEN_RE = re.compile(r"^[\x21-\x7e]+$")  # printable ASCII, no whitespace or control characters
 _MAX_ERROR_MESSAGE_LEN = 500
@@ -34,6 +54,7 @@ class OpenAICompatModelProvider(ModelProvider):
         api_key_env: str,
         transport: httpx.BaseTransport | None = None,
         price: PriceQuote | None = None,
+        live_permitted: bool = False,
     ) -> None:
         self._profile = profile
         self._profile_id = profile_id
@@ -55,8 +76,9 @@ class OpenAICompatModelProvider(ModelProvider):
                 "(no whitespace or control characters)"
             )
 
-        # EFF-01: reachable directly (not only via RecordReplayProvider).
-        if transport is None and os.environ.get("LIVE") != "1":
+        # EFF-01: reachable directly (not only via RecordReplayProvider). `live_permitted` is the SEC-15 injected
+        # permission (the deployed-judge path); it is never read from the environment.
+        if transport is None and os.environ.get("LIVE") != "1" and not live_permitted:
             raise ProviderError(
                 "PL-02/EFF-01: refusing to build a real network client without LIVE=1 (inject transport= for tests)"
             )
@@ -66,12 +88,25 @@ class OpenAICompatModelProvider(ModelProvider):
             base_url=base_url, transport=transport, headers={"Authorization": f"Bearer {api_key}"}
         )
 
-    def _messages(self, request: GenerateRequest) -> list[dict[str, str]]:
-        messages: list[dict[str, str]] = []
+    def _messages(self, request: GenerateRequest) -> list[dict[str, Any]]:
+        messages: list[dict[str, Any]] = []
         if request.system is not None:
             messages.append({"role": "system", "content": request.system})
-        messages.append({"role": "user", "content": request.prompt})
+        messages.append({"role": "user", "content": self._user_content(request)})
         return messages
+
+    def _user_content(self, request: GenerateRequest) -> Any:
+        """The prompt, or (LW-06) image_url parts then the prompt. Chat completions take images only: anything
+        else is a missing capability (the router falls back), named by type and never by content."""
+        if not check_parts(request.parts):
+            return request.prompt
+        content: list[dict[str, Any]] = []
+        for part in request.parts or ():
+            if not provider_takes("openai_compat", part):
+                raise MissingCapabilityError(f"LW-06: this endpoint takes images only, not {part.mime_type}")
+            url = f"data:{part.mime_type};base64,{base64.b64encode(part.data or b'').decode('ascii')}"
+            content.append({"type": "image_url", "image_url": {"url": url}})
+        return [*content, {"type": "text", "text": request.prompt}]
 
     def _post(self, path: str, body: dict[str, Any]) -> httpx.Response:
         # A raw httpx/h11 exception's str() can inline a malformed header
@@ -79,6 +114,7 @@ class OpenAICompatModelProvider(ModelProvider):
         try:
             return self._client.post(path, json=body)
         except httpx.HTTPError as error:
+            log_caught(error, __name__, locals())
             mapped = map_transport_error(error)
             assert mapped is not None  # httpx.HTTPError always maps
             raise mapped from None
@@ -96,7 +132,8 @@ class OpenAICompatModelProvider(ModelProvider):
         message = f"PL-02: provider returned HTTP {response.status_code}"
         try:
             data = response.json()
-        except (json.JSONDecodeError, ValueError):
+        except (json.JSONDecodeError, ValueError) as caught_error:
+            log_caught(caught_error, __name__, locals())
             data = None
         if isinstance(data, dict):
             error = data.get("error")
@@ -136,6 +173,7 @@ class OpenAICompatModelProvider(ModelProvider):
         try:
             return response.json()
         except (json.JSONDecodeError, ValueError) as error:
+            log_caught(error, __name__, locals())
             raise ProviderError(self._scrub(f"PL-02: provider returned a malformed response body: {error}")) from None
 
     def _map_message(
@@ -145,6 +183,13 @@ class OpenAICompatModelProvider(ModelProvider):
             # Honesty rule: a blocked completion surfaces as SafetyError,
             # not as ordinary (possibly empty) text.
             raise SafetyError(f"PL-02: blocked by content filter (finish_reason={finish_reason!r})")
+        if finish_reason == "length":
+            # The reply hit its max_tokens cap: cut off or empty, never a reply. No thinking count on this wire.
+            output = None if usage_raw is None else (usage_raw.get("completion_tokens") or 0)
+            prompt = None if usage_raw is None else usage_raw.get("prompt_tokens")
+            raise OutputTruncatedError(
+                truncated_message(output, None), output_tokens=output, thinking_tokens=None, input_tokens=prompt
+            )
         tool_calls: list[dict[str, Any]] | None = None
         raw_tool_calls = message.get("tool_calls")
         if raw_tool_calls:
@@ -164,6 +209,13 @@ class OpenAICompatModelProvider(ModelProvider):
                 "output_tokens": usage_raw.get("completion_tokens", 0),
                 "total_tokens": usage_raw.get("total_tokens", 0),
             }
+            # EFF-04: NIM and others often leave prompt_tokens_details out; that is unknown, not 0.
+            details = usage_raw.get("prompt_tokens_details")
+            cached = cached_tokens_or_none(
+                details.get("cached_tokens") if isinstance(details, dict) else None, usage["input_tokens"]
+            )
+            if cached is not None:
+                usage["cached_tokens"] = cached
         return GenerateResponse(
             text=message.get("content"), profile_id=self._profile_id, tool_calls=tool_calls, usage=usage
         )
@@ -179,15 +231,24 @@ class OpenAICompatModelProvider(ModelProvider):
             return {"type": "json_object"}
         return None
 
-    def generate(self, request: GenerateRequest) -> GenerateResponse:
-        body: dict[str, Any] = {"model": self._profile.model, "messages": self._messages(request)}
+    def _body(self, request: GenerateRequest, *, stream: bool = False) -> dict[str, Any]:
+        # EFF-04 stable prefix: the static parts (tool definitions, response schema) come before `messages`, which
+        # holds the system prompt and then the per-call text; the per-call limits go last.
+        body: dict[str, Any] = {"model": self._profile.model}
         if request.tools is not None:
             body["tools"] = request.tools
-        if request.max_output_tokens is not None:
-            body["max_tokens"] = request.max_output_tokens
         response_format = self._response_format(request)
         if response_format is not None:
             body["response_format"] = response_format
+        body["messages"] = self._messages(request)
+        if request.max_output_tokens is not None:
+            body["max_tokens"] = request.max_output_tokens
+        if stream:
+            body["stream"] = True
+        return body
+
+    def generate(self, request: GenerateRequest) -> GenerateResponse:
+        body = self._body(request)
 
         response = self._post("/chat/completions", body)
         self._raise_for_status(response)
@@ -196,17 +257,11 @@ class OpenAICompatModelProvider(ModelProvider):
             choice = data["choices"][0]
             return self._map_message(choice["message"], data.get("usage"), choice.get("finish_reason"))
         except (KeyError, IndexError, TypeError) as error:
+            log_caught(error, __name__, locals())
             raise ProviderError(self._scrub(f"PL-02: provider response missing {error}")) from None
 
     def stream(self, request: GenerateRequest) -> Iterator[GenerateResponse]:
-        body: dict[str, Any] = {"model": self._profile.model, "messages": self._messages(request), "stream": True}
-        if request.tools is not None:
-            body["tools"] = request.tools
-        if request.max_output_tokens is not None:
-            body["max_tokens"] = request.max_output_tokens
-        response_format = self._response_format(request)
-        if response_format is not None:
-            body["response_format"] = response_format
+        body = self._body(request, stream=True)
 
         # `client.stream()` keeps the connection open so each SSE line is
         # yielded as it arrives, instead of only after the body completes.
@@ -228,6 +283,7 @@ class OpenAICompatModelProvider(ModelProvider):
                     try:
                         chunk = json.loads(payload)
                     except (json.JSONDecodeError, ValueError) as error:
+                        log_caught(error, __name__, locals())
                         raise ProviderError(
                             self._scrub(f"PL-02: provider returned a malformed stream chunk: {error}")
                         ) from None
@@ -236,10 +292,21 @@ class OpenAICompatModelProvider(ModelProvider):
                     try:
                         choice = chunk["choices"][0]
                     except (KeyError, IndexError, TypeError) as error:
+                        log_caught(error, __name__, locals())
                         raise ProviderError(self._scrub(f"PL-02: provider stream chunk missing {error}")) from None
                     finish_reason = choice.get("finish_reason")
                     if finish_reason == "content_filter":
                         raise SafetyError(f"PL-02: blocked by content filter (finish_reason={finish_reason!r})")
+                    if finish_reason == "length":
+                        usage_raw = chunk.get("usage")
+                        output = None if not isinstance(usage_raw, dict) else (usage_raw.get("completion_tokens") or 0)
+                        prompt = None if not isinstance(usage_raw, dict) else usage_raw.get("prompt_tokens")
+                        raise OutputTruncatedError(
+                            truncated_message(output, None),
+                            output_tokens=output,
+                            thinking_tokens=None,
+                            input_tokens=prompt,
+                        )
                     delta = choice.get("delta", {})
                     content = delta.get("content")
                     if content:
@@ -250,6 +317,7 @@ class OpenAICompatModelProvider(ModelProvider):
                         buffer["name"] = function.get("name") or buffer["name"]
                         buffer["args"] += function.get("arguments") or ""
         except httpx.HTTPError as error:
+            log_caught(error, __name__, locals())
             mapped = map_transport_error(error)
             assert mapped is not None  # httpx.HTTPError always maps
             raise mapped from None
@@ -265,16 +333,27 @@ class OpenAICompatModelProvider(ModelProvider):
                 ) from None
             yield GenerateResponse(text=None, profile_id=self._profile_id, tool_calls=tool_calls)
 
-    def embed(self, request: Any) -> Any:
-        texts = request["input"] if isinstance(request, dict) else request
-        response = self._post("/embeddings", {"model": self._profile.model, "input": texts})
+    def embed(self, request: EmbedRequest) -> EmbedResponse:
+        typed = isinstance(request, EmbedRequest)
+        texts = request.texts if typed else request["input"] if isinstance(request, dict) else request
+        body: dict[str, Any] = {"model": self._profile.model, "input": texts}
+        if typed:
+            body.update(dimensions=request.dimensions, input_type=request.task)
+        response = self._post("/embeddings", body)
         self._raise_for_status(response)
         data = self._parse(response)
         try:
             vectors = [item["embedding"] for item in data["data"]]
         except (KeyError, TypeError) as error:
+            log_caught(error, __name__, locals())
             raise ProviderError(self._scrub(f"PL-02: provider response missing {error}")) from None
-        return {"vectors": vectors, "usage": data.get("usage", {})}
+        if typed:
+            if len(vectors) != len(request.texts) or any(len(vector) != request.dimensions for vector in vectors):
+                raise ProviderError("RT-05: embedding response has the wrong shape")
+            usage = {key: value for key, value in data.get("usage", {}).items() if isinstance(value, int)}
+            return EmbedResponse(vectors=vectors, profile_id=self._profile_id, usage=usage or None)
+        # older provider tests still exercise the pre-RT-05 raw shape (as FakeModelProvider does)
+        return {"vectors": vectors, "usage": data.get("usage", {})}  # type: ignore[return-value]
 
     def count_tokens(self, text: str) -> int:
         # No universal tokenize route across OpenAI-compatible endpoints;

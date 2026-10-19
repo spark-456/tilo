@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/browser.started.schema.json",
+  "x-version": "1.0.0",
+  "title": "BrowserStartedData",
+  "description": "data of browser.started (registry 1.7.0, ADR-0051, FR-CON-07): tilo-browser opened an isolated session for a unit and showed its first page. actor is the unit's agent, target the Browser Station building; authz null (browsing and reading are T1, BR-05). host is the start page's host; hosts counts the allowlist; frame is the first masked screenshot (an artifact of origin browser, BR-09), null when the page gave none. Never a full URL, query or page text (BR-13).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["session", "host", "hosts", "max_steps", "frame"],
+  "properties": {
+    "session": { "$ref": "../../browser.schema.json#/$defs/session_id" },
+    "host": { "$ref": "../../browser.schema.json#/$defs/host" },
+    "hosts": { "type": "integer", "minimum": 1, "maximum": 20 },
+    "max_steps": { "type": "integer", "minimum": 1, "maximum": 60 },
+    "frame": {
+      "anyOf": [{ "$ref": "../../common.schema.json#/$defs/artifact_ref" }, { "type": "null" }]
+    }
+  }
+}

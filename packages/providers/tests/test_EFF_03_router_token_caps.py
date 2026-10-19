@@ -413,5 +413,8 @@ def test_EFF_03_the_director_role_has_an_input_cap_below_every_profile_context(n
     import yaml  # noqa: PLC0415
 
     config = yaml.safe_load((pathlib.Path(__file__).resolve().parents[3] / "config" / name).read_text("utf-8"))
-    cap = config["roles"]["director"]["max_input_tokens"]
-    assert isinstance(cap, int) and 0 < cap < min(p["context"] for p in config["profiles"].values() if p["context"])
+    role = config["roles"]["director"]
+    cap = role["max_input_tokens"]
+    # every profile the Director can route to (an embedding profile's small context is not one: RT-05)
+    chain = [config["profiles"][role[k]] for k in ("primary", "fallback") if role.get(k)]
+    assert chain and isinstance(cap, int) and 0 < cap < min(p["context"] for p in chain if p["context"])

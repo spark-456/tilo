@@ -1,7 +1,15 @@
 // The seam between AG-WEB and the Claude lane CL-INT (issue #80). The interface below is
 // verbatim from the issue (kept on its lines with biome-ignore); changing a signature needs the
 // orchestrator's OK on that issue.
-import type { Brief, Card, Event, Layout, PlanApproach } from "@tilo/contracts";
+import type {
+  Brief,
+  Card,
+  Event,
+  Layout,
+  MakeWith,
+  PlanApproach,
+  PlanMakeChoice,
+} from "@tilo/contracts";
 
 // biome-ignore format: verbatim from issue #80
 export interface IntakeFileStatus { name: string; status: "ok" | "failed"; safety_flagged: boolean; reason: string | null }
@@ -12,9 +20,9 @@ export interface IntakeResult { task_id: string; brief: Brief; files: IntakeFile
 // biome-ignore format: verbatim from issue #80
 export interface QuestionAnswer { field: string; answer: string | null } // null = skipped; the brief records the assumption
 // biome-ignore format: verbatim from issue #80
-export interface ApproachesResult { task_id: string; approaches: PlanApproach[]; recommended: string; credit_usd: number }
+export interface ApproachesResult { task_id: string; approaches: PlanApproach[]; recommended: string; credit_usd: number; min_grant?: number; make_choices?: PlanMakeChoice[] }
 // biome-ignore format: verbatim from issue #80
-export interface ApprovalRequest { approach_id: string; budget_cap: number }
+export interface ApprovalRequest { approach_id: string; budget_cap: number; make_with?: { deliverable: number; make_with: MakeWith }[] }
 // biome-ignore format: verbatim from issue #80
 export interface DeliveredArtifact { id: string; title: string; kind: string; version: number }
 // biome-ignore format: verbatim from issue #80
@@ -36,4 +44,6 @@ export interface TiloClient {
   listCards(worldId: string): Promise<Card[]>;
   answerCard(cardId: string, answer: CardAnswer): Promise<void>;
   getDelivery(worldId: string): Promise<DeliveryResult>;
+  /** SEC-16: resolves only when the server confirmed receipt (the lifetime-cap pop-up's feedback box). */
+  submitFeedback(words: string): Promise<void>;
 }

@@ -22,7 +22,7 @@ below). API: API_FR_CHN_11.md (`t3_content_signal`, `Autopilot.preview`); no new
 from __future__ import annotations
 
 import pytest
-from _chn11_lib import USER, autopilot_module, make_bench, pair, scripted_thread
+from _chn11_lib import EXTRA_NAMES, USER, VOUCHED, autopilot_module, make_bench, pair, scripted_thread
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -45,9 +45,9 @@ def never_auto_sent(body: str) -> None:
     assert bench.outbox.entries == {}, "T3 is never scheduled without a person"
 
 
-def auto_sent(body: str) -> None:
+def auto_sent(body: str, names: tuple[str, ...] = EXTRA_NAMES) -> None:
     bench = make_bench("L2")
-    thread = scripted_thread(bench)
+    thread = scripted_thread(bench, names=names)
     card = bench.ap.preview(USER, *pair(thread, body))
     assert card.tier == "T2" and card.modifiers == (), f"harmless reply made T3: {body!r}"
     assert (card.level, card.undo_window_s) == ("L2", 60) and card.outbox_id is not None
@@ -68,8 +68,8 @@ CONTROLS = [
 
 @pytest.mark.parametrize("text", CONTROLS)
 def test_CHN_GATE_C_FR_CHN_11_short_harmless_scheduling_replies_give_no_signal(text: str) -> None:
-    assert autopilot_module().t3_content_signal(text) == frozenset()
-    assert autopilot_module().t3_content_signal(wrap(text)) == frozenset()
+    assert autopilot_module().t3_content_signal(text, names=VOUCHED) == frozenset()
+    assert autopilot_module().t3_content_signal(wrap(text), names=VOUCHED) == frozenset()
 
 
 @pytest.mark.parametrize("text", CONTROLS)
@@ -80,7 +80,7 @@ def test_CHN_GATE_C_FR_CHN_11_short_harmless_scheduling_replies_still_ride_l2(te
 @settings(max_examples=40, deadline=None)
 @given(st.lists(st.sampled_from(CONTROLS), min_size=1, max_size=4))
 def test_CHN_GATE_C_FR_CHN_11_property_any_mix_of_harmless_lines_gives_no_signal(lines: list[str]) -> None:
-    assert autopilot_module().t3_content_signal(wrap(" ".join(lines))) == frozenset()
+    assert autopilot_module().t3_content_signal(wrap(" ".join(lines)), names=VOUCHED) == frozenset()
 
 
 # ---- (a) allowlist: digits, amounts, links, length -------------------------------------------------------------------
@@ -122,7 +122,7 @@ def test_CHN_GATE_C_FR_CHN_11_the_existing_1600_character_benign_preview_keeps_t
     # The existing preview test pins this at L1 / T2; the allowlist limit must sit above it (BQ-224).
     body = "Hi David,\n\n" + "Friday 2pm works for us. See you then. " * 40 + "\n\nBest,\nSarah"
     assert len(body) <= SHORT_BODY_MAX
-    assert autopilot_module().t3_content_signal(body) == frozenset()
+    assert autopilot_module().t3_content_signal(body, names=VOUCHED) == frozenset()
 
 
 # ---- (b) word-list additions -----------------------------------------------------------------------------------------

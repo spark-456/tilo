@@ -15,8 +15,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import yaml
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 FIXTURES = REPO_ROOT / "contracts" / "fixtures" / "events" / "valid"
+REGISTRY = REPO_ROOT / "contracts" / "events" / "registry.yaml"
 NOW = datetime(2026, 10, 4, 12, 0, 0, tzinfo=UTC)
 
 # The top-level TiloEvent columns that are REQUIRED in the ledger table (infra/modules/events/main.tf, PRD 9.3).
@@ -28,8 +31,14 @@ def fixture_event(name: str) -> dict[str, Any]:
 
 
 def all_fixture_events() -> list[dict[str, Any]]:
-    """The 72 registered-type fixtures, one event per type. Their ids are unique (checked by the tests)."""
-    return [json.loads(p.read_text(encoding="utf-8")) for p in sorted(FIXTURES.glob("*.json"))]
+    """The canonical fixture of every registered type, `<type>.json`, one event per type. Further valid cases
+    (`<type>--<case>.json`, contracts/event.rules.md) are left out. Their ids are unique (checked by the tests)."""
+    return [json.loads(p.read_text(encoding="utf-8")) for p in sorted(FIXTURES.glob("*.json")) if "--" not in p.stem]
+
+
+def registered_types() -> set[str]:
+    """Every event type listed in contracts/events/registry.yaml."""
+    return set(yaml.safe_load(REGISTRY.read_text(encoding="utf-8"))["types"])
 
 
 def make_event(

@@ -1,0 +1,45 @@
+{
+  "v": "1.0",
+  "id": "01JB5VQ0000000000000WST001",
+  "seq": 41,
+  "ts": "2026-10-16T09:30:54.500Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "data.transfer",
+  "actor": "A_s1",
+  "target": "B1",
+  "level": "L1",
+  "district": "D1",
+  "item": {
+    "kind": "scroll",
+    "artifact_id": null,
+    "label": "Mail search"
+  },
+  "severity": "info",
+  "credits": 0,
+  "summary": "An agent read from Gmail.",
+  "cause": null,
+  "vis": ["D1"],
+  "authz": {
+    "by": "person",
+    "ref": "u_owner",
+    "at": "2026-10-01T08:00:00.000Z"
+  },
+  "data": {
+    "connector": "gmail",
+    "action_type": "search_email",
+    "direction": "in",
+    "artifact": null,
+    "outbox_id": null,
+    "risk_tier": "T1"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": "search_email",
+    "latency_ms": 640,
+    "archive_ref": "r_village_basic_1/40"
+  }
+}

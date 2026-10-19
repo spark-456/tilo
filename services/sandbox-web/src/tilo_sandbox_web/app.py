@@ -12,6 +12,8 @@ import yaml
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
+from tilo_sandbox_web.fetch_fixtures import router as fetch_fixtures_router
+
 SEED_DIR = Path(__file__).resolve().parents[2] / "seed"
 CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'"  # inline <style> only; no external source
 MAX_QUOTE_INPUT = 1_000_000
@@ -69,6 +71,7 @@ def render_page(seed: dict[str, Any], page_key: str) -> str:
 
 
 app = FastAPI(title="Tilo Sandbox Web", docs_url=None, redoc_url=None, openapi_url=None)
+app.include_router(fetch_fixtures_router)
 
 
 @app.middleware("http")

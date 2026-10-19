@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/meeting_join.schema.json",
+  "x-version": "1.0.0",
+  "title": "MeetingJoin",
+  "description": "The answer of `GET /v1/meetings/{meeting_id}/join` (ADR-0024 amendment 4): the Google Meet link of a meeting Tilo hosts, for that meeting's owner only, read from the host account's event when the owner clicks and stored nowhere (rules MJ-01 to MJ-10 in `meeting_join.rules.md`). It is a response body, never a record: no store, cache, event, card, notification, archive record or log line holds it, and `meeting.schema.json` and `calendar_entry.schema.json` still have no field that can. `join_url` is exactly `https://meet.google.com/` and a three-four-three lower-case meeting code: no other scheme, host, user info, port, path, query or fragment (36 characters, so a trailing newline is refused in every engine). `expires_at` is the server's clock plus 60 seconds: the client drops the link then, or when the view closes, and asks again on the next click.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["join_url", "expires_at"],
+  "properties": {
+    "join_url": {
+      "type": "string",
+      "minLength": 36,
+      "maxLength": 36,
+      "pattern": "^https://meet\\.google\\.com/[a-z]{3}-[a-z]{4}-[a-z]{3}$"
+    },
+    "expires_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    }
+  }
+}

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div data-screen-label="Ledger" style="background:var(--sheet);border:1px solid var(--gBd);border-radius:28px;box-shadow:var(--sh);padding:28px 32px 36px;display:flex;flex-direction:column;gap:20px">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <h1 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:36px;letter-spacing:-.8px;line-height:1.05">Ledger</h1>
+      <p style="margin:0;font-size:15.5px;font-weight:600;color:var(--ink2)">Every cost and every decision your agents make. September 2026 · 6 days left · budget £8,000.</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button onClick="{{ month }}" style="height:42px;padding:0 12px 0 16px;border-radius:12px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-size:14.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap">September 2026{{ icChevD }}</button>
+      <button onClick="{{ exportCsv }}" style="height:42px;padding:0 16px 0 14px;border-radius:12px;background:var(--btn2);border:1px solid var(--line);color:var(--ink);font-size:14.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap">{{ icDown }}Export CSV</button>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px">
+    <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="5">
+      <button onClick="{{ k.click }}" style="background:{{ k.bg }};border:1px solid {{ k.bd }};border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:4px;text-align:left;cursor:{{ k.cur }};color:var(--ink);min-width:0;transition:background-color .3s">
+        <span style="font-size:13px;font-weight:800;color:{{ k.lc }}">{{ k.label }}</span>
+        <span style="font-size:28px;font-weight:800;letter-spacing:-.6px;color:{{ k.vc }}">{{ k.value }}</span>
+        <span style="font-size:13px;font-weight:700;color:var(--ink2)">{{ k.sub }}</span>
+      </button>
+    </sc-for>
+  </div>
+
+  <div style="display:grid;grid-template-columns:{{ cols }};gap:18px;align-items:stretch">
+    <section aria-label="Spend over the month" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:20px 22px 18px;display:flex;flex-direction:column;gap:14px;min-width:0">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <div><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--ink3)">SPEND OVER TIME</div><h2 style="margin:4px 0 0;font-size:18px;font-weight:800">On track to finish £1,700 under budget</h2><div style="font-size:13.5px;font-weight:600;color:var(--ink2);margin-top:3px">Running total for September. Hover for daily spend.</div></div>
+        <div style="display:flex;gap:14px;font-size:12.5px;font-weight:700;color:var(--ink2);flex-wrap:wrap">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:3px;border-radius:2px;background:var(--hero)"></span>Spent</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:0;border-top:3px dotted #F0A500"></span>Forecast</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:0;border-top:2px dashed var(--ink3)"></span>Even pace</span>
+        </div>
+      </div>
+      <div onMouseMove="{{ c.move }}" onMouseLeave="{{ c.leave }}" style="position:relative;width:100%;aspect-ratio:720/270;cursor:crosshair">
+        <svg viewBox="0 0 720 270" width="100%" height="100%" style="position:absolute;inset:0;overflow:visible;display:block">
+          <path d="{{ c.grid }}" style="stroke:var(--line2);stroke-width:1;fill:none"></path>
+          <path d="{{ c.pace }}" style="stroke:var(--ink3);stroke-width:1.5;stroke-dasharray:5 6;fill:none;opacity:.7"></path>
+          <path d="{{ c.cap }}" style="stroke:var(--red);stroke-width:1.5;stroke-dasharray:2 5;stroke-linecap:round;fill:none;opacity:.8"></path>
+          <path d="{{ c.area }}" style="fill:var(--heroSoft);stroke:none"></path>
+          <path d="{{ c.fc }}" style="stroke:#F0A500;stroke-width:3;stroke-dasharray:1 7;stroke-linecap:round;fill:none"></path>
+          <path d="{{ c.line }}" style="stroke:var(--hero);stroke-width:3;fill:none;stroke-linejoin:round;stroke-linecap:round"></path>
+          <path d="{{ c.today }}" style="stroke:var(--line);stroke-width:1.5;fill:none"></path>
+          <circle cx="{{ c.nowX }}" cy="{{ c.nowY }}" r="5.5" style="fill:var(--hero);stroke:var(--card);stroke-width:2.5"></circle>
+          <circle cx="{{ c.endX }}" cy="{{ c.endY }}" r="4.5" style="fill:var(--card);stroke:#F0A500;stroke-width:2.5"></circle>
+          <path d="{{ c.hLine }}" style="stroke:var(--ink3);stroke-width:1;fill:none;opacity:{{ c.hOp }}"></path>
+          <circle cx="{{ c.hx }}" cy="{{ c.hy }}" r="5" style="fill:var(--hero);stroke:var(--card);stroke-width:2.5;opacity:{{ c.hOp }}"></circle>
+        </svg>
+        <sc-for list="{{ c.yLabels }}" as="l" hint-placeholder-count="4"><span style="position:absolute;left:0;top:{{ l.top }};transform:translateY(-50%);font-size:12px;font-weight:700;color:var(--ink3)">{{ l.t }}</span></sc-for>
+        <sc-for list="{{ c.xLabels }}" as="l" hint-placeholder-count="5"><span style="position:absolute;left:{{ l.left }};bottom:-2px;transform:translateX(-50%);font-size:12px;font-weight:700;color:var(--ink3);white-space:nowrap">{{ l.t }}</span></sc-for>
+        <span style="position:absolute;right:0;top:{{ c.capTop }};transform:translateY(-130%);font-size:12px;font-weight:800;color:var(--redInk)">Budget £8,000</span>
+        <span style="position:absolute;left:{{ c.spikeLeft }};top:{{ c.spikeTop }};transform:translate(-100%,-100%);font-size:12px;font-weight:800;color:var(--ink2);white-space:nowrap;padding-right:6px">Motor dev kit £1,140</span>
+        <span style="position:absolute;left:{{ c.fcLeft }};top:{{ c.fcTop }};transform:translate(-50%,-120%);font-size:12px;font-weight:800;color:var(--amberInk);white-space:nowrap">{{ c.fcLabel }}</span>
+        <div style="position:absolute;left:{{ c.tipLeft }};top:0;transform:translateX(-50%);opacity:{{ c.hOp }};pointer-events:none;background:var(--toast);color:var(--toastInk);border-radius:10px;padding:7px 10px;font-size:12.5px;font-weight:800;white-space:nowrap;line-height:1.35;transition:opacity .15s"><div>{{ c.tipA }}</div><div style="font-weight:600;opacity:.8">{{ c.tipB }}</div></div>
+      </div>
+    </section>
+
+    <section aria-label="Where it goes" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:20px 22px;display:flex;flex-direction:column;gap:16px;min-width:0">
+      <div><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--ink3)">WHERE IT GOES</div><h2 style="margin:4px 0 0;font-size:18px;font-weight:800;line-height:1.3;text-wrap:balance">{{ byHead }}</h2></div>
+      <div role="tablist" aria-label="Group by" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;padding:3px;border-radius:12px;background:var(--seg)">
+        <sc-for list="{{ byTabs }}" as="t" hint-placeholder-count="3"><button role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="height:32px;border:0;border-radius:9px;background:{{ t.bg }};box-shadow:{{ t.sh }};color:{{ t.fg }};font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap">{{ t.label }}</button></sc-for>
+      </div>
+      <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+        <div style="position:relative;width:140px;height:140px;flex:none">
+          <div style="position:absolute;inset:0;border-radius:999px;background:{{ conic }};transition:background .4s"></div>
+          <div style="position:absolute;inset:24px;border-radius:999px;background:var(--pop);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15"><span style="font-size:11.5px;font-weight:800;color:var(--ink3)">Total</span><span style="font-size:20px;font-weight:800">£2,412</span></div>
+        </div>
+        <div style="flex:1 1 150px;min-width:0;display:flex;flex-direction:column;gap:9px">
+          <sc-for list="{{ byRows }}" as="r" hint-placeholder-count="5">
+            <div style="display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:8px;align-items:center;font-size:13.5px;font-weight:700;animation:tiloFade .35s cubic-bezier(.2,.8,.2,1) both">
+              <span style="width:10px;height:10px;border-radius:3px;background:{{ r.c }}"></span>
+              <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span>
+              <span style="font-size:12.5px;color:var(--ink2);white-space:nowrap">{{ r.amt }} · {{ r.pct }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:18px;align-items:stretch">
+    <section aria-label="Cost per run" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:20px 22px;display:flex;flex-direction:column;gap:14px;min-width:0">
+      <div><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--ink3)">COST PER RUN</div><h2 style="margin:4px 0 0;font-size:18px;font-weight:800;line-height:1.3;text-wrap:balance">Repeat work gets cheaper. Invoice matching now costs 79% less.</h2></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:10px">
+        <sc-for list="{{ runs }}" as="s" hint-placeholder-count="4">
+          <button onClick="{{ s.open }}" style="background:var(--sunk);border:0;border-radius:16px;padding:13px 14px 11px;display:flex;flex-direction:column;gap:8px;text-align:left;cursor:pointer;color:var(--ink);min-width:0;transition:background-color .2s" style-hover="background:var(--rowOn)">
+            <span style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;width:100%"><span style="font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.name }}</span><span style="font-size:12.5px;font-weight:800;color:var(--okInk);flex:none">{{ s.drop }}</span></span>
+            <svg viewBox="0 0 200 60" preserveAspectRatio="none" style="width:100%;height:50px;display:block;overflow:visible">
+              <path d="{{ s.area }}" style="fill:var(--okSoft)"></path>
+              <path d="{{ s.line }}" fill="none" vector-effect="non-scaling-stroke" style="stroke:var(--ok);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round"></path>
+            </svg>
+            <span style="display:flex;justify-content:space-between;width:100%;font-size:12px;font-weight:700;color:var(--ink2)"><span>{{ s.first }} run 1</span><span>{{ s.now }} run {{ s.n }}</span></span>
+          </button>
+        </sc-for>
+      </div>
+    </section>
+
+    <section aria-label="Approval wait times" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:20px 22px;display:flex;flex-direction:column;gap:14px;min-width:0">
+      <div><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--ink3)">APPROVAL WAIT TIMES</div><h2 style="margin:4px 0 0;font-size:18px;font-weight:800;line-height:1.3;text-wrap:balance">Most asks get a yes in 9 minutes. Sharing outside waits longest.</h2></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ waits }}" as="b" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:76px minmax(0,1fr) 28px;gap:10px;align-items:center;font-size:13px;font-weight:700">
+            <span style="color:var(--ink2)">{{ b.label }}</span>
+            <span style="height:20px;border-radius:6px;background:var(--track);overflow:hidden"><span style="display:block;height:100%;width:{{ b.w }};background:{{ b.c }};border-radius:6px;transition:width .5s cubic-bezier(.2,.8,.2,1)"></span></span>
+            <span style="text-align:right">{{ b.n }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="border-top:1px solid var(--line2);padding-top:12px;display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ waitTypes }}" as="w" hint-placeholder-count="4"><div style="display:flex;justify-content:space-between;gap:10px;font-size:13.5px;font-weight:700"><span>{{ w.name }}</span><span style="color:{{ w.c }};white-space:nowrap">{{ w.v }}</span></div></sc-for>
+      </div>
+      <sc-if value="{{ needBackup }}" hint-placeholder-val="{{ true }}">
+        <div style="background:var(--amberSoft);border:1px solid var(--amberLine);border-radius:14px;padding:10px 12px 10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="flex:1 1 200px;font-size:13.5px;font-weight:700;line-height:1.4">Jin approves all outside sharing. A backup approver would cut the wait.</span>
+          <button onClick="{{ addBackup }}" style="height:34px;padding:0 12px;border:0;border-radius:10px;background:#F0A500;color:#1F1D2B;font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap">Add a backup</button>
+        </div>
+      </sc-if>
+    </section>
+  </div>
+
+  <section aria-label="What Tilo gave back" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:20px 22px;display:flex;flex-direction:column;gap:16px;min-width:0">
+    <div><div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--ink3)">WHAT TILO GAVE BACK</div><h2 style="margin:4px 0 0;font-size:18px;font-weight:800">£640 saved by memory and 46 hours handed back to people</h2></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:26px">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between;font-size:13.5px;font-weight:800"><span>Saved by memory, per week</span><span style="color:var(--sch)">£640</span></div>
+        <div style="height:160px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:end;border-bottom:1px solid var(--line)">
+          <sc-for list="{{ memory }}" as="b" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end">
+              <span style="font-size:12.5px;font-weight:800">{{ b.v }}</span>
+              <span style="width:100%;max-width:60px;height:{{ b.h }};border-radius:10px 10px 3px 3px;background:{{ b.c }};transform-origin:bottom;animation:tiloGrow .7s cubic-bezier(.2,.8,.2,1) both"></span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;font-size:12px;font-weight:700;color:var(--ink3);text-align:center"><span>1–7 Sep</span><span>8–14</span><span>15–21</span><span>22–24</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;justify-content:space-between;font-size:13.5px;font-weight:800"><span>Hours handed back, by team</span><span style="color:var(--heroInk)">46 h</span></div>
+        <div style="height:26px;border-radius:9px;overflow:hidden;display:flex;gap:3px">
+          <sc-for list="{{ hours }}" as="t" hint-placeholder-count="4"><span style="height:100%;width:{{ t.w }};background:{{ t.c }}"></span></sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">
+          <sc-for list="{{ hours }}" as="t" hint-placeholder-count="4">
+            <div style="background:var(--sunk);border-radius:14px;padding:10px 13px;display:flex;gap:10px;align-items:center;min-width:0">
+              <span style="width:8px;height:28px;border-radius:4px;background:{{ t.c }};flex:none"></span>
+              <span style="min-width:0;line-height:1.3"><span style="display:block;font-weight:800;font-size:14px">{{ t.name }} · {{ t.h }}</span><span style="display:block;font-size:12.5px;color:var(--ink2);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.what }}</span></span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="Activity" style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:18px 14px 10px;display:flex;flex-direction:column;gap:6px;min-width:0">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:0 8px 6px;flex-wrap:wrap">
+      <h2 style="margin:0;font-size:18px;font-weight:800">Activity</h2>
+      <div role="tablist" aria-label="Entry type" style="display:flex;gap:2px;padding:3px;border-radius:12px;background:var(--seg);flex-wrap:wrap">
+        <sc-for list="{{ kinds }}" as="k" hint-placeholder-count="7"><button role="tab" aria-selected="{{ k.on }}" onClick="{{ k.pick }}" style="height:32px;padding:0 11px;border:0;border-radius:9px;background:{{ k.bg }};box-shadow:{{ k.sh }};color:{{ k.fg }};font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap">{{ k.label }}</button></sc-for>
+      </div>
+    </div>
+    <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div style="font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--ink3);padding:10px 10px 4px">{{ g.day }}</div>
+        <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3">
+          <div style="border-radius:16px;background:{{ r.rowBg }};transition:background-color .2s">
+            <button onClick="{{ r.toggle }}" aria-expanded="{{ r.open }}" style="width:100%;display:grid;grid-template-columns:56px 40px minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 10px;border:0;background:transparent;border-radius:16px;text-align:left;cursor:pointer;color:var(--ink)" style-hover="background:var(--rowHover)">
+              <span style="font-size:13px;font-weight:700;color:var(--ink2)">{{ r.time }}</span>
+              <span style="width:40px;height:40px;border-radius:12px;background:{{ r.tile }};color:{{ r.ic }};display:flex;align-items:center;justify-content:center">{{ r.icon }}</span>
+              <span style="min-width:0"><span style="display:block;font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.what }}</span><span style="display:block;font-size:13px;color:var(--ink2);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.sub }}</span></span>
+              <span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px"><span style="font-weight:800;font-size:15px;color:{{ r.amtC }};white-space:nowrap">{{ r.amt }}</span><span style="font-size:12px;font-weight:800;color:{{ r.tagC }};white-space:nowrap">{{ r.tag }}</span></span>
+            </button>
+            <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:2px 16px 14px 130px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 28px;font-size:13.5px;line-height:1.4;animation:tiloFade .3s cubic-bezier(.2,.8,.2,1) both">
+                <sc-for list="{{ r.detail }}" as="d" hint-placeholder-count="3"><div><div style="font-size:12px;font-weight:800;color:var(--ink3)">{{ d.k }}</div><div style="font-weight:700">{{ d.v }}</div></div></sc-for>
+                <div style="display:flex;gap:8px;margin-left:auto">
+                  <sc-if value="{{ r.canApprove }}" hint-placeholder-val="{{ false }}"><button onClick="{{ r.approve }}" style="height:34px;padding:0 13px;border:0;border-radius:10px;background:#F0A500;color:#1F1D2B;font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap">{{ r.approveL }}</button></sc-if>
+                  <button onClick="{{ r.openWorld }}" style="height:34px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--btn2);color:var(--ink);font-size:13.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap">Open in world{{ icChev }}</button>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </sc-for>
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}"><div style="padding:24px;text-align:center;font-size:14px;font-weight:700;color:var(--ink3)">Nothing here this month.</div></sc-if>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { by: 'world', k: 'all', hover: null, open: 0 };
+  renderVals() {
+    const h = React.createElement, app = this.props.app || {}, TA = window.TiloApp, D = TA && TA.data;
+    if (!D) return {};
+    const K = TA.ready() ? TA.kit(h) : null, S = this.state, dec = app.dec || {}, go = app.go || (() => {}), toast = app.toast || (() => {});
+    const icon = (n, s) => K ? K.icon(n, s) : null, up = p => this.setState(p), gbp = D.gbp, L = D.ledger;
+    const seg = on => ({ bg: on ? 'var(--tabOn)' : 'transparent', sh: on ? '0 1px 3px rgba(31,29,43,.16)' : 'none', fg: on ? 'var(--ink)' : 'var(--ink2)' });
+    const kpis = [
+      { label: 'Spent so far', value: dec.depot ? '£5,832' : '£2,412', sub: dec.depot ? '73% of £8,000' : '30% of £8,000', bg: 'var(--card)', bd: 'var(--line2)', lc: 'var(--ink2)', vc: 'var(--ink)' },
+      { label: 'Month-end forecast', value: '£6,300', sub: '£1,700 under budget', bg: 'var(--card)', bd: 'var(--line2)', lc: 'var(--ink2)', vc: 'var(--ink)' },
+      dec.depot ? { label: 'Waiting on you', value: '£0', sub: 'Laptop Depot approved today', bg: 'var(--okSoft)', bd: 'transparent', lc: 'var(--okInk)', vc: 'var(--okInk)' }
+        : { label: 'Waiting on you', value: '£3,420', sub: 'Laptop Depot sign-off', bg: 'var(--amberSoft)', bd: 'var(--amberLine)', lc: 'var(--amberInk)', vc: 'var(--amberInk)', click: () => go('world', { id: 'k1' }), cur: 'pointer' },
+      { label: 'Saved by memory', value: '£640', sub: 'Up £120 on August', bg: 'var(--schSoft)', bd: 'transparent', lc: 'var(--sch)', vc: 'var(--ink)' },
+      { label: 'Hours handed back', value: '46 h', sub: 'About 6 working days', bg: 'var(--heroSoft)', bd: 'transparent', lc: 'var(--heroInk)', vc: 'var(--ink)' }
+    ].map(k => ({ cur: 'default', click: undefined, ...k }));
+    const daily = L.daily.slice(); if (dec.depot) daily[23] += 3420;
+    const cum = []; daily.reduce((a, v, i) => (cum[i] = a + v), 0);
+    const X = d => 48 + (d - 1) * (652 / 29), Y = v => 236 - v / 8000 * 206;
+    const pts = cum.map((v, i) => [X(i + 1), Y(v)]), P = a => a.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+    const now = pts[pts.length - 1], fcPts = dec.depot ? [now, [X(30), Y(6300)]] : [now, [X(25), Y(2412 + 3420 + 70)], [X(30), Y(6300)]];
+    const hd = S.hover != null ? Math.min(24, Math.max(1, S.hover)) : null, DN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const c = {
+      grid: [0, 2000, 4000, 6000].map(v => 'M48 ' + Y(v).toFixed(1) + ' H700').join(' '), line: P(pts), area: P(pts) + ' L' + now[0].toFixed(1) + ' 236 L48 236 Z',
+      fc: P(fcPts), pace: 'M' + X(1) + ' ' + Y(0) + ' L' + X(30) + ' ' + Y(8000), cap: 'M48 ' + Y(8000) + ' H700', today: 'M' + now[0].toFixed(1) + ' 24 V236',
+      nowX: now[0].toFixed(1), nowY: now[1].toFixed(1), endX: X(30).toFixed(1), endY: Y(6300).toFixed(1),
+      yLabels: [[0, '£0'], [2000, '£2k'], [4000, '£4k'], [6000, '£6k']].map(([v, t]) => ({ t, top: (Y(v) / 270 * 100).toFixed(2) + '%' })),
+      xLabels: [[1, '1 Sep'], [8, '8'], [15, '15'], [24, 'Today'], [30, '30 Sep']].map(([d, t]) => ({ t, left: (X(d) / 720 * 100).toFixed(2) + '%' })),
+      capTop: (Y(8000) / 270 * 100) + '%', spikeLeft: ((X(21) - 4) / 720 * 100).toFixed(2) + '%', spikeTop: (Y(cum[20]) / 270 * 100).toFixed(2) + '%',
+      fcLeft: (X(27.4) / 720 * 100).toFixed(2) + '%', fcTop: (Y(5950) / 270 * 100).toFixed(2) + '%', fcLabel: dec.depot ? 'Forecast £6,300' : 'If you approve £3,420',
+      hOp: hd ? '1' : '0', hx: hd ? X(hd).toFixed(1) : '0', hy: hd ? Y(cum[hd - 1]).toFixed(1) : '0', hLine: hd ? 'M' + X(hd).toFixed(1) + ' 24 V236' : 'M0 0',
+      tipLeft: hd ? (X(hd) / 720 * 100).toFixed(2) + '%' : '0%', tipA: hd ? DN[(hd + 1) % 7] + ' ' + hd + ' Sep · ' + gbp(daily[hd - 1]) : '', tipB: hd ? 'Running total ' + gbp(cum[hd - 1]) : '',
+      move: e => { const r = e.currentTarget.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * 720, d = Math.round((x - 48) / (652 / 29)) + 1; if (d !== this.state.hover) this.setState({ hover: d }); },
+      leave: () => this.setState({ hover: null })
+    };
+    const PAL = ['#5A3FE0', '#0E7C79', '#F0A500', '#D9588C', '#3F7FE0', '#8C8899'];
+    const B = L.by[S.by], tot = B.rows.reduce((a, r) => a + r[1], 0);
+    let acc = 0;
+    const stops = B.rows.map((r, i) => { const a = acc / tot * 100; acc += r[1]; const b = acc / tot * 100; return PAL[i] + ' ' + a.toFixed(2) + '% ' + (b - .5).toFixed(2) + '%, transparent ' + (b - .5).toFixed(2) + '% ' + b.toFixed(2) + '%'; });
+    const byRows = B.rows.map((r, i) => ({ name: r[0], amt: gbp(r[1]), pct: Math.round(r[1] / tot * 100) + '%', c: PAL[i] }));
+    const runs = L.runs.map(([name, v, n, sk]) => {
+      const mx = v[0], p = v.map((cc, i) => [i / (v.length - 1) * 200, 6 + (1 - cc / mx) * 50]), line = P(p);
+      return { name, n: String(n), line, area: line + ' L200 60 L0 60 Z', first: '£' + v[0].toFixed(2), now: '£' + v[v.length - 1].toFixed(2), drop: '−' + Math.round((1 - v[v.length - 1] / v[0]) * 100) + '%', open: () => go('skills', { id: sk }) };
+    });
+    const bk = L.waits.buckets, bmax = Math.max(...bk.map(b => b[1]));
+    const waits = bk.map(([label, n], i) => ({ label, n: String(n), w: (n / bmax * 100) + '%', c: i < 2 ? 'var(--ok)' : i < 3 ? 'var(--sch)' : '#F0A500' }));
+    const backup = app.prefs && app.prefs.backup;
+    const waitTypes = L.waits.types.map(([name, v, tone]) => ({ name, v: name.startsWith('Sharing') && backup ? 'About 20 min with a backup' : v, c: tone === 'ok' ? 'var(--okInk)' : tone === 'amber' && !backup ? 'var(--amberInk)' : 'var(--ink)' }));
+    const memory = L.memory.map((v, i) => ({ v: '£' + v, h: (v / 200 * 120) + 'px', c: i === 3 ? 'var(--sch)' : 'var(--schSoft)' }));
+    const hours = L.hours.map(([name, hh, cc, what]) => ({ name, h: hh + ' h', w: (hh / 46 * 100) + '%', c: cc, what }));
+    const KM = {
+      spend: ['coin', 'var(--heroSoft)', 'var(--heroInk)', 'Spend', 'spend'], approval: ['check', 'var(--okSoft)', 'var(--ok)', 'Approved', 'approval'], declined: ['lock', 'var(--redSoft)', 'var(--redInk)', 'Declined', 'approval'],
+      gate: ['flag', 'var(--chip)', 'var(--ink2)', 'Gate passed', 'gate'], waiting: ['help', 'var(--amberTile)', 'var(--amberInk)', 'Waiting on you', 'waiting'], waitshare: ['help', 'var(--amberTile)', 'var(--amberInk)', 'Waiting on you', 'waiting'],
+      share: ['up', 'var(--blueSoft)', 'var(--blueInk)', 'Shared outside', 'share'], saved: ['vault', 'var(--schSoft)', 'var(--sch)', 'Memory saving', 'saved']
+    };
+    const today = 'Today · Thu 24 Sep';
+    let E = L.activity.filter(e => !(e.dec && dec[e.dec]));
+    if (dec.mail) E = [{ day: today, t: 'Just now', k: 'share', world: 'k1', what: 'Sent the supplier brief to 3 battery suppliers', sub: 'K1 electric scooter · approved by you', amt: '—', detail: [['Recipients', '3 battery suppliers'], ['Signed with', 'Your approval'], ['Waited', '1 h 20 min']] }, ...E];
+    if (dec.depot) E = [{ day: today, t: 'Just now', k: 'approval', world: 'k1', what: 'You approved £3,420 for Laptop Depot', sub: 'K1 electric scooter · Alex Morgan', amt: '£3,420', detail: [['Your limit', 'No limit'], ['Asked by', 'Builder agent'], ['Waited', '1 h 10 min']] }, ...E];
+    const waitN = L.activity.filter(e => e.dec && !dec[e.dec]).length;
+    const kinds = [['all', 'All'], ['waiting', 'Waiting' + (waitN ? ' · ' + waitN : '')], ['spend', 'Spend'], ['approval', 'Approvals'], ['gate', 'Gates'], ['share', 'Shared'], ['saved', 'Savings']].map(([key, label]) => ({ label, on: S.k === key, ...seg(S.k === key), pick: () => up({ k: key, open: -1 }) }));
+    const groups = [];
+    E.forEach((e, i) => {
+      const m = KM[e.k]; if (S.k !== 'all' && m[4] !== S.k) return;
+      let g = groups.find(x => x.day === e.day); if (!g) groups.push(g = { day: e.day, rows: [] });
+      const isOpen = S.open === i, waiting = !!e.dec;
+      g.rows.push({ time: e.t, what: e.what, sub: e.sub, amt: e.amt, tag: m[3], icon: icon(m[0], 17), tile: m[1], ic: m[2],
+        amtC: e.k === 'saved' ? 'var(--okInk)' : waiting ? 'var(--amberInk)' : e.k === 'spend' ? 'var(--ink)' : 'var(--ink2)', tagC: waiting ? 'var(--amberInk)' : e.k === 'declined' ? 'var(--redInk)' : 'var(--ink3)',
+        open: isOpen, rowBg: isOpen ? 'var(--sunk)' : waiting ? 'var(--amberSoft)' : 'transparent', detail: e.detail.map(([k2, v]) => ({ k: k2, v })),
+        canApprove: waiting, approveL: e.dec === 'depot' ? 'Approve £3,420' : 'Send brief', approve: () => app.decide && app.decide(e.dec),
+        openWorld: () => go('world', { id: e.world }), toggle: () => up({ open: isOpen ? -1 : i }) });
+    });
+    return {
+      icChevD: icon('chevD', 13), icDown: icon('download', 15), icChev: icon('chevR', 12),
+      month: () => toast('August and earlier months live here'), exportCsv: () => toast('Exported september-2026.csv · also synced to Xero'),
+      kpis, c, cols: (app.vw || 1440) >= 1100 ? 'minmax(0,1.65fr) minmax(320px,1fr)' : 'minmax(0,1fr)',
+      byTabs: [['world', 'World'], ['tool', 'Tool'], ['role', 'Agent']].map(([v, label]) => ({ label, on: S.by === v, ...seg(S.by === v), pick: () => up({ by: v }) })),
+      byHead: B.head, byRows, conic: 'conic-gradient(' + stops.join(', ') + ')',
+      runs, waits, waitTypes, needBackup: !backup, addBackup: () => go('team', { focus: 'share' }), memory, hours,
+      kinds, groups, empty: groups.length === 0
+    };
+  }
+}
+</script>
+</body>
+</html>

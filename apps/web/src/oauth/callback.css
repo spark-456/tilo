@@ -1,0 +1,22 @@
+/* ADR-0035 LC-02..04: the Google callback page in Studio (STUDIO-6). The page, header and card come from
+   landing/landing.css; Studio role tokens only; no motion, no inline styles (CSP). */
+.oauth-root .oauth-main ul {
+  margin: 0 0 16px;
+  padding-left: 20px;
+  color: var(--ink2);
+  line-height: 1.6;
+}
+.oauth-root .oauth-back {
+  min-height: 52px;
+  margin-top: 8px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--priFill);
+  box-shadow: 0 3px 0 var(--priLip);
+  color: var(--onPri);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}

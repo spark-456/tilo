@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/meeting.asked.schema.json",
+  "x-version": "1.0.0",
+  "title": "MeetingAskedData",
+  "description": "data of meeting.asked (ADR-0028). The convener said something in the room to one attendee (to; the web sends the lead when nobody is selected). actor is the convener, target the addressed agent. The words are in the redacted raw archive (message_ref), never here (MR-12). Turns count 1, 2, ... per room with one turn in flight (MR-04); mode is the person's Quick or Thinking choice for this turn.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["room_id", "turn", "to", "mode", "message_ref"],
+  "properties": {
+    "room_id": { "$ref": "../../common.schema.json#/$defs/ulid" },
+    "turn": { "$ref": "../../meeting_room.schema.json#/$defs/turn_number" },
+    "to": { "$ref": "../../common.schema.json#/$defs/agent_id" },
+    "mode": { "$ref": "../../meeting_room.schema.json#/$defs/mode" },
+    "message_ref": { "$ref": "../../event.schema.json#/$defs/archive_ref" }
+  }
+}

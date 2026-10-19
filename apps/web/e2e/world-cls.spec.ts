@@ -21,7 +21,7 @@ for (const viewport of VIEWPORTS) {
         test.setTimeout(60_000);
         await page.setViewportSize(viewport);
         await watchShifts(page);
-        await page.goto(`/world/w_village_basic${query}${display}`);
+        await page.goto(`/world/w_village_basic/stage${query}${display}`);
         await expect(page.getByTestId("replay-banner")).toContainText("Replay of run", {
           timeout: 20_000,
         });
@@ -42,7 +42,7 @@ test("FR-WLD-14 Professional stage mode at 1920x1080: zero layout shift while th
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.addInitScript(() => window.localStorage.setItem("tilo.density", "professional"));
   await watchShifts(page);
-  await page.goto("/world/w_village_basic?fixture=village-basic&seq=44&display=stage");
+  await page.goto("/world/w_village_basic/stage?fixture=village-basic&seq=44&display=stage");
   await expect(page.getByTestId("replay-banner")).toContainText("Replay of run", {
     timeout: 20_000,
   });
@@ -55,7 +55,7 @@ test("PRD-18.6 the Trace list is focusable with a name, and axe finds no violati
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto("/world/w_village_basic?fixture=village-basic&seq=44");
+  await page.goto("/world/w_village_basic/stage?fixture=village-basic&seq=44");
   const list = page.getByTestId("trace-list");
   await expect(list).toHaveAttribute("tabindex", "0");
   await expect(list).toHaveAttribute("aria-label", "Trace");

@@ -110,5 +110,6 @@ userinfo in an error message or the decision log.
 None required. Noted, not blocking: there is no registered event for a blocked egress request, so the
 Browser Station cannot animate one yet (HR: nothing animates without a recorded event); today the
 blocked request lives in `EgressPolicy.blocked` for the caller to turn into an event or alert.
-`config/connectors.yaml` (the per-adapter egress allowlist named in `services/browser/CLAUDE.md`) does
-not exist yet; the tests build `EgressPolicy` from literals.
+`config/connectors.yaml` exists as the connector catalogue, but the browser service does not load
+it as an egress allowlist; the tests build `EgressPolicy` from literals. See
+`services/browser/CLAUDE.md` for explicit policy, LW-08 authentication and archive configuration.

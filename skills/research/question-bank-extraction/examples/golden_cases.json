@@ -1,0 +1,117 @@
+{
+  "cases": [
+    {
+      "id": "paper_with_answer_key",
+      "input": {
+        "parts": [
+          {
+            "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+            "role": "question_paper",
+            "pages": [
+              {
+                "page": 1,
+                "text": "Northbridge Fictional Academy - Past Paper 1 (2023)\nSubject: Imaginary Systems 101\nQ1 [Topic: lattice_flux]: Compute the steady-state flux of a fictional 3-node lattice.\n(A) 7.0 flux units (B) 14.0 flux units (C) 21.0 flux units (D) 28.0 flux units"
+              },
+              {
+                "page": 2,
+                "text": "Q2 [Topic: clockwork_valves]: Why does a Northbridge clockwork valve stabilize at 42.0 units?\n(A) Positive resonance (B) Negative feedback loop (C) Thermal drift (D) Random damping"
+              }
+            ]
+          },
+          {
+            "artifact": { "artifact_id": "art_northbridge_key_1", "version": 1 },
+            "role": "answer_key",
+            "pages": [
+              {
+                "page": 1,
+                "text": "Northbridge Fictional Academy - Official Answer Key (Past Paper 1)\nQ1: B (14.0 flux units)\nQ2: B (Negative feedback loop)"
+              }
+            ]
+          }
+        ]
+      },
+      "expected_output": {
+        "questions": [
+          {
+            "id": "q1",
+            "stem": "Compute the steady-state flux of a fictional 3-node lattice.",
+            "options": {
+              "a": "7.0 flux units",
+              "b": "14.0 flux units",
+              "c": "21.0 flux units",
+              "d": "28.0 flux units"
+            },
+            "answer": "b",
+            "answer_source": {
+              "artifact": { "artifact_id": "art_northbridge_key_1", "version": 1 },
+              "page": 1
+            },
+            "topic": "lattice_flux",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 1
+            }
+          },
+          {
+            "id": "q2",
+            "stem": "Why does a Northbridge clockwork valve stabilize at 42.0 units?",
+            "options": {
+              "a": "Positive resonance",
+              "b": "Negative feedback loop",
+              "c": "Thermal drift",
+              "d": "Random damping"
+            },
+            "answer": "b",
+            "answer_source": {
+              "artifact": { "artifact_id": "art_northbridge_key_1", "version": 1 },
+              "page": 1
+            },
+            "topic": "clockwork_valves",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_1", "version": 1 },
+              "page": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "paper_without_answer_key",
+      "input": {
+        "parts": [
+          {
+            "artifact": { "artifact_id": "art_northbridge_paper_2", "version": 1 },
+            "role": "question_paper",
+            "pages": [
+              {
+                "page": 3,
+                "text": "Northbridge Fictional Academy - Past Paper 2 (2024)\nQ1 [Topic: cyclic_routing]: Which routing mode avoids head-of-line blocking in a 5-hub toy network?\n(A) Static star (B) Linear chain (C) Cyclic ring (D) Flood broadcast"
+              }
+            ]
+          }
+        ]
+      },
+      "expected_output": {
+        "questions": [
+          {
+            "id": "q1",
+            "stem": "Which routing mode avoids head-of-line blocking in a 5-hub toy network?",
+            "options": {
+              "a": "Static star",
+              "b": "Linear chain",
+              "c": "Cyclic ring",
+              "d": "Flood broadcast"
+            },
+            "answer": "unknown",
+            "answer_source": null,
+            "topic": "cyclic_routing",
+            "source": {
+              "artifact": { "artifact_id": "art_northbridge_paper_2", "version": 1 },
+              "page": 3
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

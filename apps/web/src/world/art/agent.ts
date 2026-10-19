@@ -4,7 +4,6 @@
 // layout carries a rank, not a role). Rank is shown by SHAPE: a director wears a crest, a lead a
 // cap, a verifier carries a clipboard, a specialist is plain; colour is only identity.
 import type { Graphics } from "pixi.js";
-import tokens from "../../design/tokens";
 import { PALETTE, dk, lt, shade } from "./color";
 import { type Proj, box, poly } from "./iso";
 
@@ -18,19 +17,29 @@ const HEIGHT: Readonly<Record<string, number>> = {
 
 export const AGENT_SCALE = 1.35;
 
-export function drawAgent(g: Graphics, rank: string, tint: string): void {
+export function drawAgent(
+  g: Graphics,
+  rank: string,
+  tint: string,
+  shadows = true,
+  hand = false,
+): void {
   const director = rank === "director";
-  const col = director ? tokens.color.brand.primary : tint;
+  const col = tint;
   const [cT, cR, limb] = [lt(col, 0.2), dk(col, 0.22), dk(col, 0.3)];
   const w = director ? 15 : 13;
   const hh = HEIGHT[rank] ?? 15;
   const [x0, y0, z] = [-w / 2, -w / 2, 3];
-  g.ellipse(0, 0, w * 0.95, w * 0.5).fill({ color: PALETTE.ink, alpha: 0.13 });
+  if (shadows) g.ellipse(0, 0, w * 0.95, w * 0.5).fill({ color: PALETTE.ink, alpha: 0.13 });
   const leg = { t: limb, l: limb, r: dk(limb, 0.2) };
   box(g, PF, [x0 + 2, y0 + w - 5, 0], [4, 4, 3], leg);
   box(g, PF, [x0 + w - 6, y0 + w - 5, 0], [4, 4, 3], leg);
   box(g, PF, [x0 - 3, y0 + w - 4, z + 3], [3, 3.5, hh * 0.45], leg);
-  box(g, PF, [x0 + w, y0 + w - 4, z + 3], [3, 3.5, hh * 0.45], leg);
+  if (hand) {
+    box(g, PF, [x0 + w, y0 + w - 4, z + hh - 2], [3, 3.5, hh * 0.55], leg);
+  } else {
+    box(g, PF, [x0 + w, y0 + w - 4, z + 3], [3, 3.5, hh * 0.45], leg);
+  }
   box(g, PF, [x0 + 1.2, y0 + 1.2, z + 1], [w - 2.4, w - 2.4, hh - 2], { t: cR, l: cR, r: cR });
   poly(
     g,

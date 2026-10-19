@@ -1,0 +1,22 @@
+.thinking-tilo {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+.thinking-tilo picture,
+.thinking-tilo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.thinking-tilo .thinking-tilo__still {
+  display: none;
+}
+.thinking-tilo--still picture{display:none}
+.thinking-tilo--still .thinking-tilo__still{display:block}
+/* Still motion freezes it on the saved static frame (FR-UX-12) */
+[data-motion="still"] .thinking-tilo picture{display:none}
+[data-motion="still"] .thinking-tilo .thinking-tilo__still{display:block}

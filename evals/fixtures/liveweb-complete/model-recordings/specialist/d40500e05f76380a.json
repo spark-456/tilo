@@ -1,0 +1,28 @@
+{
+  "key": "d40500e05f76380a",
+  "profile": "fixture",
+  "response": {
+    "profile_id": "scripted",
+    "tool_calls": [
+      {
+        "args": {
+          "url": "https://sandbox-web.example/papers/paper-1.pdf"
+        },
+        "name": "fetch_url"
+      },
+      {
+        "args": {
+          "url": "https://sandbox-web.example/papers/answer-key.pdf"
+        },
+        "name": "fetch_url"
+      },
+      {
+        "args": {
+          "url": "https://sandbox-web.example/papers/wrong-magic.pdf"
+        },
+        "name": "fetch_url"
+      }
+    ]
+  },
+  "role": "specialist"
+}

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<script src="./tilo-t.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" data-screen-label="Team" style="position:relative;width:100%;height:{{ H }};overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:15px;line-height:1.5;display:flex;flex-direction:column">
+  <dc-import name="Tilo T Nav" active="team" device="{{ navD }}" theme="{{ theme }}" hint-size="100%,64px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <div aria-hidden="true" style="flex:1 1 0;min-width:0;background-image:var(--doodle);background-size:280px 280px"></div>
+    <main style="flex:0 1 1200px;min-width:0;box-sizing:border-box;padding:{{ pad }};display:flex;flex-direction:column;gap:18px;overflow:hidden">
+      <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;flex:none">
+        <div style="flex:1;min-width:220px;display:flex;flex-direction:column"><h1 style="margin:0;font-weight:700;font-size:{{ h1 }};letter-spacing:-1.2px;line-height:1.05">Team Rao</h1><span style="color:var(--ink2);font-size:14px">{{ sub }}</span></div>
+        <span role="button" style="height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);background:var(--card);display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px">{{ iLink }}Copy invite link</span>
+        <span role="button" style="height:44px;padding:0 16px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px">{{ iPlus }}Invite people</span>
+      </div>
+      <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T State" kind="loading" layout="split" caption="Tilo is fetching your team" hint-size="100%,520px"></dc-import></sc-if>
+      <sc-if value="{{ error }}" hint-placeholder-val="{{ false }}"><div style="border-radius:24px;background:var(--card);border:1px solid var(--line);flex:none"><dc-import name="Tilo T State" kind="error" title="Couldn’t load your team" body="Your team’s worlds keep running. Invites you already sent are still valid." cta="Try again" code="team.members · 500 · 9:20 am" hint-size="100%,400px"></dc-import></div></sc-if>
+      <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+        <div style="border-radius:28px;background:var(--card);border:1px dashed var(--line2);padding:28px;display:flex;flex-wrap:wrap;gap:28px;align-items:center;flex:none">
+          <div style="flex:1 1 320px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:flex-end;gap:4px"><dc-import name="Tilo S Buddy" size="110" mood="happy" hint-size="93px,110px"></dc-import><span style="width:80px;height:96px;border-radius:18px;border:2px dashed var(--line2);display:flex;align-items:center;justify-content:center;color:var(--ink3)">{{ iUser }}</span><span style="width:80px;height:96px;border-radius:18px;border:2px dashed var(--line2);display:flex;align-items:center;justify-content:center;color:var(--ink3)">{{ iUser }}</span></div>
+            <h2 style="margin:0;font-weight:700;font-size:28px;letter-spacing:-.8px;line-height:1.1">Your team is just you for now</h2>
+            <p style="margin:0;color:var(--ink2);max-width:440px">Invite people to share worlds, a pin board and approvals. You stay the Owner; they join as Members.</p>
+            <div style="height:52px;box-sizing:border-box;padding:0 6px 0 14px;border-radius:14px;border:1.5px solid var(--ink);display:flex;align-items:center;gap:8px;max-width:480px"><span style="flex:1;color:var(--ink3)">name@company.com, another@…</span><span style="height:40px;padding:0 14px;border-radius:10px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;font-weight:700;font-size:14px">Invite</span></div>
+          </div>
+          <div style="flex:1 1 280px;display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ share }}" as="s" hint-placeholder-count="3"><div style="display:flex;gap:12px;align-items:center;padding:12px;border-radius:16px;background:var(--bg)"><span style="width:40px;height:40px;border-radius:12px;background:{{ s.bg }};color:{{ s.fg }};display:flex;align-items:center;justify-content:center;flex:none">{{ s.ic }}</span><span style="display:flex;flex-direction:column;line-height:1.35"><span style="font-weight:700;font-size:14.5px">{{ s.t }}</span><span style="font-size:13px;color:var(--ink2)">{{ s.d }}</span></span></div></sc-for>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ ok }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;flex:none">
+          <section aria-label="Members" style="flex:3 1 520px;min-width:0;border-radius:24px;background:var(--card);border:1px solid var(--line);overflow:clip">
+            <div style="padding:14px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)"><span style="font-weight:700;font-size:16px;flex:1">Members · 5</span><span style="font-size:12.5px;color:var(--ink3)">Owners can invite, remove and set the credit cap</span></div>
+            <sc-for list="{{ members }}" as="m" hint-placeholder-count="5">
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap">
+                <span style="position:relative;width:44px;height:44px;border-radius:99px;background:{{ m.bg }};color:{{ m.fg }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex:none">{{ m.i }}<sc-if value="{{ m.live }}"><span style="position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:9px;background:var(--mint);border:2px solid var(--card)"></span></sc-if></span>
+                <span style="flex:1 1 180px;min-width:0;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:14.5px">{{ m.n }}</span><span style="font-size:12.5px;color:var(--ink3)">{{ m.e }}</span></span>
+                <span style="flex:1 1 200px;min-width:0;font-size:13px;color:var(--ink2)">{{ m.doing }}</span>
+                <span role="button" aria-haspopup="listbox" style="height:36px;padding:0 10px 0 12px;border-radius:10px;border:1px solid {{ m.rbd }};background:{{ m.rbg }};display:flex;align-items:center;gap:4px;font-size:13px;font-weight:700">{{ m.role }}{{ iChevD }}</span>
+              </div>
+            </sc-for>
+          </section>
+          <aside style="flex:2 1 340px;min-width:0;display:flex;flex-direction:column;gap:14px">
+            <div style="border-radius:24px;background:{{ liveBg }};color:{{ liveFg }};border:1px solid var(--line);padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:9px;background:var(--mint);animation:tGlow 1.4s infinite"></span><span style="font-weight:700;font-size:15px;flex:1">Working now</span><span style="font-family:var(--mono);font-size:10.5px;opacity:.7">live · from world events</span></div>
+              <sc-for list="{{ live }}" as="l" hint-placeholder-count="3"><div style="display:flex;gap:10px;align-items:center"><span style="width:32px;height:32px;border-radius:99px;background:{{ l.bg }};color:{{ l.fg }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11.5px;flex:none">{{ l.i }}</span><span style="flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:600;font-size:13.5px">{{ l.t }}</span><span style="font-size:12px;opacity:.75">{{ l.s }}</span></span><span style="height:22px;padding:0 8px;border-radius:99px;background:{{ l.cb }};color:{{ l.cf }};font-size:11px;font-weight:700;display:flex;align-items:center;white-space:nowrap">{{ l.c }}</span></div></sc-for>
+            </div>
+            <div style="border-radius:24px;background:var(--card);border:1px solid var(--line);padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;align-items:center"><span style="font-weight:700;font-size:15px;flex:1">Shared worlds</span><a href="#" style="font-size:13px;font-weight:600;color:var(--ink2)">All →</a></div>
+              <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><sc-for list="{{ worlds }}" as="w" hint-placeholder-count="3"><a href="#" style="border-radius:14px;border:1px solid var(--line);overflow:clip;display:flex;flex-direction:column"><span style="height:64px;background:var(--cityBg);padding:3px;box-sizing:border-box"><span style="display:block;width:100%;height:100%;filter:var(--cityFx)">{{ w.c }}</span></span><span style="padding:6px 8px;font-size:12px;font-weight:600;line-height:1.3">{{ w.t }}</span></a></sc-for></div>
+            </div>
+            <div style="border-radius:24px;background:var(--card);border:1px solid var(--line);padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--ink2)">{{ iPin }}</span><span style="font-weight:700;font-size:15px;flex:1">Team pins</span><a href="#agenda" style="font-size:13px;font-weight:600;color:var(--ink2)">Board →</a></div>
+              <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><sc-for list="{{ pins }}" as="n" hint-placeholder-count="3"><div style="min-height:84px;box-sizing:border-box;padding:9px;border-radius:5px 5px 12px 5px;background:{{ n.bg }};transform:rotate({{ n.r }});display:flex;flex-direction:column;gap:4px"><span style="font-weight:700;font-size:12px;line-height:1.3;color:var(--ink)">{{ n.t }}</span><span style="margin-top:auto;font-family:var(--mono);font-size:9.5px;color:var(--ink2)">{{ n.by }}</span></div></sc-for></div>
+            </div>
+          </aside>
+        </div>
+      </sc-if>
+    </main>
+    <div aria-hidden="true" style="flex:1 1 0;min-width:0;background-image:var(--doodle);background-size:280px 280px;background-position:140px 60px"></div>
+  </div>
+  <sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T Nav" active="team" device="tabs" theme="{{ theme }}" hint-size="100%,84px"></dc-import></sc-if>
+  <sc-if value="{{ invite }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:var(--scrim);z-index:10"></div>
+    <div role="dialog" aria-label="Invite people" style="position:absolute;left:50%;top:{{ mT }};width:{{ mW }};transform:translateX(-50%);z-index:11;box-sizing:border-box;background:var(--card);border-radius:28px;border:1px solid var(--line);padding:22px;display:flex;flex-direction:column;gap:16px;animation:tPop .3s ease-out both">
+      <div style="display:flex;align-items:center"><span style="font-weight:700;font-size:20px;letter-spacing:-.4px;flex:1">Invite to Team Rao</span><span aria-label="Close" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center">{{ iX }}</span></div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600">By email
+        <span style="min-height:52px;box-sizing:border-box;padding:7px 10px;border-radius:14px;border:1.5px solid var(--ink);display:flex;flex-wrap:wrap;align-items:center;gap:6px"><sc-for list="{{ emails }}" as="e" hint-placeholder-count="2"><span style="height:32px;padding:0 4px 0 10px;border-radius:99px;background:var(--sunk);display:flex;align-items:center;gap:4px;font-size:13px;font-weight:600">{{ e }}<span style="width:24px;height:24px;border-radius:99px;display:flex;align-items:center;justify-content:center;color:var(--ink3)">{{ iXs }}</span></span></sc-for><span style="font-size:14px;color:var(--ink3);font-weight:500">Add another…</span></span>
+      </label>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600">Role</span>
+        <div role="radiogroup" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <span role="radio" aria-checked="false" style="border-radius:14px;border:1px solid var(--line2);padding:10px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-weight:700;font-size:14px">Owner</span><span style="font-size:12.5px;color:var(--ink2)">Invites, removes, sets the credit cap</span></span>
+          <span role="radio" aria-checked="true" style="border-radius:14px;border:2px solid var(--ink);padding:9px 11px;display:flex;flex-direction:column;gap:2px"><span style="font-weight:700;font-size:14px">Member</span><span style="font-size:12.5px;color:var(--ink2)">Runs and shares worlds, approves their own</span></span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--sunk);flex-wrap:wrap"><span style="color:var(--ink2)">{{ iLink }}</span><span style="flex:1;min-width:160px;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:600;font-size:13.5px">Or share a link</span><span style="font-family:var(--mono);font-size:11.5px;color:var(--ink3)">tilo.app/join/rao-7f3k · expires in 7 days</span></span><span role="button" style="height:40px;padding:0 12px;border-radius:10px;background:var(--card);border:1px solid var(--line2);display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px">{{ iCopy }}Copy</span></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px"><span role="button" style="height:48px;padding:0 18px;border-radius:14px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600">Cancel</span><span role="button" style="height:48px;padding:0 20px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;font-weight:700">Send 2 invites</span></div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ready&quot;,&quot;running&quot;,&quot;invite&quot;,&quot;loading&quot;,&quot;empty&quot;,&quot;error&quot;],&quot;default&quot;:&quot;ready&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloR || !window.TiloT) this.t = setInterval(() => { if (window.TiloR && window.TiloCity && window.TiloT) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const h = React.createElement, R = window.TiloR ? window.TiloR(h) : null, T = window.TiloT, ic = (n, s) => T ? T.ic(h, n, s) : null;
+    const p = this.props, d = (p.device ?? 'desktop') === 'desktop', s = p.state ?? 'ready';
+    const run = s === 'running';
+    const M = [['MR', 'Maya Rao (you)', 'maya@raostudio.co', 'Owner', 'Waiting on 1 approval in Porto offsite', 'lilac', 1], ['JO', 'Jo Park', 'jo@raostudio.co', 'Member', 'Q3 deck world · 2 helpers working', 'sky', 1], ['OB', 'Oskar Berg', 'oskar@raostudio.co', 'Member', 'Finished Compare 3 suppliers', 'teal', 0], ['SA', 'Sam Ade', 'sam@raostudio.co', 'Member', 'Nothing running', 'amber', 0], ['LC', 'Lin Chen', 'lin@partner.co', 'Invited', 'Invite sent Tue · resend', 'pink', 0]];
+    return {
+      theme: p.theme ?? 'studio', phone: !d, navD: d ? 'desktop' : 'phone', H: d ? '900px' : '844px', pad: d ? '24px 32px' : '14px 14px 110px', h1: d ? '40px' : '30px',
+      sub: s === 'empty' ? 'New team · 1 member' : '5 people · 6 shared worlds · 400 credits a month',
+      loading: s === 'loading', error: s === 'error', empty: s === 'empty', ok: ['ready', 'running', 'invite'].includes(s), invite: s === 'invite',
+      mT: d ? '120px' : '70px', mW: d ? '560px' : 'calc(100% - 20px)',
+      members: M.map(([i, n, e, role, doing, c, live]) => ({ i, n, e, role, doing, live: !!live, bg: `var(--${c}Soft)`, fg: `var(--${c}Ink)`, rbg: role === 'Owner' ? 'var(--ink)' : role === 'Invited' ? 'transparent' : 'var(--card)', rbd: role === 'Owner' ? 'var(--ink)' : 'var(--line2)' })).map(m => Object.assign(m, { rbg: m.role === 'Owner' ? 'var(--sunk)' : m.rbg })),
+      liveBg: run ? 'var(--ink)' : 'var(--card)', liveFg: run ? 'var(--card)' : 'var(--ink)',
+      live: [['JO', 'Jo · Q3 deck', 'Writer is drafting slide 6 of 9', 'Working', 'sky', 'var(--priSoft)', 'var(--priInk)'], ['MR', 'Maya · Team offsite in Porto', 'Messenger needs a yes for 12 emails', 'Needs you', 'lilac', 'var(--amberSoft)', 'var(--amberInk)'], ['OB', 'Oskar · Compare 3 suppliers', 'Delivered 10 min ago', 'Done', 'teal', 'var(--mintSoft)', 'var(--mintInk)']].map(([i, t, ss, c, col, cb, cf]) => ({ i, t, s: ss, c, bg: `var(--${col}Soft)`, fg: `var(--${col}Ink)`, cb, cf })),
+      worlds: [['Q3 deck', 'town'], ['Porto offsite', 'trip'], ['Suppliers', 'suppliers']].map(([t, k]) => ({ t, c: R ? R.city(k, { labels: false, tags: false, seed: 5 }) : null })),
+      pins: [['Q3 goals doc: agreed Monday', 'JO · PINNED', 'priSoft', '-1deg'], ['Brightcell: €74 a pack', 'OSKAR · FROM A RESULT', 'amberSoft', '1.2deg'], ['Offsite: 14–16 May', 'MAYA · FROM A WORLD', 'skySoft', '-.6deg']].map(([t, by, c, r]) => ({ t, by, bg: `var(--${c})`, r })),
+      share: [['Shared worlds', 'Everyone can watch, and owners approve', 'city', 'sky'], ['One pin board', 'Notes from any result, in one place', 'pin', 'amber'], ['Shared credits', 'One cap for the team, set by an Owner', 'credit', 'mint']].map(([t, dd, i, c]) => ({ t, d: dd, ic: ic(i, 20), bg: `var(--${c}Soft)`, fg: `var(--${c}Ink)` })),
+      emails: ['lin@partner.co', 'dev@raostudio.co'],
+      iLink: ic('link', 18), iPlus: ic('plus', 18), iUser: ic('user', 28), iChevD: ic('chevD', 14), iPin: ic('pin', 16), iX: ic('x', 20), iXs: ic('x', 12), iCopy: ic('copy', 15)
+    };
+  }
+}
+</script>
+</body>
+</html>

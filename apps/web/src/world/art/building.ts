@@ -7,12 +7,20 @@
 //   operational  full building, windows lit            completed     as operational
 //   archived     the same building in greys
 import type { Graphics } from "pixi.js";
+import tokens from "../../design/tokens";
 import { PALETTE, dk, gray, lt } from "./color";
 import { P, type Proj, type Pt, box, dashed, poly, stroke } from "./iso";
 
 export type Roof = "flat" | "gable" | "dome";
 export type Facade = "windows" | "band" | "arches";
-export type BuildingShown = "planned" | "constructing" | "operational" | "completed" | "archived";
+export type BuildingShown =
+  | "planned"
+  | "constructing"
+  | "operational"
+  | "completed"
+  | "archived"
+  | "needs"
+  | "failed";
 
 export interface BuildingArt {
   readonly x: number; // footprint in grid cells
@@ -256,11 +264,21 @@ export function drawBuilding(g: Graphics, b: BuildingArt): Pt {
     ghost(g, p, x, y, PLINTH, W, D, H);
     return p(x + W / 2, y + D / 2, PLINTH + H);
   }
-  const c = colours(b.status === "archived" ? gray(lt(b.tint, 0.2)) : b.tint);
-  const cons = b.status === "constructing";
+  const isFailed = b.status === "failed";
+  const isNeeds = b.status === "needs";
+  const c = colours(
+    b.status === "archived"
+      ? gray(lt(b.tint, 0.2))
+      : isFailed
+        ? dk(tokens.color.signal.blocked, 0.1)
+        : isNeeds
+          ? lt(tokens.color.signal.needs, 0.1)
+          : b.tint,
+  );
+  const cons = b.status === "constructing" || isFailed;
   const hb = cons ? Math.max(24, Math.round(H * 0.45)) : H;
   const floors = cons ? 1 : b.floors;
-  const lit = b.status === "operational" || b.status === "completed";
+  const lit = b.status === "operational" || b.status === "completed" || isNeeds;
   box(g, p, [x - 0.08, y - 0.08, 0], [W + 0.16, D + 0.16, PLINTH], PALETTE.plinth);
   box(g, p, [x, y, PLINTH], [W, D, hb], { t: c.wt, l: c.wl, r: c.wr });
   facade(g, p, "L", { x, y, W, D }, hb, floors, c, b.facade, lit);
@@ -268,6 +286,7 @@ export function drawBuilding(g: Graphics, b: BuildingArt): Pt {
   let roofH = 0;
   if (cons) {
     ghost(g, p, x, y, PLINTH + hb, W, D, H - hb);
+    const scaffoldColor = isFailed ? tokens.color.signal.blocked : PALETTE.scaffold;
     const post = [
       [x - 0.06, y + D + 0.06],
       [x + W + 0.06, y + D + 0.06],
@@ -275,7 +294,7 @@ export function drawBuilding(g: Graphics, b: BuildingArt): Pt {
       [x + W / 2, y + D + 0.06],
     ] as const;
     for (const [a, q] of post)
-      stroke(g, [p(a, q, PLINTH), p(a, q, PLINTH + H)], PALETTE.scaffold, 2.2);
+      stroke(g, [p(a, q, PLINTH), p(a, q, PLINTH + H)], scaffoldColor, 2.2);
     for (let z = 16; z <= H; z += 16) {
       stroke(
         g,
@@ -284,7 +303,7 @@ export function drawBuilding(g: Graphics, b: BuildingArt): Pt {
           p(x + W + 0.06, y + D + 0.06, PLINTH + z),
           p(x + W + 0.06, y - 0.06, PLINTH + z),
         ],
-        PALETTE.scaffold,
+        scaffoldColor,
         2.2,
       );
     }

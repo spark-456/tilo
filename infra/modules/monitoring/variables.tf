@@ -51,3 +51,9 @@ variable "alert_duration_seconds" {
   type        = number
   default     = 300
 }
+
+variable "eval_nightly_job_name" {
+  description = "Cloud Run job whose failed executions raise the nightly eval alert (EFF-05c). The env passes the job resource's name; the default matches it."
+  type        = string
+  default     = "tilo-eval-nightly"
+}

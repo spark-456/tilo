@@ -1,0 +1,41 @@
+{
+  "v": "1.0",
+  "id": "01JB6Z00000000000000SK0003",
+  "seq": 3,
+  "ts": "2026-10-09T09:00:00.000Z",
+  "world_id": "w_desk_priya",
+  "run_id": "r_desk_priya_1",
+  "type": "skill.try_run",
+  "actor": "u_priya",
+  "target": "u_priya",
+  "level": null,
+  "district": null,
+  "item": null,
+  "severity": "info",
+  "credits": 76,
+  "summary": "A try run matched 3 of 4 steps and sent nothing (completed).",
+  "cause": null,
+  "vis": [],
+  "authz": null,
+  "data": {
+    "skill": "tsk_01JB6Z0000000000000000INV",
+    "version": 1,
+    "try_run": "01JB6Z00000000000000TRY001",
+    "match": 0.75,
+    "total": 4,
+    "matched": 3,
+    "asked": 2,
+    "skipped": 1,
+    "side_effects": 1,
+    "outcome": "completed"
+  },
+  "trace": {
+    "model_role": null,
+    "profile": null,
+    "tokens_in": null,
+    "tokens_out": null,
+    "tool": null,
+    "latency_ms": null,
+    "archive_ref": null
+  }
+}

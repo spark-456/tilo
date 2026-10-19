@@ -62,7 +62,13 @@ def test_P0_07c_deploy_web_recipe_builds_without_api_url_then_deploys_hosting_to
     assert build.start() < cmd.start(), "the build comes before the deploy"
     # Fixture / replay world: the build must not get an API origin. Neither set nor passed through from the shell.
     code = re.sub(r"(?m)^\s*#.*$", "", body)
-    for m in re.finditer(r"VITE_TILO_API_URL(\s*=\s*(\S*))?", code):
+    # PROD-WIRE-4 (documented test change): the recipe gained `api=""`, a just-validated Cloud Run URL for a build
+    # against a deployed tilo-api (test_PROD_WIRE_4_deploy_web_switch.py). The build's value is a `{{ ... }}`
+    # interpolation of that parameter, whose default stays empty; with it removed, the fixture build is still empty.
+    header = RECIPE_HEADER.search(body).group(0)
+    assert header.split(":")[0].split()[1:] in ([], ['api=""'], ["api=''"]), "the only parameter is `api`, empty"
+    code = re.sub(r"\{\{.*\}\}", "", code)
+    for m in re.finditer(r"VITE_TILO_API_URL(\s*=\s*('[^']*'|\"[^\"]*\"|[^\s)]*))?", code):
         value = (m.group(2) or "").strip("\"'")
         assert m.group(1) is not None and value == "", "the web build must not be given a VITE_TILO_API_URL value"
 
@@ -77,7 +83,8 @@ def test_P0_07c_deploy_web_recipe_refuses_other_projects_and_never_mentions_demo
     params = header.split(":")[0].split()[1:]
     deploy_at = body.index("firebase deploy")
     if params:
-        refusal = re.search(r"!=|exit\(1\)|sys\.exit", body)
+        # PROD-WIRE-4 (documented test change): `just`'s own `error()` refuses a bad `api` before any line runs.
+        refusal = re.search(r"!=|exit\(1\)|sys\.exit|error\(", body)
         assert refusal and refusal.start() < deploy_at, "a parameterised recipe must refuse a non-dev project first"
         assert "essential-wares-510320-f0" in body[: deploy_at + 200]
     # Whatever project ids are mentioned, the only one is the dev project.
@@ -144,6 +151,18 @@ def test_P0_07c_firebase_json_caches_hashed_assets_forever_and_never_caches_inde
 
 def test_P0_07c_firebase_json_has_no_project_ids_or_secrets(repo_root: pathlib.Path) -> None:
     text = (repo_root / "firebase.json").read_text(encoding="utf-8")
+    # SEC-15 / SIGNIN (documented test change, BQ-SIGNIN-5): the Content-Security-Policy must name two origins whose
+    # spelling contains a word this guard searches for: the project's own sign-in iframe on its auth domain (it IS the
+    # project id; `/__/auth/` is where Firebase serves it) and the SDK's Secure Token REST host (`token`). They are
+    # public hostnames, not ids or secrets; they are removed here and nothing else is.
+    for origin in ("https://essential-wares-510320-f0.firebaseapp.com/__/auth/", "https://securetoken.googleapis.com"):
+        assert text.count(origin) == 1, f"{origin} is named exactly once, in the CSP"
+        text = text.replace(origin, "")
+    # ADR32 T5b (documented test change): the second Firestore database is named `tilo-tokens` and its rules file
+    # `firestore.tokens.rules` in the `firestore` list; both are public names holding the word `token`, each named once.
+    for name in ('"tilo-tokens"', "firestore.tokens.rules"):
+        assert text.count(name) == 1, f"{name} appears exactly once, in the firestore list"
+        text = text.replace(name, "")
     assert not re.search(r"tilo-demo|apiKey|secret|token|essential-wares", text, re.I)
 
 
@@ -195,7 +214,18 @@ def test_P0_07c_web_source_never_reads_a_backend_origin_when_api_url_is_unset(re
             assert not re.search(r"run\.app|cloudfunctions|appspot|googleapis", host), (
                 f"{p.name}: hard-coded backend origin {url}; the origin comes only from VITE_TILO_API_URL"
             )
-    assert set(env_readers) <= {"VITE_TILO_API_URL"}, f"only VITE_TILO_API_URL may be read: {env_readers}"
+    # SEC-10 (documented test change): App Check needs the Firebase web `apiKey` and `projectId`, which the build
+    # supplies (`just deploy-web` reads them from `firebase apps:sdkconfig`; no key literal is committed). They are
+    # public client values, not backend origins, and only the App Check starter may read them. The API origin rule
+    # is unchanged.
+    app_check_vars = {"VITE_FIREBASE_API_KEY", "VITE_FIREBASE_PROJECT_ID"}
+    assert set(env_readers) <= {"VITE_TILO_API_URL"} | app_check_vars, (
+        f"only VITE_TILO_API_URL and the two App Check config variables may be read: {env_readers}"
+    )
+    for var in app_check_vars & set(env_readers):
+        assert env_readers[var] == ["appcheck/appCheck.ts"], (
+            f"{var} is read only by appcheck/appCheck.ts: {env_readers}"
+        )
     assert env_readers.get("VITE_TILO_API_URL") == ["api/ClientProvider.tsx"], (
         f"the single reader of VITE_TILO_API_URL is api/ClientProvider.tsx (feeding chooseClient): {env_readers}"
     )

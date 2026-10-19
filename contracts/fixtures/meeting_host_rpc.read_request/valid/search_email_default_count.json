@@ -1,0 +1,7 @@
+{
+  "user_id": "u_owner",
+  "tool": "search_email",
+  "args": {
+    "query": "invoice"
+  }
+}

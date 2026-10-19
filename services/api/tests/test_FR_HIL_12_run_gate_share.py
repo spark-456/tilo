@@ -4,9 +4,19 @@ others, so a later answer on either card (owner or Approver) writes nothing, als
 
 from __future__ import annotations
 
+import pytest
 from _clint2_lib import FLOW_USER, assert_stream_valid, wait_for
+from _peopleseams1_lib import directory
+from tilo_api import app, deps
 
 APPROVER = "u_approver"
+
+
+@pytest.fixture(autouse=True)
+def _approver_is_in_the_directory(run_flow):
+    """An Approver is named from the org's people directory (PEOPLE-SEAMS-1, BQ-PEOPLESEAMS1-6)."""
+    people = directory(FLOW_USER, APPROVER, "u_other_approver")
+    app.dependency_overrides[deps.get_people_stores] = lambda: people
 
 
 def _share(rf, card_id: str, approver: str = APPROVER) -> dict:

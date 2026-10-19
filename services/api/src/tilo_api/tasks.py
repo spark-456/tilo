@@ -4,36 +4,49 @@ answer the questions, get the approaches, approve one with a budget cap.
 Every route needs the signed-in principal, and only the task's creator may use it: anyone else gets the same
 404 as an unknown task, before any model call. Model calls go through the provider layer's Router; the grant
 is `tilo_planning.budget` run through the deterministic policy engine, never a model. Events are built and
-validated by `tilo_planning`; `Store.events` stands in for the world's stream until the harness writer is
-wired, and each task appends to it in strictly increasing `seq`.
+validated by `tilo_planning`, and every one of them is committed through `EventWriter.append` (ADR-0026 decision 4):
+the writer assigns `seq`, and `TaskRecord.next_seq` is only the helpers' `seq=` hint, derived from what was committed.
 """
 
 from __future__ import annotations
 
 import copy
+import dataclasses
+import hashlib
+import json
 import logging
-from collections.abc import Awaitable, Callable, Iterator
+import threading
+from collections import OrderedDict
+from collections.abc import Awaitable, Callable, Iterator, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import UTC, date, datetime
 from typing import Annotated, Any
 
 import tilo_planning.budget as budget
 import tilo_policy
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from tilo_contracts import MakeWith
 from tilo_metering.flags import FlagStore
 from tilo_planning.approaches import ApproachProposalError, propose_approaches
 from tilo_planning.brief import BriefValidationError, ExtractionResult, edit_brief_field
+from tilo_planning.deliverable_kinds import DeliverableKind, DeliverableKindsError
 from tilo_planning.events import build_event
 from tilo_planning.intake import IntakeResult
 from tilo_planning.questions import apply_answer, generate_questions, record_assumption
 from tilo_planning.scenarios import ScenarioError, load_scenario
+from tilo_providers.clock import Clock
 from tilo_providers.config import ProviderConfigError
+from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
-from tilo_providers.router import Router
+from tilo_providers.router import Deadline, Router, RouterDeadlineError
 
-from tilo_api import deps, runs
+from tilo_api import deps, makers, runs
+from tilo_api.intake_deadline import INTAKE_DEADLINE_DETAIL, load_intake_deadline
+from tilo_api.people_writes import _capped_body
+from tilo_api.skills_route import SkillContext, get_skill_context
 
 logger = logging.getLogger("tilo_api.tasks")
 router = APIRouter()
@@ -55,10 +68,29 @@ class AnswersIn(BaseModel):
     brief_edits: dict[str, Any] = Field(default_factory=dict)
 
 
+class MakerPickIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    deliverable: Annotated[int, Field(ge=0, le=9)]
+    make_with: MakeWith
+
+
 class ApproveIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     approach_id: str
     budget_cap: Annotated[float, Field(strict=True, gt=0, allow_inf_nan=False)]  # credits, the person's own
+    make_with: list[MakerPickIn] = Field(default_factory=list, max_length=10)
+
+    @field_validator("make_with")
+    @classmethod
+    def unique_deliverables(cls, value: list[MakerPickIn]) -> list[MakerPickIn]:
+        if len({item.deliverable for item in value}) != len(value):
+            raise ValueError("Choose one maker per deliverable.")
+        return value
+
+
+class RerunIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    direction: Annotated[str, Field(min_length=1, max_length=2000)]
 
 
 def _json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaitable[Body]]:
@@ -68,8 +100,9 @@ def _json_body[Body: BaseModel](model: type[Body]) -> Callable[[Request], Awaita
     async def parse(request: Request) -> Body:
         if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
             raise HTTPException(status_code=415, detail="Send application/json.")
+        raw = await _capped_body(request)
         try:
-            return model.model_validate_json(await request.body())
+            return model.model_validate_json(raw)
         except ValidationError as exc:
             detail = [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]
             raise HTTPException(status_code=422, detail=detail) from exc
@@ -86,13 +119,32 @@ def _base(task: deps.TaskRecord, actor: str) -> dict[str, Any]:
     return {"v": "1.0", "ts": now_ts(), "world_id": task.world_id, "run_id": task.run_id, "actor": actor}
 
 
-def _append(store: deps.Store, task: deps.TaskRecord, events: list[dict[str, Any]]) -> None:
-    store.events.setdefault(task.world_id, []).extend(events)
-    task.next_seq = max([task.next_seq - 1, *(e["seq"] for e in events)]) + 1
+def _saved(
+    store: deps.Store,
+    writer: deps.EventWriter | None,
+    task_id: str,
+    task: deps.TaskRecord,
+    parts: list[dict[str, Any]],
+    changes: dict[str, Any],
+    **records: Any,
+) -> deps.TaskRecord:
+    """The task with `changes` applied, saved with its event parts through `Store.save` (ADR-0026 decisions 3, 4): the
+    store's records change only when that returns, so a refused request changes nothing. `next_seq` is only the helpers'
+    `seq=` hint, moved past the parts; the writer assigns the real `seq`."""
+    new = dataclasses.replace(task, next_seq=task.next_seq + len(parts), **changes)  # shares the task's lock
+    store.save(writer, tasks={task_id: new}, parts={task.world_id: parts} if parts else None, **records)
+    return new
 
 
 def create_task(
-    store: deps.Store, intake: IntakeResult, extraction: ExtractionResult, scenario: str | None = None
+    store: deps.Store,
+    writer: deps.EventWriter,
+    intake: IntakeResult,
+    extraction: ExtractionResult,
+    scenario: str | None = None,
+    kinds: Sequence[DeliverableKind] | None = None,
+    skill: dict[str, Any] | None = None,
+    skill_plan: list[dict[str, Any]] | None = None,
 ) -> tuple[str, deps.TaskRecord]:
     """FR-INT-03/04: the task from its intake and the Director's brief (extracted first, so a failed extraction
     stores nothing), then the questions, decided in code."""
@@ -105,15 +157,31 @@ def create_task(
     ]
     intake_events = [intake.event, *(e for f in intake.files for e in f.events)]
     task = deps.TaskRecord(owner, intake.world_id, intake.run_id, draft, draft, [], len(intake_events) + 1)
-    task.scenario = scenario
+    task.scenario, task.gaps = scenario, extraction.gaps
+    task.skill = skill  # SKILL-TAG: a tagged skill (source `tagged`) is never replaced by the matcher
+    task.skill_plan = copy.deepcopy(skill_plan)
     asked = generate_questions(
-        draft, extraction.ambiguous_fields, memory=store.memory, base=_base(task, DIRECTOR), seq=task.next_seq
+        draft,
+        extraction.ambiguous_fields,
+        memory=store.memory,
+        base=_base(task, DIRECTOR),
+        seq=task.next_seq,
+        topic_questions=extraction.questions,
+        kinds=kinds,
     )
     task.draft = task.brief = asked.brief
     task.questions = asked.questions
-    store.worlds[task.world_id] = deps.WorldRecord(owner=owner, districts={}, run_id=task.run_id)
-    _append(store, task, [*intake_events, *asked.memory_hit_events, *([asked.event] if asked.event else [])])
-    store.tasks[intake.task_id] = task
+    parts = [*intake_events, *asked.memory_hit_events, *([asked.event] if asked.event else [])]
+    task.next_seq = len(parts) + 1
+    world = deps.WorldRecord(owner=owner, districts={}, run_id=task.run_id)
+    created = [("worlds", task.world_id), ("tasks", intake.task_id)]
+    store.save(
+        writer,
+        worlds={task.world_id: world},
+        tasks={intake.task_id: task},
+        parts={task.world_id: parts},
+        create=created,
+    )
     return intake.task_id, task
 
 
@@ -124,18 +192,36 @@ def _owned(store: deps.Store, task_id: str, principal: deps.Principal) -> deps.T
     return task
 
 
-def _brief(task: deps.TaskRecord, answers: dict[str, str | None], edits: dict[str, Any]) -> dict[str, Any]:
-    brief, today = task.draft, date.today()
+def _latest(store: deps.Store, task_id: str) -> deps.TaskRecord:
+    """The record saved last, read again after the task's lock is taken (a prefetch or a second request may have stored
+    a newer one). A commit that failed evicts its entries, so this reloads from the store; gone is the unknown-task 404,
+    never a KeyError."""
+    task = store.load_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="No such task.")
+    return task
+
+
+def _brief(task: deps.TaskRecord, answers: dict[str, str | None], edits: dict[str, Any], today: date) -> dict[str, Any]:
+    brief = task.draft
     for question in task.questions:
         if question.field in answers and question.field not in edits:  # an edit stands over the answer (BQ-99)
             answer = answers[question.field]
             if answer is None:
-                brief = record_assumption(brief, question)
+                try:
+                    brief = record_assumption(brief, question, today=today)
+                except BriefValidationError:  # a skip is never refused (SIMPLE-RUN-2): the guess stands as asked
+                    brief = {**brief, "assumptions": [*brief["assumptions"], _assumption_line(question)]}
             else:
                 brief = apply_answer(brief, question, answer, today=today)
     for field, value in edits.items():
-        brief = edit_brief_field(brief, field, value)
+        brief = edit_brief_field(brief, field, value, today=today)
     return brief
+
+
+def _assumption_line(question: Any) -> dict[str, Any]:
+    guess = question.suggested_answers[0] if question.suggested_answers else ""
+    return {"question": question.text[:300], "assumed": f"{question.label or question.field}: {guess}"[:300]}
 
 
 def _strings(value: Any) -> Iterator[str]:
@@ -152,10 +238,23 @@ def _screen(safety: SafetyProvider, strings: list[str]) -> None:
         return
     try:
         flagged = safety.check("\n".join(strings))["flagged"]
-    except (ProviderError, ReplayMissError) as exc:
+    except (ProviderError, ProviderConfigError, ReplayMissError) as exc:
+        log_caught(exc, __name__, locals())
         raise HTTPException(status_code=503, detail="The safety screen is unavailable; nothing changed.") from exc
     if flagged:
         raise HTTPException(status_code=422, detail="The safety screen flagged this change; rephrase it.")
+
+
+def _director_strings(task: deps.TaskRecord, answers: list[AnswerIn]) -> list[str]:
+    """The model-written strings an answer or a skip puts into the brief (INTAKE-QUALITY-1): the text of each Director
+    question answered, and the guess a skip takes. A typed answer is screened with the person's other strings."""
+    by_field = {a.field: a.answer for a in answers}
+    return [
+        text
+        for q in task.questions
+        if q.label is not None and q.field in by_field
+        for text in (q.text, *([q.suggested_answers[0]] if by_field[q.field] is None else []))
+    ]
 
 
 def _foreign_sources(task: deps.TaskRecord, edits: dict[str, Any]) -> bool:
@@ -171,7 +270,8 @@ def _foreign_sources(task: deps.TaskRecord, edits: dict[str, Any]) -> bool:
 
 Principal = Annotated[deps.Principal, Depends(deps.get_current_principal)]
 StoreDep = Annotated[deps.Store, Depends(deps.get_store)]
-FlagsDep = Annotated[FlagStore, Depends(deps.get_flag_store)]
+WriterDep = Annotated[deps.EventWriter, Depends(deps.get_event_writer)]
+FlagsDep = Annotated[FlagStore, Depends(deps.get_switches)]  # deployed: NFR-24's flag or the spend ledger's switch
 
 
 @router.post("/tasks/{task_id}/answers")
@@ -180,11 +280,16 @@ def answer_questions(
     principal: Principal,
     body: Annotated[AnswersIn, Depends(_json_body(AnswersIn))],
     store: StoreDep,
+    writer: WriterDep,
+    model_router: Annotated[Router, Depends(deps.get_router)],
     safety: Annotated[SafetyProvider, Depends(deps.get_safety)],
     flags: FlagsDep,
+    clock: Annotated[Clock, Depends(deps.get_today)],
 ) -> dict[str, Any]:
     """FR-INT-03/04: answers, skips (`answer: null`, recorded as "Assumed: ...") and chip edits, every typed
-    string screened first (FR-INT-02). No model call; a refused request changes nothing."""
+    string screened first (FR-INT-02). No model call in the request; a refused request changes nothing. Once every
+    question has an answer and the brief is saved, the approaches are proposed in the background (APPROACH-SPEED),
+    so GET /approaches returns the stored result or waits on that one call."""
     task = _owned(store, task_id, principal)
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check
     fields = [a.field for a in body.answers]
@@ -192,8 +297,10 @@ def answer_questions(
         raise HTTPException(status_code=422, detail="Answer only the questions that were asked, each once.")
     if _foreign_sources(task, body.brief_edits):
         raise HTTPException(status_code=422, detail="Add only this task's files, or web and url sources.")
-    _screen(safety, [a.answer for a in body.answers if a.answer is not None] + list(_strings(body.brief_edits)))
+    typed = [a.answer for a in body.answers if a.answer is not None]
+    _screen(safety, typed + _director_strings(task, body.answers) + list(_strings(body.brief_edits)))
     with task.lock:
+        task = _latest(store, task_id)  # the record saved last: a prefetch may have stored the approaches meanwhile
         if task.granted:
             raise HTTPException(status_code=409, detail="The budget is approved; the brief is final.")
         answers = {**task.answers, **{a.field: a.answer for a in body.answers}}
@@ -202,13 +309,165 @@ def answer_questions(
         answered = {a.field for a in body.answers}
         edits = {**{f: v for f, v in task.edits.items() if f not in answered}, **body.brief_edits}
         try:
-            brief = _brief(task, answers, edits)
+            brief = _brief(task, answers, edits, clock())
         except BriefValidationError as exc:
             raise HTTPException(status_code=422, detail=f"That change does not fit the brief: {exc}") from exc
+        except DeliverableKindsError as exc:  # the file changed for the worse since the question was asked
+            logger.error("deliverable kinds config unusable: %s", exc)
+            raise HTTPException(
+                status_code=503, detail="Deliverable choices are unavailable; nothing changed."
+            ) from exc
+        changes: dict[str, Any] = {"answers": answers, "edits": edits, "brief": brief}
         if brief != task.brief:
-            task.approaches = None  # proposed for the old brief
-        task.answers, task.edits, task.brief = answers, edits, brief
+            changes["approaches"] = None  # proposed for the old brief
+        saved = _saved(store, None, task_id, task, [], changes)
+        if brief != task.brief:
+            saved.approaches_work["version"] = saved.approaches_work.get("version", 0) + 1
+        prefetch = saved.approaches is None and all(q.field in answers for q in saved.questions)
+        if prefetch:
+            _queue_approaches(store, writer, task_id, saved, model_router, clock)
     return {"brief": brief}
+
+
+def _proposed(
+    store: deps.Store,
+    writer: deps.EventWriter | None,
+    task_id: str,
+    task: deps.TaskRecord,
+    model_router: Router,
+    clock: Clock,
+) -> deps.TaskRecord:
+    """Wait outside the task lock; concurrent GETs and answers share one bounded worker."""
+    while True:
+        with task.lock:
+            task = _latest(store, task_id)
+            if any(q.field not in task.answers for q in task.questions):
+                raise HTTPException(status_code=409, detail="Answer or skip every question first.")
+            if task.approaches is not None:
+                return task
+            work = task.approaches_work
+            if work.get("computed") == work.get("version", 0):
+                result = work["result"]
+                return _saved(store, writer, task_id, task, [result.event], {"approaches": result.approaches})
+            future = _queue_approaches(store, writer, task_id, task, model_router, clock)
+            if future is None:
+                raise HTTPException(status_code=503, detail="The Director is busy; try again shortly.")
+        future.result()
+
+
+def _compute_approaches(task: deps.TaskRecord, model_router: Router, clock: Clock) -> Any:
+    try:
+        limit = load_intake_deadline()
+        result = propose_approaches(
+            task.brief,
+            router=model_router,
+            base=_base(task, DIRECTOR),
+            seq=task.next_seq,
+            gaps=task.gaps,
+            today=clock(),
+            deadline=Deadline.after(limit.seconds, limit.first_attempt_share),
+        )
+    except ApproachProposalError as exc:
+        if isinstance(exc.__cause__, RouterDeadlineError):
+            raise HTTPException(status_code=503, detail=INTAKE_DEADLINE_DETAIL) from exc
+        deps.raise_if_model_unavailable(exc)
+        raise HTTPException(status_code=502, detail="The Director could not propose approaches.") from exc
+    return result
+
+
+_PREFETCH = ThreadPoolExecutor(max_workers=4, thread_name_prefix="approaches")
+_PREFETCH_SLOTS = threading.BoundedSemaphore(32)  # running + queued tasks; edits never enqueue another job
+
+
+def _queue_approaches(
+    store: deps.Store,
+    writer: deps.EventWriter | None,
+    task_id: str,
+    task: deps.TaskRecord,
+    model_router: Router,
+    clock: Clock,
+) -> Future | None:
+    """Called under task.lock. One future per task, including failures for the same version."""
+    work = task.approaches_work
+    future = work.get("future")
+    version = work.get("version", 0)
+    if future is not None and (not future.done() or work.get("finished") == version):
+        return future
+    slots = _PREFETCH_SLOTS
+    if not slots.acquire(blocking=False):
+        return None
+    future = Future()
+    work["future"] = future
+    try:
+        _PREFETCH.submit(_prefetch_approaches, store, writer, task_id, model_router, clock, future, slots)
+    except Exception as caught_error:
+        log_caught(caught_error, __name__, locals())
+        work.pop("future", None)
+        slots.release()
+        raise
+    return future
+
+
+def _prefetch_approaches(
+    store: deps.Store,
+    writer: deps.EventWriter | None,
+    task_id: str,
+    model_router: Router,
+    clock: Clock,
+    future: Future,
+    slots: threading.BoundedSemaphore,
+) -> None:
+    """Coalesce edits to the latest version. Compute unlocked, publish only if still current.
+
+    Keep a computed result even if publication fails, so replay never pays to compute it twice.
+    """
+    task = _latest(store, task_id)
+    work = task.approaches_work
+    try:
+        while True:
+            with task.lock:
+                task = _latest(store, task_id)
+                version = work.get("version", 0)
+                snapshot = dataclasses.replace(task, brief=copy.deepcopy(task.brief))
+                if (
+                    task.approaches is not None
+                    or task.granted
+                    or any(q.field not in task.answers for q in task.questions)
+                ):
+                    work["finished"] = version
+                    future.set_result(None)
+                    return
+            result, error = None, None
+            try:
+                deps.providers_config()
+                if work.get("computed") == version:
+                    result = work["result"]
+                else:
+                    result = _compute_approaches(snapshot, model_router, clock)
+            except Exception as exc:
+                log_caught(exc, __name__, locals())
+                error = exc
+            with task.lock:
+                task = _latest(store, task_id)
+                if work.get("version", 0) != version:
+                    continue  # stale result/error: no event, no cache, only the newest pending brief runs
+                if error is None:
+                    work.update(computed=version, result=result)
+                    try:
+                        assert result is not None
+                        _saved(store, writer, task_id, task, [result.event], {"approaches": result.approaches})
+                    except Exception as exc:
+                        log_caught(exc, __name__, locals())
+                        error = exc
+                work["finished"] = version
+                if error is None:
+                    future.set_result(None)
+                else:
+                    future.set_exception(error)
+                    logger.warning("approaches prefetch for a task did not complete: %s", type(error).__name__)
+                return
+    finally:
+        slots.release()
 
 
 @router.get("/tasks/{task_id}/approaches")
@@ -216,10 +475,14 @@ def get_approaches(
     task_id: str,
     principal: Principal,
     store: StoreDep,
+    writer: WriterDep,
     model_router: Annotated[Router, Depends(deps.get_router)],
     flags: FlagsDep,
+    clock: Annotated[Clock, Depends(deps.get_today)],
+    skills: Annotated[SkillContext, Depends(get_skill_context)],
 ) -> dict[str, Any]:
-    """FR-INT-06: the Director's 2-3 approaches for the confirmed brief, proposed once per brief."""
+    """FR-INT-06: the Director's 2-3 approaches for the confirmed brief, proposed once per brief. SKILL-ROUTE: and the
+    skill that fits the task, if one does (`skill`: id, kind, name, version, score, source; null when none)."""
     task = _owned(store, task_id, principal)
     deps.refuse_if_replay_only(flags)  # NFR-24: this reaches the Director
     try:
@@ -227,21 +490,67 @@ def get_approaches(
     except ProviderConfigError as exc:
         logger.warning("provider config unavailable: %s", exc)
         raise HTTPException(status_code=503, detail="The model configuration is not available.") from exc
-    with task.lock:
-        if any(q.field not in task.answers for q in task.questions):
-            raise HTTPException(status_code=409, detail="Answer or skip every question first.")
-        if task.approaches is None:
-            try:
-                base = _base(task, DIRECTOR)
-                result = propose_approaches(task.brief, router=model_router, base=base, seq=task.next_seq)
-            except ApproachProposalError as exc:
-                raise HTTPException(status_code=502, detail="The Director could not propose approaches.") from exc
-            _append(store, task, [result.event])
-            task.approaches = result.approaches
-        approaches = task.approaches
+    task = _proposed(store, writer, task_id, task, model_router, clock)
+    assert task.approaches is not None
+    approaches = task.approaches
+    try:
+        make_choices = makers.make_choices(task.brief, task.owner)
+    except makers.MakerConfigError as exc:
+        raise HTTPException(status_code=503, detail="Maker choices are unavailable; nothing changed.") from exc
+    task = _matched(store, writer, task_id, task, skills)
     # Default (PRD silent, BQ-83): the cheapest approach is recommended; ties keep the Director's order.
     recommended = min(approaches, key=lambda a: a["credits"]["max"])["id"]
-    return {"task_id": task_id, "approaches": approaches, "recommended": recommended, "credit_usd": credit_usd}
+    floor = deps.min_run_grant()
+    shown = [_floored(a, floor) for a in approaches]  # BQ-BUDGET-FLOOR-1: stored as the Director made them
+    return {
+        "task_id": task_id,
+        "approaches": shown,
+        "make_choices": make_choices,
+        "recommended": recommended,
+        "credit_usd": credit_usd,
+        # SIMPLE-RUN-2: the most one approval may grant, so a one-step Start sends min(estimate, ceiling), never a 422.
+        "budget_ceiling": deps.budget_cap_ceiling(),
+        "min_grant": floor,  # BQ-BUDGET-FLOOR-1: and the least; approve raises a smaller cap to this
+        "skill": task.skill,
+    }
+
+
+_MATCHED: OrderedDict[tuple[str, str], dict[str, Any] | None] = OrderedDict()  # (task, brief hash) -> the match
+_MATCHED_MAX = 256
+
+
+def _matched(
+    store: deps.Store, writer: deps.EventWriter | None, task_id: str, task: deps.TaskRecord, skills: SkillContext
+) -> deps.TaskRecord:
+    """SKILL-ROUTE: the skill the task fits, kept on the task so the run pins what the start-plan card named. A skill
+    the person tagged is never replaced; no fit clears an earlier match. Advisory: a failure changes nothing."""
+    if task.skill is not None and task.skill.get("source") == "tagged":
+        return task
+    goal = str(task.brief.get("goal", ""))
+    key = (task_id, hashlib.sha256(goal.encode()).hexdigest())
+    if key in _MATCHED:  # one match per brief: a repeat GET costs no embedding
+        found = _MATCHED[key]
+    else:
+        found = skills.best_for(goal)
+        if not skills.failed:  # a transient failure or a refusal is not "nothing fits": it is asked again next time
+            _MATCHED[key] = found
+            while len(_MATCHED) > _MATCHED_MAX:
+                _MATCHED.popitem(last=False)
+    if found == task.skill:
+        return task
+    try:
+        with task.lock:
+            return _saved(store, writer, task_id, _latest(store, task_id), [], {"skill": found})
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("skill match not kept: %s", type(exc).__name__)
+        return task
+
+
+def _floored(approach: dict[str, Any], floor: float) -> dict[str, Any]:
+    """The approach as the confirm card shows it: its estimate raised to the floor a Start grants (BQ-BUDGET-FLOOR-1),
+    so the card never promises less than the grant. `min` follows `max` down, never above it."""
+    top = max(approach["credits"]["max"], floor)
+    return {**approach, "credits": {**approach["credits"], "min": min(approach["credits"]["min"], top), "max": top}}
 
 
 def _load_scenario(task: deps.TaskRecord) -> Any:
@@ -276,12 +585,57 @@ def _scenario_policies(
     return policies, events
 
 
+_NOT_STARTED = (
+    "Tilo could not start this run just now. Nothing was started and nothing was charged. "
+    "Press Start again in a minute; if it keeps happening, the problem is on our side."
+)
+
+
+def _loud() -> bool:
+    """Deployed, a run that cannot start is a plain 503 (SIMPLE-RUN-2). Locally and in tests the stores are often
+    deliberately absent, so the long-standing answer stays: the grant is recorded and a world answers 200."""
+    return deps.enforced()
+
+
+def _run_started(store: deps.Store, task: deps.TaskRecord) -> bool:
+    store.settle(task.world_id)
+    return task.world_id in store.runs or any(e["type"] == "world.started" for e in store.events.get(task.world_id, []))
+
+
+def _granted_cap(store: deps.Store, task: deps.TaskRecord, asked: float) -> float:
+    """The cap this task's grant recorded, which a second Start keeps (the request's number never raises it)."""
+    for event in reversed(store.events.get(task.world_id, [])):
+        if event.get("type") == "budget.granted":
+            try:
+                return float(event["data"]["cap"])
+            except (KeyError, TypeError, ValueError) as caught_error:
+                log_caught(caught_error, __name__, locals())
+                break
+    return asked
+
+
+def _start(
+    store: deps.Store, task: deps.TaskRecord, *, approach: dict, budget_cap: float, seams: runs.Seams | None
+) -> None:
+    """Start the task's one run. A start that fails is a 503 in plain words, never a 200 onto a world that never
+    moves (SIMPLE-RUN-2, LIVE-PATH-AUDIT-A finding 6). The grant stays recorded, so Start again retries only this."""
+    if seams is None:
+        return  # local and tests only (`_loud` refuses before this when deployed): nothing to start with
+    try:
+        runs.start_run(store, task, approach=approach, budget_cap=budget_cap, seams=seams)
+    except Exception as exc:
+        log_caught(exc, __name__, locals())
+        if _loud():
+            raise HTTPException(status_code=503, detail=_NOT_STARTED) from exc
+
+
 @router.post("/tasks/{task_id}/approve")
 def approve(
     task_id: str,
     principal: Principal,
     body: Annotated[ApproveIn, Depends(_json_body(ApproveIn))],
     store: StoreDep,
+    writer: WriterDep,
     seams: Annotated[runs.Seams | None, Depends(runs.run_seams)],
     flags: FlagsDep,
 ) -> dict[str, Any]:
@@ -290,17 +644,48 @@ def approve(
     the task's one run (CL-INT-2); a run that cannot start never changes this answer."""
     task = _owned(store, task_id, principal)
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check, before any grant
+    if _loud() and task.granted and not _run_started(store, task):
+        # SIMPLE-RUN-2: the budget was approved but the run never started (it could not be wired, or the start failed):
+        # Start again starts it with the grant already recorded, so the person is never stuck on "already approved".
+        approach = next((a for a in task.approaches or [] if a["id"] == body.approach_id), None)
+        if approach is None:
+            raise HTTPException(status_code=422, detail="Pick one of the proposed approaches.")
+        if seams is None:
+            raise HTTPException(status_code=503, detail=_NOT_STARTED)
+        _start(store, task, approach=approach, budget_cap=_granted_cap(store, task, body.budget_cap), seams=seams)
+        return {"world_id": task.world_id}
+    if (
+        seams is None and _loud()
+    ):  # SIMPLE-RUN-2: loud and before the grant, so nothing is approved or charged for a run that cannot go
+        logger.error("approve refused: the run seams are not wired (task %s)", task_id)
+        raise HTTPException(status_code=503, detail=_NOT_STARTED)
+    getattr(store, "admit_run", lambda: None)()  # a demo may have only a few runs at once (DEMO-EPHEMERAL-1)
     if body.budget_cap > (ceiling := deps.budget_cap_ceiling()):  # finite already: the body refuses NaN and Infinity
         raise HTTPException(status_code=422, detail=f"One run may use at most {ceiling:g} credits.")
     with store.grant_lock(task.owner), task.lock:  # always in this order: the owner's grants, then the task
+        task = _latest(store, task_id)  # the record saved last (a prefetch may have stored the approaches)
         if task.granted:
             raise HTTPException(status_code=409, detail="This task's budget is already approved.")
         if task.approaches is None:
             raise HTTPException(status_code=409, detail="Get the approaches first.")
         if body.approach_id not in {a["id"] for a in task.approaches}:
             raise HTTPException(status_code=422, detail="Pick one of the proposed approaches.")
+        try:
+            current_choices = makers.make_choices(task.brief, task.owner)
+            picks = makers.resolve_picks(
+                current_choices,
+                [item.model_dump(mode="json") for item in body.make_with],
+                task.brief,
+            )
+        except makers.MakerConfigError as exc:
+            raise HTTPException(status_code=503, detail="Maker choices are unavailable; nothing changed.") from exc
+        except makers.MakerSelectionError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         preload = _load_scenario(task)  # before anything changes: a scenario that no longer loads stops the approval
-        now, base, cap = now_ts(), _base(task, task.owner), body.budget_cap
+        now, base = now_ts(), _base(task, task.owner)
+        cap = max(body.budget_cap, deps.min_run_grant())  # BQ-BUDGET-FLOOR-1: never below the floor, above it kept
+        # the earlier grants and the policies are read across all of the owner's worlds
+        store.load_owner(task.owner, settle=True)
         owned = {w for w, record in store.worlds.items() if record.owner == task.owner}
         earlier = [e for w in owned for e in store.events.get(w, []) if e.get("type") == "budget.granted"]
         outcome = budget.request_budget_grant(
@@ -315,15 +700,146 @@ def approve(
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail="Only the world's owner sets budgets.") from exc
         policies, policy_events = _scenario_policies(task, preload, event["seq"] + 1)  # built before anything is stored
-        _append(store, task, [event, *policy_events])
-        for policy in policies:
-            store.policies[policy["id"]] = policy
-            store.policy_worlds[policy["id"]] = task.world_id
-        task.granted = True
         approach = next(a for a in task.approaches if a["id"] == body.approach_id)
-    if seams is not None:
-        try:
-            runs.start_run(store, task, approach=approach, budget_cap=cap, seams=seams)
-        except Exception:
-            logger.exception("the run for task %s did not start", task_id)
+        maker_events = [
+            build_event(
+                {**base, "actor": principal.user_id},
+                seq=event["seq"] + 1 + len(policy_events) + offset,
+                type="plan.maker_chosen",
+                target=task.world_id,
+                item=None,
+                severity="info",
+                tool=None,
+                cause=event["id"],
+                data=pick,
+                summary=f"You picked {pick['label']} to make the {pick['format']} deliverable.",
+            )
+            for offset, pick in enumerate(picks)
+        ]
+        task = _saved(
+            store, writer, task_id, task, [event, *policy_events, *maker_events],
+            {"granted": True, "maker_picks": picks},
+            policies={p["id"]: p for p in policies}, policy_worlds={p["id"]: task.world_id for p in policies},
+        )  # fmt: skip
+    _start(store, task, approach=approach, budget_cap=cap, seams=seams)
     return {"world_id": task.world_id}
+
+
+_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+def _again_ids(world_id: str, direction: str = "") -> tuple[str, str, str]:
+    """The ids of a world's "Start it again" run: derived from the old world, so pressing twice is one new world."""
+    found = []
+    for prefix in ("t", "w", "r"):
+        raw = json.dumps(["/worlds/rerun", world_id, direction, prefix], separators=(",", ":")).encode()
+        number = int.from_bytes(hashlib.sha256(raw).digest()[:16], "big")
+        found.append(prefix + "_" + "".join(_CROCKFORD[(number >> (5 * i)) & 31] for i in range(25, -1, -1)))
+    return found[0], found[1], found[2]
+
+
+def _continued_brief(
+    brief: dict[str, Any], stream: list[dict[str, Any]], failed_unit: str | None = None, direction: str = ""
+) -> dict[str, Any]:
+    """Carry bounded, recorded work into a new run without changing the paused run or the brief schema."""
+    carried = copy.deepcopy(brief)
+    constraints = list(carried.get("constraints") or [])
+    if direction:
+        constraints.append(f"Change direction: {direction[:275]}")
+    room = max(0, 20 - len(constraints))
+    summaries = [
+        e.get("summary")
+        for e in stream
+        if e.get("type") in {"unit.completed", "artifact.delivered"} and isinstance(e.get("summary"), str)
+    ]
+    constraints.extend(
+        f"Earlier run completed: {line[:275]}" for line in (summaries[-room:] if room else []) if line.strip()
+    )
+    if failed_unit and len(constraints) < 20:
+        constraints.append(f"Resume from failed unit {failed_unit}; keep the earlier completed work.")
+    carried["constraints"] = constraints
+    return carried
+
+
+_SHARED = "world.share_changed"
+
+
+@router.post("/worlds/{world_id}/rerun")
+def rerun(
+    world_id: str,
+    principal: Principal,
+    store: StoreDep,
+    writer: WriterDep,
+    seams: Annotated[runs.Seams | None, Depends(runs.run_seams)],
+    flags: FlagsDep,
+    safety: Annotated[SafetyProvider, Depends(deps.get_safety)],
+    body: RerunIn | None = None,
+) -> dict[str, Any]:
+    """RERUN-1, RERUN-ANY: a world whose latest world state is `world.failed` (a restart, a unit that failed, any
+    recorded reason) is started again as a NEW run of the same task: the same brief, the approach the person approved
+    and the cap they granted, through the approve path (so the policy engine, the ceiling and the owner's grants decide
+    again). Only the owner; anyone else gets the unknown-world 404. A world still running, waiting or finished is a 409.
+    Pressing twice is one new world."""
+    world = store.load_world(world_id)
+    if world is None or world.owner != principal.user_id:
+        raise HTTPException(status_code=404, detail="No such world.")
+    deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in and the owner check, before anything is stored
+    store.settle(world_id)
+    stream = store.events.get(world_id, [])
+    direction = body.direction.strip() if body is not None else ""
+    if body is not None and not direction:
+        raise HTTPException(status_code=422, detail="Describe what the team should change.")
+    _screen(safety, [direction] if direction else [])
+
+    # The latest world state; a share change is not one, so sharing a stopped world does not hide its stop.
+    last = next((e for e in reversed(stream) if e["type"].startswith("world.") and e["type"] != _SHARED), None)
+    paused = last is not None and last["type"] == "world.paused" and world.paused
+    redirectable = last is not None and (last["type"] in ("world.completed", "world.failed") or paused)
+    retryable = last is not None and (last["type"] == "world.failed" or paused)
+    if (direction and not redirectable) or (not direction and not retryable):
+        raise HTTPException(status_code=409, detail="Only a run that stopped can be started again.")
+    old = store.load_world_task(world_id)
+    planned = next((e for e in reversed(stream) if e["type"] == "world.planned"), None)
+    if old is None or old.approaches is None or planned is None:
+        raise HTTPException(status_code=409, detail="This world has no approved task to start again.")
+    if any(src.get("kind") == "file" for src in old.brief.get("sources", [])):
+        raise HTTPException(
+            status_code=409,
+            detail="This task used attached files, which stay with the first run. Describe it again from Home.",
+        )
+    task_id, new_world, new_run = _again_ids(world_id, direction)
+    # The durable store, not this process's cache: a second press on another instance (after scale to zero) finds the
+    # first one's task and dedupes. Pressed twice is one new world once its run started; a first press whose start
+    # failed falls through to `approve`, which starts it again with the grant it recorded (SIMPLE-RUN-2).
+    again = store.load_task(task_id)
+    if again is not None and again.granted and (not _loud() or _run_started(store, again)):
+        return {"world_id": again.world_id, "task_id": task_id}
+    cap = _granted_cap(store, old, 0.0)
+    if cap <= 0:
+        raise HTTPException(status_code=409, detail="This world has no approved budget to start again.")
+    # What `approve` refuses before it grants is refused here first: a refusal leaves no orphan world or task.
+    if seams is None and _loud():
+        logger.error("rerun refused: the run seams are not wired (world %s)", world_id)
+        raise HTTPException(status_code=503, detail=_NOT_STARTED)
+    getattr(store, "admit_run", lambda: None)()
+    if cap > (ceiling := deps.budget_cap_ceiling()):
+        raise HTTPException(status_code=422, detail=f"One run may use at most {ceiling:g} credits.")
+    if again is None:
+        fresh = deps.TaskRecord(
+            old.owner, new_world, new_run, copy.deepcopy(old.draft),
+            _continued_brief(
+                old.brief, stream, None if paused else str(last["data"].get("unit") or "failed step"), direction
+            ),
+            list(old.questions), 1,
+            answers=dict(old.answers), edits=copy.deepcopy(old.edits), approaches=copy.deepcopy(old.approaches),
+            granted=False, scenario=old.scenario, gaps=old.gaps,
+        )  # fmt: skip
+        store.save(
+            writer,
+            worlds={new_world: deps.WorldRecord(owner=old.owner, districts={}, run_id=new_run)},
+            tasks={task_id: fresh},
+            create=[("worlds", new_world), ("tasks", task_id)],
+        )
+    body = ApproveIn(approach_id=str(planned["data"]["approach"]), budget_cap=cap)
+    approve(task_id, principal, body, store, writer, seams, flags)
+    return {"world_id": new_world, "task_id": task_id}

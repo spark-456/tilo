@@ -39,13 +39,7 @@ interface ActorState {
   scheduleEnd: number; // finish time of the last scheduled move, for chaining the next one
 }
 
-/** `reducedMotion` may be a live getter: each enqueue reads it, so a mid-playback change applies
- * to every later movement with no restart. */
-export function createChoreographer(
-  opts: { reducedMotion?: boolean | (() => boolean) } = {},
-): Choreographer {
-  const rm = opts.reducedMotion ?? false;
-  const reducedMotion = typeof rm === "function" ? rm : () => rm;
+export function createChoreographer(): Choreographer {
   const actors = new Map<string, ActorState>();
 
   const actorOf = (id: string): ActorState => {
@@ -74,7 +68,8 @@ export function createChoreographer(
     enqueue(move) {
       const a = actorOf(move.actor);
       const start = Math.max(move.receivedAtMs, a.scheduleEnd);
-      const durationMs = reducedMotion() ? 0 : Math.min(move.durationMs, MAX_DURATION_MS);
+      // Motion preference affects presentation, not whether a recorded move takes place.
+      const durationMs = Math.min(move.durationMs, MAX_DURATION_MS);
       const finish = start + durationMs;
       a.schedule.push({ move, start, finish });
       a.scheduleEnd = finish;

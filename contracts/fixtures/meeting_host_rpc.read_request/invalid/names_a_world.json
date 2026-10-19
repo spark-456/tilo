@@ -1,0 +1,8 @@
+{
+  "user_id": "u_owner",
+  "tool": "read_email",
+  "args": {
+    "message_id": "18c2f0a9"
+  },
+  "world_id": "w_village_basic"
+}

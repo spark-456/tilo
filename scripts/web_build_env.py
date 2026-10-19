@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""SEC-10: run a web build command with the Firebase web config in its environment (`just deploy-web`).
+
+The web client's App Check needs the Firebase `apiKey` and `projectId` of the `tilo-web` app. The key ends up in the
+public JavaScript bundle, so it must be restricted in the Google Cloud console BEFORE it is baked in (to the Firebase
+App Check API and to the two Hosting origins; infra/ACCESS.md section 7 and docs/deploy-dev.md). The script therefore
+bakes it only when the owner has done that and says so with TILO_BAKE_FIREBASE_KEY=1; otherwise the build runs with
+no Firebase config and App Check is skipped in the browser (by design, nothing breaks).
+
+With the flag set, the config is read from `firebase apps:sdkconfig WEB <app id>` (the owner's own `firebase login`
+is needed), checked for shape, and handed to the build as VITE_FIREBASE_API_KEY and VITE_FIREBASE_PROJECT_ID.
+Nothing is written to disk and nothing is printed. VITE_TILO_API_URL is set empty, so the deployed web app stays the
+fixture / replay world (P0-07c), except with the first argument --tilo-dev-api (`just deploy-web-live`, WEB-TO-API):
+then it is the one fixed tilo-dev tilo-api origin below and the Firebase config is required.
+
+Nothing is written to disk and nothing is printed. VITE_TILO_API_URL comes only from `--api <url>` (PROD-WIRE-4):
+empty, or tilo-api's own Cloud Run url, checked here as well as by `just`. Without it the deployed web app stays the
+fixture / replay world (P0-07c); a VITE_TILO_API_URL already in the shell is always ignored.
+
+Usage: python scripts/web_build_env.py [--api <url>] <build command...>   (stdlib only; runs on Windows and Linux)
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from collections.abc import Mapping
+from typing import Any
+
+APP_ID = "1:379216745263:web:8cda5846cf882c2cefc7da"  # Firebase web app "tilo-web" (infra/ACCESS.md section 7)
+PROJECT = "essential-wares-510320-f0"  # the tilo-dev project, pinned like `just deploy-web`
+LIVE_API_ORIGIN = (
+    "https://tilo-api-4qhkpsn5ga-as.a.run.app"  # the deployed tilo-dev tilo-api (WEB-TO-API); nothing sets it
+)
+LIVE_FLAG = "--tilo-dev-api"  # first argument: build against LIVE_API_ORIGIN (`just deploy-web-live`)
+BAKE_FLAG = "TILO_BAKE_FIREBASE_KEY"  # "1" (exactly) once the owner has restricted the browser key
+
+_API_KEY_SHAPE = re.compile(r"^AIza[0-9A-Za-z_-]{35}$")
+_LIVE_ORIGIN_SHAPE = re.compile(r"^https://tilo-api-[0-9a-z]+-as\.a\.run\.app$")
+
+# tilo-api's own Cloud Run urls (the `just deploy-web` check, kept in step by tests/repo/test_PROD_WIRE_4_*).
+API_URL = re.compile(r"https://tilo-api-[a-z0-9]+-as\.a\.run\.app|https://tilo-api-[0-9]+\.asia-southeast1\.run\.app")
+_FIELDS = (("apiKey", "VITE_FIREBASE_API_KEY"), ("projectId", "VITE_FIREBASE_PROJECT_ID"))
+
+
+def _config_from_json(text: str) -> dict[str, Any] | None:
+    """The config object inside `--json` output (`result.fileContents` is itself JSON text), or None."""
+    try:
+        data: Any = json.loads(text)
+    except ValueError:
+        return None
+    for _ in range(4):  # unwrap {"result": {"fileContents": "<json>"}} and similar, a few levels at most
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except ValueError:
+                return None
+        elif isinstance(data, dict) and "apiKey" not in data:
+            nested = data.get("result", data.get("fileContents"))
+            if nested is None:
+                return None
+            data = nested
+        else:
+            break
+    return data if isinstance(data, dict) else None
+
+
+def parse_sdkconfig(text: str) -> dict[str, str]:
+    """The VITE_ variables in `firebase apps:sdkconfig` output: JSON (preferred) or the JS object text."""
+    config = _config_from_json(text)
+    found: dict[str, str] = {}
+    for field, variable in _FIELDS:
+        if config is not None and isinstance(config.get(field), str):
+            found[variable] = config[field]
+            continue
+        match = re.search(rf"""["']?{field}["']?\s*:\s*["']([^"'\s]+)["']""", text)
+        if match:
+            found[variable] = match.group(1)
+    return found
+
+
+def is_valid(found: Mapping[str, str]) -> bool:
+    """True only for a Google browser API key shape and the dev project's own id."""
+    return bool(_API_KEY_SHAPE.fullmatch(found.get("VITE_FIREBASE_API_KEY", ""))) and (
+        found.get("VITE_FIREBASE_PROJECT_ID") == PROJECT
+    )
+
+
+def _run(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    resolved = shutil.which(argv[0])  # finds pnpm.cmd on Windows
+    return subprocess.run([resolved or argv[0], *argv[1:]], text=True, check=False, **kwargs)
+
+
+def sdk_env(base: Mapping[str, str]) -> dict[str, str]:
+    """The Firebase web config for the build; empty (with one line on stderr) when not asked for or not readable."""
+    if base.get(BAKE_FLAG) != "1":
+        print(
+            f"web_build_env: {BAKE_FLAG}=1 is not set; building without App Check (see docs/deploy-dev.md).",
+            file=sys.stderr,
+        )
+        return {}
+    argv = [
+        "pnpm",
+        "exec",
+        "firebase",
+        "apps:sdkconfig",
+        "WEB",
+        APP_ID,
+        "--project",
+        PROJECT,
+        "--non-interactive",
+        "--json",
+    ]
+    found: dict[str, str] = {}
+    try:
+        result = _run(argv, capture_output=True, timeout=120, stdin=subprocess.DEVNULL)
+        if result.returncode == 0:
+            found = parse_sdkconfig(result.stdout)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    if not is_valid(found):
+        print(
+            "web_build_env: no valid Firebase web config (not signed in?); building without App Check.", file=sys.stderr
+        )
+        return {}
+    return found
+
+
+def build_env(base: Mapping[str, str], firebase: Mapping[str, str], api_url: str = "") -> dict[str, str]:
+    # A VITE_FIREBASE_* value already in the shell is dropped: only the checked config above may reach the bundle.
+    kept = {k: v for k, v in base.items() if not k.startswith("VITE_FIREBASE_")}
+    return {**kept, **firebase, "VITE_TILO_API_URL": api_url}
+
+
+def main(argv: list[str]) -> int:
+    live = bool(argv) and argv[0] == LIVE_FLAG
+    argv = argv[1:] if live else argv
+    api = ""
+    if argv[:1] == ["--api"]:
+        if len(argv) < 2 or not (argv[1] == "" or API_URL.fullmatch(argv[1])):
+            print("web_build_env.py: --api must be empty or tilo-api's own Cloud Run url", file=sys.stderr)
+            return 2
+        api, argv = argv[1], argv[2:]
+    if not argv or argv[0].startswith("-"):
+        print("usage: web_build_env.py [--tilo-dev-api] <build command...>", file=sys.stderr)
+        return 2
+    firebase = sdk_env(os.environ)
+    if live and (not firebase or not _LIVE_ORIGIN_SHAPE.fullmatch(LIVE_API_ORIGIN)):
+        # A live build needs the sign-in config: without it every call would be refused. Nothing is built.
+        print(
+            f"web_build_env: {LIVE_FLAG} needs {BAKE_FLAG}=1 and a signed-in firebase CLI; nothing built.",
+            file=sys.stderr,
+        )
+        return 2
+    return _run(argv, env=build_env(os.environ, firebase, LIVE_API_ORIGIN if live else api)).returncode
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

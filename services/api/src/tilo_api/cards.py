@@ -23,19 +23,23 @@ import logging
 import re
 import secrets
 import threading
-from collections.abc import Callable
-from dataclasses import dataclass, field
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Protocol
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import jsonschema
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 from tilo_harness.question_wait import AlreadyCommitted  # raised by an event writer; one class for both sides
+from tilo_providers.diagnostics import log_caught
+from tilo_redact import redact
 
+from tilo_api import deps
 from tilo_api.deps import Principal, get_current_principal
 from tilo_api.redaction import _DISTRICT_RE, _safe_districts
 
@@ -43,6 +47,7 @@ logger = logging.getLogger("tilo_api.cards")
 CONTRACTS = Path(__file__).resolve().parents[4] / "contracts"
 
 _TS_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
+_HHMM_RE = re.compile(r"^([01][0-9]|2[0-3]):([0-5][0-9])$")
 _ULID_RE = re.compile(r"^[0-7][0-9A-HJKMNP-TV-Z]{25}$")
 _USER_RE = re.compile(r"^u_[0-9A-Za-z_]{1,48}$")
 _DOMAIN_RE = re.compile(r"[a-z][a-z0-9_]{0,63}")  # common.schema.json slug
@@ -50,8 +55,52 @@ _MERGEABLE = ("needs_you", "meeting")
 _ROLES = ("owner", "team_lead", "approver")  # any other role (a Viewer included) answers and lists nothing
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _WEB_CHANNELS = ("web", "mobile_web")
+OWNER_ONLY_ACTIONS = frozenset({"create_meeting_event"})  # FR-MTG-09, ADR-0024: no plan names it, no Approver opens it
 _ANSWER_CHANNELS = (*_WEB_CHANNELS, "email")  # the only channels that answer, whatever a card lists (CH-RM)
 _STATUS = {"card_not_found": 404, "forbidden": 403, "busy": 409}  # AnswerResult.reason -> HTTP; others are 400
+_ALWAYS_NOTIFY = frozenset({"gate", "blocked"})
+
+
+def _parse_hhmm(value: object) -> int | None:
+    if not isinstance(value, str) or (m := _HHMM_RE.match(value.strip())) is None:
+        return None
+    return int(m.group(1)) * 60 + int(m.group(2))
+
+
+def _quiet_hours_active(prefs: Mapping[str, Any] | None, now: datetime.datetime) -> bool:
+    """FR-HIL-13: whether `now` falls in the user's `[start, end)` quiet-hours window in their IANA timezone."""
+    if prefs is None:
+        return False
+    if not isinstance(prefs, Mapping):
+        logger.warning("quiet_hours held: reason=invalid_window error=ValueError")
+        return True
+    raw = prefs.get("quiet_hours")
+    if raw is not None and not isinstance(raw, Mapping):
+        logger.warning("quiet_hours held: reason=invalid_window error=ValueError")
+        return True
+    block = raw if isinstance(raw, Mapping) else (prefs if ("start" in prefs or "end" in prefs) else None)
+    if not isinstance(block, Mapping) or block.get("enabled") is False:
+        return False
+    start_min, end_min = _parse_hhmm(block.get("start")), _parse_hhmm(block.get("end"))
+    if start_min is None or end_min is None:
+        logger.warning("quiet_hours held: reason=invalid_window error=ValueError")
+        return True
+    if start_min == end_min:
+        return False
+    tz_name = (
+        block.get("timezone") or block.get("time_zone") or prefs.get("timezone") or prefs.get("time_zone") or "UTC"
+    )
+    if not isinstance(tz_name, str) or not tz_name.strip():
+        logger.warning("quiet_hours held: reason=timezone_unresolved error=ValueError")
+        return True
+    try:
+        tz = ZoneInfo(tz_name.strip())
+    except (ZoneInfoNotFoundError, KeyError, ValueError, OSError) as exc:
+        logger.warning("quiet_hours held: reason=timezone_unresolved error=%s", type(exc).__name__)
+        return True
+    local_dt = now.astimezone(tz)
+    cur_min = local_dt.hour * 60 + local_dt.minute
+    return (start_min <= cur_min < end_min) if start_min < end_min else (cur_min >= start_min or cur_min < end_min)
 
 
 def _derived_id(seed: str) -> str:
@@ -111,7 +160,8 @@ def _card_errors(card: Any) -> list[str]:
         errors.append("CR-01: safe_default must name one of options[].id")
     try:
         _deadline(card)
-    except (ValueError, OverflowError):
+    except (ValueError, OverflowError) as caught_error:
+        log_caught(caught_error, __name__, locals())
         errors.append("created_at must be a real calendar instant and created_at + timeout must be representable")
     return errors
 
@@ -190,6 +240,9 @@ class _Record:
     def kind(self) -> str:
         return self.card["kind"]
 
+    def assignee_until_live(self, now: datetime.datetime) -> bool:
+        return self.assignee_until is None or now < self.assignee_until
+
 
 def _can_see(p: Principal, world_id: str, owner: str | None, r: _Record, now: datetime.datetime) -> bool:
     """PRD 10.1 scope: the owner sees every card, a Team Lead their districts' cards, an Approver
@@ -225,17 +278,47 @@ class CardStore:
         writer: EventWriter,
         world_owners: dict[str, str] | None = None,
         merge_window_s: int = 60,
+        preferences: Any | None = None,
+        notifier: Callable[[dict], None] | None = None,
+        safety: Any | None = None,
+        redactor: Callable[[str], str] = redact,
     ) -> None:
+        self._safety, self._redactor = safety, redactor
         self._clock = clock
         self._writer = writer
         self._world_owners = dict(world_owners or {})
         self._merge_window_s = merge_window_s
+        self._preferences = preferences
+        self._notifier = notifier
         self._records: dict[str, dict[str, _Record]] = {}
         self._seen: dict[tuple[str, str], tuple[str, SubmitResult]] = {}
         self._groups: dict[tuple, _Group] = {}
         self._pending: dict[tuple[str, str], _Record] = {}  # open and not yet nudged: tick's work set
         self._answers_by_lead: list[dict[str, Any]] = []  # a Team Lead's own answers, in order (FR-HIL-10)
         self._lock = threading.RLock()  # guards every state change; a write happens outside it
+
+    def _user_prefs(self, user_id: str | None) -> Mapping[str, Any] | None:
+        if not user_id or self._preferences is None:
+            return None
+        if isinstance(self._preferences, Mapping):
+            return self._preferences.get(user_id)
+        if callable(getattr(self._preferences, "get", None)):
+            return self._preferences.get(user_id)
+        return None
+
+    def should_notify(self, card: dict, *, user_id: str | None = None, now: str | None = None) -> bool:
+        """FR-HIL-13: during quiet hours only `gate` and `blocked` cards notify."""
+        rung = str(card.get("rung") or card.get("kind") or "").lower()
+        if rung in _ALWAYS_NOTIFY or card.get("kind") == "gate":
+            return True
+        target = user_id or self._world_owners.get(card.get("world_id", ""))
+        instant = _parse_ts(now or self._clock.now())
+        try:
+            prefs = self._user_prefs(target)
+        except Exception as exc:
+            logger.warning("quiet_hours held: reason=preference_error error=%s", type(exc).__name__)
+            return False
+        return not _quiet_hours_active(prefs, instant)
 
     # -- submit ---------------------------------------------------------
 
@@ -302,6 +385,10 @@ class CardStore:
         self._pending[(world_id, card_id)] = record
         result = SubmitResult("merged" if merged else "accepted", group.primary_id, ())
         self._seen[(world_id, card_id)] = (digest, result)
+        if not merged and self._notifier is not None:
+            recipient = assignee or self._world_owners.get(world_id)
+            if self.should_notify(record.card, user_id=recipient):
+                self._notifier(copy.deepcopy(record.card))
         return result
 
     def _submit_errors(
@@ -413,6 +500,32 @@ class CardStore:
                     shown[id(record.group)] = record
             return sorted((copy.deepcopy(r.card) for r in shown.values()), key=lambda c: c["created_at"])
 
+    def plate_facts(self, user_id: str, *, limit: int = 500) -> list[dict]:
+        """PEOPLE-SEAMS-1 (ADR-0021, PE-27): the plate's card facts for `user_id` alone, oldest first, one per group:
+        every open card of a world the person owns, and an open gate whose live Approver assignment names them (a share
+        link's expiry ends it). `{data, world_owner, approver, answered: False}`; nothing of any other person's."""
+        now = _parse_ts(self._clock.now())
+        with self._lock:
+            shown: dict[int, tuple[_Record, str | None]] = {}
+            for world_id, records in self._records.items():
+                owner = self._world_owners.get(world_id)
+                for record in records.values():
+                    if record.status != "open" or id(record.group) in shown:
+                        continue
+                    approves = record.kind == "gate" and record.assignee == user_id and record.assignee_until_live(now)
+                    if (owner is not None and owner == user_id) or approves:
+                        shown[id(record.group)] = (record, owner)
+            found = sorted(shown.values(), key=lambda pair: (pair[0].card["created_at"], pair[0].card["id"]))
+            return [
+                {
+                    "data": copy.deepcopy(r.card),
+                    "world_owner": owner,
+                    "approver": r.assignee if r.kind == "gate" and r.assignee_until_live(now) else None,
+                    "answered": False,
+                }
+                for r, owner in found[: max(limit, 0)]
+            ]
+
     def lead_answers(self, world_id: str, user_id: str) -> list[dict]:
         """FR-HIL-10: this Team Lead's own answers (never a timeout default), each `{card_id, option, answered_at,
         answer_time_s}`, with the time read from the injected clock."""
@@ -444,6 +557,8 @@ class CardStore:
                 raise ShareRefused("not_an_open_gate")
             if record.reraised_from is not None:
                 raise ShareRefused("not_an_original_gate")  # a shared card is never shared again
+            if record.card["gate"]["action"]["type"] in OWNER_ONLY_ACTIONS:
+                raise ShareRefused("owner_only_gate")
             now = self._clock.now()
             new_id, outbox_id = _derived_id(secrets.token_hex(16)), _derived_id(secrets.token_hex(16))
             card = copy.deepcopy(record.card) | {"id": new_id, "created_at": now}
@@ -491,7 +606,9 @@ class CardStore:
         world_id: str,
         card_id: str,
         *,
-        option: str,
+        option: str | None = None,
+        text: str | None = None,
+        safety: Any | None = None,
         channel: str,
         principal: Principal,
         console_domain: str | None = None,
@@ -521,7 +638,24 @@ class CardStore:
                 return AnswerResult("rejected", "busy", ())
 
             card = record.card
-            if option not in {o["id"] for o in card["options"]}:
+            answer_key_text = text
+            if (option is None) == (text is None):
+                return AnswerResult("rejected", "Choose an option or type an answer.", ())
+            if text is not None:
+                if record.kind != "needs_you":
+                    return AnswerResult("rejected", "You can only type an answer to a question.", ())
+                if not isinstance(text, str) or not 1 <= len(text) <= 300 or not text.strip():
+                    return AnswerResult("rejected", "Use 1 to 300 characters with at least one word.", ())
+                try:
+                    text = self._redactor(text)
+                    if not 1 <= len(text) <= 300 or not text.strip():
+                        return AnswerResult("rejected", "Please shorten your answer and try again.", ())
+                    verdict = (safety or self._safety).check(text)
+                    if verdict["flagged"] is not False:
+                        return AnswerResult("rejected", "Please reword your answer and try again.", ())
+                except Exception:
+                    return AnswerResult("rejected", "Your answer could not be checked. Please try again.", ())
+            if option is not None and option not in {o["id"] for o in card["options"]}:
                 return AnswerResult("rejected", "invalid_option", ())
             if channel not in card["answer_channels"] or channel not in _ANSWER_CHANNELS:
                 # SEC-06: a gate opens only in a signed-in session; any other channel is refused, whatever a card lists
@@ -529,7 +663,7 @@ class CardStore:
             if channel == "email" and record.kind != "needs_you":
                 return AnswerResult("rejected", "invalid_channel", ())  # email answers a plain question only (CH-RM)
 
-            who = (option, channel, principal.user_id, principal.role)
+            who = (option, answer_key_text, channel, principal.user_id, principal.role)
             authz = {"by": "person", "ref": principal.user_id, "at": self._clock.now()}
             if record.attempt is not None and record.attempt[0] == who:
                 part: dict | None = record.attempt[1]  # this answer again after a write that raised: resend it as is
@@ -546,20 +680,25 @@ class CardStore:
                 part = self._part(record, "connection.consented", data, authz=authz) if option == "connect" else None
             else:
                 by = "team_lead" if principal.role == "team_lead" else "person"
-                part = self._part(record, "question.answered", {"answered_by": by}) | {"option": option}
-                # `option` is scope for the waiting agent (BQ-207), not event data: the event stays {answered_by}
+                data = {"answered_by": by}
+                if text is not None:
+                    data["text"] = text
+                part = self._part(record, "question.answered", data) | {"option": option}
+                # The chosen option is scope; typed text belongs to the question event data.
             if part is None:
                 return AnswerResult("answered", None, ())
             record.group.resolving = True  # exactly one resolution per card: later answers and tick see this
         if not self._write_then_close(record, who, part):
             return AnswerResult("rejected", "already_resolved", ())  # an earlier answer committed: it won
         if principal.role == "team_lead" and part["type"] == "question.answered":
-            self._note_answer(record, principal.user_id, option, authz["at"])
+            self._note_answer(record, principal.user_id, option, authz["at"], text)
         return AnswerResult("answered", None, (part,))
 
-    def _note_answer(self, record: _Record, user_id: str, option: str, at: str) -> None:
+    def _note_answer(self, record: _Record, user_id: str, option: str | None, at: str, text: str | None = None) -> None:
         seconds = (_parse_ts(at) - _parse_ts(record.card["created_at"])).total_seconds()
         entry = {"world_id": record.world_id, "user_id": user_id, "card_id": record.card["id"], "option": option}
+        if text is not None:
+            entry["answer"] = text
         with self._lock:
             self._answers_by_lead.append({**entry, "answered_at": at, "answer_time_s": seconds})
 
@@ -571,7 +710,8 @@ class CardStore:
             with self._lock:
                 self._resolve_group(record.group)
             return False
-        except BaseException:
+        except BaseException as caught_error:
+            log_caught(caught_error, __name__, locals())
             with self._lock:
                 record.group.resolving = False
                 record.attempt = (who, part)  # it may have committed: the same answer resends this exact part
@@ -621,6 +761,7 @@ class CardStore:
             except BaseException as exc:
                 # This claim, and (if the failure is not an ordinary error) every later one, goes back to the
                 # work set for the next tick; an ordinary failure never blocks the cards after it.
+                log_caught(exc, __name__, locals())
                 rest = [claimed[i]] if isinstance(exc, Exception) else claimed[i:]
                 with self._lock:
                     for k, r, h in rest:
@@ -642,9 +783,28 @@ class _AnswerBody(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    option: str
+    option: str | None = None
+    text: str | None = Field(default=None, min_length=1, max_length=300, pattern=r"\S")
     channel: str = "web"
     pin_verified: bool = False
+
+    @model_validator(mode="after")
+    def exactly_one_answer(self) -> _AnswerBody:
+        if (self.option is None) == (self.text is None):
+            raise ValueError("Choose exactly one: option or text.")
+        return self
+
+
+def answer_safety(
+    body: _AnswerBody,
+    request: Request,
+    mode: Any = Depends(deps.get_mode),
+    switches: Any = Depends(deps.get_switches),
+) -> Any:
+    if body.text is None:
+        return None
+    override = request.app.dependency_overrides.get(deps.get_safety)
+    return override() if override else deps.get_safety(mode, request, switches)
 
 
 def session_allows(principal: Principal, claimed: str, from_channels: bool) -> bool:
@@ -657,6 +817,55 @@ def session_allows(principal: Principal, claimed: str, from_channels: bool) -> b
     return principal.channel in _WEB_CHANNELS and claimed in _WEB_CHANNELS
 
 
+def answering_principal(
+    principal: Principal, world_id: str, *, record_owner: str | None, cards: CardStore, from_channels: bool
+) -> Principal | None:
+    """Who answers a card in `world_id` (BQ-XWORLD-1, BQ-XWORLD-2). A session bound to that world, unchanged. Otherwise
+    only role owner, on the user's own web or mobile_web session (never a tilo-channels caller, so never an email link),
+    when both the world's record owner and its run's CardStore owner are the caller: the principal narrowed to that
+    world, role and user unchanged, and only on a full web sign-in session (`full_session`, BQ-XWORLD-10), so a
+    signed-link landing session stays bound. Anything else is None, the unknown-world 404. Checked on every request."""
+    if principal.world_id == world_id:
+        return principal
+    me = principal.user_id
+    if principal.role != "owner" or principal.channel not in _WEB_CHANNELS or from_channels:
+        return None
+    if not principal.full_session:
+        return None
+    if record_owner != me or cards.owner_of(world_id) != me:
+        return None
+    return replace(principal, world_id=world_id)
+
+
+def reading_principal(principal: Principal, world_id: str, *, record_owner: str | None) -> Principal | None:
+    """Who reads `world_id`'s cards (BQ-XWORLD-6): a session bound to it, or its record owner with role owner on any
+    channel, as `GET /cards` shows them (narrowed to that world); anyone else is None, the unknown-world 404. What the
+    owner sees there, full or redacted, is `as_read_by`'s (BQ-XWORLD-9)."""
+    if principal.world_id == world_id:
+        return principal
+    if principal.role == "owner" and record_owner == principal.user_id:
+        return replace(principal, world_id=world_id)
+    return None
+
+
+_SUMMARY_KEYS = ("id", "world_id", "kind", "created_at", "timeout")
+
+
+def as_read_by(session: Principal, world_id: str, cards: list[dict]) -> list[dict]:
+    """What `session` reads of `world_id`'s cards (BQ-XWORLD-9): in full in its bound world or on a full web sign-in;
+    otherwise each card as a summary built from an allowlist (ids, kind, timing, the gate's tier), never free text."""
+    if session.world_id == world_id or session.full_session:
+        return cards
+    summaries = []
+    for card in cards:
+        gate = card.get("gate")
+        summary = {key: card.get(key) for key in _SUMMARY_KEYS}
+        summary["risk_tier"] = gate.get("risk_tier") if isinstance(gate, dict) else None
+        summary["redacted"] = True
+        summaries.append(summary)
+    return summaries
+
+
 def get_channels_caller() -> bool:
     """True only when the request was authenticated as tilo-channels, acting for the principal
     (service-to-service auth lands with sign-in, PRD 15.3). Until then no caller is, so every
@@ -665,57 +874,83 @@ def get_channels_caller() -> bool:
 
 
 def build_router(
-    cards: CardStore | Callable[..., CardStore], *, answer_guard: Callable[..., None] | None = None
+    cards: CardStore | Callable[..., CardStore],
+    *,
+    answer_guard: Callable[..., None] | None = None,
+    world_owner: Callable[..., str | None] | None = None,
 ) -> APIRouter:
     """`cards` is one CardStore, or a dependency that finds the world's own; `answer_guard` (a dependency) may
-    refuse an answer before the store sees it."""
+    refuse an answer before the store sees it; `world_owner` (a dependency) names the path world's record owner, so
+    an owner reads and answers across the worlds they own (S-06); without it every route stays bound to one world."""
     router = APIRouter()
     get_cards = cards if not isinstance(cards, CardStore) else (lambda: cards)
     guards = [Depends(answer_guard)] if answer_guard is not None else []
+    get_owner = world_owner or (lambda: None)
 
     @router.get("/worlds/{world_id}/cards")
     def list_cards(
         world_id: str,
         principal: Principal = Depends(get_current_principal),
         store: CardStore = Depends(get_cards),
+        record_owner: str | None = Depends(get_owner),
     ) -> list[dict]:
-        if principal.world_id != world_id:
-            raise HTTPException(status_code=404)  # same as an unknown world
+        reader = reading_principal(principal, world_id, record_owner=record_owner)
+        if reader is None:
+            raise HTTPException(status_code=404, detail="Tilo could not find that.")  # same as an unknown world
         try:
-            return store.list_for_world(world_id, principal=principal)
+            return as_read_by(principal, world_id, store.list_for_world(world_id, principal=reader))
         except PermissionError as exc:
-            raise HTTPException(status_code=403) from exc
+            raise HTTPException(status_code=403, detail="You do not have access to this.") from exc
 
     @router.post("/worlds/{world_id}/cards/{card_id}/answer", dependencies=guards)
     def answer_card(
         world_id: str,
         card_id: str,
         body: _AnswerBody,
+        safety: Any = Depends(answer_safety),
         principal: Principal = Depends(get_current_principal),
         from_channels: bool = Depends(get_channels_caller),
         store: CardStore = Depends(get_cards),
+        record_owner: str | None = Depends(get_owner),
     ) -> JSONResponse:
-        if principal.world_id != world_id:
-            raise HTTPException(status_code=404)
+        actor = answering_principal(
+            principal, world_id, record_owner=record_owner, cards=store, from_channels=from_channels
+        )
+        if actor is None:
+            raise HTTPException(
+                status_code=404, detail="Tilo could not find that."
+            )  # same as an unknown world, before any other check
         if body.pin_verified or (not from_channels and body.channel not in _WEB_CHANNELS):
             return JSONResponse(status_code=403, content={"outcome": "rejected", "reason": "channel_not_permitted"})
-        if not session_allows(principal, body.channel, from_channels):
+        if not session_allows(actor, body.channel, from_channels):
             return JSONResponse(status_code=400, content={"outcome": "rejected", "reason": "invalid_channel"})
         try:
             result = store.answer(
                 world_id,
                 card_id,
                 option=body.option,
+                text=body.text,
+                safety=safety,
                 channel=body.channel,
-                principal=principal,
+                principal=actor,
             )
         except Exception as exc:  # the event write failed; the card stays open and the answer can be sent again
             logger.warning("a card answer could not be written: %s", type(exc).__name__)
             return JSONResponse(status_code=503, content={"outcome": "error", "reason": "event_write_failed"})
         if result.outcome == "answered":
+            if actor is not principal:  # BQ-XWORLD-5: an operations record of a cross-world answer, ids only
+                logger.info(
+                    "cross-world answer: user %s, session world %s, target world %s, card %s, option %s",
+                    actor.user_id, principal.world_id, world_id, card_id, body.option,
+                )  # fmt: skip
             return JSONResponse(status_code=200, content={"outcome": "answered"})
         return JSONResponse(
-            status_code=_STATUS.get(result.reason or "", 400), content={"outcome": "rejected", "reason": result.reason}
+            status_code=_STATUS.get(result.reason or "", 400),
+            content={
+                "outcome": "rejected",
+                "reason": result.reason,
+                **({"detail": result.reason} if " " in (result.reason or "") else {}),
+            },
         )
 
     return router

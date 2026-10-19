@@ -15,6 +15,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 DRIVE_READS = {"get_metadata", "list_folder", "download"}
+DRIVE_READS |= {"search_files", "read_text"}  # ADR-0048: the agents' two reads; drive.file is still the whole boundary
 
 
 def _states(entries: list[dict]) -> dict[str, str]:

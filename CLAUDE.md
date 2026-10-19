@@ -17,7 +17,7 @@ Ambiguity: apply the PRD's stated default, log it in `docs/open-questions.md`, k
 - Nothing animates without a recorded event (honesty rules HR-1 to HR-7, PRD 9.4).
 - No scenario-specific code. A scenario that needs code becomes a pillar requirement first.
 - No secrets in code, prompts, logs or fixtures. Fake secrets for tests are assembled at runtime. Tilo never handles passwords.
-- Fresh code only: nothing copied from other projects. Tilo's own design prototypes `design/source/tilo-kit.js`, `tilo-world.js`, `tilo-player.js` and `worlds/k1-generator.js` may be ported (user approval 2026-09-25, ADR-0003); `design/source/support.js` (Claude Design's runtime) never. Record every dependency's licence in `docs/licences.md`.
+- Fresh code only: nothing copied from other projects. Tilo's own design prototypes `design/source/tilo-kit.js`, `tilo-world.js`, `tilo-player.js` and `worlds/k1-generator.js` may be ported (user approval 2026-09-25, ADR-0003), and so may `design_handoff_tilo_web_app/design/tilo-world.js`, `tilo-park.js` and `tilo-app.js` (user approval 2026-10-06, ADR-0003a); `design/source/support.js` (Claude Design's runtime) never. Record every dependency's licence in `docs/licences.md`.
 - Deploy on Cloud Run and Firebase, region `asia-southeast1`. English everywhere.
 - Local-first until Google Cloud billing is available (ADR-0003): Firestore and Pub/Sub emulators with a `demo-` project id, no cloud credentials. Live model tests may use NVIDIA NIM through the OpenAI-compatible adapter; Google adapters stay built and tested against mocks and recordings.
 
@@ -64,6 +64,6 @@ Changing a frozen contract (ADR first); applying infrastructure or spending mone
 - `just check-fast` — format + lint + tests, used by `.claude/hooks/stop_check.py`, under 2 minutes
 - `just test` — all Python and JS test suites
 - `just fmt` / `just lint` / `just typecheck` — individual gate steps
-- `just eval` — run the eval harness (not built yet; prints a message and exits 0 until P3)
+- `just eval` — run the full replay eval set without paid calls; write `evals/results.local.md` (git-ignored). Exit 0 when all cases pass, 1 on a failed case, 2 on an error, or 3 at the credit cap (EFF-07).
 - `just skills-test` — run `skills/` tests (FR-AGT-04); passes with none present
 - `just deploy dev` — refuses anything but `dev`, and infra isn't applied yet either way (ticket P0-07)

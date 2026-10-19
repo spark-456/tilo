@@ -1,0 +1,399 @@
+{
+  "description": "Golden evaluation fixtures for try-run-match skill (FR-SKL-03)",
+  "cases": [
+    {
+      "id": "case_01_identical_run",
+      "category": "identical_run",
+      "description": "Recorded run exactly matches taught workflow in order and paused at ask-first step.",
+      "input": {
+        "taught_steps": [
+          {
+            "verb": "search",
+            "object": "invoices from last 30 days",
+            "tool": "gmail",
+            "ask_me_first": false
+          },
+          {
+            "verb": "extract",
+            "object": "invoice PDF attachments",
+            "tool": "google_drive",
+            "ask_me_first": false
+          },
+          {
+            "verb": "send",
+            "object": "summary report to accounting@acme.com",
+            "tool": "slack",
+            "ask_me_first": true
+          }
+        ],
+        "recorded_steps": [
+          {
+            "verb": "search",
+            "object": "invoices from last 30 days",
+            "tool": "gmail",
+            "paused": false
+          },
+          {
+            "verb": "extract",
+            "object": "invoice PDF attachments",
+            "tool": "google_drive",
+            "paused": false
+          },
+          {
+            "verb": "send",
+            "object": "summary report to accounting@acme.com",
+            "tool": "slack",
+            "paused": true
+          }
+        ]
+      },
+      "output": {
+        "status": "pass",
+        "match_percent": 100.0,
+        "matched_steps": [
+          {
+            "verb": "search",
+            "object": "invoices from last 30 days",
+            "tool": "gmail",
+            "ask_me_first": false
+          },
+          {
+            "verb": "extract",
+            "object": "invoice PDF attachments",
+            "tool": "google_drive",
+            "ask_me_first": false
+          },
+          {
+            "verb": "send",
+            "object": "summary report to accounting@acme.com",
+            "tool": "slack",
+            "ask_me_first": true
+          }
+        ],
+        "added_steps": [],
+        "skipped_steps": [],
+        "paused_ask_first_steps": [
+          {
+            "verb": "send",
+            "object": "summary report to accounting@acme.com",
+            "tool": "slack",
+            "ask_me_first": true
+          }
+        ],
+        "missed_ask_first_steps": [],
+        "failure_reason": null
+      }
+    },
+    {
+      "id": "case_02_reordered_steps",
+      "category": "reordered_steps",
+      "description": "Recorded run executed steps out of order, lowering match alignment score.",
+      "input": {
+        "taught_steps": [
+          {
+            "verb": "read",
+            "object": "unread emails",
+            "tool": "gmail",
+            "ask_me_first": false
+          },
+          {
+            "verb": "draft",
+            "object": "weekly customer digest",
+            "tool": "google_docs",
+            "ask_me_first": false
+          },
+          {
+            "verb": "notify",
+            "object": "channel #updates with preview",
+            "tool": "slack",
+            "ask_me_first": false
+          }
+        ],
+        "recorded_steps": [
+          {
+            "verb": "draft",
+            "object": "weekly customer digest",
+            "tool": "google_docs",
+            "paused": false
+          },
+          {
+            "verb": "read",
+            "object": "unread emails",
+            "tool": "gmail",
+            "paused": false
+          },
+          {
+            "verb": "notify",
+            "object": "channel #updates with preview",
+            "tool": "slack",
+            "paused": false
+          }
+        ]
+      },
+      "output": {
+        "status": "pass",
+        "match_percent": 66.7,
+        "matched_steps": [
+          {
+            "verb": "read",
+            "object": "unread emails",
+            "tool": "gmail",
+            "ask_me_first": false
+          },
+          {
+            "verb": "notify",
+            "object": "channel #updates with preview",
+            "tool": "slack",
+            "ask_me_first": false
+          }
+        ],
+        "added_steps": [
+          {
+            "verb": "draft",
+            "object": "weekly customer digest",
+            "tool": "google_docs",
+            "paused": false
+          }
+        ],
+        "skipped_steps": [
+          {
+            "verb": "draft",
+            "object": "weekly customer digest",
+            "tool": "google_docs",
+            "ask_me_first": false
+          }
+        ],
+        "paused_ask_first_steps": [],
+        "missed_ask_first_steps": [],
+        "failure_reason": null
+      }
+    },
+    {
+      "id": "case_03_extra_step",
+      "category": "extra_step",
+      "description": "Recorded run inserted an extra step not in the taught sequence.",
+      "input": {
+        "taught_steps": [
+          {
+            "verb": "fetch",
+            "object": "pending Stripe charges",
+            "tool": "stripe",
+            "ask_me_first": false
+          },
+          {
+            "verb": "post",
+            "object": "charge totals to finance",
+            "tool": "slack",
+            "ask_me_first": false
+          }
+        ],
+        "recorded_steps": [
+          {
+            "verb": "fetch",
+            "object": "pending Stripe charges",
+            "tool": "stripe",
+            "paused": false
+          },
+          {
+            "verb": "create",
+            "object": "backup spreadsheet in drive",
+            "tool": "google_drive",
+            "paused": false
+          },
+          {
+            "verb": "post",
+            "object": "charge totals to finance",
+            "tool": "slack",
+            "paused": false
+          }
+        ]
+      },
+      "output": {
+        "status": "pass",
+        "match_percent": 66.7,
+        "matched_steps": [
+          {
+            "verb": "fetch",
+            "object": "pending Stripe charges",
+            "tool": "stripe",
+            "ask_me_first": false
+          },
+          {
+            "verb": "post",
+            "object": "charge totals to finance",
+            "tool": "slack",
+            "ask_me_first": false
+          }
+        ],
+        "added_steps": [
+          {
+            "verb": "create",
+            "object": "backup spreadsheet in drive",
+            "tool": "google_drive",
+            "paused": false
+          }
+        ],
+        "skipped_steps": [],
+        "paused_ask_first_steps": [],
+        "missed_ask_first_steps": [],
+        "failure_reason": null
+      }
+    },
+    {
+      "id": "case_04_skipped_step",
+      "category": "skipped_step",
+      "description": "Recorded run skipped an optional non-ask-first step.",
+      "input": {
+        "taught_steps": [
+          {
+            "verb": "search",
+            "object": "high priority alerts",
+            "tool": "slack",
+            "ask_me_first": false
+          },
+          {
+            "verb": "tag",
+            "object": "alerts in triage sheet",
+            "tool": "google_sheets",
+            "ask_me_first": false
+          },
+          {
+            "verb": "forward",
+            "object": "digest to on-call team",
+            "tool": "gmail",
+            "ask_me_first": false
+          }
+        ],
+        "recorded_steps": [
+          {
+            "verb": "search",
+            "object": "high priority alerts",
+            "tool": "slack",
+            "paused": false
+          },
+          {
+            "verb": "forward",
+            "object": "digest to on-call team",
+            "tool": "gmail",
+            "paused": false
+          }
+        ]
+      },
+      "output": {
+        "status": "pass",
+        "match_percent": 66.7,
+        "matched_steps": [
+          {
+            "verb": "search",
+            "object": "high priority alerts",
+            "tool": "slack",
+            "ask_me_first": false
+          },
+          {
+            "verb": "forward",
+            "object": "digest to on-call team",
+            "tool": "gmail",
+            "ask_me_first": false
+          }
+        ],
+        "added_steps": [],
+        "skipped_steps": [
+          {
+            "verb": "tag",
+            "object": "alerts in triage sheet",
+            "tool": "google_sheets",
+            "ask_me_first": false
+          }
+        ],
+        "paused_ask_first_steps": [],
+        "missed_ask_first_steps": [],
+        "failure_reason": null
+      }
+    },
+    {
+      "id": "case_05_missed_ask_first_pause",
+      "category": "missed_ask_first_pause",
+      "description": "Recorded run executed an ask_me_first step without pausing; results in hard fail.",
+      "input": {
+        "taught_steps": [
+          {
+            "verb": "read",
+            "object": "overdue accounts",
+            "tool": "stripe",
+            "ask_me_first": false
+          },
+          {
+            "verb": "send",
+            "object": "payment reminder notice",
+            "tool": "gmail",
+            "ask_me_first": true
+          }
+        ],
+        "recorded_steps": [
+          {
+            "verb": "read",
+            "object": "overdue accounts",
+            "tool": "stripe",
+            "paused": false
+          },
+          {
+            "verb": "send",
+            "object": "payment reminder notice",
+            "tool": "gmail",
+            "paused": false
+          }
+        ]
+      },
+      "output": {
+        "status": "fail",
+        "match_percent": 0.0,
+        "matched_steps": [],
+        "added_steps": [],
+        "skipped_steps": [],
+        "paused_ask_first_steps": [],
+        "missed_ask_first_steps": [
+          {
+            "verb": "send",
+            "object": "payment reminder notice",
+            "tool": "gmail",
+            "ask_me_first": true
+          }
+        ],
+        "failure_reason": "missed_ask_first_pause"
+      }
+    },
+    {
+      "id": "case_06_empty_example",
+      "category": "empty_example",
+      "description": "Empty taught steps example results in hard fail.",
+      "input": {
+        "taught_steps": [],
+        "recorded_steps": [
+          {
+            "verb": "list",
+            "object": "all files in root",
+            "tool": "google_drive",
+            "paused": false
+          }
+        ]
+      },
+      "output": {
+        "status": "fail",
+        "match_percent": 0.0,
+        "matched_steps": [],
+        "added_steps": [
+          {
+            "verb": "list",
+            "object": "all files in root",
+            "tool": "google_drive",
+            "paused": false
+          }
+        ],
+        "skipped_steps": [],
+        "paused_ask_first_steps": [],
+        "missed_ask_first_steps": [],
+        "failure_reason": "empty_taught_example"
+      }
+    }
+  ]
+}

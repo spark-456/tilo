@@ -34,6 +34,8 @@ from _cards_lib import OWNER_P, FakeClock, FakeEventWriter, add_seconds, clone_c
 from _clint2_lib import wait_for
 from tilo_api.cards import CardStore
 
+pytestmark = pytest.mark.usefixtures("must_ask_ask_mode")  # these suites pin the cards (BQ-ASSUME-1)
+
 ASK_2 = task("ASK-01")  # "Update the pricing sheet ...": its own question and options, a different unit
 OWNER = "u_owner"
 START = "2026-09-29T09:30:00.000Z"
@@ -252,5 +254,20 @@ def test_FR_HIL_10_a_card_tick_failure_after_the_harness_default_does_not_fail_t
         (answered,) = [e for e in events if e["type"] == "question.answered"]
         assert answered["data"]["answered_by"] == "default" and answered["severity"] == "nudge"
         assert "world.failed" not in [e["type"] for e in events]
+    finally:
+        rf.close()
+
+
+def test_CX_WEB_ROUTE_1_decline_uses_existing_world_failed_event(repo_root):
+    rf = build_ask_flow(repo_root, tasks_provider(ASK, *CLEAR[1:]), independent=True)
+    try:
+        start_and_approve(rf)
+        wait_for(lambda: rf.events("question.routed"), what="question.routed")
+        run = rf.store.runs[rf.world_id]
+        run._fail("declined", "U1", summary="Stopped by you.")
+        (failed,) = rf.events("world.failed")
+        assert failed["summary"] == "Stopped by you."
+        assert failed["data"]["reason"] == "declined"
+        assert failed["data"]["unit"] == "U1"
     finally:
         rf.close()

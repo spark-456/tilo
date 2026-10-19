@@ -20,6 +20,7 @@ import sys
 from typing import Any
 
 from _api_contracts_lib import INJECTION_PHRASE, make_docx_bytes, make_png_bytes
+from _api_lib import FakeEventWriter
 
 FLOW_USER = "u_flow_owner"
 OTHER_USER = "u_flow_other"
@@ -209,6 +210,8 @@ class Flow:
 
         app.dependency_overrides[deps.get_current_principal] = current_principal
         app.dependency_overrides[deps.get_store] = lambda: store
+        self.writer = FakeEventWriter(store)  # every event of the flow goes through the single writer (ADR-0026)
+        app.dependency_overrides[deps.get_event_writer] = lambda: self.writer
         app.dependency_overrides[seam(deps, "get_router")] = lambda: self.router
         if safety is not None:
             app.dependency_overrides[intake_module.get_safety] = lambda: safety

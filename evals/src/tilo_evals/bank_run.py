@@ -109,8 +109,26 @@ def _detail(response: Any) -> str:
     return said if isinstance(said, str) and said else f"HTTP {response.status_code}"
 
 
-def drive(case: BankCase, obs: Observation, timeout_s: float, app: Any) -> None:
-    """Intake to a terminal state through `app`'s own routes (the live runner passes its own wiring)."""
+def _revise(call: Any, task: dict[str, Any], person: Any) -> bool:
+    """A person who declined the approaches and said why gets one revised set: the reason joins the brief's
+    constraints (an edit, so the old approaches are dropped and the Director proposes again). No reason, no revision."""
+    reason = getattr(person, "decline_reason", "")
+    if not reason:
+        return False
+    brief = call("POST", f"/tasks/{task['task_id']}/answers", json={"answers": [], "brief_edits": {}}).json()["brief"]
+    wish = f"Must address: {reason}"
+    edits = {"constraints": list(dict.fromkeys([*brief["constraints"], wish]))}
+    return (
+        call("POST", f"/tasks/{task['task_id']}/answers", json={"answers": [], "brief_edits": edits}).status_code < 400
+    )
+
+
+MAX_REASKS = 2  # a person whose answers do not fit the brief is asked again this many times, then the run stops
+
+
+def drive(case: BankCase, obs: Observation, timeout_s: float, app: Any, person: Any = None) -> None:
+    """Intake to a terminal state through `app`'s own routes (the live runner passes its own wiring). With `person`,
+    a person answers the questions, picks or declines the approach and says yes or no to each gate card."""
     from fastapi.testclient import TestClient  # noqa: PLC0415
     from tilo_api import deps, dev  # noqa: PLC0415
 
@@ -147,15 +165,28 @@ def drive(case: BankCase, obs: Observation, timeout_s: float, app: Any) -> None:
             obs.outcome = "needs_answers" if obs.questions else None
             return
         given = case.answers or {}
-        answers = [{"field": q["field"], "answer": given.get(q["field"])} for q in task["questions"]]
-        obs.answered = {a["field"]: a["answer"] for a in answers}
-        if fail(call("POST", f"/tasks/{task['task_id']}/answers", json={"answers": answers, "brief_edits": {}})):
+        pick = person.answer if person else lambda q: given.get(q["field"])
+        for attempt in range(MAX_REASKS + 1):
+            answers = [{"field": q["field"], "answer": pick(q)} for q in task["questions"]]
+            obs.answered = {a["field"]: a["answer"] for a in answers}
+            posted = call("POST", f"/tasks/{task['task_id']}/answers", json={"answers": answers, "brief_edits": {}})
+            if posted.status_code == 422 and attempt < MAX_REASKS and hasattr(person, "explain"):
+                person.explain(_detail(posted))  # a refused request changed nothing: the person says it again
+                continue
+            break
+        if fail(posted):
             return
         approaches = call("GET", f"/tasks/{task['task_id']}/approaches")
         if fail(approaches, honest=(502,)):  # 502: "The Director could not propose approaches", said on purpose
             return
         offered = approaches.json()
         wanted = (case.approve or {}).get("approach") or offered["recommended"]
+        if person is not None and (wanted := person.approach(offered)) is None and _revise(call, task, person):
+            offered = call("GET", f"/tasks/{task['task_id']}/approaches").json()  # one revised set (BQ-DECLINE-1)
+            wanted = person.approach(offered)
+        if person is not None and wanted is None:
+            obs.outcome, obs.reason = "declined", "the person declined the approach; nothing ran"
+            return
         obs.cap = float((case.approve or {}).get("cap", DEFAULT_CAP))
         body = {"approach_id": wanted, "budget_cap": obs.cap}
         if fail(call("POST", f"/tasks/{task['task_id']}/approve", json=body)):
@@ -177,9 +208,11 @@ def drive(case: BankCase, obs: Observation, timeout_s: float, app: Any) -> None:
                     continue
                 if obs.sent_at_first_gate is None:
                     obs.sent_at_first_gate = sent()
-                if case.gates == "hold":
+                asked = time.monotonic()
+                if not (person.gate(card) if person is not None else case.gates != "hold"):
                     obs.outcome = "held_at_gate"
                     break
+                deadline += time.monotonic() - asked  # the time a person takes is not the run's
                 answered.add(card["id"])
                 reply = call("POST", f"/worlds/{obs.world_id}/cards/{card['id']}/answer", json={"option": "approve"})
                 if reply.status_code == 200:

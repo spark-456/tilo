@@ -1,0 +1,24 @@
+{"t": 10, "speaker": "Alex", "text": "Okay let's get started. Welcome everyone to the weekly product sync."}
+{"t": 30, "speaker": "Alex", "text": "The goal today is to align on the roadmap and check launch risks."}
+{"t": 70, "speaker": "Priya", "text": "Sounds good. The kickoff goals are clear from my side."}
+{"t": 120, "speaker": "Alex", "text": "Great, so the main goals: ship the beta and finalize the roadmap."}
+{"t": 180, "speaker": "Sam", "text": "I agree with those goals."}
+{"t": 220, "speaker": "Alex", "text": "Kickoff done, let's move on to the roadmap review."}
+{"t": 320, "speaker": "Priya", "text": "For the Q3 roadmap, search improvements are the top item."}
+{"t": 390, "speaker": "Sam", "text": "The roadmap has the mobile app slipping to Q4."}
+{"t": 465, "speaker": "Alex", "text": "We decided to keep the mobile app in Q4 on the roadmap."}
+{"t": 510, "speaker": "Priya", "text": "Also we should update the pricing page before launch."}
+{"t": 570, "speaker": "Sam", "text": "The roadmap review shows the API work is on track."}
+{"t": 660, "speaker": "Priya", "text": "I'll send the revised roadmap by Friday."}
+{"t": 750, "speaker": "Alex", "text": "Any other roadmap concerns?"}
+{"t": 810, "speaker": "Sam", "text": "No, the roadmap looks fine to me."}
+{"t": 860, "speaker": "Alex", "text": "Agreed, roadmap review complete."}
+{"t": 930, "speaker": "Priya", "text": "Quick side note, the demo environment was slow yesterday."}
+{"t": 1020, "speaker": "Sam", "text": "I think it was a caching issue with the search index."}
+{"t": 1140, "speaker": "Alex", "text": "Let's look at the launch date next."}
+{"t": 1230, "speaker": "Alex", "text": "Launch risks: the biggest risk is the beta slipping."}
+{"t": 1320, "speaker": "Sam", "text": "I'll draft the risk register."}
+{"t": 1410, "speaker": "Priya", "text": "Another launch risk is the payment provider approval."}
+{"t": 1500, "speaker": "Sam", "text": "Launch risks also include support staffing."}
+{"t": 1620, "speaker": "Alex", "text": "We decided to keep the launch date and revisit risks next week."}
+{"t": 1710, "speaker": "Alex", "text": "Thanks everyone, that's the meeting."}

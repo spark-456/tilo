@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/retrieval_chunk.schema.json",
+  "x-version": "1.0.0",
+  "title": "RetrievalChunk",
+  "description": "One indexed passage of a record a person may read, for per-account grounding (ADR-0049): the document at orgs/{org}/chunks/{id} without its vector. The stored document also holds `embedding`, a Firestore vector of `dimensions` floats made by the `embed` role's `embed_profile`; JSON readers (erasure, export, tests) never see it. Written by code only, from records already stored and screened clean (RT-01, RT-08). `owner` is the person whose record it is; `team_id` is set only for a source a team may read under the existing rules (a team pin, or a deliverable of a world while a team share is in force), and team reads are re-checked at every query (RT-02, RT-03). A chunk lives no longer than its source (RT-07). $defs `prompt_block` is the data block a prompt receives and `grounding_ref` what an answer shows it looked at. Rules RT-01 to RT-10 are in retrieval_chunk.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "org_id",
+    "owner",
+    "team_id",
+    "world_id",
+    "source",
+    "label",
+    "position",
+    "text",
+    "text_sha256",
+    "embed_profile",
+    "dimensions",
+    "screening",
+    "created_at",
+    "expires_at"
+  ],
+  "properties": {
+    "id": { "$ref": "#/$defs/chunk_id" },
+    "org_id": { "$ref": "common.schema.json#/$defs/org_id" },
+    "owner": { "$ref": "common.schema.json#/$defs/user_id" },
+    "team_id": { "anyOf": [{ "$ref": "common.schema.json#/$defs/team_id" }, { "type": "null" }] },
+    "world_id": { "anyOf": [{ "$ref": "common.schema.json#/$defs/world_id" }, { "type": "null" }] },
+    "source": { "$ref": "#/$defs/source" },
+    "label": { "$ref": "#/$defs/label" },
+    "position": { "type": "integer", "minimum": 0, "maximum": 999 },
+    "text": { "$ref": "#/$defs/text" },
+    "text_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "embed_profile": { "$ref": "providers.schema.json#/$defs/profile_id" },
+    "dimensions": { "type": "integer", "minimum": 64, "maximum": 2048 },
+    "screening": { "const": "clean" },
+    "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "expires_at": {
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }]
+    }
+  },
+  "if": {
+    "properties": {
+      "source": {
+        "properties": { "kind": { "enum": ["upload", "minutes", "memory_item"] } },
+        "required": ["kind"]
+      }
+    },
+    "required": ["source"]
+  },
+  "then": { "properties": { "team_id": { "type": "null" } } },
+  "else": {
+    "if": {
+      "properties": {
+        "source": { "properties": { "kind": { "const": "deliverable" } }, "required": ["kind"] },
+        "team_id": { "type": "string" }
+      },
+      "required": ["source", "team_id"]
+    },
+    "then": { "properties": { "world_id": { "type": "string" } } }
+  },
+  "$defs": {
+    "chunk_id": {
+      "description": "ch_ and the first 32 hex digits of SHA-256 over org, source kind, source id, source version, position and embed_profile, so indexing the same version again writes the same ids.",
+      "type": "string",
+      "pattern": "^ch_[0-9a-f]{32}$"
+    },
+    "source": {
+      "description": "The record the passage came from. deliverable and upload name an artifact version (ADR-0018); minutes name the meeting and the version of its minutes artifact; pin and memory_item name the record, whose current text is indexed (version null).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "version"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["deliverable", "upload", "minutes", "pin", "memory_item"]
+        },
+        "id": { "type": "string", "pattern": "^(art|mt|pb|mem)_[0-9A-Za-z_]{1,48}$" },
+        "version": { "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] }
+      },
+      "if": {
+        "properties": { "kind": { "enum": ["deliverable", "upload"] } },
+        "required": ["kind"]
+      },
+      "then": { "properties": { "id": { "pattern": "^art_" }, "version": { "type": "integer" } } },
+      "else": {
+        "if": { "properties": { "kind": { "const": "minutes" } }, "required": ["kind"] },
+        "then": { "properties": { "id": { "pattern": "^mt_" }, "version": { "type": "integer" } } },
+        "else": {
+          "if": { "properties": { "kind": { "const": "pin" } }, "required": ["kind"] },
+          "then": { "properties": { "id": { "pattern": "^pb_" }, "version": { "type": "null" } } },
+          "else": { "properties": { "id": { "pattern": "^mem_" }, "version": { "type": "null" } } }
+        }
+      }
+    },
+    "label": {
+      "description": "What the person sees for the source (a file or deliverable label, a meeting or pin title, or 'Your note'): one line of 1 to 120 characters with no control, format, line or paragraph separator character.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF\\uFFF9-\\uFFFB]+$",
+      "not": { "pattern": "[\\n\\r]" }
+    },
+    "text": {
+      "description": "The passage: 1 to 1200 characters, cleaned and secret-redacted by code before it is embedded or stored (RT-08). Line breaks and tabs stay; every other control character, format character and line or paragraph separator is gone. Untrusted data, never instructions.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1200,
+      "pattern": "^[^\\u0000-\\u0008\\u000B-\\u001F\\u007F-\\u009F\\u00AD\\u0600-\\u0605\\u061C\\u06DD\\u070F\\u0890\\u0891\\u08E2\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF\\uFFF9-\\uFFFB]+$",
+      "not": { "pattern": "\\r" }
+    },
+    "prompt_chunk": {
+      "description": "One retrieved passage as a prompt sees it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "label", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/chunk_id" },
+        "source": { "$ref": "#/$defs/source" },
+        "label": { "$ref": "#/$defs/label" },
+        "text": { "$ref": "#/$defs/text" }
+      }
+    },
+    "prompt_block": {
+      "description": "The data block tilo-api renders into the user turn (never the system prompt, EFF-04) of the person's own Quick ask and their own signed-in intake's Director brief extraction (RT-04): at most 5 passages that passed the query-time scope check, nearest first. Fenced and labelled as untrusted data.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "chunks"],
+      "properties": {
+        "v": { "const": "1.0" },
+        "chunks": {
+          "type": "array",
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/prompt_chunk" }
+        }
+      }
+    },
+    "grounding_ref": {
+      "description": "What an answer shows it looked at, one per passage given to the model (RT-04): the source and its label, never the text. A Quick answer carries at most 5 as `grounded_on`.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "label"],
+      "properties": {
+        "source": { "$ref": "#/$defs/source" },
+        "label": { "$ref": "#/$defs/label" }
+      }
+    }
+  }
+}

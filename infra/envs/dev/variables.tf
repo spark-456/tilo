@@ -12,6 +12,12 @@ variable "project_id" {
   default     = "tilo-dev"
 }
 
+variable "meet_bot_enabled" {
+  description = "Opt in to the private, ephemeral guest Meet service and long API attendance requests. LIVE remains user-managed."
+  type        = bool
+  default     = false
+}
+
 variable "region" {
   description = "Region for all Tilo services and data (PRD 6.5)."
   type        = string
@@ -29,15 +35,15 @@ variable "github_repository" {
 }
 
 variable "budget_amount_usd" {
-  description = "Monthly billing budget ceiling in USD for tilo-dev (PRD 17.3)."
+  description = "Monthly billing budget ceiling for tilo-dev (PRD 17.3), in var.budget_currency_code units despite the name (user decision 8 Oct 2026: INR 15,000)."
   type        = number
-  default     = 150
+  default     = 15000
 }
 
 variable "budget_currency_code" {
   description = "Currency of the billing account (gcloud billing accounts describe ID --format='value(currencyCode)'), e.g. \"INR\". Then budget_amount_usd is in that currency."
   type        = string
-  default     = "USD"
+  default     = "INR"
 }
 
 variable "github_repository_id" {
@@ -93,4 +99,17 @@ variable "deployer_project_roles" {
     condition     = alltrue([for r in var.deployer_project_roles : contains(["roles/cloudbuild.builds.editor", "roles/firebasehosting.admin", "roles/firebaserules.admin"], r)])
     error_message = "deployer_project_roles may only contain roles/cloudbuild.builds.editor, roles/firebasehosting.admin or roles/firebaserules.admin."
   }
+}
+
+variable "api_durable_stores" {
+  description = <<-EOT
+    Opt-in to tilo-api's durable stores (PROD-WIRE 3). false (default): tilo-api bills CPU only during requests.
+    true: CPU stays allocated between requests (the in-process kill-switch state, run threads and the writer lease).
+    The store switches themselves (TILO_API_STORE, TILO_PEOPLE_STORE) are tilo-api runtime env,
+    set with gcloud (ignore_env, docs/deploy-dev.md "Durable stores"), never by Terraform. Set this, and those, only
+    when you accept ADR-0026 (the api store, still Proposed) and ADR-0023 (the people store, security-flagged). One
+    instance (max_instance_count = 1) holds either way.
+  EOT
+  type        = bool
+  default     = false
 }

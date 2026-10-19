@@ -41,9 +41,10 @@ for (const viewport of [DESKTOP, MOBILE]) {
     }
     await expect(sheet.getByTestId("policy-stamp")).toHaveCount(0);
     expect(await page.locator("main button.primary").count()).toBeLessThanOrEqual(1); // UX-1
-    expect(await page.getByTestId("screen-page").innerText()).not.toMatch(noIds);
+    expect(await page.locator("main").innerText()).not.toMatch(noIds);
     await expectTypeScale(page);
     const axe = await new AxeBuilder({ page })
+      .include(".park-view-root")
       .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
       .analyze();
     expect(axe.violations).toEqual([]);
@@ -115,7 +116,7 @@ test("FR-CHN-01 S_06 the same card shows the same fields at 1440x900 and 390x844
         els.map((el) => (el as HTMLElement).innerText.replace(/\s+/g, " ").trim()),
       ),
     );
-    expect(await page.getByTestId("screen-page").innerText()).not.toMatch(noIds);
+    expect(await page.locator("main").innerText()).not.toMatch(noIds);
     const hero = page.locator("main button.primary"); // the one filled button: 48 px, 56 on a phone
     await expect(hero).toHaveCount(1);
     expect((await hero.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(

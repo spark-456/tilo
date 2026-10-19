@@ -35,7 +35,7 @@ from _chn11_lib import (
     MemoryDraftStore,
     autopilot_module,
     context,
-    make_rig,
+    named_rig,
     ready,
     scripted_thread,
 )
@@ -252,7 +252,7 @@ def make_w4(
     policy: Callable[[Any], Any] | None = None, contacts: tuple[str, ...] = (DAVID, SARAH), district: Any = DISTRICT
 ) -> W4:
     """`policy` is a factory taking the rig's fake clock (default `DecideStub`)."""
-    rig = make_rig()
+    rig = named_rig()  # CHN-GATE-E: the owner's own SENT message names "Sarah"
     w4 = W4(
         rig=rig,
         outbox=GateOutbox(rig.clock),

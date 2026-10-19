@@ -3,9 +3,10 @@ import type { Container, Graphics } from "pixi.js";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import tokens from "../design/tokens";
 import { useMediaQuery } from "../hooks/useMediaQuery";
-import { AppLink } from "../screens/AppLink";
 import { agentNames, rankName } from "../world/runSummary";
-import { useSelection } from "../world/selection";
+import { select, useSelection } from "../world/selection";
+import { flyTo, onFly, openAgent, registerProbe as probeOf, setHover } from "../world/spotlight";
+import { ViewLink } from "../worldView/ViewLink";
 import * as cam from "./camera";
 
 const { tileWidth: TW, tileHeight: TH } = tokens.stage;
@@ -36,6 +37,7 @@ const KEYS: Record<string, (c: cam.CameraState) => cam.CameraState> = {
   "+": (c) => zoomAt(c, Z, 0, 0),
   "=": (c) => zoomAt(c, Z, 0, 0),
   "-": (c) => zoomAt(c, -Z, 0, 0),
+  Home: () => cam.INITIAL_CAMERA, // TILO-T-WORLD: Fit, the framed world
 };
 
 /**
@@ -64,6 +66,7 @@ export function Stage({
   paused = false,
   layout,
   worldId,
+  landmark = true,
 }: {
   onWorld?: WorldSeam;
   seq?: number;
@@ -71,8 +74,18 @@ export function Stage({
   paused?: boolean;
   layout?: Layout | null;
   worldId?: string;
+  /** The stage is the page's main landmark (the old app). Inside the Park shell, whose <main> holds the page, it is
+   * a labelled region instead: one main per page. */
+  landmark?: boolean;
 }) {
-  const [, set, toggle] = useSelection(worldId ?? "");
+  const [selectedId, set, toggle] = useSelection(worldId ?? "");
+  // TILO-T-WORLD: Follow keeps the chosen agent centred as events move it; Zoom and Fit end it.
+  const [follow, setFollow] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `seq` (the last drawn event) is the trigger to re-centre.
+  useEffect(() => {
+    // triggeredBy: agent.moved (any recorded event that moves the followed agent): the camera glides to it.
+    if (follow && worldId && selectedId) flyTo(worldId, selectedId, cam.CAMERA_TRANSITION_MS);
+  }, [follow, seq, selectedId, worldId]);
   const outlineItems = useMemo(() => {
     if (!layout) return [];
     const names = agentNames(layout);
@@ -125,6 +138,8 @@ export function Stage({
   msRef.current = cam.getCameraPanDurationMs(useMediaQuery("(prefers-reduced-motion: reduce)"));
   const seamRef = useRef(onWorld);
   seamRef.current = onWorld;
+  const worldIdRef = useRef(worldId);
+  worldIdRef.current = worldId;
 
   // Pixi is code-split off the landing route (NFR-01): the page is interactive without it. A world
   // to draw loads it at once; the bare grid is decoration, so it waits until the first keystroke
@@ -165,7 +180,7 @@ export function Stage({
     let ready = false;
     let cur = cam.INITIAL_CAMERA; // the camera drawn now
     let goal = cur; // where keyboard moves are heading
-    let ease: { from: cam.CameraState; t0: number } | null = null;
+    let ease: { from: cam.CameraState; t0: number; ms: number } | null = null;
     let raf = 0;
     let gridKey = ""; // the view the grid was last built for: world-content frames skip rebuilding it
 
@@ -191,7 +206,7 @@ export function Stage({
     const frame = () => {
       raf = 0;
       if (ease) {
-        const t = (performance.now() - ease.t0) / msRef.current;
+        const t = (performance.now() - ease.t0) / ease.ms;
         cur = cam.easeCamera(ease.from, goal, t);
         if (t >= 1) ease = null;
         else raf = requestAnimationFrame(frame);
@@ -207,9 +222,9 @@ export function Stage({
       cur = goal = next;
       draw();
     };
-    const glide = (next: cam.CameraState) => {
+    const glide = (next: cam.CameraState, ms = msRef.current) => {
       if (!msRef.current) return jump(next);
-      ease = { from: cur, t0: performance.now() };
+      ease = { from: cur, t0: performance.now(), ms };
       goal = next;
       requestRender();
     };
@@ -267,12 +282,58 @@ export function Stage({
     listen("pointerup", lift);
     listen("pointercancel", lift);
 
+    // TILO-T-WORLD: hover lights an agent and shows its stats card; a click or tap opens its panel. Display state
+    // only (never an event); the stage's own probe says which drawn agent is under the pointer.
+    const here = (e: PointerEvent) => {
+      const r = target.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+    let downAt: { x: number; y: number } | null = null;
+    listen("pointerdown", (e) => {
+      downAt = e.button === 0 ? { x: e.clientX, y: e.clientY } : null;
+    });
+    listen("pointermove", (e) => {
+      const wid = worldIdRef.current;
+      if (!wid || pts.size || e.pointerType === "touch") return;
+      const at = here(e);
+      const id = probeOf.get(wid)?.agentAt(at.x, at.y) ?? null;
+      target.style.cursor = id ? "pointer" : "";
+      setHover(wid, id, at);
+    });
+    listen("pointerleave", () => {
+      const wid = worldIdRef.current;
+      if (wid) setHover(wid, null, null);
+    });
+    listen("pointerup", (e) => {
+      const wid = worldIdRef.current;
+      const from = downAt;
+      downAt = null;
+      if (!wid || !from || Math.hypot(e.clientX - from.x, e.clientY - from.y) > 5) return; // a drag pans
+      if ((e.target as Element).closest(".stage-controls, .stage-outline")) return;
+      const at = here(e);
+      const id = probeOf.get(wid)?.agentAt(at.x, at.y) ?? null;
+      if (!id) return;
+      select(wid, id);
+      openAgent(wid, id);
+    });
+    // triggeredBy: a Story or chat click on a recorded event: the camera glides to where it happened (display only).
+    const unfly = worldIdRef.current
+      ? onFly(worldIdRef.current, (id, ms) => {
+          const p = probeOf.get(worldIdRef.current ?? "")?.locate(id);
+          if (!p) return;
+          const r = target.getBoundingClientRect();
+          glide(pan(cur, r.width / 2 - p.x, r.height / 2 - p.y), ms);
+        })
+      : undefined;
+
     listen("keydown", (e) => {
       const move = KEYS[e.key];
       if (!move || e.ctrlKey || e.metaKey || e.altKey) return; // browser shortcuts pass
       if ((e.target as Element).closest(".stage-outline")) return; // arrows belong to the list
       e.preventDefault();
-      if (!pts.size) glide(move(goal)); // a drag or pinch in progress owns the camera
+      const isInteraction = e.key === "Home" || e.key === "+" || e.key === "=" || e.key === "-";
+      const dur = isInteraction ? cam.CAMERA_TRANSITION_MS : msRef.current;
+      if (!pts.size) glide(move(goal), dur); // a drag or pinch in progress owns the camera
     });
     // Native and non-passive, so preventDefault() works without a console error.
     listen(
@@ -313,6 +374,7 @@ export function Stage({
     });
     return () => {
       on.abort();
+      unfly?.();
       observer.disconnect();
       cancelAnimationFrame(raf);
       unplug?.();
@@ -321,15 +383,15 @@ export function Stage({
     };
   }, [supported, pixi]);
 
+  const Frame = landmark ? "main" : "section";
   return (
-    <main
+    <Frame
       className="stage-frame"
       data-testid="stage-frame"
       {...(seq !== undefined ? { "data-seq": seq } : {})}
       {...(selected ? { "data-selected": selected } : {})}
       {...(paused ? { "data-paused": "true" } : {})}
       aria-label="World stage"
-      // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard pan and zoom (PRD 9.7).
       tabIndex={0}
       ref={frameRef}
     >
@@ -357,6 +419,37 @@ export function Stage({
         // The wheel and pinch have a pointer alternative (WCAG 2.5.7). A press sends the same "+"
         // or "-" key the stage already handles, so the camera has one path (HR-3, PRD 9.7).
         <div className="stage-controls">
+          <button
+            type="button"
+            className="secondary"
+            data-lens-control
+            aria-label="Fit"
+            onClick={() => {
+              setFollow(false);
+              frameRef.current?.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Home", bubbles: true, cancelable: true }),
+              );
+            }}
+          >
+            Fit
+          </button>
+          <button
+            type="button"
+            className={`secondary${follow ? " is-active" : ""}`}
+            data-lens-control
+            aria-label={follow ? "Stop following" : "Follow agent"}
+            aria-pressed={follow}
+            onClick={() => {
+              const next = !follow;
+              setFollow(next);
+              if (next && worldId) {
+                const target = selectedId ?? layout?.semantic.agents[0]?.id;
+                if (target) flyTo(worldId, target, cam.CAMERA_TRANSITION_MS);
+              }
+            }}
+          >
+            {follow ? "Following" : "Follow"}
+          </button>
           {(["+", "-"] as const).map((key) => (
             <button
               key={key}
@@ -364,11 +457,12 @@ export function Stage({
               className="secondary"
               data-lens-control
               aria-label={key === "+" ? "Zoom in" : "Zoom out"}
-              onClick={() =>
+              onClick={() => {
+                setFollow(false);
                 frameRef.current?.dispatchEvent(
                   new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
-                )
-              }
+                );
+              }}
             >
               <span aria-hidden="true">{key === "+" ? "+" : "−"}</span>
             </button>
@@ -396,16 +490,16 @@ export function Stage({
                 {item.name}
               </button>
               {selected === item.id && item.inspect && worldId && (
-                <AppLink
+                <ViewLink
                   to={`/world/${encodeURIComponent(worldId)}/inspect/${encodeURIComponent(item.id)}`}
                 >
                   Inspect
-                </AppLink>
+                </ViewLink>
               )}
             </li>
           ))}
         </ul>
       )}
-    </main>
+    </Frame>
   );
 }

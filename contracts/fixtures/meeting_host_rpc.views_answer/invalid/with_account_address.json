@@ -1,0 +1,11 @@
+{
+  "views": [
+    {
+      "connector": "meeting_host",
+      "state": "connected",
+      "scopes": ["https://www.googleapis.com/auth/calendar.events.owned"],
+      "connected_at": "2026-10-08T09:30:00.000Z",
+      "account": "host@example.org"
+    }
+  ]
+}

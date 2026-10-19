@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-t.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" data-screen-label="Skills" style="position:relative;width:100%;height:{{ H }};overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:15px;line-height:1.5;display:flex;flex-direction:column">
+  <dc-import name="Tilo T Nav" active="skills" device="{{ navD }}" theme="{{ theme }}" hint-size="100%,64px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <div aria-hidden="true" style="flex:1 1 0;min-width:0;background-image:var(--doodle);background-size:280px 280px"></div>
+    <main style="flex:0 1 1200px;min-width:0;box-sizing:border-box;padding:{{ pad }};display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:20px;overflow:hidden">
+      <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:4px"><h1 style="margin:0;font-weight:700;font-size:{{ h1 }};letter-spacing:-1.4px;line-height:1">Skills</h1><span style="color:var(--ink2)">Things Tilo knows how to do. They grow with you.</span></div>
+        <span style="height:44px;width:220px;box-sizing:border-box;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;gap:8px;color:var(--ink3);font-size:14px">{{ iSearch }}Search skills</span>
+        <span role="button" style="height:44px;padding:0 16px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px">{{ iWand }}Teach a skill</span>
+      </div>
+      <section aria-label="How skills work" style="border-radius:24px;background:var(--card);border:1px solid var(--line);padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+        <sc-for list="{{ how }}" as="x" hint-placeholder-count="3">
+          <div style="display:flex;gap:14px;align-items:center;padding:6px">
+            <span style="position:relative;width:76px;height:76px;border-radius:20px;background:{{ x.bg }};display:flex;align-items:flex-end;justify-content:center;flex:none;overflow:clip"><dc-import name="Tilo S Buddy" size="60" mood="{{ x.mood }}" hint-size="51px,60px"></dc-import><span style="position:absolute;right:6px;top:6px;width:28px;height:28px;border-radius:9px;background:var(--card);color:var(--ink);display:flex;align-items:center;justify-content:center">{{ x.ic }}</span></span>
+            <span style="display:flex;flex-direction:column;gap:2px"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">{{ x.n }}</span><span style="font-weight:700;font-size:16px;line-height:1.25">{{ x.t }}</span><span style="font-size:13.5px;color:var(--ink2);line-height:1.4">{{ x.d }}</span></span>
+          </div>
+        </sc-for>
+      </section>
+      <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T State" kind="loading" layout="grid" caption="Tilo is fetching your skills" hint-size="100%,460px"></dc-import></sc-if>
+      <sc-if value="{{ error }}" hint-placeholder-val="{{ false }}"><div style="border-radius:24px;background:var(--card);border:1px solid var(--line)"><dc-import name="Tilo T State" kind="error" title="Skills didn’t load" body="Tilo can still use every skill while this page is down. Try again in a moment." cta="Try again" code="skills.list · 503 · 9:14 am" hint-size="100%,400px"></dc-import></div></sc-if>
+      <sc-if value="{{ list }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ cats }}" as="c" hint-placeholder-count="6"><span style="height:38px;padding:0 14px;border-radius:99px;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }};display:flex;align-items:center;font-size:13.5px;font-weight:600">{{ c.t }}</span></sc-for></div>
+        <sc-if value="{{ running }}" hint-placeholder-val="{{ false }}">
+          <div style="border-radius:20px;border:1px solid var(--ink);background:var(--card);padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap"><dc-import name="Tilo S Buddy" size="44" mood="work" hint-size="37px,44px"></dc-import><span style="flex:1;min-width:200px;display:flex;flex-direction:column;line-height:1.35"><span style="font-weight:700">Learning “Chase overdue invoices”</span><span style="font-size:13px;color:var(--ink2)">Turning your recording into steps · 4 of 6 steps found</span></span><span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">skill.learning</span><span style="height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:700;font-size:13.5px">Watch</span></div>
+        </sc-if>
+        <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}"><div style="border-radius:24px;border:1px dashed var(--line2);background:var(--card)"><dc-import name="Tilo T State" kind="empty" mood="happy" title="No skills of your own yet" body="Tilo already has the built-in ones below. Show it how you like something done once, and it becomes yours." cta="Teach your first skill" hint-size="100%,380px"></dc-import></div></sc-if>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax({{ minC }},1fr));gap:12px">
+          <sc-for list="{{ skills }}" as="s" hint-placeholder-count="12">
+            <a href="#" style="border-radius:20px;background:var(--card);border:1px solid {{ s.bd }};padding:16px;display:flex;flex-direction:column;gap:12px" style-hover="border-color:var(--ink)">
+              <div style="display:flex;align-items:flex-start;gap:10px"><span style="width:48px;height:48px;border-radius:14px;background:{{ s.bg }};color:{{ s.fg }};display:flex;align-items:center;justify-content:center;flex:none">{{ s.ic }}</span><div style="flex:1"></div><sc-if value="{{ s.mine }}"><span style="height:24px;padding:0 8px;border-radius:99px;background:var(--lime);color:#0B0B0C;font-size:11px;font-weight:700;display:flex;align-items:center">Yours</span></sc-if></div>
+              <span style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:700;font-size:15.5px">{{ s.n }}</span><span style="font-size:13px;color:var(--ink2);line-height:1.4">{{ s.d }}</span></span>
+              <span style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink3);margin-top:auto"><span style="display:flex;align-items:center;gap:3px;color:var(--ink);font-weight:700">{{ iStar }}{{ s.r }}</span><span>used {{ s.u }}×</span><span style="margin-left:auto;font-family:var(--mono);font-size:10.5px">{{ s.c }}</span></span>
+            </a>
+          </sc-for>
+        </div>
+      </sc-if>
+    </main>
+    <div aria-hidden="true" style="flex:1 1 0;min-width:0;background-image:var(--doodle);background-size:280px 280px;background-position:140px 60px"></div>
+  </div>
+  <sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T Nav" active="skills" device="tabs" theme="{{ theme }}" hint-size="100%,84px"></dc-import></sc-if>
+
+  <sc-if value="{{ detail }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:var(--scrim);z-index:10"></div>
+    <aside aria-label="Skill detail" style="position:absolute;right:0;top:{{ drT }};bottom:0;width:{{ drW }};z-index:11;box-sizing:border-box;background:var(--card);border-left:1px solid var(--line);border-radius:{{ drR }};padding:22px 24px;display:flex;flex-direction:column;gap:16px;overflow:hidden;animation:tSlideR .36s cubic-bezier(.2,.8,.2,1) both">
+      <div style="display:flex;align-items:center;gap:12px"><span style="width:56px;height:56px;border-radius:16px;background:var(--mintSoft);color:var(--mintInk);display:flex;align-items:center;justify-content:center">{{ iCoins }}</span><span style="flex:1;display:flex;flex-direction:column;line-height:1.25"><span style="font-weight:700;font-size:22px;letter-spacing:-.5px">Chase overdue invoices</span><span style="font-size:13px;color:var(--ink3)">Yours · taught by Maya · v3</span></span><span aria-label="Close" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center">{{ iX }}</span></div>
+      <div style="display:flex;gap:14px;align-items:center;font-size:13.5px"><span style="display:flex;align-items:center;gap:4px;font-weight:700">{{ iStar }}4.8</span><span style="color:var(--ink3)">from 23 runs</span><span style="color:var(--ink3)">· about 6 credits a run</span></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">WHEN TILO USES IT</span><span style="font-size:14.5px;line-height:1.5">When you mention unpaid, overdue or late invoices, or every Monday at 9 am. You can also say “use Chase invoices”.</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="border-radius:16px;border:1px solid var(--line);padding:12px;display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">IT NEEDS</span><sc-for list="{{ needs }}" as="n" hint-placeholder-count="2"><span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600"><span style="width:28px;height:28px;border-radius:8px;border:1px dashed var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;color:var(--ink3)">logo</span>{{ n.t }}<span style="margin-left:auto;font-size:11px;color:var(--mintInk);font-weight:700">{{ n.s }}</span></span></sc-for></div>
+        <div style="border-radius:16px;border:1px solid var(--line);padding:12px;display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">IT PRODUCES</span><span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600">{{ iSheet }}A list of who owes what</span><span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600">{{ iMail }}Reminder drafts · asks first</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">VERSION HISTORY</span>
+        <sc-for list="{{ vers }}" as="v" hint-placeholder-count="3"><div style="display:flex;gap:10px;font-size:13.5px;padding:8px 0;border-top:1px solid var(--line)"><span style="font-family:var(--mono);font-size:12px;width:28px;font-weight:600">{{ v.v }}</span><span style="flex:1;color:var(--ink2)">{{ v.t }}</span><span style="font-size:12px;color:var(--ink3)">{{ v.d }}</span></div></sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">HOW DID THE LAST RUN GO?</span><div style="display:flex;gap:6px"><sc-for list="{{ rate }}" as="r" hint-placeholder-count="5"><span role="button" aria-label="{{ r.l }}" style="width:44px;height:44px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:{{ r.c }}">{{ iStar }}</span></sc-for></div></div>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:8px"><span role="button" style="flex:1;height:52px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:15px">{{ iPlay }}Try it</span><span role="button" style="height:52px;padding:0 18px;border-radius:14px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600">Edit steps</span></div>
+    </aside>
+  </sc-if>
+
+  <sc-if value="{{ teach }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:var(--scrim);z-index:10"></div>
+    <div role="dialog" aria-label="Teach a skill" style="position:absolute;left:50%;top:{{ wzT }};width:{{ wzW }};transform:translateX(-50%);z-index:11;box-sizing:border-box;background:var(--card);border-radius:28px;border:1px solid var(--line);padding:22px;display:flex;flex-direction:column;gap:18px;animation:tPop .3s ease-out both">
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-weight:700;font-size:20px;letter-spacing:-.4px;flex:1">Teach Tilo a skill</span><span aria-label="Close" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center">{{ iX }}</span></div>
+      <ol style="margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+        <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3"><li aria-current="{{ s.cur }}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;background:{{ s.bg }};font-size:13px;font-weight:600;color:{{ s.fg }}"><span style="width:26px;height:26px;border-radius:99px;background:{{ s.dbg }};color:{{ s.dfg }};border:1.5px solid {{ s.dbd }};box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none">{{ s.m }}</span><span style="min-width:0">{{ s.t }}</span></li></sc-for>
+      </ol>
+      <sc-if value="{{ t1 }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+          <div style="border-radius:20px;border:2px solid var(--ink);padding:16px;display:flex;flex-direction:column;gap:8px"><span style="width:44px;height:44px;border-radius:12px;background:var(--redSoft);color:var(--redInk);display:flex;align-items:center;justify-content:center">{{ iRec }}</span><span style="font-weight:700;font-size:16px">Record it</span><span style="font-size:13.5px;color:var(--ink2)">Do it once while Tilo watches your screen. Best for clicks and forms.</span></div>
+          <div style="border-radius:20px;border:1px solid var(--line2);padding:16px;display:flex;flex-direction:column;gap:8px"><span style="width:44px;height:44px;border-radius:12px;background:var(--lilacSoft);color:var(--lilacInk);display:flex;align-items:center;justify-content:center">{{ iPen }}</span><span style="font-weight:700;font-size:16px">Describe it</span><span style="font-size:13.5px;color:var(--ink2)">Write the steps in your own words. Best for writing and research.</span></div>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600">Name<span style="height:48px;box-sizing:border-box;padding:0 14px;border-radius:12px;border:1.5px solid var(--ink);display:flex;align-items:center;font-size:15px;font-weight:500">Chase overdue invoices</span></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600">When should Tilo use it?<span style="min-height:64px;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid var(--line2);font-size:14.5px;font-weight:500;color:var(--ink2)">When I mention late invoices, and every Monday at 9 am</span></label>
+      </sc-if>
+      <sc-if value="{{ t2 }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <div style="position:relative;flex:2 1 300px;height:250px;border-radius:18px;border:1px solid var(--line);background:var(--sunk);overflow:clip">
+            <div style="height:30px;display:flex;align-items:center;gap:6px;padding:0 12px;border-bottom:1px solid var(--line);background:var(--card)"><span style="width:8px;height:8px;border-radius:9px;background:var(--line2)"></span><span style="width:8px;height:8px;border-radius:9px;background:var(--line2)"></span><span style="flex:1;margin-left:8px;height:16px;border-radius:6px;background:var(--sunk)"></span></div>
+            <div style="padding:14px;display:flex;flex-direction:column;gap:8px"><span style="height:12px;width:60%;border-radius:6px;background:var(--line2)"></span><span style="height:12px;width:80%;border-radius:6px;background:var(--line)"></span><span style="height:12px;width:45%;border-radius:6px;background:var(--line)"></span><span style="height:60px;border-radius:10px;background:var(--card);border:1px solid var(--line)"></span></div>
+            <span style="position:absolute;left:12px;bottom:12px;height:32px;padding:0 12px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700"><span style="width:9px;height:9px;border-radius:9px;background:var(--red);animation:tBlinkDot 1s infinite"></span>Recording · 0:42</span>
+            <span style="position:absolute;right:10px;bottom:6px"><dc-import name="Tilo S Buddy" size="70" mood="listen" hint-size="59px,70px"></dc-import></span>
+          </div>
+          <div style="flex:1 1 220px;display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.4px">STEPS TILO NOTICED</span>
+            <sc-for list="{{ seen }}" as="x" hint-placeholder-count="4"><span style="display:flex;gap:8px;align-items:center;font-size:13.5px;animation:tPop .3s ease-out both;animation-delay:{{ x.d }}"><span style="width:22px;height:22px;border-radius:99px;background:var(--mintSoft);color:var(--mintInk);display:flex;align-items:center;justify-content:center;flex:none">{{ iCheckS }}</span>{{ x.t }}</span></sc-for>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ t3 }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <sc-for list="{{ review }}" as="x" hint-placeholder-count="5"><div style="display:flex;align-items:center;gap:10px;min-height:48px;box-sizing:border-box;padding:6px 10px;border-radius:12px;border:1px solid var(--line)"><span style="color:var(--ink3)">{{ iGrip }}</span><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);width:16px">{{ x.n }}</span><span style="flex:1;font-size:14px">{{ x.t }}</span><sc-if value="{{ x.ask }}"><span style="height:24px;padding:0 8px;border-radius:99px;background:var(--amberSoft);color:var(--amberInk);font-size:11px;font-weight:700;display:flex;align-items:center">Asks first</span></sc-if></div></sc-for>
+        </div>
+        <div style="border-radius:16px;background:var(--mintSoft);padding:12px 14px;display:flex;align-items:center;gap:10px;font-size:14px;color:var(--mintInk);font-weight:600">{{ iCheckS }}Test run passed: found 4 overdue invoices, drafted 4 reminders, sent nothing.</div>
+      </sc-if>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><span role="button" style="height:48px;padding:0 18px;border-radius:14px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600">{{ back }}</span><span role="button" style="height:48px;padding:0 20px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;font-weight:700">{{ next }}</span></div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;gallery&quot;,&quot;running&quot;,&quot;detail&quot;,&quot;teach1&quot;,&quot;teach2&quot;,&quot;teach3&quot;,&quot;loading&quot;,&quot;empty&quot;,&quot;error&quot;],&quot;default&quot;:&quot;gallery&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloT) this.t = setInterval(() => { if (window.TiloT) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const T = window.TiloT, ic = (n, s) => T ? T.ic(React.createElement, n, s) : null;
+    const p = this.props, d = (p.device ?? 'desktop') === 'desktop', v = p.view ?? 'gallery';
+    const tn = v === 'teach1' ? 1 : v === 'teach2' ? 2 : v === 'teach3' ? 3 : 0;
+    const SK = [['Write a friendly reply', 'Drafts in your voice, ready to send', 'mail', 'lilac', '4.9', 112, 'GMAIL'], ['Research a topic', 'Finds, reads and cites sources', 'research', 'sky', '4.8', 86, 'WEB'], ['Plan my week', 'Fits work around your meetings', 'calendar', 'amber', '4.6', 40, 'CALENDAR'], ['Compare options', 'Side by side, picks a winner', 'sheet', 'teal', '4.8', 57, 'SHEETS'], ['Fill in a website', 'Uses sites for you, asks before submitting', 'globe', 'sky', '4.4', 31, 'BROWSER'], ['Write a first draft', 'Posts, briefs and docs', 'pen', 'lilac', '4.7', 64, 'DOCS'], ['Meeting notes', 'Joins, takes minutes, follows up', 'people', 'pink', '4.9', 98, 'MEET'], ['Fix a small bug', 'Reads the code, opens a pull request', 'code', 'mint', '4.5', 12, 'GITHUB'], ['Make slides', 'Turns notes into clean slides', 'palette', 'pink', '4.6', 22, 'SLIDES'], ['Plan a trip', 'Routes, stays and costs', 'plane', 'amber', '4.8', 19, 'WEB'], ['Chase overdue invoices', 'Finds who owes what, drafts reminders', 'coins', 'mint', '4.8', 23, 'GMAIL · SHEETS', 1], ['Find hidden gems', 'Past the top-10 lists', 'search', 'teal', '4.7', 44, 'WEB']];
+    const step = (k, t) => { const on = k === tn, done = k < tn; return { t, m: done ? '✓' : String(k), cur: on ? 'step' : undefined, bg: on ? 'var(--sunk)' : 'transparent', fg: on || done ? 'var(--ink)' : 'var(--ink3)', dbg: done ? 'var(--ink)' : on ? 'var(--lime)' : 'transparent', dfg: done ? 'var(--card)' : '#0B0B0C', dbd: done || on ? 'var(--ink)' : 'var(--line2)' }; };
+    const ld = v === 'loading', er = v === 'error';
+    return {
+      theme: p.theme ?? 'studio', phone: !d, navD: d ? 'desktop' : 'phone', H: d ? '900px' : '844px', pad: d ? '28px 32px' : '16px 14px 110px', h1: d ? '44px' : '32px', minC: d ? '250px' : '160px',
+      loading: ld, error: er, list: !ld && !er, running: v === 'running', empty: v === 'empty', detail: v === 'detail', teach: tn > 0, t1: tn === 1, t2: tn === 2, t3: tn === 3,
+      drT: d ? '0px' : '60px', drW: d ? '520px' : '100%', drR: d ? '0' : '24px 24px 0 0', wzT: d ? '96px' : '70px', wzW: d ? '760px' : 'calc(100% - 20px)',
+      how: [['1 · AUTOMATIC', 'Tilo picks the right skill', 'Just describe the work. Tilo matches it to a skill and says which one it used.', 'sparkle', 'var(--skySoft)', 'think'], ['2 · TEACH ONCE', 'Show it how, one time', 'Record your screen or describe the steps. It becomes a skill you can reuse.', 'wand', 'var(--lilacSoft)', 'listen'], ['3 · GROWS WITH YOU', 'Ratings make it better', 'Rate a run and Tilo adjusts the steps. Every change gets a new version.', 'star', 'var(--priSoft)', 'happy']].map(([n, t, dd, i, bg, mood]) => ({ n, t, d: dd, ic: ic(i, 16), bg, mood })),
+      cats: ['All', 'Writing', 'Research', 'Planning', 'Money', 'Yours'].map((t, i) => ({ t, bd: i === 0 ? 'var(--ink)' : 'var(--line)', bg: i === 0 ? 'var(--ink)' : 'var(--card)', fg: i === 0 ? 'var(--card)' : 'var(--ink)' })),
+      skills: SK.map(([n, dd, i, c, r, u, cc, mine]) => ({ n, d: dd, ic: ic(i, 24), bg: `var(--${c}Soft)`, fg: `var(--${c}Ink)`, r, u: String(u), c: cc, mine: !!mine, bd: mine && v === 'detail' ? 'var(--ink)' : 'var(--line)' })),
+      needs: [['Gmail', 'Connected'], ['Google Sheets', 'Connected']].map(([t, s]) => ({ t, s })),
+      vers: [['v3', 'Skips invoices under €50 (you rated v2 3★ for that)', 'Oct 10'], ['v2', 'Adds the invoice PDF to each reminder', 'Sep 28'], ['v1', 'Taught by recording, 6 steps', 'Sep 21']].map(([vv, t, dd]) => ({ v: vv, t, d: dd })),
+      rate: [1, 2, 3, 4, 5].map(k => ({ l: k + ' stars', c: k <= 4 ? 'var(--amber)' : 'var(--line2)' })),
+      steps: [step(1, 'Record or describe'), step(2, 'Show it once'), step(3, 'Review and test')],
+      seen: ['Opened Google Sheets “Invoices 2026”', 'Filtered unpaid, older than 30 days', 'Opened Gmail, new message to the client', 'Pasted the amount and due date'].map((t, k) => ({ t, d: (k * .2) + 's' })),
+      review: [['1', 'Open the sheet “Invoices 2026”', 0], ['2', 'Find unpaid invoices older than 30 days, over €50', 0], ['3', 'Draft a kind reminder for each client', 0], ['4', 'Attach the invoice PDF', 0], ['5', 'Send the reminders', 1]].map(([n, t, ask]) => ({ n, t, ask: !!ask })),
+      back: tn === 1 ? 'Cancel' : 'Back', next: tn === 3 ? 'Save skill' : 'Next',
+      iSearch: ic('search', 16), iWand: ic('wand', 18), iStar: ic('star', 14), iX: ic('x', 20), iCoins: ic('coins', 26), iSheet: ic('sheet', 16), iMail: ic('mail', 16), iPlay: ic('play', 16), iRec: ic('record', 20), iPen: ic('pen', 20), iCheckS: ic('check', 13), iGrip: ic('grip', 16)
+    };
+  }
+}
+</script>
+</body>
+</html>

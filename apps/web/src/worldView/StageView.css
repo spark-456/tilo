@@ -1,0 +1,47 @@
+/* S-25: scope presentation to this stage, including its surrounding Park shell. */
+@media (min-width: 1920px) {
+  [data-park]:has([data-stage-layout="1920x1080"]) {
+    font-size: 20px;
+  }
+  [data-park]:has([data-stage-layout="1920x1080"]) .park-shell__nav,
+  [data-park]:has([data-stage-layout="1920x1080"]) .park-shell__bar,
+  [data-park]:has([data-stage-layout="1920x1080"]) .park-view-crumb {
+    display: none;
+  }
+  [data-park]:has([data-stage-layout="1920x1080"]) .park-shell__main,
+  [data-park]:has([data-stage-layout="1920x1080"]) .park-shell__page,
+  [data-park]:has([data-stage-layout="1920x1080"]) .park-shell__column {
+    max-width: none;
+    padding: 16px;
+  }
+  [data-park]:has([data-stage-layout="1920x1080"]) .park-view-title {
+    font-size: 36px;
+  }
+  [data-park] [data-stage-layout="1920x1080"] {
+    grid-template-columns: minmax(0, 1fr) 400px;
+    gap: 24px;
+  }
+  [data-park] [data-stage-layout="1920x1080"] .park-view-stagebox {
+    height: min(76vh, 820px);
+    min-height: 600px;
+  }
+  [data-park] [data-stage-layout="1920x1080"] .park-view-stagebox .stage-frame {
+    height: 100%;
+  }
+  [data-park] [data-stage-layout="1920x1080"] .park-view-banner,
+  [data-park] [data-stage-layout="1920x1080"] .park-view-note,
+  [data-park] [data-stage-layout="1920x1080"] .park-view-flag,
+  [data-park] [data-stage-layout="1920x1080"] .park-view-chiplink,
+  [data-park] [data-stage-layout="1920x1080"] .park-view-pausenote,
+  [data-park] [data-stage-layout="1920x1080"] .park-view-figures span {
+    font-size: 20px;
+  }
+  [data-park] [data-stage-layout="1920x1080"] .park-view-h2,
+  [data-park] [data-stage-layout="1920x1080"] .park-view-figures b {
+    font-size: 28px;
+  }
+}
+[data-park] .park-stage-source {
+  font-size: 24px;
+  font-weight: 800;
+}

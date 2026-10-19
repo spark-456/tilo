@@ -13,7 +13,7 @@ from typing import Any
 
 import tilo_policy
 
-from ._schema import outbox_validator
+from ._schema import authz_validator, outbox_validator
 from ._time import add_seconds, parse_ts
 from .errors import (
     AdapterError,
@@ -125,6 +125,7 @@ class Outbox:
         retry: RetryPolicy | None = None,  # production passes RetryPolicy()
         alert: Callable[[dict], None] | None = None,  # gets alert.raised parts {type, authz, data, world_id}
         halted: Callable[[], bool] | None = None,
+        source_valid: Callable[[dict], bool] | None = None,
     ) -> None:
         if any(name.strip() == RESERVED_CONNECTOR_ID for name in connectors):
             raise ValueError(f"connector id {RESERVED_CONNECTOR_ID!r} is reserved and cannot be bound")
@@ -136,6 +137,7 @@ class Outbox:
         self._retry = retry if retry is not None else _IMMEDIATE
         self._alert = alert
         self._halted = halted  # set: asked at each claim; True means nothing more is claimed (a paused world)
+        self._source_valid = source_valid
 
     def enqueue(self, entry: dict, evidence: dict) -> dict:
         if errors := sorted(outbox_validator().iter_errors(entry), key=lambda e: list(e.path)):
@@ -202,13 +204,24 @@ class Outbox:
             raise OutboxRefused(f"cannot cancel {outbox_id!r}: not 'scheduled'")
         return updated
 
-    def abandon(self, outbox_id: str) -> dict:
+    def abandon(self, outbox_id: str, *, keep_ambiguous: bool = False) -> dict:
         """A run gave up on this unsent entry: "failed", so no later dispatch_due() ever sends it. Refused while a
         live lease may be sending it, or once it is sent, failed or cancelled."""
         self._own(outbox_id, "abandon")
-        if (updated := self._store._abandon(outbox_id, self._clock())) is None:
+        if (updated := self._store._abandon(outbox_id, self._clock(), keep_ambiguous)) is None:
             raise OutboxRefused(f"cannot abandon {outbox_id!r}: being sent or already settled")
         return updated
+
+    def abandon_before_dispatch(self, outbox_id: str) -> dict:
+        """Compensate a refused decision record atomically; mark only entries never claimed for sending."""
+        self._own(outbox_id, "abandon")
+        if (updated := self._store._abandon_before_dispatch(outbox_id)) is None:
+            raise OutboxRefused("cannot compensate an entry that may have reached an adapter")
+        return updated
+
+    def was_abandoned_before_dispatch(self, outbox_id: str) -> bool:
+        self._own(outbox_id, "read compensation")
+        return self._store.was_abandoned_before_dispatch(outbox_id)
 
     def dispatch_due(self) -> list[dict]:
         now = self._clock()
@@ -237,10 +250,26 @@ class Outbox:
             return None
         if claimed is None:
             return None
+        if "authz" not in claimed or not authz_validator().is_valid(claimed["authz"]):  # SEC-11: re-check the store
+            # A stored entry whose authz is missing or malformed (a store bug, an edited document) is not sent now: the
+            # side effect and its data.transfer record (authz included) must stay one thing. This checks the shape only;
+            # binding an entry to its authorisation belongs to the persistent-store ticket. An earlier attempt that may
+            # have acted still alerts a person (FR-AGT-13), as on every other final refusal.
+            _log.error("outbox entry %s: the stored entry no longer carries a valid authz; not sent", outbox_id)
+            alert = _alert_part(claimed) if self._store.retry_state(outbox_id)["ambiguous"] else None
+            return self._store._finalize_claim(outbox_id, holder, "failed", alert=alert)
         name = claimed["connector"]
         adapter = None if name.strip() == RESERVED_CONNECTOR_ID else self._connectors.get(name)
         if adapter is None:  # never a reserved id, even if the map was edited after construction
             return self._store._finalize_claim(outbox_id, holder, "failed")
+        if self._source_valid is not None:
+            try:
+                valid = self._source_valid(deepcopy(claimed)) is True
+            except Exception:
+                valid = False  # no source authority without a fresh readable record
+            if not valid:
+                alert = _alert_part(claimed) if self._store.retry_state(outbox_id)["ambiguous"] else None
+                return self._store._finalize_claim(outbox_id, holder, "failed", alert=alert)
         grant = Grant(world_id=claimed["world_id"], idempotency_key=claimed["idempotency_key"])
         _LIVE_GRANTS.add(id(grant))
         execute = getattr(adapter, "execute_side_effect", None)  # FR-CON-04/05 adapters; else send_reply
@@ -256,7 +285,8 @@ class Outbox:
                     grant,
                 )
         except SideEffectRefused as exc:  # final: it can never succeed as written; nothing is emitted
-            alert = _alert_part(claimed) if isinstance(exc, PossiblySent) else None  # it may have acted: tell a person
+            may_have_sent = isinstance(exc, PossiblySent) or self._store.retry_state(outbox_id)["ambiguous"]
+            alert = _alert_part(claimed) if may_have_sent else None  # an earlier try may have acted: tell a person
             return self._store._finalize_claim(outbox_id, holder, "failed", alert=alert)
         except Exception as exc:  # ambiguous or not final: retried later, within the policy's bounds
             try:

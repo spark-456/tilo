@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { DESKTOP } from "./support/viewports";
+import { STAGE_PATH } from "./support/world";
 
 test.use({ viewport: DESKTOP });
 
@@ -17,7 +18,7 @@ test("PRD-9.7 stage: with WebGL2 unavailable, the Story-lens fallback panel repl
     };
   });
 
-  await page.goto("/");
+  await page.goto(STAGE_PATH);
 
   await expect(page.getByTestId("stage-frame").locator("canvas")).toHaveCount(0);
 

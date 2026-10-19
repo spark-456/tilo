@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-t.js"></script>
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" data-screen-label="Landing" style="width:100%;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:16px;line-height:1.5;overflow:hidden">
+<sc-if value="{{ desk }}" hint-placeholder-val="{{ true }}">
+  <header style="height:80px;box-sizing:border-box;padding:0 40px;display:flex;align-items:center;gap:16px">
+    <div style="width:38px;height:38px;border-radius:12px;background:var(--pri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;justify-content:center"><div style="width:23px;height:12px;border-radius:6px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:5px"><div style="width:3px;height:3px;border-radius:9px;background:#0B0B0C"></div><div style="width:3px;height:3px;border-radius:9px;background:#0B0B0C"></div></div></div>
+    <div style="font-family:var(--fH);font-weight:800;font-size:28px;letter-spacing:-1px;flex:1">tilo</div>
+    <a href="#" style="height:44px;padding:0 16px;display:flex;align-items:center;font-weight:600;font-size:15px;color:var(--ink2)">How it works</a>
+    <a href="#" style="height:44px;padding:0 16px;display:flex;align-items:center;font-weight:600;font-size:15px;color:var(--ink2)">Skills</a>
+    <a href="#" style="height:44px;padding:0 16px;display:flex;align-items:center;font-weight:600;font-size:15px;color:var(--ink2)">Safety</a>
+    <a href="#" style="height:44px;padding:0 18px;border-radius:14px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600;font-size:15px;color:var(--ink)">Sign in</a>
+  </header>
+
+  <section style="padding:56px 40px 0;display:flex;flex-direction:column;align-items:center;gap:24px;text-align:center">
+    <span style="height:36px;padding:0 14px 0 6px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--ink2)"><span style="height:24px;padding:0 8px;border-radius:99px;background:var(--lime);color:#0B0B0C;font-family:var(--mono);font-size:11px;display:flex;align-items:center">NEW</span>Quick answers now take one helper and a few seconds</span>
+    <h1 style="margin:0;font-family:var(--fH);font-weight:700;font-size:96px;line-height:.95;letter-spacing:-4.5px;max-width:1080px;text-wrap:balance">Describe the work. <span style="background:linear-gradient(transparent 64%,var(--lime) 64%,var(--lime) 92%,transparent 92%);color:var(--ink)">Watch your team do it.</span></h1>
+    <p style="margin:0;font-size:21px;line-height:1.5;color:var(--ink2);max-width:660px;text-wrap:pretty">Plain words in. A tiny city of AI helpers plans it, does it, and checks with you before anything important.</p>
+    <div style="position:relative;width:100%;max-width:720px;background:var(--card);border:1px solid var(--line2);border-radius:24px;box-shadow:var(--sh3);padding:10px 10px 10px 18px;display:flex;align-items:center;gap:14px;text-align:left;margin-top:4px">
+      <dc-import name="Tilo S Buddy" size="46" mood="talk" hint-size="40px,46px"></dc-import>
+      <div style="flex:1;min-width:0;height:30px;overflow:hidden;font-family:var(--fH);font-weight:600;font-size:21px;letter-spacing:-.4px;line-height:30px;color:var(--ink2)">
+        <div style="animation:tsCycle 12s cubic-bezier(.7,0,.2,1) infinite">
+          <div>Compare 3 battery suppliers for me</div>
+          <div>Plan a road trip to Gokarna</div>
+          <div>Reply to Lin, nicely, by Friday</div>
+          <div>Summarise these 40 pages into one</div>
+        </div>
+      </div>
+      <span style="height:52px;padding:0 22px;border-radius:16px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;gap:8px;font-family:var(--fH);font-weight:700;font-size:17px;flex:none">Try it →</span><span style="position:absolute;right:18px;bottom:-26px;font-size:12.5px;color:var(--ink3);font-weight:500">Opens sign-in, then runs it</span>
+    </div>
+    <div style="display:flex;gap:12px;justify-content:center;align-items:center;padding-top:2px">
+      <span style="height:56px;padding:0 24px 0 8px;border-radius:18px;background:var(--card);border:1px solid var(--line2);display:flex;align-items:center;gap:12px;font-family:var(--fH);font-weight:700;font-size:17px;white-space:nowrap"><span style="width:40px;height:40px;border-radius:12px;background:var(--sunk);color:var(--ink);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:19px">G</span>Continue with Google</span>
+      <span style="height:56px;padding:0 22px;border-radius:18px;display:flex;align-items:center;gap:10px;font-family:var(--fH);font-weight:700;font-size:17px;text-decoration:underline;text-underline-offset:5px;text-decoration-thickness:2px;text-decoration-color:var(--lime);white-space:nowrap">Explore a demo town</span>
+      <span style="font-size:14px;color:var(--ink3);font-weight:500;white-space:nowrap">Free to try · you see the cost first</span>
+    </div>
+
+    <div style="position:relative;width:100%;max-width:1440px;overflow:hidden;margin-top:20px;padding:4px 0"><span style="position:absolute;left:0;top:0;bottom:0;width:140px;z-index:1;background:linear-gradient(90deg,var(--bg),transparent)"></span><span style="position:absolute;right:0;top:0;bottom:0;width:140px;z-index:1;background:linear-gradient(270deg,var(--bg),transparent)"></span>
+      <div style="display:flex;gap:10px;width:max-content;will-change:transform;animation:tsMarq 48s linear infinite">
+        <sc-for list="{{ live }}" as="l" hint-placeholder-count="12">
+          <span style="height:40px;padding:0 14px 0 6px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:10px;font-size:14px;font-weight:500;white-space:nowrap"><span style="width:28px;height:28px;border-radius:99px;background:{{ l.bg }};display:flex;align-items:flex-end;justify-content:center;overflow:hidden">{{ l.av }}</span><span style="font-weight:700">{{ l.who }}</span>{{ l.t }}<span style="font-family:var(--mono);font-size:11.5px;color:var(--ink3)">{{ l.w }}</span></span>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="position:relative;width:100%;max-width:1360px;height:640px;margin-top:28px;border-radius:36px;background:var(--cityBg);border:1px solid var(--cityLine);overflow:hidden;text-align:left">
+      <div style="position:absolute;left:14%;right:14%;top:40px;bottom:30px;filter:var(--cityFx)">
+        <div style="position:absolute;inset:0;animation:tsS1 14s ease-in-out infinite">{{ c1 }}</div>
+        <div style="position:absolute;inset:0;animation:tsS2 14s ease-in-out infinite">{{ c2 }}</div>
+        <div style="position:absolute;inset:0;animation:tsS3 14s ease-in-out infinite">{{ c3 }}</div>
+        <div style="position:absolute;inset:0;animation:tsS4 14s ease-in-out infinite">{{ c4 }}</div>
+      </div>
+      <div style="position:absolute;left:0;right:0;bottom:100px;height:70px;pointer-events:none">
+        <div style="position:absolute;left:0;bottom:0;will-change:transform;animation:tsWalk 22s linear infinite"><div style="animation:tsStep .5s ease-in-out infinite"><dc-import name="Tilo S Buddy" role="research" mood="happy" size="58" hint-size="49px,58px"></dc-import></div></div>
+        <div style="position:absolute;left:0;bottom:6px;will-change:transform;animation:tsWalk 22s linear -11s infinite"><div style="animation:tsStep .5s ease-in-out -.25s infinite"><dc-import name="Tilo S Buddy" role="connector" mood="idle" size="50" hint-size="43px,50px"></dc-import></div></div>
+        <div style="position:absolute;left:0;bottom:-6px;will-change:transform;animation:tsWalkR 28s linear -6s infinite"><div style="animation:tsStep .55s ease-in-out infinite"><dc-import name="Tilo S Buddy" role="finance" mood="idle" size="54" hint-size="46px,54px"></dc-import></div></div>
+      </div>
+      <div style="position:absolute;left:32px;top:32px;width:400px;box-sizing:border-box;background:var(--card);border-radius:20px;box-shadow:var(--sh2);padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.5px">YOU ASKED</span>
+        <span style="display:flex;align-items:center;font-family:var(--fH);font-weight:600;font-size:21px;letter-spacing:-.4px"><span style="display:inline-block;overflow:hidden;white-space:nowrap;width:0;animation:tsType 14s steps(28,end) infinite">Plan a road trip to Gokarna</span><span style="width:2px;height:24px;background:var(--ink);margin-left:2px;animation:tsCaret 1s steps(1) infinite"></span></span>
+      </div>
+      <div style="position:absolute;right:32px;top:32px;width:300px;box-sizing:border-box;background:var(--card);border-radius:18px;box-shadow:var(--sh2);padding:12px 14px;display:flex;gap:12px;align-items:center;opacity:0;animation:tsP1 14s ease-in-out infinite">
+        <span style="width:40px;height:40px;border-radius:99px;background:var(--priSoft);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ aDir }}</span>
+        <span style="display:flex;flex-direction:column;line-height:1.35"><span style="font-size:12.5px;font-weight:600;color:var(--ink3)">Director</span><span style="font-size:14.5px;font-weight:500">Split it into beaches, route, stays and food.</span></span>
+      </div>
+      <div style="position:absolute;right:32px;top:128px;width:300px;box-sizing:border-box;background:var(--card);border-radius:18px;box-shadow:var(--sh2);padding:12px 14px;display:flex;gap:12px;align-items:center;opacity:0;animation:tsP2 14s ease-in-out infinite">
+        <span style="width:40px;height:40px;border-radius:99px;background:var(--skySoft);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ aRes }}</span>
+        <span style="display:flex;flex-direction:column;line-height:1.35"><span style="font-size:12.5px;font-weight:600;color:var(--ink3)">Researcher</span><span style="font-size:14.5px;font-weight:500">Found 5 hidden beaches near Gokarna.</span></span>
+      </div>
+      <div style="position:absolute;right:32px;top:224px;width:300px;box-sizing:border-box;background:var(--card);border-radius:18px;box-shadow:var(--sh2);padding:12px 14px;display:flex;gap:12px;align-items:center;opacity:0;animation:tsP3 14s ease-in-out infinite">
+        <span style="width:40px;height:40px;border-radius:99px;background:var(--mintSoft);color:var(--mintInk);display:flex;align-items:center;justify-content:center;flex:none">{{ iCheck }}</span>
+        <span style="display:flex;flex-direction:column;line-height:1.35"><span style="font-size:12.5px;font-weight:600;color:var(--ink3)">Route planner · step done</span><span style="font-size:14.5px;font-weight:500">Coastal road. Skips the steep ghat.</span></span>
+      </div>
+      <div style="position:absolute;left:50%;top:50%;width:360px;margin-left:-180px;margin-top:-86px;box-sizing:border-box;background:var(--card);border-radius:24px;box-shadow:var(--sh3);padding:22px 24px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;opacity:0;animation:tsP4 14s ease-in-out infinite">
+        <span style="position:absolute;top:-10px;left:40px;width:16px;height:16px;border-radius:4px;background:var(--lime);opacity:0;animation:tsSpark 14s ease-in-out infinite"></span>
+        <span style="position:absolute;top:18px;right:-8px;width:12px;height:12px;border-radius:99px;background:var(--amber);opacity:0;animation:tsSpark 14s ease-in-out .15s infinite"></span>
+        <span style="position:absolute;bottom:-8px;right:60px;width:14px;height:14px;border-radius:4px;background:var(--mint);opacity:0;animation:tsSpark 14s ease-in-out .3s infinite"></span>
+        <span style="position:absolute;bottom:20px;left:-8px;width:10px;height:10px;border-radius:99px;background:var(--sky);opacity:0;animation:tsSpark 14s ease-in-out .2s infinite"></span>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--mintInk);letter-spacing:.5px">DONE IN 18 MIN · £3.10</span>
+        <span style="font-family:var(--fH);font-weight:700;font-size:24px;letter-spacing:-.6px">Your 5-day trip is ready</span>
+        <span style="font-size:14.5px;color:var(--ink2)">Day-by-day route, beaches and stays.</span>
+      </div>
+      <div style="position:absolute;left:32px;right:32px;bottom:28px;display:flex;align-items:flex-end;gap:16px">
+        <div style="flex:1;max-width:520px;background:var(--card);border-radius:18px;box-shadow:var(--sh2);padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600"><span>Road trip to Gokarna</span><span style="font-family:var(--mono);font-weight:500;color:var(--ink3)">£ spent so far, cap £8</span></div>
+          <div style="height:8px;border-radius:99px;background:var(--sunk);overflow:hidden"><div style="height:100%;border-radius:99px;background:var(--pri);width:3%;animation:tsProg 14s ease-in-out infinite"></div></div>
+        </div>
+        <div style="flex:1"></div>
+        <dc-import name="Tilo S Buddy" size="150" mood="happy" hint-size="127px,150px"></dc-import>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:28px 0 8px;color:var(--ink3);font-size:14px;font-weight:600">
+      <span style="width:26px;height:40px;border-radius:99px;border:2px solid var(--line2);box-sizing:border-box;display:flex;justify-content:center;padding-top:7px"><span style="width:4px;height:8px;border-radius:99px;background:var(--ink2);animation:tsScroll 1.8s ease-in-out infinite"></span></span>
+      Scroll to see how it works
+    </div>
+  </section>
+
+  <section style="max-width:1232px;margin:0 auto;padding:110px 32px 0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:stretch">
+    <div style="display:flex;flex-direction:column;gap:18px;justify-content:center;padding-right:24px">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.5px">ONE LINE IN</span>
+      <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:56px;line-height:1.02;letter-spacing:-2.4px">You type one sentence. You get the whole thing back.</h2>
+      <p style="margin:0;font-size:19px;color:var(--ink2)">No prompts to engineer, no tabs to juggle. Here’s a real one from this week.</p>
+      <div style="background:var(--card);border:1px solid var(--line2);border-radius:20px;box-shadow:var(--sh2);padding:16px 18px;font-family:var(--fH);font-weight:600;font-size:22px;letter-spacing:-.4px">“Compare 3 battery suppliers for the K1 scooter.”</div>
+      <div style="display:flex;gap:18px;font-family:var(--mono);font-size:12.5px;color:var(--ink3)"><span>4 HELPERS</span><span>23 MIN</span><span>£1.84</span><span>1 YES FROM YOU</span></div>
+    </div>
+    <div style="position:relative;background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh3);padding:26px;display:flex;flex-direction:column;gap:16px;transform:rotate(1.2deg)">
+      <div style="display:flex;align-items:center;gap:10px"><span style="height:26px;padding:0 10px;border-radius:99px;background:var(--mintSoft);color:var(--mintInk);font-size:12.5px;font-weight:700;display:flex;align-items:center">Done</span><span style="font-size:13px;color:var(--ink3);font-weight:600">Supplier scorecard · 1 page</span><div style="flex:1"></div><span style="font-size:13px;font-weight:700">↓ PDF</span></div>
+      <div style="font-family:var(--fH);font-weight:700;font-size:26px;letter-spacing:-.8px">Brightcell wins, narrowly.</div>
+      <div style="border:1px solid var(--line);border-radius:16px;overflow:hidden;font-size:14px">
+        <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;padding:10px 14px;background:var(--sunk);font-weight:700;color:var(--ink2);font-size:12.5px"><span></span><span>Brightcell</span><span>Voltway</span><span>Nordpack</span></div>
+        <sc-for list="{{ score }}" as="r" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;padding:10px 14px;border-top:1px solid var(--line)"><span style="color:var(--ink2)">{{ r.k }}</span><span style="font-weight:{{ r.w1 }}">{{ r.a }}</span><span style="font-weight:{{ r.w2 }}">{{ r.b }}</span><span style="font-weight:{{ r.w3 }}">{{ r.c }}</span></div></sc-for>
+      </div>
+      <div style="font-size:14.5px;color:var(--ink2)">Brightcell is £4 dearer a pack but has a 3-year warranty and ships in 2 weeks. Voltway is cheapest if you can wait 6.</div>
+      <span style="position:absolute;left:-30px;bottom:-26px"><dc-import name="Tilo S Buddy" role="finance" mood="happy" size="96" hint-size="82px,96px"></dc-import></span>
+    </div>
+  </section>
+
+  <section style="max-width:1232px;margin:0 auto;padding:120px 32px 0;display:flex;flex-direction:column;gap:40px">
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:760px">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.5px">HOW IT WORKS</span>
+      <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:56px;line-height:1.02;letter-spacing:-2.4px">Three steps. No jargon, no surprises.</h2>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px">
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);padding:28px;display:flex;flex-direction:column;gap:20px">
+        <span style="font-family:var(--mono);font-size:13px;color:var(--ink3)">01</span>
+        <div style="height:180px;border-radius:20px;background:var(--sunk);padding:18px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between">
+          <div style="background:var(--card);border-radius:14px;box-shadow:var(--sh1);padding:12px 14px;font-weight:600;font-size:15px">Compare 3 battery suppliers for the K1 scooter<span style="display:inline-block;width:2px;height:16px;margin-left:2px;vertical-align:-3px;background:var(--ink);animation:tsCaret 1s steps(1) infinite"></span></div>
+          <div style="display:flex;gap:6px"><span style="height:30px;padding:0 10px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:12.5px;font-weight:600;display:flex;align-items:center">+ Attach</span><span style="height:30px;padding:0 10px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:12.5px;font-weight:600;display:flex;align-items:center">Make a world</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px"><h3 style="margin:0;font-family:var(--fH);font-weight:700;font-size:24px;letter-spacing:-.6px">Describe it</h3><p style="margin:0;color:var(--ink2)">Write it the way you’d ask a friend. Drop in files if they help.</p></div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);padding:28px;display:flex;flex-direction:column;gap:20px">
+        <span style="font-family:var(--mono);font-size:13px;color:var(--ink3)">02</span>
+        <div style="height:180px;border-radius:20px;background:var(--sunk);padding:18px;box-sizing:border-box;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;flex-wrap:wrap;gap:6px"><span style="height:30px;padding:0 10px;border-radius:10px;background:var(--card);border:1px dashed var(--line2);font-size:12.5px;font-weight:500;display:flex;align-items:center">2,000 units ✎</span><span style="height:30px;padding:0 10px;border-radius:10px;background:var(--card);border:1px dashed var(--line2);font-size:12.5px;font-weight:500;display:flex;align-items:center">Ships to the UK ✎</span><span style="height:30px;padding:0 10px;border-radius:10px;background:var(--card);border:1px dashed var(--line2);font-size:12.5px;font-weight:500;display:flex;align-items:center">By Friday ✎</span></div>
+          <div style="flex:1"></div>
+          <div style="background:var(--card);border-radius:14px;box-shadow:var(--sh1);padding:10px 10px 10px 14px;display:flex;align-items:center;gap:10px"><span style="flex:1;display:flex;flex-direction:column;line-height:1.2"><span style="font-family:var(--fH);font-weight:700;font-size:20px">About £2</span><span style="font-size:12px;color:var(--ink3)">asks before going over £5</span></span><span style="height:38px;padding:0 16px;border-radius:12px;background:var(--pri);color:var(--onPri);font-weight:700;font-size:14px;display:flex;align-items:center">Start →</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px"><h3 style="margin:0;font-family:var(--fH);font-weight:700;font-size:24px;letter-spacing:-.6px">Check the plan</h3><p style="margin:0;color:var(--ink2)">See what Tilo assumed and fix anything in place. The cost is in real money, before it starts.</p></div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);padding:28px;display:flex;flex-direction:column;gap:20px">
+        <span style="font-family:var(--mono);font-size:13px;color:var(--ink3)">03</span>
+        <div style="position:relative;height:180px;border-radius:20px;background:var(--cityBg);overflow:hidden">
+          <div style="position:absolute;inset:6px;filter:var(--cityFx)">{{ cSup }}</div>
+          <div style="position:absolute;left:10px;right:10px;bottom:10px;background:var(--card);border-radius:12px;box-shadow:var(--sh1);padding:8px 10px;font-size:13px;font-weight:500;display:flex;gap:8px;align-items:center"><span style="width:8px;height:8px;border-radius:99px;background:var(--mint);flex:none"></span>Brightcell replied with a price</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px"><h3 style="margin:0;font-family:var(--fH);font-weight:700;font-size:24px;letter-spacing:-.6px">Watch it happen</h3><p style="margin:0;color:var(--ink2)">Helpers move around their little city as they work. Every step is written in plain sentences.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width:1232px;margin:0 auto;padding:120px 32px 0;display:flex;flex-direction:column;gap:36px">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px">
+      <div style="display:flex;flex-direction:column;gap:10px;max-width:760px">
+        <span style="font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.5px">MEET THE TEAM</span>
+        <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:56px;line-height:1.02;letter-spacing:-2.4px">Six helpers. Each one good at one thing.</h2>
+      </div>
+      <p style="margin:0;font-size:17px;color:var(--ink2);max-width:360px">Tilo picks who you need for each job, so a quick question gets one helper and a launch gets the whole crew.</p>
+    </div>
+    <div style="position:relative;border-radius:36px;background:var(--cityBg);border:1px solid var(--cityLine);padding:56px 40px 0;overflow:hidden">
+      <div style="position:absolute;left:0;right:0;bottom:0;height:120px;background:var(--cityLine)"></div>
+      <div style="position:relative;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;align-items:end">
+        <sc-for list="{{ crew }}" as="c" hint-placeholder-count="6">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+            <span style="max-width:170px;min-height:58px;box-sizing:border-box;padding:10px 12px;border-radius:16px 16px 16px 4px;background:var(--card);box-shadow:var(--sh2);font-size:13.5px;font-weight:500;line-height:1.35;text-align:left">{{ c.say }}</span>
+            <dc-import name="Tilo S Buddy" role="{{ c.role }}" mood="{{ c.mood }}" size="{{ c.size }}" delay="{{ c.d }}" hint-size="100px,118px"></dc-import>
+            <span style="display:flex;flex-direction:column;align-items:center;padding:4px 0 26px;line-height:1.3"><span style="font-weight:700;font-size:16px">{{ c.n }}</span><span style="font-size:13px;color:var(--ink2)">{{ c.d2 }}</span></span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width:1232px;margin:0 auto;padding:120px 32px 0;display:flex;flex-direction:column;gap:40px">
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:780px">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.5px">ONE BOX, TWO SPEEDS</span>
+      <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:56px;line-height:1.02;letter-spacing:-2.4px">A quick answer, or a whole world.</h2>
+      <p style="margin:0;font-size:19px;color:var(--ink2)">Tilo picks the right size for the job. You can always switch.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px">
+      <div style="position:relative;background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);padding:32px;display:flex;flex-direction:column;gap:20px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px"><span style="height:26px;padding:0 10px;border-radius:99px;background:var(--priSoft);color:var(--priInk);font-family:var(--mono);font-size:11px;font-weight:600;display:flex;align-items:center">QUICK ANSWER · 1 HELPER</span><span style="font-family:var(--mono);font-size:12px;color:var(--ink3)">seconds · pennies</span></div>
+        <h3 style="margin:0;font-family:var(--fH);font-weight:700;font-size:32px;letter-spacing:-1px;line-height:1.1">Ask a question, get an answer</h3>
+        <div style="display:flex;gap:20px;align-items:flex-end">
+          <div style="flex:1;display:flex;flex-direction:column;gap:10px">
+            <span style="align-self:flex-end;background:var(--pri);color:var(--onPri);border-radius:16px 16px 4px 16px;padding:10px 14px;font-size:15px">Does this hotel include breakfast?</span>
+            <span style="align-self:flex-start;background:var(--sunk);border-radius:16px 16px 16px 4px;padding:10px 14px;font-size:15px">Yes, for 2 adults. Your son’s is ₹350 a day.</span>
+          </div>
+          <dc-import name="Tilo S Buddy" size="170" mood="talk" hint-size="144px,170px"></dc-import>
+        </div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);padding:32px;display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="height:26px;padding:0 10px;border-radius:99px;background:var(--sunk);color:var(--ink2);font-family:var(--mono);font-size:11px;font-weight:600;display:flex;align-items:center">WORLD · A SMALL TEAM</span><span style="font-family:var(--mono);font-size:12px;color:var(--ink3)">minutes · you approve the cost</span></div>
+        <h3 style="margin:0;font-family:var(--fH);font-weight:700;font-size:32px;letter-spacing:-1px;line-height:1.1">Hand over a job, watch it get done</h3>
+        <div style="height:220px;border-radius:20px;background:var(--cityBg);padding:8px;box-sizing:border-box"><div style="width:100%;height:100%;filter:var(--cityFx)">{{ cTown }}</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width:1232px;margin:0 auto;padding:120px 32px 0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center">
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.5px">APPROVE FROM ANYWHERE</span>
+      <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:56px;line-height:1.02;letter-spacing:-2.4px">Nothing important happens without a yes.</h2>
+      <p style="margin:0;font-size:19px;color:var(--ink2)">Tilo stops and asks before it does anything you can’t undo, and tells you exactly what will happen.</p>
+      <div style="display:flex;flex-direction:column;gap:12px;padding-top:6px">
+        <sc-for list="{{ rules }}" as="r" hint-placeholder-count="4"><span style="display:flex;align-items:center;gap:12px;font-size:17px;font-weight:500"><span style="width:28px;height:28px;border-radius:9px;background:var(--lime);color:#0B0B0C;display:flex;align-items:center;justify-content:center;flex:none">{{ iCheckS }}</span>{{ r }}</span></sc-for>
+      </div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh2);padding:28px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink3);font-weight:600"><span style="width:8px;height:8px;border-radius:99px;background:var(--amber)"></span>Compare 3 suppliers · needs you</div>
+      <div style="font-family:var(--fH);font-weight:700;font-size:28px;letter-spacing:-.8px;line-height:1.15">Can Tilo email 3 suppliers for a price?</div>
+      <div style="background:var(--amberSoft);border:1px solid var(--amberLine);border-radius:16px;padding:14px 16px;display:flex;gap:12px;align-items:center"><span style="width:40px;height:40px;border-radius:12px;background:var(--amber);color:#1A1407;display:flex;align-items:center;justify-content:center;flex:none">{{ iMail }}</span><span style="font-weight:600;font-size:16px">This will send an email to 3 people. Cost £0.30.</span></div>
+      <div style="display:flex;gap:8px"><span style="flex:1;height:52px;border-radius:16px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;justify-content:center;font-family:var(--fH);font-weight:700;font-size:17px">Yes, send them</span><span style="height:52px;padding:0 18px;border-radius:16px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600">Change</span><span style="height:52px;padding:0 18px;border-radius:16px;display:flex;align-items:center;font-weight:600;color:var(--redInk)">No</span></div>
+    </div>
+  </section>
+
+  <section style="max-width:1232px;margin:0 auto;padding:120px 32px 0;display:flex;flex-direction:column;gap:40px">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px">
+      <div style="display:flex;flex-direction:column;gap:10px;max-width:760px">
+        <span style="font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.5px">SKILLS</span>
+        <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:56px;line-height:1.02;letter-spacing:-2.4px">Skills that grow with you.</h2>
+        <p style="margin:0;font-size:19px;color:var(--ink2)">Dozens built in. Show Tilo how you like something done once, and it remembers.</p>
+      </div>
+      <span style="height:52px;padding:0 22px;border-radius:16px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600;flex:none">Browse all skills →</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">
+      <sc-for list="{{ skills }}" as="s" hint-placeholder-count="4">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh1);padding:22px;display:flex;flex-direction:column;gap:14px">
+          <span style="width:52px;height:52px;border-radius:16px;background:{{ s.bg }};color:{{ s.fg }};display:flex;align-items:center;justify-content:center">{{ s.ic }}</span>
+          <div style="display:flex;flex-direction:column;gap:4px"><span style="font-weight:700;font-size:17px">{{ s.n }}</span><span style="font-size:15px;color:var(--ink2)">{{ s.d }}</span></div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+
+  <section style="max-width:1232px;margin:0 auto;padding:120px 32px 0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center">
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.5px">MEETINGS WITH TILO</span>
+      <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:56px;line-height:1.02;letter-spacing:-2.4px">It joins, takes minutes, and follows up.</h2>
+      <p style="margin:0;font-size:19px;color:var(--ink2);max-width:520px">Send Tilo to any call. It gets a brief ready 15 minutes before, writes the minutes as you talk, and drafts the follow-ups for your yes.</p>
+    </div><div style="position:relative;height:400px;border-radius:32px;background:var(--card);border:1px solid var(--line);overflow:clip;padding:28px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;gap:16px;align-items:center"><div style="width:240px;height:180px;border-radius:18px;overflow:clip;flex:none;position:relative"><div style="position:absolute;left:-40px;top:-30px"><dc-import name="Tilo T Meet" pose="speak" hint-size="320px,240px"></dc-import></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:14px"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">MINUTES · LIVE</span><span style="animation:tLoopA 9s ease-in-out infinite">11:04 · Price settled at €74 a pack</span><span style="animation:tLoopB 9s ease-in-out infinite">11:09 · Ships 2 weeks after order</span><span style="animation:tLoopC 9s ease-in-out infinite">11:12 · Warranty terms in writing</span></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;animation:tLoopD 9s ease-in-out infinite"><span style="height:40px;padding:0 14px;border-radius:12px;background:var(--lime);color:#0B0B0C;display:flex;align-items:center;font-weight:700;font-size:14px">3 follow-ups drafted</span><span style="height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600;font-size:14px">Report pinned to the team board</span></div>
+      <div style="display:flex;gap:10px;margin-top:auto;font-family:var(--mono);font-size:12px;color:var(--ink3)"><span>JOINS</span><span>·</span><span>TAKES MINUTES</span><span>·</span><span>FOLLOWS UP</span></div>
+    </div>
+  </section>
+  <section style="max-width:1232px;margin:0 auto;padding:120px 32px 0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center">
+    <div style="position:relative;height:400px;border-radius:32px;background:var(--card);border:1px solid var(--line);overflow:clip;background:var(--cityBg)">
+      <div style="position:absolute;inset:40px 40px 70px;filter:var(--cityFx)">{{ cTeam }}</div>
+      <div style="position:absolute;left:24px;top:24px;display:flex;flex-direction:column;gap:8px">
+        <span style="height:40px;padding:0 14px 0 6px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;animation:tLoopA 8s ease-in-out infinite"><span style="width:28px;height:28px;border-radius:99px;background:var(--skySoft);color:var(--skyInk);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">JO</span>Jo is watching the Q3 deck</span>
+        <span style="height:40px;padding:0 14px 0 6px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;animation:tLoopB 8s ease-in-out infinite"><span style="width:28px;height:28px;border-radius:99px;background:var(--tealSoft);color:var(--tealInk);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">OB</span>Oskar approved the supplier email</span>
+        <span style="height:40px;padding:0 14px 0 6px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;animation:tLoopC 8s ease-in-out infinite"><span style="width:28px;height:28px;border-radius:99px;background:var(--lilacSoft);color:var(--lilacInk);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">MR</span>Maya shared Porto offsite with 4 people</span>
+      </div>
+      <div style="position:absolute;left:24px;right:24px;bottom:20px;display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--ink2)"><span>OWNER · MEMBER</span><span>ONE CREDIT CAP</span><span>SHARED WORLDS</span></div>
+    </div><div style="display:flex;flex-direction:column;gap:16px">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.5px">TEAMS AND SHARED WORLDS</span>
+      <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:56px;line-height:1.02;letter-spacing:-2.4px">One town for the whole team.</h2>
+      <p style="margin:0;font-size:19px;color:var(--ink2);max-width:520px">Share a world and everyone sees the same city, the same story and the same approvals. Owners set one credit cap for all.</p>
+    </div>
+  </section>
+  <section style="max-width:1232px;margin:0 auto;padding:120px 32px 0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center">
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.5px">PIN BOARDS AND AGENDA</span>
+      <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:56px;line-height:1.02;letter-spacing:-2.4px">Your week, and the bits worth keeping.</h2>
+      <p style="margin:0;font-size:19px;color:var(--ink2);max-width:520px">Pin anything from a result with one click. Your agenda shows which meetings Tilo joins and what it has ready.</p>
+    </div><div style="position:relative;height:400px;border-radius:32px;background:var(--card);border:1px solid var(--line);overflow:clip;padding:28px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;gap:8px">{{ dayStrip }}</div>
+      <div style="position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding-top:8px">
+        <div style="min-height:130px;padding:14px;border-radius:6px 6px 18px 6px;background:var(--amberSoft);transform:rotate(-2deg);display:flex;flex-direction:column;gap:6px"><strong style="font-size:15px">Brightcell: €74 a pack</strong><span style="font-size:12.5px;color:var(--ink2)">from Compare 3 suppliers</span></div>
+        <div style="min-height:130px;padding:14px;border-radius:6px 6px 18px 6px;background:var(--priSoft);transform:rotate(1.5deg);display:flex;flex-direction:column;gap:6px;animation:tDrag 5s cubic-bezier(.45,0,.2,1) infinite;box-shadow:var(--sh3);z-index:2"><strong style="font-size:15px">Porto: Casa do Rio</strong><span style="font-size:12.5px;color:var(--ink2)">pinned from a world</span></div>
+        <div style="min-height:130px;padding:14px;border-radius:6px 6px 18px 6px;background:var(--skySoft);transform:rotate(-1deg);display:flex;flex-direction:column;gap:6px"><strong style="font-size:15px">Call Lin back</strong><span style="font-size:12.5px;color:var(--ink2)">before Friday</span></div>
+      </div>
+      <span style="margin-top:auto;font-family:var(--mono);font-size:12px;color:var(--ink3)">PIN FROM ANY RESULT · DRAG TO REORDER · MINE OR THE TEAM’S</span>
+    </div>
+  </section>
+  <section style="max-width:1232px;margin:0 auto;padding:120px 32px 0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center">
+    <div style="position:relative;height:400px;border-radius:32px;background:var(--card);border:1px solid var(--line);overflow:clip;padding:28px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-content:center">
+      {{ connTiles }}
+    </div><div style="display:flex;flex-direction:column;gap:16px">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.5px">CONNECTORS</span>
+      <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:56px;line-height:1.02;letter-spacing:-2.4px">Works with the apps you already use.</h2>
+      <p style="margin:0;font-size:19px;color:var(--ink2);max-width:520px">Each connection says in plain words what Tilo may do. Reading is fine; sending, paying and sharing always ask first.</p>
+    </div>
+  </section>
+  <section style="max-width:1232px;margin:0 auto;padding:120px 32px 0;display:flex;flex-direction:column;gap:32px">
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:780px"><span style="font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.5px">FOR YOU, AND FOR YOUR COMPANY</span><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:56px;line-height:1.02;letter-spacing:-2.4px">Personal help, team-grade control.</h2></div>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px">
+      <div style="border-radius:28px;background:var(--card);border:1px solid var(--line);padding:30px;display:flex;flex-direction:column;gap:16px"><div style="display:flex;align-items:center;gap:12px"><dc-import name="Tilo S Buddy" size="64" mood="happy" hint-size="54px,64px"></dc-import><span style="font-family:var(--fH);font-weight:700;font-size:28px;letter-spacing:-.8px">Personal</span></div><sc-for list="{{ perso }}" as="x" hint-placeholder-count="4"><span style="display:flex;gap:12px;align-items:center;font-size:16.5px"><span style="width:26px;height:26px;border-radius:8px;background:var(--lime);color:#0B0B0C;display:flex;align-items:center;justify-content:center;flex:none">{{ iCheckS }}</span>{{ x }}</span></sc-for></div>
+      <div style="border-radius:28px;background:#0B0B0C;color:#F4F4F2;padding:30px;display:flex;flex-direction:column;gap:16px"><div style="display:flex;align-items:center;gap:12px"><div style="display:flex;align-items:flex-end"><dc-import name="Tilo S Buddy" size="52" role="research" mood="idle" hint-size="44px,52px"></dc-import><dc-import name="Tilo S Buddy" size="64" mood="idle" hint-size="54px,64px"></dc-import><dc-import name="Tilo S Buddy" size="52" role="finance" mood="idle" delay="-1" hint-size="44px,52px"></dc-import></div><span style="font-family:var(--fH);font-weight:700;font-size:28px;letter-spacing:-.8px">Enterprise</span></div><sc-for list="{{ ent }}" as="x" hint-placeholder-count="4"><span style="display:flex;gap:12px;align-items:center;font-size:16.5px"><span style="width:26px;height:26px;border-radius:8px;background:#C8F23A;color:#0B0B0C;display:flex;align-items:center;justify-content:center;flex:none">{{ iCheckS }}</span>{{ x }}</span></sc-for></div>
+    </div>
+  </section>
+  <section style="max-width:1232px;margin:0 auto;padding:120px 32px 0;display:flex;flex-direction:column;gap:32px">
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:780px"><span style="font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.5px">WHY TILO</span><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:56px;line-height:1.02;letter-spacing:-2.4px">Honest by design.</h2></div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">
+      <div style="border-radius:28px;background:var(--card);border:1px solid var(--line);padding:26px;display:flex;flex-direction:column;gap:16px"><div style="height:150px;border-radius:18px;background:var(--sunk);padding:16px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;font-family:var(--mono);font-size:12px"><span style="animation:tLoopA 7s infinite"><span style="color:var(--limeK)">building.constructing</span> → scaffold rises</span><span style="animation:tLoopB 7s infinite"><span style="color:var(--limeK)">agent.handoff</span> → bots meet, note shown</span><span style="animation:tLoopC 7s infinite"><span style="color:var(--limeK)">artifact.delivered</span> → parcel lands</span></div><h3 style="margin:0;font-family:var(--fH);font-weight:700;font-size:24px;letter-spacing:-.6px">Honest progress</h3><p style="margin:0;color:var(--ink2)">Nothing in your city moves unless something really happened. No fake progress bars, ever.</p></div>
+      <div style="border-radius:28px;background:var(--card);border:1px solid var(--line);padding:26px;display:flex;flex-direction:column;gap:16px"><div style="height:150px;border-radius:18px;background:var(--amberSoft);display:flex;align-items:center;justify-content:center;gap:12px"><dc-import name="Tilo S Buddy" size="96" role="connector" mood="hand" hint-size="81px,96px"></dc-import><span style="height:44px;padding:0 16px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;font-weight:700;animation:tPulse 1.6s ease-out infinite">Approve</span></div><h3 style="margin:0;font-family:var(--fH);font-weight:700;font-size:24px;letter-spacing:-.6px">Approvals for risky steps</h3><p style="margin:0;color:var(--ink2)">Sending, paying, booking and sharing wait for you, with the exact text and the risk in plain words.</p></div>
+      <div style="border-radius:28px;background:var(--card);border:1px solid var(--line);padding:26px;display:flex;flex-direction:column;gap:16px"><div style="height:150px;border-radius:18px;background:var(--sunk);padding:20px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;gap:10px"><div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600"><span>76 of 120 credits</span><span style="color:var(--ink3)">your cap</span></div><div style="height:10px;border-radius:9px;background:var(--card);overflow:hidden"><div style="height:100%;border-radius:9px;background:var(--ink);animation:tsProg 14s ease-in-out infinite"></div></div><span style="font-size:13px;color:var(--ink2)">Asks before it goes over. Every step shows what it cost.</span></div><h3 style="margin:0;font-family:var(--fH);font-weight:700;font-size:24px;letter-spacing:-.6px">Credits you control</h3><p style="margin:0;color:var(--ink2)">See the cost before a world starts, watch it as it runs, and set a cap Tilo never crosses.</p></div>
+    </div>
+  </section>
+
+  <section style="max-width:1296px;margin:0 auto;padding:120px 32px 0;display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:780px;padding:0 0 4px">
+      <span style="font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.5px">A DAY IN YOUR TOWN</span>
+      <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:56px;line-height:1.02;letter-spacing:-2.4px">While you get on with your day.</h2>
+    </div>
+    <div style="position:relative;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px">
+      <div style="position:absolute;left:4%;right:4%;top:27px;border-top:2px dashed var(--line2)"></div>
+      <sc-for list="{{ day }}" as="d" hint-placeholder-count="5">
+        <div style="position:relative;display:flex;flex-direction:column;gap:14px">
+          <span style="align-self:flex-start;height:56px;padding:0 16px 0 8px;border-radius:99px;background:{{ d.bg }};color:{{ d.fg }};border:1px solid var(--line);display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:14px;font-weight:600"><span style="width:40px;height:40px;border-radius:99px;background:{{ d.ibg }};color:{{ d.ifg }};display:flex;align-items:center;justify-content:center">{{ d.ic }}</span>{{ d.time }}</span>
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:var(--sh1);padding:18px;display:flex;flex-direction:column;gap:6px;min-height:150px;box-sizing:border-box"><span style="font-weight:700;font-size:16px;line-height:1.3">{{ d.t }}</span><span style="font-size:14px;color:var(--ink2)">{{ d.s }}</span><div style="flex:1"></div><span style="font-family:var(--mono);font-size:11.5px;color:var(--ink3)">{{ d.m }}</span></div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="position:relative;padding:120px 0 0;display:flex;flex-direction:column;gap:12px;overflow:hidden"><span style="position:absolute;left:0;top:0;bottom:0;width:160px;z-index:1;background:linear-gradient(90deg,var(--bg),transparent)"></span><span style="position:absolute;right:0;top:0;bottom:0;width:160px;z-index:1;background:linear-gradient(270deg,var(--bg),transparent)"></span>
+    <div style="text-align:center;font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:.5px;padding-bottom:12px">THINGS PEOPLE HANDED TO TILO THIS WEEK</div>
+    <div style="display:flex;gap:12px;width:max-content;will-change:transform;animation:tsMarq 60s linear infinite">
+      <sc-for list="{{ asks1 }}" as="a" hint-placeholder-count="10"><span style="height:60px;padding:0 24px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;font-family:var(--fH);font-weight:600;font-size:20px;letter-spacing:-.4px;white-space:nowrap">{{ a }}</span></sc-for>
+    </div>
+    <div style="display:flex;gap:12px;width:max-content;will-change:transform;animation:tsMarqR 70s linear infinite">
+      <sc-for list="{{ asks2 }}" as="a" hint-placeholder-count="10"><span style="height:60px;padding:0 24px;border-radius:99px;background:{{ a.bg }};color:{{ a.fg }};display:flex;align-items:center;font-family:var(--fH);font-weight:600;font-size:20px;letter-spacing:-.4px;white-space:nowrap">{{ a.t }}</span></sc-for>
+    </div>
+  </section>
+
+  <section style="max-width:1296px;margin:0 auto;padding:120px 32px 0">
+    <div style="position:relative;border-radius:36px;background:#0B0B0C;color:#F4F4F2;padding:72px 64px;display:flex;align-items:center;gap:48px;overflow:hidden">
+      <div style="flex:1;display:flex;flex-direction:column;gap:20px">
+        <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:64px;line-height:1;letter-spacing:-2.8px">Your little city<br>is waiting.</h2>
+        <p style="margin:0;font-size:19px;color:#C2C2C6;max-width:520px">Free to try. Bring one job you’ve been putting off and see what your team does with it.</p>
+        <div style="display:flex;gap:12px">
+          <span style="height:60px;padding:0 26px 0 10px;border-radius:18px;background:#C8F23A;color:#0B0B0C;display:flex;align-items:center;gap:14px;font-family:var(--fH);font-weight:700;font-size:18px"><span style="width:40px;height:40px;border-radius:12px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;font-weight:800">G</span>Continue with Google</span>
+          <span style="height:60px;padding:0 26px;border-radius:18px;border:1px solid #36363B;display:flex;align-items:center;font-family:var(--fH);font-weight:700;font-size:18px">Explore a demo →</span>
+        </div>
+      </div>
+      <dc-import name="Tilo S Buddy" size="280" mood="happy" hint-size="237px,280px"></dc-import>
+    </div>
+  </section>
+
+  <footer style="max-width:1232px;margin:0 auto;padding:72px 32px 56px;display:flex;align-items:flex-start;gap:48px;color:var(--ink2);font-size:15px">
+    <div style="flex:1;display:flex;flex-direction:column;gap:10px"><span style="font-family:var(--fH);font-weight:800;font-size:24px;letter-spacing:-1px;color:var(--ink)">tilo</span><span>Describe the work. Watch your team do it.</span><span style="font-family:var(--mono);font-size:12px;color:var(--ink3)">© 2026 Tilo</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px"><span style="font-weight:600;color:var(--ink)">Product</span><span>How it works</span><span>Skills</span><span>Pricing</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px"><span style="font-weight:600;color:var(--ink)">Trust</span><span>Safety</span><span>Privacy</span><span>Status</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px"><span style="font-weight:600;color:var(--ink)">Company</span><span>About</span><span>Careers</span><span>Contact</span></div>
+  </footer>
+</sc-if>
+<sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}">
+  <header style="height:56px;box-sizing:border-box;padding:0 16px;display:flex;align-items:center;gap:10px;margin-top:44px">
+    <div style="width:32px;height:32px;border-radius:10px;background:var(--pri);display:flex;align-items:center;justify-content:center"><div style="width:19px;height:10px;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;gap:4px"><div style="width:3px;height:3px;border-radius:9px;background:#0B0B0C"></div><div style="width:3px;height:3px;border-radius:9px;background:#0B0B0C"></div></div></div>
+    <div style="font-family:var(--fH);font-weight:800;font-size:22px;letter-spacing:-1px;flex:1">tilo</div>
+    <a href="#" style="height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:600;font-size:14px">Sign in</a>
+  </header>
+  <section style="padding:24px 16px 0;display:flex;flex-direction:column;gap:16px">
+    <h1 style="margin:0;font-family:var(--fH);font-weight:700;font-size:46px;line-height:.98;letter-spacing:-2px">Describe the work. <span style="background:linear-gradient(transparent 62%,var(--lime) 62%,var(--lime) 92%,transparent 92%)">Watch your team do it.</span></h1>
+    <p style="margin:0;font-size:17px;color:var(--ink2)">A tiny city of AI helpers plans it, does it, and checks with you before anything important.</p>
+    <div style="background:var(--card);border:1px solid var(--line2);border-radius:20px;padding:12px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--sh2)"><div style="display:flex;align-items:center;gap:10px"><dc-import name="Tilo S Buddy" size="40" mood="talk" hint-size="34px,40px"></dc-import><div style="flex:1;height:26px;overflow:hidden;font-family:var(--fH);font-weight:600;font-size:17px;line-height:26px;color:var(--ink2)"><div style="animation:tsCycle 12s cubic-bezier(.7,0,.2,1) infinite"><div>Plan our team offsite</div><div>Research 5 competitors</div><div>Reply to Lin, nicely</div><div>Summarise these 40 pages</div></div></div></div><span style="height:48px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;font-weight:700">Try it → sign in</span></div>
+    <span style="height:52px;border-radius:16px;background:var(--card);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;gap:10px;font-weight:700"><span style="width:32px;height:32px;border-radius:10px;background:var(--sunk);display:flex;align-items:center;justify-content:center;font-weight:800">G</span>Continue with Google</span>
+    <div style="position:relative;height:300px;border-radius:24px;background:var(--cityBg);border:1px solid var(--cityLine);overflow:clip">
+      <div style="position:absolute;inset:16px 8px 60px;filter:var(--cityFx)"><div style="position:absolute;inset:0;animation:tsS1 14s ease-in-out infinite">{{ c1 }}</div><div style="position:absolute;inset:0;animation:tsS2 14s ease-in-out infinite">{{ c2 }}</div><div style="position:absolute;inset:0;animation:tsS3 14s ease-in-out infinite">{{ c3 }}</div><div style="position:absolute;inset:0;animation:tsS4 14s ease-in-out infinite">{{ c4 }}</div></div>
+      <div style="position:absolute;left:12px;right:12px;bottom:12px;background:var(--card);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600">Road trip to Gokarna</span><div style="height:6px;border-radius:9px;background:var(--sunk);overflow:hidden"><div style="height:100%;background:var(--pri);width:3%;animation:tsProg 14s ease-in-out infinite"></div></div></div>
+    </div>
+  </section>
+  <sc-for list="{{ mSecs }}" as="s" hint-placeholder-count="8">
+    <section style="padding:56px 16px 0;display:flex;flex-direction:column;gap:12px">
+      <span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.5px">{{ s.e }}</span>
+      <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:32px;line-height:1.04;letter-spacing:-1.2px">{{ s.t }}</h2>
+      <p style="margin:0;font-size:16px;color:var(--ink2)">{{ s.b }}</p>
+      <div style="height:150px;border-radius:22px;background:{{ s.bg }};border:1px solid var(--line);display:flex;align-items:flex-end;justify-content:center;gap:6px;overflow:clip;position:relative"><span style="position:absolute;left:14px;top:14px;height:34px;padding:0 12px;border-radius:99px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;animation:tLoopA 8s ease-in-out infinite">{{ s.ic }}{{ s.chip }}</span><dc-import name="Tilo S Buddy" role="{{ s.role }}" mood="{{ s.mood }}" size="96" hint-size="81px,96px"></dc-import></div>
+    </section>
+  </sc-for>
+  <section style="padding:56px 16px 40px">
+    <div style="border-radius:28px;background:#0B0B0C;color:#F4F4F2;padding:28px 22px;display:flex;flex-direction:column;gap:14px;align-items:flex-start"><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:36px;line-height:1;letter-spacing:-1.4px">Your little city is waiting.</h2><span style="height:52px;padding:0 20px;border-radius:16px;background:#C8F23A;color:#0B0B0C;display:flex;align-items:center;font-weight:700">Continue with Google</span><dc-import name="Tilo S Buddy" size="120" mood="happy" hint-size="102px,120px"></dc-import></div>
+  </section>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:9200},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloR || !window.TiloT) this.t = setInterval(() => { if (window.TiloR && window.TiloCity && window.TiloT) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const R = window.TiloR ? window.TiloR(React.createElement) : null;
+    const theme = this.props.theme ?? 'studio', desk = (this.props.device ?? 'desktop') === 'desktop';
+    const TT = window.TiloT, tic = (n, s) => TT ? TT.ic(React.createElement, n, s) : null;
+    const c = show => R ? R.city('tripDone', { labels: false, tags: true, show }) : null;
+    const ic = (n, s) => R ? R.ic(n, s) : null;
+    return {
+      theme, desk, phone: !desk,
+      cTeam: R ? R.city('town', { labels: false, tags: true, seed: 5 }) : null,
+      dayStrip: [['9:30', 'Standup', 'Tilo joins'], ['11:00', 'Supplier call', 'Brief ready'], ['14:00', 'Due: Q3 deck', '80% done']].map(([a, b, c], k) => React.createElement('div', { key: k, style: { flex: 1, borderRadius: 14, border: '1px solid ' + (k === 1 ? 'var(--ink)' : 'var(--line)'), padding: '8px 10px', display: 'flex', flexDirection: 'column', lineHeight: 1.3 } }, React.createElement('span', { style: { fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink3)' } }, a), React.createElement('span', { style: { fontWeight: 700, fontSize: 14 } }, b), React.createElement('span', { style: { fontSize: 12, color: 'var(--ink3)' } }, c))),
+      connTiles: ['Gmail', 'Calendar', 'Drive', 'Sheets', 'Slack', 'GitHub', 'Figma', 'Any website'].map((n, k) => React.createElement('div', { key: n, style: { height: 120, borderRadius: 18, border: '1px solid var(--line)', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, animation: k % 3 === 0 ? 'tLoopA 6s ease-in-out ' + (k * .3) + 's infinite' : 'none' } }, React.createElement('span', { style: { width: 44, height: 44, borderRadius: 12, border: '1.5px dashed var(--line2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--ink3)' } }, 'LOGO'), React.createElement('span', { style: { fontSize: 13, fontWeight: 600 } }, n), React.createElement('span', { style: { fontSize: 11, fontWeight: 700, color: k < 6 ? 'var(--mintInk)' : 'var(--ink3)' } }, k < 6 ? '● Connected' : 'Connect'))),
+      perso: ['Inbox, errands and trips off your plate', 'Quick answers in seconds', 'Skills that learn how you like things', 'A monthly credit cap you choose'],
+      ent: ['Owner and Member roles', 'Shared worlds, pins and approvals', 'One team credit cap, per-step costs', 'A full event log of every step'],
+      mSecs: [['WATCH IT GET BUILT', 'A city that builds your job', 'Every building is a piece of the work, with a label and a status.', 'research', 'work', 'var(--cityBg)', 'Building: venue research', 'city'], ['APPROVE FROM ANYWHERE', 'Nothing important without a yes', 'Exact text, the risk in plain words, the cost.', 'connector', 'hand', 'var(--amberSoft)', 'Send 12 invites?', 'inbox'], ['SKILLS', 'Skills that grow with you', 'Show Tilo once and it remembers.', 'designer', 'happy', 'var(--lilacSoft)', 'New skill: Chase invoices', 'wand'], ['MEETINGS', 'Joins, takes minutes, follows up', 'A brief before, minutes during, follow-ups after.', 'director', 'talk', 'var(--priSoft)', 'Minutes: 3 decisions', 'people'], ['TEAMS', 'One town for the whole team', 'Shared worlds, pins and one credit cap.', 'research', 'idle', 'var(--skySoft)', 'Jo is watching', 'people'], ['PINS AND AGENDA', 'Your week, and what’s worth keeping', 'Pin from any result in one click.', 'builder', 'idle', 'var(--sunk)', 'Pinned: Casa do Rio', 'pin'], ['CONNECTORS', 'Works with your apps', 'Each one says what Tilo may do.', 'browser', 'work', 'var(--tealSoft)', '6 apps connected', 'plug'], ['WHY TILO', 'Honest by design', 'Real events only, approvals for risky steps, credits you control.', 'finance', 'happy', 'var(--mintSoft)', '76 of 120 credits', 'credit']].map(([e, tt, b, role, mood, bg, chip, i]) => ({ e, t: tt, b, role: role === 'director' ? 'director' : role, mood, bg, chip, ic: tic(i, 15) })),
+      c1: c(['hall']), c2: c(['hall', 'research']), c3: c(['hall', 'research', 'analysis']), c4: c(['hall', 'research', 'analysis', 'delivery']),
+      cSup: R ? R.city('suppliers', { labels: false, tags: false }) : null, cTown: R ? R.city('town', { labels: false, tags: true, seed: 5 }) : null,
+      aDir: R ? R.agent(null, 'focused', 36, 'director') : null, aRes: R ? R.agent('research', 'delighted', 36) : null,
+      iCheck: ic('check', 20), iCheckS: ic('check', 16), iMail: ic('mail', 20),
+      live: (() => { const L = [['Researcher', 'found 5 hidden beaches', 'Gokarna', 'research', 'sky'], ['Writer', 'drafted a thank-you to Lin', 'Bristol', 'designer', 'lilac'], ['Money keeper', 'matched 41 invoices', 'Leeds', 'finance', 'mint'], ['Planner', 'booked a 2-hour focus block', 'Lisbon', 'builder', 'amber'], ['Messenger', 'is waiting for a yes', 'Pune', 'connector', 'pink'], ['Director', 'split a launch into 4 parts', 'Austin', null, 'pri']].map(([who, t, w, r, c]) => ({ who, t, w: w.toUpperCase(), bg: `var(--${c}Soft)`, av: R ? R.agent(r, 'delighted', 26, r ? undefined : 'director') : null })); return L.concat(L); })(),
+      score: [['Price a pack', '£78', '£71', '£83', 0, 1, 0], ['Warranty', '3 years', '2 years', '3 years', 1, 0, 1], ['Ships in', '2 weeks', '6 weeks', '3 weeks', 1, 0, 0], ['Replied', 'Same day', '2 days', 'Same day', 1, 0, 1]].map(([k, a, b, c, x, y, z]) => ({ k, a, b, c, w1: x ? 700 : 400, w2: y ? 700 : 400, w3: z ? 700 : 400 })),
+      crew: [['director', 'Director', 'Plans the work', 'I’ll split this into 4 parts.', 'talk', 118], ['research', 'Researcher', 'Finds and checks', 'Found 5 that aren’t on any list!', 'happy', 104], ['designer', 'Writer', 'Words that sound like you', 'Draft’s ready, short and warm.', 'idle', 104], ['builder', 'Planner', 'Routes and schedules', 'Coastal road. Skips the ghat.', 'think', 104], ['finance', 'Money keeper', 'Prices and budgets', 'That’s £2 under your cap.', 'idle', 104], ['connector', 'Messenger', 'Talks to your apps', 'Can I send it? Just say yes.', 'talk', 104]].map(([role, n, d2, say, mood, size], i) => ({ role, n, d2, say, mood, size: String(size), d: String(-i * .6) })),
+      day: [['8:00', 'Inbox sorted', '23 emails read. 3 need you, the rest are filed.', 'MESSENGER · £0.06', 'mail', 'pink'], ['10:30', 'Brief for your 11:00', 'Oskar quoted £71 on the phone but £78 in writing.', 'DIRECTOR · £0.04', 'doc', 'pri'], ['13:00', 'Quotes compared', '3 suppliers, 1 page, a clear winner.', 'MONEY KEEPER · £1.84', 'chart', 'mint'], ['16:00', 'Friday update written', 'Thanked Jo for the pricing table.', 'WRITER · £0.09', 'people', 'lilac'], ['22:00', 'Overnight job', 'Checking 12 hotels while you sleep.', 'RESEARCHER · RUNNING', 'clock', 'sky']].map(([time, t, s, m, i, c], k) => ({ time, t, s, m, ic: ic(i, 18), ibg: `var(--${c}Soft)`, ifg: `var(--${c}Ink)`, bg: k === 4 ? 'var(--ink)' : 'var(--card)', fg: k === 4 ? 'var(--card)' : 'var(--ink)' })),
+      asks1: (() => { const A = ['Plan our team offsite in Porto', 'Find a cheaper broadband deal', 'Reply to every review from last week', 'Turn this PDF into 5 slides', 'Chase the 3 overdue invoices', 'Find a dentist open on Saturdays']; return A.concat(A); })(),
+      asks2: (() => { const A = [['Compare 3 suppliers', 'lime'], ['Book a table for 6 on Friday', 'sky'], ['Draft a job post for a designer', 'lilac'], ['Summarise yesterday’s calls', 'mint'], ['Plan a road trip to Gokarna', 'amber'], ['Write a kind no to this request', 'pink']].map(([t, c]) => ({ t, bg: c === 'lime' ? 'var(--lime)' : `var(--${c}Soft)`, fg: c === 'lime' ? '#0B0B0C' : `var(--${c}Ink)` })); return A.concat(A); })(),
+      rules: ['Asks before sending, buying, sharing or booking', 'Shows the cost in money, before and as it goes', 'Never goes over the cap you set', 'Every step written down, so you can check it'],
+      skills: [['Find hidden gems', 'Digs past top-10 lists for places locals love.', 'search', 'sky'], ['Compare options', 'Lines up choices side by side and picks a winner.', 'chart', 'teal'], ['Write a friendly reply', 'Drafts a reply in your voice, ready to send.', 'mail', 'lilac'], ['Teach your own', 'Show Tilo once. It turns it into a skill.', 'cap', 'pri']].map(([n, d, i, k]) => ({ n, d, ic: ic(i, 26), bg: `var(--${k}Soft)`, fg: `var(--${k}Ink)` }))
+    };
+  }
+}
+</script>
+</body>
+</html>

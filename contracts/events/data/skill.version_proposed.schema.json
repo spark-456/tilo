@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/skill.version_proposed.schema.json",
+  "x-version": "1.0.0",
+  "title": "SkillVersionProposedData",
+  "description": "data of skill.version_proposed (registry 1.4.0, ADR-0034, FR-SKL-02): Tilo restated a draft as plan steps, with at most one question and the estimates code worked out. The actor is the person who asked for it; credits and trace name the skill_capture role. Envelope as TS-11. Counts and the estimate only, never step text.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["skill", "version", "steps", "asks", "question", "credits_per_run", "source"],
+  "properties": {
+    "skill": { "$ref": "../../taught_skill.schema.json#/$defs/id" },
+    "version": { "type": "integer", "minimum": 1 },
+    "steps": { "$ref": "../../taught_skill.schema.json#/$defs/step_number" },
+    "asks": { "$ref": "../../taught_skill.schema.json#/$defs/count" },
+    "question": {
+      "description": "true when the version asks one clarifying question.",
+      "type": "boolean"
+    },
+    "credits_per_run": { "$ref": "../../common.schema.json#/$defs/credits" },
+    "source": { "type": "string", "enum": ["ledger", "prior"] }
+  }
+}

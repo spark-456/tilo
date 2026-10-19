@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-t.css">
+<script src="./tilo-t.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" data-screen-label="Connectors" style="position:relative;width:100%;height:{{ H }};overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:15px;line-height:1.5;display:flex;flex-direction:column">
+  <dc-import name="Tilo T Nav" active="connectors" device="{{ navD }}" theme="{{ theme }}" hint-size="100%,64px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <div aria-hidden="true" style="flex:1 1 0;min-width:0;background-image:var(--doodle);background-size:280px 280px"></div>
+    <main style="flex:0 1 1200px;min-width:0;box-sizing:border-box;padding:{{ pad }};display:flex;flex-direction:column;gap:18px;overflow:hidden">
+      <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;flex:none">
+        <div style="flex:1;min-width:220px;display:flex;flex-direction:column"><h1 style="margin:0;font-weight:700;font-size:{{ h1 }};letter-spacing:-1.2px;line-height:1.05">Connectors</h1><span style="color:var(--ink2);font-size:14px">{{ sub }}</span></div>
+        <span style="height:44px;width:240px;max-width:100%;box-sizing:border-box;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;gap:8px;color:var(--ink3);font-size:14px">{{ iSearch }}Search 40+ apps</span>
+      </div>
+      <sc-if value="{{ error }}" hint-placeholder-val="{{ false }}">
+        <div role="alert" style="flex:none;border-radius:18px;border:1px solid var(--redInk);background:var(--redSoft);padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="color:var(--redInk)">{{ iAlert }}</span><span style="flex:1;min-width:220px;font-size:14px"><strong>Google Calendar needs you to sign in again.</strong> Until then Tilo can’t read your agenda or prepare meeting briefs.</span><span role="button" style="height:40px;padding:0 14px;border-radius:10px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;font-weight:700;font-size:13.5px">Reconnect</span></div>
+      </sc-if>
+      <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T State" kind="loading" layout="grid" caption="Checking your connections" hint-size="100%,520px"></dc-import></sc-if>
+      <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:none;border-radius:24px;background:var(--card);border:1px dashed var(--line2);padding:18px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap"><dc-import name="Tilo S Buddy" size="72" mood="talk" hint-size="61px,72px"></dc-import><span style="flex:1;min-width:240px;display:flex;flex-direction:column"><span style="font-weight:700;font-size:18px">Nothing connected yet</span><span style="font-size:14px;color:var(--ink2)">Tilo can still research the web. Connect Gmail and Calendar first: they unlock replies, briefs and meeting notes.</span></span><span role="button" style="height:44px;padding:0 16px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;font-weight:700;font-size:14px">Connect Google Workspace</span></div>
+      </sc-if>
+      <sc-if value="{{ grid }}" hint-placeholder-val="{{ true }}">
+        <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+          <section style="flex:none;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:baseline;gap:8px"><h2 style="margin:0;font-weight:700;font-size:18px;letter-spacing:-.3px">{{ g.t }}</h2><span style="font-size:12.5px;color:var(--ink3)">{{ g.n }}</span></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax({{ minC }},1fr));gap:10px">
+              <sc-for list="{{ g.items }}" as="c" hint-placeholder-count="4">
+                <div style="border-radius:20px;background:var(--card);border:1px solid {{ c.bd }};padding:14px;display:flex;flex-direction:column;gap:10px">
+                  <div style="display:flex;align-items:center;gap:10px"><span aria-label="{{ c.n }} logo" style="width:44px;height:44px;border-radius:12px;border:1.5px dashed var(--line2);background:var(--bg);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;color:var(--ink3);flex:none">LOGO</span><span style="flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25"><span style="font-weight:700;font-size:14.5px">{{ c.n }}</span><span style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:{{ c.sf }}"><span style="width:7px;height:7px;border-radius:9px;background:{{ c.sd }};animation:{{ c.pulse }}"></span>{{ c.s }}</span></span></div>
+                  <span style="font-size:12.5px;color:var(--ink2);line-height:1.45;min-height:36px">{{ c.can }}</span>
+                  <span role="button" style="height:40px;border-radius:11px;border:1px solid {{ c.btnBd }};background:{{ c.btnBg }};color:{{ c.btnFg }};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13.5px">{{ c.btn }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+        </sc-for>
+      </sc-if>
+    </main>
+    <div aria-hidden="true" style="flex:1 1 0;min-width:0;background-image:var(--doodle);background-size:280px 280px;background-position:140px 60px"></div>
+  </div>
+  <sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}"><dc-import name="Tilo T Nav" active="connectors" device="tabs" theme="{{ theme }}" hint-size="100%,84px"></dc-import></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ready&quot;,&quot;running&quot;,&quot;loading&quot;,&quot;empty&quot;,&quot;error&quot;],&quot;default&quot;:&quot;ready&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloT) this.t = setInterval(() => { if (window.TiloT) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const T = window.TiloT, ic = (n, s) => T ? T.ic(React.createElement, n, s) : null;
+    const p = this.props, d = (p.device ?? 'desktop') === 'desktop', s = p.state ?? 'ready';
+    const G = [
+      ['Google Workspace', [['Gmail', 'on', 'Read and sort mail, draft replies. Sends only after you say yes.'], ['Google Calendar', s === 'error' ? 'warn' : 'on', 'See your week, prepare briefs, find free time.'], ['Google Drive', 'on', 'Find and read files you point it to.'], ['Google Sheets', s === 'running' ? 'busy' : 'on', 'Read and build sheets, like budgets and trackers.'], ['Google Docs', 'off', 'Write first drafts and meeting reports.'], ['Google Meet', 'on', 'Join as notetaker, write minutes, follow up.']]],
+      ['Communication', [['Slack', 'on', 'Post summaries to channels you choose. Asks before DMs.'], ['Microsoft Teams', 'off', 'Read and reply in chats you share with Tilo.'], ['Zoom', 'off', 'Join calls as a notetaker.']]],
+      ['Build', [['GitHub', 'on', 'Read code, open pull requests. Never merges.'], ['Linear', 'off', 'Create and update issues from meetings.']]],
+      ['Design', [['Figma', 'off', 'Read files and leave comments.'], ['Canva', 'off', 'Make slides and social posts from your notes.']]],
+      ['Vendors and websites', [['Any website', 'on', 'Browse, compare and fill in forms. Asks before submitting.'], ['Travel booking', 'off', 'Search and hold flights and rooms. Asks before paying.'], ['Payments', 'off', 'Pay invoices you approve, within your cap.']]]
+    ];
+    const ST = { on: ['Connected', 'var(--mintInk)', 'var(--mint)', 'Manage', 'var(--card)', 'var(--ink)', 'var(--line2)', 'var(--line)'], off: ['Not connected', 'var(--ink3)', 'var(--line2)', 'Connect', 'var(--pri)', 'var(--onPri)', 'var(--pri)', 'var(--line)'], warn: ['Needs you to sign in', 'var(--redInk)', 'var(--red)', 'Reconnect', 'var(--pri)', 'var(--onPri)', 'var(--pri)', 'var(--redInk)'], busy: ['Connecting…', 'var(--ink)', 'var(--limeD)', 'Waiting for Google', 'var(--sunk)', 'var(--ink2)', 'var(--line)', 'var(--ink)'] };
+    const groups = G.map(([t, items]) => ({ t, n: items.filter(i => i[1] === 'on').length + ' of ' + items.length + ' connected', items: items.map(([n, st, can]) => { const k = s === 'empty' ? 'off' : st, c = ST[k]; return { n, can, s: c[0], sf: c[1], sd: c[2], btn: c[3], btnBg: c[4], btnFg: c[5], btnBd: c[6], bd: c[7], pulse: k === 'busy' ? 'tGlow 1s infinite' : 'none' }; }) }));
+    return {
+      theme: p.theme ?? 'studio', phone: !d, navD: d ? 'desktop' : 'phone', H: d ? '900px' : '844px', pad: d ? '24px 32px' : '14px 14px 110px', h1: d ? '40px' : '30px', minC: d ? '260px' : '100%',
+      sub: s === 'empty' ? 'Apps Tilo can use for you. Nothing connected yet.' : 'Apps Tilo can use for you. Each one says what Tilo may do.',
+      loading: s === 'loading', error: s === 'error', empty: s === 'empty', grid: s !== 'loading', groups: d ? groups : groups.slice(0, 2),
+      iSearch: ic('search', 16), iAlert: ic('alert', 18)
+    };
+  }
+}
+</script>
+</body>
+</html>

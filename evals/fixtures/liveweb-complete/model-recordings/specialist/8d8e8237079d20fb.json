@@ -1,0 +1,16 @@
+{
+  "key": "8d8e8237079d20fb",
+  "profile": "fixture",
+  "response": {
+    "profile_id": "scripted",
+    "tool_calls": [
+      {
+        "args": {
+          "query": "Northbridge fictional past paper and answer key"
+        },
+        "name": "web_search"
+      }
+    ]
+  },
+  "role": "specialist"
+}

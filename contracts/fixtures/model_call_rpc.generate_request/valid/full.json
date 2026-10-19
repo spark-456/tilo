@@ -1,0 +1,29 @@
+{
+  "org_id": "org_example",
+  "slot": "models",
+  "run_id": "r_demo01",
+  "profile_id": "byok-large",
+  "request": {
+    "prompt": "Return the plan as JSON.",
+    "system": "You are the planner.",
+    "max_output_tokens": 4096,
+    "tools": [
+      {
+        "name": "lookup",
+        "parameters": {
+          "type": "object"
+        }
+      }
+    ],
+    "json_mode": true,
+    "response_schema": {
+      "type": "object",
+      "properties": {
+        "steps": {
+          "type": "array"
+        }
+      }
+    },
+    "thinking_level": "low"
+  }
+}

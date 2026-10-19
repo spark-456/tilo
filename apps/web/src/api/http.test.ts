@@ -221,7 +221,7 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
     await expect(c.getLayout("w 1")).resolves.toMatchObject({ world_id: "w_village_basic" });
     expect(calls.map((x) => x.url)).toEqual([
       `${BASE}/worlds/w%201/events`,
-      `${BASE}/worlds/w%201/events`,
+      `${BASE}/worlds/w%201/events?after_seq=1`,
       `${BASE}/worlds/w%201/layout`,
     ]);
   });
@@ -251,6 +251,15 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
       status: 404,
       retryable: true,
     });
+  });
+
+  it("FR-WLD-05 LIVE-LAYOUT getLayout asks once, not five times, when a finished run has no layout", async () => {
+    const done = script(
+      events("world.started", "world.completed"),
+      json({ detail: "Not Found" }, 404),
+    );
+    await expect(client(done.fetch, 1).getLayout("w1")).rejects.toMatchObject({ status: 404 });
+    expect(done.calls.filter((c) => c.url.includes("/layout"))).toHaveLength(1);
   });
 
   it("FR-WLD-05 getLayout rejects plainly when the run failed before it built a world, and a retry asks again", async () => {
@@ -303,7 +312,11 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
       const layout = c.getLayout("w1");
       await vi.advanceTimersByTimeAsync(1000);
       await expect(layout).resolves.toBeDefined();
-      expect(calls.map((x) => x.url.split("/").pop())).toEqual(["events", "events", "layout"]);
+      expect(calls.map((x) => x.url.split("/").pop())).toEqual([
+        "events",
+        "events?after_seq=1",
+        "layout",
+      ]);
       stop();
       expect(vi.getTimerCount()).toBe(0);
     } finally {
@@ -364,7 +377,7 @@ describe("CL-INT-3: HttpClient calls the services/api routes", () => {
         const b = c.getLayout("w1", second.signal);
         expect(a).toBe(b);
         first.abort();
-        await vi.advanceTimersByTimeAsync(3000);
+        await vi.advanceTimersByTimeAsync(7000);
         const mid = urls.length;
         expect(mid).toBeGreaterThan(2); // still polling for the second
         second.abort();
@@ -543,9 +556,84 @@ describe("CL-INT-3 / FR-WLD-05: subscribeEvents polls GET /worlds/{id}/events wi
     expect(got.map((e) => e.seq)).toEqual(sample.slice(0, 4).map((e) => e.seq));
     expect(calls.map((c) => c.url)).toEqual([
       `${BASE}/worlds/w1/events`,
-      `${BASE}/worlds/w1/events`,
+      `${BASE}/worlds/w1/events?after_seq=${sample[2]?.seq}`,
     ]);
     stop();
+  });
+
+  it("FT_PERF_1: sends after_seq cursor and adapts interval (1s active, 3s idle)", async () => {
+    const { calls, fetch } = script(
+      json({ events: [view(sample[0] as Event)] }), // poll 1 -> fresh -> next at 1s
+      json({ events: [view(sample[1] as Event)] }), // poll 2 -> fresh -> next at 1s
+      json({ events: [] }), // poll 3 -> idle -> next at 3s
+      json({ events: [] }), // poll 4
+    );
+    const stop = client(fetch, 1000).subscribeEvents("w1", () => undefined);
+    await settle(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe(`${BASE}/worlds/w1/events`);
+
+    // Active polling: next poll fires after 1000ms
+    await settle(1000);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.url).toBe(`${BASE}/worlds/w1/events?after_seq=${sample[0]?.seq}`);
+
+    // Still active: next poll fires after 1000ms
+    await settle(1000);
+    expect(calls).toHaveLength(3);
+    expect(calls[2]?.url).toBe(`${BASE}/worlds/w1/events?after_seq=${sample[1]?.seq}`);
+
+    // Idle polling: poll 3 returned no events, so at 1000ms and 2000ms later no new poll
+    await settle(1000);
+    expect(calls).toHaveLength(3);
+    await settle(1000);
+    expect(calls).toHaveLength(3);
+    // At 3000ms total idle delay, poll 4 fires
+    await settle(1000);
+    expect(calls).toHaveLength(4);
+    expect(calls[3]?.url).toBe(`${BASE}/worlds/w1/events?after_seq=${sample[1]?.seq}`);
+    stop();
+  });
+
+  it("FT_PERF_1: pauses polling when document.hidden and resumes when visible", async () => {
+    class FakeDocument extends EventTarget {
+      hidden = false;
+    }
+    const fakeDoc = new FakeDocument();
+    const origDoc = (globalThis as unknown as { document?: unknown }).document;
+    (globalThis as unknown as { document: unknown }).document = fakeDoc;
+
+    try {
+      const { calls, fetch } = script(
+        json({ events: [view(sample[0] as Event)] }),
+        json({ events: [view(sample[1] as Event)] }),
+      );
+      const stop = client(fetch, 1000).subscribeEvents("w1", () => undefined);
+      await settle(0);
+      expect(calls).toHaveLength(1);
+
+      // Tab becomes hidden
+      fakeDoc.hidden = true;
+      fakeDoc.dispatchEvent(new Event("visibilitychange"));
+
+      // 10s pass while hidden - no polls should run
+      await settle(10_000);
+      expect(calls).toHaveLength(1);
+
+      // Tab becomes visible again - resumes polling immediately
+      fakeDoc.hidden = false;
+      fakeDoc.dispatchEvent(new Event("visibilitychange"));
+      await settle(0);
+      expect(calls).toHaveLength(2);
+      expect(calls[1]?.url).toBe(`${BASE}/worlds/w1/events?after_seq=${sample[0]?.seq}`);
+      stop();
+    } finally {
+      if (origDoc !== undefined) {
+        (globalThis as unknown as { document: unknown }).document = origDoc;
+      } else {
+        (globalThis as unknown as { document?: unknown }).document = undefined;
+      }
+    }
   });
 
   it("resumes after a failed poll without repeating or skipping an event", async () => {

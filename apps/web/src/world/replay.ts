@@ -16,6 +16,7 @@ export {
   subscribeReplay,
 } from "./replayPoint";
 
+const SAMPLE_WORLD_ID = "w_sample_village_basic";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** "29 Sep 2026" in UTC, so every viewer reads the same day (and no ICU build can spell it "Sept");
@@ -34,7 +35,8 @@ export function replayBanner(events: readonly Event[], fixture: boolean): string
   const first = events[0];
   if (!first) return null;
   const date = recordedDate(first.ts);
-  const text = `Replay of run #${first.run_id}${date ? ` recorded ${date}` : ""}`;
+  const sample = first.world_id === SAMPLE_WORLD_ID ? " · sample project, not your work" : ""; // STARTER-1
+  const text = `Replay of run #${first.run_id}${date ? ` recorded ${date}` : ""}${sample}`;
   return fixture ? `${text} · dev fixture, not a real run` : text;
 }
 

@@ -1,0 +1,45 @@
+{
+  "id": "mt_q4_plan",
+  "org_id": "org_example",
+  "owner": "u_owner",
+  "title": "\ud55c\uad6d \ud300 \ud68c\uc758 \u4f1a\u8bae \u8ba1\u5212",
+  "series": "q4_planning_weekly",
+  "scheduled": {
+    "start": "2026-10-06T09:00:00.000Z",
+    "end": "2026-10-06T10:00:00.000Z"
+  },
+  "agenda": [
+    {
+      "title": "\u092c\u091c\u091f \u092f\u094b\u091c\u0928\u093e",
+      "minutes": null
+    },
+    {
+      "title": "\u0645\u0631\u0627\u062c\u0639\u0629 \u0627\u0644\u062e\u0637\u0629",
+      "minutes": null
+    }
+  ],
+  "attendees": [
+    {
+      "name": "\u1820\u180b\u1821",
+      "user": null
+    },
+    {
+      "name": "Priya \ud83c\udf89",
+      "user": null
+    }
+  ],
+  "attestation": {
+    "by": "u_owner",
+    "at": "2026-10-05T09:00:00.000Z",
+    "notice_version": "1.0.0"
+  },
+  "source": "bot",
+  "status": "live",
+  "ended_reason": null,
+  "transcript": null,
+  "minutes": null,
+  "minutes_confirmed_by": null,
+  "delete_transcript_after": null,
+  "delete_minutes_after": null,
+  "created_at": "2026-10-05T09:00:00.000Z"
+}

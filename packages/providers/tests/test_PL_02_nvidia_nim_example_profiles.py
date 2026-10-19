@@ -48,6 +48,10 @@ def test_PL_02_nim_profiles_use_the_openai_compat_provider_and_nim_base_url(nim_
     profiles = raw["profiles"]
     assert profiles, "config/models.nim.yaml must declare at least one profile"
     for profile_id, profile in profiles.items():
+        if profile_id == "embed-fake":  # ADR-0049 RT-05: offline placeholder until the owner prices a live model
+            assert profile["provider"] == "fake" and profile["model"] == "fake-embed"
+            assert "base_url" not in profile and "api_key_env" not in profile
+            continue
         assert profile["provider"] == "openai_compat", f"{profile_id}: provider must be openai_compat"
         assert profile["base_url"] == NIM_BASE_URL, f"{profile_id}: base_url must be NVIDIA's NIM endpoint"
 
@@ -56,6 +60,9 @@ def test_PL_02_nim_profiles_name_their_key_by_env_var_and_never_contain_a_key(ni
     raw_text = nim_models_path.read_text(encoding="utf-8")
     raw = yaml.safe_load(raw_text)
     for profile_id, profile in raw["profiles"].items():
+        if profile_id == "embed-fake":  # ADR-0049 RT-05: fake needs no credential
+            assert profile["provider"] == "fake" and "api_key_env" not in profile
+            continue
         assert profile.get("api_key_env") == NIM_API_KEY_ENV, (
             f"{profile_id}: must name the key by env var ({NIM_API_KEY_ENV}), 16.1 rule 4 / ADR-0003"
         )

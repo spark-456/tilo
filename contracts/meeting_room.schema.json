@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/meeting_room.schema.json",
+  "x-version": "1.0.0",
+  "title": "MeetingRoom",
+  "description": "A meeting room (ADR-0028, user-requested 2026-10-08, Proposed): a person calls a lead agent and the agents it supervises into the Meeting Hall of a live or finished world, asks them what they did and why, and confirms changes they proposed. The root is the room as tilo-api serves it (GET /v1/worlds/{world_id}/rooms/{room_id}); it is rebuilt from the room's meeting.* events plus the redacted archive records they point at, and holds nothing the events do not. $defs hold the three request bodies and the shapes the meeting.* event data share. Text is plain text: the web shows it as text, never as markup or links. Rules MR-01 to MR-12 are in meeting_room.rules.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "room_id",
+    "world_id",
+    "run_id",
+    "state",
+    "reason",
+    "lead",
+    "agents",
+    "as_role",
+    "credit_cap",
+    "credits_spent",
+    "max_turns",
+    "turns"
+  ],
+  "properties": {
+    "room_id": { "$ref": "common.schema.json#/$defs/ulid" },
+    "world_id": { "$ref": "common.schema.json#/$defs/world_id" },
+    "run_id": { "$ref": "common.schema.json#/$defs/run_id" },
+    "state": { "type": "string", "enum": ["open", "adjourned"] },
+    "reason": {
+      "description": "Why the room closed; null exactly while it is open.",
+      "anyOf": [{ "$ref": "#/$defs/adjourn_reason" }, { "type": "null" }]
+    },
+    "lead": { "$ref": "common.schema.json#/$defs/agent_id" },
+    "agents": { "$ref": "#/$defs/attendees" },
+    "as_role": { "$ref": "#/$defs/as_role" },
+    "credit_cap": { "$ref": "common.schema.json#/$defs/credits" },
+    "credits_spent": { "$ref": "common.schema.json#/$defs/credits" },
+    "max_turns": { "$ref": "#/$defs/turn_number" },
+    "turns": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/turn" } }
+  },
+  "if": { "properties": { "state": { "const": "open" } }, "required": ["state"] },
+  "then": { "properties": { "reason": { "type": "null" } } },
+  "else": { "properties": { "reason": { "$ref": "#/$defs/adjourn_reason" } } },
+  "$defs": {
+    "mode": {
+      "description": "The person's Quick or Thinking choice for a turn: quick uses the meeting role, thinking the meeting_thinking role (config/models.yaml).",
+      "type": "string",
+      "enum": ["quick", "thinking"]
+    },
+    "as_role": {
+      "description": "Why the convener may hold this room, from the team store and the world record at the time (MR-03): the world's owner, or an Approver or Member of the world's team whose scope covers every attendee's district. A Viewer never convenes.",
+      "type": "string",
+      "enum": ["owner", "approver", "member"]
+    },
+    "adjourn_reason": {
+      "description": "person: the convener closed it; idle: no turn for the configured time; capped: the next turn would pass the room's credit or turn cap; paused: Pause all or Stop all; access_lost: the convener's role or scope no longer covers the room; failed: the room could not go on (writer or archive error).",
+      "type": "string",
+      "enum": ["person", "idle", "capped", "paused", "access_lost", "failed"]
+    },
+    "outcome": {
+      "description": "answered: a reply grounded in the agent's own units; proposed_change: a reply that also proposes a change for the person to confirm; declined: the agent has no record for it, or the safety screen flagged the message; failed: no reply was produced (no text exists).",
+      "type": "string",
+      "enum": ["answered", "proposed_change", "declined", "failed"]
+    },
+    "turn_number": { "type": "integer", "minimum": 1, "maximum": 50 },
+    "attendees": {
+      "description": "The agents in the room besides the lead, in seating order.",
+      "type": "array",
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/agent_id" }
+    },
+    "cited_units": {
+      "description": "Plan units the reply rests on: the replying agent's own units (a lead's: its district's), checked by code against the grounding set (MR-06).",
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/unit_id" }
+    },
+    "cited_artifacts": {
+      "description": "Pinned artifact versions the reply rests on, made by those units.",
+      "type": "array",
+      "maxItems": 10,
+      "items": { "$ref": "common.schema.json#/$defs/artifact_ref" }
+    },
+    "proposal": {
+      "description": "A change an agent proposes. It names only WHAT changes (units and artifact versions); its wording is in the reply's archive record. It has no field for an action, a recipient, a connector, a risk tier or a policy: the planner and the policy engine derive those (MR-11).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposal_id", "units", "artifacts"],
+      "properties": {
+        "proposal_id": { "$ref": "common.schema.json#/$defs/ulid" },
+        "units": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/unit_id" }
+        },
+        "artifacts": {
+          "type": "array",
+          "maxItems": 10,
+          "items": { "$ref": "common.schema.json#/$defs/artifact_ref" }
+        }
+      }
+    },
+    "person_text": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "reply_text": {
+      "description": "A reply's text after the secret redactor; a reply's text is null exactly when its outcome is failed.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "turn": {
+      "description": "One turn: what the person asked, the reply (null while it is pending) and the change the person confirmed from it (null if none).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["turn", "to", "mode", "text", "reply", "change"],
+      "properties": {
+        "turn": { "$ref": "#/$defs/turn_number" },
+        "to": { "$ref": "common.schema.json#/$defs/agent_id" },
+        "mode": { "$ref": "#/$defs/mode" },
+        "text": { "$ref": "#/$defs/person_text" },
+        "reply": { "anyOf": [{ "$ref": "#/$defs/reply" }, { "type": "null" }] },
+        "change": { "anyOf": [{ "$ref": "#/$defs/confirmed_change" }, { "type": "null" }] }
+      }
+    },
+    "reply": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "outcome", "text", "units", "artifacts", "proposal"],
+      "properties": {
+        "from": { "$ref": "common.schema.json#/$defs/agent_id" },
+        "outcome": { "$ref": "#/$defs/outcome" },
+        "text": { "anyOf": [{ "$ref": "#/$defs/reply_text" }, { "type": "null" }] },
+        "units": { "$ref": "#/$defs/cited_units" },
+        "artifacts": { "$ref": "#/$defs/cited_artifacts" },
+        "proposal": { "anyOf": [{ "$ref": "#/$defs/proposal" }, { "type": "null" }] }
+      },
+      "if": { "properties": { "outcome": { "const": "failed" } }, "required": ["outcome"] },
+      "then": {
+        "description": "A failed reply has no text, cites nothing and proposes nothing.",
+        "properties": {
+          "text": { "type": "null" },
+          "units": { "maxItems": 0 },
+          "artifacts": { "maxItems": 0 },
+          "proposal": { "type": "null" }
+        }
+      },
+      "else": {
+        "description": "Any other reply has text. A proposed_change carries its proposal and every other outcome none; answered and proposed_change cite at least one unit of the agent's own (HR-1).",
+        "properties": { "text": { "type": "string" } },
+        "if": {
+          "properties": { "outcome": { "const": "proposed_change" } },
+          "required": ["outcome"]
+        },
+        "then": { "properties": { "proposal": { "type": "object" }, "units": { "minItems": 1 } } },
+        "else": {
+          "properties": { "proposal": { "type": "null" } },
+          "if": { "properties": { "outcome": { "const": "answered" } }, "required": ["outcome"] },
+          "then": { "properties": { "units": { "minItems": 1 } } }
+        }
+      }
+    },
+    "confirmed_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposal_id", "text"],
+      "properties": {
+        "proposal_id": { "$ref": "common.schema.json#/$defs/ulid" },
+        "text": { "$ref": "#/$defs/person_text" }
+      }
+    },
+    "convene_request": {
+      "description": "POST /v1/worlds/{world_id}/rooms. The server picks the run, the role, the caps and the room id.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lead", "agents"],
+      "properties": {
+        "lead": { "$ref": "common.schema.json#/$defs/agent_id" },
+        "agents": { "$ref": "#/$defs/attendees" }
+      }
+    },
+    "ask_request": {
+      "description": "POST /v1/worlds/{world_id}/rooms/{room_id}/turns. One turn in flight at a time.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["to", "text", "mode"],
+      "properties": {
+        "to": { "$ref": "common.schema.json#/$defs/agent_id" },
+        "text": { "$ref": "#/$defs/person_text" },
+        "mode": { "$ref": "#/$defs/mode" }
+      }
+    },
+    "change_request": {
+      "description": "POST /v1/worlds/{world_id}/rooms/{room_id}/changes: the person confirms a proposal, in the proposal's words or their own. Units and artifacts come from the proposal, never from this body (MR-07).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposal_id", "text"],
+      "properties": {
+        "proposal_id": { "$ref": "common.schema.json#/$defs/ulid" },
+        "text": { "$ref": "#/$defs/person_text" }
+      }
+    }
+  }
+}

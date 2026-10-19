@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "example": true,
+  "enabled": false,
+  "day_cap_credits_max": null,
+  "calls_per_org_per_minute": 120,
+  "consent_version": 1,
+  "bundles": {}
+}

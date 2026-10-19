@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.tilo.example/events/data/meeting.change_requested.schema.json",
+  "x-version": "1.0.0",
+  "title": "MeetingChangeRequestedData",
+  "description": "data of meeting.change_requested (ADR-0028). The convener confirmed a change an agent proposed in this room. actor is the convener, target the proposing agent (to). units and artifacts equal the proposal's, so the person confirms exactly what was shown (MR-07); message_ref is the confirmed wording in the redacted raw archive (the proposal's words or the person's own). It is not a side effect and authorises nothing: nothing leaves Tilo and nothing is spent until plan.revised and the budget events (MR-09, MR-10); it is never an L2 instruction (OB-01 counts only world.requested) and sets no gate, tier or policy (MR-11).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["room_id", "proposal_id", "to", "units", "artifacts", "as_role", "message_ref"],
+  "properties": {
+    "room_id": { "$ref": "../../common.schema.json#/$defs/ulid" },
+    "proposal_id": { "$ref": "../../common.schema.json#/$defs/ulid" },
+    "to": { "$ref": "../../common.schema.json#/$defs/agent_id" },
+    "units": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": { "$ref": "../../common.schema.json#/$defs/unit_id" }
+    },
+    "artifacts": { "$ref": "../../meeting_room.schema.json#/$defs/cited_artifacts" },
+    "as_role": { "$ref": "../../meeting_room.schema.json#/$defs/as_role" },
+    "message_ref": { "$ref": "../../event.schema.json#/$defs/archive_ref" }
+  }
+}

@@ -11,3 +11,6 @@ credit_usd: 0.005
 
 profiles:
   dev-unit: { input: 1.0, output: 4.0 } # US$ per million tokens; a 2000-in, 600-out unit costs 0.88 credits
+  # LW-05: the dev search profile (config/models.dev.yaml) makes no paid call, so its token rates and its fee per
+  # query are 0 (the loader wants a unit_price with unit query on every search profile while prices are set).
+  search-fake: { input: 0, output: 0, unit_price: { unit: query, per_1k: 0 } }

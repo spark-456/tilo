@@ -6,6 +6,7 @@ key EventWriter.append dedupes on (EV-10). Pure functions: no locking, no I/O.
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -22,7 +23,16 @@ def now() -> str:
 def new_part_id() -> str:
     """A fresh id matching common.schema.json#/$defs/ulid's pattern. Only uniqueness matters;
     ordering is the writer's stamped `seq`."""
-    n = uuid.uuid4().int % (32**25)
+    return _ulid(uuid.uuid4().int)
+
+
+def stable_part_id(*key: str) -> str:
+    """The same id for the same key, in the ulid shape: an event that every loader would write writes once (EV-10)."""
+    return _ulid(int.from_bytes(hashlib.sha256("\x1f".join(key).encode()).digest(), "big"))
+
+
+def _ulid(n: int) -> str:
+    n %= 32**25
     body = []
     for _ in range(25):
         n, r = divmod(n, 32)
@@ -69,17 +79,30 @@ def apply_level_change(policy: dict, *, owner: str, change: str, at: str) -> Non
     policy["changed_by"] = {"by": owner, "at": at}
 
 
-def policy_changed_part(*, part_id: str, policy_id: str, change: str, owner: str, at: str, vis: Any) -> dict:
+def policy_changed_part(
+    *, part_id: str, policy_id: str, change: str, owner: str, at: str, vis: Any, level: str = "L1"
+) -> dict:
     return {
         "id": part_id,
         "type": "policy.changed",
         "actor": owner,
         "target": policy_id,
-        "summary": f"{owner} set policy {policy_id} to L1 ({change})"[:140],
+        "summary": f"{owner} set policy {policy_id} to {level} ({change})"[:140],
         "vis": vis,
         "authz": {"by": "person", "ref": owner, "at": at},
-        "data": {"policy_id": policy_id, "change": change, "level": "L1"},
+        "data": {"policy_id": policy_id, "change": change, "level": level},
     }
+
+
+def world_failed_part(world_id: str, reason: str, run_id: str) -> dict:
+    """The one `world.failed` of a restart: the run that held this world is gone (ADR-0026 decision 5). Its id comes
+    from the world and its run, so two processes loading the world at once write one."""
+    return {
+        "id": stable_part_id("world.failed", world_id, run_id), "type": "world.failed", "actor": "system",
+        "target": world_id, "level": None, "district": None, "item": None, "severity": "blocked", "credits": 0,
+        "cause": None, "vis": "all", "authz": None, "summary": f"Stopped: {reason}"[:140],
+        "data": {"reason": reason, "unit": None},
+    }  # fmt: skip
 
 
 def world_paused_part(*, part_id: str, world_id: str, actor: str, channel: str | None) -> dict:

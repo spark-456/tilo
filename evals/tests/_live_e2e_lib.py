@@ -125,6 +125,8 @@ def env(**overrides: str) -> Iterator[None]:
             os.environ.pop(key, None)
         os.environ["CLOUDSDK_CONFIG"] = str(Path(tempfile.gettempdir()) / "tilo-test-no-gcloud-config")
         os.environ.update(overrides)
+        if os.environ.get("LIVE") == "1":  # match the checked-in global price sheet (LIVE-GLOBAL-1)
+            os.environ.setdefault("GOOGLE_LOCATION", "global")
         yield
 
 
@@ -314,6 +316,20 @@ class CaseFakeModel(ModelProvider):
             text = json.dumps(reply, sort_keys=True)
         elif kind == "schema":
             text = json.dumps(instance_for(request.response_schema or {}), sort_keys=True)
+        elif self._role == "writer" and "The object has exactly these keys and no others:" in request.prompt:
+            # The shared runner requests a DeliverableSpec in the prompt rather than response_schema.
+            text = json.dumps(
+                {
+                    "title": "Synthetic report",
+                    "date": "2026-10-09",
+                    "tables": [],
+                    "charts": [],
+                    "sections": [
+                        {"heading": "Result", "blocks": [{"type": "paragraph", "text": "Synthetic report text."}]}
+                    ],
+                },
+                sort_keys=True,
+            )
         else:
             text = f"Synthetic {self._role} reply for the test. {world.leak}".strip()
         tin, tout = world.usage
@@ -359,8 +375,11 @@ def write_prices(
     raw["status"] = status
     raw["credit_usd"] = credit_usd
     raw["source"] = "Test fixture only. Not a real price page."
-    for profile_id in raw["profiles"]:
+    raw.pop("region", None)  # a fixture sheet is quoted for no location (ADR-0029 decision 3)
+    for profile_id, real in raw["profiles"].items():
         raw["profiles"][profile_id] = {"input": per_million, "output": per_million}
+        if "unit_price" in real:  # the search role wants a query unit price (ADR-0029 decision 7): a fake fee
+            raw["profiles"][profile_id]["unit_price"] = {"unit": real["unit_price"]["unit"], "per_1k": per_million}
     path = tmp_path / name
     path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
     return path

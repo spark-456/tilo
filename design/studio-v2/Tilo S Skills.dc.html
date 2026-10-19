@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./tilo-studio.css">
+<link rel="stylesheet" href="./tilo-daylight.css">
+<script src="./tilo-city.js"></script>
+<script src="./tilo-daylight.js"></script>
+<style>body{margin:0;-webkit-font-smoothing:antialiased}a{color:var(--ink);text-decoration:none}a:hover{color:var(--ink2)}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="position:relative;width:100%;min-height:100%;background:var(--bg);color:var(--ink);font-family:var(--fB);font-size:16px;line-height:1.5;overflow:hidden">
+
+<sc-if value="{{ desk }}" hint-placeholder-val="{{ true }}">
+  <dc-import name="Tilo S Nav" active="skills" theme="{{ theme }}" hint-size="100%,72px"></dc-import>
+  <sc-if value="{{ notTeach }}" hint-placeholder-val="{{ true }}">
+    <main style="max-width:1232px;margin:0 auto;padding:48px 32px 64px;display:flex;flex-direction:column;gap:28px">
+      <div style="display:flex;align-items:flex-end;gap:24px">
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+          <h1 style="margin:0;font-family:var(--fH);font-weight:700;font-size:48px;line-height:1.05;letter-spacing:-1px">Skills</h1>
+          <p style="margin:0;font-size:18px;color:var(--ink2);max-width:640px">Things your helpers already know how to do. Use one in a task, or teach Tilo something new.</p>
+        </div>
+        <span style="height:52px;padding:0 22px;border-radius:16px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;gap:10px;font-family:var(--fH);font-weight:700;font-size:17px"><span style="font-size:22px;line-height:1">+</span>Teach Tilo a skill</span>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);padding:24px 28px 24px 24px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:28px;align-items:center">
+        <div style="width:150px;height:156px;border-radius:24px;background:var(--priSoft);display:flex;align-items:flex-end;justify-content:center;overflow:hidden"><dc-import name="Tilo S Buddy" size="140" mood="think" hint-size="119px,140px"></dc-import></div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:var(--mono);font-size:12px;color:var(--ink3);letter-spacing:.5px">TEACH TILO A SKILL</span><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:30px;letter-spacing:-1px;line-height:1.15">Show Tilo how you like it done, once.</h2></div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+            <sc-for list="{{ ways }}" as="w" hint-placeholder-count="3"><div style="border-radius:16px;background:var(--sunk);padding:12px 14px;display:flex;align-items:center;gap:12px"><span style="width:36px;height:36px;border-radius:11px;background:var(--card);display:flex;align-items:center;justify-content:center;flex:none">{{ w.ic }}</span><span style="display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:700;font-size:14.5px">{{ w.t }}</span><span style="font-size:12.5px;color:var(--ink3)">{{ w.s }}</span></span></div></sc-for>
+          </div>
+        </div>
+        <span style="height:52px;padding:0 22px;border-radius:16px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;font-family:var(--fH);font-weight:700;font-size:16px;white-space:nowrap">Start teaching →</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="height:56px;box-sizing:border-box;padding:0 20px;border-radius:18px;background:var(--card);border:1px solid var(--line);box-shadow:var(--sh1);display:flex;align-items:center;gap:12px;font-size:17px;color:var(--ink3);font-weight:600"><span>{{ iSearch }}</span>Search skills, like “compare” or “invoice”</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <sc-for list="{{ cats }}" as="c" hint-placeholder-count="6">
+            <span style="height:44px;padding:0 18px;border-radius:99px;display:flex;align-items:center;font-size:15px;font-weight:800;background:{{ c.bg }};color:{{ c.fg }};border:1px solid {{ c.bd }}">{{ c.label }}</span>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between"><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:24px">Popular with your team</h2><span style="font-size:14px;font-weight:700;color:var(--ink3)">24 skills</span></div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">
+        <sc-for list="{{ skills }}" as="s" hint-placeholder-count="8">
+          <div style="background:var(--card);border:1px solid {{ s.bd }};border-radius:24px;box-shadow:var(--sh1);padding:20px;display:flex;flex-direction:column;gap:14px;transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s" style-hover="transform:translateY(-3px);box-shadow:var(--sh2)">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between">
+              <span style="width:56px;height:56px;border-radius:18px;background:{{ s.bg }};color:{{ s.fg }};display:flex;align-items:center;justify-content:center">{{ s.ic }}</span>
+              <span style="height:26px;padding:0 10px;border-radius:99px;background:{{ s.sbg }};color:{{ s.sfg }};font-size:12px;font-weight:800;display:flex;align-items:center">{{ s.st }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="font-weight:800;font-size:18px;line-height:1.3">{{ s.name }}</div>
+              <div style="font-size:15px;color:var(--ink2);line-height:1.45;min-height:44px">{{ s.what }}</div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;color:var(--ink3);padding-top:12px;border-top:1px solid var(--line)"><span>Used {{ s.used }} times</span><span>{{ s.cat }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;padding-top:12px"><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:24px">Learning now</h2><span style="font-size:14px;font-weight:600;color:var(--ink3)">Tilo practises new skills and checks with you before they’re trusted</span></div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px">
+        <sc-for list="{{ learning }}" as="l" hint-placeholder-count="2">
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh1);padding:22px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;align-items:center;gap:14px"><span style="width:52px;height:52px;border-radius:16px;background:{{ l.bg }};color:{{ l.fg }};display:flex;align-items:center;justify-content:center">{{ l.ic }}</span><span style="flex:1;display:flex;flex-direction:column"><span style="font-weight:700;font-size:18px">{{ l.n }}</span><span style="font-size:14px;color:var(--ink3)">{{ l.who }}</span></span><span style="height:26px;padding:0 10px;border-radius:99px;background:var(--lilacSoft);color:var(--lilacInk);font-size:12px;font-weight:700;display:flex;align-items:center">Learning</span></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600"><span>{{ l.run }}</span><span style="font-family:var(--mono);font-weight:500;color:var(--ink3)">{{ l.pct }}</span></div><div style="height:8px;border-radius:99px;background:var(--sunk)"><div style="height:100%;border-radius:99px;background:var(--lime);width:{{ l.pct }}"></div></div></div>
+            <div style="border-radius:14px;background:var(--sunk);padding:10px 14px;font-size:14px;color:var(--ink2)"><strong style="color:var(--ink)">Last try:</strong> {{ l.last }}</div>
+            <div style="display:flex;gap:8px"><span style="height:44px;padding:0 16px;border-radius:12px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;font-weight:700;font-size:14px">Check its work</span><span style="height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:700;font-size:14px">Give a tip</span><span style="height:44px;padding:0 16px;border-radius:12px;display:flex;align-items:center;font-weight:700;font-size:14px;color:var(--ink3)">Pause</span></div>
+          </div>
+        </sc-for>
+      </div>
+    </main>
+  </sc-if>
+
+  <sc-if value="{{ drawer }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:var(--scrim)"></div>
+    <aside style="position:absolute;top:0;right:0;bottom:0;width:560px;box-sizing:border-box;background:var(--card);box-shadow:var(--sh3);border-radius:28px 0 0 28px;display:flex;flex-direction:column">
+      <div style="padding:28px 28px 20px;display:flex;align-items:flex-start;gap:16px;border-bottom:1px solid var(--line)">
+        <span style="width:64px;height:64px;border-radius:20px;background:var(--skySoft);color:var(--skyInk);display:flex;align-items:center;justify-content:center;flex:none">{{ iBig }}</span>
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;align-items:center;gap:10px"><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:28px;line-height:1.15">Find hidden gems</h2><span style="height:26px;padding:0 10px;border-radius:99px;background:var(--sunk);color:var(--ink2);font-size:12px;font-weight:800;display:flex;align-items:center">Built-in</span></div>
+          <div style="font-size:15px;color:var(--ink3);font-weight:600">Research · used 12 times · last used today</div>
+        </div>
+        <span style="width:44px;height:44px;border-radius:14px;background:var(--sunk);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--ink2);flex:none">×</span>
+      </div>
+      <div style="flex:1;overflow:hidden;padding:24px 28px;display:flex;flex-direction:column;gap:24px">
+        <div style="display:flex;flex-direction:column;gap:6px"><h3 style="margin:0;font-size:14px;font-weight:800;color:var(--ink3)">What it does</h3><p style="margin:0;font-size:16px;line-height:1.6">Looks past the usual top-10 lists to find places locals love. It reads travel forums, maps reviews and blogs, then checks each place is real, open and reachable.</p></div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <h3 style="margin:0;font-size:14px;font-weight:800;color:var(--ink3)">Example</h3>
+          <div style="align-self:flex-start;max-width:85%;background:var(--sunk);border-radius:18px 18px 18px 6px;padding:12px 16px;font-size:15px"><span style="font-weight:800">You ask:</span> Quiet beaches near Gokarna that aren’t on the usual lists.</div>
+          <div style="border:1px solid var(--line);border-radius:18px 18px 6px 18px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:14px;font-weight:800;color:var(--mintInk)">Tilo gives you</div>
+            <sc-for list="{{ exOut }}" as="e" hint-placeholder-count="3">
+              <div style="display:flex;gap:10px;font-size:15px"><span style="width:24px;height:24px;border-radius:8px;background:var(--skySoft);color:var(--skyInk);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">{{ e.n }}</span><span><strong>{{ e.t }}</strong> <span style="color:var(--ink2)">{{ e.s }}</span></span></div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <h3 style="margin:0;font-size:14px;font-weight:800;color:var(--ink3)">Steps it follows</h3>
+          <sc-for list="{{ steps }}" as="p" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;gap:12px"><span style="width:28px;height:28px;border-radius:99px;background:var(--priSoft);color:var(--priInk);font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">{{ p.n }}</span><span style="flex:1;font-size:15px">{{ p.t }}</span><sc-if value="{{ p.ask }}"><span style="height:24px;padding:0 8px;border-radius:99px;background:var(--amberSoft);color:var(--amberInk);font-size:12px;font-weight:800;display:flex;align-items:center;white-space:nowrap">Asks you first</span></sc-if></div>
+          </sc-for>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span style="height:32px;padding:0 12px;border-radius:10px;background:var(--sunk);font-size:13px;font-weight:700;display:flex;align-items:center">Usually 4 min</span>
+          <span style="height:32px;padding:0 12px;border-radius:10px;background:var(--sunk);font-size:13px;font-weight:700;display:flex;align-items:center">About £0.40 a run</span>
+          <span style="height:32px;padding:0 12px;border-radius:10px;background:var(--sunk);font-size:13px;font-weight:700;display:flex;align-items:center">Uses web search and maps</span>
+        </div>
+      </div>
+      <div style="padding:20px 28px 28px;border-top:1px solid var(--line);display:flex;gap:12px">
+        <span style="flex:1;height:56px;border-radius:16px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;justify-content:center;font-family:var(--fH);font-weight:700;font-size:18px">Use in a task</span>
+        <span style="flex:1;height:56px;border-radius:16px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px">Teach a new version</span>
+      </div>
+    </aside>
+  </sc-if>
+
+  <sc-if value="{{ teach }}" hint-placeholder-val="{{ false }}">
+    <main style="max-width:880px;margin:0 auto;padding:32px 32px 64px;display:flex;flex-direction:column;gap:24px">
+      <div style="display:flex;align-items:center;gap:12px"><a href="#" style="font-size:14px;font-weight:700;color:var(--ink3);flex:1">← Back to skills</a><span style="font-size:14px;font-weight:700;color:var(--ink3)">{{ stepLabel }}</span></div>
+      <h1 style="margin:0;font-family:var(--fH);font-weight:700;font-size:40px;line-height:1.1;letter-spacing:-.8px">Teach Tilo a skill</h1>
+      <div style="position:relative;border-radius:28px;background:var(--cityBg);border:1px solid var(--cityLine);padding:20px 32px 16px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">
+        <div style="position:absolute;left:16%;right:16%;top:96px;border-top:3px dashed var(--line2)"></div>
+        <sc-for list="{{ wiz }}" as="w" hint-placeholder-count="3">
+          <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="height:140px;display:flex;align-items:flex-end;justify-content:center;gap:0;filter:var(--cityFx)">{{ w.art }}</div>
+            <div style="display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:99px;background:{{ w.bg }};color:{{ w.fg }};font-size:14px;font-weight:800;box-shadow:var(--sh1)"><span style="width:22px;height:22px;border-radius:99px;background:{{ w.nbg }};color:{{ w.nfg }};font-size:12px;display:flex;align-items:center;justify-content:center">{{ w.n }}</span>{{ w.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ t1 }}" hint-placeholder-val="{{ false }}">
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);padding:32px;display:flex;flex-direction:column;gap:22px">
+        <div style="display:flex;flex-direction:column;gap:6px"><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:28px;letter-spacing:-.6px">What should Tilo learn?</h2><p style="margin:0;font-size:16px;color:var(--ink2)">Explain it the way you would to a new teammate. Plain words are perfect.</p></div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+          <sc-for list="{{ ways }}" as="w" hint-placeholder-count="3">
+            <div style="border-radius:18px;border:{{ w.bd }};background:{{ w.bg }};padding:14px 16px;display:flex;align-items:center;gap:12px"><span style="width:40px;height:40px;border-radius:12px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none">{{ w.ic }}</span><span style="display:flex;flex-direction:column;line-height:1.35"><span style="font-weight:700;font-size:15px">{{ w.t }}</span><span style="font-size:13px;color:var(--ink3)">{{ w.s }}</span></span></div>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600;color:var(--ink3)">Skill name</span><div style="height:52px;box-sizing:border-box;padding:0 16px;border-radius:14px;border:1px solid var(--line2);display:flex;align-items:center;gap:12px;font-weight:600;font-size:17px"><span style="width:32px;height:32px;border-radius:10px;background:var(--skySoft);color:var(--skyInk);display:flex;align-items:center;justify-content:center">{{ iPeopleS }}</span>Weekly team update</div></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600;color:var(--ink3)">What it does, step by step</span><div style="min-height:150px;box-sizing:border-box;padding:16px 18px;border-radius:16px;border:2px solid var(--ink);font-size:17px;line-height:1.6">Every Friday at 4, collect what each person did this week from Slack and email. Group it by project and write a short, friendly note for the #team channel. Keep it under 300 words and thank anyone who shipped something<span style="display:inline-block;width:2px;height:20px;margin-left:2px;vertical-align:-4px;background:var(--ink);animation:tsCaret 1s steps(1) infinite"></span></div><span style="font-family:var(--mono);font-size:12px;color:var(--ink3)">Tilo turns this into steps for you to check.</span></div>
+        <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;font-weight:600;color:var(--ink3)">When should Tilo use it?</span><div style="display:flex;gap:8px;flex-wrap:wrap"><span style="height:44px;padding:0 16px;border-radius:99px;background:var(--ink);color:var(--card);font-weight:600;font-size:15px;display:flex;align-items:center">Every Friday, 4 pm</span><span style="height:44px;padding:0 16px;border-radius:99px;border:1px solid var(--line);font-weight:600;font-size:15px;display:flex;align-items:center">Only when I ask</span><span style="height:44px;padding:0 16px;border-radius:99px;border:1px solid var(--line);font-weight:600;font-size:15px;display:flex;align-items:center">When a project ships</span></div></div>
+        <div style="display:flex;align-items:center;gap:12px;padding-top:4px"><span style="height:52px;padding:0 20px;border-radius:16px;display:flex;align-items:center;font-weight:700;font-size:16px;color:var(--ink2)">Cancel</span><div style="flex:1"></div><span style="height:52px;padding:0 24px;border-radius:16px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;gap:8px;font-family:var(--fH);font-weight:700;font-size:17px">Next: show an example →</span></div>
+      </div>
+      </sc-if>
+      <sc-if value="{{ t2 }}" hint-placeholder-val="{{ false }}">
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);padding:32px;display:flex;flex-direction:column;gap:22px">
+        <div style="display:flex;flex-direction:column;gap:6px"><h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:28px;letter-spacing:-.6px">Show Tilo a good example</h2><p style="margin:0;font-size:16px;color:var(--ink2)">One example is enough to start. Two makes it better.</p></div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 32px minmax(0,1fr);gap:8px;align-items:stretch">
+          <div style="border:1px solid var(--line);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.5px">WHAT GOES IN</span>
+            <sc-for list="{{ ins }}" as="x" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--sunk)"><span style="width:30px;height:30px;border-radius:9px;background:var(--card);font-family:var(--mono);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ x.m }}</span><span style="flex:1;display:flex;flex-direction:column;line-height:1.3"><span style="font-weight:600;font-size:14px">{{ x.t }}</span><span style="font-size:12.5px;color:var(--ink3)">{{ x.s }}</span></span></div></sc-for>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--ink3)">→</div>
+          <div style="border:1px solid var(--line);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.5px">WHAT YOU’D WANT OUT</span>
+            <div style="border-radius:14px;background:var(--sunk);padding:14px 16px;font-size:14px;line-height:1.55;display:flex;flex-direction:column;gap:6px"><strong>Happy Friday, team.</strong><span><strong>Launch page:</strong> Jo finished the pricing table. Thank you Jo.</span><span><strong>Suppliers:</strong> two quotes in, one to go.</span><span><strong>Next week:</strong> sample testing starts Tuesday.</span></div>
+          </div>
+        </div>
+        <div style="border:1.5px dashed var(--line2);border-radius:20px;padding:18px 20px;display:flex;align-items:center;gap:16px">
+          <span style="width:48px;height:48px;border-radius:14px;background:var(--sunk);display:flex;align-items:center;justify-content:center;font-size:22px">+</span>
+          <span style="flex:1;display:flex;flex-direction:column"><span style="font-weight:700">Drop a past update here, or paste one</span><span style="font-size:14px;color:var(--ink3)">Docs, PDFs, screenshots or a link</span></span>
+          <span style="height:40px;padding:0 6px 0 8px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600"><span style="width:28px;height:28px;border-radius:8px;background:var(--skySoft);color:var(--skyInk);font-family:var(--mono);font-size:9.5px;display:flex;align-items:center;justify-content:center">MD</span>update_oct_3.md<span style="color:var(--ink3);padding:0 6px">×</span></span>
+        </div>
+        <div style="border-radius:20px;background:var(--sunk);padding:16px 20px;display:flex;align-items:center;gap:14px"><span style="width:14px;height:14px;border-radius:99px;background:var(--red);box-shadow:0 0 0 5px var(--redSoft)"></span><span style="flex:1"><strong>Or show me once.</strong> Record your screen while you do it and Tilo writes the steps.</span><span style="height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line2);background:var(--card);display:flex;align-items:center;font-weight:700">Start recording</span></div>
+        <div style="display:flex;align-items:center;gap:12px;padding-top:4px"><span style="height:52px;padding:0 20px;border-radius:16px;display:flex;align-items:center;font-weight:700;font-size:16px;color:var(--ink2)">Back</span><div style="flex:1"></div><span style="height:52px;padding:0 24px;border-radius:16px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;gap:8px;font-family:var(--fH);font-weight:700;font-size:17px">Next: review the steps →</span></div>
+      </div>
+      </sc-if>
+      <sc-if value="{{ t3 }}" hint-placeholder-val="{{ false }}">
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:28px;box-shadow:var(--sh1);padding:32px;display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <h2 style="margin:0;font-family:var(--fH);font-weight:700;font-size:28px">Here’s how Tilo will do it</h2>
+          <p style="margin:0;font-size:16px;color:var(--ink2)">Change anything you like. Tilo will try it once and show you before saving.</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:18px;background:var(--sunk)">
+          <span style="width:48px;height:48px;border-radius:16px;background:var(--skySoft);color:var(--skyInk);display:flex;align-items:center;justify-content:center">{{ iPeople }}</span>
+          <div style="flex:1;display:flex;flex-direction:column"><span style="font-size:13px;font-weight:700;color:var(--ink3)">Skill name</span><span style="font-weight:800;font-size:18px">Weekly team update</span></div>
+          <span style="font-size:14px;font-weight:800;color:var(--priInk)">Rename</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ tSteps }}" as="p" hint-placeholder-count="5">
+            <div style="min-height:60px;box-sizing:border-box;padding:10px 14px;border-radius:16px;border:1px solid var(--line);display:flex;align-items:center;gap:14px">
+              <span style="color:var(--ink3);font-size:16px;letter-spacing:-2px">⋮⋮</span>
+              <span style="width:28px;height:28px;border-radius:99px;background:var(--priSoft);color:var(--priInk);font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">{{ p.n }}</span>
+              <span style="flex:1;font-size:16px">{{ p.t }}</span>
+              <span style="height:32px;padding:0 6px 0 12px;border-radius:99px;background:{{ p.abg }};color:{{ p.afg }};font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px;white-space:nowrap">Ask me first<span style="width:30px;height:20px;border-radius:99px;background:{{ p.tbg }};display:flex;align-items:center;padding:2px;box-sizing:border-box;justify-content:{{ p.tj }}"><span style="width:16px;height:16px;border-radius:99px;background:#FFFFFF"></span></span></span>
+              <span style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--ink3)">✎</span>
+            </div>
+          </sc-for>
+          <span style="height:52px;border-radius:16px;border:1.5px dashed var(--line2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:var(--ink2)">+ Add a step</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding-top:8px">
+          <span style="height:52px;padding:0 20px;border-radius:16px;display:flex;align-items:center;font-weight:800;font-size:16px;color:var(--ink2)">Back</span>
+          <div style="flex:1"></div>
+          <span style="height:52px;padding:0 20px;border-radius:16px;border:1px solid var(--line2);display:flex;align-items:center;font-weight:800;font-size:16px">Try it once</span>
+          <span style="height:52px;padding:0 24px;border-radius:16px;background:var(--pri);color:var(--onPri);box-shadow:0 3px 0 var(--priH);display:flex;align-items:center;font-family:var(--fH);font-weight:700;font-size:18px">Save skill</span>
+        </div>
+      </div>
+      </sc-if>
+    </main>
+  </sc-if>
+</sc-if>
+
+<sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}">
+  <div style="position:relative;height:844px;overflow:hidden">
+    <dc-import name="Tilo R Nav" device="status" hint-size="100%,48px"></dc-import>
+    <sc-if value="{{ notTeach }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:4px 16px 120px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between"><h1 style="margin:0;font-family:var(--fH);font-weight:700;font-size:34px">Skills</h1><span style="width:44px;height:44px;border-radius:14px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700">+</span></div>
+        <div style="height:48px;box-sizing:border-box;padding:0 16px;border-radius:16px;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;gap:10px;font-size:15px;color:var(--ink3);font-weight:600"><span>{{ iSearch }}</span>Search skills</div>
+        <div style="display:flex;gap:8px;overflow:hidden;margin-right:-16px">
+          <sc-for list="{{ cats }}" as="c" hint-placeholder-count="6"><span style="height:44px;padding:0 16px;border-radius:99px;display:flex;align-items:center;font-size:14px;font-weight:800;white-space:nowrap;flex:none;background:{{ c.bg }};color:{{ c.fg }};border:1px solid {{ c.bd }}">{{ c.label }}</span></sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+          <sc-for list="{{ skills }}" as="s" hint-placeholder-count="8">
+            <div style="background:var(--card);border:1px solid {{ s.bd }};border-radius:20px;padding:14px;display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start"><span style="width:44px;height:44px;border-radius:14px;background:{{ s.bg }};color:{{ s.fg }};display:flex;align-items:center;justify-content:center">{{ s.icS }}</span><span style="height:22px;padding:0 8px;border-radius:99px;background:{{ s.sbg }};color:{{ s.sfg }};font-size:11px;font-weight:800;display:flex;align-items:center">{{ s.st }}</span></div>
+              <div style="font-weight:800;font-size:15px;line-height:1.3">{{ s.name }}</div>
+              <div style="font-size:12px;font-weight:700;color:var(--ink3)">Used {{ s.used }} times</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <dc-import name="Tilo R Nav" device="phone" active="skills" style="position:absolute;left:0;right:0;bottom:0" hint-size="100%,84px"></dc-import>
+    </sc-if>
+    <sc-if value="{{ drawer }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;background:var(--scrim)"></div>
+      <div style="position:absolute;left:0;right:0;bottom:0;top:120px;background:var(--card);border-radius:28px 28px 0 0;box-shadow:var(--sh3);display:flex;flex-direction:column">
+        <div style="width:40px;height:5px;border-radius:99px;background:var(--line2);margin:10px auto 0"></div>
+        <div style="padding:16px 20px 12px;display:flex;align-items:center;gap:12px">
+          <span style="width:52px;height:52px;border-radius:16px;background:var(--skySoft);color:var(--skyInk);display:flex;align-items:center;justify-content:center;flex:none">{{ iMid }}</span>
+          <div style="flex:1"><div style="font-family:var(--fH);font-weight:700;font-size:22px;line-height:1.2">Find hidden gems</div><div style="font-size:13px;color:var(--ink3);font-weight:600">Built-in · Research · used 12 times</div></div>
+        </div>
+        <div style="flex:1;overflow:hidden;padding:0 20px;display:flex;flex-direction:column;gap:16px">
+          <p style="margin:0;font-size:15px;line-height:1.55">Looks past the usual top-10 lists to find places locals love, then checks each one is real, open and reachable.</p>
+          <div style="background:var(--sunk);border-radius:16px 16px 16px 6px;padding:10px 14px;font-size:14px"><strong>You ask:</strong> Quiet beaches near Gokarna that aren’t on the usual lists.</div>
+          <div style="border:1px solid var(--line);border-radius:16px 16px 6px 16px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:14px"><span style="font-weight:800;color:var(--mintInk)">Tilo gives you</span><span><strong>Half Moon Beach</strong> · 20 min cliff path</span><span><strong>Paradise Beach</strong> · boat from Om</span></div>
+          <div style="font-size:13px;font-weight:800;color:var(--ink3)">Steps it follows</div>
+          <sc-for list="{{ steps }}" as="p" hint-placeholder-count="5"><div style="display:flex;align-items:center;gap:10px;font-size:14px"><span style="width:24px;height:24px;border-radius:99px;background:var(--priSoft);color:var(--priInk);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">{{ p.n }}</span>{{ p.t }}</div></sc-for>
+        </div>
+        <div style="padding:14px 20px 34px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px">
+          <span style="height:56px;border-radius:16px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;font-family:var(--fH);font-weight:700;font-size:18px">Use in a task</span>
+          <span style="height:48px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:var(--priInk)">Teach a new version</span>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ teach }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:0 16px 24px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;height:44px"><span style="font-size:24px;color:var(--ink2)">×</span><span style="font-size:14px;font-weight:800;color:var(--ink3)">Step 3 of 3</span></div>
+        <div style="position:relative;border-radius:24px;background:var(--cityBg);border:1px solid var(--cityLine);padding:12px 8px 12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px">
+          <div style="position:absolute;left:18%;right:18%;top:70px;border-top:3px dashed var(--line2)"></div>
+          <sc-for list="{{ wizS }}" as="w" hint-placeholder-count="3"><div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="height:96px;display:flex;align-items:flex-end;filter:var(--cityFx)">{{ w.art }}</div><span style="width:28px;height:28px;border-radius:99px;background:{{ w.nbg }};color:{{ w.nfg }};font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center">{{ w.n }}</span></div></sc-for>
+        </div>
+        <h1 style="margin:0;font-family:var(--fH);font-weight:700;font-size:26px;line-height:1.15">Here’s how Tilo will do it</h1>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ tSteps }}" as="p" hint-placeholder-count="5">
+            <div style="min-height:56px;box-sizing:border-box;padding:8px 12px;border-radius:16px;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;gap:10px">
+              <span style="width:26px;height:26px;border-radius:99px;background:var(--priSoft);color:var(--priInk);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">{{ p.n }}</span>
+              <span style="flex:1;font-size:14px;line-height:1.35">{{ p.t }}</span>
+              <span style="width:34px;height:22px;border-radius:99px;background:{{ p.tbg }};display:flex;align-items:center;padding:2px;box-sizing:border-box;justify-content:{{ p.tj }};flex:none"><span style="width:18px;height:18px;border-radius:99px;background:#FFFFFF"></span></span>
+            </div>
+          </sc-for>
+          <div style="font-size:13px;color:var(--ink3);font-weight:600;padding:0 4px">Switch on to have Tilo ask you before that step.</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+          <span style="height:52px;border-radius:16px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px">Try it once</span>
+          <span style="height:52px;border-radius:16px;background:var(--pri);color:var(--onPri);display:flex;align-items:center;justify-content:center;font-family:var(--fH);font-weight:700;font-size:17px">Save skill</span>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1500},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;studio&quot;,&quot;studioDark&quot;],&quot;default&quot;:&quot;studio&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;gallery&quot;,&quot;drawer&quot;,&quot;teach1&quot;,&quot;teach2&quot;,&quot;teach3&quot;],&quot;default&quot;:&quot;gallery&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() { if (!window.TiloR) this.t = setInterval(() => { if (window.TiloR && window.TiloCity) { clearInterval(this.t); this.forceUpdate(); } }, 60); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const R = window.TiloR ? window.TiloR(React.createElement) : null;
+    const theme = this.props.theme ?? 'studio', device = this.props.device ?? 'desktop', view = this.props.view ?? 'gallery';
+    const ic = (n, s) => R ? R.ic(n, s) : null;
+    const ST = { 'Built-in': ['var(--sunk)', 'var(--ink2)'], Learning: ['var(--lilacSoft)', 'var(--lilacInk)'], Yours: ['var(--priSoft)', 'var(--priInk)'] };
+    const skills = [
+      ['Find hidden gems', 'Digs past the top-10 lists for places locals love.', 'Research', 'search', 'sky', 'Built-in', 12],
+      ['Compare options', 'Lines up 2 to 10 choices side by side and picks a winner.', 'Data', 'chart', 'teal', 'Built-in', 31],
+      ['Write a friendly reply', 'Drafts a reply in your voice, ready for you to send.', 'Email', 'mail', 'pink', 'Yours', 48],
+      ['Plan a route', 'Turns a list of stops into a day-by-day route.', 'Planning', 'flag', 'amber', 'Built-in', 9],
+      ['Summarise a long read', 'Turns a 40-page PDF into one clear page.', 'Writing', 'doc', 'lilac', 'Built-in', 22],
+      ['Check invoices', 'Matches invoices to orders and flags anything odd.', 'Data', 'coin', 'mint', 'Learning', 17],
+      ['Book a meeting', 'Finds a time that suits everyone and sends invites.', 'Planning', 'clock', 'pri', 'Learning', 6],
+      ['Weekly team update', 'Collects what everyone did and writes the Friday note.', 'Writing', 'people', 'sky', 'Yours', 4]
+    ].map(([name, what, cat, i, c, st, used], k) => ({ name, what, cat, st, used, sbg: ST[st][0], sfg: ST[st][1], bg: `var(--${c}Soft)`, fg: `var(--${c}Ink)`, ic: ic(i, 28), icS: ic(i, 22), bd: view === 'drawer' && k === 0 ? 'var(--pri)' : 'var(--line)' }));
+    const cats = ['All', 'Research', 'Writing', 'Email', 'Planning', 'Data'].map((label, i) => ({ label, bg: i === 0 ? 'var(--ink)' : 'var(--card)', fg: i === 0 ? 'var(--bg)' : 'var(--ink)', bd: i === 0 ? 'var(--ink)' : 'var(--line)' }));
+    const steps = [['Read what you’re after and where', false], ['Search forums, map reviews and local blogs', false], ['Drop anything from the big top-10 lists', false], ['Check each place is open and reachable', false], ['Write a short note on why each one is worth it', false]].map(([t, ask], i) => ({ n: i + 1, t, ask }));
+    const tSteps = [['Collect last week’s updates from Slack and email', false], ['Group them by person and project', false], ['Write a friendly Friday note, under 300 words', false], ['Show me the draft', true], ['Send it to the #team channel', true]].map(([t, on], i) => ({ n: i + 1, t, abg: on ? 'var(--amberSoft)' : 'var(--sunk)', afg: on ? 'var(--amberInk)' : 'var(--ink3)', tbg: on ? 'var(--amber)' : 'var(--line2)', tj: on ? 'flex-end' : 'flex-start' }));
+    const art = (kit, st, hgt, d, a) => R ? [R.bld(kit, st, hgt, d), a ? R.agent('builder', 'focused', hgt * .45) : null] : null;
+    const ts = view === 'teach1' ? 1 : view === 'teach2' ? 2 : 3, isT = view.startsWith('teach');
+    const W = [['library', 'Describe it', 'research'], ['workshop', 'Show an example', 'analysis'], ['desk', 'Review the steps', 'delivery']].map(([k, label, d], i) => [k, i + 1 < ts ? 'complete' : i + 1 === ts ? 'construction' : 'planned', label, d]);
+    const wiz = W.map(([k, s, label, d], i) => { const done = i + 1 < ts, cur = i + 1 === ts; return { art: art(k, s, 130, d, cur), label, n: done ? '✓' : String(i + 1), bg: cur ? 'var(--pri)' : 'var(--card)', fg: cur ? 'var(--onPri)' : done ? 'var(--ink)' : 'var(--ink3)', nbg: done ? 'var(--mint)' : 'var(--card)', nfg: done ? '#FFFFFF' : 'var(--priInk)' }; });
+    const wizS = W.map(([k, s, label, d], i) => ({ art: art(k, s, 88, d, i + 1 === ts), n: i + 1 < ts ? '✓' : String(i + 1), nbg: i + 1 < ts ? 'var(--mint)' : 'var(--pri)', nfg: i + 1 < ts ? '#FFFFFF' : 'var(--onPri)' }));
+    const ways = [['Describe it', 'Write it in plain words', 'doc'], ['Show me once', 'Record your screen', 'eye'], ['Upload a guide', 'A doc or past example', 'parcel']].map(([t, s, i], k) => ({ t, s, ic: ic(i, 18), bd: k === 0 && ts === 1 ? '2px solid var(--ink)' : '1px solid var(--line)', bg: k === 0 && ts === 1 ? 'var(--sunk)' : 'var(--card)' }));
+    const learning = [['Check invoices', 'Learning from Ravi · started Monday', 'Practice run 3 of 5', '60%', 'Matched 41 of 42 invoices. Asked about one with no order number.', 'coin', 'mint'], ['Book a meeting', 'Learning from you · started Tuesday', 'Practice run 1 of 3', '33%', 'Found a slot for 4 people, but forgot Lin is in Singapore. Fixed.', 'clock', 'pri']].map(([n, who, run, pct, last, i, c]) => ({ n, who, run, pct, last, ic: ic(i, 26), bg: `var(--${c}Soft)`, fg: `var(--${c}Ink)` }));
+    return {
+      theme, desk: device === 'desktop', phone: device === 'phone', notTeach: !isT, drawer: view === 'drawer', teach: isT, t1: ts === 1, t2: ts === 2, t3: ts === 3, stepLabel: 'Step ' + ts + ' of 3',
+      skills, cats, steps, tSteps, wiz, wizS, ways, learning, iPeopleS: ic('people', 18),
+      ins: [['#', '#design and #launch', '14 messages this week'], ['@', 'Email from Lin', 'Brightcell quote, Wed'], ['N', 'Notion: Sprint board', '6 cards moved to Done']].map(([m, t, s]) => ({ m, t, s })),
+      exOut: [['1', 'Half Moon Beach', '20-minute cliff path, no shops'], ['2', 'Paradise Beach', 'Boat from Om Beach, best before noon'], ['3', 'Nirvana Beach', 'Long, empty, great at sunset']].map(([n, t, s]) => ({ n, t, s })),
+      iSearch: ic('search', 20), iBig: ic('search', 34), iMid: ic('search', 26), iPeople: ic('people', 24)
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -50,7 +50,7 @@ from _handoff_lib import (
     settle,
     write_partners,
 )
-from hypothesis import given, settings
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 
 GRANT_ID = re.compile(r"(?i)dg_[0-9A-HJKMNP-TV-Z]{26}")
@@ -623,7 +623,28 @@ def test_FR_CON_20_a_refusal_never_holds_the_text_or_the_secret():
     assert grant.id in str(ei.value) or "art_notes" in str(ei.value) or "DG-05" in str(ei.value)
 
 
+# Invisible or direction-changing code points (DG-05, BH-05): Unicode tag characters U+E0000..U+E007F, bidi embeddings,
+# overrides and isolates, deprecated format controls, interlinear annotation. An independent oracle, not the module's.
+_HIDDEN = re.compile("[\U000e0000-\U000e007f‪-‮⁦-⁩⁪-⁯￹-￻]")
+
+
+def _expect_exact_or_hidden_refusal(env, grant, requested, expected):
+    """An excerpt is exactly `expected`, unless it holds a hidden code point: then it is refused (DG-05), whole."""
+    if _HIDDEN.search(expected):
+        with pytest.raises(errs().HandoffRefused) as ei:
+            excerpts_for(env, grant, [_req("art_p", 1, requested)])
+        _assert_rule(ei, "DG-05")
+    else:
+        (ex,) = excerpts_for(env, grant, [_req("art_p", 1, requested)])
+        assert ex.text == expected
+
+
 @settings(max_examples=60, deadline=None)
+@example(text="\U000e0000", span=(0, 1))
+@example(text="\U000e0041", span=(0, 1))
+@example(text="\U000e007f", span=(0, 1))
+@example(text="ab\U000e0041cd", span=(0, 2))  # the cut is clean, the whole text is not
+@example(text="‮", span=(0, 1))
 @given(
     text=st.text(alphabet=st.characters(blacklist_categories=("Cs", "Cc")), min_size=1, max_size=300),
     span=st.tuples(st.integers(0, 299), st.integers(1, 300)),
@@ -635,10 +656,22 @@ def test_FR_CON_20_property_an_excerpt_is_exactly_the_requested_part_of_the_gran
     i = min(span[0], len(text) - 1)
     j = min(max(span[1], i + 1), len(text))
     part = text[i:j]
-    (ex,) = excerpts_for(env, grant, [_req("art_p", 1, part)])
-    assert ex.text == part
-    (whole,) = excerpts_for(env, grant, [_req("art_p", 1, None)])
-    assert whole.text == text
+    _expect_exact_or_hidden_refusal(env, grant, part, part)
+    _expect_exact_or_hidden_refusal(env, grant, None, text)
+
+
+@pytest.mark.parametrize("tag", ["\U000e0000", "\U000e0020", "\U000e0041", "\U000e007f"])
+def test_FR_CON_20_a_unicode_tag_character_never_reaches_an_excerpt_and_the_refusal_is_dg_05(tag):
+    env = make_env()
+    env.artifacts.put("art_p", 1, f"ab{tag}cd")
+    grant = create_grant(env, grant_items(("art_p", 1, "P")))
+    for requested in (None, "b" + tag, tag, tag + "c"):  # the whole text and any cut that holds the tag character
+        with pytest.raises(errs().HandoffRefused) as ei:
+            excerpts_for(env, grant, [_req("art_p", 1, requested)])
+        _assert_rule(ei, "DG-05")
+        assert tag not in str(ei.value) and "ab" not in str(ei.value)
+    (ex,) = excerpts_for(env, grant, [_req("art_p", 1, "ab")])  # a cut that holds none is still given, exactly
+    assert ex.text == "ab"
 
 
 # --- acceptance through the whole handoff -----------------------------------------------------------------------

@@ -1,0 +1,137 @@
+/* Library page (OLD-UI-OUT wave 3). No design export covers it, so it is built from the Ledger's page vocabulary
+   (title, lede, KPI row, cards) in the park role tokens. Every selector sits under [data-park]. No motion. */
+
+[data-park] .park-library-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+[data-park] .park-library-title {
+  margin: 0;
+  font-family: "Nunito", sans-serif;
+  font-weight: 900;
+  font-size: 36px;
+  letter-spacing: -0.8px;
+  line-height: 1.05;
+}
+[data-park] .park-library-lede {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-library-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+[data-park] .park-library-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 20px 22px;
+  border: 1px solid var(--line2);
+  border-radius: 22px;
+  background: var(--card);
+}
+[data-park] .park-library-cardhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+[data-park] .park-library-cardtitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+[data-park] .park-library-search {
+  box-sizing: border-box;
+  min-width: 220px;
+  padding: 8px 12px;
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-14);
+}
+[data-park] .park-library-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+[data-park] .park-library-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line2);
+}
+[data-park] .park-library-row:first-child {
+  border-top: 0;
+}
+[data-park] .park-library-rowmain {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+[data-park] .park-library-rowname {
+  font-size: 15px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-library-rowsub {
+  font-size: var(--text-14);
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-library-note {
+  margin: 0;
+  font-size: var(--text-14);
+  font-weight: 600;
+  color: var(--ink2);
+}
+[data-park] .park-library-state {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* the search field takes the same focus ring as every park control and a 44 px target */
+[data-park] .park-library-search {
+  min-height: 44px;
+}
+[data-park] .park-library-search:focus-visible {
+  outline: 3px solid #5a3fe0;
+  outline-offset: 2px;
+}
+[data-park] .park-library-rowmain {
+  flex: 1 1 auto;
+}
+/* a phone: the card fits the 16 px gutters, the search takes the width, a row stacks its action under its words */
+@media (max-width: 520px) {
+  [data-park] .park-library-title {
+    font-size: 30px;
+  }
+  [data-park] .park-library-card {
+    padding: 16px;
+    border-radius: 18px;
+  }
+  [data-park] .park-library-search {
+    min-width: 0;
+    width: 100%;
+  }
+  [data-park] .park-library-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -11,6 +11,11 @@ store's next version ahead of EV-15's (#393), so every refusal known before a pu
 kind, size and text (UTF-8, not blank), a parent the world recorded (then put as that checked ref), and a dry run of
 the manifest (claims MF-01, MF-06, sources). Only refusals the store alone sees can still leave such a version (the
 store has no purge API).
+A PDF is the one file a unit may store, and only as a `RenderedPdf` (LW-10): `deliverable.render_output` makes it from a
+validated DeliverableSpec by `tilo_render.pdf.render_pdf`, in process, and `keep` stores it with origin `render` (no
+agent) under the same AR-05 key, up to `MAX_PDF` bytes. Any other `UnitOutput` stays text or JSON only (AR-04).
+The store cannot redact a file, so `keep` runs the redactor over the spec's text (`spec_text`) and refuses the unit if
+it would change anything (AR-07 for a file: a secret never reaches a stored PDF).
 `existing` accepts refs of versions the store holds in the run's Scope (AR-03) and the world recorded (`recorded`).
 """
 
@@ -18,7 +23,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from tilo_connectors.provenance import build_manifest
 from tilo_memory.artifacts import (
@@ -30,8 +35,11 @@ from tilo_memory.artifacts import (
     Origin,
     StoredVersion,
 )
+from tilo_memory.website_check import check_website
+from tilo_providers.diagnostics import log_caught
 
 MAX_OUTPUTS = 10  # a unit's cap (BQ-257)
+MAX_PDF = 20 * 1024 * 1024  # a rendered PDF's cap (LW-10); the store's own file cap is 50 MB
 _LABEL_MAX = 80  # event.schema.json item.label
 _DRY_REF = {"artifact_id": "art_preflight", "version": 1}  # the manifest dry run's stand-in for a new artifact
 
@@ -54,9 +62,58 @@ class UnitOutput:
 
 
 @dataclass(frozen=True)
+class RenderedPdf(UnitOutput):
+    """A PDF that `tilo_render` made from a validated spec (LW-10). Only `deliverable.render_output` builds one; `keep`
+    stores exactly this type (not a subclass) as origin `render`, and nothing else as a file. `spec_text` is the
+    validated spec as JSON: what the PDF says, for the redactor."""
+
+    spec_text: str = ""
+
+    def __post_init__(self) -> None:
+        if self.media_type != "application/pdf" or not isinstance(self.content, bytes):
+            raise ValueError("a rendered PDF is application/pdf bytes")
+        if not self.content.startswith(b"%PDF-") or len(self.content) > MAX_PDF:
+            raise ValueError(f"a rendered PDF starts with %PDF- and is at most {MAX_PDF} bytes")
+
+
+@dataclass(frozen=True)
+class WebsiteHtml(UnitOutput):
+    """One website HTML file (WEB-1, WS-01). Only `website.website_output` builds one, from a writer's `deliver` unit
+    of a native website, after the static checker passed; `keep` stores exactly this type as `text/html` (origin
+    unit) and refuses any other output that claims HTML. The store runs the checker again on the bytes it keeps."""
+
+    def __post_init__(self) -> None:
+        if self.media_type != "text/html" or type(self.content) is not bytes:
+            raise ValueError("a website is text/html bytes")
+
+
+@dataclass(frozen=True)
 class Kept:
     version: StoredVersion
     label: str | None
+
+
+OFFICE_TYPES = {
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
+
+
+@dataclass(frozen=True)
+class RenderedOffice(UnitOutput):
+    """Office bytes from the authenticated renderer; spec text is checked before storage."""
+
+    spec_text: str = ""
+
+    def __post_init__(self) -> None:
+        if (
+            self.media_type not in OFFICE_TYPES
+            or type(self.content) is not bytes
+            or not 4 < len(self.content) <= MAX_PDF
+            or not self.content.startswith(b"PK\x03\x04")
+        ):
+            raise ValueError("a rendered Office file must be bounded OOXML bytes")
 
 
 def existing(artifacts: Any, scope: Any, refs: Any, recorded: Callable[[str], int]) -> list[dict[str, Any]]:
@@ -93,6 +150,9 @@ def keep(
     """Stores every output and its manifest, or raises OutputRefused (see the module docstring)."""
     if not isinstance(outputs, list | tuple) or len(outputs) > MAX_OUTPUTS:
         raise OutputRefused(f"outputs must be a list of at most {MAX_OUTPUTS}")
+    pages = [out for out in outputs if type(out) is WebsiteHtml]
+    if pages and (len(pages) > 1 or unit.get("role") != "writer" or unit.get("unit_type") != "deliver"):
+        raise OutputRefused("only a writer's deliver unit may output one website HTML file")  # WS-01
     for out in outputs:
         if not isinstance(out, UnitOutput) or not isinstance(out.content, bytes):
             raise OutputRefused("an output is not a UnitOutput with bytes content")
@@ -100,6 +160,12 @@ def keep(
         plain = type(label) is str and 0 < len(label) <= _LABEL_MAX and label.isprintable()
         if label is not None and not (plain and redact(label) == label):
             raise OutputRefused("an output label is not 1 to 80 characters free of secrets")
+        if (
+            type(out) in (RenderedPdf, RenderedOffice)
+            and redact(cast(RenderedPdf | RenderedOffice, out).spec_text)
+            != cast(RenderedPdf | RenderedOffice, out).spec_text
+        ):  # a PDF cannot be redacted
+            raise OutputRefused("a rendered report holds a secret")
 
     def manifest_of(out: UnitOutput, ref: Any, content: bytes, parents: Any, sources: Any) -> dict[str, Any]:
         return build_manifest(
@@ -133,6 +199,7 @@ def keep(
         for item, out in zip(kept, outputs, strict=True):
             _manifest(artifacts, scope, item.version, out, manifest_of)
     except Exception as error:  # a refused put or manifest, a backend error: the unit fails, nothing announced
+        log_caught(error, __name__, locals())
         raise OutputRefused(type(error).__name__) from None
     return kept
 
@@ -143,9 +210,20 @@ def _preflight(
     """Raises for what the store or the manifest would refuse that is known before a put: a unit's kind, size and
     text (UTF-8, not blank; AR-04), a parent the world never recorded, and a dry run of the manifest (claims, sources;
     MF-01, MF-06). Returns the parent as the store's own ref, or None."""
-    if out.media_type not in TEXT_TYPES or not 0 < memoryview(out.content).nbytes <= MAX_TEXT:
+    if type(out) is RenderedPdf:  # frozen, but re-checked: the file kind is only ever the render path's
+        if out.media_type != "application/pdf" or not 5 < len(out.content) <= MAX_PDF or out.content[:5] != b"%PDF-":
+            raise OutputRefused("a rendered PDF is not %PDF- bytes of at most 20 MiB")
+    elif type(out) is RenderedOffice:
+        try:
+            RenderedOffice.__post_init__(out)
+        except ValueError:
+            raise OutputRefused("a rendered Office file is not bounded OOXML bytes") from None
+    elif type(out) is WebsiteHtml:
+        if not check_website(bytes(memoryview(out.content))).ok:  # WS-09: the store checks again after the redactor
+            raise OutputRefused("a website did not pass the static checks")
+    elif out.media_type not in TEXT_TYPES or not 0 < memoryview(out.content).nbytes <= MAX_TEXT:
         raise OutputRefused("an output is not 1 byte to 2 MB of text or JSON")
-    if not bytes(memoryview(out.content)).decode("utf-8").strip():  # UnicodeDecodeError on bad UTF-8
+    elif not bytes(memoryview(out.content)).decode("utf-8").strip():  # UnicodeDecodeError on bad UTF-8
         raise OutputRefused("an output's text is blank")
     parents = existing(artifacts, scope, [out.parent], recorded) if out.parent is not None else []
     ref = {"artifact_id": parents[0]["artifact_id"], "version": parents[0]["version"] + 1} if parents else _DRY_REF
@@ -167,7 +245,9 @@ def _put(
         media_type=out.media_type,
         content=bytes(memoryview(out.content)),  # the buffer's bytes: never a subclass's len() or __bytes__
         run_id=run_id,
-        origin=Origin(kind="unit", unit=unit["id"], agent=worker),
+        origin=Origin(kind="render", unit=unit["id"], agent=None)
+        if type(out) in (RenderedPdf, RenderedOffice)
+        else Origin(kind="unit", unit=unit["id"], agent=worker),
         sources=tuple(dict(source) for source in out.sources),
         idempotency_key=f"{run_id}:{unit['id']}:{at}",
         parent=parent,  # the ref the preflight checked, never the runner's object again

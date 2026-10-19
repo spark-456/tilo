@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div data-screen-label="Agenda" style="background:var(--sheet);border:1px solid var(--gBd);border-radius:28px;box-shadow:var(--sh);padding:28px 32px 36px;display:flex;flex-direction:column;gap:30px">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <h1 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:36px;letter-spacing:-.8px;line-height:1.05">Agenda</h1>
+      <p style="margin:0;font-size:15.5px;font-weight:600;color:var(--ink2)">Thursday 24 September. Pins from your team and Tilo, and a week that stays in sync.</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <div style="height:40px;padding:0 14px 0 6px;box-sizing:border-box;border-radius:999px;background:var(--btn2);border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:var(--ink2);white-space:nowrap"><span style="width:28px;height:28px;border-radius:99px;background:var(--okSoft);color:var(--ok);display:flex;align-items:center;justify-content:center">{{ icCheck }}</span>Google Calendar · synced just now</div>
+      <button onClick="{{ find }}" style="height:42px;padding:0 18px 0 14px;border:0;border-radius:12px;background:var(--hero);color:#FFFFFF;font-size:15px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap" style-hover="filter:brightness(1.08)">{{ icCal }}Find a time</button>
+    </div>
+  </div>
+
+  <section aria-label="Boards" style="display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div><h2 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:24px;letter-spacing:-.4px">Boards</h2><div style="font-size:14.5px;font-weight:600;color:var(--ink2);margin-top:3px">Anyone on the team can pin. Tilo pins action items from meetings and things that need you.</div></div>
+      <div role="radiogroup" aria-label="Board style" style="position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));background:var(--seg);border-radius:12px;padding:3px;width:220px">
+        <div style="position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / 2);border-radius:9px;background:var(--tabOn);box-shadow:0 1px 3px rgba(31,29,43,.16);transform:translateX({{ styleX }});transition:transform .4s cubic-bezier(.34,1.3,.5,1)"></div>
+        <button role="radio" aria-checked="{{ isCork }}" onClick="{{ setCork }}" style="position:relative;height:34px;border:0;background:transparent;color:{{ corkFg }};font-weight:800;font-size:14px;cursor:pointer;transition:color .25s">Pinboard</button>
+        <button role="radio" aria-checked="{{ isSoft }}" onClick="{{ setSoft }}" style="position:relative;height:34px;border:0;background:transparent;color:{{ softFg }};font-weight:800;font-size:14px;cursor:pointer;transition:color .25s">Grouped</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:18px;align-items:start">
+      <sc-for list="{{ boards }}" as="b" hint-placeholder-count="2">
+        <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:42px;height:42px;border-radius:13px;background:{{ b.iconBg }};display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ b.icon }}</div>
+            <div style="flex:1;min-width:0;line-height:1.3"><div style="font-size:17px;font-weight:800">{{ b.title }}</div><div style="font-size:13px;color:var(--ink2);font-weight:600">{{ b.sub }}</div></div>
+            <span style="font-size:13px;font-weight:800;color:var(--ink2)">{{ b.count }}</span>
+          </div>
+          <sc-if value="{{ isCork }}" hint-placeholder-val="{{ true }}">
+            <div style="background-color:var(--cork);background-image:radial-gradient(var(--corkDot) 1px,transparent 1.4px);background-size:9px 9px;border:9px solid var(--corkFrame);border-radius:24px;padding:24px 18px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,170px),1fr));gap:24px 16px;box-shadow:inset 0 2px 8px rgba(0,0,0,.12);animation:tiloFade .4s cubic-bezier(.2,.8,.2,1) both">
+              <sc-for list="{{ b.pins }}" as="p" hint-placeholder-count="5">
+                <div style="position:relative;background:{{ p.paper }};border:{{ p.paperBd }};transform:rotate({{ p.rot }});border-radius:3px 3px 14px 3px;padding:20px 13px 11px;min-height:150px;box-sizing:border-box;box-shadow:0 1px 1px rgba(0,0,0,.08),0 12px 18px -12px rgba(60,40,10,.55);display:flex;flex-direction:column;gap:6px;color:#1F1D2B;opacity:{{ p.op }};transition:transform .45s cubic-bezier(.34,1.4,.5,1),box-shadow .3s,opacity .3s" style-hover="transform:rotate(0deg) translateY(-4px) scale(1.03);box-shadow:0 2px 2px rgba(0,0,0,.08),0 22px 28px -14px rgba(60,40,10,.6)">
+                  <span style="position:absolute;top:-8px;left:50%;margin-left:-8px;width:16px;height:16px;border-radius:99px;background:{{ p.pinC }};box-shadow:inset -2px -3px 0 rgba(0,0,0,.22),0 3px 4px rgba(0,0,0,.35)"></span>
+                  <sc-if value="{{ p.suggested }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:900;color:#4A31CC;letter-spacing:.5px">TILO SUGGESTS</span></sc-if>
+                  <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;line-height:1.18;text-decoration:{{ p.deco }};text-wrap:pretty">{{ p.title }}</div>
+                  <div style="font-size:12.5px;font-weight:600;color:#4A4655;line-height:1.4;text-wrap:pretty">{{ p.note }}</div>
+                  <div style="flex:1"></div>
+                  <sc-if value="{{ p.suggested }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;gap:6px">
+                      <button onClick="{{ p.accept }}" style="flex:1;height:32px;border:0;border-radius:9px;background:#5A3FE0;color:#FFFFFF;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap">{{ p.acceptLabel }}</button>
+                      <button onClick="{{ p.dismiss }}" style="height:32px;padding:0 10px;border:1px solid rgba(31,29,43,.2);border-radius:9px;background:transparent;color:#1F1D2B;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap">Not now</button>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ p.hasAct }}" hint-placeholder-val="{{ false }}"><button onClick="{{ p.act }}" style="height:30px;border:0;border-radius:9px;background:#F0A500;color:#1F1D2B;font-weight:800;font-size:12.5px;cursor:pointer;white-space:nowrap">{{ p.actL }}</button></sc-if>
+                  <sc-if value="{{ p.regular }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span style="width:26px;height:26px;border-radius:99px;background:rgba(255,255,255,.75);display:flex;align-items:{{ p.avAlign }};justify-content:center;overflow:hidden;flex:none;font-size:10.5px;font-weight:900">{{ p.av }}</span>
+                      <span style="flex:1;min-width:0;font-size:11.5px;font-weight:800;color:#4A4655;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.due }}</span>
+                      <button onClick="{{ p.toggle }}" aria-label="{{ p.checkL }}" style="width:28px;height:28px;border-radius:99px;border:1.5px solid rgba(31,29,43,.3);background:{{ p.checkBg }};color:#FFFFFF;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;padding:0;transition:background-color .2s,transform .25s cubic-bezier(.34,1.6,.5,1)" style-active="transform:scale(.85)">{{ p.checkIc }}</button>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+              <div style="border:2px dashed rgba(127,100,60,.4);border-radius:14px;min-height:150px;padding:13px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;justify-content:center">
+                <input aria-label="{{ b.addLabel }}" value="{{ b.newVal }}" onChange="{{ b.onNew }}" onKeyDown="{{ b.onKey }}" placeholder="Pin something…" style="height:38px;border:0;border-radius:9px;background:rgba(255,255,255,.8);padding:0 12px;font-size:14px;font-weight:700;color:#1F1D2B;outline:none"></input>
+                <button onClick="{{ b.add }}" style="height:34px;border:0;border-radius:9px;background:rgba(31,29,43,.86);color:#FFFFFF;font-weight:800;font-size:13.5px;cursor:pointer">Pin it</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isSoft }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:14px;display:flex;flex-direction:column;gap:14px;animation:tiloFade .4s cubic-bezier(.2,.8,.2,1) both">
+              <div style="height:42px;box-sizing:border-box;border-radius:12px;background:var(--sunk);display:flex;align-items:center;gap:8px;padding:0 6px 0 12px;color:var(--ink2)">{{ icPlusS }}<input aria-label="{{ b.addLabel }}" value="{{ b.newVal }}" onChange="{{ b.onNew }}" onKeyDown="{{ b.onKey }}" placeholder="Pin something…" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:14px;font-weight:600;color:var(--ink)"></input><button onClick="{{ b.add }}" style="height:32px;padding:0 12px;border:0;border-radius:9px;background:var(--hero);color:#FFFFFF;font-size:13px;font-weight:800;cursor:pointer">Pin</button></div>
+              <sc-for list="{{ b.groups }}" as="g" hint-placeholder-count="3">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <div style="font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--ink3);padding:2px 4px 0">{{ g.title }} · {{ g.n }}</div>
+                  <sc-for list="{{ g.pins }}" as="p" hint-placeholder-count="2">
+                    <div style="display:grid;grid-template-columns:6px minmax(0,1fr) auto;gap:12px;align-items:stretch;padding:10px 10px 10px 8px;border-radius:14px;background:{{ p.softBg }};border:{{ p.softBd }};opacity:{{ p.op }};animation:tiloFade .3s cubic-bezier(.2,.8,.2,1) both">
+                      <span style="border-radius:99px;background:{{ p.accent }}"></span>
+                      <div style="min-width:0;display:flex;flex-direction:column;gap:3px;line-height:1.35">
+                        <span style="font-size:14px;font-weight:800;text-decoration:{{ p.deco }}">{{ p.title }}</span>
+                        <span style="font-size:13px;font-weight:600;color:var(--ink2);text-wrap:pretty">{{ p.note }}</span>
+                        <sc-if value="{{ p.suggested }}" hint-placeholder-val="{{ false }}"><span style="display:flex;gap:6px;margin-top:4px"><button onClick="{{ p.accept }}" style="height:30px;padding:0 12px;border:0;border-radius:9px;background:var(--hero);color:#FFFFFF;font-weight:800;font-size:12.5px;cursor:pointer;white-space:nowrap">{{ p.acceptLabel }}</button><button onClick="{{ p.dismiss }}" style="height:30px;padding:0 10px;border:1px solid var(--line);border-radius:9px;background:var(--btn2);color:var(--ink);font-weight:800;font-size:12.5px;cursor:pointer;white-space:nowrap">Not now</button></span></sc-if>
+                        <sc-if value="{{ p.regular }}" hint-placeholder-val="{{ true }}"><span style="display:flex;align-items:center;gap:8px;margin-top:3px;flex-wrap:wrap"><span style="font-size:12px;font-weight:800;color:{{ p.dueC }}">{{ p.due }}</span><sc-if value="{{ p.hasAct }}" hint-placeholder-val="{{ false }}"><button onClick="{{ p.act }}" style="height:26px;padding:0 10px;border:0;border-radius:8px;background:#F0A500;color:#1F1D2B;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap">{{ p.actL }}</button></sc-if></span></sc-if>
+                      </div>
+                      <sc-if value="{{ p.regular }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-direction:column;align-items:center;gap:8px"><span style="width:30px;height:30px;border-radius:10px;background:{{ p.avBg }};display:flex;align-items:{{ p.avAlign }};justify-content:center;overflow:hidden;font-size:11px;font-weight:800;color:#1F1D2B">{{ p.av }}</span><button onClick="{{ p.toggle }}" aria-label="{{ p.checkL }}" style="width:24px;height:24px;border-radius:8px;border:2px solid {{ p.checkBd }};background:{{ p.checkBgS }};color:#FFFFFF;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">{{ p.checkIc }}</button></div></sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section aria-label="This week" style="display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div><h2 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:24px;letter-spacing:-.4px">This week · {{ weekRange }}</h2><div style="font-size:14.5px;font-weight:600;color:var(--ink2);margin-top:3px">{{ weekSummary }}</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <sc-for list="{{ cals }}" as="c" hint-placeholder-count="3"><button onClick="{{ c.toggle }}" aria-pressed="{{ c.on }}" style="height:34px;padding:0 12px 0 10px;border-radius:999px;border:1px solid var(--line);background:var(--btn2);color:var(--ink);font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:7px;opacity:{{ c.op }};white-space:nowrap;transition:opacity .2s"><span style="width:10px;height:10px;border-radius:3px;background:{{ c.c }}"></span>{{ c.label }}</button></sc-for>
+        <button onClick="{{ toggleWeekend }}" aria-pressed="{{ weekend }}" style="height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:{{ wkBg }};color:{{ wkFg }};font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;transition:background-color .2s">Weekend</button>
+      </div>
+    </div>
+
+    <sc-if value="{{ finding }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--heroSoft);border-radius:18px;padding:10px 12px 10px 10px;animation:tiloFade .35s cubic-bezier(.2,.8,.2,1) both">
+        <div style="width:44px;height:44px;border-radius:13px;background:var(--card);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;flex:none">{{ findAgent }}</div>
+        <div style="flex:1 1 300px;line-height:1.35"><div style="font-weight:800;font-size:15px">K1 Level 3 gate review · 30 min · Alex, Jin, Priya, Tom</div><div style="font-size:13.5px;color:var(--ink2);font-weight:600">Tilo checked all four calendars. Pick a dashed slot to book it.</div></div>
+        <button onClick="{{ cancelFind }}" style="height:36px;padding:0 14px;border-radius:11px;border:1px solid var(--line);background:var(--btn2);color:var(--ink);font-weight:800;font-size:13.5px;cursor:pointer">Cancel</button>
+      </div>
+    </sc-if>
+
+    <div style="display:grid;grid-template-columns:{{ cols }};gap:18px;align-items:start">
+      <div style="background:var(--card);border:1px solid var(--line2);border-radius:22px;overflow:hidden;min-width:0">
+        <div style="display:grid;grid-template-columns:{{ cal.cols }};border-bottom:1px solid var(--line2)">
+          <div></div>
+          <sc-for list="{{ cal.days }}" as="d" hint-placeholder-count="5">
+            <div style="padding:10px 10px 9px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--line2);background:{{ d.headBg }};min-width:0">
+              <div style="display:flex;align-items:center;gap:7px"><span style="font-size:12px;font-weight:800;color:{{ d.fg }}">{{ d.name }}</span><span style="min-width:26px;height:26px;padding:0 4px;box-sizing:border-box;border-radius:99px;background:{{ d.numBg }};color:{{ d.numFg }};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800">{{ d.num }}</span></div>
+              <div style="font-size:11.5px;font-weight:700;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.load }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:{{ cal.cols }};position:relative;height:{{ cal.height }}">
+          <div style="position:relative"><sc-for list="{{ cal.hours }}" as="hr" hint-placeholder-count="9"><div style="position:absolute;right:8px;top:{{ hr.top }};transform:translateY(-50%);font-size:11px;font-weight:700;color:var(--ink3)">{{ hr.t }}</div></sc-for></div>
+          <sc-for list="{{ cal.days }}" as="d" hint-placeholder-count="5">
+            <div style="position:relative;border-left:1px solid var(--line2);background-color:{{ d.colBg }};background-image:repeating-linear-gradient(to bottom,var(--line2) 0 1px,transparent 1px 52px)">
+              <sc-for list="{{ d.events }}" as="e" hint-placeholder-count="2">
+                <button onClick="{{ e.pick }}" style="position:absolute;left:3px;right:3px;top:{{ e.top }};height:{{ e.h }};border:0;border-left:3px solid {{ e.bar }};border-radius:8px;background:{{ e.bg }};color:{{ e.fg }};box-shadow:{{ e.ring }};padding:{{ e.pad }};display:flex;flex-direction:column;gap:1px;text-align:left;cursor:pointer;overflow:hidden;box-sizing:border-box;opacity:{{ e.op }};transition:box-shadow .2s,transform .2s" style-hover="transform:translateY(-1px)">
+                  <span style="display:flex;align-items:center;gap:4px;min-width:0;width:100%"><span style="font-weight:800;font-size:12px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0">{{ e.title }}</span><sc-if value="{{ e.joins }}" hint-placeholder-val="{{ false }}"><span style="flex:none;display:flex;width:16px;height:16px;border-radius:99px;background:var(--card);align-items:flex-end;justify-content:center;overflow:hidden">{{ e.badge }}</span></sc-if></span>
+                  <sc-if value="{{ e.tall }}" hint-placeholder-val="{{ true }}"><span style="font-size:11px;font-weight:700;opacity:.8;white-space:nowrap">{{ e.time }}</span></sc-if>
+                </button>
+              </sc-for>
+              <sc-for list="{{ d.slots }}" as="s" hint-placeholder-count="0">
+                <button onClick="{{ s.book }}" style="position:absolute;left:3px;right:3px;top:{{ s.top }};height:{{ s.h }};border:2px dashed var(--hero);border-radius:8px;background:var(--pop);color:var(--heroInk);font-weight:800;font-size:11.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;overflow:hidden;box-sizing:border-box;animation:tiloGhost 1.6s ease-in-out infinite" style-hover="background:var(--heroSoft)">{{ icPlusS }}{{ s.label }}</button>
+              </sc-for>
+              <sc-if value="{{ d.today }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:-4px;right:0;top:{{ cal.nowTop }};height:2px;background:var(--red);pointer-events:none"><span style="position:absolute;left:0;top:-4px;width:10px;height:10px;border-radius:99px;background:var(--red)"></span></div></sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <aside aria-label="Event detail" style="position:sticky;top:96px;background:var(--card);border:1px solid var(--line2);border-radius:22px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:3px;background:{{ ev.bar }}"></span><span style="font-size:12.5px;font-weight:800;color:var(--ink2)">{{ ev.calLabel }}</span></div>
+          <div style="font-size:20px;font-weight:800;line-height:1.2;letter-spacing:-.2px">{{ ev.title }}</div>
+          <div style="font-size:13.5px;font-weight:700;color:var(--ink2)">{{ ev.when }}</div>
+        </div>
+        <div style="display:flex;align-items:center">
+          <sc-for list="{{ ev.people }}" as="p" hint-placeholder-count="3"><span style="width:32px;height:32px;border-radius:99px;background:{{ p.c }};border:2px solid var(--pop);margin-right:-6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#1F1D2B">{{ p.i }}</span></sc-for>
+          <sc-if value="{{ ev.joins }}" hint-placeholder-val="{{ false }}"><span style="width:32px;height:32px;border-radius:99px;background:var(--heroSoft);border:2px solid var(--pop);display:flex;align-items:flex-end;justify-content:center;overflow:hidden">{{ ev.tiloFace }}</span></sc-if>
+        </div>
+        <sc-if value="{{ ev.hasBrief }}" hint-placeholder-val="{{ false }}">
+          <div style="background:var(--heroSoft);border-radius:16px;padding:13px 14px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-size:12px;font-weight:900;color:var(--heroInk);letter-spacing:.5px">TILO’S BRIEF</span><span style="font-size:12px;font-weight:700;color:var(--heroInk)">{{ ev.briefMeta }}</span></div>
+            <sc-for list="{{ ev.brief }}" as="x" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:8px minmax(0,1fr);gap:10px;font-size:13.5px;font-weight:600;line-height:1.4"><span style="width:6px;height:6px;border-radius:99px;background:var(--heroInk);margin-top:7px"></span><span>{{ x.t }}</span></div></sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ ev.needsBrief }}" hint-placeholder-val="{{ false }}"><button onClick="{{ ev.makeBrief }}" style="height:42px;border-radius:12px;border:1.5px dashed var(--hero);background:transparent;color:var(--heroInk);font-weight:800;font-size:14px;cursor:pointer">Ask Tilo for a brief</button></sc-if>
+        <sc-if value="{{ ev.past }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:12px;font-weight:900;color:var(--ink3);letter-spacing:.5px">NOTES BY TILO</div>
+            <sc-for list="{{ ev.notes }}" as="x" hint-placeholder-count="3"><div style="font-size:13.5px;font-weight:600;line-height:1.45">{{ x.t }}</div></sc-for>
+            <div style="font-size:12px;font-weight:900;color:var(--ink3);letter-spacing:.5px;margin-top:4px">FOLLOW-UPS</div>
+            <sc-for list="{{ ev.actions }}" as="x" hint-placeholder-count="2">
+              <div style="display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;align-items:center;background:var(--sunk);border-radius:12px;padding:8px 10px">
+                <span style="width:28px;height:28px;border-radius:99px;background:{{ x.c }};display:flex;align-items:{{ x.al }};justify-content:center;font-size:10.5px;font-weight:900;overflow:hidden;color:#1F1D2B">{{ x.who }}</span>
+                <span style="min-width:0;line-height:1.3"><span style="display:block;font-weight:800;font-size:13.5px">{{ x.t }}</span><span style="display:block;font-size:12px;color:var(--ink2);font-weight:700">{{ x.s }}</span></span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ ev.empty }}" hint-placeholder-val="{{ false }}"><div style="font-size:13.5px;font-weight:600;color:var(--ink3)">No notes for this one.</div></sc-if>
+        <sc-if value="{{ ev.upcoming }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;border-top:1px solid var(--line2);padding-top:6px">
+            <sc-for list="{{ ev.toggles }}" as="g" hint-placeholder-count="3">
+              <button role="switch" aria-checked="{{ g.on }}" onClick="{{ g.flip }}" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 0;border:0;background:transparent;text-align:left;cursor:pointer;color:var(--ink)">
+                <span style="line-height:1.3"><span style="display:block;font-weight:800;font-size:14px">{{ g.label }}</span><span style="display:block;font-size:12.5px;color:var(--ink2);font-weight:600">{{ g.sub }}</span></span>
+                <span style="width:44px;height:26px;border-radius:99px;background:{{ g.track }};padding:3px;box-sizing:border-box;display:flex;transition:background-color .2s"><span style="width:20px;height:20px;border-radius:99px;background:#FFFFFF;box-shadow:0 1px 3px rgba(31,29,43,.3);transform:{{ g.knob }};transition:transform .25s cubic-bezier(.3,1.3,.5,1)"></span></span>
+              </button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </aside>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;boardStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;cork&quot;,&quot;soft&quot;],&quot;default&quot;:&quot;cork&quot;,&quot;tsType&quot;:&quot;'cork'|'soft'&quot;}}">
+class Component extends DCLogic {
+  state = { style: null, newVal: { team: '', me: '' }, pins: null, cals: { work: true, personal: true, tilo: true }, weekend: false, sel: 'sync', finding: false, booked: null, flags: {}, briefed: {}, done: {} };
+  renderVals() {
+    const h = React.createElement, app = this.props.app || {}, TA = window.TiloApp, D = TA && TA.data;
+    if (!D) return {};
+    const K = TA.ready() ? TA.kit(h) : null, S = this.state, night = !!app.night, dec = app.dec || {}, go = app.go || (() => {}), toast = app.toast || (() => {});
+    const icon = (n, s) => K ? K.icon(n, s) : null, A = (a, s) => K ? K.agent(a, s, night) : null, up = p => this.setState(p), AG = D.agenda;
+    const fmt = t => { const hh = Math.floor(t), mm = Math.round((t - hh) * 60); return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'); };
+    const style = S.style ?? this.props.boardStyle ?? 'cork';
+    const allPins = S.pins || AG.pins;
+    const setPins = f => this.setState(s => ({ pins: f(s.pins || AG.pins) }));
+    const PAPER = { yellow: '#FFF1A8', pink: '#FCD9E6', blue: '#D7E7FC', green: '#DDF1D2', lilac: '#E6DEFC', amber: '#FFDD85', white: '#FFFFFF' };
+    const ACC = { yellow: '#E5C33A', pink: '#D9588C', blue: '#3F7FE0', green: '#76A035', lilac: '#8A74F0', amber: '#F0A500', white: '#5A3FE0' };
+    const PC = { AM: '#E6E1F8', PS: '#D9F0EE', JP: '#FBE4EE', TR: '#FDEBDD', SO: '#E2ECFB', NL: '#EDEBE4' };
+    const rots = ['-2deg', '1.5deg', '-1deg', '2.2deg', '-1.6deg', '1deg', '-2.4deg', '1.8deg'];
+    const isDone = p => p.dec ? !!dec[p.dec] : (S.done[p.id] != null ? S.done[p.id] : !!p.done);
+    const pinVM = (p, i) => {
+      const done = isDone(p), waiting = p.group === 'waiting' && !done, tilo = p.by === 'tilo';
+      const av = tilo ? A(p.role === 'director' ? { rank: 'director', expr: done ? 'delighted' : 'neutral' } : { role: p.role, expr: done ? 'delighted' : 'neutral' }, 26) : p.by;
+      return {
+        title: p.title, note: p.dec && dec[p.dec] ? 'Approved · £3,420 · K1 electric scooter' : p.note, due: done ? 'Done' : (p.due || ''), dueC: waiting ? 'var(--amberInk)' : 'var(--ink3)',
+        suggested: !!p.suggested, regular: !p.suggested, paper: PAPER[p.color] || '#FFF1A8', paperBd: p.suggested ? '2px dashed #8A74F0' : '0', rot: rots[i % rots.length], accent: ACC[p.color] || '#E5C33A',
+        pinC: tilo ? '#5A3FE0' : '#E2483D', av, avAlign: tilo ? 'flex-end' : 'center', avBg: tilo ? 'var(--heroSoft)' : (PC[p.by] || '#E6E1F8'),
+        op: done ? '.62' : '1', deco: done ? 'line-through' : 'none',
+        softBg: p.suggested ? 'var(--heroSoft)' : waiting ? 'var(--amberSoft)' : 'var(--sunk)', softBd: p.suggested ? '1.5px dashed var(--hero)' : waiting ? '1px solid var(--amberLine)' : '1px solid transparent',
+        checkBg: done ? '#1E8A4C' : 'transparent', checkBgS: done ? 'var(--ok)' : 'var(--card)', checkBd: done ? 'var(--ok)' : 'var(--line)', checkIc: done ? icon('check', 12) : null, checkL: done ? 'Mark as not done' : 'Mark as done',
+        hasAct: !!(p.dec && !dec[p.dec]) || !!(p.go && !done), actL: p.dec ? 'Review and approve' : 'Open', act: () => go('world', { id: p.dec ? 'k1' : p.go }),
+        acceptLabel: p.kind === 'find' ? 'Find a time' : 'Block it',
+        toggle: () => { if (p.dec) { if (!dec[p.dec]) go('world', { id: 'k1' }); return; } up({ done: { ...S.done, [p.id]: !done } }); },
+        dismiss: () => setPins(ps => ps.filter(q => q.id !== p.id)),
+        accept: () => {
+          if (p.kind === 'find') { this.findTime(); return; }
+          setPins(ps => ps.map(q => q.id === p.id ? { ...q, suggested: false, title: 'Focus time · Mon 28 Sep', note: '09:30–11:30, added to your Google Calendar', due: 'Blocked by Tilo', color: 'lilac', group: 'week', by: 'tilo' } : q));
+          toast('Blocked 09:30–11:30 on Monday in Google Calendar');
+        }
+      };
+    };
+    const add = key => () => {
+      const v = (S.newVal[key] || '').trim(); if (!v) return;
+      setPins(ps => [...ps.filter(q => q.board === key && q.suggested), { id: 'n' + Date.now(), board: key, title: v, note: 'Added just now', by: 'AM', due: 'Alex · just now', color: key === 'team' ? 'yellow' : 'blue', group: 'week' }, ...ps.filter(q => !(q.board === key && q.suggested))]);
+      this.setState(s => ({ newVal: { ...s.newVal, [key]: '' } }));
+    };
+    const boards = [['team', 'Team board', 'Northwind Ops · 5 people and Tilo', 'var(--heroSoft)', { rank: 'director', expr: 'neutral' }], ['me', 'My board', 'Only you and Tilo can see this', 'var(--schSoft)', { role: 'research', expr: 'delighted' }]].map(([key, title, sub, iconBg, ag]) => {
+      const ps = allPins.filter(p => p.board === key), vm = ps.map(pinVM);
+      const G = [['TILO SUGGESTS', p => p.suggested], ['NEEDS SOMEONE', p => !p.suggested && !isDone(p) && p.group === 'waiting'], ['THIS WEEK', p => !p.suggested && !isDone(p) && p.group === 'week'], ['DONE', p => !p.suggested && isDone(p)]];
+      const groups = G.map(([t, f]) => { const list = ps.map((p, i) => [p, vm[i]]).filter(([p]) => f(p)).map(x => x[1]); return { title: t, n: String(list.length), pins: list }; }).filter(g => g.pins.length);
+      return { title, sub, iconBg, icon: A(ag, 38), count: ps.filter(p => !isDone(p) && !p.suggested).length + ' open', pins: vm, groups,
+        newVal: S.newVal[key], addLabel: 'Pin to ' + title, onNew: e => { const v = e.target.value; this.setState(s => ({ newVal: { ...s.newVal, [key]: v } })); }, onKey: e => { if (e.key === 'Enter') add(key)(); }, add: add(key) };
+    });
+
+    const CAL = { work: ['Work', 'var(--hero)', 'var(--heroSoft)', 'var(--ink)'], personal: ['Personal', 'var(--ok)', 'var(--okSoft)', 'var(--ink)'], tilo: ['Tilo', 'var(--sch)', 'var(--schSoft)', 'var(--ink)'], booked: ['Booked by Tilo', 'var(--heroInk)', 'var(--hero)', '#FFFFFF'] };
+    let EV = AG.events;
+    if (S.booked) EV = [...EV, { id: 'gate', d: S.booked.d, s: S.booked.s, e: S.booked.e, t: 'K1 gate review', cal: 'booked', joins: true }];
+    const joinsOf = e => S.flags[e.id + ':join'] ?? !!e.joins;
+    const H0 = AG.start, H1 = AG.end, PX = 52, DAYS = AG.days.concat(AG.wkend), nd = S.weekend ? 7 : 5;
+    const days = DAYS.slice(0, nd).map((label, d) => {
+      const [name, num] = label.split(' '), today = d === AG.today;
+      const evs = EV.filter(e => e.d === d && (e.cal === 'booked' || S.cals[e.cal]));
+      const meet = EV.filter(e => e.d === d && !e.tiloOnly && e.cal !== 'tilo'), hrs = meet.reduce((a, e) => a + (e.e - e.s), 0);
+      return { name: name.toUpperCase(), num, today, load: meet.length ? meet.length + (meet.length === 1 ? ' event · ' : ' events · ') + (Math.round(hrs * 10) / 10) + ' h' : 'Free',
+        headBg: today ? 'var(--heroSoft)' : 'transparent', colBg: today ? 'var(--rowOn)' : d > 4 ? 'var(--sunk)' : 'transparent', fg: today ? 'var(--heroInk)' : 'var(--ink3)', numBg: today ? 'var(--hero)' : 'transparent', numFg: today ? '#FFFFFF' : 'var(--ink)',
+        events: evs.map(e => { const c = CAL[e.cal], on = S.sel === e.id, tall = e.e - e.s >= .75;
+          return { title: e.t, time: fmt(e.s) + '–' + fmt(e.e), tall, joins: joinsOf(e), badge: A({ rank: 'director', expr: 'neutral' }, 15),
+            top: ((e.s - H0) * PX + 1) + 'px', h: Math.max(20, (e.e - e.s) * PX - 3) + 'px', pad: tall ? '5px 7px' : '2px 7px', bar: c[1], bg: c[2], fg: c[3], op: e.past && !on ? '.7' : '1',
+            ring: on ? '0 0 0 2px ' + c[1] : 'none', pick: () => up({ sel: e.id }) }; }),
+        slots: S.finding ? AG.slots.filter(s => s.d === d).map(s => ({ top: ((s.s - H0) * PX + 1) + 'px', h: ((s.e - s.s) * PX - 3) + 'px', label: fmt(s.s) + ' · all free',
+          book: () => { setPins(ps => [{ id: 'tg', board: 'team', title: 'K1 gate review booked', note: s.l + '. Invites sent to Jin, Priya and Tom.', by: 'tilo', role: 'research', due: 'Tilo booked · just now', color: 'lilac', group: 'week' }, ...ps.filter(q => q.id !== 't0')]); up({ finding: false, booked: s, sel: 'gate' }); toast('Booked ' + s.l + '. Invites sent from Google Calendar'); } })) : []
+      };
+    });
+    const hours = []; for (let t = H0 + 1; t < H1; t++) hours.push({ t: fmt(t), top: ((t - H0) * PX) + 'px' });
+    const cal = { cols: '50px repeat(' + nd + ',minmax(0,1fr))', days, hours, height: ((H1 - H0) * PX) + 'px', nowTop: ((AG.now - H0) * PX) + 'px' };
+    const upcomingJoins = EV.filter(e => joinsOf(e) && !e.past).length;
+
+    const ppl = a => a.map(i => ({ i, c: PC[i] || '#EDEBE4' }));
+    const e0 = EV.find(e => e.id === S.sel) || EV.find(e => e.id === 'sync');
+    const det = AG.details[e0.id] || (e0.id.startsWith('su') ? AG.details.su : { people: ['AM'] });
+    const briefed = S.briefed[e0.id], flag = (k, def) => S.flags[e0.id + ':' + k] ?? def;
+    const jOn = joinsOf(e0), pOn = flag('pins', true), bOn = flag('brief', !!det.brief || !!briefed);
+    const tog = (k, cur, msg) => () => { this.setState(s => ({ flags: { ...s.flags, [e0.id + ':' + k]: !cur } })); if (msg) toast(msg(!cur)); };
+    const TG = (label, sub, on, flip) => ({ label, sub, on, flip, track: on ? 'var(--ok)' : 'var(--track)', knob: on ? 'translateX(18px)' : 'none' });
+    let brief = det.brief || ['Tilo will gather the latest emails, docs and notes for this meeting.', 'You’ll get it 15 minutes before it starts.'];
+    if (e0.id === 'gate' && dec.depot) brief = brief.map(x => x.startsWith('Laptop Depot') ? 'Laptop Depot budget was approved today.' : x);
+    const pastNotes = !!e0.past && !!det.notes;
+    const ev = {
+      title: e0.t, when: DAYS[e0.d] + ' Sep · ' + fmt(e0.s) + '–' + fmt(e0.e) + (e0.cal === 'booked' ? ' · booked by Tilo' : ''),
+      calLabel: CAL[e0.cal][0] + (e0.cal === 'tilo' || e0.cal === 'booked' ? '' : ' · Google Calendar'), bar: CAL[e0.cal][1],
+      people: ppl(det.people), joins: jOn, tiloFace: A({ rank: 'director', expr: 'talking' }, 28),
+      hasBrief: !e0.past && (!!det.brief || !!briefed), brief: brief.map(t => ({ t })), briefMeta: det.briefMeta || 'Queued · arrives 15 min before',
+      needsBrief: !e0.past && !det.brief && !briefed && !e0.tiloOnly, makeBrief: () => { up({ briefed: { ...S.briefed, [e0.id]: true } }); toast('Tilo will brief you 15 minutes before ' + e0.t); },
+      past: pastNotes, notes: (det.notes || []).map(t => ({ t })), empty: !!e0.past && !det.notes,
+      actions: (det.actions || []).map(([t, who, s]) => ({ t, s, who: who === 'tilo' ? A({ role: 'delivery', expr: 'delighted' }, 24) : who, al: who === 'tilo' ? 'flex-end' : 'center', c: who === 'tilo' ? 'var(--heroSoft)' : PC[who] || '#EDEBE4' })),
+      upcoming: !e0.past && !e0.tiloOnly,
+      toggles: [TG('Tilo joins and takes notes', 'Shares notes with attendees after', jOn, tog('join', jOn, v => v ? 'Tilo will join ' + e0.t : 'Tilo won’t join this one')), TG('Turn action items into pins', 'Pinned to the Team board with owners', pOn, tog('pins', pOn)), TG('Brief before it starts', '15 minutes ahead, in your inbox', bOn, tog('brief', bOn))]
+    };
+    return {
+      icCal: icon('calendar', 16), icCheck: icon('check', 13), icPlusS: icon('plus', 13),
+      find: () => this.findTime(), cancelFind: () => up({ finding: false }), finding: S.finding,
+      findAgent: A({ role: 'research', expr: 'focused' }, 40),
+      isCork: style === 'cork', isSoft: style === 'soft', styleX: style === 'cork' ? '0%' : '100%', corkFg: style === 'cork' ? 'var(--ink)' : 'var(--ink2)', softFg: style === 'soft' ? 'var(--ink)' : 'var(--ink2)',
+      setCork: () => up({ style: 'cork' }), setSoft: () => up({ style: 'soft' }), boards,
+      weekRange: S.weekend ? '21–27 September' : '21–25 September',
+      weekSummary: EV.filter(e => !e.tiloOnly && e.cal !== 'tilo').length + ' events from Google Calendar · Tilo joins ' + upcomingJoins + ' still to come',
+      cals: ['work', 'personal', 'tilo'].map(k => ({ label: CAL[k][0], c: CAL[k][1], on: S.cals[k], op: S.cals[k] ? '1' : '.5', toggle: () => up({ cals: { ...S.cals, [k]: !S.cals[k] } }) })),
+      weekend: S.weekend, wkBg: S.weekend ? 'var(--toast)' : 'var(--btn2)', wkFg: S.weekend ? 'var(--toastInk)' : 'var(--ink)', toggleWeekend: () => up({ weekend: !S.weekend }),
+      cols: (app.vw || 1440) >= 1100 ? 'minmax(0,1fr) 340px' : 'minmax(0,1fr)', cal, ev
+    };
+  }
+  findTime() {
+    if (this.state.booked) { const t = this.props.app && this.props.app.toast; if (t) t('Already booked for ' + this.state.booked.l); return; }
+    this.setState({ finding: true });
+  }
+}
+</script>
+</body>
+</html>

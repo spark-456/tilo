@@ -47,6 +47,15 @@ _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
 @pytest.fixture(autouse=True)
+def patient_pdf_counter(monkeypatch: pytest.MonkeyPatch) -> None:
+    """LW-06: counting a PDF's pages starts a child process with a wall-clock limit; a loaded machine must not turn a
+    slow start into a refusal in a test that is about something else (tests of the limit set their own)."""
+    from tilo_providers import media  # noqa: PLC0415
+
+    monkeypatch.setattr(media, "PDF_TIMEOUT_SECONDS", 60.0)
+
+
+@pytest.fixture(autouse=True)
 def block_non_local_sockets(monkeypatch: pytest.MonkeyPatch) -> None:
     real_connect = socket_module.socket.connect
 

@@ -1,0 +1,44 @@
+{
+  "v": "1.0",
+  "id": "01JB7A0000000000000000E042",
+  "seq": 42,
+  "ts": "2026-10-16T10:00:42.000Z",
+  "world_id": "w_village_basic",
+  "run_id": "r_village_basic_1",
+  "type": "browser.acted",
+  "actor": "A_s1",
+  "target": "B2",
+  "level": "L1",
+  "district": "D1",
+  "item": null,
+  "severity": "info",
+  "credits": 1,
+  "summary": "The Specialist browser step 1: click (done).",
+  "cause": null,
+  "vis": "all",
+  "authz": null,
+  "data": {
+    "session": "bs_01JB7A0000000000000000BRW1",
+    "step": 1,
+    "kind": "type",
+    "verdict": "done",
+    "reason": null,
+    "host": "shop.example.com",
+    "chars": null,
+    "masked": 0,
+    "blocked": 1,
+    "frame": {
+      "artifact_id": "art_bs01JB7A0000000000000000BRW1_1",
+      "version": 1
+    }
+  },
+  "trace": {
+    "model_role": "computer_use",
+    "profile": "example-vision",
+    "tokens_in": 1400,
+    "tokens_out": 40,
+    "tool": "browse_web",
+    "latency_ms": 2100,
+    "archive_ref": null
+  }
+}

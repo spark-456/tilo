@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div data-screen-label="Connectors" style="background:var(--sheet);border:1px solid var(--gBd);border-radius:28px;box-shadow:var(--sh);padding:28px 32px 36px;display:flex;flex-direction:column;gap:22px">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <div style="display:flex;align-items:baseline;gap:12px"><h1 style="margin:0;font-family:'Nunito',sans-serif;font-weight:900;font-size:36px;letter-spacing:-.8px;line-height:1.05">Connectors</h1><span style="font-size:15px;font-weight:700;color:var(--ink3)">{{ nOn }}</span></div>
+      <p style="margin:0;font-size:15.5px;font-weight:600;color:var(--ink2)">The tools your agents can use, and how far each one can go.</p>
+    </div>
+    <div style="height:42px;width:260px;box-sizing:border-box;border-radius:12px;background:var(--field);border:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--ink2)">{{ icSearch }}<input aria-label="Search connectors" value="{{ q }}" onChange="{{ onQ }}" placeholder="Search 60+ tools" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:14.5px;font-weight:600;color:var(--ink)"></input></div>
+  </div>
+
+  <sc-if value="{{ hasAttn }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;align-items:center;gap:14px;padding:12px 14px 12px 12px;border-radius:18px;background:var(--redSoft);flex-wrap:wrap">
+      <span style="width:40px;height:40px;border-radius:12px;background:var(--card);color:var(--red);display:flex;align-items:center;justify-content:center;flex:none">{{ icPlug }}</span>
+      <div style="flex:1;min-width:220px;line-height:1.4"><div style="font-size:15px;font-weight:800">HubSpot sign-in expires in 3 days</div><div style="font-size:13.5px;font-weight:600;color:var(--ink2)">Scan competitor prices reads contacts from it. Reconnect to keep it running.</div></div>
+      <button onClick="{{ reconnect }}" style="height:38px;padding:0 16px;border:0;border-radius:11px;background:var(--red);color:#FFFFFF;font-size:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap">{{ reSpin }}{{ reL }}</button>
+    </div>
+  </sc-if>
+
+  <section aria-label="Connected" style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px"><span style="font-size:16px;font-weight:800">Connected</span><span style="font-size:13.5px;font-weight:700;color:var(--ink3)">{{ nOn }}</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px">
+      <sc-for list="{{ on }}" as="c" hint-placeholder-count="6">
+        <button onClick="{{ c.open }}" style="background:var(--card);border:1px solid var(--line2);box-shadow:{{ c.edge }};border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:14px;text-align:left;cursor:pointer;color:var(--ink);transition:transform .3s cubic-bezier(.2,.8,.2,1)" style-hover="transform:translateY(-2px)">
+          <div style="display:flex;align-items:center;gap:12px;width:100%">
+            <span style="width:44px;height:44px;border-radius:13px;background:var(--pop);border:1px solid var(--line);color:{{ c.col }};font-size:17px;font-weight:900;display:flex;align-items:center;justify-content:center;flex:none">{{ c.mono }}</span>
+            <span style="flex:1;min-width:0;line-height:1.3"><span style="display:block;font-size:15px;font-weight:800">{{ c.name }}</span><span style="display:block;font-size:13px;font-weight:600;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.acct }}</span></span>
+            <span style="height:24px;padding:0 9px;border-radius:7px;background:{{ c.lvBg }};color:{{ c.lvFg }};font-size:12px;font-weight:800;display:flex;align-items:center;flex:none">{{ c.lvl }}</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;font-size:12.5px;font-weight:700"><span style="display:flex;align-items:center;gap:6px;color:{{ c.syncC }}"><span style="width:7px;height:7px;border-radius:99px;background:{{ c.dot }}"></span>{{ c.sync }}</span><span style="color:var(--ink3)">{{ c.usedN }}</span></div>
+        </button>
+      </sc-for>
+    </div>
+  </section>
+
+  <section aria-label="Available" style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px"><span style="font-size:16px;font-weight:800">Add a tool</span><span style="font-size:13.5px;font-weight:700;color:var(--ink3)">Sign in with the tool. Tilo never sees your password.</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
+      <sc-for list="{{ avail }}" as="c" hint-placeholder-count="6">
+        <div style="background:var(--card);border:1px solid var(--line2);border-radius:18px;padding:14px;display:flex;align-items:center;gap:12px">
+          <span style="width:40px;height:40px;border-radius:12px;background:var(--pop);border:1px solid var(--line);color:{{ c.col }};font-size:15px;font-weight:900;display:flex;align-items:center;justify-content:center;flex:none">{{ c.mono }}</span>
+          <span style="flex:1;min-width:0;line-height:1.3"><span style="display:block;font-size:14.5px;font-weight:800">{{ c.name }}</span><span style="display:block;font-size:12.5px;font-weight:600;color:var(--ink2)">{{ c.blurb }}</span></span>
+          <button onClick="{{ c.connect }}" disabled="{{ c.busy }}" style="height:34px;min-width:84px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--btn2);color:var(--ink);font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;flex:none;white-space:nowrap">{{ c.spin }}{{ c.btnL }}</button>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <sc-if value="{{ drawer }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ close }}" style="position:fixed;inset:0;z-index:34;background:var(--scrim)"></div>
+    <aside role="dialog" aria-label="{{ d.name }}" style="position:fixed;right:16px;top:90px;bottom:16px;width:440px;max-width:calc(100vw - 32px);z-index:35;box-sizing:border-box;background:var(--pop);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shPop);display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:20px 22px 16px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--line2)">
+        <span style="width:52px;height:52px;border-radius:15px;background:var(--card);border:1px solid var(--line);color:{{ d.col }};font-size:20px;font-weight:900;display:flex;align-items:center;justify-content:center;flex:none">{{ d.mono }}</span>
+        <div style="flex:1;min-width:0;line-height:1.3"><div style="font-size:19px;font-weight:800">{{ d.name }}</div><div style="font-size:13px;font-weight:600;color:var(--ink2)">{{ d.cat }} · {{ d.acct }}</div></div>
+        <button onClick="{{ close }}" aria-label="Close" style="width:36px;height:36px;border:0;border-radius:11px;background:var(--chip);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none">{{ icX }}</button>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:18px 22px;display:flex;flex-direction:column;gap:22px">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:{{ d.stBg }};font-size:13.5px;font-weight:700"><span style="width:8px;height:8px;border-radius:99px;background:{{ d.dot }}"></span>{{ d.sync }}</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <h3 style="margin:0;font-size:15px;font-weight:800">How far agents can go</h3>
+          <sc-for list="{{ d.levels }}" as="l" hint-placeholder-count="4">
+            <button role="radio" aria-checked="{{ l.on }}" onClick="{{ l.pick }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:2px solid {{ l.bd }};background:{{ l.bg }};color:var(--ink);text-align:left;cursor:pointer;transition:border-color .2s,background-color .2s">
+              <span style="width:18px;height:18px;border-radius:99px;border:2px solid {{ l.ring }};box-sizing:border-box;display:flex;align-items:center;justify-content:center;flex:none"><span style="width:8px;height:8px;border-radius:99px;background:{{ l.dotC }}"></span></span>
+              <span style="flex:1;min-width:0;line-height:1.35"><span style="display:block;font-size:14.5px;font-weight:800">{{ l.label }}</span><span style="display:block;font-size:13px;font-weight:600;color:var(--ink2)">{{ l.sub }}</span></span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <h3 style="margin:0;font-size:15px;font-weight:800">Used by</h3>
+          <sc-for list="{{ d.used }}" as="u" hint-placeholder-count="2"><button onClick="{{ u.open }}" style="display:flex;align-items:center;gap:10px;height:42px;padding:0 12px;border-radius:12px;border:0;background:var(--sunk);color:var(--ink);font-size:14px;font-weight:800;cursor:pointer;text-align:left"><span style="color:var(--heroInk);display:flex">{{ u.icon }}</span><span style="flex:1">{{ u.name }}</span>{{ icChev }}</button></sc-for>
+        </div>
+        <div style="font-size:12.5px;font-weight:600;color:var(--ink3);line-height:1.5">Access uses the tool’s own sign-in. You can revoke it here or from {{ d.name }} at any time. Team rules for spend and sharing still apply on top.</div>
+      </div>
+      <div style="padding:14px 22px;border-top:1px solid var(--line2);display:flex;justify-content:space-between;gap:8px">
+        <button onClick="{{ d.disconnect }}" style="height:40px;padding:0 14px;border:0;border-radius:11px;background:transparent;color:var(--redInk);font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">Disconnect</button>
+        <button onClick="{{ d.syncNow }}" style="height:40px;padding:0 16px 0 14px;border-radius:11px;border:1px solid var(--line);background:var(--btn2);color:var(--ink);font-size:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap">{{ icRefresh }}Sync now</button>
+      </div>
+    </aside>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { q: '', open: null, st: {}, lvl: {}, busy: {}, re: 0 };
+  componentWillUnmount() { Object.values(this.tm || {}).forEach(clearTimeout); }
+  renderVals() {
+    const h = React.createElement, app = this.props.app || {}, TA = window.TiloApp, D = TA && TA.data;
+    if (!D) return {};
+    const K = TA.ready() ? TA.kit(h) : null, S = this.state, go = app.go || (() => {}), toast = app.toast || (() => {});
+    const icon = (n, s) => K ? K.icon(n, s) : null, up = p => this.setState(p); this.tm = this.tm || {};
+    const spin = () => h('span', { style: { width: 14, height: 14, boxSizing: 'border-box', borderRadius: 99, border: '2.5px solid var(--track)', borderTopColor: 'var(--hero)', animation: 'tiloSpin .7s linear infinite', display: 'block', flex: 'none' } });
+    const all = D.connectors.map(c => ({ ...c, st: S.st[c.id] || c.st, sync: S.st[c.id] ? 'just now' : c.sync, level: S.lvl[c.id] != null ? S.lvl[c.id] : (c.level || 1) }));
+    const match = c => !S.q || (c.name + ' ' + c.cat).toLowerCase().includes(S.q.toLowerCase());
+    const LV = ['', 'Read', 'Draft', 'Act'], LVC = [null, ['var(--schSoft)', 'var(--sch)'], ['var(--heroSoft)', 'var(--heroInk)'], ['var(--amberTile)', 'var(--amberInk)']];
+    const isOn = c => c.st === 'connected' || c.st === 'attention';
+    const on = all.filter(c => isOn(c) && match(c)).map(c => ({
+      name: c.name, mono: c.mono, col: c.col, acct: c.acct || 'Connected just now', lvl: LV[c.level], lvBg: LVC[c.level][0], lvFg: LVC[c.level][1],
+      sync: c.st === 'attention' ? c.sync : 'Synced ' + (c.sync === 'Live' ? 'live' : c.sync || 'just now'), syncC: c.st === 'attention' ? 'var(--redInk)' : 'var(--ink2)', dot: c.st === 'attention' ? 'var(--red)' : 'var(--ok)',
+      usedN: (c.used || []).length ? 'Used by ' + c.used.length : 'Not used yet', edge: c.st === 'attention' ? '0 0 0 2px var(--red)' : 'none', open: () => up({ open: c.id })
+    }));
+    const connect = c => () => { up({ busy: { ...S.busy, [c.id]: true } }); this.tm[c.id] = setTimeout(() => { this.setState(s => ({ busy: { ...s.busy, [c.id]: false }, st: { ...s.st, [c.id]: 'connected' }, lvl: { ...s.lvl, [c.id]: 1 } })); toast(c.name + ' connected with Read access'); }, 1400); };
+    const avail = all.filter(c => !isOn(c) && match(c)).map(c => ({ name: c.name, mono: c.mono, col: c.col, blurb: c.blurb, busy: !!S.busy[c.id], btnL: S.busy[c.id] ? 'Signing in' : 'Connect', spin: S.busy[c.id] ? spin() : null, connect: connect(c) }));
+    const hub = all.find(c => c.id === 'hubspot'), attn = hub.st === 'attention';
+    const cur = all.find(c => c.id === S.open);
+    const sk = n => D.skills.find(s => s.name === n);
+    const d = cur ? {
+      name: cur.name, mono: cur.mono, col: cur.col, cat: cur.cat, acct: cur.acct || 'Connected just now',
+      sync: cur.st === 'attention' ? cur.sync + '. Reconnect to keep agents working.' : 'Healthy · synced ' + (cur.sync === 'Live' ? 'live' : cur.sync || 'just now'),
+      stBg: cur.st === 'attention' ? 'var(--redSoft)' : 'var(--okSoft)', dot: cur.st === 'attention' ? 'var(--red)' : 'var(--ok)',
+      levels: (cur.scopes || [['Read', 1], ['Draft', 2], ['Act', 3]]).map(([sub, lv]) => { const onL = cur.level === lv; return { label: LV[lv], sub, on: onL, bd: onL ? 'var(--hero)' : 'var(--line)', bg: onL ? 'var(--heroSoft)' : 'transparent', ring: onL ? 'var(--hero)' : 'var(--line)', dotC: onL ? 'var(--hero)' : 'transparent', pick: () => { up({ lvl: { ...S.lvl, [cur.id]: lv } }); toast(cur.name + ': agents can now ' + sub.toLowerCase()); } }; }),
+      used: (cur.used || []).map(n => ({ name: n, icon: icon(sk(n) ? 'bolt' : 'calendar', 14), open: () => { up({ open: null }); const s = sk(n); if (s) go('skills', { id: s.id }); else go('agenda'); } })),
+      disconnect: () => { up({ open: null, st: { ...S.st, [cur.id]: 'available' } }); toast(cur.name + ' disconnected. Skills that use it will pause'); },
+      syncNow: () => toast('Syncing ' + cur.name + '…')
+    } : { levels: [], used: [] };
+    return {
+      nOn: on.length + ' connected', q: S.q, onQ: e => up({ q: e.target.value }), icSearch: icon('search', 16), icPlug: icon('plug', 18), icX: icon('x', 15), icChev: icon('chevR', 12), icRefresh: icon('refresh', 15),
+      hasAttn: attn, reL: S.re ? 'Waiting for HubSpot' : 'Reconnect', reSpin: S.re ? h('span', { style: { width: 14, height: 14, boxSizing: 'border-box', borderRadius: 99, border: '2.5px solid rgba(255,255,255,.4)', borderTopColor: '#FFFFFF', animation: 'tiloSpin .7s linear infinite', display: 'block' } }) : null,
+      reconnect: () => { if (S.re) return; up({ re: 1 }); this.tm.re = setTimeout(() => { this.setState(s => ({ re: 0, st: { ...s.st, hubspot: 'connected' } })); toast('HubSpot reconnected for 90 days'); }, 1500); },
+      on, avail, drawer: !!cur, d, close: () => up({ open: null })
+    };
+  }
+}
+</script>
+</body>
+</html>

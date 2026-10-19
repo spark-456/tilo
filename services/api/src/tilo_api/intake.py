@@ -10,64 +10,141 @@ answer closes intake with 503 before anything is stored or sent to a model.
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from dataclasses import asdict
+import os
+import re
+from dataclasses import asdict, replace
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
+from tilo_harness.writer import WriterBusy
 from tilo_metering.flags import FlagStore
 from tilo_planning.artifacts import InMemoryArtifactStore
 from tilo_planning.brief import BriefExtractionError, extract_brief
+from tilo_planning.deliverable_kinds import DeliverableKindsError, load_deliverable_kinds
+from tilo_planning.gaps import NothingPossible
 from tilo_planning.intake import (
     MAX_FILES,
     MAX_TOTAL_BYTES,
     IntakeFile,
     IntakeRejected,
     IntakeRequest,
+    screen_intake,
     screen_task_text,
     submit_intake,
 )
 from tilo_planning.refusal import RefusalConfigError, TaskRefused
 from tilo_planning.scenarios import ScenarioError, load_scenario
+from tilo_providers.clock import Clock
+from tilo_providers.config import ProviderConfigError
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
+from tilo_providers.media import MediaPart
 from tilo_providers.replay import ReplayMissError
-from tilo_providers.router import Router
+from tilo_providers.router import Deadline, Router, RouterDeadlineError
 
-from tilo_api import deps
+from tilo_api import deps, ephemeral, grounding, grounding_prompt, intake_requests, quick
+from tilo_api.assistant.metering import SpendLedger
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
+from tilo_api.intake_deadline import INTAKE_DEADLINE_DETAIL, load_intake_deadline
+from tilo_api.intake_refs import RefsRefused, parse_refs, tagged_skill
+from tilo_api.intake_uploads import FILE_SCREEN_UNAVAILABLE, RunUploads, UploadStorageError
+from tilo_api.skills_route import SkillContext, skill_context_for
 from tilo_api.tasks import create_task
 
 router = APIRouter()
+
+_QUIZ_INTENT = re.compile(
+    r"\b(?:quiz|interactive\s+(?:test|exam|assessment)|practice\s+test|mock\s+test|self[- ]?test)\b", re.I
+)
+_QUIZ_SOURCES = {"application/pdf", "image/png", "image/jpeg"}
+_WEBSITE_INTENT = re.compile(r"\b(?:website|web\s*app|app|questionnaire)\b", re.I)
+
+
+def safe_app_brief(brief: dict[str, Any], task_text: str, parts: list[MediaPart]) -> dict[str, Any]:
+    """Keep sourced quizzes as AppSpecs and route requested sites to the native website writer."""
+    if _QUIZ_INTENT.search(task_text) and any(part.mime_type in _QUIZ_SOURCES for part in parts):
+        return brief
+    deliverables = brief.get("deliverables")
+    if not isinstance(deliverables, list):
+        return brief
+    wants_website = not parts and _WEBSITE_INTENT.search(task_text) is not None
+    return {
+        **brief,
+        "deliverables": [
+            {**item, "format": "website"}
+            if isinstance(item, dict) and wants_website and item.get("format") in {"app", "markdown"}
+            else {**item, "format": "markdown"}
+            if isinstance(item, dict) and item.get("format") == "app"
+            else item
+            for item in deliverables
+        ],
+    }
+
+
 logger = logging.getLogger("tilo_api.intake")
 
 _store = InMemoryArtifactStore()
 
 
-def get_store() -> InMemoryArtifactStore:
-    return _store
+def get_store(
+    request: Request = None,  # type: ignore[assignment]
+    mode: Annotated[deps.Mode, Depends(deps.get_work_mode)] = "replay",
+) -> InMemoryArtifactStore:
+    demo = ephemeral.for_request(request) if request is not None else None
+    if demo is not None:
+        return demo.uploads
+    if request is None or not ({"K_SERVICE", "CLOUD_RUN_JOB"} & os.environ.keys()):
+        return _store
+    from tilo_api.intake_uploads import RunUploads
+
+    return RunUploads(
+        org_id=deps.ORG_ID,
+        artifacts=lambda: deps.get_artifact_store(request, mode),
+        archive=lambda **scope: deps.get_run_archive(request)(**scope),
+    )  # attached-file Thinking requests bind both stores before screening and the Director
 
 
 @router.post("/intake", status_code=201)
 async def intake(
+    http: Request,
     principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
     safety: Annotated[SafetyProvider, Depends(get_safety)],  # before any store: fail closed first
     store: Annotated[InMemoryArtifactStore, Depends(get_store)],
     tasks: Annotated[deps.Store, Depends(deps.get_store)],
+    writer: Annotated[deps.EventWriter, Depends(deps.get_event_writer)],
     model_router: Annotated[Router, Depends(deps.get_router)],
-    flags: Annotated[FlagStore, Depends(deps.get_flag_store)],
+    flags: Annotated[FlagStore, Depends(deps.get_switches)],
+    work_mode: Annotated[deps.Mode, Depends(deps.get_work_mode)],
+    today: Annotated[Clock, Depends(deps.get_today)],
+    allowance: Annotated[SpendLedger, Depends(deps.get_spend_ledger)],
     text: Annotated[str, Form()] = "",
     scenario: Annotated[str | None, Form()] = None,
+    mode: Annotated[str | None, Form()] = None,  # COST-FAST-1: "quick" or "thinking" (read from the form below)
     files: Annotated[list[UploadFile], File()] = [],  # noqa: B006 (FastAPI copies defaults)
+    refs: Annotated[str | None, Form()] = None,  # MN-01: a JSON array of mention refs (mentions.schema.json)
 ) -> Any:
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in, before any work
+    chosen = (await http.form()).getlist("mode")  # exactly one of quick or thinking; two fields are never resolved
+    if len(chosen) > 1 or (chosen and chosen[0] not in ("quick", "thinking")):
+        return _rejected("The mode must be quick or thinking.")  # the value is never echoed
     if scenario is not None:  # FR-INT-11: an unknown or hostile id stores nothing; nothing is created at intake
         try:
             await run_in_threadpool(load_scenario, scenario)
         except ScenarioError:
             return _rejected("That scenario is not available.")
+    skills = skill_context_for(http, principal, model_router)
+    try:  # MN-02, MN-09: before any world, upload or model call; a ref the person cannot use is one 422
+        parsed = parse_refs(refs)
+        tagged = tagged_skill(parsed, skills) if parsed else None
+        tagged_plan = skills.taught_plan(tagged)
+    except RefsRefused as refused:
+        return refused.response()
+    if tagged is not None and chosen and chosen[0] == "quick":  # MN-06: Quick keeps no record; refs make it Thinking
+        return JSONResponse({**quick.offer("refs"), "skill": tagged})
     if len(files) > MAX_FILES:
         return _rejected(f"{len(files)} files attached; the limit is {MAX_FILES}.")
     uploads, remaining = [], MAX_TOTAL_BYTES
@@ -78,39 +155,297 @@ async def intake(
             return _rejected(f"The files total more than {MAX_TOTAL_BYTES // 1_000_000} MB.")
         uploads.append(IntakeFile(filename=upload.filename or "", content=content))
     request = IntakeRequest(text=text, files=uploads, user_id=principal.user_id)
+    key = http.headers.get("idempotency-key")
+
+    async def perform() -> Any:
+        return await _thinking(
+            http,
+            principal,
+            safety,
+            store,
+            tasks,
+            writer,
+            model_router,
+            flags,
+            work_mode,
+            today,
+            allowance,
+            request,
+            chosen,
+            scenario,
+            key,
+            tagged,
+            tagged_plan,
+        )
+
+    if key is None or (chosen and chosen[0] == "quick"):
+        return await perform()
+    return await intake_requests.once(allowance, principal.user_id, key, request, scenario, perform, parsed)
+
+
+async def _thinking(
+    http: Request,
+    principal: deps.Principal,
+    safety: SafetyProvider,
+    store: InMemoryArtifactStore,
+    tasks: deps.Store,
+    writer: deps.EventWriter,
+    model_router: Router,
+    flags: FlagStore,
+    work_mode: deps.Mode,
+    today: Clock,
+    allowance: SpendLedger,
+    request: IntakeRequest,
+    chosen: list[Any],
+    scenario: str | None,
+    key: str | None,
+    tagged: dict[str, Any] | None = None,
+    tagged_plan: list[dict[str, Any]] | None = None,
+) -> Any:
+    text = request.text
+    limit = load_intake_deadline()
+    deadline = Deadline.after(limit.seconds, limit.first_attempt_share)  # NFR-03: ends inside the web's wait
+    ids = intake_requests.identifiers(principal.user_id, key)
+    if key is not None and not (chosen and chosen[0] == "quick"):
+        await run_in_threadpool(tasks.load_path, {"task_id": ids[0]})
+        existing = tasks.tasks.get(ids[0])
+        if existing is not None:
+            if existing.owner != principal.user_id:
+                raise HTTPException(status_code=404, detail="No such task.")
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "intake_already_committed", "task_id": ids[0], "world_id": existing.world_id},
+            )
     try:
         # CPU-bound extraction and blocking screen and model calls stay off the event loop.
         await run_in_threadpool(screen_task_text, request, safety=safety)
-        # The Director reads only the screened text, and runs before anything is stored: a failure leaves no
-        # artifacts without a task (BQ-99).
+        if chosen and chosen[0] == "quick":  # COST-FAST-1: the rules answer, offer Thinking, or call the cheap role
+            return await _quick(
+                http,
+                request,
+                principal.user_id,
+                safety,
+                model_router,
+                allowance,
+                flags,
+                work_mode,
+                scenario,
+                skill_context_for(
+                    http, principal, getattr(model_router, "raw", model_router)
+                ),  # inside Quick's own hold
+                ground=grounding.enabled() and grounding_prompt.eligible(principal),
+            )
+        file_screen = None
+        if request.files and isinstance(store, RunUploads):
+            try:
+                store.task_id = ids[0]
+                await run_in_threadpool(store.bind, world_id=ids[1], run_id=ids[2], owner=principal.user_id)
+            except HTTPException:
+                raise
+            except Exception:
+                await _abort_uploads(store)
+                raise HTTPException(status_code=503, detail="Upload storage is unavailable; retry.") from None
+            file_screen = store.screen_file
+        prepared = await run_in_threadpool(
+            screen_intake, request, safety=safety, director=True, file_screen=file_screen
+        )
+        if prepared.screened and all(error == FILE_SCREEN_UNAVAILABLE for _, error, _, _ in prepared.screened):
+            raise HTTPException(status_code=503, detail="The attached files could not be screened; retry.")
+        # The Director receives only the stored verdict; failed pre-commit attempts clean their owned versions.
+        passages, memory_ids = "", frozenset[str]()
+        if grounding.enabled() and grounding_prompt.eligible(principal):  # RT-04: the person's own signed-in intake
+            opened = await run_in_threadpool(grounding.opener(http, mode=work_mode, router=model_router))
+            hits = await run_in_threadpool(grounding_prompt.recall, opened, principal.user_id, text)
+            passages = grounding_prompt.render(hits, "director", "brief_passages.md")
+            memory_ids = frozenset(h.id for h in hits)
         try:
-            extraction = await run_in_threadpool(extract_brief, text, router=model_router)
+            extraction = await run_in_threadpool(
+                extract_brief,
+                text,
+                router=model_router,
+                today=today(),
+                source_text=prepared.source_text,
+                parts=prepared.parts,
+                deadline=deadline,
+                passages=passages,
+                memory_ids=memory_ids,
+            )
+            extraction = replace(extraction, brief=safe_app_brief(extraction.brief, text, prepared.parts))
         except TaskRefused as refused:
+            await _abort_uploads(store)
             # FR-INT-12: configured text only (reason, nearest task, category); nothing stored, no further call.
             return JSONResponse(
                 status_code=422,
                 content={"error": refused.reason, "alternative": refused.alternative, "category": refused.category},
             )
-        except RefusalConfigError as exc:  # fail closed: no refusal list, no brief
+        except NothingPossible as nothing:
+            await _abort_uploads(store)
+            # FR-INT-15: acceptable but nothing Tilo can do; plain, with the alternatives, never a refusal.
+            return JSONResponse(
+                status_code=422, content={"error": nothing.message, "gaps": [g.as_dict() for g in nothing.gaps]}
+            )
+        except RefusalConfigError as exc:  # fail closed: no refusal list or gap list, no brief
             logger.error("refusal config unusable: %s", exc)
             raise HTTPException(status_code=503, detail="Task screening is unavailable; nothing was stored.") from exc
         except BriefExtractionError as exc:
             # A category only: the error text can quote the model's output.
             logger.warning("brief extraction failed: %s", type(exc.__cause__ or exc).__name__)
+            if isinstance(exc.__cause__, RouterDeadlineError):  # NFR-22: a plain, retryable answer, never a late 201
+                raise HTTPException(status_code=503, detail=INTAKE_DEADLINE_DETAIL) from exc
+            deps.raise_if_model_unavailable(exc)
             raise HTTPException(status_code=502, detail="The Director could not draft a brief.") from exc
-        result = await run_in_threadpool(submit_intake, request, safety=safety, store=store)
+        try:  # a bad kinds file stops the task before anything is stored, like a bad refusal list
+            kinds = await run_in_threadpool(load_deliverable_kinds)
+        except DeliverableKindsError as exc:
+            logger.error("deliverable kinds config unusable: %s", exc)
+            raise HTTPException(
+                status_code=503, detail="Deliverable choices are unavailable; nothing was stored."
+            ) from exc
+        try:
+            result = await run_in_threadpool(
+                submit_intake,
+                request,
+                safety=safety,
+                store=store,
+                prepared=prepared,
+                identifiers=ids,
+                put_failed=not isinstance(store, RunUploads),
+            )
+        except (HTTPException, IntakeRejected, UploadStorageError):
+            raise
+        except Exception as exc:
+            raise UploadStorageError("upload submission failed") from exc
     except IntakeRejected as exc:
+        await _abort_uploads(store)
         return _rejected(exc.reason)
-    except (ProviderError, ReplayMissError) as exc:
+    except (ProviderError, ProviderConfigError, ReplayMissError) as exc:
+        await _abort_uploads(store)
         logger.warning("safety screen failed: %s", type(exc).__name__)
         raise HTTPException(status_code=503, detail="The safety screen is unavailable; nothing was stored.") from exc
-    task_id, task = create_task(tasks, result, extraction, scenario=scenario)
+    except HTTPException:
+        await _abort_uploads(store)
+        raise
+    except UploadStorageError as exc:
+        await _abort_uploads(store)
+        logger.warning("upload persistence failed: %s", type(exc.__cause__ or exc).__name__)
+        raise HTTPException(status_code=503, detail="Upload storage is unavailable; retry.") from exc
+    except BaseException:
+        await _abort_uploads(store)
+        raise
+    try:
+        task_id, task = await run_in_threadpool(
+            create_task,
+            tasks,
+            writer,
+            result,
+            extraction,
+            scenario=scenario,
+            kinds=kinds,
+            skill=tagged,
+            skill_plan=tagged_plan,
+        )
+    except WriterBusy:
+        raise  # the existing app handler preserves store_unavailable; retain sources after any ambiguous write
+    except HTTPException as exc:
+        if exc.status_code in (429, 409):
+            await _abort_uncommitted(store, tasks, ids)
+        raise
+    except Exception as exc:
+        # A timed-out write can land after an empty read. Keep owned versions for retention/owner erasure.
+        logger.warning("intake persistence failed: %s", type(exc).__name__)
+        detail = "Upload storage is unavailable; retry." if request.files else "store_unavailable"
+        raise HTTPException(status_code=503, detail=detail) from exc
+    if grounding.enabled():  # RT-01: each clean, readable upload becomes the owner's own passages, after the answer
+        _in_background(_remember_uploads_later(http, principal.user_id, result))
     body = asdict(result)  # per-file text and events stay server-side
     body["files"] = [{k: v for k, v in f.items() if k not in ("text", "events")} for f in body["files"]]
     questions = [
         {"field": q.field, "text": q.text, "suggested_answers": list(q.suggested_answers)} for q in task.questions
     ]
-    return {**body, "task_id": task_id, "brief": task.brief, "questions": questions, "scenario": scenario}
+    return {
+        **body,
+        "mode": "thinking",
+        "task_id": task_id,
+        "brief": task.brief,
+        "questions": questions,
+        "scenario": scenario,
+        "gaps": [g.as_dict() for g in task.gaps],
+        **({"skill": task.skill} if task.skill is not None else {}),  # SKILL-TAG: the skill the person tagged
+    }
+
+
+_BACKGROUND: set[asyncio.Task[None]] = set()
+_REMEMBER_UPLOADS_S = (
+    60.0  # indexing is best effort and never delays an answer; past this it is left for the next change
+)
+
+
+def _in_background(work: Any) -> None:
+    task = asyncio.ensure_future(work)
+    _BACKGROUND.add(task)  # a reference, so the task is not collected before it finishes
+    task.add_done_callback(_BACKGROUND.discard)
+
+
+async def _remember_uploads_later(http: Request, uid: str, result: Any) -> None:
+    try:
+        await asyncio.wait_for(run_in_threadpool(_remember_uploads, http, uid, result), _REMEMBER_UPLOADS_S)
+    except Exception as exc:  # TimeoutError included: the answer has already gone
+        logger.warning("grounding uploads not indexed (%s)", type(exc).__name__)
+
+
+def _remember_uploads(http: Request, uid: str, result: Any) -> None:
+    if (opened := grounding.opener(http)()) is None:
+        return
+    for f in result.files:
+        if f.status == "ok" and not f.safety_flagged:
+            opened.index_upload(uid, result.world_id, f.filename, f.artifact, f.text)
+
+
+async def _abort_uncommitted(store: InMemoryArtifactStore, tasks: deps.Store, ids: tuple[str, str, str]) -> None:
+    try:
+        await run_in_threadpool(tasks.load_path, {"task_id": ids[0]})
+        if ids[0] in tasks.tasks or ids[1] in tasks.worlds:
+            return  # commit may have landed: retention and owner erasure keep the sources intact
+    except Exception:
+        return  # a failed read cannot establish that deletion is safe
+    await _abort_uploads(store)
+
+
+async def _quick(
+    http: Request,
+    request: IntakeRequest,
+    uid: str,
+    safety: SafetyProvider,
+    model_router: Router,
+    allowance: SpendLedger,
+    flags: FlagStore,
+    work_mode: deps.Mode,
+    scenario: str | None,
+    skills: SkillContext,
+    *,
+    ground: bool = False,
+) -> JSONResponse:
+    """COST-FAST-1: nothing is created or stored; the body is the answer or the offer to switch to Thinking. Quick holds
+    its own SEC-16 unit around the whole ask, so it gets the Router unmetered (`raw`): one hold, not one per call."""
+    try:
+        body = await run_in_threadpool(
+            quick.respond, text=request.text, uid=uid, has_files=bool(request.files), scenario=scenario,
+            safety=safety, router=getattr(model_router, "raw", model_router), allowance=allowance, switches=flags,
+            mode=work_mode,
+            caps=deps.caps_for(http), key=http.headers.get("idempotency-key"), ledger=deps.ledger_writer_for(http),
+            skills=skills,
+            grounding=(lambda r, b: grounding.opener(http, mode=work_mode, router=r, budget=b)()) if ground else None,
+        )  # fmt: skip
+    except quick.QuickRefusal as refusal:
+        return JSONResponse(status_code=refusal.status, content={"error": refusal.message})
+    return JSONResponse(body)
+
+
+async def _abort_uploads(store: InMemoryArtifactStore) -> None:
+    try:
+        await run_in_threadpool(store.abort)
+    except Exception as exc:
+        logger.warning("upload cleanup pending: %s", type(exc).__name__)
 
 
 def _rejected(reason: str) -> JSONResponse:

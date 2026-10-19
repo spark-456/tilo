@@ -1,0 +1,10 @@
+# Per-user and per-IP token-bucket rate limits for tilo-api public routes (SEC-10).
+# Validated at load by tilo_api.rate_limit.load_rate_limit_config.
+# Sized with headroom above the web client's 1000 ms event poll per open world (apps/web/src/api/http.ts:192):
+# several open worlds plus ordinary calls per user, and several concurrent users behind one shared NAT IP.
+# Cloud Run appends the client IP to X-Forwarded-For as 1 trusted hop from the right.
+ip_capacity: 600
+ip_refill_per_s: 50.0
+user_capacity: 120
+user_refill_per_s: 10.0
+trusted_hops: 1

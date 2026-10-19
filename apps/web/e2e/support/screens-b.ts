@@ -30,7 +30,9 @@ export async function visit(page: Page, path: string, name: string, check: () =>
 /** PRD 18.2: every text size on the screen is on the 12/14/16/20/24/32/40 px scale, and the page
  * title is above the section titles, which are above the row text, measured not eyeballed. */
 export async function expectTypeScale(page: Page) {
-  const sizes = await page.getByTestId("screen-page").evaluate((root) => {
+  // OLD-UI-OUT-2: a Park page (worldView/) is the first `.park-view-root`; an old screen is its `screen-page`.
+  const root = page.locator('[data-testid="screen-page"], .park-view-root').first();
+  const sizes = await root.evaluate((root) => {
     const used = new Set<number>();
     for (const el of root.querySelectorAll<HTMLElement>("*")) {
       const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent?.trim());

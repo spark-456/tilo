@@ -1,0 +1,32 @@
+{
+  "id": "neutral",
+  "name": "Neutral",
+  "default": false,
+  "note": "FR-WLD-15 second theme. Neutral greys only (no brand colour, no third-party asset). Status colours (ok, amber, red) are not themed: they carry meaning.",
+  "day": {
+    "ground": "#cfd1d4",
+    "paper": "#f2f2f2",
+    "hero": "#3a3a3a",
+    "heroFill": "#3a3a3a",
+    "heroInk": "#2b2b2b",
+    "heroSoft": "rgba(58, 58, 58, 0.1)",
+    "logo": "#3a3a3a",
+    "run": "#3a3a3a",
+    "rowOn": "rgba(58, 58, 58, 0.08)",
+    "sch": "#5a5a5a",
+    "schSoft": "rgba(90, 90, 90, 0.1)"
+  },
+  "night": {
+    "ground": "#4a4d50",
+    "paper": "#17181a",
+    "hero": "#8a8a8a",
+    "heroFill": "#5a5a5a",
+    "heroInk": "#d0d0d0",
+    "heroSoft": "rgba(180, 180, 180, 0.2)",
+    "logo": "#d0d0d0",
+    "run": "#bdbdbd",
+    "rowOn": "rgba(180, 180, 180, 0.18)",
+    "sch": "#a8a8a8",
+    "schSoft": "rgba(168, 168, 168, 0.14)"
+  }
+}
