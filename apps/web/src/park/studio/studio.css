@@ -527,6 +527,8 @@
   [data-park][data-theme="studio"] .park-skills-rate-btn,
   [data-park][data-theme="studio"] .park-skills-review-trust,
   [data-park][data-theme="studio"] .park-skills-review-keep,
+  [data-park][data-theme="studio"] .park-world-toast__act,
+  [data-park][data-theme="studio"] .park-world-dactions .park-btn,
   [data-park][data-theme="studio"] .park-connectors-action-btn,
   [data-park][data-theme="studio"] .park-profile-mopt,
   [data-park][data-theme="studio"] .park-profile-scene,
@@ -535,6 +537,10 @@
   }
   [data-park][data-theme="studio"] .park-skills-rate-btn {
     min-width: 40px;
+  }
+  [data-park][data-theme="studio"] .park-world-back {
+    min-width: 40px;
+    min-height: 40px;
   }
   [data-park][data-theme="studio"] .park-ledger-method {
     display: inline-flex;
