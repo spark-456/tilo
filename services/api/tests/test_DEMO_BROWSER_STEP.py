@@ -2,8 +2,10 @@
 
 import base64
 import hashlib
+import json
 from types import SimpleNamespace
 
+from tilo_browser.session import SessionRefused
 from tilo_memory.artifacts import Scope
 
 
@@ -36,9 +38,11 @@ class FakeRun:
         self.seams = SimpleNamespace(artifacts=FakeArtifacts())
         self.store = SimpleNamespace(browser_controls={})
         self.events = []
+        self.charges = []
 
     def put(self, kind, actor, target, summary, data, **kwargs):
         self.events.append((kind, data))
+        self.charges.append(kwargs.get("credits", 0))
         return {"id": f"e_{len(self.events)}"}
 
 
@@ -129,6 +133,58 @@ def test_DEMO_BROWSER_STEP_owner_stop_closes_session_without_next_action():
     assert not result.success
     assert rpc.calls == ["start", "extract", "end"]
     assert [kind for kind, _ in run.events] == [
-        "browser.started", "browser.acted", "browser.controlled", "browser.stopped"
+        "browser.started",
+        "browser.acted",
+        "browser.controlled",
+        "browser.stopped",
     ]
     assert run.events[-1][1]["steps"] == 1
+
+
+def test_DEMO_BROWSER_STEP_unavailable_service_has_plain_failure():
+    from tilo_api.browser_step import BrowseStepExecutor
+
+    class OfflineRpc:
+        def start(self, body):
+            raise SessionRefused("browser_unavailable", 503)
+
+    result = BrowseStepExecutor(FakeRun(), OfflineRpc(), lambda goal, frame, text: {}).execute(
+        unit={"id": "U1", "district": "D1"}, agent="A_s1", building="B2", goal="Read", hosts=["example.org"]
+    )
+    assert not result.success
+    assert "unavailable" in result.reason
+
+
+def test_DEMO_BROWSER_STEP_records_only_actual_model_charges():
+    from tilo_api.browser_step import BrowseStepExecutor
+
+    run = FakeRun()
+    proposals = iter([({"kind": "extract"}, 0.3), ({"kind": "done"}, 0.1)])
+    result = BrowseStepExecutor(run, FakeRpc(), lambda goal, frame, text: next(proposals)).execute(
+        unit={"id": "U1", "district": "D1"}, agent="A_s1", building="B2", goal="Read", hosts=["example.org"]
+    )
+    assert result.success
+    assert run.charges == [0, 0.3, 0.1]
+
+
+def test_DEMO_BROWSER_STEP_wikipedia_search_demo_records_navigation_then_read():
+    from tilo_api.browser_step import BrowseStepExecutor
+    from tilo_providers.fake_browser import FakeBrowserProvider
+    from tilo_providers.interfaces import GenerateRequest
+
+    run, rpc, model = FakeRun(), FakeRpc(), FakeBrowserProvider()
+
+    def propose(goal, frame, extracted):
+        return json.loads(
+            model.generate(GenerateRequest(prompt=f"Goal: {goal}\nExtracted page text: {extracted}")).text
+        )
+
+    result = BrowseStepExecutor(run, rpc, propose).execute(
+        unit={"id": "U1", "district": "D1"}, agent="A_s1", building="B2",
+        goal="Search https://en.wikipedia.org for Ada Lovelace and summarize the top 3",
+        hosts=["en.wikipedia.org"],
+    )
+    assert result.success
+    assert rpc.calls == ["start", "navigate", "extract", "end"]
+    assert [e[0] for e in run.events] == ["browser.started", "browser.acted", "browser.acted", "browser.stopped"]
+    assert result.outputs[0].content == b"First. Second. Third."

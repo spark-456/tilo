@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -26,7 +27,7 @@ _MAX_TEXT = 30_000
 
 
 class BrowseStepExecutor:
-    def __init__(self, run: Any, rpc: Any, propose: Callable[[str, bytes, str], dict]) -> None:
+    def __init__(self, run: Any, rpc: Any, propose: Callable[[str, bytes, str], Any]) -> None:
         self.run, self.rpc, self.propose = run, rpc, propose
 
     def _save(self, session: str, step: int, unit: str, agent: str, result: dict) -> dict:
@@ -61,20 +62,25 @@ class BrowseStepExecutor:
             return UnitOutcome(False, reason="The browser has no approved site or step limit.")
         session = "bs_" + new_part_id()
         opened, step, outcome = False, 0, "error"
+        stop_charge = 0.0
         extracted: list[str] = []
+        history: list[str] = []
         last: dict | None = None
         try:
-            last = self.rpc.start(
-                {
-                    "session": session,
-                    "world_id": self.run.world_id,
-                    "run_id": self.run.run_id,
-                    "unit_id": unit["id"],
-                    "allow_hosts": hosts,
-                    "start_url": f"https://{hosts[0]}/",
-                    "viewport": {"width": 1200, "height": 800},
-                }
-            )
+            try:
+                last = self.rpc.start(
+                    {
+                        "session": session,
+                        "world_id": self.run.world_id,
+                        "run_id": self.run.run_id,
+                        "unit_id": unit["id"],
+                        "allow_hosts": hosts,
+                        "start_url": f"https://{hosts[0]}/",
+                        "viewport": {"width": 1200, "height": 800},
+                    }
+                )
+            except SessionRefused as exc:
+                return UnitOutcome(False, reason=f"The browser service is unavailable ({exc.reason}).")
             opened = True
             frame = self._save(session, 0, unit["id"], agent, last)
             self.run.put(
@@ -113,16 +119,28 @@ class BrowseStepExecutor:
                     step -= 1
                     return UnitOutcome(False, reason="You stopped the browser.")
                 screenshot = base64.b64decode(last["screenshot_artifact"]["base64"], validate=True)
-                action = self.propose(goal, screenshot, "\n\n".join(extracted)[-_MAX_TEXT:])
+                proposed = self.propose(
+                    goal + "\nCompleted browser actions: " + ", ".join(history),
+                    screenshot,
+                    "\n\n".join(extracted)[-_MAX_TEXT:],
+                )
+                action, charge = proposed if isinstance(proposed, tuple) and len(proposed) == 2 else (proposed, 0.0)
+                if not isinstance(charge, (int, float)) or not math.isfinite(charge) or charge < 0:
+                    raise ValueError("browser model returned an invalid charge")
                 if not isinstance(action, dict) or not _ACTION.is_valid(action):
-                    self._record_refusal(session, step, unit, agent, building, last, "navigate", "invalid_action")
+                    self._record_refusal(
+                        session, step, unit, agent, building, last, "navigate", "invalid_action", credits=charge
+                    )
                     return UnitOutcome(False, reason="The browser proposed an invalid action.")
                 kind = action["kind"]
                 if kind in ("done", "ask"):
                     outcome = "done" if kind == "done" else "needs_person"
+                    stop_charge = charge
                     break
                 if kind not in ("navigate", "click", "type", "scroll", "extract"):
-                    self._record_refusal(session, step, unit, agent, building, last, kind, "invalid_action")
+                    self._record_refusal(
+                        session, step, unit, agent, building, last, kind, "invalid_action", credits=charge
+                    )
                     return UnitOutcome(False, reason="The browser proposed an unsupported action.")
                 digest, target_name, target_box = None, "", None
                 if kind in ("click", "type"):
@@ -146,6 +164,7 @@ class BrowseStepExecutor:
                         None if gated else exc.reason,
                         gated=gated,
                         box=target_box,
+                        credits=charge,
                     )
                     outcome = "needs_person" if gated else "error"
                     return UnitOutcome(
@@ -174,12 +193,14 @@ class BrowseStepExecutor:
                         "caption": caption,
                     },
                     district=unit["district"],
+                    credits=charge,
                 )
                 if last["login_required"]:
                     outcome = "needs_person"
                     return UnitOutcome(False, reason="This site needs you to sign in; Tilo never enters credentials.")
                 if kind == "extract" and last["text"]:
                     extracted.append(last["text"])
+                history.append(kind)
             else:
                 outcome = "cap_steps"
             if outcome == "done" and extracted:
@@ -199,6 +220,7 @@ class BrowseStepExecutor:
                         "Tilo closed the browser.",
                         {"session": session, "outcome": outcome, "steps": step},
                         district=unit["district"],
+                        credits=stop_charge,
                     )
 
     @staticmethod
@@ -226,6 +248,7 @@ class BrowseStepExecutor:
         *,
         gated: bool = False,
         box: dict | None = None,
+        credits: float = 0.0,
     ) -> None:
         self.run.put(
             "browser.acted",
@@ -247,4 +270,5 @@ class BrowseStepExecutor:
                 "caption": "Waiting for you" if gated else "Browser action stopped",
             },
             district=unit["district"],
+            credits=credits,
         )
