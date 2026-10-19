@@ -322,3 +322,28 @@ def test_FR_MTG_09_disconnected_caller_cancels_and_awaits_browser_cleanup():
         assert cleaned.is_set()
 
     asyncio.run(check())
+
+
+def test_P0_MEET_JOIN_refusal_log_survives_the_capture_content_boundary(monkeypatch, caplog):
+    import logging
+
+    from bot.cloud_worker import quiet_capture
+
+    monkeypatch.setenv("TILO_CLOUD_CAPTURE", "1")
+    handlers = set(logging.root.handlers)
+    if logging.lastResort is not None:
+        handlers.add(logging.lastResort)
+    before = {handler: list(handler.filters) for handler in handlers}
+    try:
+        with caplog.at_level(logging.WARNING):
+            with quiet_capture():
+                logging.getLogger("bot.session").warning("private participant text")
+            # The bot's own refusal line is operational: it must reach Cloud Logging after a capture.
+            logging.getLogger("bot.cloud_run").warning("meeting attend refused status=502 reason=worker_failed")
+            logging.getLogger("bot.session").warning("private late participant text")
+        assert [record.getMessage() for record in caplog.records] == [
+            "meeting attend refused status=502 reason=worker_failed"
+        ]
+    finally:
+        for handler, filters in before.items():
+            handler.filters[:] = filters

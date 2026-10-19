@@ -16,6 +16,17 @@ from bot.browser import CHROMIUM_ARGS
 async def main():
     assert os.environ.get("LIVE") != "1"
     assert urllib.request.urlopen("http://127.0.0.1:8080/health", timeout=3).status == 200
+    # Files the attend route reads at run time: a missing one used to surface only as a live 502 (meeting-wake.json).
+    from pathlib import Path
+
+    from bot.config import load_wake_settings
+
+    load_wake_settings()
+    root = Path(os.environ["TILO_REPO_ROOT"])
+    for name in ("models.yaml", "prices.yaml", "speech.yaml", "voice.yaml", "meeting.yaml", "meeting-wake.json"):
+        assert (root / "config" / name).is_file(), f"image is missing config/{name}"
+    for name in ("meeting_voice_meter.schema.json", "common.schema.json"):
+        assert (root / "contracts" / name).is_file(), f"image is missing contracts/{name}"
     try:
         urllib.request.urlopen(
             urllib.request.Request(

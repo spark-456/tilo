@@ -81,14 +81,15 @@ it("CX_PAGES_ENRICH_AGENDA_live_calendar_shows_week_navigation_and_slot_actions"
   expect(onMeetHere.mock.calls[0]?.[1]).toBe(15);
 });
 
-it("CX_PAGES_ENRICH_AGENDA_unconnected_host_has_a_sign_in_action_in_the_slot_popover", async () => {
+// MEET-GUEST: an unconnected meeting host asks nobody to sign in; Tilo joins the person's own Meet as a guest.
+it("CX_PAGES_ENRICH_AGENDA_unconnected_host_points_to_the_guest_join_not_a_sign_in", async () => {
   const m = mount(<LiveWeek {...props()} hostState={async () => "available"} />);
   await act(async () => m.container.querySelector<HTMLButtonElement>("[data-week-slot]")?.click());
-  expect(m.container.textContent).toContain("Tilo's meeting host is not signed in.");
+  expect(m.container.textContent).toContain("Tilo joins it as a guest");
+  expect(m.container.textContent).not.toMatch(/sign in the meeting host|not signed in/i);
   expect(
-    m.container.querySelector('[aria-label="Schedule at this time"] a[href="/connectors"]')
-      ?.textContent,
-  ).toBe("Sign in the meeting host");
+    m.container.querySelector('[aria-label="Schedule at this time"] a[href="/connectors"]'),
+  ).toBeNull();
 });
 
 it("CX_PAGES_ENRICH_AGENDA_meeting_block_opens_details_and_recorded_brief", async () => {
