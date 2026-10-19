@@ -113,3 +113,11 @@
     flex: 1 1 0;
   }
 }
+
+/* RESPONSIVE: on Home the pinned strip starts at the page content's left edge (32px up to the 1296px column, then centred
+   with it) instead of a fixed 24px that matched nothing below it. */
+@media (min-width: 561px) {
+  [data-park] .park-first-run-banner--home {
+    left: max(32px, calc((100vw - 1296px) / 2 + 8px));
+  }
+}
