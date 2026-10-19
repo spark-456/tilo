@@ -159,3 +159,9 @@
     justify-content: center;
   }
 }
+@media (max-width: 560px) {
+  [data-park] .park-admin > .park-sheet {
+    padding: 20px 14px 28px;
+    border-radius: 22px;
+  }
+}

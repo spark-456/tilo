@@ -910,3 +910,15 @@
     gap: 8px;
   }
 }
+
+/* RESPONSIVE: on a phone the page sheet gives back its 32px side padding (the cards inside were 292px wide on a 390px
+   screen) and the chart's day labels get a size that keeps "15" and "Today" apart. */
+@media (max-width: 560px) {
+  [data-park] .park-ledger-root > .park-sheet {
+    padding: 20px 14px 28px;
+    border-radius: 22px;
+  }
+  [data-park] .park-ledger-xlabel {
+    font-size: 11px;
+  }
+}
