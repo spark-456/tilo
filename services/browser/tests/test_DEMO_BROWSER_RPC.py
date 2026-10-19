@@ -111,9 +111,7 @@ def test_DEMO_BROWSER_RPC_inspect_button_without_input_type_uses_null():
 
     app, _ = _app()
     assert _start(app).status_code == 200
-    inspected = _post(
-        app, f"/sessions/{SESSION}/inspect", {"session": SESSION, "at": {"x": 210, "y": 60}}
-    )
+    inspected = _post(app, f"/sessions/{SESSION}/inspect", {"session": SESSION, "at": {"x": 210, "y": 60}})
     assert inspected.status_code == 200
     assert inspected.json()["facts"]["input_type"] is None
     assert BrowserSessions._facts(node("button", "Search", id="go", type=""))["input_type"] is None
@@ -128,7 +126,7 @@ def test_DEMO_BROWSER_RPC_stops_commit_and_password_entry():
     assert submit.json()["reason"] == "needs_person"
     assert engine.contexts[0].typed == []
     secret = _act(app, {"kind": "type", "at": {"x": 0, "y": 0}, "text": "abc", "submit": False})
-    assert secret.status_code == 409
+    assert secret.status_code == 422  # no inspect digest: contract refuses it before any field can be touched
     assert engine.contexts[0].typed == []
     at = {"x": 280, "y": 60}
     form = _act(app, {"kind": "click", "at": at}, at=at)
@@ -174,3 +172,36 @@ def test_DEMO_BROWSER_RPC_blocks_offsite_navigation_before_any_request():
     refused = _act(app, {"kind": "navigate", "url": "https://outside.example.net/private"})
     assert refused.status_code == 403
     assert all("outside.example.net" not in request.url for request in engine.web.requests)
+
+
+def test_DEMO_BROWSER_RPC_rejects_action_outside_closed_contract_before_engine():
+    app, engine = _app()
+    assert _start(app).status_code == 200
+    bad = _post(
+        app,
+        f"/sessions/{SESSION}/act",
+        {
+            "session": SESSION,
+            "step": 1,
+            "action": {"kind": "navigate", "url": URL, "unreviewed": True},
+            "digest": None,
+            "outbox_id": None,
+        },
+    )
+    assert bad.status_code == 422
+    assert len(engine.web.requests) == 1
+
+
+def test_DEMO_BROWSER_RPC_refuses_oversized_viewport_before_context():
+    app, engine = _app()
+    refused = _post(
+        app,
+        "/sessions",
+        {
+            "session": SESSION, "world_id": "w_demo", "run_id": "r_demo", "unit_id": "U1",
+            "allow_hosts": ["example.org"], "start_url": URL,
+            "viewport": {"width": 9000, "height": 800},
+        },
+    )
+    assert refused.status_code == 422
+    assert engine.contexts == []

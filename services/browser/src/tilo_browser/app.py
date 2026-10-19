@@ -8,16 +8,21 @@ Bearer token, 403 when unconfigured or for an unauthorized caller).
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
+from pathlib import Path
 from typing import Any
 
+import jsonschema
 from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT202012
 from tilo_logging import configure_logging
 
 from tilo_browser.egress import EgressBlocked
@@ -29,6 +34,20 @@ from tilo_browser.worker import ScreenshotRefused
 
 configure_logging()
 _BROWSER_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tilo-browser")
+_CONTRACTS = Path(__file__).resolve().parents[4] / "contracts"
+_BROWSER_SCHEMA = json.loads((_CONTRACTS / "browser.schema.json").read_text(encoding="utf-8"))
+_COMMON_SCHEMA = json.loads((_CONTRACTS / "common.schema.json").read_text(encoding="utf-8"))
+_REGISTRY = Registry().with_resources(
+    (doc["$id"], Resource.from_contents(doc, DRAFT202012)) for doc in (_BROWSER_SCHEMA, _COMMON_SCHEMA)
+)
+
+
+def _valid_rpc(name: str, payload: dict) -> bool:
+    validator = jsonschema.Draft202012Validator(
+        {"$ref": _BROWSER_SCHEMA["$id"] + f"#/$defs/{name}"}, registry=_REGISTRY
+    )
+    return validator.is_valid(payload)
+
 
 _STATUS_BY_REASON: dict[str, int] = {
     "file_too_large": 413,
@@ -137,6 +156,8 @@ def create_app(
             return refused
         try:
             body = SessionStartPayload.model_validate(await request.json()).model_dump()
+            if not _valid_rpc("open_request", body):
+                return _refuse(422, "invalid_request")
             result = await browser_call(sessions.start, body)
         except (ValueError, ValidationError, KeyError, TypeError):
             return _refuse(422, "invalid_request")
@@ -157,7 +178,12 @@ def create_app(
             return refused
         try:
             body = SessionActionPayload.model_validate(await request.json()).model_dump()
-            if body["session"] != session or body["outbox_id"] is not None:
+            if (
+                body["session"] != session
+                or body["outbox_id"] is not None
+                or not _valid_rpc("act_request", body)
+                or body["action"]["kind"] not in ("navigate", "click", "type", "scroll", "extract")
+            ):
                 return _refuse(422, "invalid_request")
             result = await browser_call(sessions.act, session, body)
         except (ValueError, ValidationError, KeyError, TypeError):
@@ -181,7 +207,7 @@ def create_app(
             return refused
         try:
             body = SessionInspectPayload.model_validate(await request.json()).model_dump()
-            if body["session"] != session:
+            if body["session"] != session or not _valid_rpc("inspect_request", body):
                 return _refuse(422, "invalid_request")
             result = await browser_call(sessions.inspect, session, body["at"])
         except (ValueError, ValidationError, KeyError, TypeError):
