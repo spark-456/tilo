@@ -115,15 +115,15 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
     );
   if (markdown && text !== null)
     return (
-      <div className="tw-res-preview" data-testid="result-preview">
+      <div className="park-world-resulttext tw-res-preview" data-testid="result-preview">
         <Markdown text={readableMath(text)} />
       </div>
     );
   if (plain && text !== null)
     return (
-      <pre className="tw-res-preview park-world-resultpre" data-testid="result-preview">
-        {readableMath(text)}
-      </pre>
+      <div className="park-world-resulttext tw-res-preview" data-testid="result-preview">
+        <pre className="park-world-resultpre">{readableMath(text)}</pre>
+      </div>
     );
   if (pdf && imageUrl)
     return (
