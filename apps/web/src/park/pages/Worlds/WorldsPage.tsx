@@ -33,6 +33,7 @@ import { Spotlight } from "./Spotlight";
 import { makeArt, makeKit } from "./art";
 import "./Worlds.css";
 import {
+  STATUS_TABS,
   type StatusFilter,
   type TierFilter,
   countFor,
@@ -50,6 +51,8 @@ interface Loaded {
   /** The ledger's total, in its own currency; null when the read failed or is not built. */
   spent: string | null;
 }
+
+const EMPTY_WORLDS: World[] = [];
 
 export function WorldsPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
@@ -127,13 +130,18 @@ export function WorldsPage({ app }: { app: AppCtx }) {
   const go = useRef(app.go);
   go.current = app.go;
   const open = useCallback((id: string) => go.current("world", { id }), []);
-  const all = data?.worlds ?? [];
+  const all = data?.worlds ?? EMPTY_WORLDS;
   const slackState = useMemo(
     () => (data ? slackConnectorState(data.connectors) : undefined),
     [data],
   );
-  const list = visibleWorlds(all, query, tier, status);
+  const list = useMemo(() => visibleWorlds(all, query, tier, status), [all, query, tier, status]);
   const counts = useMemo(() => townCounts(all), [all]);
+  const filterCounts = useMemo(() => {
+    const byStatus = {} as Record<StatusFilter, number>;
+    for (const [filter] of STATUS_TABS) byStatus[filter] = countFor(all, query, tier, filter);
+    return byStatus;
+  }, [all, query, tier]);
   // Cards are drawn one per task, in page order (the grid is fixed per width, so a card added later moves none).
   const part = useStaged(2 + list.length);
 
@@ -323,7 +331,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
                 status={status}
                 tier={tier}
                 query={query}
-                count={(f) => countFor(all, query, tier, f)}
+                count={(f) => filterCounts[f]}
                 onStatus={setStatus}
                 onTier={setTier}
                 onQuery={setQuery}
