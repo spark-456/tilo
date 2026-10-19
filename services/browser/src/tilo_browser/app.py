@@ -8,6 +8,7 @@ Bearer token, 403 when unconfigured or for an unauthorized caller).
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
@@ -250,4 +251,19 @@ def create_app(
     return fastapi_app
 
 
-app = create_app()
+def _configured_app() -> FastAPI:
+    audience = os.environ.get("TILO_BROWSER_AUDIENCE")
+    callers = tuple(filter(None, os.environ.get("TILO_BROWSER_CALLERS", "").split(",")))
+    if not audience or not callers:
+        return create_app()  # fail closed: internal routes are present but deny every request
+
+    def verify(token: str, wanted: str) -> Mapping[str, Any]:
+        from google.auth.transport.requests import Request  # noqa: PLC0415
+        from google.oauth2 import id_token  # noqa: PLC0415
+
+        return id_token.verify_oauth2_token(token, Request(), wanted)
+
+    return create_app(oidc_verifier=verify, audience=audience, allowed_callers=callers)
+
+
+app = _configured_app()

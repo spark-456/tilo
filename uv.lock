@@ -1775,6 +1775,7 @@ version = "0.1.0"
 source = { editable = "services/browser" }
 dependencies = [
     { name = "fastapi" },
+    { name = "google-auth" },
     { name = "idna" },
     { name = "playwright" },
     { name = "tilo-archive" },
@@ -1787,6 +1788,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "google-auth", specifier = ">=2.30" },
     { name = "idna", specifier = ">=3.7" },
     { name = "playwright", specifier = ">=1.55,<2" },
     { name = "tilo-archive", editable = "packages/archive" },

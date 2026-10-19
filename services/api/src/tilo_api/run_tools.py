@@ -6,6 +6,7 @@ import asyncio
 import dataclasses
 import json
 import math
+import os
 import threading
 from collections.abc import Callable, Mapping
 from datetime import UTC, date, datetime
@@ -30,6 +31,7 @@ from tilo_providers.router import Router, RouterResult
 from tilo_providers.safety import SafetyProvider
 
 from tilo_api.access import Mode
+from tilo_api.browser_rpc import BrowserRpc
 from tilo_api.browser_step import BrowseStepExecutor
 from tilo_api.quiz_apps import source_loader
 from tilo_api.report_render import render_report
@@ -164,7 +166,7 @@ class BoundRunRunner:
         fixtures: Path,
         workspace: WorkspaceAccess | None = None,
     ) -> None:
-        self.workspace = workspace
+        self.workspace, self.mode = workspace, mode
         self.run_owner, self.providers, self.clock, self.safety = run, providers, clock, safety
         self.budget = RunBudget(run.cap)
         self.limits = load_tool_limits()  # RUN-COST-PROGRESS: config/tool_loop.yaml, read once per run
@@ -204,7 +206,7 @@ class BoundRunRunner:
             if model is None:
                 return UnitOutcome(False, reason="The browser model is unavailable.")
 
-            def propose(goal: str, frame: bytes, extracted: str) -> dict:
+            def propose(goal: str, frame: bytes, extracted: str) -> tuple[dict, float]:
                 request = GenerateRequest(
                     prompt=(
                         "Control the browser for the person's goal. Return one JSON action: navigate, click, type, "
@@ -218,13 +220,17 @@ class BoundRunRunner:
                     max_output_tokens=512,
                     parts=[MediaPart(mime_type="image/png", data=frame)],
                 )
-                reply, _charge = model.generate_budgeted(request, self.budget)
-                return cast(dict, json.loads(reply.text or "{}"))
+                reply, charge = model.generate_budgeted(request, self.budget)
+                return cast(dict, json.loads(reply.text or "{}")), charge
 
-            hosts = browse.get("hosts") or sorted(typed_hosts([str(owner.brief.get("goal", ""))]))
+            hosts = browse.get("hosts") or sorted(self.hosts)
             if not isinstance(hosts, list) or not hosts:
                 return UnitOutcome(False, reason="The browser step has no approved site in this task.")
-            executor = BrowseStepExecutor(owner, BrowserSessions(PlaywrightEngine()), propose)
+            browser_url = os.environ.get("TILO_BROWSER_URL") if self.mode == "live" else None
+            if self.mode == "live" and not browser_url:
+                return UnitOutcome(False, reason="The browser service is not configured.")
+            rpc = BrowserRpc(browser_url) if browser_url else BrowserSessions(PlaywrightEngine())
+            executor = BrowseStepExecutor(owner, rpc, propose)
             return executor.execute(
                 unit=dict(unit),
                 agent=context.agent_id,

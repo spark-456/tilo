@@ -12,6 +12,7 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.32",
     "playwright>=1.55,<2",
+    "google-auth>=2.30",
 ]
 
 [tool.uv.sources]
