@@ -190,10 +190,10 @@ function Ready({
   const [persisted, setPersisted] = useState<Record<string, Skill>>({});
   const [removed, setRemoved] = useState<Set<string>>(() => new Set());
 
-  const baseSkills = useMemo(
-    () => withTaught(data.skills, t.taught).filter((skill) => !removed.has(skill.id)),
-    [data.skills, t.taught, removed],
-  );
+  const baseSkills = useMemo(() => {
+    const taught = withTaught(data.skills, t.taught);
+    return removed.size === 0 ? taught : taught.filter((skill) => !removed.has(skill.id));
+  }, [data.skills, t.taught, removed]);
   const skills = useMemo(() => {
     const fixes = Object.values(fixed);
     return baseSkills.map((s) => {
