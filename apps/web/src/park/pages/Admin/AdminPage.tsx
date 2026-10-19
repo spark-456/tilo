@@ -48,8 +48,10 @@ export function SettingsSection({ memoryClient = null }: { memoryClient?: HttpCl
       </Block>
       <Block title="Consent">
         <p>Every opt-in is explicit and revocable.</p>
-        <a href="/connectors">Review Gmail access</a> ·{" "}
-        <a href="/profile?tab=notifications">Review Email</a>
+        <p className="park-admin-links">
+          <a href="/connectors">Review Gmail access</a>
+          <a href="/profile?tab=notifications">Review Email</a>
+        </p>
         <p>Style profile settings and the pilot diary are not available yet.</p>
       </Block>
       <Block title="Your data">

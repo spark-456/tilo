@@ -613,3 +613,40 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* RESPONSIVE: a connected tile's own button is reset (it showed the browser's square outset border), a healthy
+   connection's Reconnect is quiet (red is for a connection that needs attention), and the run cards under the grid
+   are one stack with a gap instead of touching. */
+[data-park][data-theme="studio"]
+  .park-connectors-tile:not(.park-connectors-tile--attn)
+  .park-connectors-action-btn--reconnect {
+  border-color: var(--lineStrong);
+  background: var(--card);
+  color: var(--ink);
+}
+[data-park][data-theme="studio"] .park-connectors-action-btn {
+  border-radius: 12px;
+  font-weight: 700;
+}
+[data-park][data-theme="studio"] .park-connectors-card-actions {
+  border-top-color: var(--line);
+}
+[data-park][data-theme="studio"] .park-runconn-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+[data-park][data-theme="studio"] .park-runconn-stack > .park-runconn-sample {
+  margin: 8px 0 0;
+}
+@media (max-width: 560px) {
+  [data-park][data-theme="studio"] .park-connectors-card-actions {
+    justify-content: stretch;
+  }
+  [data-park][data-theme="studio"] .park-connectors-card-actions .park-connectors-action-btn {
+    flex: 1;
+  }
+  [data-park][data-theme="studio"] .park-connectors-coming-row {
+    gap: 8px;
+  }
+}

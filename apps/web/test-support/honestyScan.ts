@@ -197,7 +197,7 @@ export const ALLOWLIST: readonly AllowEntry[] = [
     file: "src/design/tilo-t/motion.css",
     rule: "css-transition",
     reason:
-      "The global reduced-motion fallback from tilo-t.css makes walks, rises and flights opacity fades and stops loops; PoolLoader's page blur/scale transition starts after a site request or world.started remains pending 300 ms, then delays clearing at sink. Reduced motion changes it to an opacity fade only. No layout property animates; work movement remains event-driven (HR-1).",
+      "The global reduced-motion fallback from tilo-t.css makes walks, rises and flights opacity fades and stops loops; PoolLoader's page blur/scale transition starts after a site request or world.started remains pending 300 ms, then delays clearing at sink. Reduced motion changes it to an opacity fade only. It also holds the 160 ms background-color, border-color and color fade on page controls (chips, small buttons, selects) when a person hovers, presses or picks one: UI chrome, non-agent, paint only, never a layout property, off under reduced motion and the still choice. No layout property animates; work movement remains event-driven (HR-1).",
   },
 ];
 

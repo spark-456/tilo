@@ -1675,3 +1675,31 @@
     letter-spacing: 0;
   }
 }
+
+/* RESPONSIVE: Home is full-bleed (it has no shell gutter), so between a phone and the 1296px column its content sat 8 or 16px
+   from the edge while Worlds, Team and the rest sit 32px in (the shell's 24 plus the 8px page pad). It takes the same 32px,
+   and a tablet's cards, side cards and tiles use the room instead of one tall column. */
+@media (min-width: 561px) and (max-width: 1343px) {
+  [data-park] .park-home-root {
+    padding-right: 32px;
+    padding-left: 32px;
+  }
+}
+@media (min-width: 561px) and (max-width: 840px) {
+  [data-park] .park-home-cards {
+    grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
+  }
+  [data-park] .park-home-today {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  [data-park] .park-home-kpis {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  [data-park] .park-home-kpis > * {
+    grid-column: span 2;
+  }
+  [data-park] .park-home-kpis > :nth-child(4):nth-last-child(2),
+  [data-park] .park-home-kpis > :nth-child(5):last-child {
+    grid-column: span 3;
+  }
+}
