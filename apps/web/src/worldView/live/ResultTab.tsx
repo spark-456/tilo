@@ -1,8 +1,8 @@
 // TILO-W: Result tab with rich previews, working files accordion, and where it was made
 // (design/tilo-w PROMPT.md, Tilo W Parts.dc.html lines 253-365).
 import type React from "react";
-import { useState } from "react";
-import { Icon } from "../../design/tilo-t";
+import { useEffect, useState } from "react";
+import { Icon, type IconName } from "../../design/tilo-t";
 import type { Api } from "../../park/api";
 import { openResult, readResult, saveResult } from "../../park/api/results";
 import type { SharedResult } from "../../park/pages/World/ResultPanel";
@@ -14,7 +14,119 @@ import { DirectionForm } from "./DirectionForm";
 const readableMath = (text: string): string =>
   text.replace(/\$\\to\$/g, "→").replace(/\$([^$\n]+)\$/g, "$1");
 
-function ResultBody({ view, retry }: { view: ResultView; retry?: () => void }) {
+function csvRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') {
+      if (quoted && text[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+      if (char === "\r" && text[i + 1] === "\n") i++;
+      if (rows.length >= 101) break;
+    } else cell += char;
+  }
+  if (cell || row.length) rows.push([...row, cell]);
+  return rows;
+}
+
+function FilePreview({ blob, name, format }: { blob: Blob; name: string; format: string }) {
+  const mime = blob.type.split(";")[0]?.toLowerCase();
+  const csv = mime === "text/csv" || format === "CSV" || /\.csv$/i.test(name);
+  const html = mime === "text/html" || format === "HTML" || /\.html?$/i.test(name);
+  const image =
+    mime?.startsWith("image/") ||
+    /^(PNG|JPG|JPEG|WEBP|GIF)$/.test(format) ||
+    /\.(png|jpe?g|webp|gif)$/i.test(name);
+  const [text, setText] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!csv && !html) return;
+    let active = true;
+    blob
+      .slice(0, 250_000)
+      .text()
+      .then((value) => {
+        if (active) setText(value);
+      });
+    return () => {
+      active = false;
+    };
+  }, [blob, csv, html]);
+  useEffect(() => {
+    if (!image) return;
+    const url = URL.createObjectURL(blob);
+    setImageUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [blob, image]);
+  if (csv && text !== null) {
+    const [head = [], ...body] = csvRows(text);
+    return (
+      <div className="tw-res-preview" data-testid="result-preview">
+        <table>
+          <thead>
+            <tr>
+              {head.map((cell, index) => (
+                <th key={`${index}:${cell}`} scope="col">
+                  {cell}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {body.slice(0, 100).map((row, index) => (
+              <tr key={`row-${index}:${row.join("|")}`}>
+                {row.map((cell, column) => (
+                  <td key={`${column}:${cell}`}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {body.length > 100 ? <p>Showing the first 100 rows. Download for the rest.</p> : null}
+      </div>
+    );
+  }
+  if (html && text !== null)
+    return (
+      <div className="tw-res-preview" data-testid="result-preview">
+        <iframe
+          title={`Preview of ${name}`}
+          sandbox=""
+          referrerPolicy="no-referrer"
+          srcDoc={`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:">${text}`}
+        />
+      </div>
+    );
+  if (image && imageUrl)
+    return (
+      <div className="tw-res-preview" data-testid="result-preview">
+        <img src={imageUrl} alt={name} />
+      </div>
+    );
+  if ((csv || html || image) && text === null)
+    return <p className="park-world-noruns">Loading preview…</p>;
+  return <p className="park-world-noruns">Open or download this file to read it.</p>;
+}
+
+function ResultBody({
+  view,
+  retry,
+  name,
+  format,
+}: { view: ResultView; retry?: () => void; name: string; format: string }) {
   if (view.status === "loading") return <p className="park-world-noruns">Loading the result…</p>;
   if (view.status === "error")
     return (
@@ -31,16 +143,11 @@ function ResultBody({ view, retry }: { view: ResultView; retry?: () => void }) {
         ) : null}
       </div>
     );
-  if (view.status === "file")
-    return (
-      <p className="park-world-noruns">
-        {`The result is a file (${view.blob.type || "unknown type"}). Open or download it to read it.`}
-      </p>
-    );
+  if (view.status === "file") return <FilePreview blob={view.blob} name={name} format={format} />;
   if (view.status !== "text") return null;
   return (
     // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling text box must be reachable by keyboard to be read
-    <div className="park-world-resulttext" data-testid="result-text" tabIndex={0}>
+    <div className="park-world-resulttext tw-res-preview" data-testid="result-text" tabIndex={0}>
       {view.kind === "markdown" ? (
         <Markdown text={readableMath(view.text)} />
       ) : (
@@ -211,6 +318,7 @@ export function ResultTab({
   onChangeDirection,
 }: ResultTabProps) {
   const [directionOpen, setDirectionOpen] = useState(false);
+  const [actionStatus, setActionStatus] = useState("");
   const rawDelivered = extractDeliveredFiles(events);
   const view = shared?.view;
   const blob = view && (view.status === "text" || view.status === "file") ? view.blob : null;
@@ -233,7 +341,28 @@ export function ResultTab({
       : "Result");
   const mainEvent = events.find((event) => event.type === "artifact.delivered");
   const mainData = mainEvent?.data as { format?: unknown } | undefined;
-  const mainFormat = typeof mainData?.format === "string" ? mainData.format.toUpperCase() : "FILE";
+  const declaredFormat = typeof mainData?.format === "string" ? mainData.format.toUpperCase() : "";
+  const extension = /\.([a-z0-9]+)$/i.exec(mainName)?.[1]?.toUpperCase();
+  const mimeFormat =
+    blob?.type === "text/markdown"
+      ? "MD"
+      : blob?.type === "text/csv"
+        ? "CSV"
+        : blob?.type === "text/html"
+          ? "HTML"
+          : "";
+  const mainFormat =
+    extension ||
+    (declaredFormat !== "IN_APP" && declaredFormat !== "" ? declaredFormat : mimeFormat) ||
+    "FILE";
+  const typeIcon: IconName =
+    mainFormat === "CSV" || mainFormat === "XLSX"
+      ? "sheet"
+      : mainFormat === "HTML"
+        ? "browser"
+        : /^(PNG|JPG|JPEG|WEBP|GIF)$/.test(mainFormat)
+          ? "palette"
+          : "file";
   const mainSummary = mainEvent?.summary || "Ready to open or download.";
 
   const handleOpen = () => {
@@ -246,8 +375,33 @@ export function ResultTab({
     else if (onDownload) onDownload();
   };
 
-  const handleShare = () => {
-    if (onShare) onShare();
+  const handleCopy = async () => {
+    try {
+      const content =
+        view?.status === "text"
+          ? view.text
+          : blob && (/^(CSV|HTML|MD|TXT)$/.test(mainFormat) || blob.type.startsWith("text/"))
+            ? await blob.text()
+            : document.URL;
+      if (!content) throw new Error("Nothing to copy");
+      await navigator.clipboard.writeText(content);
+      setActionStatus("Copied");
+    } catch {
+      setActionStatus("Copy unavailable here");
+    }
+  };
+
+  const handleShare = async () => {
+    if (onShare) {
+      onShare();
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(document.URL);
+      setActionStatus("Link copied");
+    } catch {
+      setActionStatus("Share link unavailable here");
+    }
   };
 
   const lastDeliveryEvent = [...events].reverse().find((e) => e.type === "artifact.delivered");
@@ -278,6 +432,7 @@ export function ResultTab({
         <div className="tw-res-body">
           <div className="tw-res-meta-line">
             <span className="tw-res-type-pill" data-type={mainFormat}>
+              <Icon name={typeIcon} size={15} />
               {mainFormat}
             </span>
             <span className="tw-res-meta">Made in Tilo</span>
@@ -285,6 +440,12 @@ export function ResultTab({
 
           <h2 className="tw-res-title">{mainName}</h2>
           <p className="tw-res-summary">{mainSummary}</p>
+
+          {view ? (
+            <div className="tw-res-compat-body">
+              <ResultBody view={view} retry={shared?.retry} name={mainName} format={mainFormat} />
+            </div>
+          ) : null}
 
           <div className="tw-res-actions">
             <button type="button" className="tw-res-btn tw-res-btn--pri" onClick={handleOpen}>
@@ -295,11 +456,16 @@ export function ResultTab({
               <Icon name="download" size={16} />
               Download
             </button>
+            <button type="button" className="tw-res-btn tw-res-btn--sec" onClick={handleCopy}>
+              <Icon name="copy" size={16} />
+              Copy
+            </button>
             <button type="button" className="tw-res-btn tw-res-btn--sec" onClick={handleShare}>
               <Icon name="link" size={16} />
               Share
             </button>
           </div>
+          {actionStatus ? <output className="park-world-sub">{actionStatus}</output> : null}
 
           {onAskQuestion || onChangeDirection ? (
             <div className="tw-res-followup">
@@ -331,13 +497,6 @@ export function ResultTab({
                   onCancel={() => setDirectionOpen(false)}
                 />
               ) : null}
-            </div>
-          ) : null}
-
-          {/* Preserve text view for compatibility with existing tests checking result-text */}
-          {view ? (
-            <div className="tw-res-compat-body">
-              <ResultBody view={view} retry={shared?.retry} />
             </div>
           ) : null}
         </div>
