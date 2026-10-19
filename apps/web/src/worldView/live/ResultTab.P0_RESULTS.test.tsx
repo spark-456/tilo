@@ -28,6 +28,34 @@ const fileView = (text: string, type: string) => ({
 });
 
 describe("P0_RESULTS inline delivery", () => {
+  it("P0_RESULTS_main_download_uses_the_recorded_filename", async () => {
+    let saved = "";
+    vi.stubGlobal("URL", {
+      createObjectURL: () => "blob:download",
+      revokeObjectURL: () => undefined,
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      saved = this.download;
+    });
+    const m = mount(
+      <div data-park="">
+        <ResultTab
+          worldId="w_budget"
+          events={[delivered("csv", "Budget.csv")]}
+          shared={fileView("Item,Cost\nFood,42", "text/csv")}
+        />
+      </div>,
+    );
+    const download = [...m.container.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "Download",
+    );
+    await act(async () => Promise.resolve());
+    act(() => download?.click());
+    expect(saved).toBe("Budget.csv");
+  });
+
   it("P0_RESULTS_open_working_image_uses_its_recorded_file_type", async () => {
     const opened: string[] = [];
     vi.stubGlobal("URL", {

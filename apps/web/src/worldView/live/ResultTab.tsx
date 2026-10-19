@@ -449,8 +449,10 @@ export function ResultTab({
   };
 
   const handleDownload = () => {
-    if (blob) saveResult(blob, mainName);
-    else if (onDownload) onDownload();
+    if (blob) {
+      if (extension) saveNamedResult(blob, mainName);
+      else saveResult(blob, mainName);
+    } else if (onDownload) onDownload();
   };
 
   const handleCopy = async () => {
