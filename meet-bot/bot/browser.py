@@ -196,6 +196,10 @@ class MeetBrowser:
             raise NotLoggedIn("Set BOT_GOOGLE_EMAIL to the dedicated bot account before joining.")
         loc = await self.find(S.ACCOUNT_BUTTON, 3)
         if loc is None:
+            # Meet's pre-join page (Oct 2026) shows the signed-in email as plain text, with no "Google Account" badge.
+            text = (await self.page.inner_text("body")) if self.page is not None else ""
+            if self.cfg.bot_email.lower() in text.lower():
+                return
             raise NotLoggedIn("The bot account could not be verified; sign in manually first.")
         label = (await loc.get_attribute("aria-label")) or ""
         m = re.search(r"[\w.+-]+@[\w.-]+", label)
