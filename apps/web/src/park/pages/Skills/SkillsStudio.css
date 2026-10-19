@@ -56,9 +56,9 @@
 /* ---- Teach banner ---- */
 [data-park] .park-skills-banner {
   background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 28px;
-  box-shadow: var(--sh);
+  border: 1px solid var(--line2);
+  border-radius: 24px;
+  box-shadow: var(--sh1);
   padding: 24px 28px;
   display: flex;
   flex-direction: column;
@@ -252,9 +252,9 @@
   height: 100%;
   min-height: 44px;
   background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 24px;
-  box-shadow: var(--sh);
+  border: 1px solid var(--line2);
+  border-radius: 20px;
+  box-shadow: var(--sh1);
   padding: 20px;
   display: flex;
   flex-direction: column;

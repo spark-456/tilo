@@ -17,6 +17,7 @@ _TREE_SCRIPT = """() => {
     const name = (el.getAttribute('aria-label') || el.getAttribute('placeholder') ||
       el.innerText || el.getAttribute('name') || '').trim().slice(0,120);
     return {role, name, attrs:{id:el.dataset.tiloRef, tag:el.tagName.toLowerCase(),
+      dom_id:el.getAttribute('id') || '', placeholder:el.getAttribute('placeholder') || '',
       type:(el.getAttribute('type') || '').toLowerCase(), name:el.getAttribute('name') || '',
       autocomplete:el.getAttribute('autocomplete') || '', form_method:(el.form?.method || 'none').toLowerCase(),
       href:el.getAttribute('href') || '', download:el.hasAttribute('download'),
@@ -31,8 +32,11 @@ _SECURE_SELECTORS = (
     'input[autocomplete^="cc-"]',
     'input[name*="card" i]',
     'input[name*="otp" i]',
+    'input[name*="pass" i]',
     'input[id*="card" i]',
     'input[id*="otp" i]',
+    'input[id*="pass" i]',
+    'input[placeholder*="pass" i]',
     "iframe",
     '[contenteditable="true"]',
 )

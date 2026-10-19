@@ -229,9 +229,9 @@
 }
 [data-park] .park-needs__card {
   background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 28px;
-  box-shadow: var(--sh);
+  border: 1px solid var(--line2);
+  border-radius: 24px;
+  box-shadow: var(--sh1);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -246,7 +246,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line2);
   font-size: 14px;
 }
 [data-park] .park-needs__world {
@@ -345,7 +345,7 @@
   background: var(--sunk);
 }
 [data-park] .park-needs__box--cost {
-  border: 1px solid var(--line);
+  border: 1px solid var(--line2);
   gap: 6px;
 }
 [data-park] .park-needs__boxh {
@@ -390,8 +390,8 @@
   gap: 10px;
 }
 [data-park] .park-needs__sentbox {
-  border: 1px solid var(--line);
-  border-radius: 20px;
+  border: 1px solid var(--line2);
+  border-radius: 18px;
   overflow: hidden;
 }
 [data-park] .park-needs__sentrow {
@@ -400,7 +400,7 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line2);
   font-size: 14px;
 }
 [data-park] .park-needs__sentk {
