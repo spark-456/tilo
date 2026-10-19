@@ -95,6 +95,23 @@ class BrowseStepExecutor:
                 outcome = "needs_person"
                 return UnitOutcome(False, reason="This site needs you to sign in; Tilo never enters credentials.")
             for step in range(1, max_steps + 1):
+                if getattr(self.run, "paused", lambda: False)():
+                    outcome = "stopped"
+                    step -= 1
+                    return UnitOutcome(False, reason="The world was paused.")
+                control = getattr(getattr(self.run, "store", None), "browser_controls", {}).pop(session, None)
+                if control == "stop":
+                    self.run.put(
+                        "browser.controlled",
+                        self.run.owner,
+                        building,
+                        "You stopped the browser.",
+                        {"session": session, "op": "stop", "step": step - 1},
+                        district=unit["district"],
+                    )
+                    outcome = "stopped"
+                    step -= 1
+                    return UnitOutcome(False, reason="You stopped the browser.")
                 screenshot = base64.b64decode(last["screenshot_artifact"]["base64"], validate=True)
                 action = self.propose(goal, screenshot, "\n\n".join(extracted)[-_MAX_TEXT:])
                 if not isinstance(action, dict) or not _ACTION.is_valid(action):
@@ -174,14 +191,15 @@ class BrowseStepExecutor:
         finally:
             if opened:
                 self.rpc.end(session)
-                self.run.put(
-                    "browser.stopped",
-                    agent,
-                    building,
-                    "Tilo closed the browser.",
-                    {"session": session, "outcome": outcome, "steps": step},
-                    district=unit["district"],
-                )
+                if not getattr(self.run, "paused", lambda: False)():
+                    self.run.put(
+                        "browser.stopped",
+                        agent,
+                        building,
+                        "Tilo closed the browser.",
+                        {"session": session, "outcome": outcome, "steps": step},
+                        district=unit["district"],
+                    )
 
     @staticmethod
     def _caption(kind: str, name: str, host: str | None, action: dict) -> str:

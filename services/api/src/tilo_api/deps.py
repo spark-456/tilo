@@ -177,6 +177,7 @@ class Store:
     """In-memory injected state; one instance per test, mutated in place by route handlers."""
 
     worlds: dict[str, WorldRecord] = field(default_factory=dict)
+    browser_controls: dict[str, str] = field(default_factory=dict)  # session id -> stop, set only by its owner
     events: dict[str, list[dict]] = field(default_factory=dict)  # world_id -> event.schema.json
     # records, append-only (EV-10), written only by EventWriter.append.
     policies: dict[str, dict] = field(default_factory=dict)  # policy_id -> policy.schema.json record

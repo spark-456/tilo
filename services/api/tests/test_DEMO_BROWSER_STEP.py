@@ -34,6 +34,7 @@ class FakeRun:
     def __init__(self):
         self.scope = Scope(self.org_id, self.world_id, self.owner)
         self.seams = SimpleNamespace(artifacts=FakeArtifacts())
+        self.store = SimpleNamespace(browser_controls={})
         self.events = []
 
     def put(self, kind, actor, target, summary, data, **kwargs):
@@ -104,3 +105,30 @@ def test_DEMO_BROWSER_STEP_dispatches_only_the_pinned_browse_action():
     assert taught_browse_step(run, {"id": "U1", "unit_type": "taught_step"})["text"] == "Find three results"
     assert taught_browse_step(run, {"id": "U2", "unit_type": "taught_step"}) is None
     assert taught_browse_step(run, {"id": "U1", "unit_type": "deliver"}) is None
+
+
+def test_DEMO_BROWSER_STEP_owner_stop_closes_session_without_next_action():
+    from tilo_api.browser_step import BrowseStepExecutor
+
+    run, rpc = FakeRun(), FakeRpc()
+
+    def propose(goal, frame, text):
+        run.store.browser_controls[rpc.session] = "stop"
+        return {"kind": "extract"}
+
+    original = rpc.start
+
+    def start(body):
+        rpc.session = body["session"]
+        return original(body)
+
+    rpc.start = start
+    result = BrowseStepExecutor(run, rpc, propose).execute(
+        unit={"id": "U1", "district": "D1"}, agent="A_s1", building="B2", goal="Read", hosts=["example.org"]
+    )
+    assert not result.success
+    assert rpc.calls == ["start", "extract", "end"]
+    assert [kind for kind, _ in run.events] == [
+        "browser.started", "browser.acted", "browser.controlled", "browser.stopped"
+    ]
+    assert run.events[-1][1]["steps"] == 1

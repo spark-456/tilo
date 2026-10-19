@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
-
 from tilo_api.deps import Principal, Store, WorldRecord
 
 
@@ -41,3 +40,18 @@ def test_DEMO_BROWSER_FRAME_route_requires_owner_and_recorded_frame():
         with pytest.raises(HTTPException) as denied:
             get_browser_frame("w_demo", artifact, principal, store, lambda: FakeArtifacts())
         assert denied.value.status_code == 404
+
+
+def test_DEMO_BROWSER_FRAME_stop_reaches_only_an_active_owned_session():
+    from tilo_api.browser_frames import stop_browser
+
+    store = Store()
+    store.worlds["w_demo"] = WorldRecord(owner="u_demo", districts={}, run_id="r_demo")
+    store.events["w_demo"] = [{"type": "browser.started", "data": {"session": "bs_demo"}}]
+    owner = Principal("u_demo", "owner", world_id="w_demo")
+    assert stop_browser("w_demo", "bs_demo", owner, store) == {"requested": True}
+    assert store.browser_controls["bs_demo"] == "stop"
+    with pytest.raises(HTTPException):
+        stop_browser("w_demo", "bs_demo", Principal("u_other", "owner"), store)
+    with pytest.raises(HTTPException):
+        stop_browser("w_demo", "bs_unknown", owner, store)

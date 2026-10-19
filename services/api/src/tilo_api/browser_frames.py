@@ -36,7 +36,9 @@ def get_browser_frame(
         for event in store.events.get(world_id, [])
         if event.get("type") in ("browser.started", "browser.acted")
     )
-    if not any(isinstance(ref, dict) and ref.get("artifact_id") == artifact_id and ref.get("version") == 1 for ref in refs):
+    if not any(
+        isinstance(ref, dict) and ref.get("artifact_id") == artifact_id and ref.get("version") == 1 for ref in refs
+    ):
         raise _MISSING
     scope = Scope(deps.ORG_ID, world_id, world.owner)
     ref = {"artifact_id": artifact_id, "version": 1}
@@ -62,3 +64,28 @@ def get_browser_frame(
         media_type="image/png",
         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
+
+
+@router.post("/worlds/{world_id}/browser/{session}/stop")
+def stop_browser(
+    world_id: str,
+    session: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    store: Annotated[deps.Store, Depends(deps.get_store)],
+) -> dict[str, bool]:
+    world = store.worlds.get(world_id)
+    if (
+        world is None
+        or principal.role != "owner"
+        or principal.user_id != world.owner
+        or principal.channel not in ("web", "mobile_web")
+        or principal.world_id not in (None, world_id)
+    ):
+        raise _MISSING
+    events = store.events.get(world_id, [])
+    started = any(e.get("type") == "browser.started" and e.get("data", {}).get("session") == session for e in events)
+    stopped = any(e.get("type") == "browser.stopped" and e.get("data", {}).get("session") == session for e in events)
+    if not started or stopped:
+        raise _MISSING
+    store.browser_controls[session] = "stop"
+    return {"requested": True}
