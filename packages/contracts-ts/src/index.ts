@@ -7,7 +7,7 @@
  * artifact.schema.json 1.3.0 sha256:dafce81fa75a5ed5
  * attention.schema.json 1.0.0 sha256:f35cff84728304af
  * brief.schema.json 1.0.0 sha256:be4e747f37e399b2
- * browser.schema.json 1.0.0 sha256:196a0b328e45bf22
+ * browser.schema.json 1.1.0 sha256:a92335a572619ef1
  * byok.schema.json 1.0.0 sha256:683d5d2b4fc8b0fe
  * calendar_entry.schema.json 1.1.0 sha256:291531543be88320
  * card.schema.json 1.0.0 sha256:2666292eb19087d0
@@ -47,7 +47,7 @@
  * events/data/artifact.versioned.schema.json 1.0.0 sha256:b6ceac1481d2595b
  * events/data/assistant.asked.schema.json 1.0.0 sha256:8775120b73c4ed38
  * events/data/assistant.replied.schema.json 1.0.0 sha256:48fb513dadef290d
- * events/data/browser.acted.schema.json 1.0.0 sha256:3b55e5a09f00e387
+ * events/data/browser.acted.schema.json 1.1.0 sha256:e4fcf23f19afd365
  * events/data/browser.controlled.schema.json 1.0.0 sha256:6b8442f6dbb88479
  * events/data/browser.started.schema.json 1.0.0 sha256:1bed13c81c886df2
  * events/data/browser.stopped.schema.json 1.0.0 sha256:8ae289ea75dfd6b5
@@ -398,11 +398,18 @@ export type BrowserConfigResumeUrl = string;
  */
 export type BrowserConfigTypedChars = number;
 /**
+ * SHA-256 (lower-case hex) of the page URL and the facts, so an act runs only on the element that was inspected (BR-03).
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigDigest".
+ */
+export type BrowserConfigDigest = string;
+/**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "BrowserConfigActionKind".
  */
 export type BrowserConfigActionKind =
-  "navigate" | "click" | "type" | "scroll" | "key" | "back" | "wait" | "done" | "ask";
+  "navigate" | "click" | "type" | "scroll" | "extract" | "key" | "back" | "wait" | "done" | "ask";
 /**
  * BR-01: the only things a model may propose. A proposal that does not validate is refused as invalid_action and still counts as a step.
  *
@@ -414,6 +421,7 @@ export type BrowserConfigAction =
   | BrowserConfigClickAction
   | BrowserConfigTypeAction
   | BrowserConfigScrollAction
+  | BrowserConfigExtractAction
   | BrowserConfigKeyAction
   | BrowserConfigBackAction
   | BrowserConfigWaitAction
@@ -426,13 +434,6 @@ export type BrowserConfigAction =
  * via the `definition` "BrowserConfigTypedText".
  */
 export type BrowserConfigTypedText = string;
-/**
- * SHA-256 (lower-case hex) of the page URL and the facts, so an act runs only on the element that was inspected (BR-03).
- *
- * This interface was referenced by `TiloContracts`'s JSON-Schema
- * via the `definition` "BrowserConfigDigest".
- */
-export type BrowserConfigDigest = string;
 /**
  * Why code refused or stopped a step (BR-02 to BR-12).
  *
@@ -2154,6 +2155,29 @@ export interface BrowserConfigPoint {
   y: number;
 }
 /**
+ * CSS-pixel box of the action target; viewport for actions without an element target.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigTargetBox".
+ */
+export interface BrowserConfigTargetBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+/**
+ * Masked PNG bytes returned by the internal RPC for storage as a browser artifact; never a public URL.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigScreenshotArtifact".
+ */
+export interface BrowserConfigScreenshotArtifact {
+  mime_type: "image/png";
+  sha256: BrowserConfigDigest;
+  base64: BrowserConfigScreenshot;
+}
+/**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
  * via the `definition` "BrowserConfigNavigateAction".
  */
@@ -2188,6 +2212,15 @@ export interface BrowserConfigTypeAction {
 export interface BrowserConfigScrollAction {
   kind: "scroll";
   direction: "up" | "down";
+}
+/**
+ * Read masked visible page text without changing the page.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigExtractAction".
+ */
+export interface BrowserConfigExtractAction {
+  kind: "extract";
 }
 /**
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -2295,6 +2328,21 @@ export interface BrowserConfigObservation {
   reason: BrowserConfigReason | null;
 }
 /**
+ * One successful start or action response. The screenshot artifact is masked before leaving tilo-browser.
+ *
+ * This interface was referenced by `TiloContracts`'s JSON-Schema
+ * via the `definition` "BrowserConfigRpcResult".
+ */
+export interface BrowserConfigRpcResult {
+  session: BrowserConfigSessionId;
+  step: number;
+  kind: "start" | "navigate" | "click" | "type" | "scroll" | "extract";
+  url: BrowserConfigHttpsUrl;
+  target_box: BrowserConfigTargetBox;
+  screenshot_artifact: BrowserConfigScreenshotArtifact;
+  text: string;
+}
+/**
  * tilo-api to tilo-browser POST /sessions/{session}/inspect, before any click, type or key (BR-03).
  *
  * This interface was referenced by `TiloContracts`'s JSON-Schema
@@ -2312,6 +2360,7 @@ export interface BrowserConfigInspectAnswer {
   session: BrowserConfigSessionId;
   facts: BrowserConfigFacts;
   digest: BrowserConfigDigest;
+  target_box?: BrowserConfigTargetBox;
 }
 /**
  * tilo-api to tilo-browser POST /sessions/{session}/act: one action code allowed. A click or type names the digest of its inspect (BR-03). outbox_id is set only by the outbox dispatcher for a commit a person approved (BR-05); the worker refuses a commit-like target without one.
@@ -3508,6 +3557,8 @@ export interface BrowserActedData {
   masked: number;
   blocked: number;
   frame: ArtifactRef | null;
+  target_box?: BrowserConfigTargetBox;
+  caption?: string;
 }
 /**
  * data of browser.controlled (registry 1.7.0, ADR-0051, BR-10): the world owner paused, resumed, stopped or took over a browser session from the Browser panel. actor is that person, target the Browser Station building, authz null (control never authorises a side effect; it only holds or ends one). The panel shows Paused only after this event (HR-1). stop and take_over are followed by browser.stopped.

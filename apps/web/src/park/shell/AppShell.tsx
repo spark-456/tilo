@@ -130,11 +130,18 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [api, store]);
 
-  // The traffic schedule is solved in a worker; keep the HTML cover until it and the design fonts are ready.
+  // Studio's veil is opaque, so drawing the city beneath it creates SVG blobs and starts a worker for no pixels.
+  const sceneVisible = themeFor(app.prefs.theme) !== "studio";
+  // The traffic schedule is solved in a worker only when the city is visible; fonts still settle before reveal.
   const [scene, setScene] = useState<BackdropScene | null>(null);
   useEffect(() => {
     let live = true;
     const draw = () => {
+      if (!sceneVisible) {
+        setScene(null);
+        void loadShellFonts().then(() => live && setReady(true));
+        return;
+      }
       const next = backdropScene(appearance.time, appearance.motion);
       void Promise.all([next.ready, loadShellFonts()]).then(() => {
         if (!live) return;
@@ -147,7 +154,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => {
       live = false;
     };
-  }, [appearance.time, appearance.motion]);
+  }, [appearance.time, appearance.motion, sceneVisible]);
 
   const page = route?.page ?? null;
   // A tab or menu click fades the old page out and the new one in. Everything else (the browser's back button, a

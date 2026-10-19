@@ -93,6 +93,7 @@ const buttonContaining = (root: ParentNode, sub: string): HTMLButtonElement => {
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.localStorage.setItem("tilo.theme", "metropolis"); // these checks exercise the visible city theme
   reduced = false;
   listeners.clear();
 });
