@@ -123,7 +123,8 @@ it("CX_PAGES_ENRICH_AGENDA_live_API_route_shows_calendar_entries_in_the_week_gri
   })) as unknown as typeof api.getAgenda;
   const { container } = await renderAgenda({ api });
   expect(region(container, "Week calendar")).not.toBeNull();
-  const entry = q<HTMLButtonElement>(container, ".cx-agenda-event");
+  // Restored old calendar markup: .park-agenda-event replaces .cx-agenda-event
+  const entry = q<HTMLButtonElement>(container, ".park-agenda-event");
   expect(entry?.className).toContain("is-calendar-entry");
   expect(text(container)).not.toContain("calendar-internal-id");
 });

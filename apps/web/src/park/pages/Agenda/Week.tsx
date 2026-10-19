@@ -85,7 +85,7 @@ function Calendar({
   const cols =
     viewMode === "day" ? "50px minmax(0,1fr)" : `50px repeat(${days.length},minmax(0,1fr))`;
   const hours: number[] = [];
-  for (let t = START_HOUR + 1; t < END_HOUR; t++) hours.push(t);
+  for (let t = START_HOUR; t <= END_HOUR; t++) hours.push(t);
 
   const dragSlot = useRef<AgendaSlot | null>(null);
 

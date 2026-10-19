@@ -50,7 +50,8 @@ it("CX_PAGES_ENRICH_AGENDA_live_agenda_keeps_empty_structures_visible", async ()
   expect(container.textContent).toContain("Sat");
   expect(container.textContent).toContain("Oct");
   expect(container.querySelector('[aria-label="Week calendar"]')).not.toBeNull();
-  expect(container.querySelectorAll(".cx-agenda-day")).toHaveLength(7);
+  // Restored old calendar markup: .park-agenda-col replaces .cx-agenda-day
+  expect(container.querySelectorAll(".park-agenda-col")).toHaveLength(7);
   for (const label of ["Event details", "Available times", "Boards"])
     expect(container.querySelector(`[aria-label="${label}"]`)).not.toBeNull();
   expect(container.querySelectorAll("[data-week-slot]")).toHaveLength(392);
@@ -64,9 +65,10 @@ it("CX_PAGES_ENRICH_AGENDA_empty_calendar_keeps_grid_and_new_action", async () =
   expect(container.querySelector('[aria-label="Week calendar"]')).not.toBeNull();
   expect(container.querySelector('[aria-label="Week time slots"]')).not.toBeNull();
   expect(container.textContent).toContain("+ New");
-  const mini = container.querySelector('[aria-label="Mini month"]');
-  expect(mini?.querySelectorAll("button").length).toBe(42);
-  expect(mini?.querySelector("a")?.textContent).toBe("Google Calendar connection");
+  // Restored old calendar markup: Month calendar replaces newer Mini month sidebar
+  const month = container.querySelector('[aria-label="Month calendar"]');
+  expect(month?.querySelectorAll(".park-agenda-monthday-btn").length).toBe(42);
+  expect(container.querySelector('[aria-label="Calendar view"]')).not.toBeNull();
 });
 it("FR_UX_14 a failed plate read shows the existing error instead of sample pins", async () => {
   const { container } = await mount({}, 503);

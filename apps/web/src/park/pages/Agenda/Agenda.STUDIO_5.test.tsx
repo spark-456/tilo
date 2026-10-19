@@ -49,9 +49,11 @@ it("STUDIO_5 agenda live: today and the recorded plate", async () => {
   expect(container.textContent).toContain(
     "Tilo prepares a brief before each meeting and takes notes in the ones you invite it to.",
   );
-  // P0-AGENDA-REDO replaces the old Today list with a navigable month grid.
+  // Restored old calendar markup: .park-agenda-viewswitch replaces .cx-agenda-views
   act(() =>
-    container.querySelector<HTMLButtonElement>(".cx-agenda-views button:nth-child(3)")?.click(),
+    container
+      .querySelector<HTMLButtonElement>(".park-agenda-viewswitch button:nth-child(3)")
+      ?.click(),
   );
   await settle();
   const month = container.querySelector<HTMLElement>('[aria-label="Month calendar"]');

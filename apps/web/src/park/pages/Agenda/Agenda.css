@@ -1294,6 +1294,73 @@
   background: var(--red);
 }
 
+[data-park] .park-agenda-col [data-week-slot] {
+  position: absolute;
+  right: 0;
+  left: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 1;
+}
+[data-park] .park-agenda-col [data-week-slot]:hover,
+[data-park] .park-agenda-col [data-week-slot]:focus-visible {
+  background: var(--heroSoft);
+  outline: none;
+}
+[data-park] .park-agenda-slot-popover {
+  position: absolute;
+  z-index: 6;
+  left: 6px;
+  display: flex;
+  width: min(230px, calc(100% - 12px));
+  min-width: 0;
+  margin: 0;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--sh);
+}
+[data-park] .park-agenda-slot-popover button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--heroSoft);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-park] .park-agenda-slot-popover button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+[data-park] .park-agenda-slot-popover p {
+  margin: 0;
+  color: var(--ink2);
+  font-size: 12px;
+}
+[data-park] .park-agenda-detailclose {
+  background: transparent;
+  border: 0;
+  color: var(--ink2);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+[data-park] .park-agenda-due {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* event detail */
 [data-park] .park-agenda-detail {
   position: sticky;
@@ -1855,15 +1922,32 @@
   gap: 2px;
   margin-top: 4px;
 }
+[data-park] .park-agenda-monthday-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
 [data-park] .park-agenda-monthtag {
   font-size: 10px;
   padding: 2px 4px;
+  border: none;
   border-radius: 4px;
   background: var(--heroSoft);
   color: var(--heroInk);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: left;
+  cursor: pointer;
+  display: block;
+  width: 100%;
 }
 [data-park] .park-agenda-monthmore {
   font-size: 9px;

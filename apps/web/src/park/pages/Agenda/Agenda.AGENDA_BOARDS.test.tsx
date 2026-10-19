@@ -88,7 +88,8 @@ it("AGENDA_BOARDS_live_plate_keeps_both_cork_boards_and_routes_each_add_to_its_s
   expect(container.textContent).toContain("Tilo suggests");
   expect(container.textContent).toContain("Event details");
   expect(container.querySelector('[aria-label="Week calendar"]')).not.toBeNull();
-  expect(container.querySelector('[aria-label="Mini month"]')).not.toBeNull();
+  // Restored old calendar markup: Month calendar replaces newer Mini month sidebar
+  expect(container.querySelector('[aria-label="Month calendar"]')).not.toBeNull();
   expect(container.querySelector('[aria-label="Calendar view"]')).not.toBeNull();
   expect(container.textContent).toContain("07:00");
   expect(container.textContent).toContain("21:00");
