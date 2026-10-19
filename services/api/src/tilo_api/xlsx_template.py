@@ -9,7 +9,6 @@ from typing import Any
 
 from tilo_harness.unit_prompt import UpstreamItem
 from tilo_memory.artifacts import ArtifactStore, Scope
-from tilo_render.xlsx import MAX_TEMPLATE_BYTES, describe_workbook
 
 TEMPLATE_ID = "xlsx_template"
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -19,6 +18,8 @@ _RECORDS = {"artifact.created", "artifact.versioned"}
 def find_template(
     artifacts: ArtifactStore, scope: Scope, stream: list[dict[str, Any]], run_id: str | None
 ) -> bytes | None:
+    from tilo_render.xlsx import MAX_TEMPLATE_BYTES  # openpyxl loads with the first workbook, not at boot
+
     for event in stream:
         ref = event.get("data", {}).get("artifact") if event.get("type") in _RECORDS else None
         if not isinstance(ref, dict):
@@ -48,6 +49,8 @@ def attach_template(
     deliverable is not a workbook, no usable upload exists, or the upload cannot be read (a new workbook is made)."""
     if fmt != "xlsx":
         return None, context
+    from tilo_render.xlsx import describe_workbook
+
     data = find_template(artifacts, scope, stream, run_id)
     if data is None:
         return None, context

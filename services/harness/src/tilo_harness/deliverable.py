@@ -15,14 +15,15 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from tilo_providers.diagnostics import log_caught
-from tilo_render.pdf import render_pdf
 from tilo_render.spec import DeliverableSpec
-from tilo_render.xlsx import MAX_FILL_CELLS, FillCell
 
 from tilo_harness.outputs import MAX_PDF, RenderedPdf
+
+if TYPE_CHECKING:
+    from tilo_render.xlsx import FillCell
 
 MAX_REPLY = 500_000  # characters of the writer's reply (the spec's own limits keep a real report far below this)
 PDF_FORMAT = "pdf"
@@ -45,6 +46,13 @@ class DeliverableRefused(Exception):
         super().__init__(_REASONS[code])
         self.code = code
         self.detail = detail  # a fixed checker code and a line number (WEB-1), never reply text
+
+
+def render_pdf(spec: DeliverableSpec) -> bytes:
+    """`tilo_render.pdf.render_pdf`, imported on first use: reportlab is slow to load and tilo-api boots without it."""
+    from tilo_render.pdf import render_pdf as render
+
+    return render(spec)
 
 
 def wants_pdf(unit: Mapping[str, Any], brief: Mapping[str, Any] | None) -> bool:
@@ -113,6 +121,8 @@ def parse_spec(reply: Any, *, report_date: date | None = None) -> DeliverableSpe
 
 def parse_fill(reply: Any) -> tuple[FillCell, ...]:
     """DOCS-OUT A4: a template fill reply, exactly `{"cells": [{sheet, cell, value}, ...]}`, or DeliverableRefused."""
+    from tilo_render.xlsx import MAX_FILL_CELLS, FillCell  # openpyxl loads here, not when tilo-api boots
+
     data = _json_object(reply)
     try:
         if not isinstance(data, dict) or set(data) != {"cells"} or not isinstance(data["cells"], list):

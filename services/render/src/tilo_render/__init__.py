@@ -3,9 +3,10 @@
 Deterministic code only: no model calls, no network, no clock (services/render/CLAUDE.md).
 """
 
+import importlib
+from typing import TYPE_CHECKING, Any
+
 from .charts import ChartData
-from .pdf import render_pdf
-from .pptx import render_pptx
 from .spec import (
     MAX_BLOCKS_PER_SECTION,
     MAX_BULLETS_PER_BLOCK,
@@ -29,6 +30,24 @@ from .spec import (
     Table,
     TableBlock,
 )
+
+if TYPE_CHECKING:
+    from .pdf import render_pdf
+    from .pptx import render_pptx
+
+_RENDERERS = {"render_pdf": ".pdf", "render_pptx": ".pptx"}
+
+
+def __getattr__(name: str) -> Any:
+    """`render_pdf` and `render_pptx` import on first use: reportlab and python-pptx take seconds to load, and a caller
+    that only needs `tilo_render.spec` (tilo-api, at boot) must not pay for them."""
+    module = _RENDERERS.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(importlib.import_module(module, __name__), name)
+    globals()[name] = value
+    return value
+
 
 __all__ = [
     "Block",

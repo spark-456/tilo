@@ -11,11 +11,7 @@ from typing import Literal, cast
 from starlette.concurrency import run_in_threadpool
 from tilo_harness.deliverable import MAX_PDF, DeliverableRefused, parse_fill, parse_spec
 from tilo_harness.outputs import RenderedOffice, RenderedPdf
-from tilo_render.docx import render_docx
-from tilo_render.pdf import render_pdf
-from tilo_render.pptx import render_pptx
 from tilo_render.spec import DeliverableSpec, RequestDeliverableSpec
-from tilo_render.xlsx import fill_workbook, render_xlsx
 
 from tilo_api.render_rpc import MIME, RenderRpc
 
@@ -28,13 +24,30 @@ def _render(spec: DeliverableSpec, fmt: str) -> bytes:
     url = os.environ.get("TILO_RENDER_URL", "")
     if fmt in ("pptx", "docx") and url:
         return RenderRpc(url).render(cast(RequestDeliverableSpec, spec), cast(Literal["pptx", "docx"], fmt))
-    # DOCS-OUT: with no render door configured, the same library the door runs renders in process.
-    return {"pdf": render_pdf, "docx": render_docx, "pptx": render_pptx, "xlsx": render_xlsx}[fmt](spec)
+    # DOCS-OUT: with no render door configured, the same library the door runs renders in process. The renderers
+    # (reportlab, python-pptx, openpyxl) load on first use, so tilo-api boots without them.
+    if fmt == "pdf":
+        from tilo_render.pdf import render_pdf
+
+        return render_pdf(spec)
+    if fmt == "docx":
+        from tilo_render.docx import render_docx
+
+        return render_docx(spec)
+    if fmt == "pptx":
+        from tilo_render.pptx import render_pptx
+
+        return render_pptx(spec)
+    from tilo_render.xlsx import render_xlsx
+
+    return render_xlsx(spec)
 
 
 def _plan(reply: str, fmt: str, template: bytes | None, report_date: date) -> tuple[Callable[[], bytes], str]:
     """The validated reply as the work to do and the text the file says (for the redactor)."""
     if fmt == "xlsx" and template is not None:  # DOCS-OUT A4: the reply is cells for the person's own workbook
+        from tilo_render.xlsx import fill_workbook
+
         fills = parse_fill(reply)
         return (lambda: fill_workbook(template, fills)), json.dumps({"cells": [f.model_dump() for f in fills]})
     # A workbook is made in process and has its own cell cap, so it takes the full spec, not the door's 1200 cells.
