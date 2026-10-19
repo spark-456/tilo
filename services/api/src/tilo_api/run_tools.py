@@ -231,7 +231,8 @@ class BoundRunRunner:
                 return UnitOutcome(False, reason="The browser service is not configured.")
             rpc = BrowserRpc(browser_url) if browser_url else BrowserSessions(PlaywrightEngine())
             executor = BrowseStepExecutor(owner, rpc, propose)
-            return executor.execute(
+            return await asyncio.to_thread(
+                executor.execute,
                 unit=dict(unit),
                 agent=context.agent_id,
                 building=self.building_of(unit),
