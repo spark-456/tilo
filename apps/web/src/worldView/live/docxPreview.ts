@@ -13,7 +13,7 @@ const WORD_XML = "word/document.xml";
 const XML_LIMIT = 1_500_000;
 
 async function inflateDocument(compressed: Uint8Array): Promise<ArrayBuffer> {
-  const reader = new Blob([compressed.buffer])
+  const reader = new Blob([compressed.buffer as ArrayBuffer])
     .stream()
     .pipeThrough(new DecompressionStream("deflate-raw"))
     .getReader();

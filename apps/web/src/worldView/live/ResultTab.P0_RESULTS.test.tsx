@@ -274,6 +274,7 @@ describe("P0_RESULTS inline delivery", () => {
       seq: 1,
       type: "artifact.created",
       ts: "2026-10-19T10:00:00.000Z",
+      credits: 0,
       summary: "Document made.",
       item: { label: "Decision" },
       data: {
