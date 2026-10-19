@@ -82,6 +82,40 @@ export function TeachWizard({ t, user, night, onClose, onView, retryRead }: Wiza
         <button type="button" className="park-teach__back" onClick={onClose}>
           ← Back to skills
         </button>
+        <nav className="park-teach__progress-header" aria-label="Progress">
+          <span
+            className={cx(
+              "park-teach__progress-step",
+              step === 1 && "park-teach__progress-step--active",
+              step > 1 && "park-teach__progress-step--done",
+            )}
+          >
+            {step > 1 ? "✓ Record" : "Record"}
+          </span>
+          <span className="park-teach__progress-sep" aria-hidden="true">
+            ›
+          </span>
+          <span
+            className={cx(
+              "park-teach__progress-step",
+              step === 2 && "park-teach__progress-step--active",
+              step > 2 && "park-teach__progress-step--done",
+            )}
+          >
+            {step > 2 ? "✓ Review steps" : "Review steps"}
+          </span>
+          <span className="park-teach__progress-sep" aria-hidden="true">
+            ›
+          </span>
+          <span
+            className={cx(
+              "park-teach__progress-step",
+              step === 3 && "park-teach__progress-step--active",
+            )}
+          >
+            Save
+          </span>
+        </nav>
         <span className="park-teach__count">{`Step ${step} of 3`}</span>
       </div>
       <h1 className="park-skills-h1 park-teach__h1" tabIndex={-1}>
@@ -91,6 +125,7 @@ export function TeachWizard({ t, user, night, onClose, onView, retryRead }: Wiza
         {WIZARD_STEPS.map((s, i) => {
           const n = i + 1;
           const state = n < step || t.saved ? "complete" : n === step ? "construction" : "planned";
+          const displayLabel = i === 0 ? "Record" : i === 1 ? "Review steps" : "Save";
           return (
             <li
               key={s.label}
@@ -102,8 +137,9 @@ export function TeachWizard({ t, user, night, onClose, onView, retryRead }: Wiza
               </span>
               <span className="park-teach__pill">
                 <span className="park-teach__n">{state === "complete" ? "✓" : n}</span>
-                {s.label}
+                <span className="park-teach__label-text">{displayLabel}</span>
                 <span className="park-sr-only">
+                  {s.label}
                   {state === "complete" ? " (done)" : state === "planned" ? " (not yet)" : " (now)"}
                 </span>
               </span>
@@ -248,8 +284,17 @@ export function ScreenExample({
         </Button>
       ) : file ? (
         <>
-          {/* biome-ignore lint/a11y/useMediaCaption: this is an unsent local preview of the person's own capture; no transcript exists yet. */}
-          {url ? <video src={url} controls aria-label="Recording preview" /> : null}
+          {url ? (
+            <div className="park-teach__video-wrap">
+              {/* biome-ignore lint/a11y/useMediaCaption: this is an unsent local preview of the person's own capture; no transcript exists yet. */}
+              <video
+                src={url}
+                controls
+                aria-label="Recording preview"
+                className="park-teach__recording-preview"
+              />
+            </div>
+          ) : null}
           <Button
             variant="primary"
             size="sm"
@@ -525,11 +570,17 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
           />
         </span>
       </div>
-      <ol className="park-teach__list">
+      <ol className="park-teach__list park-teach__list--cards">
         {rows.map((p, i) => {
           const on = t.ask[i] === true || p.locked;
           return (
-            <li key={`${i}:${p.text}`} className="park-teach__row park-teach__row--step">
+            <li
+              key={`${i}:${p.text}`}
+              className="park-teach__row park-teach__row--step park-teach__step-card"
+            >
+              <span className="park-teach__drag-handle" aria-hidden="true" title="Drag step">
+                ⋮⋮
+              </span>
               <span className="park-teach__num">{i + 1}</span>
               <span className="park-teach__steptext">
                 {t.live ? (

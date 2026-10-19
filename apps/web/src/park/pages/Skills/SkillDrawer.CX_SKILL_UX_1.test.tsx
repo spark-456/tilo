@@ -110,7 +110,7 @@ it("P0_SKILLS_run_collects_required_inputs_and_submits_the_selected_skill", asyn
     />,
   );
   const button = [...m.container.querySelectorAll("button")].find(
-    (b) => b.textContent === "Run it",
+    (b) => b.textContent === "Run skill" || b.textContent === "Run it",
   );
   expect(button?.disabled).toBe(true);
   const field = m.container.querySelector<HTMLInputElement>('input[aria-label="Project brief"]');
