@@ -791,7 +791,10 @@ class Run:
                 archive=archive,
                 redact=self.seams.redactor,
                 before_handoff=self.before_handoff,
-                brief=copy.deepcopy(self.brief),
+                brief={
+                    **copy.deepcopy(self.brief),
+                    **({"taught_skill_steps": [s["text"] for s in self.skill_plan]} if self.skill_plan else {}),
+                },
                 intake_answers=self.intake_answers,
             )  # fmt: skip
         )

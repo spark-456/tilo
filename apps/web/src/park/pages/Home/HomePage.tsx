@@ -548,7 +548,8 @@ export function HomePage({ app }: { app: AppCtx }) {
           selectedSkill={selectedSkill}
           skillClient={briefClient}
           onSkill={(skill) => {
-            setQuery(query.replace(/(?:^|\s)@[^\s@]*$/, "").trimEnd());
+            const withoutMention = query.replace(/(?:^|\s)@[^\s@]*$/, "").trim();
+            setQuery(withoutMention || `Run the ${skill.name} skill.`);
             setSelectedSkill(skill);
           }}
           onClearSkill={() => setSelectedSkill(null)}
