@@ -375,3 +375,12 @@
     box-shadow: 0 0 0 3px var(--pri) !important;
   }
 }
+
+/* RESPONSIVE: pointer and state feedback on the controls the pages style themselves (chips, small buttons, selects). A
+   colour fade of 160 ms (background, border and text colour only, never a layout property) when a person hovers, presses or
+   picks one; nothing here shows or implies an agent, a run or a decision. Reduced motion and the still choice switch it off. */
+[data-park] :is(.park-chat-quiet,.park-chat-new,.park-chat-history__turn,.park-connectors-action-btn,.park-team-btn,.park-team-select,.park-team-more,.park-profile-mopt,.park-profile-scene,.park-admin nav button,.park-skills-ask-opt,.park-worlds-dec__yes,.park-worlds-dec__open,.park-worlds-scale__btn){transition:background-color .16s ease,border-color .16s ease,color .16s ease}
+@media (prefers-reduced-motion:reduce){
+[data-park] :is(.park-chat-quiet,.park-chat-new,.park-chat-history__turn,.park-connectors-action-btn,.park-team-btn,.park-team-select,.park-team-more,.park-profile-mopt,.park-profile-scene,.park-admin nav button,.park-skills-ask-opt,.park-worlds-dec__yes,.park-worlds-dec__open,.park-worlds-scale__btn){transition:none!important}
+}
+[data-park][data-motion="still"] :is(.park-chat-quiet,.park-chat-new,.park-chat-history__turn,.park-connectors-action-btn,.park-team-btn,.park-team-select,.park-team-more,.park-profile-mopt,.park-profile-scene,.park-admin nav button,.park-skills-ask-opt,.park-worlds-dec__yes,.park-worlds-dec__open,.park-worlds-scale__btn){transition:none!important}
