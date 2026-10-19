@@ -42,7 +42,10 @@
   "then": { "properties": { "reason": { "$ref": "../../browser.schema.json#/$defs/reason" } } },
   "else": {
     "properties": { "reason": { "type": "null" } },
-    "if": { "properties": { "kind": { "const": "type" } }, "required": ["kind"] },
+    "if": {
+      "properties": { "kind": { "const": "type" }, "verdict": { "enum": ["done", "committed"] } },
+      "required": ["kind", "verdict"]
+    },
     "then": { "properties": { "chars": { "type": "integer" } } },
     "else": { "properties": { "chars": { "type": "null" } } }
   }

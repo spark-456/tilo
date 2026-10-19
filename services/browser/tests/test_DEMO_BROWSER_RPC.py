@@ -21,6 +21,14 @@ def _app():
         tree=doc(
             textbox("query", "Search", box=BOX),
             node("button", "Search", id="go", box={"x": 190, "y": 40, "width": 80, "height": 30}),
+            node(
+                "button",
+                "Search",
+                id="submit",
+                box={"x": 300, "y": 40, "width": 80, "height": 30},
+                form_method="get",
+                type="submit",
+            ),
             textbox("cc", "Card", autocomplete="cc-number"),
         ),
     )
@@ -109,6 +117,11 @@ def test_DEMO_BROWSER_RPC_stops_commit_and_password_entry():
     secret = _act(app, {"kind": "type", "at": {"x": 0, "y": 0}, "text": "abc", "submit": False})
     assert secret.status_code == 409
     assert engine.contexts[0].typed == []
+    at = {"x": 280, "y": 60}
+    form = _act(app, {"kind": "click", "at": at}, at=at)
+    assert form.status_code == 409
+    assert form.json()["reason"] == "needs_person"
+    assert engine.contexts[0].clicked == []
 
 
 def test_DEMO_BROWSER_RPC_extract_scroll_and_end_use_the_same_isolated_context():
@@ -135,7 +148,10 @@ def test_DEMO_BROWSER_RPC_extract_scroll_and_end_use_the_same_isolated_context()
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://browser.test") as client:
             return await client.delete(f"/sessions/{SESSION}", headers={"Authorization": "Bearer fake"})
 
-    assert asyncio.run(end()).status_code == 200
+    ended = asyncio.run(end())
+    assert ended.status_code == 200
+    assert ended.json()["target_box"]["width"] == 1200
+    assert ended.json()["screenshot_artifact"]["mime_type"] == "image/png"
     assert engine.contexts[0].closed
 
 

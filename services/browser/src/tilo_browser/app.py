@@ -198,6 +198,8 @@ def create_app(
             result = await browser_call(sessions.end, session)
         except SessionRefused as exc:
             return _refuse(exc.status, exc.reason, reason=exc.reason)
+        except ScreenshotRefused:
+            return _refuse(409, "screenshot_unavailable", reason="screenshot_unavailable")
         return JSONResponse(result)
 
     @fastapi_app.get("/health")  # Cloud Run reserves /healthz on run.app; the smoke check uses /health (#397)

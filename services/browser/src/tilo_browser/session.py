@@ -11,8 +11,8 @@ from threading import RLock
 from typing import Any
 from urllib.parse import urlsplit
 
-from tilo_browser.egress import EgressPolicy
-from tilo_browser.login import is_secure_node, iter_nodes, node_ref
+from tilo_browser.egress import EgressPolicy, sanitise_url
+from tilo_browser.login import is_secure_node, iter_nodes, node_ref, secure_nodes
 from tilo_browser.masking import mask_text
 from tilo_browser.worker import BrowserWorker
 
@@ -28,6 +28,7 @@ class _Session:
     worker: BrowserWorker
     viewport: dict[str, int]
     step: int = 0
+    blocked_seen: int = 0
 
 
 _COMMIT = re.compile(
@@ -65,6 +66,9 @@ class BrowserSessions:
     def _result(session: str, step: int, kind: str, state: _Session, box: dict) -> dict:
         capture = state.worker.capture()  # worker masks secure fields before returning bytes
         frame = capture.screenshot
+        blocked_total = len(state.worker._policy.blocked)
+        blocked = blocked_total - state.blocked_seen
+        state.blocked_seen = blocked_total
         return {
             "session": session,
             "step": step,
@@ -77,6 +81,9 @@ class BrowserSessions:
                 "base64": base64.b64encode(frame).decode("ascii"),
             },
             "text": capture.text[:20000] if kind == "extract" else "",
+            "masked": len(secure_nodes(state.worker._driver.read_accessibility_tree())),
+            "blocked": blocked,
+            "login_required": state.worker._login_wall,
         }
 
     def start(self, body: dict) -> dict:
@@ -115,7 +122,10 @@ class BrowserSessions:
                     raise SessionRefused("secure_field")
                 attrs = node.get("attrs", {})
                 label = f"{node.get('name', '')} {attrs.get('value', '')}"
-                if _COMMIT.search(label) or attrs.get("form_method", "").lower() == "post":
+                form_submit = kind == "click" and (
+                    attrs.get("type") == "submit" or attrs.get("form_method", "none").lower() not in ("none", "")
+                )
+                if _COMMIT.search(label) or form_submit:
                     raise SessionRefused("needs_person")
                 if kind == "type":
                     if action.get("submit"):
@@ -158,7 +168,7 @@ class BrowserSessions:
     @classmethod
     def _digest(cls, worker: BrowserWorker, node: dict) -> str:
         facts = cls._facts(node)
-        payload = json.dumps([worker.capture().url, facts], sort_keys=True, separators=(",", ":"))
+        payload = json.dumps([sanitise_url(worker._url), facts], sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(payload.encode()).hexdigest()
 
     def inspect(self, session: str, at: dict[str, int]) -> dict:
@@ -174,10 +184,12 @@ class BrowserSessions:
                 "target_box": box,
             }
 
-    def end(self, session: str) -> dict[str, str]:
+    def end(self, session: str) -> dict:
         with self._lock:
             state = self.sessions.pop(session, None)
             if state is None:
                 raise SessionRefused("session_lost", 404)
-            state.worker.close()
-            return {"session": session, "state": "ended"}
+            try:
+                return self._result(session, state.step, "end", state, self._viewport_box(state.viewport))
+            finally:
+                state.worker.close()

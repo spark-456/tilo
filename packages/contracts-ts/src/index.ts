@@ -7,7 +7,7 @@
  * artifact.schema.json 1.3.0 sha256:dafce81fa75a5ed5
  * attention.schema.json 1.0.0 sha256:f35cff84728304af
  * brief.schema.json 1.0.0 sha256:be4e747f37e399b2
- * browser.schema.json 1.1.0 sha256:a92335a572619ef1
+ * browser.schema.json 1.1.0 sha256:f2fdcfe0c901f28f
  * byok.schema.json 1.0.0 sha256:683d5d2b4fc8b0fe
  * calendar_entry.schema.json 1.1.0 sha256:291531543be88320
  * card.schema.json 1.0.0 sha256:2666292eb19087d0
@@ -47,7 +47,7 @@
  * events/data/artifact.versioned.schema.json 1.0.0 sha256:b6ceac1481d2595b
  * events/data/assistant.asked.schema.json 1.0.0 sha256:8775120b73c4ed38
  * events/data/assistant.replied.schema.json 1.0.0 sha256:48fb513dadef290d
- * events/data/browser.acted.schema.json 1.1.0 sha256:e4fcf23f19afd365
+ * events/data/browser.acted.schema.json 1.1.0 sha256:a768e01e41dbf888
  * events/data/browser.controlled.schema.json 1.0.0 sha256:6b8442f6dbb88479
  * events/data/browser.started.schema.json 1.0.0 sha256:1bed13c81c886df2
  * events/data/browser.stopped.schema.json 1.0.0 sha256:8ae289ea75dfd6b5
@@ -2336,11 +2336,14 @@ export interface BrowserConfigObservation {
 export interface BrowserConfigRpcResult {
   session: BrowserConfigSessionId;
   step: number;
-  kind: "start" | "navigate" | "click" | "type" | "scroll" | "extract";
+  kind: "start" | "navigate" | "click" | "type" | "scroll" | "extract" | "end";
   url: BrowserConfigHttpsUrl;
   target_box: BrowserConfigTargetBox;
   screenshot_artifact: BrowserConfigScreenshotArtifact;
   text: string;
+  masked: number;
+  blocked: number;
+  login_required: boolean;
 }
 /**
  * tilo-api to tilo-browser POST /sessions/{session}/inspect, before any click, type or key (BR-03).

@@ -419,15 +419,18 @@
       "description": "One successful start or action response. The screenshot artifact is masked before leaving tilo-browser.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["session", "step", "kind", "url", "target_box", "screenshot_artifact", "text"],
+      "required": ["session", "step", "kind", "url", "target_box", "screenshot_artifact", "text", "masked", "blocked", "login_required"],
       "properties": {
         "session": { "$ref": "#/$defs/session_id" },
         "step": { "type": "integer", "minimum": 0, "maximum": 60 },
-        "kind": { "type": "string", "enum": ["start", "navigate", "click", "type", "scroll", "extract"] },
+        "kind": { "type": "string", "enum": ["start", "navigate", "click", "type", "scroll", "extract", "end"] },
         "url": { "$ref": "#/$defs/https_url" },
         "target_box": { "$ref": "#/$defs/target_box" },
         "screenshot_artifact": { "$ref": "#/$defs/screenshot_artifact" },
-        "text": { "type": "string", "maxLength": 20000 }
+        "text": { "type": "string", "maxLength": 20000 },
+        "masked": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "blocked": { "type": "integer", "minimum": 0 },
+        "login_required": { "type": "boolean" }
       }
     },
     "inspect_request": {
