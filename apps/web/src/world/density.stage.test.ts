@@ -294,3 +294,33 @@ it("P0_PERF holds a static handoff note without a frame loop", () => {
   stop();
   raf.mockRestore();
 });
+
+it("P0_PERF finishes a recorded walk when reduced motion is enabled mid-walk", () => {
+  const callbacks: FrameRequestCallback[] = [];
+  const raf = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) => {
+    callbacks.push(callback);
+    return callbacks.length;
+  });
+  let reduced = false;
+  let deliver: (event: Event) => void = () => undefined;
+  const stop = runClientWorld({
+    world: new Container(),
+    layout,
+    size: () => ({ width: 900, height: 600 }),
+    requestRender: () => undefined,
+    reducedMotion: () => reduced,
+    onSeq: () => undefined,
+    watch: (on) => {
+      for (const event of events.slice(0, 18)) on(event);
+      deliver = on;
+      return () => undefined;
+    },
+  });
+  deliver(events[18] as Event); // a recorded handoff starts a walk
+  expect(callbacks).toHaveLength(1);
+  reduced = true;
+  callbacks[0]?.(performance.now());
+  expect(callbacks).toHaveLength(1); // no more interpolated frames
+  stop();
+  raf.mockRestore();
+});

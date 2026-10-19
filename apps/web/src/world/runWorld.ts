@@ -287,7 +287,9 @@ function createLive(
       dirtyWhileHidden = true;
       return false;
     }
-    choreo.advance(now);
+    // A live preference change settles moves already in flight; later recorded events still
+    // arrive in order and choose their own presentation duration.
+    choreo.advance(calm() ? Number.POSITIVE_INFINITY : now);
     let busy = false;
     for (const id of agentIds) {
       const done = choreo.completed(id);
@@ -311,7 +313,7 @@ function createLive(
       }
       const span = act.finish - act.start;
       const t =
-        span > 0 && layer.density() !== "professional"
+        span > 0 && !calm()
           ? Math.min(1, Math.max(0, (now - act.start) / span))
           : 1;
       const bob = walkBob(t, calm());
@@ -479,7 +481,7 @@ function createLive(
           // A settle (a finished agent going to its post once the talk window has passed) is a walk too: the event
           // that closed the window is its recorded cause (TILO-T-WORLD).
           durationMs:
-            layer.density() !== "professional" &&
+            !calm() &&
             (WALKS.has(event.type) || (event.actor !== a.id && stood !== stands))
               ? Math.min(MOVE_DURATION_MS, MAX_DURATION_MS)
               : 0,
