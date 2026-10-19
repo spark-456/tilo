@@ -118,7 +118,7 @@ def test_PRD_12_2_the_web_connector_reads_only_and_its_tiers_agree_with_the_tabl
     assert not errors_for(load_schema(repo_root, "connector"), web, registry)
     assert (web["auth"], web["scopes"], web["data_class"]["returns"]) == ("none", {}, ["public"])
     actions = {a["id"]: a for a in web["actions"]}
-    assert set(actions) == {"web_search", "fetch_url"}
+    assert set(actions) == {"web_search", "fetch_url", "browse_web"}  # browse_web: ADR-0052, reads only
     table = _config(repo_root, "autonomy.yaml")["actions"]
     for action_id, action in actions.items():
         assert (action["risk_tier"], action["gate_type"], action["irreversible"]) == ("T1", "none", False)

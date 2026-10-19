@@ -71,6 +71,7 @@ roles:
   # Router sends 1024 (BQ-63) and the model's own thinking uses all of it, so a role that writes a document or a research
   # note states a cap that fits thinking plus the text, and thinks little.
   specialist: { primary: lite-31, fallback: flash-37, thinking: low, max_output_tokens: 32768 } # EFF-02: cheapest first
+  computer_use: { primary: flash-38, fallback: flash-38, thinking: low, max_output_tokens: 2048 }
   # ADR-0034 decision 3 / ADR-0051 decision A (TS-20): the one understanding step for describe, upload and record. It
   # reads typed words, documents and (S2) a recording as delimited data, so both profiles declare json, vision, video and
   # documents; lite-31 carries an audio_input price, flash-37 does not (a recording with sound is read only by a profile
