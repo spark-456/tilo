@@ -573,3 +573,80 @@
     height: 190px;
   }
 }
+
+/* RESPONSIVE: the rail's small scene scales its desk and balcony rail with it (they were 120 and 130px on a 190 to 230px
+   picture and hid the helper); on a tablet or a phone the rail and the thread are two rounded cards with the same edge as the
+   sample strip, the scene sits beside the history (tablet) or shrinks (phone), and an empty history is just the button. */
+[data-park] .park-chat-rail .park-chat-scene {
+  --park-desk-h: 76px;
+  --park-rail-h: 84px;
+}
+@media (max-width: 840px) {
+  [data-park] .park-chat-grid {
+    gap: 12px;
+  }
+  [data-park] .park-chat-rail,
+  [data-park] .park-chat-main {
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    background: var(--card);
+  }
+  [data-park] .park-chat-main {
+    overflow: hidden;
+  }
+  [data-park] .park-chat-rail {
+    padding: 14px;
+    gap: 12px;
+  }
+  [data-park] .park-chat-rail .park-chat-scene {
+    height: 210px;
+  }
+}
+@media (min-width: 561px) and (max-width: 840px) {
+  [data-park] .park-chat-rail {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    align-items: start;
+  }
+  [data-park] .park-chat-history {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    max-height: 290px;
+  }
+  [data-park] .park-chat-rail .park-chat-scene {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  [data-park] .park-chat-scene-controls {
+    grid-column: 2;
+    grid-row: 2;
+    padding-top: 0;
+  }
+}
+@media (max-width: 560px) {
+  [data-park] .park-chat-rail {
+    padding: 12px;
+    gap: 10px;
+  }
+  [data-park] .park-chat-rail .park-chat-scene {
+    height: 160px;
+  }
+  [data-park] .park-chat-history {
+    max-height: 200px;
+  }
+  [data-park] .park-chat-new {
+    margin-bottom: 0;
+  }
+  [data-park] .park-chat-history__label:has(+ .park-chat-history__empty),
+  [data-park] .park-chat-history__label + .park-chat-history__empty {
+    display: none;
+  }
+  [data-park] .park-chat-scene-controls {
+    padding-top: 0;
+  }
+  [data-park] .park-chat-main .park-chat-head {
+    padding: 12px 14px;
+  }
+  [data-park] .park-chat-main .park-chat-h1 {
+    font-size: 20px;
+  }
+}
