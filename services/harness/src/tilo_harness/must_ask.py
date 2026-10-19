@@ -157,6 +157,10 @@ def _parse(text: Any) -> Ask | None:
     if reply["ask"] is False:
         return None
     options, suggested = reply.get("options"), reply.get("suggested")
+    if isinstance(options, list) and all(isinstance(o, str) and o.strip() for o in options):
+        options = [_clip(o.strip(), 20) for o in options]  # P0-RUNS-FIX: a long label is clipped to the card, not lost
+    if isinstance(reply.get("why"), str) and reply["why"].strip():
+        reply["why"] = _clip(reply["why"].strip(), 200)
     valid = (
         reply.get("reason") in _MODEL_REASONS
         and isinstance(reply.get("question"), str)

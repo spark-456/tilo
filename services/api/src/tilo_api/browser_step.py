@@ -120,8 +120,11 @@ class BrowseStepExecutor:
                     return UnitOutcome(False, reason="You stopped the browser.")
                 screenshot = base64.b64decode(last["screenshot_artifact"]["base64"], validate=True)
                 proposed = self.propose(
-                    goal + "\nApproved hosts: " + ", ".join(hosts)
-                    + "\nCompleted browser actions: " + ", ".join(history),
+                    goal
+                    + "\nApproved hosts: "
+                    + ", ".join(hosts)
+                    + "\nCompleted browser actions: "
+                    + ", ".join(history),
                     screenshot,
                     "\n\n".join(extracted)[-_MAX_TEXT:],
                 )
@@ -147,9 +150,7 @@ class BrowseStepExecutor:
                 try:
                     if kind in ("click", "type"):
                         found = self.rpc.inspect(session, action["at"])
-                        digest, target_name, target_box = (
-                            found["digest"], found["facts"]["name"], found["target_box"]
-                        )
+                        digest, target_name, target_box = (found["digest"], found["facts"]["name"], found["target_box"])
                     last = self.rpc.act(
                         session,
                         {"session": session, "step": step, "action": action, "digest": digest, "outbox_id": None},
@@ -229,6 +230,64 @@ class BrowseStepExecutor:
                         district=unit["district"],
                         credits=stop_charge,
                     )
+
+    def read_page(self, *, unit: dict, agent: str, building: str, url: str, host: str) -> str:
+        """P0-RUNS-FIX: a research unit reads one allowlisted page in the visible browser, read-only and with no model:
+        open it, extract its text, close. Each step is a recorded browser.* event with its real frame, so the World's
+        browser panel shows exactly what Tilo read. Raises SessionRefused when the browser cannot read it (the caller
+        then fetches the page directly and says so); returns the page text, possibly empty."""
+        session = "bs_" + new_part_id()
+        district = unit["district"]
+        last = self.rpc.start(
+            {
+                "session": session,
+                "world_id": self.run.world_id,
+                "run_id": self.run.run_id,
+                "unit_id": unit["id"],
+                "allow_hosts": [host],
+                "start_url": url,
+                "viewport": {"width": 1200, "height": 800},
+            }
+        )
+        outcome, steps = "error", 0
+        try:
+            frame = self._save(session, 0, unit["id"], agent, last)
+            started = {"session": session, "host": host, "hosts": 1, "max_steps": 1, "frame": frame}
+            self.run.put("browser.started", agent, building, "Tilo opened the browser.", started, district=district)
+            if last["login_required"]:
+                outcome = "login_wall"
+                raise SessionRefused("login_wall")
+            action = {"kind": "extract"}
+            last = self.rpc.act(
+                session, {"session": session, "step": 1, "action": action, "digest": None, "outbox_id": None}
+            )
+            steps = 1
+            frame = self._save(session, 1, unit["id"], agent, last)
+            caption = f"Reading {host}"[:120]
+            acted = {
+                "session": session,
+                "step": 1,
+                "kind": "extract",
+                "verdict": "done",
+                "reason": None,
+                "host": urlsplit(last["url"]).hostname,
+                "chars": None,
+                "masked": last["masked"],
+                "blocked": last["blocked"],
+                "frame": frame,
+                "target_box": last["target_box"],
+                "caption": caption,
+            }
+            self.run.put("browser.acted", agent, building, caption, acted, district=district)
+            outcome = "done"
+            return str(last["text"] or "")[:_MAX_TEXT]
+        finally:
+            try:
+                self.rpc.end(session)
+            except SessionRefused:
+                outcome = "error" if outcome == "done" else outcome
+            stopped = {"session": session, "outcome": outcome, "steps": steps}
+            self.run.put("browser.stopped", agent, building, "Tilo closed the browser.", stopped, district=district)
 
     @staticmethod
     def _caption(kind: str, name: str, host: str | None, action: dict) -> str:
