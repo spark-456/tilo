@@ -3,7 +3,7 @@ const FIRST_LOOP_MS = 4600;
 const RETURNING_DELAY_MS = 300;
 const MAX_BOOT_WAIT_MS = 6000;
 
-/** The HTML cover exists before the JavaScript bundle. Release it after the app and one saved loop are ready. */
+/** The HTML cover exists before the JavaScript bundle. Release it as soon as the app is ready. */
 export function installBootCover(): Promise<void> {
   const cover = document.getElementById("tilo-boot-cover");
   const root = document.getElementById("root");
@@ -11,16 +11,17 @@ export function installBootCover(): Promise<void> {
   if (!cover || !root || !image) return Promise.resolve();
 
   let appReady = false;
-  let loopReady = false;
   let seen = false;
   let released = false;
   let returningDelayPassed = false;
   let maxTimer = 0;
+  let loopTimer = 0;
   const release = (fade: boolean) => {
     if (released) return;
     released = true;
     observer.disconnect();
     window.clearTimeout(maxTimer);
+    window.clearTimeout(loopTimer);
     root.removeAttribute("inert");
     root.removeAttribute("aria-hidden");
     document.documentElement.classList.remove("tilo-returning-session");
@@ -36,7 +37,7 @@ export function installBootCover(): Promise<void> {
       if (appReady) release(returningDelayPassed);
       return;
     }
-    if (appReady && loopReady) release(true);
+    if (appReady) release(true);
   };
   const check = () => {
     appReady = Boolean(
@@ -70,9 +71,8 @@ export function installBootCover(): Promise<void> {
       reveal();
     }, RETURNING_DELAY_MS);
   } else {
-    window.setTimeout(
+    loopTimer = window.setTimeout(
       () => {
-        loopReady = true;
         cover.dataset.loopComplete = "true";
         image.src = "/loader/pool-576f781839ee.png";
         window.dispatchEvent(new Event("tilo-boot-loop-complete"));

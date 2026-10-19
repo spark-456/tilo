@@ -27,6 +27,8 @@
     "chars": null,
     "masked": 0,
     "blocked": 1,
+    "target_box": {"x": 190, "y": 40, "width": 80, "height": 30},
+    "caption": "Clicking Search",
     "frame": {
       "artifact_id": "art_bs01JB7A0000000000000000BRW1_1",
       "version": 1
