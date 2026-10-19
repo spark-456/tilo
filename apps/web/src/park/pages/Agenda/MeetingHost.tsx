@@ -6,8 +6,7 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { HostState } from "../../../api/connect";
 import { displayApiError } from "../../../api/http";
-import { ENDED_TEXT, type MeetingHostApi } from "../../api/live/meetingHost";
-import { AppLink } from "../../shared/AppLink";
+import { ENDED_TEXT, MEET, type MeetingHostApi } from "../../api/live/meetingHost";
 import {
   type HostForm,
   type HostableRow,
@@ -30,7 +29,7 @@ type Flow =
   | { phase: "starting" }
   | { phase: "joining"; id: string }
   | { phase: "ended"; text: string }
-  | { phase: "retry"; id: string }
+  | { phase: "retry"; id: string; url?: string | undefined }
   | { phase: "failed"; text: string }
   | { phase: "scheduled"; names: string[] };
 
@@ -63,32 +62,20 @@ export function HostMeeting({
   }, [hostState]);
   useEffect(() => read(), [read]);
   if (conn === null) return null;
-  if (conn !== "connected")
-    return (
-      <p data-testid="host-meeting-gate">
-        {conn === "unknown" ? "Tilo could not confirm the meeting host. " : ""}
-        <AppLink to="/connectors">Sign in the meeting host first</AppLink>
-        {conn === "unknown" ? (
-          <>
-            {" "}
-            <button type="button" className="secondary" onClick={read}>
-              Check again
-            </button>
-          </>
-        ) : null}
-      </p>
-    );
+  // MEET-GUEST: without Tilo's own meeting host account (an enterprise option), Tilo joins the person's own Meet as a
+  // guest. No sign-in is asked of anyone.
+  const hosted = conn === "connected";
 
-  const attend = async (id: string) => {
+  const attend = async (id: string, url?: string) => {
     setFlow({ phase: "joining", id });
     try {
-      const r = await api.attend(id);
+      const r = await api.attend(id, url);
       setFlow({
         phase: "ended",
         text: (r.reason && ENDED_TEXT[r.reason]) || `The meeting is now ${r.status}.`,
       });
     } catch {
-      setFlow({ phase: "retry", id }); // the invitation and the meeting stand: only the joining is asked again
+      setFlow({ phase: "retry", id, url }); // the invitation and the meeting stand: only the joining is asked again
     }
     setWrap(false);
     onChanged?.();
@@ -126,6 +113,20 @@ export function HostMeeting({
     }
     await attend(id);
   };
+  const guestMeet = async (url: string) => {
+    setLink(null);
+    setFlow({ phase: "starting" });
+    let id: string | null = null;
+    try {
+      id = await api.createNow(now(), crypto.randomUUID());
+      await api.world(id);
+    } catch (e) {
+      if (id !== null) await api.remove(id).catch(() => undefined); // nothing was sent: no half-made meeting
+      setFlow({ phase: "failed", text: displayApiError(e) });
+      return;
+    }
+    await attend(id, url);
+  };
   const scheduled = async (picked: Picked[], f: HostForm) => {
     const { you } = await api.people();
     const id = await api.create(f, crypto.randomUUID(), picked);
@@ -150,15 +151,30 @@ export function HostMeeting({
   const busy = flow.phase === "starting" || flow.phase === "joining";
   return (
     <div className="park-agenda-hostbox" aria-label="Meet with Tilo">
-      <div className="park-agenda-hostactions">
-        <button type="button" disabled={busy} onClick={() => void meetNow()}>
-          Meet with Tilo now
-        </button>
-        <button type="button" className="secondary" disabled={busy} onClick={() => setDialog(true)}>
-          Schedule with others
-        </button>
-      </div>
-      <small>{MEET_NOW_NOTICE}</small>
+      <GuestJoin busy={busy} onSend={(url) => void guestMeet(url)} />
+      {hosted ? (
+        <>
+          <div className="park-agenda-hostactions">
+            <button
+              type="button"
+              className="secondary"
+              disabled={busy}
+              onClick={() => void meetNow()}
+            >
+              Meet with Tilo now
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              disabled={busy}
+              onClick={() => setDialog(true)}
+            >
+              Schedule with others
+            </button>
+          </div>
+          <small>{MEET_NOW_NOTICE}</small>
+        </>
+      ) : null}
       {flow.phase === "starting" ? <output>Starting…</output> : null}
       {flow.phase === "joining" ? (
         <output>
@@ -181,7 +197,7 @@ export function HostMeeting({
       {flow.phase === "retry" ? (
         <div role="alert">
           <p>{JOIN_FAILED}</p>
-          <button type="button" onClick={() => void attend(flow.id)}>
+          <button type="button" onClick={() => void attend(flow.id, flow.url)}>
             Try again
           </button>
         </div>
@@ -203,6 +219,45 @@ export function HostMeeting({
           onConfirm={scheduled}
         />
       ) : null}
+    </div>
+  );
+}
+
+const GUEST_HELP = "Paste a Google Meet link like https://meet.google.com/abc-defg-hij";
+
+/** MEET-GUEST: the person pastes their own Meet link; Tilo joins as a guest and the host admits it. */
+function GuestJoin({ busy, onSend }: { busy: boolean; onSend: (url: string) => void }) {
+  const [url, setUrl] = useState("");
+  const [err, setErr] = useState("");
+  const send = () => {
+    const u = url.trim();
+    if (!MEET.test(u)) return setErr(GUEST_HELP);
+    setErr("");
+    onSend(u);
+  };
+  return (
+    <div className="park-agenda-hostactions">
+      <label className="park-agenda-hostfield">
+        <span>Your Google Meet link</span>
+        <input
+          type="url"
+          inputMode="url"
+          placeholder="https://meet.google.com/abc-defg-hij"
+          value={url}
+          disabled={busy}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") send();
+          }}
+        />
+      </label>
+      <button type="button" disabled={busy} onClick={send}>
+        Send Tilo to my call
+      </button>
+      <small>
+        Tilo joins as a guest named Tilo notetaker. Admit it in Meet. No sign-in needed.
+      </small>
+      {err ? <p role="alert">{err}</p> : null}
     </div>
   );
 }

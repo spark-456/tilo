@@ -120,21 +120,44 @@ const flush = () => act(async () => undefined);
 type Post = (path: string, ...rest: unknown[]) => Promise<unknown>;
 
 describe("MEET_SIMPLE one click to a meeting with Tilo", () => {
-  it("MEET_SIMPLE_a_without_a_connected_meeting_host_the_buttons_are_a_link_to_connectors", async () => {
+  it("MEET_GUEST_a_without_a_connected_meeting_host_only_the_guest_join_shows_and_no_sign_in", async () => {
     const { api } = rig();
     const m = mount(<HostMeeting api={api} hostState={hostState("available")} now={() => NOW} />);
     await flush();
     expect(btn(m.container, "Meet with Tilo now")).toBeUndefined();
-    const link = m.container.querySelector("a");
-    expect(link?.textContent).toBe("Sign in the meeting host first");
-    expect(link?.getAttribute("href")).toBe("/connectors");
+    expect(btn(m.container, "Send Tilo to my call")).toBeDefined();
+    expect(m.container.querySelector("a")).toBeNull();
+    expect(m.container.textContent).not.toMatch(/sign in/i);
+  });
+  it("MEET_GUEST_b_a_pasted_meet_link_makes_the_meeting_and_sends_the_guest_bot_with_that_link", async () => {
+    const { api, http } = rig();
+    const m = mount(<HostMeeting api={api} hostState={hostState("available")} now={() => NOW} />);
+    await flush();
+    const input = m.container.querySelector("input[type=url]") as HTMLInputElement;
+    await set(input, "https://example.com/abc-defg-hij");
+    await press(m.container, "Send Tilo to my call");
+    expect(m.container.querySelector('[role="alert"]')?.textContent).toMatch(/Google Meet link/);
+    expect(http.postJson).not.toHaveBeenCalled();
+    await set(input, "  https://meet.google.com/abc-defg-hij ");
+    await press(m.container, "Send Tilo to my call");
+    await flush();
+    expect(paths(http)).toEqual([
+      "/v1/meetings",
+      "/v1/meetings/mt_new/world",
+      "/v1/meetings/mt_new/attend",
+    ]);
+    expect(http.postJson.mock.calls[2]?.[1]).toEqual({
+      join_url: "https://meet.google.com/abc-defg-hij",
+    });
+    expect(http.getJson).not.toHaveBeenCalledWith("/v1/meetings/mt_new/join");
+    expect(m.container.textContent).toContain("The meeting ended and Tilo left.");
   });
   it("MEET_SIMPLE_b_one_primary_action_and_no_host_world_attend_words", async () => {
     const { api } = rig();
     const m = mount(<HostMeeting api={api} hostState={hostState("connected")} now={() => NOW} />);
     await flush();
     const labels = Array.from(m.container.querySelectorAll("button")).map((b) => b.textContent);
-    expect(labels).toEqual(["Meet with Tilo now", "Schedule with others"]);
+    expect(labels).toEqual(["Send Tilo to my call", "Meet with Tilo now", "Schedule with others"]);
     expect(m.container.textContent).not.toMatch(
       /host a meeting|send for approval|needs you|world/i,
     );
