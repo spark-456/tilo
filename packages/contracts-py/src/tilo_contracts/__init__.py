@@ -6,7 +6,7 @@
 # artifact.schema.json 1.3.0 sha256:dafce81fa75a5ed5
 # attention.schema.json 1.0.0 sha256:f35cff84728304af
 # brief.schema.json 1.0.0 sha256:be4e747f37e399b2
-# browser.schema.json 1.1.0 sha256:a92335a572619ef1
+# browser.schema.json 1.1.0 sha256:f2fdcfe0c901f28f
 # byok.schema.json 1.0.0 sha256:683d5d2b4fc8b0fe
 # calendar_entry.schema.json 1.1.0 sha256:291531543be88320
 # card.schema.json 1.0.0 sha256:2666292eb19087d0
@@ -46,7 +46,7 @@
 # events/data/artifact.versioned.schema.json 1.0.0 sha256:b6ceac1481d2595b
 # events/data/assistant.asked.schema.json 1.0.0 sha256:8775120b73c4ed38
 # events/data/assistant.replied.schema.json 1.0.0 sha256:48fb513dadef290d
-# events/data/browser.acted.schema.json 1.1.0 sha256:e4fcf23f19afd365
+# events/data/browser.acted.schema.json 1.1.1 sha256:1c02b9b989acd656
 # events/data/browser.controlled.schema.json 1.0.0 sha256:6b8442f6dbb88479
 # events/data/browser.started.schema.json 1.0.0 sha256:1bed13c81c886df2
 # events/data/browser.stopped.schema.json 1.0.0 sha256:8ae289ea75dfd6b5
@@ -5375,11 +5375,14 @@ class BrowserConfigRpcResult(BaseModel):
     )
     session: BrowserConfigSessionId
     step: Annotated[int, Field(ge=0, le=60)]
-    kind: Literal["start", "navigate", "click", "type", "scroll", "extract"]
+    kind: Literal["start", "navigate", "click", "type", "scroll", "extract", "end"]
     url: BrowserConfigHttpsUrl
     target_box: BrowserConfigTargetBox
     screenshot_artifact: BrowserConfigScreenshotArtifact
     text: Annotated[str, Field(max_length=20000)]
+    masked: Annotated[int, Field(ge=0, le=1000)]
+    blocked: Annotated[int, Field(ge=0)]
+    login_required: bool
 
 
 class ByokConfigRoleProfiles(BaseModel):
@@ -5829,7 +5832,7 @@ class AssistantAskedData(BaseModel):
 
 class BrowserActedData(BaseModel):
     """
-    data of browser.acted (registry 1.7.0, ADR-0051): one step of an agentic browser session, written after the worker answered, so the Browser panel shows only what happened (HR-1, BR-09). verdict done: code allowed the action and the worker ran it; refused: reason says why and nothing ran; gated: a commit waiting at a T3 gate (its approval.requested follows); committed: the outbox ran a commit a person approved, after its data.transfer (BR-05). frame is the masked screenshot after the step (origin browser), null when none. host is the page's host after the step; chars counts typed characters (a type action only). Never typed text, a full URL or page text (BR-13). authz null: a commit's authorisation is on its approval.resolved and data.transfer.
+    data of browser.acted (registry 1.7.0, ADR-0051/0052): one step of an agentic browser session, written after the worker answered, so the Browser panel shows only what happened (HR-1, BR-09). verdict done: code allowed the action and the worker ran it; refused: reason says why and nothing ran; gated: a commit was withheld for a person and this release closes the session for manual continuation; committed: the outbox ran a commit a person approved, after its data.transfer (BR-05). frame is the masked screenshot after the step (origin browser), null when none. host is the page's host after the step; chars counts typed characters (a type action only). Never typed text, a full URL or page text (BR-13). authz null: a commit's authorisation is on its approval.resolved and data.transfer.
     """
 
     model_config = ConfigDict(

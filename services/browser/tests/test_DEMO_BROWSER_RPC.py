@@ -21,6 +21,14 @@ def _app():
         tree=doc(
             textbox("query", "Search", box=BOX),
             node("button", "Search", id="go", box={"x": 190, "y": 40, "width": 80, "height": 30}),
+            node(
+                "button",
+                "Search",
+                id="submit",
+                box={"x": 300, "y": 40, "width": 80, "height": 30},
+                form_method="get",
+                type="submit",
+            ),
             textbox("cc", "Card", autocomplete="cc-number"),
         ),
     )
@@ -98,6 +106,17 @@ def test_DEMO_BROWSER_RPC_returns_target_box_and_masked_frame_for_each_action():
     assert engine.contexts[0].clicked == ["go"]
 
 
+def test_DEMO_BROWSER_RPC_inspect_button_without_input_type_uses_null():
+    from tilo_browser.session import BrowserSessions
+
+    app, _ = _app()
+    assert _start(app).status_code == 200
+    inspected = _post(app, f"/sessions/{SESSION}/inspect", {"session": SESSION, "at": {"x": 210, "y": 60}})
+    assert inspected.status_code == 200
+    assert inspected.json()["facts"]["input_type"] is None
+    assert BrowserSessions._facts(node("button", "Search", id="go", type=""))["input_type"] is None
+
+
 def test_DEMO_BROWSER_RPC_stops_commit_and_password_entry():
     app, engine = _app()
     assert _start(app).status_code == 200
@@ -107,8 +126,13 @@ def test_DEMO_BROWSER_RPC_stops_commit_and_password_entry():
     assert submit.json()["reason"] == "needs_person"
     assert engine.contexts[0].typed == []
     secret = _act(app, {"kind": "type", "at": {"x": 0, "y": 0}, "text": "abc", "submit": False})
-    assert secret.status_code == 409
+    assert secret.status_code == 422  # no inspect digest: contract refuses it before any field can be touched
     assert engine.contexts[0].typed == []
+    at = {"x": 280, "y": 60}
+    form = _act(app, {"kind": "click", "at": at}, at=at)
+    assert form.status_code == 409
+    assert form.json()["reason"] == "needs_person"
+    assert engine.contexts[0].clicked == []
 
 
 def test_DEMO_BROWSER_RPC_extract_scroll_and_end_use_the_same_isolated_context():
@@ -135,7 +159,10 @@ def test_DEMO_BROWSER_RPC_extract_scroll_and_end_use_the_same_isolated_context()
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://browser.test") as client:
             return await client.delete(f"/sessions/{SESSION}", headers={"Authorization": "Bearer fake"})
 
-    assert asyncio.run(end()).status_code == 200
+    ended = asyncio.run(end())
+    assert ended.status_code == 200
+    assert ended.json()["target_box"]["width"] == 1200
+    assert ended.json()["screenshot_artifact"]["mime_type"] == "image/png"
     assert engine.contexts[0].closed
 
 
@@ -145,3 +172,36 @@ def test_DEMO_BROWSER_RPC_blocks_offsite_navigation_before_any_request():
     refused = _act(app, {"kind": "navigate", "url": "https://outside.example.net/private"})
     assert refused.status_code == 403
     assert all("outside.example.net" not in request.url for request in engine.web.requests)
+
+
+def test_DEMO_BROWSER_RPC_rejects_action_outside_closed_contract_before_engine():
+    app, engine = _app()
+    assert _start(app).status_code == 200
+    bad = _post(
+        app,
+        f"/sessions/{SESSION}/act",
+        {
+            "session": SESSION,
+            "step": 1,
+            "action": {"kind": "navigate", "url": URL, "unreviewed": True},
+            "digest": None,
+            "outbox_id": None,
+        },
+    )
+    assert bad.status_code == 422
+    assert len(engine.web.requests) == 1
+
+
+def test_DEMO_BROWSER_RPC_refuses_oversized_viewport_before_context():
+    app, engine = _app()
+    refused = _post(
+        app,
+        "/sessions",
+        {
+            "session": SESSION, "world_id": "w_demo", "run_id": "r_demo", "unit_id": "U1",
+            "allow_hosts": ["example.org"], "start_url": URL,
+            "viewport": {"width": 9000, "height": 800},
+        },
+    )
+    assert refused.status_code == 422
+    assert engine.contexts == []

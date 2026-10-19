@@ -43,6 +43,10 @@ def build_provider(
         return DevDirectorProvider(profile_id=profile_id)
 
     if profile.provider == "fake":
+        if profile.model == "fake-browser":
+            from tilo_providers.fake_browser import FakeBrowserProvider  # noqa: PLC0415
+
+            return FakeBrowserProvider(profile_id=profile_id)
         from tilo_providers.fake import FakeModelProvider  # noqa: PLC0415
 
         return FakeModelProvider(profile_id=profile_id)

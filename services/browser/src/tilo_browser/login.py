@@ -33,6 +33,7 @@ _SSO_SEGMENTS = {
 _OTP_NAME = re.compile(r"(?<![a-z])(?:otp|totp|mfa|2fa)(?![a-z])")
 _OTP_LABEL = re.compile(r"\b(?:verification|security|authentication|authenticator|\d+-digit)\b[^.]{0,40}\bcode\b")
 _PASSWORD_LABEL = re.compile(r"\b(?:password|passphrase|passcode|pwd)\b")
+_CARD_LABEL = re.compile(r"\b(?:card|credit|debit|cvc|cvv)\b")
 _CREDENTIAL_ASK = re.compile(
     r"\b(?:enter|type|paste|send|share|reply with|provide|submit|give)\b[^.\n]{0,60}"
     r"\b(?:password|passcode|passphrase|credentials|login details)\b"
@@ -105,12 +106,16 @@ def _is_otp(n: dict) -> bool:
     if _role(n) not in _INPUT_ROLES:
         return False
     label = str(n.get("name") or "").lower()
-    named = (_attr(n, "name"), _attr(n, "id"), label)
+    named = (_attr(n, "name"), _attr(n, "dom_id"), label)
     return any(_OTP_NAME.search(s) for s in named) or _OTP_LABEL.search(label) is not None
 
 
 def _is_payment(n: dict) -> bool:
-    return any(t.startswith("cc-") for t in _autocomplete(n))
+    if any(t.startswith("cc-") for t in _autocomplete(n)):
+        return True
+    if _role(n) not in _INPUT_ROLES:
+        return False
+    return any(_CARD_LABEL.search(s) for s in (_attr(n, "name"), _attr(n, "dom_id"), str(n.get("name") or "").lower()))
 
 
 def _asks_for_password(n: dict) -> bool:
@@ -126,7 +131,7 @@ def is_input_node(n: dict) -> bool:
 
 
 def is_secure_node(n: dict) -> bool:
-    return _is_password(n) or _is_otp(n) or _is_payment(n)
+    return _is_password(n) or _asks_for_password(n) or _is_otp(n) or _is_payment(n)
 
 
 def node_ref(n: dict) -> str:

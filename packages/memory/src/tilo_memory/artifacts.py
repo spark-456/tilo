@@ -116,7 +116,7 @@ class Scope:
 
 @dataclass(frozen=True)
 class Origin:
-    kind: str  # unit | render | upload | restore | fetch
+    kind: str  # unit | render | upload | restore | fetch | browser
     unit: str | None = None
     agent: str | None = None
 
@@ -787,8 +787,8 @@ class ArtifactStore:
         origin, media = new.origin, new.media_type
         if new.screening_hint is not None and (type(new.screening_hint) is not str or new.screening_hint != "flagged"):
             raise _refuse("AR-07", "a screening hint can only be 'flagged'; the store alone says clean")
-        if not isinstance(origin, Origin) or origin.kind not in ("unit", "render", "upload", "fetch"):
-            raise _refuse("AR-02", "origin must be unit, render, upload or fetch (restore has its own call)")
+        if not isinstance(origin, Origin) or origin.kind not in ("unit", "render", "upload", "fetch", "browser"):
+            raise _refuse("AR-02", "origin is not an allowed producer kind")
         if type(media) is not str or media not in _TEXTUAL | FILE_TYPES | (
             CAPTURE_TYPES if origin.kind == "upload" else frozenset()
         ):
@@ -799,9 +799,14 @@ class ArtifactStore:
             raise _refuse("AR-04", "a unit's output is text or JSON, never a file")
         if origin.kind == "render" and media not in FILE_TYPES:
             raise _refuse("AR-04", "render makes only files")
+        if origin.kind == "browser" and (media != "image/png" or new.sources or new.parent is not None):
+            raise _refuse("AR-11", "a browser frame is one PNG with no sources or parent")
         if type(new.run_id) is not str or _RUN_ID.fullmatch(new.run_id) is None:
             raise _refuse("AR-03", "run id is malformed")
-        has_unit, has_agent = origin.kind in ("unit", "render", "fetch"), origin.kind in ("unit", "fetch")
+        has_unit, has_agent = (
+            origin.kind in ("unit", "render", "fetch", "browser"),
+            origin.kind in ("unit", "fetch", "browser"),
+        )
         if (
             (origin.unit is not None) != has_unit
             or (has_agent and origin.agent is None)
@@ -813,13 +818,13 @@ class ArtifactStore:
         ):
             raise _refuse("AR-03", "origin ids are malformed")
         key = new.idempotency_key
-        if has_unit:
+        if origin.kind in ("unit", "render", "fetch"):
             pattern = _FETCH_KEY if origin.kind == "fetch" else _KEY
             match = pattern.fullmatch(key) if type(key) is str else None  # also bounds the output index to 0..9
             if match is None or match.group(1) != new.run_id or match.group(2) != origin.unit:
                 raise _refuse("AR-05", "the idempotency key must be <run>:<unit>:<attempt>:<index> of this output")
         elif key is not None:
-            raise _refuse("AR-05", "an upload has no idempotency key")
+            raise _refuse("AR-05", "an upload or browser frame has no idempotency key")
         if not isinstance(new.content, bytes) or len(new.content) < 1:
             raise _refuse("AR-04", "content must be at least 1 byte")
         if len(new.content) > (MAX_HTML if media == HTML else MAX_TEXT if media in TEXT_TYPES else MAX_FILE):
