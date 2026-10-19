@@ -29,6 +29,7 @@ vi.mock("../engines/park", async () =>
 afterEach(() => {
   vi.useRealTimers();
   cleanup();
+  window.localStorage.clear();
   window.history.pushState({}, "", "/");
 });
 
@@ -47,6 +48,7 @@ const waitDone = async () => {
 
 describe("WEB_3b_shell: the pieces and where they sit", () => {
   it("WEB_3b_shell_the_nav_the_backdrop_and_one_main_that_holds_the_page", async () => {
+    window.localStorage.setItem("tilo.theme", "metropolis");
     const { m } = await mountApp({ path: "/park/ledger" });
     expect(qa(m.container, "header nav[aria-label]")).toHaveLength(1);
     expect(qa(m.container, '[aria-hidden="true"] [data-testid="fake-scene"]')).toHaveLength(1);
@@ -150,6 +152,7 @@ describe("WEB_3b_parkapp: the real ParkApp wears the shell", () => {
   };
 
   it("WEB_3b_parkapp_one_root_with_the_nav_the_backdrop_and_a_single_main_holding_the_page", async () => {
+    window.localStorage.setItem("tilo.theme", "metropolis");
     const m = await visit("/park/home");
     const roots = qa(m.container, "[data-park]");
     expect(roots).toHaveLength(1);
