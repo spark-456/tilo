@@ -123,12 +123,6 @@ export interface AllowEntry {
 /** The whole list of animation uses outside choreographer.ts, each with its reason. Keep it small. */
 export const ALLOWLIST: readonly AllowEntry[] = [
   {
-    file: "src/park/shared/BrowserPanel.css",
-    rule: "css-transition",
-    reason:
-      "The browser cursor moves only after a recorded browser.acted event provides its target box. The same cursor transition is disabled under reduced motion; no position is inferred from a timer or a pending run.",
-  },
-  {
     file: "src/world/runWorld.ts",
     rule: "raf",
     reason:

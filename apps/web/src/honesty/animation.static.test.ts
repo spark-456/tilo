@@ -59,8 +59,7 @@ describe(
       // Updated for WEB-MOTION-2: cap 6 -> 7, the one css-transition entry for the shell's own chrome.
       // LANDING-2: one more, the landing's css-transition (landing.motion.css).
       // TILO-T-FOUNDATION: three more, all in src/design/tilo-t/motion.css (keyframes, animation, the reduced-motion transition).
-      // Browser cursor motion follows recorded browser.acted target boxes and stops under reduced motion.
-      expect(ALLOWLIST.length).toBeLessThanOrEqual(12);
+      expect(ALLOWLIST.length).toBeLessThanOrEqual(11);
       const hits = found();
       for (const a of ALLOWLIST) {
         expect(a.reason.length, `${a.file} needs a reason`).toBeGreaterThanOrEqual(30);
