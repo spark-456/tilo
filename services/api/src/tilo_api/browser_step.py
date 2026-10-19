@@ -231,20 +231,23 @@ class BrowseStepExecutor:
                         credits=stop_charge,
                     )
 
-    def read_page(self, *, unit: dict, agent: str, building: str, url: str, host: str) -> str:
+    def read_page(
+        self, *, unit: dict, agent: str, building: str, url: str, host: str, also: tuple[str, ...] = ()
+    ) -> str:
         """P0-RUNS-FIX: a research unit reads one allowlisted page in the visible browser, read-only and with no model:
         open it, extract its text, close. Each step is a recorded browser.* event with its real frame, so the World's
         browser panel shows exactly what Tilo read. Raises SessionRefused when the browser cannot read it (the caller
         then fetches the page directly and says so); returns the page text, possibly empty."""
         session = "bs_" + new_part_id()
         district = unit["district"]
+        allow = list(dict.fromkeys((host, *also)))[:20]  # `also`: the known hosts a result link may redirect to
         last = self.rpc.start(
             {
                 "session": session,
                 "world_id": self.run.world_id,
                 "run_id": self.run.run_id,
                 "unit_id": unit["id"],
-                "allow_hosts": [host],
+                "allow_hosts": allow,
                 "start_url": url,
                 "viewport": {"width": 1200, "height": 800},
             }
@@ -252,7 +255,7 @@ class BrowseStepExecutor:
         outcome, steps = "error", 0
         try:
             frame = self._save(session, 0, unit["id"], agent, last)
-            started = {"session": session, "host": host, "hosts": 1, "max_steps": 1, "frame": frame}
+            started = {"session": session, "host": host, "hosts": len(allow), "max_steps": 1, "frame": frame}
             self.run.put("browser.started", agent, building, "Tilo opened the browser.", started, district=district)
             if last["login_required"]:
                 outcome = "login_wall"

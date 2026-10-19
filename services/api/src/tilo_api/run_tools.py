@@ -359,7 +359,12 @@ class BoundRunRunner:
             return None
         executor = BrowseStepExecutor(self.run_owner, rpc, lambda *_: None)
         building, plain = self.building_of(unit), dict(unit)
-        return lambda url, host: executor.read_page(unit=plain, agent=agent, building=building, url=url, host=host)
+
+        def read(url: str, host: str) -> str:
+            also = tuple(sorted(self.hosts))  # a search result's redirect host leads to another known host
+            return executor.read_page(unit=plain, agent=agent, building=building, url=url, host=host, also=also)
+
+        return read
 
     def default_tools(self) -> dict[str, tuple[str, ...]]:
         """ADR-0048: a unit with no pinned skill also gets the reads of a connector the brief names as a source

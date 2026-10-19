@@ -139,3 +139,23 @@ def test_P0_RUNS_FIX_replay_and_dev_runs_open_no_browser(monkeypatch) -> None:
     assert research_browser("live") is not None
     monkeypatch.delenv("TILO_BROWSER_URL")
     assert research_browser("live") is None
+
+
+def test_P0_RUNS_FIX_the_browser_may_follow_a_result_redirect_to_known_hosts_only() -> None:
+    bodies: list[dict] = []
+
+    class Recording(FakeRpc):
+        def start(self, body):
+            bodies.append(body)
+            return super().start(body)
+
+    also = tuple(f"h{n}.example.org" for n in range(30))
+    BrowseStepExecutor(FakeRun(), Recording(), lambda *_: None).read_page(
+        unit={"id": "U2", "district": "D1"},
+        agent="A_s2",
+        building="B2",
+        url="https://example.org/",
+        host="example.org",
+        also=also,
+    )
+    assert bodies[0]["allow_hosts"][0] == "example.org" and len(bodies[0]["allow_hosts"]) == 20
