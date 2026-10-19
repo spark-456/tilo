@@ -46,7 +46,7 @@
 # events/data/artifact.versioned.schema.json 1.0.0 sha256:b6ceac1481d2595b
 # events/data/assistant.asked.schema.json 1.0.0 sha256:8775120b73c4ed38
 # events/data/assistant.replied.schema.json 1.0.0 sha256:48fb513dadef290d
-# events/data/browser.acted.schema.json 1.1.0 sha256:a768e01e41dbf888
+# events/data/browser.acted.schema.json 1.1.1 sha256:1c02b9b989acd656
 # events/data/browser.controlled.schema.json 1.0.0 sha256:6b8442f6dbb88479
 # events/data/browser.started.schema.json 1.0.0 sha256:1bed13c81c886df2
 # events/data/browser.stopped.schema.json 1.0.0 sha256:8ae289ea75dfd6b5
@@ -5832,7 +5832,7 @@ class AssistantAskedData(BaseModel):
 
 class BrowserActedData(BaseModel):
     """
-    data of browser.acted (registry 1.7.0, ADR-0051): one step of an agentic browser session, written after the worker answered, so the Browser panel shows only what happened (HR-1, BR-09). verdict done: code allowed the action and the worker ran it; refused: reason says why and nothing ran; gated: a commit waiting at a T3 gate (its approval.requested follows); committed: the outbox ran a commit a person approved, after its data.transfer (BR-05). frame is the masked screenshot after the step (origin browser), null when none. host is the page's host after the step; chars counts typed characters (a type action only). Never typed text, a full URL or page text (BR-13). authz null: a commit's authorisation is on its approval.resolved and data.transfer.
+    data of browser.acted (registry 1.7.0, ADR-0051/0052): one step of an agentic browser session, written after the worker answered, so the Browser panel shows only what happened (HR-1, BR-09). verdict done: code allowed the action and the worker ran it; refused: reason says why and nothing ran; gated: a commit was withheld for a person and this release closes the session for manual continuation; committed: the outbox ran a commit a person approved, after its data.transfer (BR-05). frame is the masked screenshot after the step (origin browser), null when none. host is the page's host after the step; chars counts typed characters (a type action only). Never typed text, a full URL or page text (BR-13). authz null: a commit's authorisation is on its approval.resolved and data.transfer.
     """
 
     model_config = ConfigDict(

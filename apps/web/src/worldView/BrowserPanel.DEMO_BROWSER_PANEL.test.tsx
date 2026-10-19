@@ -1,7 +1,12 @@
 // @vitest-environment happy-dom
 import type { Event } from "@tilo/contracts";
-import { describe, expect, it } from "vitest";
-import { browserView } from "./BrowserPanel";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
+import { describe, expect, it, vi } from "vitest";
+import type { TiloClient } from "../api/client";
+import { BrowserPanel, browserView } from "./BrowserPanel";
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const recorded = (seq: number, type: string, data: object) => ({ seq, type, data }) as Event;
 
@@ -25,9 +30,69 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
     const gated = recorded(3, "browser.acted", {
       session: "bs_01K7M000000000000000000000",
       verdict: "gated",
+      host: "en.wikipedia.org",
       target_box: { x: 500, y: 500, width: 20, height: 20 },
     });
     expect(browserView([start, action, gated]).cursor?.seq).toBe(2);
     expect(browserView([start, action, gated]).gated).toBe(true);
+    expect(browserView([start, action, gated]).host).toBe("en.wikipedia.org");
+    expect(browserView([start, action, recorded(4, "world.paused", {})]).paused).toBe(true);
+  });
+
+  it("shows a person handoff and sends Stop without claiming completion before its event", async () => {
+    const stopBrowser = vi.fn(async () => undefined);
+    const client = {
+      stopBrowser,
+      pauseWorld: vi.fn(async () => undefined),
+    } as unknown as TiloClient;
+    const session = "bs_01K7M000000000000000000000";
+    const events = [
+      recorded(1, "browser.started", { session, host: "en.wikipedia.org", frame: null }),
+      recorded(2, "browser.acted", {
+        session,
+        verdict: "gated",
+        host: "en.wikipedia.org",
+        frame: null,
+      }),
+    ];
+    const node = document.createElement("div");
+    const root = createRoot(node);
+    await act(async () =>
+      root.render(<BrowserPanel client={client} worldId="w_demo" events={events} replay={false} />),
+    );
+    expect(node.querySelector("a")?.getAttribute("href")).toBe("https://en.wikipedia.org/");
+    const stop = Array.from(node.querySelectorAll("button")).find(
+      (button) => button.textContent === "Stop",
+    );
+    await act(async () => stop?.click());
+    expect(stopBrowser).toHaveBeenCalledWith("w_demo", session);
+    expect(node.textContent).toContain("Waiting for you");
+    expect(node.textContent).not.toContain("Browser stopped");
+    await act(async () => root.unmount());
+  });
+
+  it("labels Stop as a request until browser.stopped is recorded", async () => {
+    const stopBrowser = vi.fn(async () => undefined);
+    const client = { stopBrowser } as unknown as TiloClient;
+    const session = "bs_01K7M000000000000000000000";
+    const node = document.createElement("div");
+    const root = createRoot(node);
+    await act(async () =>
+      root.render(
+        <BrowserPanel
+          client={client}
+          worldId="w_demo"
+          events={[recorded(1, "browser.started", { session })]}
+          replay={false}
+        />,
+      ),
+    );
+    const stop = Array.from(node.querySelectorAll("button")).find(
+      (button) => button.textContent === "Stop",
+    );
+    await act(async () => stop?.click());
+    expect(node.textContent).toContain("Stopping");
+    expect(node.textContent).not.toContain("Browser stopped");
+    await act(async () => root.unmount());
   });
 });

@@ -19,24 +19,39 @@ export function browserView(events: readonly BrowserEvent[]): {
   session: string | null;
   stopped: boolean;
   gated: boolean;
+  host: string | null;
+  paused: boolean;
 } {
   let frame: string | null = null;
   let cursor: Cursor | null = null;
   let session: string | null = null;
   let stopped = false;
   let gated = false;
+  let host: string | null = null;
+  let paused = false;
   for (const event of events) {
+    if (session && event.type === "world.paused") {
+      paused = true;
+      continue;
+    }
+    if (session && event.type === "world.resumed") {
+      paused = false;
+      continue;
+    }
     if (!event.data || typeof event.data !== "object") continue;
     if (event.type === "browser.started") {
       const data = event.data as BrowserStartedData;
       session = data.session;
+      host = data.host;
       frame = data.frame?.artifact_id ?? null;
       cursor = null;
       stopped = false;
       gated = false;
+      paused = false;
     } else if (event.type === "browser.acted") {
       const data = event.data as BrowserActedData;
       if (session !== data.session) continue;
+      host = data.host ?? host;
       frame = data.frame?.artifact_id ?? frame;
       const box = data.target_box;
       if (data.verdict === "done" && box) {
@@ -53,7 +68,7 @@ export function browserView(events: readonly BrowserEvent[]): {
       if (session === data.session) stopped = true;
     }
   }
-  return { frame, cursor, session, stopped, gated };
+  return { frame, cursor, session, stopped, gated, host, paused };
 }
 
 export function BrowserPanel({
@@ -94,7 +109,9 @@ export function BrowserPanel({
   }, [reader, worldId, view.frame, replay]);
   const session = view.session;
   if (!session) return null;
-  const available = !replay && !view.stopped;
+  const available = !replay && !view.stopped && !view.paused;
+  const handoffHost =
+    view.host && /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(view.host) ? view.host : null;
   const control = (kind: "pause" | "stop") => {
     if (!available || request !== "idle") return;
     const call =
@@ -154,12 +171,23 @@ export function BrowserPanel({
         ) : null}
       </div>
       <p className="tilo-browser__caption" aria-live="polite">
-        {view.gated
-          ? "Waiting for you. Tilo stopped before submitting."
-          : view.stopped
-            ? "Browser stopped"
-            : (view.cursor?.caption ?? "Tilo opened the browser")}
+        {view.paused
+          ? "World paused"
+          : view.gated
+            ? "Waiting for you. Tilo stopped before submitting."
+            : view.stopped
+              ? "Browser stopped"
+              : request === "pausing"
+                ? "Pausing…"
+                : request === "stopping"
+                  ? "Stopping…"
+                  : (view.cursor?.caption ?? "Tilo opened the browser")}
       </p>
+      {view.gated && handoffHost ? (
+        <a href={`https://${handoffHost}/`} target="_blank" rel="noopener noreferrer">
+          Open this site yourself to continue
+        </a>
+      ) : null}
       {request === "error" ? <p role="alert">Browser control was not confirmed.</p> : null}
     </section>
   );
