@@ -183,7 +183,26 @@ function safeDeliverableName(raw: string): string | null {
   return cleaned || null;
 }
 
-function deliveredName(event: RunEvent, id: string): string {
+function recordedArtifact(
+  events: readonly RunEvent[],
+  id: string,
+): { label: string | null; mediaType: string | null } {
+  const made = events.find((event) => {
+    const data = event.data as { artifact?: { artifact_id?: unknown } } | undefined;
+    return (
+      (event.type === "artifact.created" || event.type === "artifact.versioned") &&
+      data?.artifact?.artifact_id === id
+    );
+  });
+  const item = made as (RunEvent & { item?: { label?: unknown } }) | undefined;
+  const data = made?.data as { media_type?: unknown } | undefined;
+  return {
+    label: typeof item?.item?.label === "string" ? safeDeliverableName(item.item.label) : null,
+    mediaType: typeof data?.media_type === "string" ? data.media_type : null,
+  };
+}
+
+function deliveredName(event: RunEvent, id: string, events: readonly RunEvent[]): string {
   const data = event.data as
     | { artifact?: { label?: unknown }; format?: unknown; filename?: unknown }
     | undefined;
@@ -194,15 +213,17 @@ function deliveredName(event: RunEvent, id: string): string {
   const label = data?.artifact?.label;
   const cleanLabel = typeof label === "string" ? safeDeliverableName(label) : null;
   if (cleanLabel && cleanLabel !== id) return cleanLabel;
+  const recordedLabel = recordedArtifact(events, id).label;
+  if (recordedLabel) return recordedLabel;
   const fromSummary = event.summary.match(
     /^(?:The |Your )?(.+?) (?:is ready|was delivered)(?: in Tilo)?\.?$/i,
   );
   const cleanSummary = fromSummary?.[1] ? safeDeliverableName(fromSummary[1]) : null;
   if (cleanSummary && !/^item$/i.test(cleanSummary)) return cleanSummary;
-  const summary = safeDeliverableName(event.summary.replace(/[.!]+$/, ""));
-  return (
-    (typeof data?.format === "string" && FORMAT_NAMES[data.format]) || summary || "Working file"
-  );
+  const summary = /^The item was delivered\.?$/i.test(event.summary)
+    ? null
+    : safeDeliverableName(event.summary.replace(/[.!]+$/, ""));
+  return (typeof data?.format === "string" && FORMAT_NAMES[data.format]) || summary || id;
 }
 
 function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
@@ -215,7 +236,7 @@ function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
       typeof id === "string" &&
       !items.some((x) => x.id === id)
     ) {
-      const name = deliveredName(e, id);
+      const name = deliveredName(e, id, events);
       if (!items.some((x) => x.name.toLocaleLowerCase() === name.toLocaleLowerCase()))
         items.push({ id, name });
     }
@@ -343,14 +364,18 @@ export function ResultTab({
   const mainData = mainEvent?.data as { format?: unknown } | undefined;
   const declaredFormat = typeof mainData?.format === "string" ? mainData.format.toUpperCase() : "";
   const extension = /\.([a-z0-9]+)$/i.exec(mainName)?.[1]?.toUpperCase();
+  const recordedMime = mainItem ? recordedArtifact(events, mainItem.id).mediaType : null;
+  const mime = blob?.type !== "application/octet-stream" ? blob?.type : recordedMime;
   const mimeFormat =
-    blob?.type === "text/markdown"
+    mime === "text/markdown"
       ? "MD"
-      : blob?.type === "text/csv"
+      : mime === "text/csv"
         ? "CSV"
-        : blob?.type === "text/html"
+        : mime === "text/html"
           ? "HTML"
-          : "";
+          : mime?.startsWith("image/")
+            ? mime.slice(6).toUpperCase()
+            : "";
   const mainFormat =
     extension ||
     (declaredFormat !== "IN_APP" && declaredFormat !== "" ? declaredFormat : mimeFormat) ||

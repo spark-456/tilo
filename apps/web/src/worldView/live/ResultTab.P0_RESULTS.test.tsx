@@ -26,6 +26,40 @@ const fileView = (text: string, type: string) => ({
 });
 
 describe("P0_RESULTS inline delivery", () => {
+  it("P0_RESULTS_uses_the_recorded_artifact_name_for_in_app_files", async () => {
+    const created = {
+      seq: 1,
+      type: "artifact.created",
+      ts: "2026-10-19T10:00:00.000Z",
+      credits: 0,
+      summary: "The agent made an item.",
+      item: { label: "Actual forecast.csv" },
+      data: { artifact: { artifact_id: "art_main", version: 1 }, media_type: "text/csv" },
+    } as RunEvent;
+    const delivery = {
+      ...delivered("in_app", "The item"),
+      seq: 2,
+      summary: "The item was delivered.",
+      data: { artifact: { artifact_id: "art_main", version: 1 }, format: "in_app" },
+    };
+    const m = mount(
+      <div data-park="">
+        <ResultTab
+          worldId="w_csv"
+          events={[created, delivery]}
+          shared={fileView("Item,Cost\nFood,42", "application/octet-stream")}
+        />
+      </div>,
+    );
+    await act(async () => {
+      for (let i = 0; i < 3; i++) await Promise.resolve();
+    });
+    expect(m.container.querySelector("h2")?.textContent).toBe("Actual forecast.csv");
+    expect(
+      m.container.querySelector('[data-testid="result-preview"] table')?.textContent,
+    ).toContain("Food");
+  });
+
   it("P0_RESULTS_no_artifact_never_shows_sample_content", () => {
     const m = mount(
       <div data-park="">
