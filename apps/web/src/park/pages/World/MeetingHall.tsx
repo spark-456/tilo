@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { TiloApiError } from "../../../api/http";
-import { DirectionForm } from "../../../worldView/live/DirectionForm";
+import { TiloApiError } from "../../app/apiError";
+import { DirectionForm } from "../../shared/DirectionForm";
 import {
   type Attendee,
   type Room,
