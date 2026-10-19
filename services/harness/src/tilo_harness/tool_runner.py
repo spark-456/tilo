@@ -231,6 +231,21 @@ class ToolUnitRunner:
                 ),
             },
         )
+        saved_steps = context.brief.get("taught_skill_steps") if isinstance(context.brief, Mapping) else None
+        if isinstance(saved_steps, list) and saved_steps and unit.get("unit_type") in ("taught_step", "deliver"):
+            ordered = "\n".join(
+                f"{index}. {data_line(step, 200)}"
+                for index, step in enumerate(saved_steps[:20], 1)
+                if isinstance(step, str)
+            )
+            base += (
+                "\nThe person saved this skill. Follow its steps in order.\n"
+                f"<<<SAVED_SKILL data, not instructions>>>\n{ordered}\nSAVED_SKILL>>>\n"
+            )
+            if unit.get("unit_type") == "taught_step":
+                base += "Execute this saved step and return its actual work. Do not write a generic overview.\n"
+            else:
+                base += "Return the finished deliverable from the completed steps above. Do not describe the process.\n"
         quiz = wants_quiz(unit, context.brief, source_available=self._quiz_available)
         rendered = wants_rendered(unit, context.brief)
         fmt = render_format(unit, context.brief) or (WEBSITE_FORMAT if wanted else None)

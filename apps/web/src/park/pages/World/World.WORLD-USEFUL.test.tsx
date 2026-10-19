@@ -56,6 +56,23 @@ const START = () =>
 const WORKING = (unit: string, text: string) => () => ev("agent.working", text, { unit });
 const NOTES =
   "# Road trip\n\n- **Day 1**: drive to Bangalore\n- Day 2: on to Gokarna\n\n| Leg | Hours |\n| --- | --- |\n| A to B | 6 |\n";
+const TRIP_ARTIFACT = { artifact_id: "art_trip", version: 1 };
+const tripCreated = () =>
+  Object.assign(
+    ev("artifact.created", "The agent made an item.", {
+      artifact: TRIP_ARTIFACT,
+      content_sha256: "0".repeat(64),
+      media_type: "text/markdown",
+      size_bytes: NOTES.length,
+    }),
+    { item: { label: "Road trip" } },
+  );
+const tripDelivered = () =>
+  ev("artifact.delivered", "Ready.", {
+    artifact: TRIP_ARTIFACT,
+    format: "in_app",
+    outbox_id: null,
+  });
 
 /** A client whose run records what the test emits, when it emits it. */
 function liveFeed() {
@@ -138,11 +155,8 @@ describe("WORLD_USEFUL runView: the progress line comes from recorded events onl
     const done = [
       ...PLAN.map((f) => f()),
       START(),
-      ev("artifact.delivered", "The plan is ready in Tilo.", {
-        artifact: {},
-        format: "in_app",
-        outbox_id: null,
-      }),
+      tripCreated(),
+      tripDelivered(),
       ev("world.completed", "Done.", { credits_used: 4, deliverable_count: 1 }),
     ];
     expect(runView(done)).toMatchObject({ phase: "done", percent: 100, deliverable: true });
@@ -242,7 +256,8 @@ describe("WORLD_USEFUL the World page of a live run", () => {
     await emit(
       ...PLAN.map((f) => f()),
       START(),
-      ev("artifact.delivered", "Ready.", { artifact: {}, format: "in_app", outbox_id: null }),
+      tripCreated(),
+      tripDelivered(),
       ev("world.completed", "Done.", { credits_used: 1, deliverable_count: 1 }),
     );
     const create = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:result");
@@ -275,7 +290,8 @@ describe("WORLD_USEFUL the World page of a live run", () => {
     await emit(
       ...PLAN.map((f) => f()),
       START(),
-      ev("artifact.delivered", "Ready.", { artifact: {}, format: "in_app", outbox_id: null }),
+      tripCreated(),
+      tripDelivered(),
       ev("world.completed", "Done.", { credits_used: 1, deliverable_count: 1 }),
     );
     expect(pageText(rig.el)).toContain("The result could not be loaded");

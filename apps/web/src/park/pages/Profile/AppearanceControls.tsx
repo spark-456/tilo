@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { AppCtx } from "../../app/AppCtx";
 import { SCENE_IDS, SCENE_NAMES, type SceneId, getScene, setScene } from "../../studio/scenePref";
 import "./Profile.css";
+import "./Profile.studio.css";
 
 // UI-STUDIO-5: each card previews its look (design/studio-v2 "Tilo S Settings"): the ground, then a heading line, a
 // card and the primary button. These are pictures of a theme, so they keep their own colours in either theme.

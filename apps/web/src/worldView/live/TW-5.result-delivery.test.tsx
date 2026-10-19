@@ -87,8 +87,10 @@ describe("TW-5: Result tab and previews", () => {
     downloadBtn?.click();
     expect(onDownload).toHaveBeenCalled();
 
-    const shareBtn = m.container.querySelectorAll<HTMLButtonElement>(".tw-res-btn--sec")[1];
-    shareBtn?.click();
+    const shareBtn = [...m.container.querySelectorAll<HTMLButtonElement>(".tw-res-btn--sec")].find(
+      (button) => button.textContent?.trim() === "Share",
+    );
+    act(() => shareBtn?.click());
     expect(onShare).toHaveBeenCalled();
 
     // R-RESULT deliberately replaces the sample preview cards with only recorded deliverables.

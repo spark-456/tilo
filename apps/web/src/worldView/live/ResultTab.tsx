@@ -1,10 +1,10 @@
 // TILO-W: Result tab with rich previews, working files accordion, and where it was made
 // (design/tilo-w PROMPT.md, Tilo W Parts.dc.html lines 253-365).
 import type React from "react";
-import { useState } from "react";
-import { Icon } from "../../design/tilo-t";
+import { useEffect, useState } from "react";
+import { Icon, type IconName } from "../../design/tilo-t";
 import type { Api } from "../../park/api";
-import { openResult, readResult, saveResult } from "../../park/api/results";
+import { openResult, readResult, saveNamedResult, saveResult } from "../../park/api/results";
 import type { SharedResult } from "../../park/pages/World/ResultPanel";
 import { Markdown } from "../../park/pages/World/markdown";
 import type { RunEvent } from "../../park/pages/World/useRunEvents";
@@ -14,7 +14,119 @@ import { DirectionForm } from "./DirectionForm";
 const readableMath = (text: string): string =>
   text.replace(/\$\\to\$/g, "→").replace(/\$([^$\n]+)\$/g, "$1");
 
-function ResultBody({ view, retry }: { view: ResultView; retry?: () => void }) {
+function csvRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') {
+      if (quoted && text[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+      if (char === "\r" && text[i + 1] === "\n") i++;
+      if (rows.length >= 101) break;
+    } else cell += char;
+  }
+  if (cell || row.length) rows.push([...row, cell]);
+  return rows;
+}
+
+function FilePreview({ blob, name, format }: { blob: Blob; name: string; format: string }) {
+  const mime = blob.type.split(";")[0]?.toLowerCase();
+  const csv = mime === "text/csv" || format === "CSV" || /\.csv$/i.test(name);
+  const html = mime === "text/html" || format === "HTML" || /\.html?$/i.test(name);
+  const image =
+    mime?.startsWith("image/") ||
+    /^(PNG|JPG|JPEG|WEBP|GIF)$/.test(format) ||
+    /\.(png|jpe?g|webp|gif)$/i.test(name);
+  const [text, setText] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!csv && !html) return;
+    let active = true;
+    blob
+      .slice(0, 250_000)
+      .text()
+      .then((value) => {
+        if (active) setText(value);
+      });
+    return () => {
+      active = false;
+    };
+  }, [blob, csv, html]);
+  useEffect(() => {
+    if (!image) return;
+    const url = URL.createObjectURL(blob);
+    setImageUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [blob, image]);
+  if (csv && text !== null) {
+    const [head = [], ...body] = csvRows(text);
+    return (
+      <div className="tw-res-preview" data-testid="result-preview">
+        <table>
+          <thead>
+            <tr>
+              {head.map((cell, index) => (
+                <th key={`${index}:${cell}`} scope="col">
+                  {cell}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {body.slice(0, 100).map((row, index) => (
+              <tr key={`row-${index}:${row.join("|")}`}>
+                {row.map((cell, column) => (
+                  <td key={`${column}:${cell}`}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {body.length > 100 ? <p>Showing the first 100 rows. Download for the rest.</p> : null}
+      </div>
+    );
+  }
+  if (html && text !== null)
+    return (
+      <div className="tw-res-preview" data-testid="result-preview">
+        <iframe
+          title={`Preview of ${name}`}
+          sandbox=""
+          referrerPolicy="no-referrer"
+          srcDoc={`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:">${text}`}
+        />
+      </div>
+    );
+  if (image && imageUrl)
+    return (
+      <div className="tw-res-preview" data-testid="result-preview">
+        <img src={imageUrl} alt={name} />
+      </div>
+    );
+  if ((csv || html || image) && text === null)
+    return <p className="park-world-noruns">Loading preview…</p>;
+  return <p className="park-world-noruns">Open or download this file to read it.</p>;
+}
+
+function ResultBody({
+  view,
+  retry,
+  name,
+  format,
+}: { view: ResultView; retry?: () => void; name: string; format: string }) {
   if (view.status === "loading") return <p className="park-world-noruns">Loading the result…</p>;
   if (view.status === "error")
     return (
@@ -31,16 +143,11 @@ function ResultBody({ view, retry }: { view: ResultView; retry?: () => void }) {
         ) : null}
       </div>
     );
-  if (view.status === "file")
-    return (
-      <p className="park-world-noruns">
-        {`The result is a file (${view.blob.type || "unknown type"}). Open or download it to read it.`}
-      </p>
-    );
+  if (view.status === "file") return <FilePreview blob={view.blob} name={name} format={format} />;
   if (view.status !== "text") return null;
   return (
     // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling text box must be reachable by keyboard to be read
-    <div className="park-world-resulttext" data-testid="result-text" tabIndex={0}>
+    <div className="park-world-resulttext tw-res-preview" data-testid="result-text" tabIndex={0}>
       {view.kind === "markdown" ? (
         <Markdown text={readableMath(view.text)} />
       ) : (
@@ -76,7 +183,26 @@ function safeDeliverableName(raw: string): string | null {
   return cleaned || null;
 }
 
-function deliveredName(event: RunEvent, id: string): string {
+function recordedArtifact(
+  events: readonly RunEvent[],
+  id: string,
+): { label: string | null; mediaType: string | null } {
+  const made = events.find((event) => {
+    const data = event.data as { artifact?: { artifact_id?: unknown } } | undefined;
+    return (
+      (event.type === "artifact.created" || event.type === "artifact.versioned") &&
+      data?.artifact?.artifact_id === id
+    );
+  });
+  const item = made as (RunEvent & { item?: { label?: unknown } }) | undefined;
+  const data = made?.data as { media_type?: unknown } | undefined;
+  return {
+    label: typeof item?.item?.label === "string" ? safeDeliverableName(item.item.label) : null,
+    mediaType: typeof data?.media_type === "string" ? data.media_type : null,
+  };
+}
+
+function deliveredName(event: RunEvent, id: string, events: readonly RunEvent[]): string {
   const data = event.data as
     | { artifact?: { label?: unknown }; format?: unknown; filename?: unknown }
     | undefined;
@@ -87,15 +213,17 @@ function deliveredName(event: RunEvent, id: string): string {
   const label = data?.artifact?.label;
   const cleanLabel = typeof label === "string" ? safeDeliverableName(label) : null;
   if (cleanLabel && cleanLabel !== id) return cleanLabel;
+  const recordedLabel = recordedArtifact(events, id).label;
+  if (recordedLabel) return recordedLabel;
   const fromSummary = event.summary.match(
     /^(?:The |Your )?(.+?) (?:is ready|was delivered)(?: in Tilo)?\.?$/i,
   );
   const cleanSummary = fromSummary?.[1] ? safeDeliverableName(fromSummary[1]) : null;
   if (cleanSummary && !/^item$/i.test(cleanSummary)) return cleanSummary;
-  const summary = safeDeliverableName(event.summary.replace(/[.!]+$/, ""));
-  return (
-    (typeof data?.format === "string" && FORMAT_NAMES[data.format]) || summary || "Working file"
-  );
+  const summary = /^The item was delivered\.?$/i.test(event.summary)
+    ? null
+    : safeDeliverableName(event.summary.replace(/[.!]+$/, ""));
+  return (typeof data?.format === "string" && FORMAT_NAMES[data.format]) || summary || id;
 }
 
 function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
@@ -108,7 +236,7 @@ function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
       typeof id === "string" &&
       !items.some((x) => x.id === id)
     ) {
-      const name = deliveredName(e, id);
+      const name = deliveredName(e, id, events);
       if (!items.some((x) => x.name.toLocaleLowerCase() === name.toLocaleLowerCase()))
         items.push({ id, name });
     }
@@ -127,17 +255,6 @@ export interface ResultTabProps {
   readonly onAskQuestion?: () => void;
   readonly onChangeDirection?: (instruction: string) => Promise<void>;
 }
-
-const DEFAULT_FILES = [
-  { name: "venue-shortlist.md", who: "research", color: "ag3", size: "4 KB" },
-  { name: "flights-12-options.csv", who: "travel", color: "ag4", size: "9 KB" },
-  { name: "casa-do-rio-quote.pdf", who: "research", color: "ag3", size: "210 KB" },
-  { name: "budget-draft-v1.xlsx", who: "lead", color: "ag2", size: "18 KB" },
-  { name: "agenda-draft.docx", who: "writer", color: "ag5", size: "26 KB" },
-  { name: "invite-email.md", who: "writer", color: "ag5", size: "2 KB" },
-  { name: "review-notes.md", who: "verifier", color: "ag7", size: "3 KB" },
-  { name: "plan-v1.json", who: "director", color: "ag1", size: "6 KB" },
-];
 
 function WorkingFiles({
   api,
@@ -193,7 +310,7 @@ function WorkingFiles({
               className="tw-res-file-btn tw-res-file-btn--icon secondary"
               aria-label={`Download working file: ${f.name}`}
               title={`Download ${f.name}`}
-              onClick={() => readItem(f.id, (b) => saveResult(b, f.name))}
+              onClick={() => readItem(f.id, (b) => saveNamedResult(b, f.name))}
             >
               <Icon name="download" size={16} />
               <span className="park-sr-only">{`Download working file: ${f.name}`}</span>
@@ -222,9 +339,17 @@ export function ResultTab({
   onChangeDirection,
 }: ResultTabProps) {
   const [directionOpen, setDirectionOpen] = useState(false);
+  const [actionStatus, setActionStatus] = useState("");
   const rawDelivered = extractDeliveredFiles(events);
   const view = shared?.view;
   const blob = view && (view.status === "text" || view.status === "file") ? view.blob : null;
+
+  if (rawDelivered.length === 0)
+    return (
+      <div className="tw-res-container" data-testid="result-tab">
+        <p className="park-world-noruns">Nothing delivered yet.</p>
+      </div>
+    );
 
   const mainItem = rawDelivered[0];
   const mainName =
@@ -233,15 +358,57 @@ export function ResultTab({
       ? view.text
           .trim()
           .split("\n")[0]
-          ?.replace(/^#*\s*/, "") || "Porto offsite plan"
-      : "Porto offsite plan");
+          ?.replace(/^#*\s*/, "") || "Result"
+      : "Result");
   const mainEvent = events.find((event) => event.type === "artifact.delivered");
   const mainData = mainEvent?.data as { format?: unknown } | undefined;
-  const mainFormat = typeof mainData?.format === "string" ? mainData.format.toUpperCase() : "FILE";
+  const declaredFormat = typeof mainData?.format === "string" ? mainData.format.toUpperCase() : "";
+  const extension = /\.([a-z0-9]+)$/i.exec(mainName)?.[1]?.toUpperCase();
+  const recordedMime = mainItem ? recordedArtifact(events, mainItem.id).mediaType : null;
+  const mime = blob?.type !== "application/octet-stream" ? blob?.type : recordedMime;
+  const mimeFormat =
+    mime === "text/markdown"
+      ? "MD"
+      : mime === "text/csv"
+        ? "CSV"
+        : mime === "text/html"
+          ? "HTML"
+          : mime?.startsWith("image/")
+            ? mime.slice(6).toUpperCase()
+            : "";
+  const mainFormat =
+    extension ||
+    (declaredFormat !== "IN_APP" && declaredFormat !== "" ? declaredFormat : mimeFormat) ||
+    "FILE";
+  const typeIcon: IconName =
+    mainFormat === "CSV" || mainFormat === "XLSX"
+      ? "sheet"
+      : mainFormat === "HTML"
+        ? "browser"
+        : /^(PNG|JPG|JPEG|WEBP|GIF)$/.test(mainFormat)
+          ? "palette"
+          : "file";
   const mainSummary = mainEvent?.summary || "Ready to open or download.";
 
   const handleOpen = () => {
-    if (blob) openResult(blob);
+    const browserType: Record<string, string> = {
+      PDF: "application/pdf",
+      CSV: "text/csv",
+      HTML: "text/html",
+      MD: "text/markdown",
+      TXT: "text/plain",
+      PNG: "image/png",
+      JPG: "image/jpeg",
+      JPEG: "image/jpeg",
+      WEBP: "image/webp",
+      GIF: "image/gif",
+    };
+    if (blob)
+      openResult(
+        blob.type === "application/octet-stream" && browserType[mainFormat]
+          ? new Blob([blob], { type: browserType[mainFormat] })
+          : blob,
+      );
     else if (onOpen) onOpen();
   };
 
@@ -250,8 +417,33 @@ export function ResultTab({
     else if (onDownload) onDownload();
   };
 
-  const handleShare = () => {
-    if (onShare) onShare();
+  const handleCopy = async () => {
+    try {
+      const content =
+        view?.status === "text"
+          ? view.text
+          : blob && (/^(CSV|HTML|MD|TXT)$/.test(mainFormat) || blob.type.startsWith("text/"))
+            ? await blob.text()
+            : document.URL;
+      if (!content) throw new Error("Nothing to copy");
+      await navigator.clipboard.writeText(content);
+      setActionStatus("Copied");
+    } catch {
+      setActionStatus("Copy unavailable here");
+    }
+  };
+
+  const handleShare = async () => {
+    if (onShare) {
+      onShare();
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(document.URL);
+      setActionStatus("Link copied");
+    } catch {
+      setActionStatus("Share link unavailable here");
+    }
   };
 
   const lastDeliveryEvent = [...events].reverse().find((e) => e.type === "artifact.delivered");
@@ -259,8 +451,8 @@ export function ResultTab({
     ? new Date(lastDeliveryEvent.ts)
         .toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
         .toLowerCase()
-    : "4:16 pm";
-  const piecesCount = rawDelivered.length > 0 ? rawDelivered.length : 5;
+    : "";
+  const piecesCount = rawDelivered.length;
 
   return (
     <div className="tw-res-container" data-testid="result-tab">
@@ -279,46 +471,10 @@ export function ResultTab({
 
       {/* 2. Main Deliverable Card */}
       <div className="tw-res-card tw-res-card--main tw-res-slide-1" data-testid="run-result">
-        <div className="tw-res-hero">
-          <div className="tw-res-sheet-mock">
-            <span className="tw-res-mock-kicker">TEAM RAO · OFFSITE PLAN</span>
-            <span className="tw-res-mock-title">{mainName}</span>
-            <span className="tw-res-mock-bar" />
-            <span className="tw-res-mock-line tw-res-mock-line--full" />
-            <span className="tw-res-mock-line tw-res-mock-line--90" />
-            <span className="tw-res-mock-line tw-res-mock-line--80" />
-            <div className="tw-res-mock-grid">
-              <span className="tw-res-mock-cell" />
-              <span className="tw-res-mock-cell" />
-              <span className="tw-res-mock-cell" />
-              <span className="tw-res-mock-cell" />
-            </div>
-            <span className="tw-res-mock-line tw-res-mock-line--full" />
-            <span className="tw-res-mock-line tw-res-mock-line--70" />
-          </div>
-          <div className="tw-res-sheet-mock tw-res-sheet-mock--side">
-            <span className="tw-res-mock-title">Agenda</span>
-            <div className="tw-res-mock-agenda-row">
-              <span className="tw-res-mock-day">THU</span>
-              <span className="tw-res-mock-line" />
-            </div>
-            <div className="tw-res-mock-agenda-row">
-              <span className="tw-res-mock-day">FRI</span>
-              <span className="tw-res-mock-line" />
-            </div>
-            <div className="tw-res-mock-agenda-row">
-              <span className="tw-res-mock-day">SAT</span>
-              <span className="tw-res-mock-line" />
-            </div>
-            <span className="tw-res-mock-box" />
-            <span className="tw-res-mock-line tw-res-mock-line--90" />
-            <span className="tw-res-mock-line tw-res-mock-line--70" />
-          </div>
-        </div>
-
         <div className="tw-res-body">
           <div className="tw-res-meta-line">
             <span className="tw-res-type-pill" data-type={mainFormat}>
+              <Icon name={typeIcon} size={15} />
               {mainFormat}
             </span>
             <span className="tw-res-meta">Made in Tilo</span>
@@ -326,6 +482,12 @@ export function ResultTab({
 
           <h2 className="tw-res-title">{mainName}</h2>
           <p className="tw-res-summary">{mainSummary}</p>
+
+          {view ? (
+            <div className="tw-res-compat-body">
+              <ResultBody view={view} retry={shared?.retry} name={mainName} format={mainFormat} />
+            </div>
+          ) : null}
 
           <div className="tw-res-actions">
             <button type="button" className="tw-res-btn tw-res-btn--pri" onClick={handleOpen}>
@@ -336,11 +498,16 @@ export function ResultTab({
               <Icon name="download" size={16} />
               Download
             </button>
+            <button type="button" className="tw-res-btn tw-res-btn--sec" onClick={handleCopy}>
+              <Icon name="copy" size={16} />
+              Copy
+            </button>
             <button type="button" className="tw-res-btn tw-res-btn--sec" onClick={handleShare}>
               <Icon name="link" size={16} />
               Share
             </button>
           </div>
+          {actionStatus ? <output className="park-world-sub">{actionStatus}</output> : null}
 
           {onAskQuestion || onChangeDirection ? (
             <div className="tw-res-followup">
@@ -374,222 +541,12 @@ export function ResultTab({
               ) : null}
             </div>
           ) : null}
-
-          {/* Preserve text view for compatibility with existing tests checking result-text */}
-          {view ? (
-            <div className="tw-res-compat-body">
-              <ResultBody view={view} retry={shared?.retry} />
-            </div>
-          ) : null}
         </div>
       </div>
-
-      {events.length === 0 ? (
-        <>
-          {/* 3. ALSO DELIVERED Header */}
-          <div className="tw-res-also tw-res-slide-2">ALSO DELIVERED</div>
-
-          {/* Sheet preview */}
-          <div className="tw-res-sheet-card tw-res-slide-2">
-            <div className="tw-res-card-head">
-              <span className="tw-res-type-pill" data-type="XLSX">
-                XLSX
-              </span>
-              <div className="tw-res-card-head__text">
-                <span className="tw-res-card-head__title">Offsite budget.xlsx</span>
-                <span className="tw-res-card-head__meta">
-                  Sheet · 5 lines · made in Tilo by Kai
-                </span>
-              </div>
-              <button
-                type="button"
-                className="tw-res-icon-btn"
-                aria-label="Download budget"
-                onClick={handleDownload}
-              >
-                <Icon name="download" size={16} />
-              </button>
-            </div>
-            <div className="tw-res-table-wrap">
-              <div className="tw-res-table-head">
-                <span className="tw-res-cell--center">1</span>
-                <span className="tw-res-cell--pad">A · ITEM</span>
-                <span className="tw-res-cell--pad">B · DETAIL</span>
-                <span className="tw-res-cell--right">C · COST</span>
-              </div>
-              <div className="tw-res-table-row">
-                <span className="tw-res-cell--center tw-res-cell--sunk">2</span>
-                <span className="tw-res-cell--pad tw-res-cell--bold">Casa do Rio, 2 nights</span>
-                <span className="tw-res-cell--pad tw-res-cell--sub">12 rooms × €168</span>
-                <span className="tw-res-cell--right tw-res-cell--mono">€4,032</span>
-              </div>
-              <div className="tw-res-table-row">
-                <span className="tw-res-cell--center tw-res-cell--sunk">3</span>
-                <span className="tw-res-cell--pad tw-res-cell--bold">Flights</span>
-                <span className="tw-res-cell--pad tw-res-cell--sub">12 people, 3 cities</span>
-                <span className="tw-res-cell--right tw-res-cell--mono">€2,140</span>
-              </div>
-              <div className="tw-res-table-row">
-                <span className="tw-res-cell--center tw-res-cell--sunk">4</span>
-                <span className="tw-res-cell--pad tw-res-cell--bold">Food and dinners</span>
-                <span className="tw-res-cell--pad tw-res-cell--sub">3 days</span>
-                <span className="tw-res-cell--right tw-res-cell--mono">€3,960</span>
-              </div>
-              <div className="tw-res-table-row">
-                <span className="tw-res-cell--center tw-res-cell--sunk">5</span>
-                <span className="tw-res-cell--pad tw-res-cell--bold">Workshop space</span>
-                <span className="tw-res-cell--pad tw-res-cell--sub">Friday</span>
-                <span className="tw-res-cell--right tw-res-cell--mono">€1,850</span>
-              </div>
-              <div className="tw-res-table-row">
-                <span className="tw-res-cell--center tw-res-cell--sunk">6</span>
-                <span className="tw-res-cell--pad tw-res-cell--bold">
-                  Local transport and activities
-                </span>
-                <span className="tw-res-cell--pad tw-res-cell--sub">Boats, trams, tickets</span>
-                <span className="tw-res-cell--right tw-res-cell--mono">€2,298</span>
-              </div>
-              <div className="tw-res-table-total">
-                <span className="tw-res-cell--center tw-res-cell--sunk">7</span>
-                <span className="tw-res-cell--pad">Total · €1,720 under the €16,000 cap</span>
-                <span className="tw-res-cell--right tw-res-cell--mono">€14,280</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Slides preview */}
-          <div className="tw-res-slides-card tw-res-slide-3">
-            <div className="tw-res-card-head">
-              <span className="tw-res-type-pill" data-type="SLIDES">
-                SLIDES
-              </span>
-              <div className="tw-res-card-head__text">
-                <span className="tw-res-card-head__title">Kickoff deck</span>
-                <span className="tw-res-card-head__meta">8 slides · made in Canva by Pia</span>
-              </div>
-              <button type="button" className="tw-res-action-btn">
-                Open in Canva
-              </button>
-            </div>
-            <div className="tw-res-slides-grid">
-              <div className="tw-res-slide-thumb" data-first="true">
-                <span className="tw-res-slide-num">01</span>
-                <span className="tw-res-slide-title">Porto · 14–16 May</span>
-              </div>
-              <div className="tw-res-slide-thumb" data-first="false">
-                <span className="tw-res-slide-num">02</span>
-                <span className="tw-res-slide-title">Why Porto</span>
-              </div>
-              <div className="tw-res-slide-thumb" data-first="false">
-                <span className="tw-res-slide-num">03</span>
-                <span className="tw-res-slide-title">Where we stay</span>
-              </div>
-              <div className="tw-res-slide-thumb" data-first="false">
-                <span className="tw-res-slide-num">04</span>
-                <span className="tw-res-slide-title">Getting there</span>
-              </div>
-              <div className="tw-res-slide-badge">+4</div>
-            </div>
-          </div>
-
-          {/* Web preview */}
-          <div className="tw-res-web-card tw-res-slide-3">
-            <div className="tw-res-card-head">
-              <span className="tw-res-type-pill" data-type="WEB">
-                WEB
-              </span>
-              <div className="tw-res-card-head__text">
-                <span className="tw-res-card-head__title">Event site</span>
-                <span className="tw-res-card-head__meta">
-                  Live · 3 pages · made in Lovable by Pia
-                </span>
-              </div>
-            </div>
-            <div className="tw-res-browser">
-              <div className="tw-res-browser-bar">
-                <span className="tw-res-browser-dot tw-res-browser-dot--red" />
-                <span className="tw-res-browser-dot tw-res-browser-dot--yellow" />
-                <span className="tw-res-browser-dot tw-res-browser-dot--green" />
-                <span className="tw-res-browser-url">porto-offsite.lovable.app</span>
-              </div>
-              <div className="tw-res-browser-content">
-                <span className="tw-res-web-kicker">TEAM RAO · 14–16 MAY</span>
-                <span className="tw-res-web-h1">Porto by the river</span>
-                <span className="tw-res-web-sub">Three days, twelve people, one free morning.</span>
-                <div className="tw-res-web-days">
-                  <div className="tw-res-web-day-card">
-                    <span className="tw-res-web-day-tag">THU 14</span>
-                    <span className="tw-res-web-day-text">Arrive, river dinner</span>
-                  </div>
-                  <div className="tw-res-web-day-card">
-                    <span className="tw-res-web-day-tag">FRI 15</span>
-                    <span className="tw-res-web-day-text">Workshop day</span>
-                  </div>
-                  <div className="tw-res-web-day-card">
-                    <span className="tw-res-web-day-tag">SAT 16</span>
-                    <span className="tw-res-web-day-text">Free morning</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="tw-res-web-actions">
-              <button type="button" className="tw-res-btn tw-res-btn--pri">
-                <Icon name="globe" size={16} />
-                Open site
-              </button>
-              <button type="button" className="tw-res-btn tw-res-btn--sec">
-                <Icon name="copy" size={16} />
-                Copy link
-              </button>
-            </div>
-          </div>
-
-          {/* Text preview */}
-          <div className="tw-res-text-card tw-res-slide-4">
-            <div className="tw-res-card-head">
-              <span className="tw-res-type-pill" data-type="MD">
-                MD
-              </span>
-              <div className="tw-res-card-head__text">
-                <span className="tw-res-card-head__title">Invite email</span>
-                <span className="tw-res-card-head__meta">
-                  Sent from Gmail · 4:11 pm · written by Wren
-                </span>
-              </div>
-            </div>
-            <div className="tw-res-text-box">
-              <span className="tw-res-text-to">To: 12 people on Team Rao</span>
-              <span className="tw-res-text-subj">Porto, 14–16 May: you’re in</span>
-              <p className="tw-res-text-p">
-                Hi all, we’re off to Porto. Rooms are booked at Casa do Rio and flights are held
-                until Friday.
-              </p>
-              <ul className="tw-res-text-list">
-                <li>Thu 14: arrive, dinner by the river at 8</li>
-                <li>Fri 15: workshop day</li>
-                <li>Sat 16: free morning, flights home after 3 pm</li>
-              </ul>
-              <p className="tw-res-text-p">Reply with any food needs by Wednesday. M</p>
-            </div>
-          </div>
-        </>
-      ) : null}
 
       {/* 4. Folded Working Files */}
       {rawDelivered.length > 1 ? (
         <WorkingFiles api={api} worldId={worldId} items={rawDelivered.slice(1)} />
-      ) : events.length === 0 ? (
-        <WorkingFiles
-          api={api}
-          worldId={worldId}
-          items={DEFAULT_FILES.map((f, i) => ({
-            id: `def_${i}`,
-            name: f.name,
-            who: f.who,
-            size: f.size,
-            color: f.color,
-          }))}
-        />
       ) : null}
 
       {/* 5. Where it was made */}
@@ -601,7 +558,7 @@ export function ResultTab({
               <Icon name="sparkle" size={18} />
             </span>
             <span className="tw-res-made__name">Tilo</span>
-            <span className="tw-res-made__desc">Plan PDF, budget sheet, invite email</span>
+            <span className="tw-res-made__desc">{`${piecesCount} delivered ${piecesCount === 1 ? "file" : "files"}`}</span>
           </div>
         </div>
         <p className="tw-res-made__later">Other services coming later.</p>

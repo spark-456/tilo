@@ -513,3 +513,91 @@
   font-size: 13px;
   font-weight: 700;
 }
+
+/* ---- RESPONSIVE: touch targets. On a phone, a tablet or any coarse pointer every control is at least 40px tall (the
+   hit box grows, the look stays). One list here so a page's own stylesheet need not repeat it. The selectors carry the
+   theme attribute, so they sit above the pages' own two-class rules. ---- */
+@media (max-width: 899px), (pointer: coarse) {
+  [data-park][data-theme="studio"] .park-seg__item,
+  [data-park][data-theme="studio"] .park-chat-quiet,
+  [data-park][data-theme="studio"] .park-worlds-dec__yes,
+  [data-park][data-theme="studio"] .park-worlds-dec__open,
+  [data-park][data-theme="studio"] .park-worlds-scale__btn,
+  [data-park][data-theme="studio"] .park-skills-ask-opt,
+  [data-park][data-theme="studio"] .park-skills-rate-btn,
+  [data-park][data-theme="studio"] .park-skills-review-trust,
+  [data-park][data-theme="studio"] .park-skills-review-keep,
+  [data-park][data-theme="studio"] .park-world-toast__act,
+  [data-park][data-theme="studio"] .park-world-dactions .park-btn,
+  [data-park][data-theme="studio"] .park-connectors-action-btn,
+  [data-park][data-theme="studio"] .park-profile-mopt,
+  [data-park][data-theme="studio"] .park-profile-scene,
+  [data-park][data-theme="studio"] .park-admin nav button {
+    min-height: 40px;
+  }
+  [data-park][data-theme="studio"] .park-skills-rate-btn {
+    min-width: 40px;
+  }
+  [data-park][data-theme="studio"] .park-world-back {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  [data-park][data-theme="studio"] .park-ledger-method {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+  }
+  [data-park][data-theme="studio"] .park-chat-input,
+  [data-park][data-theme="studio"] .park-team-select,
+  [data-park][data-theme="studio"] .park-team-more {
+    min-height: 44px;
+  }
+  [data-park][data-theme="studio"] .park-team-more {
+    min-width: 44px;
+  }
+  [data-park][data-theme="studio"] .park-shell__logo,
+  [data-park][data-theme="studio"] .park-shell__sample {
+    min-height: 44px;
+  }
+  /* A text link in a footer or a sentence gets a taller line box, not a bigger look. */
+  [data-park][data-theme="studio"] .park-home-legal a,
+  [data-park][data-theme="studio"] .park-worlds-routines__how a,
+  [data-park][data-theme="studio"] .park-team-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+/* RESPONSIVE: on a 390px phone the page button gives back a few pixels so 'Needs you' and 'Connectors' keep their whole
+   name (the button's width is fixed, so no page change moves the tools). */
+@media (max-width: 430px) {
+  [data-park][data-theme="studio"] .park-shell__pagebtn {
+    gap: 2px;
+    padding: 0 2px 0 8px;
+    font-size: 14px;
+  }
+}
+
+/* The sample strip's dismiss is 44px under 481px (sample.css); between there and a tablet or any coarse pointer it is 40px. */
+@media (min-width: 481px) and (max-width: 899px), (min-width: 481px) and (pointer: coarse) {
+  [data-park][data-theme="studio"] .park-first-run-banner button {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* A switch keeps its 44x26 look; on a tablet its tap area grows to 44px with an invisible edge (a phone's own rule in
+   park.components.css already makes the box itself 44px). */
+@media (min-width: 601px) and (max-width: 899px), (min-width: 601px) and (pointer: coarse) {
+  [data-park][data-theme="studio"] .park-switch {
+    position: relative;
+  }
+  [data-park][data-theme="studio"] .park-switch::after {
+    content: "";
+    position: absolute;
+    inset: -9px -2px;
+  }
+}

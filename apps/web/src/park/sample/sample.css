@@ -113,3 +113,18 @@
     flex: 1 1 0;
   }
 }
+
+/* RESPONSIVE: on Home the pinned strip starts at the page content's left edge (32px up to the 1296px column, then centred
+   with it) instead of a fixed 24px that matched nothing below it. */
+@media (min-width: 561px) {
+  [data-park] .park-first-run-banner--home {
+    left: max(32px, calc((100vw - 1296px) / 2 + 8px));
+  }
+}
+/* RESPONSIVE: on a phone or a tablet the strip is part of Home's page (the column already starts below it), so it scrolls
+   away with the greeting instead of staying pinned over the ask box and the cards as they pass under it. */
+@media (max-width: 840px) {
+  [data-park] .park-first-run-banner--home {
+    position: absolute;
+  }
+}

@@ -183,6 +183,7 @@ TEAM_PUT_ROUTES = {
     "limit": "/v1/team/members/u_priya/limit",
     "switch": "/v1/team/switches/weekend",
     "tool": "/v1/team/tools/gmail",
+    "edit skill": "/v1/skills/tsk_missing",  # P0-SKILLS: the skill edit reads its body through json_body's cap
 }
 
 

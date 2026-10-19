@@ -398,7 +398,9 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
     clickEl(control(r.el, "Save skill"));
     await settle();
     expect(server.posts("/v1/skills")).toHaveLength(1);
-    expect((server.posts("/v1/skills")[0] as Record<string, unknown>).clarifying_question).toBeUndefined();
+    expect(
+      (server.posts("/v1/skills")[0] as Record<string, unknown>).clarifying_question,
+    ).toBeUndefined();
   });
 
   it("P0_TEACH_FLOW_saved_answer_is_sent_as_a_question_option", async () => {
@@ -418,12 +420,13 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
     });
   });
 
-  it("P0_TEACH_FLOW_browser_task_states_limit_on_review", async () => {
+  it("P0_SKILLS_browser_task_states_limit_on_review", async () => {
     const r = await rig().mount();
     await describe_(r, "Open YouTube and play the first video");
     clickEl(control(r.el, NEXT_REVIEW));
     await settle();
-    expect(text(r)).toContain("Tilo can't operate a browser yet");
+    expect(text(r)).toContain("Needs browser control (coming)");
+    expect(text(r)).not.toContain("will search the web and summarise instead");
   });
   it("test_R_SKILL_TEACH_502_keeps_capture_and_opens_one_editable_step", async () => {
     const { server, mount } = rig({
@@ -643,6 +646,34 @@ describe("SKILLS_5_live_teach: save (step 4)", () => {
       captured_steps: [{ text: "Open the invoice mail" }, { text: "Note the total" }],
       clarifying_question: { text: "Link or PDF?", options: ["Open the link", "Skip"] },
     });
+  });
+
+  it("P0_SKILLS_saved_live_skill_opens_the_server_record_in_my_skills", async () => {
+    const r = await rig().mount();
+    await toSave(r);
+    name(r, "Match invoices");
+    clickEl(control(r.el, "Save skill"));
+    await settle();
+    clickEl(control(r.el, "View in skills"));
+    await settle();
+    expect(r.el.querySelector('[role="dialog"]')?.textContent).toContain("Match invoices");
+    expect(r.el.querySelector('[role="dialog"]')?.textContent).toContain(
+      "Read the new invoice mail",
+    );
+  });
+
+  it("P0_SKILLS_review_edits_each_proposed_step_before_save", async () => {
+    const { server, mount } = rig();
+    const r = await mount();
+    await toVersion(r);
+    const step = q<HTMLInputElement>(r.el, 'input[aria-label="Edit step 1"]');
+    expect(step).toBeTruthy();
+    typeInto(step, "Read the latest invoice in Gmail");
+    name(r, "Match invoices");
+    clickEl(control(r.el, "Save skill"));
+    await settle();
+    const [body] = server.posts("/v1/skills") as { plan_steps: { text: string }[] }[];
+    expect(body?.plan_steps[0]?.text).toBe("Read the latest invoice in Gmail");
   });
 
   it("SKILLS_5_live_teach_a_step_the_person_switched_to_ask_first_is_posted_as_asked", async () => {
