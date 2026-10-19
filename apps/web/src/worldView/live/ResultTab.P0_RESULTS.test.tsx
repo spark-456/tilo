@@ -335,6 +335,27 @@ describe("P0_RESULTS inline delivery", () => {
     ).toBe("blob:preview");
   });
 
+  it("P0_RESULTS_image_preview_uses_recorded_type_when_download_is_generic", () => {
+    const types: string[] = [];
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn((blob: Blob) => {
+        types.push(blob.type);
+        return "blob:preview";
+      }),
+      revokeObjectURL: vi.fn(),
+    });
+    mount(
+      <div data-park="">
+        <ResultTab
+          worldId="w_image"
+          events={[delivered("png", "chart.png")]}
+          shared={fileView("image bytes", "application/octet-stream")}
+        />
+      </div>,
+    );
+    expect(types).toContain("image/png");
+  });
+
   it("P0_RESULTS_open_image_uses_the_recorded_type_when_download_is_octet_stream", () => {
     const opened: string[] = [];
     vi.stubGlobal(

@@ -70,10 +70,15 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
   }, [blob, csv, html, markdown, plain]);
   useEffect(() => {
     if (!image && !pdf) return;
-    const url = URL.createObjectURL(blob);
+    const imageType = image ? OPEN_TYPES[format] : undefined;
+    const shown =
+      blob.type === "application/octet-stream" && imageType?.startsWith("image/")
+        ? new Blob([blob], { type: imageType })
+        : blob;
+    const url = URL.createObjectURL(shown);
     setImageUrl(url);
     return () => URL.revokeObjectURL(url);
-  }, [blob, image, pdf]);
+  }, [blob, format, image, pdf]);
   if (csv && text !== null) {
     const [head = [], ...body] = csvRows(text);
     return (
