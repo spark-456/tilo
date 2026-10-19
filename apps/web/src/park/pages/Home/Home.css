@@ -1501,6 +1501,8 @@
     flex: 1 1 100%;
     order: 3;
     text-align: left;
+    /* P0-PERF: the loaded font wraps this hint to two lines on a phone. */
+    min-height: 2.7em;
   }
   [data-park] .park-home-start {
     margin-left: auto;
