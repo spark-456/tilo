@@ -60,6 +60,51 @@ describe("P0_RESULTS inline delivery", () => {
     expect(opened).toContain("image/png");
   });
 
+  it("P0_RESULTS_unknown_recorded_type_cannot_turn_a_download_into_active_content", async () => {
+    const opened: string[] = [];
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn((blob: Blob) => {
+        opened.push(blob.type);
+        return "blob:unknown-file";
+      }),
+      revokeObjectURL: vi.fn(),
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    const api = {} as Api;
+    installResultReader(
+      api,
+      async () => new Blob(["content"], { type: "application/octet-stream" }),
+    );
+    const created = {
+      seq: 2,
+      type: "artifact.created",
+      ts: "2026-10-19T10:00:00.000Z",
+      credits: 0,
+      summary: "A file was made.",
+      item: { label: "Unknown file" },
+      data: { artifact: { artifact_id: "art_work" }, media_type: "application/xhtml+xml" },
+    } as RunEvent;
+    const work = {
+      ...delivered("in_app", "Unknown file"),
+      seq: 3,
+      data: { artifact: { artifact_id: "art_work", label: "Unknown file" }, format: "in_app" },
+    };
+    const m = mount(
+      <div data-park="">
+        <ResultTab
+          api={api}
+          worldId="w_files"
+          events={[delivered("md", "Main.md"), created, work]}
+        />
+      </div>,
+    );
+    const open = m.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Open working file: Unknown file"]',
+    );
+    await act(async () => open?.click());
+    expect(opened).toContain("application/octet-stream");
+  });
+
   it("P0_RESULTS_previews_markdown_with_math_when_download_type_is_generic", async () => {
     const m = mount(
       <div data-park="">

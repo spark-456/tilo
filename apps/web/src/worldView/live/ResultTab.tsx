@@ -208,8 +208,11 @@ const OPEN_TYPES: Readonly<Record<string, string>> = {
 function openableBlob(blob: Blob, file: DeliveredFile): Blob {
   if (blob.type !== "application/octet-stream") return blob;
   const extension = /\.([a-z0-9]+)$/i.exec(file.name)?.[1]?.toUpperCase();
+  const recordedType = Object.values(OPEN_TYPES).includes(file.mediaType ?? "")
+    ? file.mediaType
+    : null;
   const type =
-    OPEN_TYPES[extension ?? ""] ?? OPEN_TYPES[file.format?.toUpperCase() ?? ""] ?? file.mediaType;
+    OPEN_TYPES[extension ?? ""] ?? OPEN_TYPES[file.format?.toUpperCase() ?? ""] ?? recordedType;
   return type ? new Blob([blob], { type }) : blob;
 }
 
