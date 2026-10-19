@@ -185,9 +185,32 @@ function ResultBody({
 interface DeliveredFile {
   readonly id: string;
   readonly name: string;
+  readonly format: string | undefined;
+  readonly mediaType: string | null;
   readonly who?: string;
   readonly size?: string;
   readonly color?: string;
+}
+
+const OPEN_TYPES: Readonly<Record<string, string>> = {
+  PDF: "application/pdf",
+  CSV: "text/csv",
+  HTML: "text/html",
+  MD: "text/markdown",
+  TXT: "text/plain",
+  PNG: "image/png",
+  JPG: "image/jpeg",
+  JPEG: "image/jpeg",
+  WEBP: "image/webp",
+  GIF: "image/gif",
+};
+
+function openableBlob(blob: Blob, file: DeliveredFile): Blob {
+  if (blob.type !== "application/octet-stream") return blob;
+  const extension = /\.([a-z0-9]+)$/i.exec(file.name)?.[1]?.toUpperCase();
+  const type =
+    OPEN_TYPES[extension ?? ""] ?? OPEN_TYPES[file.format?.toUpperCase() ?? ""] ?? file.mediaType;
+  return type ? new Blob([blob], { type }) : blob;
 }
 
 const FORMAT_NAMES: Record<string, string> = {
@@ -251,7 +274,7 @@ function deliveredName(event: RunEvent, id: string, events: readonly RunEvent[])
 function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
   const items: DeliveredFile[] = [];
   for (const e of events) {
-    const data = e.data as { artifact?: { artifact_id?: unknown } } | undefined;
+    const data = e.data as { artifact?: { artifact_id?: unknown }; format?: unknown } | undefined;
     const id = data?.artifact?.artifact_id;
     if (
       e.type === "artifact.delivered" &&
@@ -260,7 +283,12 @@ function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {
     ) {
       const name = deliveredName(e, id, events);
       if (!items.some((x) => x.name.toLocaleLowerCase() === name.toLocaleLowerCase()))
-        items.push({ id, name });
+        items.push({
+          id,
+          name,
+          format: typeof data?.format === "string" ? data.format : undefined,
+          mediaType: recordedArtifact(events, id).mediaType,
+        });
     }
   }
   return items;
@@ -322,7 +350,7 @@ function WorkingFiles({
               className="tw-res-file-btn tw-res-file-btn--icon secondary"
               aria-label={`Open working file: ${f.name}`}
               title={`Open ${f.name}`}
-              onClick={() => readItem(f.id, openResult)}
+              onClick={() => readItem(f.id, (b) => openResult(openableBlob(b, f)))}
             >
               <Icon name="eye" size={16} />
               <span className="park-sr-only">{`Open working file: ${f.name}`}</span>
@@ -386,7 +414,7 @@ export function ResultTab({
   const mainData = mainEvent?.data as { format?: unknown } | undefined;
   const declaredFormat = typeof mainData?.format === "string" ? mainData.format.toUpperCase() : "";
   const extension = /\.([a-z0-9]+)$/i.exec(mainName)?.[1]?.toUpperCase();
-  const recordedMime = mainItem ? recordedArtifact(events, mainItem.id).mediaType : null;
+  const recordedMime = mainItem?.mediaType;
   const mime = blob?.type !== "application/octet-stream" ? blob?.type : recordedMime;
   const mimeFormat =
     mime === "text/markdown"
@@ -413,24 +441,7 @@ export function ResultTab({
   const mainSummary = mainEvent?.summary || "Ready to open or download.";
 
   const handleOpen = () => {
-    const browserType: Record<string, string> = {
-      PDF: "application/pdf",
-      CSV: "text/csv",
-      HTML: "text/html",
-      MD: "text/markdown",
-      TXT: "text/plain",
-      PNG: "image/png",
-      JPG: "image/jpeg",
-      JPEG: "image/jpeg",
-      WEBP: "image/webp",
-      GIF: "image/gif",
-    };
-    if (blob)
-      openResult(
-        blob.type === "application/octet-stream" && browserType[mainFormat]
-          ? new Blob([blob], { type: browserType[mainFormat] })
-          : blob,
-      );
+    if (blob && mainItem) openResult(openableBlob(blob, mainItem));
     else if (onOpen) onOpen();
   };
 

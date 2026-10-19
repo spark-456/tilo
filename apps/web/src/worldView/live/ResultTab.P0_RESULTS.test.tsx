@@ -2,6 +2,8 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, mount } from "../../../test-support/park/componentsHarness";
+import type { Api } from "../../park/api";
+import { installResultReader } from "../../park/api/results";
 import type { RunEvent } from "../../park/pages/World/useRunEvents";
 import { ResultTab } from "./ResultTab";
 
@@ -26,6 +28,38 @@ const fileView = (text: string, type: string) => ({
 });
 
 describe("P0_RESULTS inline delivery", () => {
+  it("P0_RESULTS_open_working_image_uses_its_recorded_file_type", async () => {
+    const opened: string[] = [];
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn((blob: Blob) => {
+        opened.push(blob.type);
+        return "blob:working-image";
+      }),
+      revokeObjectURL: vi.fn(),
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    const api = {} as Api;
+    installResultReader(
+      api,
+      async () => new Blob(["image bytes"], { type: "application/octet-stream" }),
+    );
+    const work = {
+      ...delivered("png", "chart.png"),
+      seq: 2,
+      data: { artifact: { artifact_id: "art_work", label: "chart.png" }, format: "png" },
+    };
+    const m = mount(
+      <div data-park="">
+        <ResultTab api={api} worldId="w_files" events={[delivered("md", "Main.md"), work]} />
+      </div>,
+    );
+    const open = m.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Open working file: chart.png"]',
+    );
+    await act(async () => open?.click());
+    expect(opened).toContain("image/png");
+  });
+
   it("P0_RESULTS_previews_markdown_with_math_when_download_type_is_generic", async () => {
     const m = mount(
       <div data-park="">
