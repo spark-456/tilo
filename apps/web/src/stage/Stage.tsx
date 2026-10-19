@@ -252,6 +252,20 @@ export function Stage({
     };
 
     const on = new AbortController();
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    motionQuery.addEventListener(
+      "change",
+      () => {
+        msRef.current = cam.getCameraPanDurationMs(motionQuery.matches);
+        if (!motionQuery.matches || !ease) return;
+        cur = goal;
+        ease = null;
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0;
+        draw();
+      },
+      { signal: on.signal },
+    );
     const listen = <K extends keyof HTMLElementEventMap>(
       type: K,
       fn: (e: HTMLElementEventMap[K]) => void,
