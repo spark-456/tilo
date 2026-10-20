@@ -16,13 +16,20 @@
   display: flex;
   gap: 6px;
 }
-.tilo-browser__header button {
+.tilo-browser__frames {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.tilo-browser__header button,
+.tilo-browser__frames button {
   border: 1px solid #9bb9ce;
   background: white;
   border-radius: 8px;
   padding: 5px 10px;
   cursor: pointer;
 }
+.tilo-browser__frames button:disabled,
 .tilo-browser__header button:disabled {
   opacity: 0.45;
   cursor: default;
