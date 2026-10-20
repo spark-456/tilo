@@ -661,7 +661,7 @@ export function HomePage({ app }: { app: AppCtx }) {
             spend={spendOf(base.ledger)}
             night={night}
             onWorld={open}
-            onWorlds={() => go("worlds")}
+            onNeeds={() => go("needs")}
             onAgenda={() => go("agenda")}
             onLedger={() => go("ledger")}
             stacked={stacked}

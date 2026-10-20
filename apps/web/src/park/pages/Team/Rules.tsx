@@ -38,6 +38,12 @@ export function RulesCard({ rules, on, art, locked, log, onToggle, readOnly }: R
             label={when}
             checked={locked.includes(key) || (on[key] ?? dflt)}
             disabled={readOnly || locked.includes(key)}
+            // UX-AUDIT: a switch that cannot move says why on hover and to assistive technology.
+            {...(locked.includes(key)
+              ? { description: "Always on: Tilo always stops and asks for this" }
+              : readOnly
+                ? { description: "Only the team's owner can change this rule" }
+                : {})}
             onChange={(next) => onToggle(key, next)}
           />
         </div>

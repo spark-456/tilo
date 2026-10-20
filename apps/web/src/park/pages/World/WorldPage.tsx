@@ -58,6 +58,8 @@ import {
   TabPanel,
   type WorldTab,
   WorldTabs,
+  activeApprovalOf,
+  canTapAnswer,
   stepsCount,
 } from "./Panels";
 import { RecordedWorldArt } from "./RecordedWorldArt";
@@ -218,6 +220,8 @@ const SAMPLE_OPEN =
   "Sample only: nothing was opened. This demo world has no result file behind it.";
 const RUN_OFF = "Starting a run from this page is not connected yet. No run would start.";
 const OPEN_OFF = "This result has no file linked yet, so there is nothing to open.";
+/** UX-AUDIT: deciding later schedules nothing; the decision simply waits (it used to promise a reminder at 16:00). */
+const LATER_TOAST = "Nothing was sent. It waits for you in Needs you.";
 
 export function WorldPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
@@ -227,8 +231,25 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const [canDraw] = useState(canDrawStage);
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
   const [paused, setPaused] = useState<Record<string, boolean>>({});
+  // UX-AUDIT: a live pause or resume is in flight; the button says so and takes no second click.
+  const [pauseBusy, setPauseBusy] = useState(false);
   // STUDIO-3: the chosen tab; until a person picks one, Story (or Result once a run's result is delivered).
   const [tab, setTab] = useState<WorldTab | null>(null);
+  // UX-AUDIT: "Review" on the map's needs line opens Story and brings what waits for you into view, focused (it only
+  // switched to Story, which was usually open already, so the click looked dead).
+  const [reviewAsk, setReviewAsk] = useState(0);
+  useEffect(() => {
+    if (reviewAsk === 0) return;
+    const target = document.querySelector<HTMLElement>(
+      '[data-testid="park-page-world"] [data-testid="world-approval-card"], [data-testid="park-page-world"] .park-world-waiting',
+    );
+    target?.scrollIntoView({ block: "nearest" });
+    target?.querySelector<HTMLElement>("button:not([disabled])")?.focus({ preventScroll: true });
+  }, [reviewAsk]);
+  const review = () => {
+    setTab("story");
+    setReviewAsk((n) => n + 1);
+  };
   const [moreOpen, setMoreOpen] = useState(false);
   const [slackOpen, setSlackOpen] = useState(false);
   const [slackChannel, setSlackChannel] = useState("");
@@ -375,6 +396,12 @@ export function WorldPage({ app }: { app: AppCtx }) {
   const showRunViews = loaded.live || isCity;
   const isPaused = view?.phase === "paused" || Boolean(paused[w.id]);
   const mine = loaded.decisions.filter((d) => d.world === w.id);
+  // UX-AUDIT: the Story's approval card answers through the gate's own served decision (same card id), never alone.
+  const approvalCard = trackRun ? activeApprovalOf(runEvents)?.cardId : undefined;
+  const approvalDecision = approvalCard ? mine.find((d) => d.card?.id === approvalCard) : undefined;
+  const approvalAnswer = approvalDecision
+    ? { decided: dec[approvalDecision.k] === true, canTap: canTapAnswer(approvalDecision) }
+    : undefined;
   const slackPending = slackPendingByWorld[w.id] ?? null;
   const handoff = loaded.handoffs.find((h) => h.world === w.id) ?? null;
   const open = mine.filter((d) => !dec[d.k]).length + (slackPending ? 1 : 0);
@@ -406,21 +433,32 @@ export function WorldPage({ app }: { app: AppCtx }) {
 
   const togglePause = () => {
     if (loaded.live && worldClient && !w.sample) {
+      if (pauseBusy) return;
+      setPauseBusy(true);
+      const done = () => setPauseBusy(false);
       if (isPaused) {
         worldClient.startAgain(w.id).then(
           (next) => {
+            done();
             markPendingWorld(next.world_id);
             app.go("world", { id: next.world_id });
           },
-          () => app.toast("This run could not continue. Try again."),
+          () => {
+            done();
+            app.toast("This run could not continue. Try again.");
+          },
         );
       } else {
         worldClient.pauseWorld(w.id).then(
           () => {
+            done();
             setPaused((current) => ({ ...current, [w.id]: true }));
             app.toast("Paused. No spend while paused");
           },
-          () => app.toast("This run could not be paused. Try again."),
+          () => {
+            done();
+            app.toast("This run could not be paused. Try again.");
+          },
         );
       }
       return;
@@ -580,7 +618,12 @@ export function WorldPage({ app }: { app: AppCtx }) {
       <PageTitle title={w.name} />
       <div className="park-world-head">
         <nav aria-label="Breadcrumb" className="park-world-crumb">
-          <GoLink className="park-world-back" href="/worlds" onGo={() => app.go("worlds")}>
+          <GoLink
+            className="park-world-back"
+            href="/worlds"
+            label="All worlds"
+            onGo={() => app.go("worlds")}
+          >
             {icon("arrowL", 15)}
             <span className="park-world-backtext">All worlds</span>
           </GoLink>
@@ -673,8 +716,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
               onClick={togglePause}
               aria-label={isPaused ? "Resume run" : "Pause run"}
               {...(w.sample ? { disabled: true, title: "A recorded replay cannot be paused" } : {})}
+              {...(pauseBusy ? { disabled: true } : {})}
             >
-              {isPaused ? "Resume" : "Pause"}
+              {pauseBusy ? (isPaused ? "Resuming…" : "Pausing…") : isPaused ? "Resume" : "Pause"}
             </Button>
           ) : null}
           <Button
@@ -810,7 +854,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
               <Suspense fallback={null}>
                 <LiveStageEmbed
                   worldId={w.id}
-                  onReview={() => setTab("story")}
+                  onReview={review}
                   onChangeDirection={changeDirection}
                 />
               </Suspense>
@@ -874,7 +918,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
               />
             ) : null}
           </div>
-          {toastLine ? <MapToast line={toastLine} onReview={() => setTab("story")} /> : null}
+          {toastLine ? <MapToast line={toastLine} onReview={review} /> : null}
           {trackRun && runEvents.length > 0 ? (
             <DeliveryDock
               result={result}
@@ -940,7 +984,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
                         ? app.decide(key)
                         : app.decide(key, text, option)
                     }
-                    onLater={() => app.toast("Tilo will remind you at 16:00")}
+                    onLater={() => app.toast(LATER_TOAST)}
                     slackPending={slackPending}
                   />
                 ) : null}
@@ -961,8 +1005,14 @@ export function WorldPage({ app }: { app: AppCtx }) {
                   <RunStory
                     events={runEvents}
                     skills={loaded.skills}
-                    onApprove={(req) => app.toast(`Approved. ${req.who} is continuing.`)}
-                    onDecline={() => app.toast("Declined. Nothing was sent.")}
+                    answer={approvalAnswer}
+                    onApprove={() => {
+                      if (approvalDecision) app.decide(approvalDecision.k);
+                    }}
+                    onDetails={() =>
+                      app.go("needs", approvalDecision ? { id: approvalDecision.k } : {})
+                    }
+                    onLater={() => app.toast(LATER_TOAST)}
                   />
                 ) : (
                   <Activity

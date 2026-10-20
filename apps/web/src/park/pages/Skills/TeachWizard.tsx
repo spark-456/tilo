@@ -808,7 +808,7 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
               className={cx("park-teach__chip", t.teamId === id && "park-teach__chip--on")}
               onClick={() => t.chooseTeam(id)}
             >
-              Team {id}
+              {t.teamLabel ? t.teamLabel(id) : `Team ${id}`}
             </button>
           ))}
         </div>

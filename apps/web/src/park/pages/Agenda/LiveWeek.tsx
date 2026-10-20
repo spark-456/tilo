@@ -173,6 +173,8 @@ export function LiveWeek({
   const drag = useRef<{ start: number; end: number } | null>(null);
   const suppressClick = useRef(false);
   const [joinError, setJoinError] = useState("");
+  // UX-AUDIT: Delete asks once before it removes a scheduled meeting (the id it asks about).
+  const [deleteAsk, setDeleteAsk] = useState<string | null>(null);
   const [slotPick, setSlotPick] = useState<{ day: number; slot: number; minutes: number } | null>(
     null,
   );
@@ -424,10 +426,18 @@ export function LiveWeek({
             >
               Today
             </button>
-            <button type="button" aria-label="Previous week" onClick={() => navigate(-1)}>
+            <button
+              type="button"
+              aria-label={`Previous ${view.toLowerCase()}`}
+              onClick={() => navigate(-1)}
+            >
               ‹
             </button>
-            <button type="button" aria-label="Next week" onClick={() => navigate(1)}>
+            <button
+              type="button"
+              aria-label={`Next ${view.toLowerCase()}`}
+              onClick={() => navigate(1)}
+            >
               ›
             </button>
             <fieldset className="cx-agenda-views" aria-label="Calendar view">
@@ -761,22 +771,44 @@ export function LiveWeek({
           {selectedMeeting && minutes && ["ended", "minuted"].includes(selectedMeeting.status) ? (
             <MeetingMinutes id={selectedMeeting.id} status={selectedMeeting.status} api={minutes} />
           ) : null}
-          {selectedMeeting && host && selectedMeeting.status === "scheduled" ? (
+          {selectedMeeting &&
+          host &&
+          selectedMeeting.status === "scheduled" &&
+          deleteAsk !== selectedMeeting.id ? (
             <button
               type="button"
               className="secondary"
-              onClick={() =>
-                void host
-                  .remove(selectedMeeting.id)
-                  .then(() => {
-                    setSelected(null);
-                    onDeleted?.();
-                  })
-                  .catch(() => setJoinError("Could not delete this meeting."))
-              }
+              onClick={() => setDeleteAsk(selectedMeeting.id)}
             >
               Delete
             </button>
+          ) : null}
+          {selectedMeeting &&
+          host &&
+          selectedMeeting.status === "scheduled" &&
+          deleteAsk === selectedMeeting.id ? (
+            <div className="cx-agenda-confirm">
+              <p>Delete this meeting? Tilo will not join it.</p>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() =>
+                  void host
+                    .remove(selectedMeeting.id)
+                    .then(() => {
+                      setDeleteAsk(null);
+                      setSelected(null);
+                      onDeleted?.();
+                    })
+                    .catch(() => setJoinError("Could not delete this meeting."))
+                }
+              >
+                Yes, delete it
+              </button>
+              <button type="button" onClick={() => setDeleteAsk(null)}>
+                Keep it
+              </button>
+            </div>
           ) : null}
         </aside>
       ) : null}

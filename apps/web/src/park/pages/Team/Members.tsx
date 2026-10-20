@@ -114,6 +114,13 @@ function Person({
             aria-label={`Role for ${p.name}`}
             value={p.role ?? ""}
             disabled={!canChange(p)}
+            title={
+              canChange(p)
+                ? undefined
+                : p.you
+                  ? "You can't change your own role"
+                  : "Only the team's owner can change roles"
+            }
             onChange={(e) => onRole(p, e.target.value)}
           >
             {roles.map((r) => (
