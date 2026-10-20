@@ -739,6 +739,17 @@ class LiveSession:
                     if blocks and not getattr(self, "_heard_logged", False):
                         self._heard_logged = True
                         ops.warning("stage first_caption_heard speakers=%d", len({b.speaker for b in blocks}))
+                    # Nobody is required (every cloud attendance): a person's caption means someone is here, so start
+                    # listening without waiting for the People list (live 20 Oct 17:15: it never opened the gate).
+                    heard = [b.speaker for b in blocks if b.speaker and b.speaker.lower() not in self.ignore]
+                    if self.gate_at is None and not self.required and heard:
+                        self.gate_at = self.elapsed()
+                        self.next_brain_at = now + self.cfg.brain_interval_s
+                        self.next_status_at = self.clock.now()  # the status step keeps the mic open from here on
+                        if self.brain and not self.brain.present:
+                            self.brain.present = list(dict.fromkeys(heard))
+                        ops.warning("stage listening via=caption speakers=%d", len(set(heard)))
+                        self.events.emit("meeting.started", present=list(dict.fromkeys(heard)), required=self.required)
                     for b in blocks:
                         self.spans.touch(b.speaker, now - self.start)
                     for u in self.merger.feed(blocks, now):
@@ -882,7 +893,18 @@ class LiveSession:
             others_count = (count - 1) if count is not None else None
             if brain and others_count is not None:
                 brain.sole_human = others_count == 1
-            present = [u.speaker for u in self.store.items if u.speaker.lower() not in self.ignore]
+            # Live 20 Oct 17:15: the People list could not be read and only finished transcript lines counted, so the
+            # bot heard captions for minutes but never started listening. Caption speakers count as present too.
+            heard = [u.speaker for u in list(self.store.items) + list(self.captions_store.items)]
+            present = list(dict.fromkeys(s for s in heard if s.lower() not in self.ignore and not s.endswith("(chat)")))
+        if not getattr(self, "_presence_logged", False) or self.gate_at is None:
+            self._presence_logged = True
+            ops.warning(
+                "stage presence panel=%s others=%s present=%d",
+                "read" if info is not None else "unreadable",
+                others_count,
+                len(present),
+            )
         if self.gate_at is not None:
             await br.show_chat()  # the People read replaced the chat panel
         if others_count:
