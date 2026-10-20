@@ -863,10 +863,17 @@ export function WorldPage({ app }: { app: AppCtx }) {
                 ))}
               </div>
             ) : null}
+            {trackRun && worldClient ? (
+              // DEMO-BROWSER: the live browser floats over the map as soon as its first event is recorded
+              <BrowserPanel
+                client={worldClient}
+                worldId={w.id}
+                events={runEvents}
+                replay={false}
+                placement="overlay"
+              />
+            ) : null}
           </div>
-          {trackRun && worldClient ? (
-            <BrowserPanel client={worldClient} worldId={w.id} events={runEvents} replay={false} />
-          ) : null}
           {toastLine ? <MapToast line={toastLine} onReview={() => setTab("story")} /> : null}
           {trackRun && runEvents.length > 0 ? (
             <DeliveryDock
