@@ -47,6 +47,18 @@ BLOCKED_NOTE = (
     "Skip this source; use web_search and read one of its result links.)"
 )
 BROWSER_FALLBACK_NOTE = "(The visible browser could not open this page, so Tilo read it directly.)\n"
+# DEMO-BROWSER: why a unit that could read nothing stopped, one plain sentence with what to try (fetch block reasons).
+UNREAD = {
+    "host_not_allowlisted": "Tilo could not open {host} because it is not one of the sites you named, so name it in "
+    "your task.",
+    "robots_disallowed": "{host} asks automated readers not to read it, so try another site.",
+    "html_too_large": "The page on {host} is too large to read, so try a more specific page.",
+    "file_too_large": "The file on {host} is too large to read, so try a more specific page.",
+    "timeout": "{host} did not answer in time, so try the task again later.",
+    "upstream_error": "{host} did not answer, so try the task again later.",
+    "dns_failed": "Tilo could not find {host}, so check the site's name in your task.",
+}
+UNREAD_OTHER = "Tilo could not read {host}, so try another page or site."
 
 
 def search_engine_host(host: str) -> bool:
@@ -92,8 +104,9 @@ def typed_hosts(texts: Iterable[Any]) -> set[str]:
 def allow_entries(hosts: Iterable[str], typed: Iterable[str]) -> list[str]:
     """BR-02: a run's allowlist. Each host the person typed (or a used taught skill names) also counts as *.<host>, so
     any page of a site they named opens (wikipedia.org covers en.wikipedia.org); the other known hosts (search results)
-    stay exact. The patterns come first, so a capped list keeps the person's own sites."""
-    named = sorted(set(typed))
+    stay exact. The patterns come first, so a capped list keeps the person's own sites. A site named as www.x.org is the
+    site x.org (live 21 Oct: www.wikipedia.org must also open en.wikipedia.org)."""
+    named = sorted({host.removeprefix("www.") if host.count(".") >= 2 else host for host in typed})
     return list(dict.fromkeys([*(f"*.{host}" for host in named), *named, *sorted(hosts)]))
 
 
@@ -178,9 +191,11 @@ class SearchTool:
 
     def __init__(self, search, hosts):
         self.search, self.hosts = search, hosts
+        self.found = 0  # DEMO-BROWSER: searches that returned a result
 
     def run(self, args):
         result, credits = self.search(args["query"])
+        self.found += 1
         for source in result.sources:
             urls = [source.redirect_url, source.resolved_url]
             if source.domain:
@@ -207,6 +222,8 @@ class FetchTool:
         self.search = search  # P0-RUNS-FIX: a search-engine URL becomes a web_search of its query
         self.browser = browser  # P0-RUNS-FIX: (url, host) -> text read in the visible browser, or None for no browser
         self.count = 0
+        self.read = 0  # DEMO-BROWSER: pages read (browser or direct); and every refused read, (host, reason)
+        self.refused: list[tuple[str, str]] = []
 
     def run(self, args):
         run = self.owner
@@ -226,6 +243,7 @@ class FetchTool:
                 log_caught(caught_error, __name__, locals())
                 text = ""
             if text.strip():
+                self.read += 1
                 return ToolResult(text)
             note = BROWSER_FALLBACK_NOTE
         try:
@@ -234,8 +252,10 @@ class FetchTool:
             )
         except FetchBlocked as blocked:  # one source is skipped; the unit goes on with the others
             log_caught(blocked, __name__, locals())
+            self.refused.append((blocked.block.host or host or "that site", blocked.block.reason))
             return ToolResult(BLOCKED_NOTE.format(host=blocked.block.host or "that site", reason=blocked.block.reason))
         raw = self.service.archive_store.get_bytes(run.org_id, run.run_id, got.sha256)
+        self.read += 1
         if got.media_type == "text/plain":
             return ToolResult(note + raw.decode())
         if self.count >= 10:
