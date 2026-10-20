@@ -56,6 +56,7 @@ from tilo_api.skills_route import SkillContext, skill_context_for
 from tilo_api.tasks import create_task
 
 router = APIRouter()
+MAX_SKILL_REQUEST = 2000  # SKILLS-E2E: the characters of a taught skill's run request its steps are shown
 
 _QUIZ_INTENT = re.compile(
     r"\b(?:quiz|interactive\s+(?:test|exam|assessment)|practice\s+test|mock\s+test|self[- ]?test)\b", re.I
@@ -69,11 +70,7 @@ def _website_intent_pattern() -> re.Pattern[str]:
     except Exception:
         kinds = ()
     website_phrases = {
-        alias
-        for kind in kinds
-        if kind.format == "website"
-        for alias in (kind.label, *kind.aliases)
-        if alias.strip()
+        alias for kind in kinds if kind.format == "website" for alias in (kind.label, *kind.aliases) if alias.strip()
     } or {"website", "web app", "app", "questionnaire"}
     sorted_phrases = sorted(website_phrases, key=len, reverse=True)
     parts = [r"(?<![a-z0-9])" + re.escape(p).replace(r"\ ", r"[ -]") + r"(?![a-z0-9])" for p in sorted_phrases]
@@ -86,11 +83,7 @@ def _quiz_intent_pattern() -> re.Pattern[str]:
     except Exception:
         kinds = ()
     quiz_phrases = {
-        alias
-        for kind in kinds
-        if kind.format == "app"
-        for alias in (kind.label, *kind.aliases)
-        if alias.strip()
+        alias for kind in kinds if kind.format == "app" for alias in (kind.label, *kind.aliases) if alias.strip()
     }
     if not quiz_phrases:
         return _QUIZ_INTENT
@@ -379,6 +372,7 @@ async def _thinking(
             kinds=kinds,
             skill=tagged,
             skill_plan=tagged_plan,
+            skill_request=request.text[:MAX_SKILL_REQUEST] if tagged_plan else None,  # screened above
         )
     except WriterBusy:
         raise  # the existing app handler preserves store_unavailable; retain sources after any ambiguous write
