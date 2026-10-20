@@ -24,6 +24,7 @@ _SCHEMA = json.loads(
 )
 _ACTION = jsonschema.Draft202012Validator({"$defs": _SCHEMA["$defs"], "$ref": "#/$defs/action"})
 _MAX_TEXT = 30_000
+_MAX_INVALID = 3  # BR-01: an invalid reply counts as a step; this many in a row end the session
 
 
 class BrowseStepExecutor:
@@ -100,6 +101,7 @@ class BrowseStepExecutor:
             if last["login_required"]:
                 outcome = "needs_person"
                 return UnitOutcome(False, reason="This site needs you to sign in; Tilo never enters credentials.")
+            served, invalid, finishing = 0, 0, False  # acts tilo-browser carried out; invalid replies in a row
             for step in range(1, max_steps + 1):
                 if getattr(self.run, "paused", lambda: False)():
                     outcome = "stopped"
@@ -135,8 +137,15 @@ class BrowseStepExecutor:
                     self._record_refusal(
                         session, step, unit, agent, building, last, "navigate", "invalid_action", credits=charge
                     )
-                    return UnitOutcome(False, reason="The browser proposed an invalid action.")
+                    invalid += 1
+                    if invalid >= _MAX_INVALID:
+                        return UnitOutcome(False, reason="The browser model gave no usable action.")
+                    history.append("invalid")
+                    continue
+                invalid = 0
                 kind = action["kind"]
+                if kind == "done" and not extracted:  # code reads the page the person watched it reach, then ends
+                    action, kind, finishing = {"kind": "extract"}, "extract", True
                 if kind in ("done", "ask"):
                     outcome = "done" if kind == "done" else "needs_person"
                     stop_charge = charge
@@ -153,8 +162,9 @@ class BrowseStepExecutor:
                         digest, target_name, target_box = (found["digest"], found["facts"]["name"], found["target_box"])
                     last = self.rpc.act(
                         session,
-                        {"session": session, "step": step, "action": action, "digest": digest, "outbox_id": None},
+                        {"session": session, "step": served + 1, "action": action, "digest": digest, "outbox_id": None},
                     )
+                    served += 1
                 except SessionRefused as exc:
                     gated = exc.reason == "needs_person"
                     event_reason = exc.reason if exc.reason in _SCHEMA["$defs"]["reason"]["enum"] else "engine_error"
@@ -206,6 +216,9 @@ class BrowseStepExecutor:
                 if kind == "extract" and last["text"]:
                     extracted.append(last["text"])
                 history.append(kind)
+                if finishing:
+                    outcome = "done"
+                    break
             else:
                 outcome = "cap_steps"
             if outcome == "done" and extracted:

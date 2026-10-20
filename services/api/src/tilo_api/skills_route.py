@@ -124,20 +124,7 @@ def taught_entries(records: list[dict[str, Any]], user: str) -> list[dict[str, A
             continue
         steps = "; ".join(_line(s["text"], 60) for s in r["plan"][:3])
         tools = list(dict.fromkeys(s["tool"] for s in r["plan"] if s["tool"] != WRITER[0]))
-        needs_browser = any(
-            "browser" in str(s["tool"]).lower()
-            or (
-                any(
-                    word in str(s["text"]).lower()
-                    for word in ("open ", "navigate", "click", "play ", "type ", "fill ")
-                )
-                and any(
-                    word in str(s["text"]).lower()
-                    for word in ("browser", "website", "webpage", "youtube", "http", ".com")
-                )
-            )
-            for s in r["plan"]
-        )
+        needs_browser = any(s.get("action") == "browse_web" for s in r["plan"])  # it runs in Tilo's own browser
         out.append(
             {
                 "id": r["id"],

@@ -8,7 +8,7 @@ For each captured step, in order, give:
 - "text": the step in one plain line of at most 200 characters, with no line breaks.
 - "tool" and "action": exactly one pair from the list below, as two separate fields: the tool's name in "tool" and the action's name in "action". Never join them with a dot and never change their spelling. Use only pairs on the list. Never invent a tool, a channel, a person or an address, and never use a messaging or sending tool the steps do not call for.
 - A step that only works on text (group, sort, count, summarise, write up) needs no tool: give it "tool": "none" and "action": "none" and a verb of read, draft or write. Never bind a text-only step to a mail, calendar or file tool it does not use.
-- A step that opens and reads a web page uses the browse pair only if the list has one, and only for a page the steps name. Otherwise use the web search or fetch pair, or leave the step out.
+- A step that opens a website the steps name, or clicks, scrolls, types into or reads what is on it, uses the browse pair when the list has one: Tilo opens that site in its own browser and the person watches it. Give that site's host in "hosts". Use the web search pair to look something up when no site is named, and the fetch pair only to read one known page. A step that posts, likes, comments, buys, books or signs in is never the browse pair; leave it out.
 - "verb": one of read, draft, write, send, post, pay, delete, share, book.
 
 Words like "me", "my" and "myself" mean the signed-in person. Tilo already knows their own email address, so never ask for it, and never ask who "me" is.

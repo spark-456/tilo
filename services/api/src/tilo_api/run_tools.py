@@ -64,6 +64,19 @@ def browser_proposal_prompt(goal: str, extracted: str) -> str:
     )
 
 
+def parse_action(text: str | None) -> dict:
+    """The browser model's one JSON object, also inside a ```json fence; anything else is {} (BR-01: refused as
+    invalid_action by the contract check, and it counts as a step)."""
+    raw = (text or "").strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`").removeprefix("json").strip()
+    try:
+        found = json.loads(raw)
+    except ValueError:
+        return {}
+    return found if isinstance(found, dict) else {}
+
+
 def research_browser(mode: Mode) -> BrowserRpc | None:
     """The deployed tilo-browser for a live run when TILO_BROWSER_URL is set; None otherwise (replay and dev read pages
     through recorded fetches, so no test or dev run opens a real browser)."""
@@ -256,7 +269,7 @@ class BoundRunRunner:
                     parts=[MediaPart(mime_type="image/png", data=frame)],
                 )
                 reply, charge = model.generate_budgeted(request, self.budget)
-                return cast(dict, json.loads(reply.text or "{}")), charge
+                return parse_action(reply.text), charge
 
             hosts = browse_hosts(browse, self.hosts, self.typed)
             if not hosts:
