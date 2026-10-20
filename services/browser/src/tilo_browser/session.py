@@ -43,6 +43,11 @@ def _idle_seconds() -> float:
 IDLE_SECONDS = _idle_seconds()  # a session no call touched for this long lost its caller (timed out or stopped)
 
 
+def _read_text(text: str, search_line: str) -> str:
+    """A read's text (the contract's 20,000 characters at most), the search line kept at its end."""
+    return text[: 20000 - len(search_line)] + search_line
+
+
 @dataclass
 class _Session:
     worker: BrowserWorker
@@ -102,6 +107,18 @@ class BrowserSessions:
         return matches[0]
 
     @staticmethod
+    def _search_line(state: _Session) -> str:
+        """DEMO-BROWSER: the site's own search address, told at the end of a read when it is inside this session's
+        allowlist, so a reader can open a search like any page (a form submit itself stays a person's)."""
+        find = getattr(state.worker._driver, "search_address", None)
+        address = find() if find is not None else None
+        if not isinstance(address, str) or address.count("{words}") != 1:
+            return ""
+        if not state.worker._policy._decide(address.replace("{words}", "words")).allowed:  # not counted as blocked
+            return ""
+        return mask_text(f"\nSearch this site: {address} (put the words to look for in place of {{words}})")
+
+    @staticmethod
     def _result(session: str, step: int, kind: str, state: _Session, box: dict) -> dict:
         capture = state.worker.capture()  # worker masks secure fields before returning bytes
         frame = capture.screenshot
@@ -119,7 +136,7 @@ class BrowserSessions:
                 "sha256": hashlib.sha256(frame).hexdigest(),
                 "base64": base64.b64encode(frame).decode("ascii"),
             },
-            "text": capture.text[:20000] if kind == "extract" else "",
+            "text": _read_text(capture.text, BrowserSessions._search_line(state)) if kind == "extract" else "",
             "masked": len(secure_nodes(state.worker._driver.read_accessibility_tree())),
             "blocked": blocked,
             "login_required": state.worker._login_wall,
