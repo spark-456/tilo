@@ -114,6 +114,6 @@ def test_FR_SKL_02_SKILL_TEACH_422_a_reply_with_no_listed_pair_is_asked_once_mor
 
     again = skills4.made(FEEDBACK)
     _replies(skills4, invented)
-    refused = skills4.version(again)
-    assert refused.status_code == 422 and refused.json() == {"detail": "not_understood"}
-    assert [e["type"] for e in skills4.all_events()].count("skill.version_proposed") == 1
+    refused = skills4.version(again)  # P0-SKILLS-TEACH: still no listed pair -> an editable draft, not a 422
+    assert refused.status_code == 200 and refused.json()["fallback"] is True
+    assert [e["type"] for e in skills4.all_events()].count("skill.version_proposed") == 2

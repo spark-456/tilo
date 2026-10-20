@@ -13,7 +13,6 @@ Desk world. A failed model call, an invalid or unsafe reply is a fixed 502 `draf
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import unicodedata
@@ -32,7 +31,7 @@ from tilo_providers.prompts import load_prompt, neutralise_marker
 from tilo_providers.router import Router
 from tilo_providers.schema_guard import first_error
 
-from tilo_api import deps, events, skills_media, skills_understand
+from tilo_api import deps, events, skills_media, skills_reply, skills_understand
 from tilo_api.connectors_list import _optional_views
 from tilo_api.people import _PeopleRoute
 from tilo_api.people_events import _DESK_WORLD, WorkEvents, get_work_events
@@ -40,6 +39,7 @@ from tilo_api.people_writes import Refusal, Writer, _capped_body, _Closed, json_
 from tilo_api.skill_store import SkillStore
 from tilo_api.skills_routes import (
     _SKILL_ID,
+    StepIn,
     _guarded,
     _now,
     _teams,
@@ -53,6 +53,7 @@ router = APIRouter(route_class=_PeopleRoute)
 
 CAPTURE_ROLE = "skill_capture"  # the one place (ADR-0034 decision 3); config/models.yaml names its profiles
 _MAX_TEXT = 4000
+_NOTHING_TO_DO = "Answer the request or explain what Tilo cannot do"
 _NO_WORDS = "(The person typed no words; the attached file is the example.)"
 _DROPPED = frozenset(
     {"Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp"}
@@ -70,7 +71,7 @@ _CAPTURE_SCHEMA: dict[str, Any] = {
     "properties": {
         "steps": {
             "type": "array",
-            "minItems": 3,
+            "minItems": 1,  # the prompt asks for 3 to 12; a thin description may give fewer and is still a draft
             "maxItems": 12,
             "items": {
                 "type": "object",
@@ -127,6 +128,60 @@ _VERSION_SCHEMA: dict[str, Any] = {
 }
 
 
+# What the Router checks (and what a structured-output model is told). Loose on purpose: a reply with a long,
+# multi-line or extra step, or a verb the list does not have, is tidied by `skills_reply` and then held to the strict
+# schemas above.
+# A tight wire schema made the Router repair and escalate (several paid calls) and end in a 502.
+_CAPTURE_WIRE: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["steps"],
+    "properties": {
+        "steps": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["text"],
+                "properties": {"text": {"type": "string"}},
+            },
+        }
+    },
+}
+_VERSION_WIRE: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["steps", "question"],
+    "properties": {
+        "inputs": {"type": "array", "items": {"type": "object"}},
+        "hosts": {"type": "array", "items": {"type": "string"}},
+        "steps": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["text", "tool", "action", "verb"],
+                "properties": {k: {"type": "string"} for k in ("text", "tool", "action", "verb")},
+            },
+        },
+        "question": {
+            "anyOf": [
+                {"type": "null"},
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["text", "options"],
+                    "properties": {
+                        "text": {"type": "string"},
+                        "options": {"type": "array", "items": {"type": "string"}},
+                    },
+                },
+            ]
+        },
+    },
+}
+
+
 class ArtifactRefIn(_Closed):
     artifact_id: Annotated[str, Field(min_length=1, max_length=64)]
     version: Annotated[int, Field(ge=1)]
@@ -174,35 +229,57 @@ def _flagged(safety: SafetyProvider, text: str) -> bool:
         raise HTTPException(status_code=503, detail="unavailable") from None  # a screen that is down never passes
 
 
-def _ask(
-    router: Router, system: str, prompt: str, schema: dict[str, Any], parts: list[MediaPart] | None = None
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """One call through the Router; returns the reply (checked against `schema`) and the event's credits and trace."""
-    try:
-        result = router.generate(
-            CAPTURE_ROLE,
-            GenerateRequest(system=system, prompt=prompt, json_mode=True, response_schema=schema, parts=parts or None),
-        )
-        text = None if result.response is None else result.response.text
-        if result.outcome != "ok" or type(text) is not str:
-            raise _Failed
-        doc = json.loads(text)
-        if first_error(doc, schema) is not None:
-            raise _Failed
-        used = result.attempts[-1]
-    except _Failed:
-        raise _draft_failed() from None
-    except Exception as exc:  # a provider, router or parse failure: the type only, never the words
-        logger.warning("skill draft model call failed: %s", type(exc).__name__)
-        raise _draft_failed() from None
-    credits = 0.0
+def _credits(used: Any) -> float:
     try:
         config, quote = deps.providers_config(), deps.providers_config().price(used.profile_id)
-        credits = float(
+        return float(
             config.credits(((used.tokens_in or 0) * quote.input + (used.tokens_out or 0) * quote.output) / 1e6)
         )
     except Exception:
         logger.warning("skill draft credits not worked out")
+        return 0.0
+
+
+def _ask(
+    router: Router,
+    system: str,
+    prompt: str,
+    wire: dict[str, Any],
+    schema: dict[str, Any],
+    tidy: Callable[[Any], dict[str, Any]],
+    parts: list[MediaPart] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """One call through the Router (asked once more when the reply cannot be used); returns the reply, tidied by
+    `tidy` and checked against `schema` (the Router is sent the looser `wire`), and the event's credits and trace. A
+    failed call is never retried: the Router has already tried its profiles."""
+    credits, doc, used = 0.0, None, None
+    for _attempt in range(2):
+        try:
+            result = router.generate(
+                CAPTURE_ROLE,
+                GenerateRequest(
+                    system=system, prompt=prompt, json_mode=True, response_schema=wire, parts=parts or None
+                ),
+            )
+            text = None if result.response is None else result.response.text
+            if result.outcome != "ok" or type(text) is not str:
+                raise _Failed
+            used = result.attempts[-1]
+        except _Failed:
+            raise _draft_failed() from None
+        except Exception as exc:  # a provider or router failure: the type only, never the words
+            logger.warning("skill draft model call failed: %s", type(exc).__name__)
+            raise _draft_failed() from None
+        credits += _credits(used)
+        try:
+            candidate = tidy(skills_reply.parse_json(text))
+            if first_error(candidate, schema) is None:
+                doc = candidate
+                break
+        except Exception as exc:  # noqa: BLE001 - an unusable reply is asked for once more; its words are never logged
+            logger.warning("skill draft reply not usable: %s", type(exc).__name__)
+    if doc is None or used is None:
+        raise _draft_failed()
     trace = {
         "model_role": CAPTURE_ROLE,
         "profile": used.profile_id,
@@ -315,7 +392,15 @@ def capture_route(
     system = load_prompt("skill_describe", "capture_system.md")
     variables = {"description": neutralise_marker(text, "DESCRIPTION"), "documents": blocks}
     task = load_prompt("skill_describe", "capture_task.md", variables)
-    doc, used = _ask(model_router, system, task, _CAPTURE_SCHEMA, parts)
+    fell_back = False
+    try:
+        doc, used = _ask(model_router, system, task, _CAPTURE_WIRE, _CAPTURE_SCHEMA, skills_reply.tidy_capture, parts)
+    except HTTPException as failed:
+        if failed.status_code != 502:
+            raise
+        # The model gave nothing usable: the person's own words are the draft, to edit on the next page (no model cost).
+        words = skills_reply.split_steps("" if text == _NO_WORDS else text, example=True)
+        doc, used, fell_back = {"steps": [{"text": w} for w in words]}, {}, True
 
     def save() -> dict[str, Any]:
         now, owner = _now(clock), principal.user_id
@@ -365,7 +450,11 @@ def capture_route(
                 we.writer.append(world, part)
         finally:
             _release_desk(we.writer, world)
-        return {"capture_id": skill_id, "captured_steps": [{"text": t} for t in texts]}
+        return {
+            "capture_id": skill_id,
+            "captured_steps": [{"text": t} for t in texts],
+            **({"fallback": True} if fell_back else {}),
+        }
 
     return _guarded(save)
 
@@ -438,15 +527,40 @@ def version_route(
     preferred = ", ".join(t for t in usable if registry.get(t)["auth"] == "oauth2")
     system = load_prompt("skill_describe", "version_system.md")  # static: the person's tools ride in the task (EFF-04)
     variables = {"steps": steps_block, "actions": actions, "preferred": preferred}
-    doc, used = _ask(model_router, system, load_prompt("skill_describe", "version_task.md", variables), _VERSION_SCHEMA)
-    kept, cannot, steered = skills_understand.allocate(registry, doc["steps"], usable, allow)
-    if not kept or steered:  # SKILL-TEACH-422 / TEACH-PAIRS: nothing usable, or a step lost to an unconnected tool
-        retry = load_prompt("skill_describe", "version_retry.md", variables)
-        again_doc, again = _ask(model_router, system, retry, _VERSION_SCHEMA)
-        again_kept, again_cannot, _steered = skills_understand.allocate(registry, again_doc["steps"], usable, allow)
-        if len(again_kept) >= len(kept):  # the first reply stays when the second keeps fewer steps
-            doc, kept, cannot = again_doc, again_kept, again_cannot
-        used = {"credits": used["credits"] + again["credits"], "trace": again["trace"]}
+    task = load_prompt("skill_describe", "version_task.md", variables)
+    fell_back = False
+    try:
+        doc, used = _ask(model_router, system, task, _VERSION_WIRE, _VERSION_SCHEMA, skills_reply.tidy_version)
+        kept, cannot, steered = skills_understand.allocate(registry, doc["steps"], usable, allow)
+        if not kept or steered:  # SKILL-TEACH-422 / TEACH-PAIRS: nothing usable, or a step lost to an unconnected tool
+            retry = load_prompt("skill_describe", "version_retry.md", variables)
+            try:
+                again_doc, again = _ask(
+                    model_router, system, retry, _VERSION_WIRE, _VERSION_SCHEMA, skills_reply.tidy_version
+                )
+            except HTTPException:  # the first reply stays; the second could not be read
+                again_doc, again = None, {"credits": 0.0, "trace": used["trace"]}
+            if again_doc is not None:
+                again_kept, again_cannot, _steered = skills_understand.allocate(
+                    registry, again_doc["steps"], usable, allow
+                )
+                if len(again_kept) >= len(kept):  # the first reply stays when the second keeps fewer steps
+                    doc, kept, cannot = again_doc, again_kept, again_cannot
+            used = {"credits": used["credits"] + again["credits"], "trace": again["trace"]}
+    except HTTPException as failed:
+        if failed.status_code != 502:
+            raise
+        doc, used, kept, cannot = {"question": None}, {}, [], []
+    if not kept:
+        # P0-SKILLS-TEACH: nothing the model said could be kept (or it said nothing usable). The person's captured steps
+        # become an editable draft: a read of a tool their words name, else a text step. The steps the model said Tilo
+        # cannot do stay listed as such and are not drafted.
+        fell_back = True
+        skip = {c["text"] for c in cannot}
+        words = [c["text"] for c in draft["captured"] if c["text"] not in skip]
+        rows = skills_reply.fallback_plan(words, skills_understand.capture_hints(), usable, allow)
+        rows = rows or [{"text": _NOTHING_TO_DO, "tool": "writer", "action": "compose", "verb": "draft"}]
+        kept = [StepIn(**row) for row in rows]
     typed = " ".join(c["text"] for c in draft["captured"]).casefold() if draft["method"] == "describe" else None
     hosts = skills_understand.clean_hosts(doc.get("hosts"), kept, typed)
     if not hosts:  # TS-18: a browse step names the hosts it may open; with none kept it cannot run
@@ -457,8 +571,6 @@ def version_route(
         now, owner = _now(clock), principal.user_id
         writer = Writer(stores, deps.ORG_ID, owner, now, redact)
         try:
-            if not kept:
-                raise _not_understood()
             plan = plan_steps(kept, writer.text, registry)
             question = _one_question(doc["question"], writer.text)
             said = [*(c["text"] for c in draft["captured"]), *(s["text"] for s in plan)]
@@ -512,7 +624,7 @@ def version_route(
             raise
         finally:
             _release_desk(we.writer, world)
-        return _view(after, registry, views, team, lost)
+        return {**_view(after, registry, views, team, lost), **({"fallback": True} if fell_back else {})}
 
     return _guarded(save)
 
