@@ -25,7 +25,12 @@ def _join(items: list[str]) -> str:
     return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
 
 
-def instant_answer(question: str, state: Any, elapsed_s: float, duration_s: float, present: list[str]) -> str | None:
+NO_AGENDA_LINE = "There's no agenda set for this meeting yet. Want me to note one?"
+
+
+def instant_answer(
+    question: str, state: Any, elapsed_s: float, duration_s: float, present: list[str], agenda_set: bool = True
+) -> str | None:
     q = " ".join(_WORDS.findall(question.lower()))
     if not q or len(q.split()) > 16:
         return None
@@ -82,6 +87,8 @@ def instant_answer(question: str, state: Any, elapsed_s: float, duration_s: floa
         return f"In the meeting: {_join(present)}." if present else "I don't see anyone else in the meeting yet."
 
     if "agenda" in q and not _has(q, "add ", "change", "update", "remove"):
+        if not agenda_set:  # a stand-in agenda (live 21 Oct): never read it out or invent items
+            return NO_AGENDA_LINE
         items = state.items
         covered = [i for i in items if i.status == "covered"]
         current = [i for i in items if i.status == "in_progress"]
