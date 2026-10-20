@@ -20,7 +20,11 @@ THINKING_LEVELS = ("off", "minimal", "low", "medium", "high")
 def load_wake_settings() -> WakeSettings:
     root = Path(os.environ.get("TILO_REPO_ROOT", str(ROOT.parent)))
     data = json.loads((root / "config/meeting-wake.json").read_text(encoding="utf-8"))
-    return WakeSettings(aliases=tuple(data["aliases"]), attention_s=data["attention_s"])
+    return WakeSettings(
+        aliases=tuple(data["aliases"]),
+        attention_s=data["attention_s"],
+        after_reply_s=data.get("after_reply_s", WakeSettings.after_reply_s),
+    )
 
 
 def parse_dotenv(text: str) -> dict[str, str]:
