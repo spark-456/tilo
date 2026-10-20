@@ -300,7 +300,8 @@ export interface TodayProps {
   readonly spend: Spend;
   readonly night: boolean;
   readonly onWorld: (id: string) => void;
-  readonly onWorlds: () => void;
+  /** "See all" on the Needs you card: the Needs you page (UX-AUDIT: it used to open Worlds). */
+  readonly onNeeds: () => void;
   readonly onAgenda: () => void;
   readonly onLedger: () => void;
   /** Under 1180px the side column is a block in the page column, without the agenda. */
@@ -316,7 +317,7 @@ export function TodayPanel({
   spend,
   night,
   onWorld,
-  onWorlds,
+  onNeeds,
   onAgenda,
   onLedger,
   stacked = false,
@@ -337,7 +338,7 @@ export function TodayPanel({
             </>
           ) : null}
           <span className="park-home-head__gap" />
-          <GoLink href="/worlds" onGo={onWorlds}>
+          <GoLink href="/needs" onGo={onNeeds}>
             See all
           </GoLink>
         </div>

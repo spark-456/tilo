@@ -366,7 +366,7 @@ export const OUT = {
 } as const;
 
 export const TOASTS = {
-  later: "Tilo will remind you at 16:00",
+  later: "Nothing was sent. It waits for you in Needs you.", // UX-AUDIT: no reminder exists, none is promised
   paused: "Sample only: paused on this page. Nothing real changed.", // issue 932: a sample world claims no real outcome
   resumed: "Sample only: resumed on this page. Nothing real changed.",
   shared: "Link copied. This is a sample world, so there is nothing real to share.",

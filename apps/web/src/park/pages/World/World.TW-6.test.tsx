@@ -258,8 +258,8 @@ describe("TW_6: RunStory approval card", () => {
 
   it("TW_6_RunStory_renders_approval_card_with_actions", () => {
     const onApprove = vi.fn();
-    const onDecline = vi.fn();
-    const onEdit = vi.fn();
+    const onLater = vi.fn();
+    const onDetails = vi.fn();
     const events: RunEvent[] = [
       ev(
         "approval.requested",
@@ -276,13 +276,21 @@ describe("TW_6: RunStory approval card", () => {
     ];
 
     const div = document.createElement("div");
-    act(() => {
-      const { createRoot } = require("react-dom/client");
-      const root = createRoot(div);
-      root.render(
-        <RunStory events={events} onApprove={onApprove} onDecline={onDecline} onEdit={onEdit} />,
-      );
-    });
+    const { createRoot } = require("react-dom/client");
+    const root = createRoot(div);
+    const render = (decided: boolean) =>
+      act(() => {
+        root.render(
+          <RunStory
+            events={events}
+            answer={{ decided, canTap: true }}
+            onApprove={onApprove}
+            onDetails={onDetails}
+            onLater={onLater}
+          />,
+        );
+      });
+    render(false);
 
     const card = div.querySelector('[aria-label="Needs you"]');
     expect(card).not.toBeNull();
@@ -307,16 +315,60 @@ describe("TW_6: RunStory approval card", () => {
     ) as HTMLButtonElement | null;
 
     expect(approveBtn).not.toBeNull();
-    expect(editBtn).not.toBeNull();
-    expect(declineBtn).not.toBeNull();
+    expect(textOf(editBtn as Element)).toBe("See details");
+    expect(textOf(declineBtn as Element)).toBe("Decide later");
 
+    click(declineBtn as HTMLButtonElement);
+    expect(onLater).toHaveBeenCalledTimes(1);
+    click(editBtn as HTMLButtonElement);
+    expect(onDetails).toHaveBeenCalledTimes(1);
     click(approveBtn as HTMLButtonElement);
     expect(onApprove).toHaveBeenCalledTimes(1);
 
-    // Card shows local confirmation
-    const done = card?.querySelector(".park-world-approval-done");
+    // UX-AUDIT (HR-1): a click alone claims nothing; "Approved" shows only once the decision is answered.
+    expect(card?.querySelector(".park-world-approval-done")).toBeNull();
+    render(true);
+    const done = div.querySelector(".park-world-approval-done");
     expect(done).not.toBeNull();
     expect(textOf(done as Element)).toContain("Approved. Wren is continuing.");
+    expect(div.querySelector(".park-world-approval-btn--approve")).toBeNull();
+  });
+
+  it("TW_6_UX_AUDIT_approval_card_without_a_served_decision_only_points_to_needs_you", () => {
+    const onDetails = vi.fn();
+    const events: RunEvent[] = [
+      ev("approval.requested", "Wren needs your yes", { gate_id: "g_x" }, { actor: "Wren" }),
+    ];
+    const div = document.createElement("div");
+    act(() => {
+      const { createRoot } = require("react-dom/client");
+      createRoot(div).render(
+        <RunStory events={events} onApprove={vi.fn()} onDetails={onDetails} />,
+      );
+    });
+    expect(div.querySelector(".park-world-approval-btn--approve")).toBeNull();
+    const details = div.querySelector(".park-world-approval-btn--edit") as HTMLButtonElement;
+    expect(textOf(details)).toBe("Answer in Needs you");
+    click(details);
+    expect(onDetails).toHaveBeenCalledTimes(1);
+  });
+
+  it("TW_6_UX_AUDIT_activeApprovalOf_never_invents_risk_or_cost", () => {
+    const bare = activeApprovalOf([
+      ev("approval.requested", "Wren needs your yes", { gate_id: "g" }),
+    ]);
+    expect(bare?.risk).toBe("Not reported");
+    expect(bare?.cost).toBe("Not reported");
+    const tiered = activeApprovalOf([
+      ev("approval.requested", "Wren needs your yes", {
+        gate_id: "g",
+        risk_tier: "T2",
+        irreversible: true,
+        action_type: "send_email",
+      }),
+    ]);
+    expect(tiered?.risk).toBe("Tier 2. It can't be undone.");
+    expect(tiered?.exact).toBe("Action: send email");
   });
 
   it("TW_6_RunStory_removes_approval_card_when_approval_resolved", () => {

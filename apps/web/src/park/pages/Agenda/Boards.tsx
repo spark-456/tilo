@@ -221,6 +221,8 @@ function Board({
   const ordered = ui.style === "soft" ? GROUPS.flatMap(([, f]) => vms.filter(f)) : vms;
   const shown = ordered.slice(0, limit);
   const label = `Pin to ${b.title}`;
+  // UX-AUDIT: with nothing typed the pin button is off and says what it needs (a click used to do nothing).
+  const blank = ui.newVal[k].trim() ? {} : { disabled: true, title: "Type something to pin first" };
   const input = (cls: string) => (
     <input
       aria-label={label}
@@ -255,7 +257,12 @@ function Board({
             // being pushed down by each one (no layout shift while the board stages).
             <div className="park-agenda-newpin">
               {input("park-agenda-newinput")}
-              <button type="button" className="park-agenda-pinit" onClick={() => ui.add(k)}>
+              <button
+                type="button"
+                className="park-agenda-pinit"
+                {...blank}
+                onClick={() => ui.add(k)}
+              >
                 Pin it
               </button>
             </div>
@@ -266,7 +273,12 @@ function Board({
           <div className="park-agenda-addrow">
             {icon("plus", 13)}
             {input("park-agenda-addinput")}
-            <button type="button" className="park-agenda-addbtn" onClick={() => ui.add(k)}>
+            <button
+              type="button"
+              className="park-agenda-addbtn"
+              {...blank}
+              onClick={() => ui.add(k)}
+            >
               Pin
             </button>
           </div>

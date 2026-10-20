@@ -109,6 +109,8 @@ export interface Teach {
   capturedFallback: boolean;
   setScope: (s: Scope) => void;
   loadTeams: () => void;
+  /** UX-AUDIT: a team's served name for its chip (the id only when the server gave no name). */
+  teamLabel?: (id: string) => string;
   chooseTeam: (id: string) => void;
   removeHost: (host: string) => void;
   setTrig: (t: Trigger) => void;
@@ -151,6 +153,7 @@ export function useTeach({
   const [scope, setScope] = useState<Scope>(isLive ? "me" : "team");
   const [teamId, setTeamId] = useState<string | null>(null);
   const [teams, setTeams] = useState<readonly string[] | null>(null);
+  const [teamNames, setTeamNames] = useState<Readonly<Record<string, string>>>({});
   const [hosts, setHosts] = useState<string[]>([]);
   const [trig, setTrig] = useState<Trigger>(isLive ? "ask" : "arrive");
   const [captured, setCaptured] = useState<SkillCapture | null>(null);
@@ -475,14 +478,24 @@ export function useTeach({
       if (!isLive || !client) return;
       client.mine().then(
         ({ teams: rows }) => {
-          if (mounted.current)
-            setTeams(rows.filter((row) => row.state === "member").map((row) => row.team));
+          if (!mounted.current) return;
+          const members = rows.filter((row) => row.state === "member");
+          setTeams(members.map((row) => row.team));
+          setTeamNames(
+            // "Team" is the parser's stand-in when none was served: the chip then shows the id.
+            Object.fromEntries(
+              members.flatMap((row) =>
+                row.name && row.name !== "Team" ? [[row.team, row.name]] : [],
+              ),
+            ),
+          );
         },
         (e: unknown) => {
           if (mounted.current) setFailure(e);
         },
       );
     },
+    teamLabel: (id) => teamNames[id] ?? `Team ${id}`,
     chooseTeam: (id) => {
       if (teams?.includes(id)) {
         setTeamId(id);

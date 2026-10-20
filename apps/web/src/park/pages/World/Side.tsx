@@ -20,11 +20,14 @@ export function GoLink({
   href,
   className,
   onGo,
+  label,
   children,
 }: {
   href: string;
   className: string;
   onGo: () => void;
+  /** The link's name when its visible text can be hidden (the Studio back arrow shows the icon only). */
+  label?: string;
   children: ReactNode;
 }) {
   const click = (e: MouseEvent<HTMLAnchorElement>) => {
@@ -34,7 +37,7 @@ export function GoLink({
     onGo();
   };
   return (
-    <a className={className} href={href} onClick={click}>
+    <a className={className} href={href} aria-label={label} onClick={click}>
       {children}
     </a>
   );

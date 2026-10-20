@@ -176,3 +176,8 @@
   min-height: 40px;
   font-weight: 600;
 }
+/* UX-AUDIT: a link inside a sentence is told apart by more than its colour (WCAG 1.4.1, axe link-in-text-block). */
+[data-park] .park-admin .section-note a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
