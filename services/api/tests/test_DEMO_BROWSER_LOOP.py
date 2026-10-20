@@ -59,6 +59,14 @@ def test_DEMO_BROWSER_done_without_a_read_reads_the_page_it_ends_on():
     assert run.events[-1][1]["outcome"] == "done"
 
 
+def test_DEMO_BROWSER_the_model_is_told_to_search_by_address_not_by_pressing_search():
+    """tilo-browser refuses a click on a form's submit control as needing a person, so a search runs as a navigate."""
+    from tilo_api.run_tools import browser_proposal_prompt
+
+    prompt = browser_proposal_prompt("Search the site for Ada Lovelace", "")
+    assert "search address" in prompt and "instead of pressing" in prompt
+
+
 def test_DEMO_BROWSER_the_model_reply_may_come_fenced():
     from tilo_api.run_tools import parse_action
 
