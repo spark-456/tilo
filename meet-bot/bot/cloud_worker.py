@@ -111,6 +111,7 @@ async def attend_meeting(meeting_id: str, join_url: str, claim: str | None = Non
             bot_email=os.environ.get("BOT_GOOGLE_EMAIL", "").strip() if signed else "",
             bot_display_name="Tilo notetaker",
             agenda_path=agenda,
+            agenda_placeholder=True,  # the file above is a stand-in: Tilo says there is no agenda yet (21 Oct)
             out_dir=root / "out",
             debug_dir=root / "debug",
             context_dir=root / "context",
