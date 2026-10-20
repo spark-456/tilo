@@ -86,26 +86,29 @@ class PlaywrightDriver:
         """Playwright calls a route handler only for the first URL of a redirect chain, so each redirect hop of the
         page's own navigation is gated here (BR-02, SEC-09); a refused hop's page is left once navigation settles."""
         redirected = request.redirected_from
-        if redirected is None or not request.is_navigation_request():
-            return
-        try:
-            if request.frame != self.page.main_frame:
-                return  # a frame's page is never captured or read: iframes are masked and page text is the body's
-        except Error:
-            return
+        if redirected is None or not self._page_navigation(request):
+            return  # a frame's page is never captured or read: iframes are masked and page text is the body's
         self._chain.append(request.url)
         if not self.gate(request.url, redirect_from=redirected.url) and self._aborted is None:
             self._aborted = request.url
 
+    def _page_navigation(self, request: Request) -> bool:
+        """A navigation of the page itself; an iframe's is a subresource here (iframes are masked, never read)."""
+        try:
+            return request.is_navigation_request() and request.frame == self.page.main_frame
+        except Error:
+            return False
+
     def _route(self, route: Route) -> None:
         request = route.request
         redirected = request.redirected_from
+        page = self._page_navigation(request)
         if self.gate(request.url, redirect_from=redirected.url if redirected else None):
-            if request.is_navigation_request():
+            if page:
                 self._chain.append(request.url)
             route.continue_()
         else:
-            if request.is_navigation_request():
+            if page:  # a refused iframe (e.g. a sign-in check) is blocked and counted; it does not refuse the page
                 self._aborted = request.url
                 self._chain.append(request.url)
             route.abort()
