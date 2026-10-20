@@ -294,7 +294,9 @@ class LiveSession:
             self.record_audio,
         )
         self._setup_voice()
-        ops.info("session voice=%s tts=%s reply_mode=%s", self.voice, getattr(self.tts, "name", None), self.reply_mode)
+        ops.warning(
+            "session voice=%s tts=%s reply_mode=%s", self.voice, getattr(self.tts, "name", None), self.reply_mode
+        )
         async with MeetBrowser(self.cfg, voice=self.voice, face=True) as br:
             self._face_loop = asyncio.get_running_loop()
             if isinstance(self.speaker, VoiceSpeaker):
@@ -324,7 +326,7 @@ class LiveSession:
                     ops.warning("session intro could not be posted; leaving")
                     raise BotRefused("The disclosure could not be posted; leaving without capture.")
                 self.intro_sent = True
-                ops.info("session joined asked=%s intro posted", asked)
+                ops.warning("session joined asked=%s intro posted", asked)
                 await self._start_audio()
                 self.events.emit(
                     "meeting.joined",
@@ -334,7 +336,7 @@ class LiveSession:
                 )
                 self._prewarm()
                 captions_on = await br.enable_captions()
-                ops.info("session captions=%s", captions_on)
+                ops.warning("session captions=%s", captions_on)
                 if not captions_on:
                     log.error("captions could not be enabled: no speaker names, and no transcript without audio")
                 reader = CaptionReader(

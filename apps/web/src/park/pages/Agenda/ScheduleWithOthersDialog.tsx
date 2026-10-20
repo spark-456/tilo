@@ -10,6 +10,7 @@ import {
   hostFormError,
   refusedBeforeSend,
 } from "../../shared/hostMeetingRules";
+import { Modal } from "./Modal";
 
 const localInput = (value: string): string => {
   const date = new Date(value);
@@ -88,7 +89,7 @@ export function ScheduleWithOthersDialog({
   };
 
   return (
-    <dialog open className="park-agenda-modal" aria-label="Schedule with others">
+    <Modal label="Schedule with others" onClose={onClose}>
       {!api ? (
         <div className="park-agenda-hostform">
           <h2>Schedule with others</h2>
@@ -106,7 +107,6 @@ export function ScheduleWithOthersDialog({
             event.preventDefault();
             void confirm();
           }}
-          onKeyDown={(event) => event.key === "Escape" && onClose()}
         >
           <h2>Schedule with others</h2>
           <label className="park-agenda-hostfield">
@@ -184,6 +184,6 @@ export function ScheduleWithOthersDialog({
           {busy ? <output>Working…</output> : null}
         </form>
       )}
-    </dialog>
+    </Modal>
   );
 }
