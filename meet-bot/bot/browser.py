@@ -270,6 +270,7 @@ class MeetBrowser:
         if not S.MEETING_URL_RE.fullmatch(url):
             raise JoinFailed("The meeting link does not have the required Meet shape.")
         await self.page.goto(url, wait_until="domcontentloaded")
+        self._meeting_url = url
         self.stage("opened_meeting_page")
         self._check_url_login()
 
@@ -350,16 +351,24 @@ class MeetBrowser:
                 await self.shot("join_denied")
                 raise JoinFailed("the host denied the request to join")
             # Meet dropped the bot after it got in (live 20 Oct: the rating screen at the timeout): say why, rejoin once.
-            if not rejoined and (await self.visible(S.REJOIN) or await self.visible(S.ENDED_TEXT)):
+            # Live 20 Oct 16:27 the page went straight to "Rate the meeting", which has no Rejoin button: go back to the
+            # meeting's own address and ask again, and give the host a fresh wait.
+            if not rejoined and (
+                await self.visible(S.REJOIN) or await self.visible(S.ENDED_TEXT) or await self.rated()
+            ):
                 await self.ops_snapshot("dropped_before_ready")
                 rejoined = True
-                if await self.click(S.REJOIN):
-                    await asyncio.sleep(2)
-                    await self.click(S.JOIN_NOW, timeout_s=8)
-                    continue
+                if not await self.click(S.REJOIN) and getattr(self, "_meeting_url", None):
+                    await self.page.goto(self._meeting_url, wait_until="domcontentloaded")
+                await asyncio.sleep(3)
+                await self.dismiss_tips()
+                if await self.click(S.JOIN_NOW, timeout_s=10) or await self.click(S.ASK_TO_JOIN, timeout_s=5):
+                    self.stage("asked_again_after_drop")
+                    deadline = max(deadline, time.monotonic() + self.cfg.ask_to_join_timeout_s)
+                continue
             if time.monotonic() >= next_snapshot:
                 await self.ops_snapshot("join_wait")
-                next_snapshot = time.monotonic() + 30
+                next_snapshot = time.monotonic() + 10
             if not waiting_shot and await self.visible(S.WAITING_TEXT):
                 waiting_shot = True
                 # "Join now" can still land in the lobby (Meet files the bot under "With potential risks", where the
@@ -395,6 +404,13 @@ class MeetBrowser:
             await asyncio.sleep(0.5)
         except Exception:
             pass
+
+    async def rated(self) -> bool:
+        """Meet's after-call page ("Rate the meeting"): the bot is out of the call, whatever the reason."""
+        try:
+            return await locate(self.page, S.RATE_MEETING.strategies[0]).count() > 0
+        except Exception:
+            return False
 
     def stage(self, name: str, detail: str = "") -> None:
         """One 'stage' line per step of the bot's life in the cloud log (no participant content), so a failed call can

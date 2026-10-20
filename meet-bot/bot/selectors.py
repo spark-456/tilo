@@ -84,6 +84,7 @@ ENDED_TEXT = _s(
 )
 
 REJOIN = _s("rejoin", ("role", "button", r"^rejoin$"), ("text", r"^rejoin$"))
+RATE_MEETING = _s("rate_meeting", ("aria", "Rate the meeting"))
 # Meet's own status lines, matched by name only in ops logs (never the page text itself) to say why a join stopped.
 STATUS_PHRASES = (
     ("removed", r"you.ve been removed"),
@@ -94,6 +95,10 @@ STATUS_PHRASES = (
     ("cant_join", r"can.?t join this (video )?call"),
     ("waiting", r"asking to be let in|someone will let you in"),
     ("rate", r"rate the meeting|how was the (audio|video|call)"),
+    ("denied", r"denied your request|no one responded|request to join was"),
+    ("error", r"something went wrong|couldn.?t (connect|start|join)|an error occurred"),
+    ("reconnect", r"reconnect"),
+    ("removed_by_host", r"removed you|host removed|you were removed"),
 )
 
 # --- in call ---------------------------------------------------------------------------------------------------
