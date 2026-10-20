@@ -44,7 +44,7 @@ def followup(people_rig, monkeypatch):
 
     monkeypatch.setattr(deps, "get_work_mode", lambda *args: "replay")
     monkeypatch.setattr(deps, "router_for_mode", lambda mode: Router())
-    monkeypatch.setattr(deps, "get_safety", lambda mode: FakeSafetyProvider())
+    monkeypatch.setattr(deps, "safety_for_mode", lambda mode: FakeSafetyProvider())
     switches = spend.Switches(InMemoryFlagStore(), make_ledger(make_caps()))
 
     def factory(world_id, run_id, owner, emit):

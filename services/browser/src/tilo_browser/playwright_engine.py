@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 from typing import Any, cast
+from urllib.parse import quote_plus, urlencode
 
 from PIL import Image
 from playwright.sync_api import Error, Request, Route, sync_playwright
@@ -26,6 +27,31 @@ _TREE_SCRIPT = """() => {
       box:{x:Math.max(0,Math.floor(b.x)),y:Math.max(0,Math.floor(b.y)),
         width:Math.max(1,Math.ceil(b.width)),height:Math.max(1,Math.ceil(b.height))}},children:[]};
   })};
+}"""
+
+# DEMO-BROWSER: the page's own search address, from its GET search form (one text or search field), else its OpenSearch
+# description, fetched inside the page so the egress gate sees the request. Page markup only, never the task's words.
+_SEARCH_SCRIPT = """async () => {
+  for (const form of document.querySelectorAll('form')) {
+    if ((form.getAttribute('method') || 'get').toLowerCase() !== 'get') continue;
+    const fields = [...form.querySelectorAll('input')].filter(
+      (i) => ['search', 'text'].includes((i.getAttribute('type') || 'text').toLowerCase()) && i.name);
+    if (fields.length !== 1) continue;
+    const hidden = [...form.querySelectorAll('input[type="hidden"]')]
+      .filter((i) => i.name && (i.value || '').length <= 40).map((i) => [i.name, i.value || '']);
+    return {action: form.action, field: fields[0].name, hidden};
+  }
+  const link = document.querySelector('link[rel="search"][type="application/opensearchdescription+xml"]');
+  if (!link || !link.href) return null;
+  try {
+    const xml = await (await fetch(link.href, {credentials: 'omit'})).text();
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    const url = [...doc.getElementsByTagName('Url')].find((u) => (u.getAttribute('type') || '') === 'text/html');
+    const template = url ? url.getAttribute('template') || '' : '';
+    return template.includes('{searchTerms}') ? {template} : null;
+  } catch (e) {
+    return null;
+  }
 }"""
 
 _SECURE_SELECTORS = (
@@ -156,6 +182,23 @@ class PlaywrightDriver:
 
     def page_title(self) -> str:
         return self.page.title()
+
+    def search_address(self) -> str | None:
+        """This site's search address with a `{words}` slot, or None (DEMO-BROWSER)."""
+        try:
+            found = self.page.evaluate(_SEARCH_SCRIPT)
+        except Error:
+            return None
+        if not isinstance(found, dict):
+            return None
+        if isinstance(found.get("template"), str):
+            return str(found["template"]).replace("{searchTerms}", "{words}", 1)
+        action, field = found.get("action"), found.get("field")
+        if not isinstance(action, str) or not isinstance(field, str):
+            return None
+        hidden = urlencode([(str(k), str(v)) for k, v in found.get("hidden") or []])
+        base = action.split("#", 1)[0].split("?", 1)[0]
+        return f"{base}?{hidden + '&' if hidden else ''}{quote_plus(field)}={{words}}"
 
     def screenshot(self, mask_refs: list[str]) -> bytes:
         selectors = [*_SECURE_SELECTORS, *(f'[data-tilo-ref="{ref}"]' for ref in mask_refs)]

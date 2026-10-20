@@ -6,6 +6,7 @@ import { ResultTab } from "../../../worldView/LiveStageEmbed";
 import type { Api } from "../../api";
 import { openResult, readResult, saveResult } from "../../api/results";
 import { Button } from "../../components";
+import { BrowserSteps } from "../../shared/BrowserSteps";
 import { type SharedResult, resultHeadline } from "./ResultPanel";
 import { Markdown } from "./markdown";
 import { isRestartStop, restartApproval } from "./runProgress";
@@ -238,14 +239,17 @@ export function RunResult({
   onChangeDirection?: (instruction: string) => Promise<void>;
 }) {
   return (
-    <ResultTab
-      api={api}
-      worldId={worldId}
-      events={events}
-      shared={shared}
-      {...(onAskQuestion ? { onAskQuestion } : {})}
-      {...(onChangeDirection ? { onChangeDirection } : {})}
-    />
+    <>
+      <BrowserSteps events={events} />
+      <ResultTab
+        api={api}
+        worldId={worldId}
+        events={events}
+        shared={shared}
+        {...(onAskQuestion ? { onAskQuestion } : {})}
+        {...(onChangeDirection ? { onChangeDirection } : {})}
+      />
+    </>
   );
 }
 
