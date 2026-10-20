@@ -11,10 +11,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from collections import Counter
 from collections.abc import Callable
 from datetime import datetime
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
@@ -49,6 +51,32 @@ from .tts import STT_END_AT
 
 log = logging.getLogger("bot.session")
 ops = logging.getLogger("bot.cloud_run")  # operational lines only (no participant text): they pass the capture boundary
+_QUESTION_WORDS = frozenset(
+    {
+        "what",
+        "whats",
+        "who",
+        "whos",
+        "where",
+        "when",
+        "why",
+        "how",
+        "which",
+        "can",
+        "could",
+        "would",
+        "will",
+        "is",
+        "are",
+        "do",
+        "does",
+        "did",
+        "should",
+        "tell",
+        "give",
+        "show",
+    }
+)
 STATUS_EVERY_S = 3.0  # how often to check who is here before the meeting has started for the bot
 
 
@@ -82,6 +110,7 @@ def build_brain(cfg: Config, agenda_path: Path | None, duration: float | None, k
         meeting_scope=cfg.meeting_scope,  # off by default since the owner's 21 Oct decision (BQ-MTG-SCOPE-OWNER-1)
     )
     brain.policy.proactive = cfg.voice_nudges  # existing operator opt-in; off by default for chat AND voice
+    brain.agenda_placeholder = cfg.agenda_placeholder
     return brain
 
 
@@ -227,7 +256,34 @@ class LiveSession:
     def idle_needed(text: str, base: float) -> float:
         """How long a live partial must sit still before it counts as finished: a question mark says it is complete,
         a statement ("Tilo tell me a joke") could still be mid-sentence, so it waits a little longer."""
-        return base if text.rstrip().endswith("?") else base + 0.8
+        if text.rstrip().endswith("?"):
+            return base
+        # Live 21 Oct a three-word fragment ("what is the") was answered before the person finished: a short partial
+        # with no question mark waits longer still.
+        return base + 0.8 + (1.5 if len(text.split()) < 4 else 0.0)
+
+    @staticmethod
+    def echoes_own_speech(text: str, spoken: list[str]) -> bool:
+        """A caption of what Tilo itself just said (Meet captions the bot's voice too, live 21 Oct): not a person."""
+        words = re.findall(r"[a-z0-9]+", text.lower())
+        if len(words) < 3:
+            return False
+        # Tilo answers in statements; a person's follow-up on the same topic is usually a question, so a question only
+        # counts as an echo when it is nearly word for word what Tilo said.
+        asks = text.rstrip().endswith("?") or words[0] in _QUESTION_WORDS
+        for line in spoken:
+            mine = re.findall(r"[a-z0-9]+", line.lower())
+            if not mine:
+                continue
+            ratio = SequenceMatcher(None, " ".join(words), " ".join(mine)).ratio()
+            if asks:
+                if ratio >= 0.85:
+                    return True
+                continue
+            overlap = sum(1 for w in words if w in set(mine))
+            if overlap >= 0.6 * len(words) or ratio >= 0.6:
+                return True
+        return False
 
     # -- time ------------------------------------------------------------------------------------------------------
     def elapsed(self) -> float:  # seconds since joining (also the audio clock)
@@ -273,6 +329,10 @@ class LiveSession:
         if stop_requested(u.text):
             ops.warning("stage leave reason=stop_requested_in_caption")
             self.leave_requested = True
+            return
+        recent = [text for at, text in getattr(self, "spoken_recent", []) if self.clock.now() - at <= 30.0]
+        if self.echoes_own_speech(u.text, recent):
+            ops.warning("stage heard_own_speech chars=%d (ignored)", len(u.text))
             return
         # One line per heard utterance: its length and whether it names Tilo, never what was said.
         named = bool(self.brain and addressed_sentence(u.text, getattr(self.brain, "bot_name", "") or "Tilo"))
@@ -532,6 +592,9 @@ class LiveSession:
 
         if want_voice:
             mark("tts_request", t0)
+            # What Tilo says aloud comes back as captions: remember it so it is never taken as a person's words.
+            kept = [(at, text) for at, text in getattr(self, "spoken_recent", []) if self.clock.now() - at <= 30.0]
+            self.spoken_recent = [*kept[-4:], (self.clock.now(), msg.text)]
         speak = None
         if want_voice:
             token = STT_END_AT.set(turn.marks.get("stt_final") if turn is not None else None)  # the task copies it
@@ -766,6 +829,8 @@ class LiveSession:
                 if brain and self.gate_at is not None:
                     gate = self.gate_at
                     opens = [] if self.hybrid else self.merger.open_utterances(now)
+                    spoken = [x for at, x in getattr(self, "spoken_recent", []) if self.clock.now() - at <= 30.0]
+                    opens = [(u, idle) for u, idle in opens if not self.echoes_own_speech(u.text, spoken)]
                     base = [self._shift(u) for u in self.store.window(self.elapsed(), 3)]
                     q_any = brain.pending_question(base + [self._shift(u) for u, _ in opens])
                     if q_any:

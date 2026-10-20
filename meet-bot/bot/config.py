@@ -109,6 +109,8 @@ class Config:
     # FR-MTG-13 meeting-only answers (agenda, minutes, own items). Owner 21 Oct (BQ-MTG-SCOPE-OWNER-1): off by default,
     # so Tilo answers like a normal assistant; MEETING_ANSWER_SCOPE=1 turns the old scope back on.
     meeting_scope: bool = False
+    # The agenda file is a stand-in (cloud attendance writes one when the meeting has none): never read it out.
+    agenda_placeholder: bool = False
 
     @classmethod
     def from_env(cls) -> Config:
