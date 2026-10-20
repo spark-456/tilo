@@ -378,7 +378,7 @@ describe("FR_MTG_10_UI send Tilo to the meeting", () => {
     await press(m.container, "Bring Tilo in");
     expect(http.postJson).toHaveBeenCalledWith("/v1/meetings/mt_a/attend", {});
     expect(m.container.textContent).toContain(
-      "Tilo is joining… Admit Tilo notetaker in Meet. Keep this tab open.",
+      'Tilo is joining… In Meet, admit Tilo Test. If it sits under "With potential risks", open the ⋮ beside it and choose Admit. Keep this tab open.',
     );
     expect(btn(m.container, "Bring Tilo in")).toBeUndefined();
     await act(async () => finish({ id: "mt_a", status: "ended", ended_reason: "left_on_request" }));

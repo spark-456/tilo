@@ -265,6 +265,7 @@ class MeetBrowser:
         if not S.MEETING_URL_RE.fullmatch(url):
             raise JoinFailed("The meeting link does not have the required Meet shape.")
         await self.page.goto(url, wait_until="domcontentloaded")
+        self.stage("opened_meeting_page")
         self._check_url_login()
 
     async def join(self) -> bool:
@@ -289,14 +290,17 @@ class MeetBrowser:
                 await self.shot("02_prejoin_mic_cam_off")
                 shot_done = True
             if await self.click(S.JOIN_NOW):
+                self.stage("pressed_join_now")
                 break
             if await self.click(S.ASK_TO_JOIN):
+                self.stage("pressed_ask_to_join")
                 asked = True
                 break
             # Same account already in the call (the host is the bot account): "Other ways to join" > "Join here too".
             if await self.click(S.OTHER_WAYS_TO_JOIN):
                 await asyncio.sleep(0.8)
                 if await self.click(S.JOIN_HERE_TOO):
+                    self.stage("pressed_join_here_too")
                     break
             await asyncio.sleep(1)
         else:
@@ -329,6 +333,8 @@ class MeetBrowser:
         next_snapshot = time.monotonic() + 15
         while time.monotonic() < deadline:
             if await self.in_call():
+                self.stage("in_call")
+                await self.ops_snapshot("in_call")
                 await self._after_join()
                 return
             if await self.visible(S.DENIED_TEXT):
@@ -347,12 +353,21 @@ class MeetBrowser:
                 next_snapshot = time.monotonic() + 30
             if not waiting_shot and await self.visible(S.WAITING_TEXT):
                 waiting_shot = True
+                # "Join now" can still land in the lobby (Meet files the bot under "With potential risks", where the
+                # host sees only Deny until they open the row's menu): wait as long as for an ask (live 20 Oct).
+                deadline = max(deadline, time.monotonic() + self.cfg.ask_to_join_timeout_s)
+                self.stage("waiting_in_lobby", f"wait={self.cfg.ask_to_join_timeout_s:.0f}s")
                 log.info("waiting to be let in (timeout %.0fs)", timeout)
                 await self.shot("02b_waiting_to_be_admitted")
             await asyncio.sleep(1)
         await self.shot("join_timeout")
         await self.ops_snapshot("join_timeout")
         raise JoinFailed(f"not in the call after {timeout:.0f}s (waiting for admission?)")
+
+    def stage(self, name: str, detail: str = "") -> None:
+        """One 'stage' line per step of the bot's life in the cloud log (no participant content), so a failed call can
+        be followed step by step (filter the service's log on textPayload:"stage")."""
+        logging.getLogger("bot.cloud_run").warning("stage %s %s", name, detail)
 
     async def ops_snapshot(self, where: str) -> None:
         """An operational line for the cloud log: the page's address form and its button labels (Meet's own UI text,
@@ -382,15 +397,18 @@ class MeetBrowser:
         """In the call once the call's Leave control exists. Meet hides its toolbar while the mouse is idle (live
         20 Oct: the bot was admitted but timed out waiting for a *visible* Leave button), so nudge the mouse and
         also accept the control when it is attached but hidden, unless the lobby's waiting text is showing."""
+        # Live 20 Oct: a Leave control alone also matched the waiting room, the bot "joined" while still waiting, and
+        # left when its intro could not be posted. Now: a meeting address, no lobby text, and a control that only a
+        # joined call has (chat, people, hand, reactions).
+        if not S.MEETING_URL_RE.match(self.page.url):
+            return False
         try:
             await self.page.mouse.move(random.randint(300, 900), random.randint(500, 700))
         except Exception:
             pass
-        if await self.visible(S.LEAVE_CALL):
-            return True
         if await self.visible(S.WAITING_TEXT):
             return False
-        for strat in S.LEAVE_CALL.strategies + S.IN_CALL_MARK.strategies:
+        for strat in S.IN_CALL_MARK.strategies:
             try:
                 if await locate(self.page, strat).count() > 0:
                     return True

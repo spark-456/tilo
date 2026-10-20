@@ -566,6 +566,13 @@ class LiveSession:
             chat_s, first_out = self.clock.now() - t1, (self.clock.now() - t0)
             if chat_ok:
                 mark("chat_posted")
+        ops.warning(
+            "stage reply kind=%s chat=%s voice=%s voice_error=%s",
+            msg.kind,
+            chat_ok,
+            bool(res and res.spoken),
+            str(res.error)[:80] if res is not None and res.error else "-",
+        )
         if res is not None:
             self.timeline.record(
                 "speech",
@@ -724,6 +731,9 @@ class LiveSession:
                     return
                 while not self.queue.empty():
                     blocks, now = self.queue.get_nowait()
+                    if blocks and not getattr(self, "_heard_logged", False):
+                        self._heard_logged = True
+                        ops.warning("stage first_caption_heard speakers=%d", len({b.speaker for b in blocks}))
                     for b in blocks:
                         self.spans.touch(b.speaker, now - self.start)
                     for u in self.merger.feed(blocks, now):
@@ -751,6 +761,7 @@ class LiveSession:
                         ]
                         q = brain.pending_question(ready)
                         if q:
+                            ops.warning("stage question_detected")
                             meta = {
                                 "question": q[1],
                                 "detected": now,
