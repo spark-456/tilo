@@ -50,7 +50,14 @@ from tilo_providers.interfaces import GenerateRequest, GenerateResponse, ModelPr
 from tilo_providers.media import MediaPart, check_parts
 from tilo_providers.prompts import load_prompt, neutralise_marker
 
-from tilo_harness.deliverable import DeliverableRefused, prompt_name, render_format, render_output, wants_rendered
+from tilo_harness.deliverable import (
+    DeliverableRefused,
+    csv_output,
+    prompt_name,
+    render_format,
+    render_output,
+    wants_rendered,
+)
 from tilo_harness.outputs import UnitOutput
 from tilo_harness.quiz import SourceLoader, quiz_output, wants_quiz
 from tilo_harness.tool_limits import ToolLimits
@@ -67,7 +74,14 @@ from tilo_harness.tools import (
 )
 from tilo_harness.unit_prompt import UpstreamItem, data_line, inputs_text, request_variables
 from tilo_harness.untrusted import neutralise
-from tilo_harness.website import REPAIR_REPLY_CHARS, WEBSITE_FORMAT, degraded, wants_website, website_output
+from tilo_harness.website import (
+    REPAIR_REPLY_CHARS,
+    WEBSITE_FORMAT,
+    degraded,
+    tidy,
+    wants_website,
+    website_output,
+)
 
 if TYPE_CHECKING:
     from tilo_harness.executor import UnitContext, UnitOutcome
@@ -79,6 +93,7 @@ RESULT_CAP = 6000  # characters of one tool result shown to the model
 RESULTS_TOTAL_CAP = 16000  # characters of all tool results shown to the model
 ARCHIVE_CAP = 200_000  # characters of one raw result written to the archive
 MAX_CONTINUATIONS = 3  # P0-RUN-DIES: bounded recovery after router-level larger-cap retry and fallback
+REPAIR_SPEC_TOKENS = 16_384  # a file spec's one repair returns the whole spec again (a long table outgrows 4096)
 PROMPT_ROLE = "specialist"  # the role whose prompts/<role>/tools*.md frame the tool loop, for every worker role
 
 Stop = Literal["done", "step_cap", "credit_cap", "no_text"]
@@ -294,13 +309,12 @@ class ToolUnitRunner:
                     if website:
                         return await asyncio.to_thread(website_output, text)
                     if rendered:
-                        if fmt != "pdf" and self._report_renderer is None:
+                        if self._report_renderer is not None:
+                            return await self._report_renderer(text)
+                        if fmt not in ("pdf", "csv"):  # an Office file is made only by the API's bounded renderer
                             raise DeliverableRefused("render_failed")
-                        return (
-                            await self._report_renderer(text)
-                            if self._report_renderer is not None
-                            else await asyncio.to_thread(render_output, text, report_date=today)
-                        )
+                        make = render_output if fmt == "pdf" else csv_output
+                        return await asyncio.to_thread(make, text, report_date=today)
                     if quiz:
                         return await asyncio.to_thread(quiz_output, text, self._quiz_sources)
                     return UnitOutput(media_type="text/markdown", content=text.encode("utf-8"))
@@ -321,7 +335,7 @@ class ToolUnitRunner:
                         and loop.credits < self._credit_cap
                     ):
                         loop.step += 1  # the repair is one real model round, within this unit's cap
-                        bad = neutralise(response.text, limit=8000)
+                        bad = neutralise(response.text, limit=REPAIR_REPLY_CHARS if rendered else 8000)
                         repair_request = GenerateRequest(
                             prompt=(
                                 base
@@ -333,10 +347,10 @@ class ToolUnitRunner:
                             system=request.system,
                             parts=request.parts,
                             json_mode=True,
-                            max_output_tokens=4096,
+                            max_output_tokens=REPAIR_SPEC_TOKENS if rendered else 4096,
                         )
                         if website:  # WEB-1: same role, no tools; the checker's code and line and the reply as data
-                            shown = neutralise_marker(response.text[:REPAIR_REPLY_CHARS], "BAD_REPLY")
+                            shown = neutralise_marker(tidy(response.text)[:REPAIR_REPLY_CHARS], "BAD_REPLY")
                             variables = {"violations": refused.detail, "reply": shown}
                             repair_request = GenerateRequest(
                                 prompt=base + load_prompt(role, "unit_website_repair.md", variables),

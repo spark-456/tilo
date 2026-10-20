@@ -9,8 +9,8 @@ from datetime import UTC, date, datetime
 from typing import Literal, cast
 
 from starlette.concurrency import run_in_threadpool
-from tilo_harness.deliverable import MAX_PDF, DeliverableRefused, parse_fill, parse_spec
-from tilo_harness.outputs import RenderedOffice, RenderedPdf
+from tilo_harness.deliverable import MAX_PDF, DeliverableRefused, csv_output, parse_fill, parse_spec
+from tilo_harness.outputs import RenderedOffice, RenderedPdf, UnitOutput
 from tilo_render.docx import render_docx
 from tilo_render.pdf import render_pdf
 from tilo_render.pptx import render_pptx
@@ -46,8 +46,10 @@ def _plan(reply: str, fmt: str, template: bytes | None, report_date: date) -> tu
 
 async def render_report(
     reply: str, *, fmt: str = "pdf", template: bytes | None = None, report_date: date | None = None
-) -> RenderedPdf | RenderedOffice:
+) -> RenderedPdf | RenderedOffice | UnitOutput:
     """The writer's reply as the file for `fmt`; with an uploaded workbook as `template` it is the cells to fill."""
+    if fmt == "csv":  # DEMO-DELIVER: one table as text/csv, small and linear, so no render slot is needed
+        return await run_in_threadpool(lambda: csv_output(reply, report_date=report_date))
     if fmt not in ("pdf", "pptx", "docx", "xlsx"):
         raise DeliverableRefused("render_failed")
     try:

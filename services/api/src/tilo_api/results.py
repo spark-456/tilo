@@ -29,6 +29,7 @@ _SERVED = {  # the types the owner route names; DOCS-OUT: Office files keep thei
     "application/json": "",
     "text/plain": "",
     "text/markdown": "",
+    "text/csv": ".csv",  # DEMO-DELIVER: a CSV deliverable is a real file with its own type and extension
     "text/html": ".html",  # WEB-2, WS-13: a native website, served as an attachment under the preview CSP
     _OFFICE + "wordprocessingml.document": ".docx",
     _OFFICE + "presentationml.presentation": ".pptx",

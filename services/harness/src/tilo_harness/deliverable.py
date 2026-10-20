@@ -17,17 +17,19 @@ from collections.abc import Mapping
 from datetime import UTC, date, datetime
 from typing import Any
 
+from tilo_memory.artifacts import MAX_TEXT
 from tilo_providers.diagnostics import log_caught
+from tilo_render.csv_table import render_csv
 from tilo_render.pdf import render_pdf
 from tilo_render.spec import DeliverableSpec
 from tilo_render.xlsx import MAX_FILL_CELLS, FillCell
 
-from tilo_harness.outputs import MAX_PDF, RenderedPdf
+from tilo_harness.outputs import MAX_PDF, RenderedPdf, UnitOutput
 
 MAX_REPLY = 500_000  # characters of the writer's reply (the spec's own limits keep a real report far below this)
 PDF_FORMAT = "pdf"
 TEMPLATE_ID = "xlsx_template"  # the upstream item that carries an uploaded workbook's layout (DOCS-OUT A4)
-RENDERED_FORMATS = ("pdf", "pptx", "docx", "xlsx")  # DOCS-OUT: the formats the final writer's spec becomes
+RENDERED_FORMATS = ("pdf", "pptx", "docx", "xlsx", "csv")  # DOCS-OUT: the formats the final writer's spec becomes
 _REASONS = {
     "too_large": "the reply is too long",
     "not_json": "the reply is not one JSON object",
@@ -147,3 +149,20 @@ def render_output(reply: Any, *, report_date: date | None = None) -> RenderedPdf
     if len(pdf) > MAX_PDF:
         raise DeliverableRefused("too_large")
     return RenderedPdf(media_type="application/pdf", content=pdf, spec_text=spec.model_dump_json())
+
+
+def csv_output(reply: Any, *, report_date: date | None = None) -> UnitOutput:
+    """DEMO-DELIVER: the reply's spec as one real `text/csv` file (its table), stored like any text output, so the
+    store redacts it and the result route serves it as `.csv`. A spec with no table is `invalid_spec` (one repair)."""
+    spec = parse_spec(reply, report_date=report_date or datetime.now(UTC).date())
+    try:
+        content = render_csv(spec)
+    except ValueError as caught_error:  # no table, or more rows than one file holds: the repair is told to fix it
+        log_caught(caught_error, __name__, locals())
+        raise DeliverableRefused("invalid_spec") from None
+    except Exception as caught_error:  # noqa: BLE001 - the error text may echo the spec
+        log_caught(caught_error, __name__, locals())
+        raise DeliverableRefused("render_failed") from None
+    if len(content) > MAX_TEXT:
+        raise DeliverableRefused("too_large")
+    return UnitOutput(media_type="text/csv", content=content)
