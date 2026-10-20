@@ -1,9 +1,10 @@
+/* Colours are the theme's role tokens (light and dark); the literals are fallbacks for a page with no theme. */
 .tilo-browser {
-  border: 1px solid #c7d7e7;
+  border: 1px solid var(--line, #c7d7e7);
   border-radius: 14px;
-  background: #f7fbff;
+  background: var(--card, #f7fbff);
   padding: 12px;
-  color: #17334c;
+  color: var(--ink, #17334c);
 }
 /* DEMO-BROWSER: the live browser as a window over the World's map (640px tall; 400px below 760px wide). */
 .tilo-browser--overlay {
@@ -22,10 +23,10 @@
   top: 12px;
   right: 12px;
   z-index: 3;
-  border: 1px solid #9bb9ce;
+  border: 1px solid var(--lineStrong, #9bb9ce);
   border-radius: 999px;
-  background: white;
-  color: #17334c;
+  background: var(--field, #ffffff);
+  color: var(--ink, #17334c);
   padding: 6px 12px;
   cursor: pointer;
 }
@@ -52,8 +53,10 @@
 }
 .tilo-browser__header button,
 .tilo-browser__frames button {
-  border: 1px solid #9bb9ce;
-  background: white;
+  border: 1px solid var(--lineStrong, #9bb9ce);
+  background: var(--field, #ffffff);
+  color: var(--ink, #17334c);
+  font: inherit;
   border-radius: 8px;
   padding: 5px 10px;
   cursor: pointer;
@@ -69,7 +72,7 @@
   aspect-ratio: 3 / 2;
   overflow: hidden;
   border-radius: 8px;
-  background: #eaf1f7;
+  background: var(--sunk, #eaf1f7);
 }
 .tilo-browser__screen img {
   display: block;
