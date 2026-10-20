@@ -101,17 +101,13 @@
 
 /* ---- Cards: hairline, r24 to r28, the soft shadow ---- */
 [data-park][data-theme="studio"] .park-agenda-studio .park-agenda-state,
+[data-park][data-theme="studio"] .park-agenda-card,
 [data-park][data-theme="studio"] .park-agenda-detail,
 [data-park][data-theme="studio"] .park-agenda-board {
   border: 1px solid var(--line);
   border-radius: 24px;
   background: var(--card);
   box-shadow: var(--sh);
-}
-[data-park][data-theme="studio"] .park-agenda-studio .park-agenda-sidecard {
-  border: 1px dashed var(--lineStrong);
-  border-radius: 20px;
-  box-shadow: none;
 }
 [data-park][data-theme="studio"] .park-agenda-studio .park-agenda-state h2,
 [data-park][data-theme="studio"] .park-agenda-h2 {
@@ -140,10 +136,6 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-}
-[data-park][data-theme="studio"] #agenda-meetings {
-  display: grid;
-  gap: 12px;
 }
 [data-park][data-theme="studio"] #agenda-meetings [data-testid="agenda-pinboards"] ul {
   display: grid;

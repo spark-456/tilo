@@ -22,6 +22,11 @@ const EMPTY: Record<Kind, string> = {
   meetings: "No meetings yet.",
   pinboards: "No pinboard items yet.",
 };
+const EMPTY_HINT: Record<Kind, string> = {
+  meetings:
+    "Meetings you schedule or bring Tilo to show up here, with a brief before and minutes after.",
+  pinboards: "",
+};
 const READ = { meetings: "getMeetings", pinboards: "getPinboards" } as const;
 const cap = (s: string): string => (s[0] ?? "").toUpperCase() + s.slice(1);
 const humanTime = (value: string): string => {
@@ -47,6 +52,7 @@ function List({
   minutes,
   host,
   readBrief,
+  reload,
   onRows,
 }: {
   kind: Kind;
@@ -54,6 +60,8 @@ function List({
   minutes: MeetingMinutesApi | null;
   host: { api: MeetingHostApi; state: () => Promise<HostState> } | null;
   readBrief: ((path: string) => Promise<unknown>) | null;
+  /** Bumped by the card above this list when it changed a meeting: read the list again. */
+  reload: number;
   onRows?: (rows: PeopleRow[]) => void;
 }) {
   const [attempt, setAttempt] = useState(0);
@@ -69,24 +77,17 @@ function List({
     return () => {
       live = false;
     };
-  }, [api, kind, attempt]);
+  }, [api, kind, attempt, reload]);
   useEffect(() => {
     if (kind === "meetings" && typeof state !== "string") onRows?.(state.rows);
   }, [kind, onRows, state]);
   return (
     <section
       aria-label={TITLE[kind]}
-      className="park-agenda-state park-agenda-peoplelist"
+      className="park-agenda-card park-agenda-peoplelist"
       data-testid={`agenda-${kind}`}
     >
       <h2>{TITLE[kind]}</h2>
-      {host ? (
-        <HostMeeting
-          api={host.api}
-          hostState={host.state}
-          onChanged={() => setAttempt((n) => n + 1)}
-        />
-      ) : null}
       {state === "loading" ? (
         <output>Loading…</output>
       ) : state === "failed" ? (
@@ -97,7 +98,10 @@ function List({
           </button>
         </div>
       ) : state.rows.length === 0 ? (
-        <p>{EMPTY[kind]}</p>
+        <div className="park-agenda-empty">
+          <p className="park-agenda-empty__title">{EMPTY[kind]}</p>
+          {EMPTY_HINT[kind] ? <p>{EMPTY_HINT[kind]}</p> : null}
+        </div>
       ) : (
         <>
           <ul>
@@ -148,15 +152,24 @@ export function PeopleLists({ onMeetings }: { onMeetings?: (rows: PeopleRow[]) =
     const flow = http ? liveConnectFlow() : null;
     return http && flow ? { api: meetingHostApi(http), state: () => flow.meetingHost() } : null;
   }, [http]);
+  const [reload, setReload] = useState(0);
   if (!api) return null;
   return (
     <>
+      {host ? (
+        <HostMeeting
+          api={host.api}
+          hostState={host.state}
+          onChanged={() => setReload((n) => n + 1)}
+        />
+      ) : null}
       <List
         kind="meetings"
         api={api}
         minutes={minutes}
         host={host}
         readBrief={readBrief}
+        reload={reload}
         {...(onMeetings ? { onRows: onMeetings } : {})}
       />
     </>
