@@ -5,4 +5,7 @@ import { installBootCover } from "./bootCover";
 const afterFirstPaint = (decoded: Promise<void>) =>
   decoded.then(() => new Promise<void>((resolve) => window.setTimeout(resolve, 0)));
 
-void afterFirstPaint(installBootCover()).then(() => import("./startApp"));
+void afterFirstPaint(installBootCover())
+  .then(() => import("./startApp"))
+  .then(() => import("./staleBuild"))
+  .then((stale) => stale.watchForNewBuild());

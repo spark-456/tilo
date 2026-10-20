@@ -145,17 +145,39 @@ class MeetBrowser:
         # Keep the caller API, but persist no browser pixels.
         return self.cfg.debug_dir / f"{label}.png"
 
+    async def _first_visible(self, sel: S.Sel) -> Any | None:
+        for strat in sel.strategies:
+            try:
+                loc = locate(self.page, strat).first
+                if await loc.is_visible():
+                    return loc
+            except Exception:
+                continue
+        return None
+
+    async def reveal_toolbar(self) -> None:
+        """Meet hides its call toolbar while the mouse is still, and a cloud browser's mouse never moves (live 20 Oct:
+        the chat button was never visible, so the intro was never posted). Hover the toolbar's band to bring it back."""
+        try:
+            size = self.page.viewport_size or {"width": 1280, "height": 720}
+            x = size["width"] // 2 + random.randint(-40, 40)
+            await self.page.mouse.move(x, size["height"] - 140)
+            await self.page.mouse.move(x + 5, size["height"] - 60, steps=3)
+            await asyncio.sleep(0.4)
+        except Exception:
+            pass
+
     async def find(self, sel: S.Sel, timeout_s: float = 0.0) -> Any | None:
-        """First visible match over the selector's strategies, polling up to timeout_s. None if not found."""
+        """First visible match over the selector's strategies, polling up to timeout_s. None if not found.
+        A call-toolbar control that is hidden gets one toolbar reveal per pass before it counts as missing."""
         deadline = time.monotonic() + timeout_s
         while True:
-            for strat in sel.strategies:
-                try:
-                    loc = locate(self.page, strat).first
-                    if await loc.is_visible():
-                        return loc
-                except Exception:
-                    continue
+            loc = await self._first_visible(sel)
+            if loc is None and sel.name in S.TOOLBAR_CONTROLS:
+                await self.reveal_toolbar()
+                loc = await self._first_visible(sel)
+            if loc is not None:
+                return loc
             if time.monotonic() >= deadline:
                 return None
             await asyncio.sleep(0.3)
@@ -163,9 +185,23 @@ class MeetBrowser:
     async def visible(self, sel: S.Sel) -> bool:
         return await self.find(sel) is not None
 
+    async def _click_attached(self, sel: S.Sel) -> bool:
+        """Last resort for a toolbar control that stays hidden: click the attached element itself."""
+        for strat in sel.strategies:
+            try:
+                loc = locate(self.page, strat).first
+                if await loc.count() > 0:
+                    await loc.evaluate("e => e.click()")
+                    return True
+            except Exception:
+                continue
+        return False
+
     async def click(self, sel: S.Sel, timeout_s: float = 0.0, required: bool = False) -> bool:
         loc = await self.find(sel, timeout_s)
         if loc is None:
+            if sel.name in S.TOOLBAR_CONTROLS and await self._click_attached(sel):
+                return True
             if required:
                 await self.selector_miss(sel)
             return False
