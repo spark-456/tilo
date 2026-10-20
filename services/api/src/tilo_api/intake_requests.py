@@ -47,6 +47,7 @@ async def once(
     scenario: str | None,
     perform: Callable[[], Coroutine[Any, Any, Any]],
     refs: list[dict[str, Any]] | None = None,
+    inputs: dict[str, str] | None = None,
 ) -> Any:
     if re.fullmatch(r"[A-Za-z0-9._-]{1,64}", key) is None:
         raise HTTPException(status_code=422, detail="The Idempotency-Key is not valid.")
@@ -58,6 +59,7 @@ async def once(
         scenario,
         [(f.filename, hashlib.sha256(f.content).hexdigest()) for f in request.files],
         *([refs] if refs else []),  # SKILL-TAG: the same key with other refs is another request
+        *([{"inputs": inputs}] if inputs is not None else []),  # TS-19: and other run-form values
     ]
     fingerprint = _Fingerprint(digest=hashlib.sha256(json.dumps(payload, ensure_ascii=False).encode()).hexdigest())
 
