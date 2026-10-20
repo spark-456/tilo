@@ -26,6 +26,7 @@ from tilo_providers.prompts import neutralise_marker
 
 from tilo_api import team_access, team_store
 from tilo_api.skills_routes import _ROOT, WRITER, StepIn, _declared
+from tilo_api.web_tools import typed_hosts
 
 logger = logging.getLogger("tilo_api.skills_understand")
 _NO_TOOL_VERBS = frozenset({"read", "draft", "write"})  # what a step with no tool can do: it only works on text
@@ -103,18 +104,20 @@ def allocate(
 
 def clean_hosts(raw: Any, steps: list[StepIn], typed: str | None) -> list[str]:
     """TS-18: hosts only for a kept browse step, each valid under browser.schema.json#/$defs/host and, when the person
-    typed the work, named in what they typed. Nothing a model adds survives."""
+    typed the work, named in what they typed. Nothing a model adds survives. DEMO-BROWSER: the model's "www.site" for
+    a typed "site" is that typed site, and when no model host survives, the sites code finds in the typed words are."""
     if not any(s.action == "browse_web" for s in steps):
         return []
     found: list[str] = []
     for host in raw if isinstance(raw, list) else []:
-        if (
-            isinstance(host, str)
-            and host not in found
-            and conforms("browser.schema.json#/$defs/host", host)
-            and (typed is None or host in typed)
-        ):
+        if not isinstance(host, str):
+            continue
+        if typed is not None and host not in typed and host.startswith("www.") and host[4:] in typed:
+            host = host[4:]
+        if host not in found and conforms("browser.schema.json#/$defs/host", host) and (typed is None or host in typed):
             found.append(host)
+    if not found and typed is not None:
+        found = [h for h in sorted(typed_hosts([typed])) if conforms("browser.schema.json#/$defs/host", h)]
     return found[:10]
 
 

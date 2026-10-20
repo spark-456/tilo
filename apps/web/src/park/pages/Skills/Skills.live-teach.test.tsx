@@ -32,6 +32,7 @@ import {
   typeInto,
 } from "../../../../test-support/park/skillsHarness";
 import { createLiveApi } from "../../api/liveApi";
+import { BROWSER_NOTE } from "../../shared/browserNote";
 import { TRY_OFF } from "./TeachWizard";
 
 afterEach(() => {
@@ -420,13 +421,27 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
     });
   });
 
-  it("P0_SKILLS_browser_task_states_limit_on_review", async () => {
+  it("DEMO_BROWSER_a_browse_step_on_review_says_it_runs_in_tilos_browser", async () => {
+    const BROWSE = { ...READ, text: "Open youtube.com and read the top videos", tool: "web" };
+    const browse = { ...BROWSE, action: "browse_web" };
+    const r = await rig({
+      "POST /v1/skills/captures/tsk_C1/version": () =>
+        json({ ...VERSION, plan_steps: [browse], hosts: ["youtube.com"] }),
+    }).mount();
+    await describe_(r, "Open youtube.com and read the top videos");
+    clickEl(control(r.el, NEXT_REVIEW));
+    await settle();
+    expect(text(r)).toContain(BROWSER_NOTE);
+    expect(text(r)).not.toContain("Needs browser control (coming)");
+  });
+
+  it("DEMO_BROWSER_words_about_a_site_alone_add_no_browser_note", async () => {
     const r = await rig().mount();
     await describe_(r, "Open YouTube and play the first video");
     clickEl(control(r.el, NEXT_REVIEW));
     await settle();
-    expect(text(r)).toContain("Needs browser control (coming)");
-    expect(text(r)).not.toContain("will search the web and summarise instead");
+    expect(text(r)).not.toContain(BROWSER_NOTE);
+    expect(text(r)).not.toContain("Needs browser control (coming)");
   });
   it("test_R_SKILL_TEACH_502_keeps_capture_and_opens_one_editable_step", async () => {
     const { server, mount } = rig({

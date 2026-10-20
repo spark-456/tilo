@@ -88,7 +88,8 @@ def test_P0_SKILLS_catalog_flags_browser_work_even_after_the_first_three_steps()
     from tilo_api.skills_route import taught_entries
 
     skill = taught("tsk_later_browser", PRIYA, "Site research")
-    skill["plan"] = [*skill["plan"] * 3, {**skill["plan"][0], "text": "Open the supplier website"}]
+    browse = {**skill["plan"][0], "text": "Open the supplier website", "tool": "web", "action": "browse_web"}
+    skill["plan"] = [*skill["plan"] * 3, browse]  # DEMO-BROWSER: the flag is the browse_web step, not its wording
     entry = taught_entries([skill], PRIYA)[0]
     assert entry["needs_browser_control"] is True
 

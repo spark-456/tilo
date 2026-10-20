@@ -46,11 +46,23 @@ def test_FR_CON_07_hosts_come_from_https_urls_in_text() -> None:
         "https://intranet/wiki",  # a bare name is not a public host
         "ftp://files.example.org/a",
         "javascript:alert(1) https://",
-        "no urls here, only example.org",
+        # DEMO-BROWSER: a bare site name is a host now (below), but an address, a file name or an abbreviation is not
+        "mail the summary to ana@example.org",
+        "summarise report.pdf, data.csv, notes.txt and index.html",
+        "e.g. the U.S. budget, i.e. version 3.8",
+        "open metadata.google.internal or app.localhost",
     ],
 )
 def test_FR_CON_07_unsafe_or_non_https_urls_add_no_host(text: str) -> None:
     assert typed_hosts([text]) == set()
+
+
+def test_DEMO_BROWSER_bare_site_names_the_person_typed_are_hosts() -> None:
+    """The owner's real tasks name sites without a scheme ("Open wikipedia.org, search for ...")."""
+    assert typed_hosts(["Use the browser to open wikipedia.org and summarise today's featured article"]) == {
+        "wikipedia.org"
+    }
+    assert typed_hosts(["Open www.BBC.co.uk/news, then Example.COM."]) == {"www.bbc.co.uk", "example.com"}
 
 
 def test_FR_CON_07_the_number_of_typed_hosts_is_bounded() -> None:
