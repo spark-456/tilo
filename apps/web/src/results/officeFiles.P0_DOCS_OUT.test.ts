@@ -49,7 +49,7 @@ describe("P0_DOCS_OUT office previews", () => {
   });
 
   it("P0_DOCS_OUT_browser_inflate_reads_the_same_files", async () => {
-    if (typeof DecompressionStream === "undefined") return; // older runtimes: the node inflate above covers parsing
+    expect(typeof DecompressionStream).toBe("function"); // the browser's own inflate, no injected helper
     const view = await previewXlsx(file("sales.xlsx", XLSX), 1);
     expect(view.rows[0]?.[0]).toBe("Region");
   });
