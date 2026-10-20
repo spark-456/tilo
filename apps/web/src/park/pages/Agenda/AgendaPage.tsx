@@ -350,6 +350,9 @@ function Plate({ A, api, app }: { A: LiveAgenda; api: Api; app: AppCtx }) {
         onDeleted={() => setPeopleKey((n) => n + 1)}
         compact={app.vw <= PHONE_WIDTH}
       />
+      <div id="agenda-meetings" tabIndex={-1} className="park-agenda-meetingsblock">
+        <PeopleLists key={peopleKey} onMeetings={setMeetings} />
+      </div>
       <LivePinboards
         key={peopleKey}
         load={pinboards?.getPinboards ?? null}
@@ -381,9 +384,6 @@ function Plate({ A, api, app }: { A: LiveAgenda; api: Api; app: AppCtx }) {
             </h2>
             {list(A.plate.parked, "No parked work.")}
           </section>
-          <div id="agenda-meetings" tabIndex={-1}>
-            <PeopleLists key={peopleKey} onMeetings={setMeetings} />
-          </div>
         </div>
         <aside className="park-agenda-studioside">
           <section aria-label="Event details" className="park-agenda-state park-agenda-sidecard">
