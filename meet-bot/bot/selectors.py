@@ -105,6 +105,8 @@ IN_CALL_MARK = _s(
     ("aria", "Show everyone"),
     ("aria", "Raise hand"),
     ("aria", "Send a reaction"),
+    # Top-bar control of a joined call, present even while the bottom toolbar is not rendered (live 20 Oct 16:27).
+    ("aria", "More activities in this meeting"),
 )
 CAPTIONS_ON = _s("captions_turn_on", ("role", "button", r"turn on captions"), ("aria", "Turn on captions"))
 CAPTIONS_OFF = _s("captions_turn_off", ("role", "button", r"turn off captions"), ("aria", "Turn off captions"))
