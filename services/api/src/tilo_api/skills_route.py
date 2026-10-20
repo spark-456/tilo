@@ -196,7 +196,9 @@ class SkillContext:
         return None if found is None else _data(found, 1.0, "tagged")
 
     def taught_plan(self, tagged: dict[str, Any] | None) -> list[dict[str, Any]] | None:
-        """Return the readable version's stored steps for an explicitly tagged taught skill."""
+        """Return the readable version's stored steps for an explicitly tagged taught skill. A browse step carries the
+        skill's saved hosts (TS-18), the sites the person approved when they saved it: the run's copy is the only place
+        the browser learns which site to open (BR-02), since "Run the skill" names none."""
         if tagged is None or tagged.get("kind") != "taught":
             return None
         try:
@@ -213,7 +215,11 @@ class SkillContext:
         except Exception as exc:  # noqa: BLE001 - intake already resolved visibility; a second read fails closed
             logger.warning("tagged taught skill plan not read: %s", type(exc).__name__)
             return None
-        return None if record is None else json.loads(json.dumps(record["plan"]))
+        if record is None:
+            return None
+        hosts = [h for h in record.get("hosts") or [] if isinstance(h, str)]
+        plan: list[dict[str, Any]] = json.loads(json.dumps(record["plan"]))
+        return [{**s, "hosts": hosts} if s.get("action") == "browse_web" and hosts else s for s in plan]
 
     def block(self) -> str:
         """The catalog as fenced data for a prompt: one line per skill, name and purpose only."""

@@ -320,6 +320,7 @@ class Run:
             self.brief["deliverables"][pick["deliverable"]]["make_with"] = pick["make_with"]
         self.skill = task.skill  # SKILL-ROUTE: what the start-plan card named; a library skill is pinned in `_prepare`
         self.skill_plan = copy.deepcopy(task.skill_plan)
+        self.skill_request = getattr(task, "skill_request", None)  # SKILLS-E2E: the run's input values, verbatim
         self.intake_answers = (
             tuple(  # (the Director's question, the person's answer) for the units' prompts (UNIT-PROMPT)
                 (q.text, str(task.answers[q.field]))
@@ -794,6 +795,7 @@ class Run:
                 brief={
                     **copy.deepcopy(self.brief),
                     **({"taught_skill_steps": [s["text"] for s in self.skill_plan]} if self.skill_plan else {}),
+                    **({"taught_skill_request": self.skill_request} if self.skill_plan and self.skill_request else {}),
                 },
                 intake_answers=self.intake_answers,
             )  # fmt: skip
