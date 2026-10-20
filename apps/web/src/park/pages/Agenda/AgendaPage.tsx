@@ -186,7 +186,11 @@ function Plate({ A, api, app }: { A: LiveAgenda; api: Api; app: AppCtx }) {
   const [selected, setSelected] = useState<AgendaPlateRow | null>(targetRow);
   const [teamIds, setTeamIds] = useState<string[]>([]);
   const [personId, setPersonId] = useState<string | null>(null);
-  const [schedule, setSchedule] = useState<{ start: string; minutes: number } | null>(null);
+  const [schedule, setSchedule] = useState<{
+    start: string;
+    minutes: number;
+    title?: string;
+  } | null>(null);
   const demo = sessionView.demo();
   const http = useMemo(() => {
     const baseUrl = API_URL?.trim();
@@ -221,11 +225,11 @@ function Plate({ A, api, app }: { A: LiveAgenda; api: Api; app: AppCtx }) {
       current = false;
     };
   }, [api, http]);
-  const meetHere = async (start: string, minutes: number) => {
+  const meetHere = async (start: string, minutes: number, title?: string) => {
     if (!host) throw new Error("Meeting host is unavailable");
     const { you } = await host.people();
     const form: HostForm = {
-      title: "Meet with Tilo",
+      title: title || "Meet with Tilo",
       start: agendaLocalDateTime(start),
       minutes,
       attested: true,
@@ -335,7 +339,9 @@ function Plate({ A, api, app }: { A: LiveAgenda; api: Api; app: AppCtx }) {
         parked={A.plate.parked}
         today={A.plate.today}
         meetings={meetings}
-        onSchedule={(start, minutes) => setSchedule({ start, minutes })}
+        onSchedule={(start, minutes, title) =>
+          setSchedule({ start, minutes, ...(title ? { title } : {}) })
+        }
         host={host}
         {...(hostState ? { hostState } : {})}
         minutes={minutes}
@@ -418,6 +424,7 @@ function Plate({ A, api, app }: { A: LiveAgenda; api: Api; app: AppCtx }) {
           api={host}
           start={schedule.start}
           minutes={schedule.minutes}
+          {...(schedule.title ? { title: schedule.title } : {})}
           onClose={() => setSchedule(null)}
           onScheduled={() => setPeopleKey((n) => n + 1)}
         />

@@ -22,17 +22,19 @@ export function ScheduleWithOthersDialog({
   api,
   start,
   minutes,
+  title = "",
   onClose,
   onScheduled,
 }: {
   api: MeetingHostApi | null;
   start: string;
   minutes: number;
+  title?: string;
   onClose: () => void;
   onScheduled: () => void;
 }) {
   const [form, setForm] = useState<HostForm>({
-    title: "",
+    title,
     start: localInput(start),
     minutes: (LENGTHS as readonly number[]).includes(minutes) ? minutes : 15,
     attested: false,

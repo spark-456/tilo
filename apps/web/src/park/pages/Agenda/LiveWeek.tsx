@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import type { HostState } from "../../../api/connect";
 import type { MeetingHostApi } from "../../api/live/meetingHost";
 import type { MeetingMinutesApi } from "../../api/live/meetingMinutes";
@@ -118,12 +118,12 @@ export function LiveWeek({
   parked: AgendaPlateRow[];
   today?: string | null;
   meetings: PeopleRow[];
-  onSchedule: (start: string, minutes: number) => void;
+  onSchedule: (start: string, minutes: number, title?: string) => void;
   host: MeetingHostApi | null;
   hostState?: () => Promise<HostState>;
   minutes: MeetingMinutesApi | null;
   getJson: ((path: string) => Promise<unknown>) | null;
-  onMeetHere?: (start: string, minutes: number) => Promise<void>;
+  onMeetHere?: (start: string, minutes: number, title?: string) => Promise<void>;
   onDeleted?: () => void;
   /** A phone shows one day at first: seven columns do not fit beside each other. */
   compact?: boolean;
@@ -136,7 +136,14 @@ export function LiveWeek({
     date.setDate(start.getDate() + index);
     return date;
   });
-  const entries: Entry[] = [
+  const [cals, setCals] = useState<Record<Tone, boolean>>({
+    work: true,
+    personal: true,
+    tilo: true,
+  });
+  const [quickTitle, setQuickTitle] = useState("");
+  const [popAt, setPopAt] = useState<{ top: number; left: number } | null>(null);
+  const allEntries: Entry[] = [
     ...rows
       .filter((row) => row.ref.kind === CALENDAR_ENTRY_KIND && row.at && row.title)
       .map((row) => ({
@@ -155,6 +162,7 @@ export function LiveWeek({
         meeting,
       })),
   ];
+  const entries = allEntries.filter((entry) => cals[toneOf(entry)]);
   const todayKey = today?.slice(0, 10) ?? localDate(new Date());
   const todayEntries = entries
     .filter((entry) => localDate(new Date(entry.start)) === todayKey)
@@ -282,7 +290,6 @@ export function LiveWeek({
       live = false;
     };
   }, [getJson, selectedMeetingId]);
-  const selectedDate = selected ? human(selected.start) : "";
   const join = async (meeting: PeopleRow) => {
     if (!host) return;
     const tab = openMeetTab();
@@ -293,6 +300,37 @@ export function LiveWeek({
       tab?.close();
       setJoinError("The Meet link is not available right now.");
     }
+  };
+
+  const openEntry = (entry: Entry, anchor: HTMLElement) => {
+    const box = anchor.getBoundingClientRect();
+    const width = document.documentElement.clientWidth || 1200;
+    const height = document.documentElement.clientHeight || 800;
+    const right = box.right + 8;
+    const left = right + 320 > width ? box.left - 328 : right;
+    setPopAt({ top: Math.max(8, Math.min(box.top, height - 360)), left: Math.max(8, left) });
+    setSelected(entry);
+    setBriefRequested(false);
+  };
+  const rangeDays = view === "Month" ? monthDays : days;
+  const rangeKeys = new Set(rangeDays.map(localDate));
+  const rangeEmpty = !entries.some((entry) => rangeKeys.has(localDate(new Date(entry.start))));
+  const emptyLine = rangeEmpty ? (
+    <p className="cx-agenda-emptyline">
+      {view === "Month"
+        ? "No events this month. Connect Google Calendar or press Create."
+        : "No events this week. Connect Google Calendar or press Create."}
+    </p>
+  ) : null;
+  const fullDate = (value: string): string => {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? ""
+      : new Intl.DateTimeFormat(undefined, {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        }).format(date);
   };
 
   return (
@@ -312,7 +350,7 @@ export function LiveWeek({
               <button
                 key={localDate(day)}
                 type="button"
-                className={`${localDate(day) === todayKey ? "is-today" : ""} ${day.getMonth() === monthFirst.getMonth() ? "" : "is-outside"}`}
+                className={`${localDate(day) === todayKey ? "is-today" : ""} ${localDate(day) === selectedDay ? "is-selected" : ""} ${day.getMonth() === monthFirst.getMonth() ? "" : "is-outside"}`}
                 aria-label={`Show ${new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(day)}`}
                 onClick={() => chooseDay(day)}
               >
@@ -321,6 +359,20 @@ export function LiveWeek({
             ))}
           </div>
         </aside>
+        <section className="cx-agenda-cals" aria-label="My calendars">
+          <h2>My calendars</h2>
+          {(["work", "personal", "tilo"] as const).map((tone) => (
+            <label key={tone} className="cx-agenda-calrow" data-event-tone={tone}>
+              <input
+                type="checkbox"
+                checked={cals[tone]}
+                onChange={() => setCals((prev) => ({ ...prev, [tone]: !prev[tone] }))}
+              />
+              <span aria-hidden="true" className="cx-agenda-calbox" />
+              {tone === "work" ? "Work" : tone === "personal" ? "Personal" : "Tilo"}
+            </label>
+          ))}
+        </section>
         <section className="cx-agenda-today" aria-label="Today's calendar">
           <h2>Today's calendar</h2>
           {todayEntries.length ? (
@@ -341,23 +393,25 @@ export function LiveWeek({
       <div className="cx-agenda-weektitle">
         <div>
           <h2>
-            {view === "Week" ? "Week of " : ""}
             {new Intl.DateTimeFormat(
               undefined,
-              view === "Month"
-                ? { month: "long", year: "numeric" }
-                : { day: "numeric", month: "short", year: "numeric" },
-            ).format(view === "Day" ? civilDate(selectedDay) : start)}
+              view === "Day"
+                ? { day: "numeric", month: "long", year: "numeric" }
+                : { month: "long", year: "numeric" },
+            ).format(view === "Day" ? civilDate(selectedDay) : view === "Week" ? days[3] : start)}
           </h2>
-          <p>
-            {view === "Month"
-              ? "Pick a day to open it, or choose an event to see its details."
-              : "Choose an open time or drag across 15-minute slots to schedule."}
-          </p>
         </div>
         <div className="cx-agenda-weekactions">
-          <button type="button" aria-label="Previous week" onClick={() => navigate(-1)}>
-            ‹
+          <button
+            type="button"
+            className="cx-agenda-create"
+            onClick={() => {
+              const now = new Date();
+              now.setMinutes(Math.ceil(now.getMinutes() / 15) * 15, 0, 0);
+              onSchedule(now.toISOString(), 15);
+            }}
+          >
+            + Create
           </button>
           <button
             type="button"
@@ -369,18 +423,11 @@ export function LiveWeek({
           >
             Today
           </button>
+          <button type="button" aria-label="Previous week" onClick={() => navigate(-1)}>
+            ‹
+          </button>
           <button type="button" aria-label="Next week" onClick={() => navigate(1)}>
             ›
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const now = new Date();
-              now.setMinutes(Math.ceil(now.getMinutes() / 15) * 15, 0, 0);
-              onSchedule(now.toISOString(), 15);
-            }}
-          >
-            + New
           </button>
           <fieldset className="cx-agenda-views" aria-label="Calendar view">
             {(["Day", "Week", "Month"] as const).map((mode) => (
@@ -397,6 +444,7 @@ export function LiveWeek({
         </div>
       </div>
       <section className="cx-agenda-month" aria-label="Month calendar" hidden={view !== "Month"}>
+        {view === "Month" ? emptyLine : null}
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
           <span aria-hidden="true" className="cx-agenda-monthhead" key={day}>
             {day}
@@ -421,10 +469,7 @@ export function LiveWeek({
                   type="button"
                   className="cx-agenda-monthchip"
                   data-event-tone={toneOf(entry)}
-                  onClick={() => {
-                    setSelected(entry);
-                    setBriefRequested(false);
-                  }}
+                  onClick={(event) => openEntry(entry, event.currentTarget)}
                 >
                   {entry.title}
                 </button>
@@ -448,6 +493,7 @@ export function LiveWeek({
         data-view={view.toLowerCase()}
         hidden={view === "Month"}
       >
+        {view === "Month" ? null : emptyLine}
         <div className="cx-agenda-headrow">
           <span aria-hidden="true" />
           {days.map((day) => {
@@ -558,10 +604,7 @@ export function LiveWeek({
                       left: `calc(${(lane / lanes) * 100}% + 3px)`,
                       width: `calc(${100 / lanes}% - 6px)`,
                     }}
-                    onClick={() => {
-                      setSelected(entry);
-                      setBriefRequested(false);
-                    }}
+                    onClick={(event) => openEntry(entry, event.currentTarget)}
                     aria-label={`${entry.title}, ${human(entry.start)}`}
                   >
                     <strong>{entry.title}</strong>
@@ -570,10 +613,18 @@ export function LiveWeek({
                 ))}
                 {slotPick?.day === dayIndex ? (
                   <fieldset
-                    className="cx-agenda-slot-popover"
+                    className={`cx-agenda-slot-popover${dayIndex >= 4 && view !== "Day" ? " is-right" : ""}`}
                     style={{ top: slotPick.slot * SLOT_HEIGHT + SLOT_HEIGHT }}
                     aria-label="Schedule at this time"
                   >
+                    <input
+                      type="text"
+                      className="cx-agenda-addtitle"
+                      aria-label="Add title"
+                      placeholder="Add title"
+                      value={quickTitle}
+                      onChange={(event) => setQuickTitle(event.target.value)}
+                    />
                     <strong>{human(slotStart(day, slotPick.slot).toISOString())}</strong>
                     <p>Tilo will join at this time and prepare meeting notes.</p>
                     {hostConnection === "connected" ? (
@@ -586,9 +637,11 @@ export function LiveWeek({
                           void onMeetHere?.(
                             slotStart(day, slotPick.slot).toISOString(),
                             slotPick.minutes,
+                            ...(quickTitle.trim() ? [quickTitle.trim()] : []),
                           )
                             .then(() => {
                               setSlotPick(null);
+                              setQuickTitle("");
                               onDeleted?.();
                             })
                             .catch(() =>
@@ -609,8 +662,13 @@ export function LiveWeek({
                     <button
                       type="button"
                       onClick={() => {
-                        onSchedule(slotStart(day, slotPick.slot).toISOString(), slotPick.minutes);
+                        onSchedule(
+                          slotStart(day, slotPick.slot).toISOString(),
+                          slotPick.minutes,
+                          ...(quickTitle.trim() ? [quickTitle.trim()] : []),
+                        );
                         setSlotPick(null);
+                        setQuickTitle("");
                       }}
                     >
                       Invite others...
@@ -637,7 +695,22 @@ export function LiveWeek({
         </div>
       </section>
       {selected ? (
-        <aside className="park-agenda-state cx-agenda-selected" aria-label="Event details">
+        <aside
+          className="park-agenda-state cx-agenda-selected"
+          aria-label="Event details"
+          data-event-tone={toneOf(selected)}
+          style={
+            popAt
+              ? ({
+                  "--pop-top": `${popAt.top}px`,
+                  "--pop-left": `${popAt.left}px`,
+                } as CSSProperties)
+              : undefined
+          }
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setSelected(null);
+          }}
+        >
           <button
             type="button"
             className="cx-agenda-close"
@@ -646,8 +719,12 @@ export function LiveWeek({
           >
             ×
           </button>
-          <h3>{selected.title}</h3>
-          <p>{selectedDate}</p>
+          <h3 className="cx-agenda-poptitle">
+            <span aria-hidden="true" className="cx-agenda-popdot" />
+            {selected.title}
+          </h3>
+          <p>{`${fullDate(selected.start)} · ${range(selected)}`}</p>
+          {toneOf(selected) === "tilo" ? <p>Tilo joins and takes notes</p> : null}
           {selectedMeeting ? (
             attendeeNames === null ? (
               <p>Loading people…</p>
@@ -675,7 +752,7 @@ export function LiveWeek({
           ) : null}
           {selectedMeeting && host && selectedMeeting.status === "scheduled" ? (
             <button type="button" onClick={() => void join(selectedMeeting)}>
-              Join now
+              Open meeting
             </button>
           ) : null}
           {joinError ? <p role="alert">{joinError}</p> : null}
