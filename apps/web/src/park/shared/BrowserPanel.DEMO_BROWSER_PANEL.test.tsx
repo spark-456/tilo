@@ -131,6 +131,61 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
     await act(async () => root.unmount());
   });
 
+  it("DEMO_BROWSER steps back and forth through every recorded frame after the run, as display state", async () => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:frame"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+    const getBrowserFrame = vi.fn(async () => new Blob(["masked"], { type: "image/png" }));
+    const client = { getBrowserFrame } as unknown as TiloClient;
+    const session = "bs_01K7M000000000000000000000";
+    const box = { x: 0, y: 0, width: 1200, height: 800 };
+    const events = [
+      recorded(1, "browser.started", {
+        session,
+        host: "en.wikipedia.org",
+        frame: { artifact_id: "art_0" },
+      }),
+      recorded(2, "browser.acted", {
+        session,
+        verdict: "done",
+        kind: "scroll",
+        frame: { artifact_id: "art_1" },
+        target_box: box,
+        caption: "Scrolling down",
+      }),
+      recorded(3, "browser.acted", {
+        session,
+        verdict: "done",
+        kind: "extract",
+        frame: { artifact_id: "art_2" },
+        target_box: box,
+        caption: "Reading en.wikipedia.org",
+      }),
+      recorded(4, "browser.stopped", { session, outcome: "done", steps: 2 }),
+    ];
+    const node = document.createElement("div");
+    const root = createRoot(node);
+    await act(async () =>
+      root.render(<BrowserPanel client={client} worldId="w_demo" events={events} replay={false} />),
+    );
+    const button = (name: string) =>
+      Array.from(node.querySelectorAll("button")).find((b) => b.textContent === name);
+    expect(getBrowserFrame).toHaveBeenLastCalledWith("w_demo", "art_2");
+    expect(button("Later")?.disabled).toBe(true);
+    await act(async () => button("Earlier")?.click());
+    expect(getBrowserFrame).toHaveBeenLastCalledWith("w_demo", "art_1");
+    expect(node.textContent).toContain("Frame 2 of 3: Scrolling down");
+    await act(async () => button("Earlier")?.click());
+    expect(getBrowserFrame).toHaveBeenLastCalledWith("w_demo", "art_0");
+    expect(button("Earlier")?.disabled).toBe(true);
+    await act(async () => button("Latest")?.click());
+    expect(getBrowserFrame).toHaveBeenLastCalledWith("w_demo", "art_2");
+    expect(node.textContent).toContain("Browser stopped");
+    await act(async () => root.unmount());
+  });
+
   it("DEMO_BROWSER says a frame the server will not serve could not be shown, never loads forever", async () => {
     const getBrowserFrame = vi.fn(async () => {
       throw new Error("404");

@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 from test_DEMO_BROWSER_STEP import FakeRpc, FakeRun
-from tilo_api.browser_step import BrowseStepExecutor
+from tilo_api.browser_step import READ_SCROLLS, BrowseStepExecutor
 from tilo_api.web_tools import BROWSER_FALLBACK_NOTE, FetchTool, search_engine_host
 from tilo_browser.fetch import FetchBlocked
 from tilo_browser.session import SessionRefused
@@ -95,12 +95,14 @@ def test_P0_RUNS_FIX_an_allowlisted_page_is_read_in_the_visible_browser() -> Non
     )
 
     assert text == "First. Second. Third."
-    assert rpc.calls == ["start", "extract", "end"]
-    assert [kind for kind, _ in run.events] == ["browser.started", "browser.acted", "browser.stopped"]
-    started, acted, stopped = (data for _, data in run.events)
+    # DEMO-BROWSER: the read looks through the page (READ_SCROLLS scrolls) before it extracts
+    assert rpc.calls == ["start", *["scroll"] * READ_SCROLLS, "extract", "end"]
+    kinds = [kind for kind, _ in run.events]
+    assert kinds == ["browser.started", *["browser.acted"] * (READ_SCROLLS + 1), "browser.stopped"]
+    started, acted, stopped = run.events[0][1], run.events[-2][1], run.events[-1][1]
     assert started["frame"] and acted["frame"], "every recorded step carries its real frame"
     assert acted["kind"] == "extract" and acted["verdict"] == "done" and acted["caption"] == "Reading example.org"
-    assert stopped["outcome"] == "done" and stopped["steps"] == 1
+    assert stopped["outcome"] == "done" and stopped["steps"] == READ_SCROLLS + 1
 
 
 def test_P0_RUNS_FIX_fetch_uses_the_browser_for_allowlisted_hosts_only() -> None:
