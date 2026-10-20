@@ -17,8 +17,9 @@ from reportlab.graphics.charts.linecharts import HorizontalLineChart
 from reportlab.graphics.charts.piecharts import Pie
 from reportlab.graphics.shapes import Drawing, String
 from reportlab.lib import colors, pagesizes
+from reportlab.lib.enums import TA_RIGHT
 from reportlab.lib.styles import ParagraphStyle
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, TableStyle
+from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, TableStyle
 from reportlab.platypus import Table as PlTable
 from tilo_contracts import Manifest
 
@@ -49,6 +50,10 @@ def _resolve_color(role: str, tokens: dict[str, Any]) -> colors.Color:
 def _markup(text: str) -> str:
     """Untrusted text to reportlab markup: sanitised, escaped; newlines become the only markup we emit (<br/>)."""
     return "<br/>".join(html.escape(line, quote=True) for line in lines(text))
+
+
+def _number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
 
 
 def _flat(text: str) -> str:
@@ -96,6 +101,8 @@ def _chart(ch: Any, data: ChartData, aw: float, fmt: Callable[[Any], str], th: d
     chart.data = [data.series[c] for c in ch.y_columns]
     chart.categoryAxis.categoryNames = [wrap_long_token(_flat(c)) for c in data.categories]
     chart.categoryAxis.labels.fontSize = chart.valueAxis.labels.fontSize = size
+    if is_bar and all(v >= 0 for c in ch.y_columns for v in data.series[c]):
+        chart.valueAxis.valueMin = 0  # a bar's length is its value: the axis starts at zero
     labels = chart.barLabels if is_bar else chart.lineLabels
     labels.fontSize, labels.fillColor = size, col["chart_label"]
     if is_bar:
@@ -150,19 +157,53 @@ def render_pdf(
     title_s = style("T", "Helvetica-Bold", "title_size_pt", "title", spaceAfter=6)
     sub_s = style("S", "Helvetica", "subtitle_size_pt", "subtitle", spaceAfter=4)
     date_s = style("D", "Helvetica", "date_size_pt", "date", spaceAfter=14)
-    head_s = style("H", "Helvetica-Bold", "heading_size_pt", "heading", spaceBefore=10, spaceAfter=6)
+    head_s = style("H", "Helvetica-Bold", "heading_size_pt", "heading", spaceBefore=10, spaceAfter=6, keepWithNext=1)
     body_s = style("B", "Helvetica", "body_size_pt", "body", 1.35, spaceAfter=6)
     bullet_s = style(
         "BL", "Helvetica", "bullet_size_pt", "bullet", 1.35, leftIndent=15, firstLineIndent=-10, spaceAfter=3
     )
     th_s = style("TH", "Helvetica-Bold", "table_header_size_pt", "table_header_fg")
     td_s = style("TD", "Helvetica", "table_body_size_pt", "table_row_fg")
+    th_num_s = ParagraphStyle("THN", parent=th_s, alignment=TA_RIGHT)
+    td_num_s = ParagraphStyle("TDN", parent=td_s, alignment=TA_RIGHT)
+    cover_title_s = ParagraphStyle(
+        "CT", parent=title_s, fontSize=typo["title_size_pt"] * 1.7, leading=typo["title_size_pt"] * 2
+    )
+    cover_sub_s = ParagraphStyle(
+        "CS", parent=sub_s, fontSize=typo["subtitle_size_pt"] * 1.3, leading=typo["subtitle_size_pt"] * 1.9
+    )
 
-    story: list[Any] = [Paragraph(_markup(spec.title), title_s)]
-    if spec.subtitle:
-        story.append(Paragraph(_markup(spec.subtitle), sub_s))
-    story.append(Paragraph(_markup(spec.date), date_s))
+    # A cover page, then the report from page 2; every page after the cover carries a footer with its number.
+    cover_bar = PlTable([[""]], colWidths=[72], rowHeights=[6])
+    cover_bar.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), col["title"])]))
+    cover_bar.hAlign = "LEFT"
+    if spec.layout == "one_page":  # a flyer, poster or one-pager: the title block opens the first page, no cover
+        story: list[Any] = [cover_bar, Spacer(1, 10), Paragraph(_markup(spec.title), title_s)]
+        if spec.subtitle:
+            story.append(Paragraph(_markup(spec.subtitle), sub_s))
+        story.append(Paragraph(_markup(spec.date), date_s))
+    else:
+        story = [
+            Spacer(1, doc.height * 0.3),
+            cover_bar,
+            Spacer(1, 18),
+            Paragraph(_markup(spec.title), cover_title_s),
+        ]
+        if spec.subtitle:
+            story.append(Paragraph(_markup(spec.subtitle), cover_sub_s))
+        story.extend([Spacer(1, 6), Paragraph(_markup(spec.date), date_s), Paragraph("Prepared by Tilo", date_s)])
+        story.append(PageBreak())
+    footer_text = _flat(spec.title)[:80]
 
+    def footer(canvas: Any, document: Any) -> None:
+        canvas.saveState()
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(col["date"])
+        canvas.drawString(document.leftMargin, 30, footer_text)
+        canvas.drawRightString(document.pagesize[0] - document.rightMargin, 30, f"Page {document.page}")
+        canvas.restoreState()
+
+    zebra = colors.Color(*(0.5 * a + 0.5 for a in col["table_grid"].rgb()))  # the grid colour, half way to white
     tables = {t.id: t for t in spec.tables}
     charts = {c.id: c for c in spec.charts}
     for section in spec.sections:
@@ -178,8 +219,12 @@ def render_pdf(
                 story.append(Spacer(1, 4))
             elif isinstance(block, TableBlock):
                 tbl = tables[block.table_id]
-                head = [Paragraph(_markup(c), th_s) for c in tbl.columns]
-                body = [[Paragraph(_markup(fmt(c)), td_s) for c in row] for row in tbl.rows]
+                numeric = [all(_number(row[i]) for row in tbl.rows) for i in range(len(tbl.columns))]
+                head = [Paragraph(_markup(c), th_num_s if numeric[i] else th_s) for i, c in enumerate(tbl.columns)]
+                body = [
+                    [Paragraph(_markup(fmt(c)), td_num_s if numeric[i] else td_s) for i, c in enumerate(row)]
+                    for row in tbl.rows
+                ]
                 flow = PlTable(
                     [head, *body],
                     colWidths=[doc.width / len(tbl.columns)] * len(tbl.columns),
@@ -190,6 +235,7 @@ def render_pdf(
                     TableStyle(
                         [
                             ("BACKGROUND", (0, 0), (-1, 0), col["table_header_bg"]),
+                            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, zebra]),
                             ("GRID", (0, 0), (-1, -1), 0.5, col["table_grid"]),
                             ("VALIGN", (0, 0), (-1, -1), "TOP"),
                             ("TOPPADDING", (0, 0), (-1, -1), 4),
@@ -210,5 +256,5 @@ def render_pdf(
             story.append(Paragraph(_markup(line), bullet_s, bulletText="•"))
         story.append(Spacer(1, 4))
 
-    doc.build(story)
+    doc.build(story, onLaterPages=footer)
     return buf.getvalue()

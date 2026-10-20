@@ -9,8 +9,29 @@ import type { SharedResult } from "../../park/pages/World/ResultPanel";
 import { Markdown } from "../../park/pages/World/markdown";
 import type { RunEvent } from "../../park/pages/World/useRunEvents";
 import type { ResultView } from "../../park/pages/World/useRunResult";
+import { OfficePreview } from "../../results/OfficePreview";
 import { type WebsiteArtifactVersion, WebsitePreview } from "../../results/WebsitePreview";
 import { DirectionForm } from "./DirectionForm";
+
+const OFFICE_MIME = "application/vnd.openxmlformats-officedocument.";
+const OFFICE_TYPES: Readonly<Record<string, string>> = {
+  DOCX: `${OFFICE_MIME}wordprocessingml.document`,
+  XLSX: `${OFFICE_MIME}spreadsheetml.sheet`,
+  PPTX: `${OFFICE_MIME}presentationml.presentation`,
+};
+const FILE_EXTENSIONS: Readonly<Record<string, string>> = {
+  [OFFICE_TYPES.DOCX ?? ""]: ".docx",
+  [OFFICE_TYPES.XLSX ?? ""]: ".xlsx",
+  [OFFICE_TYPES.PPTX ?? ""]: ".pptx",
+  "application/pdf": ".pdf",
+};
+
+/** DOCS-OUT: the extension a delivered Word, Excel, PowerPoint or PDF file is saved with, from its type, else its format. */
+function fileExtension(blob: Blob, format: string): string | undefined {
+  const type = blob.type.split(";")[0]?.toLowerCase() ?? "";
+  if (FILE_EXTENSIONS[type]) return FILE_EXTENSIONS[type];
+  return /^(DOCX|XLSX|PPTX|PDF)$/.test(format) ? `.${format.toLowerCase()}` : undefined;
+}
 
 const readableMath = (text: string): string =>
   text.replace(/\$\\to\$/g, "→").replace(/\$([^$\n]+)\$/g, "$1");
@@ -50,6 +71,12 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
   const markdown = mime === "text/markdown" || format === "MD" || /\.md$/i.test(name);
   const plain = mime === "text/plain" || format === "TXT" || /\.txt$/i.test(name);
   const pdf = mime === "application/pdf" || format === "PDF" || /\.pdf$/i.test(name);
+  const office =
+    mime === OFFICE_TYPES.XLSX || format === "XLSX" || /\.xlsx$/i.test(name)
+      ? "xlsx"
+      : mime === OFFICE_TYPES.DOCX || format === "DOCX" || /\.docx$/i.test(name)
+        ? "docx"
+        : null;
   const image =
     mime?.startsWith("image/") ||
     /^(PNG|JPG|JPEG|WEBP|GIF)$/.test(format) ||
@@ -81,6 +108,7 @@ function FilePreview({ blob, name, format }: { blob: Blob; name: string; format:
     setImageUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [blob, format, image, pdf]);
+  if (office) return <OfficePreview blob={blob} kind={office} />;
   if (csv && text !== null) {
     const [head = [], ...body] = csvRows(text);
     return (
@@ -200,6 +228,7 @@ interface DeliveredFile {
 }
 
 const OPEN_TYPES: Readonly<Record<string, string>> = {
+  ...OFFICE_TYPES,
   PDF: "application/pdf",
   CSV: "text/csv",
   HTML: "text/html",
@@ -530,6 +559,12 @@ export function ResultTab({
       if (isWebsite) {
         const filename = mainName.endsWith(".html") ? mainName : `${mainName}.html`;
         saveNamedResult(blob, filename);
+      } else if (fileExtension(blob, mainFormat)) {
+        const ext = fileExtension(blob, mainFormat) ?? "";
+        saveNamedResult(
+          blob,
+          mainName.toLowerCase().endsWith(ext) ? mainName : `${mainName}${ext}`,
+        );
       } else if (extension) {
         saveNamedResult(blob, mainName);
       } else {

@@ -86,9 +86,9 @@ def test_FR_CON_09_pdf_opens_and_paginates_long_tables() -> None:
     tbl = Table(id="t", columns=["ItemName", "MetricA", "MetricB"], rows=rows)
     pages = _pages(_one_section([TableBlock(table_id="t")], tables=[tbl]))
     assert len(pages) > 1
-    for idx, page in enumerate(pages):
+    for idx, page in enumerate(pages[1:], 2):  # page 1 is the cover (P0_DOCS_OUT)
         for col in tbl.columns:
-            assert col in page, f"header {col} missing on page {idx + 1}"
+            assert col in page, f"header {col} missing on page {idx}"
     text = "\n".join(pages)
     assert all(f"Item-{i}" in text for i in (0, 250, 499))
 

@@ -12,7 +12,8 @@ The object has exactly these keys and no others:
 - title: the report title (text, not empty).
 - subtitle: optional text.
 - date: today's code-supplied ISO date, YYYY-MM-DD. The renderer stamps it from the clock even if this field differs.
-- tables: a list of tables, each {"id": "t1", "columns": ["Name", "Value"], "rows": [["A", 1], ["B", 2.5]]}. Ids are unique. Every row has one cell per column; a cell is text or a number, never null. At most 500 rows.
+- layout: optional, "report" (the default: a PDF gets a cover page, then the report) or "one_page" (a flyer, poster, one-pager or short letter: the title block opens the first page and there is no cover).
+- tables: a list of tables, each {"id": "t1", "columns": ["Name", "Value"], "rows": [["A", 1], ["B", 2.5]]}. Ids are unique. Every row has one cell per column; a cell is text or a number, never null. At most 500 rows. A table may add "formulas": [{"column": "Revenue", "expr": "[Units] * [Unit price]"}] for a computed column: a new column name and arithmetic over earlier numeric columns written as [Column name] with + - * / and brackets only (no functions, no cell addresses). Tilo computes it for every row, and an Excel workbook gets it as a real formula, so do not also write that column's values in the rows.
 - charts: a list of charts, each {"id": "c1", "kind": "bar" or "line" or "pie", "table_id": "t1", "x": "Name", "y": "Value", "title": "Chart title"}. A chart reads its data from the table it names: x and every y are columns of that table, y is a column name or a list of them (a pie takes one), and the y cells are numbers. At most 200 points.
 - sections: a list of at most 60 sections, each {"heading": "Heading", "blocks": [...]}. A block is one of {"type": "paragraph", "text": "..."}, {"type": "bullets", "bullets": ["...", "..."]}, {"type": "table", "table_id": "t1"} or {"type": "chart", "chart_id": "c1"}. A table or chart shows only where a block places it, and the id must exist.
 

@@ -1,5 +1,7 @@
 """Text helpers shared by the PPTX and PDF renderers (FR-CON-09, FR-CON-10). All deliverable text is untrusted."""
 
+import json
+import re
 from pathlib import Path
 
 from tilo_contracts import Manifest
@@ -14,6 +16,16 @@ _WRAP_WIDTH = 80
 def find_repo_root() -> Path:
     cur = Path(__file__).resolve()
     return next((p for p in [cur, *cur.parents] if (p / "design" / "tokens.json").exists()), Path.cwd())
+
+
+def brand_color(fallback: str = "#33475B") -> str:
+    """The report colour (design tokens brand.primary) as #RRGGBB for header fills, or `fallback`."""
+    try:
+        node = json.loads((find_repo_root() / "design" / "tokens.json").read_text("utf-8"))["color"]["brand"]["primary"]
+        value = str(node["value"] if isinstance(node, dict) else node)
+        return value if re.fullmatch(r"#[0-9A-Fa-f]{6}", value) else fallback
+    except Exception:  # noqa: BLE001 - styling only
+        return fallback
 
 
 def sanitize_text(text: str) -> str:

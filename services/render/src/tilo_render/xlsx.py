@@ -1,7 +1,9 @@
-"""Excel workbooks from the tables of a DeliverableSpec (DOCS-OUT A4, MIT `openpyxl`).
+"""Excel workbooks from the tables of a DeliverableSpec (DOCS-OUT A4; `xlsxwriter` writes, `openpyxl` fills a template).
 
-Each table becomes a sheet: bold header row, frozen and filtered, typed numbers and ISO dates, column widths from the
-content, and a totals row of plain same-sheet `SUM` formulas under the numeric columns. Everything a model wrote is
+Each table becomes a sheet: a branded header row, frozen and filtered, typed numbers and ISO dates, column widths from
+the content, computed columns as real row formulas (`=B2*C2`), a totals row of same-sheet `SUM` formulas under the
+numeric columns (every formula also carries its computed value, so a viewer that does not recalculate still shows it),
+and a native Excel chart for each chart block. Everything a model wrote is
 data: a string is always stored as a string (never a formula, link or macro), and the workbook has no external parts.
 Total cells are capped so the file stays small and can be screened.
 """
@@ -10,19 +12,19 @@ import io
 import re
 import zipfile
 from collections.abc import Sequence
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from math import isfinite
 from typing import Any
 
+import xlsxwriter
 from openpyxl import Workbook, load_workbook
 from openpyxl.cell.cell import MergedCell
-from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import column_index_from_string, get_column_letter
-from openpyxl.worksheet.worksheet import Worksheet
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, StrictStr, field_validator
 
-from tilo_render.spec import BulletsBlock, DeliverableSpec, ParagraphBlock, Table, TableBlock
-from tilo_render.text import sanitize_text
+from tilo_render import formula
+from tilo_render.spec import BulletsBlock, Chart, DeliverableSpec, ParagraphBlock, Table, TableBlock
+from tilo_render.text import brand_color, sanitize_text
 
 MAX_XLSX_CELLS = 7000  # table cells (header and totals included) plus report lines, across all sheets
 MAX_CELL_CHARS = 32_000  # Excel's own limit is 32,767
@@ -35,7 +37,6 @@ MAX_TEMPLATE_BYTES = 8 * 1024 * 1024
 MAX_TEMPLATE_EXPANDED = 32 * 1024 * 1024
 _ADDRESS = re.compile(r"([A-Z]{1,3})([1-9][0-9]{0,4})")
 _ACTIVE_PARTS = ("externallink", "vbaproject", "activex", "embeddings/", "oleobject")
-_HEADER_FILL = PatternFill("solid", start_color="E8EDF3", end_color="E8EDF3")
 
 
 def text_value(value: Any) -> str:
@@ -62,13 +63,6 @@ def store(cell: Any, value: Any) -> None:
     cell.data_type = "s"  # a leading "=", "+", "-" or "@" is text here, never a formula
 
 
-def put(sheet: Worksheet, row: int, column: int, value: Any, *, bold: bool = False) -> None:
-    cell = sheet.cell(row=row, column=column)
-    store(cell, value)
-    if bold:
-        cell.font = Font(bold=True)
-
-
 def _sheet_name(base: str, used: set[str]) -> str:
     name = _BAD_SHEET_CHARS.sub(" ", sanitize_text(base)).replace("\n", " ").strip().strip("'").strip() or "Sheet"
     candidate, n = name[:31], 1
@@ -84,32 +78,97 @@ def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and isfinite(value)
 
 
-def _table_sheet(sheet: Worksheet, table: Table) -> None:
-    for column, name in enumerate(table.columns, 1):
-        put(sheet, 1, column, name, bold=True)
-        sheet.cell(row=1, column=column).fill = _HEADER_FILL
-    for r, row in enumerate(table.rows, 2):
-        for column, value in enumerate(row, 1):
-            put(sheet, r, column, value)
+class _Styles:
+    def __init__(self, book: Any) -> None:
+        brand = brand_color()
+        head = {"bold": True, "font_color": "#FFFFFF", "bg_color": brand, "valign": "vcenter", "border": 1}
+        self.header = book.add_format({**head, "border_color": "#D9DEE5", "text_wrap": True})
+        self.text = book.add_format({"valign": "top", "text_wrap": True})
+        self.integer = book.add_format({"num_format": "#,##0", "valign": "top"})
+        self.decimal = book.add_format({"num_format": "#,##0.00", "valign": "top"})
+        self.date = book.add_format({"num_format": "yyyy-mm-dd", "align": "left", "valign": "top"})
+        self.total_label = book.add_format({"bold": True, "top": 1})
+        self.total_int = book.add_format({"bold": True, "top": 1, "num_format": "#,##0"})
+        self.total_dec = book.add_format({"bold": True, "top": 1, "num_format": "#,##0.00"})
+        self.title = book.add_format({"bold": True, "font_size": 16, "text_wrap": True, "valign": "top"})
+        self.heading = book.add_format({"bold": True, "font_size": 12, "font_color": brand, "valign": "top"})
+        self.muted = book.add_format({"font_color": "#5A6573", "text_wrap": True, "valign": "top"})
+
+
+def _write(sheet: Any, styles: _Styles, row: int, column: int, value: Any) -> None:
+    """One cell (zero-based): numbers stay numbers, ISO dates become dates, every other string is a string."""
+    if _is_number(value):
+        sheet.write_number(row, column, value, styles.integer if isinstance(value, int) else styles.decimal)
+        return
+    plain = text_value(value)
+    if _ISO_DATE.fullmatch(plain):
+        try:
+            day = datetime.combine(date.fromisoformat(plain), datetime.min.time())
+            sheet.write_datetime(row, column, day, styles.date)
+            return
+        except ValueError:
+            pass
+    sheet.write_string(row, column, plain, styles.text)  # a leading "=", "+", "-" or "@" is text, never a formula
+
+
+def _table_sheet(sheet: Any, styles: _Styles, table: Table) -> int:
+    """Fills one sheet from a table: header, typed cells, formula columns and a totals row. Returns the last row."""
+    sheet.set_row(0, 22)
+    for column, name in enumerate(table.columns):
+        sheet.write_string(0, column, text_value(name), styles.header)
+    letters = {name: get_column_letter(c) for c, name in enumerate(table.columns, 1)}
+    computed = {f.column: formula.parse(f.expr) for f in table.formulas}
+    for r, row in enumerate(table.rows, 1):
+        for c, value in enumerate(row):
+            name = table.columns[c]
+            if name in computed and _is_number(value):
+                refs = {n: f"{letters[n]}{r + 1}" for n in formula.columns_used(computed[name])}
+                style = styles.integer if isinstance(value, int) else styles.decimal
+                sheet.write_formula(r, c, "=" + formula.to_excel(computed[name], refs), style, value)
+            else:
+                _write(sheet, styles, r, c, value)
     last = len(table.rows) + 1
     summed = [
         c
-        for c, name in enumerate(table.columns, 1)
-        if all(_is_number(row[c - 1]) for row in table.rows) and not _NOT_A_QUANTITY.search(name)
+        for c, name in enumerate(table.columns)
+        if all(_is_number(row[c]) for row in table.rows) and not _NOT_A_QUANTITY.search(name)
     ]
     if summed:
-        total = last + 1
-        if 1 not in summed:
-            put(sheet, total, 1, "Total", bold=True)
+        if 0 not in summed:
+            sheet.write_string(last, 0, "Total", styles.total_label)
         for c in summed:
-            letter = get_column_letter(c)
-            cell = sheet.cell(row=total, column=c, value=f"=SUM({letter}2:{letter}{last})")
-            cell.font = Font(bold=True)  # a formula over this sheet's own range, never model text
-    for c, name in enumerate(table.columns, 1):
-        longest = max([len(text_value(name)), *(len(text_value(row[c - 1])) for row in table.rows)])
-        sheet.column_dimensions[get_column_letter(c)].width = min(max(10, longest + 2), 60)
-    sheet.freeze_panes = "A2"
-    sheet.auto_filter.ref = f"A1:{get_column_letter(len(table.columns))}{last}"
+            letter = get_column_letter(c + 1)
+            whole = all(isinstance(row[c], int) for row in table.rows)
+            style = styles.total_int if whole else styles.total_dec
+            sheet.write_formula(last, c, f"=SUM({letter}2:{letter}{last})", style, sum(row[c] for row in table.rows))
+    for c, name in enumerate(table.columns):
+        longest = max([len(text_value(name)), *(len(text_value(row[c])) for row in table.rows)])
+        sheet.set_column(c, c, min(max(10, longest + 2), 60))
+    sheet.freeze_panes(1, 0)
+    sheet.autofilter(0, 0, last - 1, len(table.columns) - 1)
+    return last
+
+
+_CHART_TYPES = {"bar": "column", "line": "line", "pie": "pie"}
+
+
+def _add_chart(book: Any, sheet: Any, table: Table, chart: Chart, slot: int) -> None:
+    """A native Excel chart that reads the table's own cells, so it follows any edit to them."""
+    native = book.add_chart({"type": _CHART_TYPES[chart.kind.value]})
+    name = sheet.get_name()
+    x = table.columns.index(chart.x)
+    for y_name in chart.y_columns:
+        y = table.columns.index(y_name)
+        native.add_series(
+            {
+                "name": [name, 0, y],
+                "categories": [name, 1, x, len(table.rows), x],
+                "values": [name, 1, y, len(table.rows), y],
+            }
+        )
+    native.set_title({"name": text_value(chart.title)})
+    native.set_size({"width": 560, "height": 320})
+    sheet.insert_chart(1 + slot * 17, len(table.columns) + 1, native)
 
 
 def _cell_count(spec: DeliverableSpec) -> int:
@@ -118,18 +177,16 @@ def _cell_count(spec: DeliverableSpec) -> int:
     return tables + lines + 3 + len(spec.sections)
 
 
-def _report_sheet(sheet: Worksheet, spec: DeliverableSpec) -> None:
-    sheet.column_dimensions["A"].width = 100
-    wrap = Alignment(wrap_text=True, vertical="top")
-    row = 1
-    for text, bold in ((spec.title, True), (spec.subtitle or "", False), (spec.date, False)):
+def _report_sheet(sheet: Any, styles: _Styles, spec: DeliverableSpec) -> None:
+    sheet.set_column(0, 0, 100)
+    row = 0
+    for text, style in ((spec.title, styles.title), (spec.subtitle or "", styles.muted), (spec.date, styles.muted)):
         if text:
-            put(sheet, row, 1, text, bold=bold)
-            sheet.cell(row=row, column=1).alignment = wrap
+            sheet.write_string(row, 0, text_value(text), style)
             row += 1
     for section in spec.sections:
         row += 1
-        put(sheet, row, 1, section.heading, bold=True)
+        sheet.write_string(row, 0, text_value(section.heading), styles.heading)
         for block in section.blocks:
             if isinstance(block, ParagraphBlock):
                 items = [block.text]
@@ -139,8 +196,17 @@ def _report_sheet(sheet: Worksheet, spec: DeliverableSpec) -> None:
                 continue
             for item in items:
                 row += 1
-                put(sheet, row, 1, item)
-                sheet.cell(row=row, column=1).alignment = wrap
+                sheet.write_string(row, 0, text_value(item), styles.text)
+
+
+def _fixed_zip(data: bytes) -> bytes:
+    """The same package with a fixed timestamp on every part, so one spec always gives the same bytes."""
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as target:
+        for name in sorted(source.namelist(), key=lambda n: (n != "[Content_Types].xml", n)):
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            target.writestr(info, source.read(name), compress_type=zipfile.ZIP_DEFLATED)
+    return out.getvalue()
 
 
 def render_xlsx(spec: DeliverableSpec) -> bytes:
@@ -148,26 +214,35 @@ def render_xlsx(spec: DeliverableSpec) -> bytes:
     spec = DeliverableSpec.model_validate(spec.model_dump())
     if _cell_count(spec) > MAX_XLSX_CELLS:
         raise ValueError("too many cells for one workbook")
-    workbook = Workbook()
-    workbook.remove(workbook.active)
+    buffer = io.BytesIO()
+    book = xlsxwriter.Workbook(
+        buffer,
+        {"in_memory": True, "strings_to_formulas": False, "strings_to_urls": False, "strings_to_numbers": False},
+    )
+    book.set_properties(
+        {"author": "Tilo", "title": text_value(spec.title)[:200], "created": datetime.fromisoformat(spec.date)}
+    )
+    styles = _Styles(book)
     used: set[str] = set()
     has_text = any(isinstance(b, ParagraphBlock | BulletsBlock) for s in spec.sections for b in s.blocks)
     if has_text or not spec.tables:
-        _report_sheet(workbook.create_sheet(_sheet_name("Summary" if spec.tables else "Report", used)), spec)
+        _report_sheet(book.add_worksheet(_sheet_name("Summary" if spec.tables else "Report", used)), styles, spec)
     headings: dict[str, str] = {}  # the heading of the section that first shows each table
     for section in spec.sections:
         for block in section.blocks:
             if isinstance(block, TableBlock):
                 headings.setdefault(block.table_id, section.heading)
+    sheets: dict[str, Any] = {}
     for table in spec.tables:
-        _table_sheet(workbook.create_sheet(_sheet_name(headings.get(table.id, table.id), used)), table)
-    moment = datetime.fromisoformat(spec.date).replace(tzinfo=UTC).replace(tzinfo=None)
-    workbook.properties.creator = "Tilo"
-    workbook.properties.title = text_value(spec.title)[:200]
-    workbook.properties.created = workbook.properties.modified = moment
-    buffer = io.BytesIO()
-    workbook.save(buffer)
-    return buffer.getvalue()
+        sheets[table.id] = book.add_worksheet(_sheet_name(headings.get(table.id, table.id), used))
+        _table_sheet(sheets[table.id], styles, table)
+    placed: dict[str, int] = {}
+    for chart in spec.charts:
+        table = next(t for t in spec.tables if t.id == chart.table_id)
+        _add_chart(book, sheets[table.id], table, chart, placed.get(table.id, 0))
+        placed[table.id] = placed.get(table.id, 0) + 1
+    book.close()
+    return _fixed_zip(buffer.getvalue())
 
 
 class FillCell(BaseModel):
