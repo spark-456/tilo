@@ -26,4 +26,4 @@ words:
   side_effect_verbs: [send, post, delete, remove, erase, book, reserve, buy, purchase, order, pay, publish, upload, share, forward, reply, cancel, invite, schedule, submit, transfer, tweet, message, email, call, notify, remind, archive, unsubscribe, approve, sign, install, deploy, push, rename, move]
   production_verbs: [create, make, build, write, draft, prepare, produce, generate, design, compile, put, turn]
   deliverable_nouns: [deck, slide, slides, slideshow, presentation, powerpoint, pptx, report, pdf, spreadsheet, workbook, xlsx, excel, csv, docx, proposal, brochure, newsletter, infographic, website, webpage, dashboard]
-  tool_words: [search, google, browse, internet, web, inbox, calendar, research, latest, news, weather, url, drive, folder, files]
+  tool_words: [search, google, browse, browser, internet, web, inbox, calendar, research, latest, news, weather, url, drive, folder, files]
