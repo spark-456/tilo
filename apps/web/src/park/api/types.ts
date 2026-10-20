@@ -290,6 +290,8 @@ export interface SkillSetup {
 export interface SkillCapture {
   id: string;
   steps: string[];
+  /** The server could not read the example or the words with the model: these steps are the person's own words to edit. */
+  fallback?: boolean;
 }
 /** SKILLS-5 (FR-SKL-02): Tilo's version; `locked` steps were forced to ask first by the server and cannot be switched off. */
 export interface SkillVersion {

@@ -23,3 +23,26 @@ export function takeDraftSkill(): import("../../api/skillRoute").CatalogSkill | 
   pendingSkill = null;
   return skill;
 }
+
+// P0-SKILLS-TEACH: "teach Tilo to ..." typed on Home opens the Teach wizard on Skills with the words already in it.
+let pendingTeach: string | null = null;
+
+export function handTeach(text: string): void {
+  pendingTeach = text.trim() || null;
+}
+
+/** The handed-over description, once: the next caller gets null. */
+export function takeTeach(): string | null {
+  const text = pendingTeach;
+  pendingTeach = null;
+  return text;
+}
+
+/** "Teach Tilo to: every Monday ..." -> the words after it; null for any other text (a plain task). */
+export function teachIntent(query: string): string | null {
+  const m = /^\s*(?:please\s+)?teach\s+tilo\s*(?:to|how\s+to|that)?\s*[:,\-–—]?\s*([\s\S]+)$/i.exec(
+    query,
+  );
+  const words = m?.[1]?.trim() ?? "";
+  return words.length >= 3 ? words : null;
+}

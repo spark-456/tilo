@@ -1432,6 +1432,36 @@
 [data-park] .park-teach__row--step.park-teach__step-card:hover {
   border-color: var(--lineStrong);
 }
+[data-park] .park-teach__reorder {
+  display: inline-flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+[data-park] .park-teach__move {
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink2);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+[data-park] .park-teach__move:disabled {
+  color: var(--ink3);
+  cursor: default;
+  opacity: 0.4;
+}
+[data-park] .park-teach__move:focus-visible {
+  outline: 3px solid var(--focus, var(--hero));
+  outline-offset: 2px;
+}
+[data-park] .park-teach__add {
+  align-self: flex-start;
+  color: var(--hero);
+}
 [data-park] .park-teach__drag-handle {
   display: inline-flex;
   align-items: center;

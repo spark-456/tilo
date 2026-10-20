@@ -26,6 +26,16 @@ import {
 
 export type Stage = 0 | 1;
 
+const NOTHING_TO_DO = "Answer the request or explain what Tilo cannot do";
+const BLANK_STEP = {
+  text: "",
+  tool: "writer",
+  action: "compose",
+  verb: "draft",
+  ask: false,
+  locked: false,
+} as const;
+
 export interface TeachInput {
   app: AppCtx;
   api: Api;
@@ -71,6 +81,14 @@ export interface Teach {
   setName: (v: string) => void;
   setDesc: (v: string) => void;
   setStepText: (index: number, text: string) => void;
+  /** Review: move a step one place up (-1) or down (1), add a blank text step, remove one. */
+  moveStep: (index: number, by: -1 | 1) => void;
+  addStep: () => void;
+  removeStep: (index: number) => void;
+  /** Every step has words and there is at least one: Save can be pressed. */
+  stepsReady: boolean;
+  /** The steps shown are the person's own words, not the model's reading (it could not read the example). */
+  capturedFallback: boolean;
   setScope: (s: Scope) => void;
   loadTeams: () => void;
   chooseTeam: (id: string) => void;
@@ -170,19 +188,18 @@ export function useTeach({
       try {
         next = (await api.proposeVersion(captured.id)).data;
       } catch (e) {
-        if (!(e instanceof TiloApiError) || e.status !== 502) throw e;
+        // A reply the page cannot use (502, 422, or a 200 it cannot read) is an editable draft, never an error page.
+        if (!(e instanceof TiloApiError) || ![200, 422, 502].includes(e.status ?? 0)) throw e;
         next = {
           fallback: true,
-          steps: [
-            {
-              text: captured.steps[0] ?? "Answer the request or explain what Tilo cannot do",
-              tool: "writer",
-              action: "compose",
-              verb: "draft",
-              ask: false,
-              locked: false,
-            },
-          ],
+          steps: (captured.steps.length ? captured.steps : [NOTHING_TO_DO]).map((text) => ({
+            text,
+            tool: "writer",
+            action: "compose",
+            verb: "draft",
+            ask: false,
+            locked: false,
+          })),
           question: null,
           estimates: null,
           inputs: [],
@@ -199,8 +216,12 @@ export function useTeach({
   };
   const saveLive = (nm: string) => {
     if (!version || !captured) return;
-    if (version.fallback && !version.steps[0]?.text.trim()) return;
-    const steps = version.steps.map((s, i) => ({ ...s, ask: s.locked || ask[i] === true }));
+    if (version.steps.length === 0 || version.steps.some((s) => !s.text.trim())) return;
+    const steps = version.steps.map((s, i) => ({
+      ...s,
+      text: s.text.trim(),
+      ask: s.locked || ask[i] === true,
+    }));
     const question = version.question && !qSkipped ? version.question : null;
     const answer = qSaved ? qAns?.trim().slice(0, 200) : null;
     const options = question
@@ -274,7 +295,11 @@ export function useTeach({
       return false;
     }
     if (file.size === 0 || file.size > 10_485_760) {
-      setFileError("Choose one nonempty file up to 10 MiB.");
+      setFileError(
+        file.size === 0
+          ? "That file is empty. Choose another, or describe the work in words."
+          : "That file is over 10 MiB, more than Tilo can read at once. Record a shorter clip (up to 5 minutes), or describe the work in words.",
+      );
       return false;
     }
     setFileError(null);
@@ -387,6 +412,40 @@ export function useTeach({
             steps: current.steps.map((step, i) => (i === index ? { ...step, text } : step)),
           },
       ),
+    moveStep: (index, by) => {
+      const to = index + by;
+      const swap = <T>(list: readonly T[]): T[] => {
+        const next = [...list];
+        const [a, b] = [next[index], next[to]];
+        if (a === undefined || b === undefined) return next;
+        next[index] = b;
+        next[to] = a;
+        return next;
+      };
+      setVersion((current) => current && { ...current, steps: swap(current.steps) });
+      setAsk((current) => swap(current));
+    },
+    addStep: () => {
+      setVersion((current) =>
+        current && current.steps.length < 12
+          ? { ...current, steps: [...current.steps, { ...BLANK_STEP }] }
+          : current,
+      );
+      setAsk((current) => (current.length < 12 ? [...current, false] : current));
+    },
+    removeStep: (index) => {
+      setVersion((current) =>
+        current && current.steps.length > 1
+          ? { ...current, steps: current.steps.filter((_, i) => i !== index) }
+          : current,
+      );
+      setAsk((current) =>
+        version && version.steps.length > 1 ? current.filter((_, i) => i !== index) : current,
+      );
+    },
+    stepsReady:
+      !!version && version.steps.length > 0 && version.steps.every((s) => s.text.trim() !== ""),
+    capturedFallback: captured?.fallback === true,
     setScope,
     loadTeams: () => {
       const client = teamsClient();
