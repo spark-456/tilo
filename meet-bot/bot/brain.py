@@ -15,7 +15,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, NamedTuple, Protocol
 
-from .answer_scope import scoped_answer
+from .answer_scope import DECLINE, scoped_answer
 from .captions import Utterance
 from .events import remove_meet_links
 from .instant import instant_answer
@@ -271,6 +271,7 @@ FOLLOWUP_S = 30.0  # after an exchange with Tilo, what follows needs no name for
 REWORD_S = 8.0  # a reworded copy of a question (live partial vs final) within this long is the same question
 SOLE_MIN_WORDS = 3  # alone with Tilo, a fragment shorter than this ('Yes.') says nothing to answer
 _SENTINEL_LINES = {NO_ANSWER: NO_ANSWER_LINE, UNCLEAR: UNCLEAR_LINE}
+FIXED_LINES = frozenset({NO_ANSWER_LINE, UNCLEAR_LINE, COULD_NOT_GET_LINE, DECLINE})  # canned fallbacks, never twice
 
 
 class Question(NamedTuple):
@@ -410,6 +411,10 @@ class ChatPolicy:
         min_gap_s = self.direct_gap_s if min_gap_s is None else min_gap_s
         text = _sentences(reply) or _sentences(reply, n=1)  # too long for two sentences: say the first
         if not text or not bot_name or len(self.direct_sent) >= max_direct:
+            return None
+        # Owner 21 Oct: the bot "keeps repeating the same thing". A fixed fallback line is never sent twice in a row:
+        # if it still cannot answer, it has already said so once. Real answers may repeat when a question is re-asked.
+        if text in FIXED_LINES and self.direct_sent and self.direct_sent[-1]["text"] == text:
             return None
         if self.direct_sent and elapsed_s - self.direct_sent[-1]["elapsed_s"] < min_gap_s:
             return None
