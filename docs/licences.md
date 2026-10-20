@@ -131,6 +131,7 @@ FR-CON-10 (`tilo_connectors.provenance`) adds the in-workspace `tilo-archive` an
 | Dependency | Licence | Source |
 | --- | --- | --- |
 | idna (UTS 46 non-transitional host normalisation for the egress allowlist, as browsers do) | BSD-3-Clause | https://pypi.org/project/idna/ |
+| Pillow (DEMO-BROWSER: re-encodes each masked frame as a 256-colour PNG so the run's safety screen accepts it; already in `uv.lock` through `python-pptx` and `reportlab`) | MIT-CMU | https://pypi.org/project/pillow/ |
 
 Its tests use `jsonschema` and `referencing` from the root dev group (above).
 

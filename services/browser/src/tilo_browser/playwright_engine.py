@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import io
 from typing import Any, cast
 
+from PIL import Image
 from playwright.sync_api import Error, Request, Route, sync_playwright
 
 _TREE_SCRIPT = """() => {
@@ -40,6 +42,17 @@ _SECURE_SELECTORS = (
     "iframe",
     '[contenteditable="true"]',
 )
+
+
+def compact_png(png: bytes) -> bytes:
+    """The frame as a 256-colour PNG of the same size (masks already painted black). A page screenshot reads the same
+    and is about a third of the bytes, so the run's safety screen accepts it (an estimate over the safety role's input
+    cap is stored unscreened, and the World's Browser panel never gets it)."""
+    with Image.open(io.BytesIO(png)) as image:
+        palette = image.convert("RGB").quantize(colors=256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)
+    out = io.BytesIO()
+    palette.save(out, "PNG", optimize=True)
+    return out.getvalue()
 
 
 class PlaywrightEngine:
@@ -144,7 +157,7 @@ class PlaywrightDriver:
     def screenshot(self, mask_refs: list[str]) -> bytes:
         selectors = [*_SECURE_SELECTORS, *(f'[data-tilo-ref="{ref}"]' for ref in mask_refs)]
         masks = [self.page.locator(selector) for selector in selectors]
-        return self.page.screenshot(type="png", mask=masks, mask_color="#000000")
+        return compact_png(self.page.screenshot(type="png", mask=masks, mask_color="#000000"))
 
     def screenshot_meta(self) -> dict:
         return {}
