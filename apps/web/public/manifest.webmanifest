@@ -1,0 +1,31 @@
+{
+  "id": "/",
+  "name": "Tilo",
+  "short_name": "Tilo",
+  "description": "Describe the work. Tilo plans it, agent teams run it, and you approve from your phone.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#FFFFFF",
+  "background_color": "#FFFFFF",
+  "categories": ["productivity", "business"],
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "/icons/tilo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/tilo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    {
+      "src": "/icons/tilo-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/tilo-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
