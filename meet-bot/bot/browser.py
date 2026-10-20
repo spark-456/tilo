@@ -434,12 +434,10 @@ class MeetBrowser:
         # joined call has (chat, people, hand, reactions).
         if not S.MEETING_URL_RE.match(self.page.url):
             return False
-        try:
-            await self.page.mouse.move(random.randint(300, 900), random.randint(500, 700))
-        except Exception:
-            pass
         if await self.visible(S.WAITING_TEXT):
             return False
+        # Live 20 Oct 16:27: admitted, but the toolbar was not in the page until the mouse reached its band.
+        await self.reveal_toolbar()
         for strat in S.IN_CALL_MARK.strategies:
             try:
                 if await locate(self.page, strat).count() > 0:
