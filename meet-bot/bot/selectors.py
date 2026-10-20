@@ -114,6 +114,23 @@ CHAT_INPUT = _s(
 CHAT_SEND = _s("chat_send", ("role", "button", r"send a message"), ("aria", "Send a message"))
 PEOPLE_BUTTON = _s("people_button", ("role", "button", r"^(people|show everyone)"), ("aria", "Show everyone"))
 
+# Controls on Meet's call toolbar, which Meet hides while the mouse is still (browser.reveal_toolbar brings it back).
+# The microphone's state is read from these buttons too, so a hidden toolbar also left the bot muted (live 20 Oct).
+TOOLBAR_CONTROLS = frozenset(
+    {
+        "leave_call",
+        "captions_turn_on",
+        "captions_turn_off",
+        "chat_open",
+        "people_button",
+        "more_options",
+        "mic_turn_on",
+        "mic_turn_off",
+        "cam_turn_on",
+        "cam_turn_off",
+    }
+)
+
 # Lines inside the captions region that are UI, not speech (compared case-insensitively, exact match).
 CAPTION_NOISE_LINES = frozenset({"jump to bottom", "captions", "live captions", "arrow_downward"})
 # Material icon ligatures leak into text as snake_case words, e.g. "format_size".

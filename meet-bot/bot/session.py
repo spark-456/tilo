@@ -323,6 +323,8 @@ class LiveSession:
                     self.merger.add_ignored(br.account_name)
                 self.chat = ChatPoster(br)
                 if not await self._post(intro_text(self.record_audio, self.hybrid, self.voice), "intro"):
+                    if snapshot := getattr(br, "ops_snapshot", None):
+                        await snapshot("intro_failed")
                     ops.warning("session intro could not be posted; leaving")
                     raise BotRefused("The disclosure could not be posted; leaving without capture.")
                 self.intro_sent = True
