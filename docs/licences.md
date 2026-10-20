@@ -147,6 +147,7 @@ Its tests use `jsonschema` and `referencing` from the root dev group (above).
 | python-pptx | MIT | https://pypi.org/project/python-pptx/ |
 | reportlab | BSD | https://pypi.org/project/reportlab/ |
 | openpyxl (DOCS-OUT A4: xlsx deliverables and template fill; pulls et-xmlfile, MIT) | MIT | https://pypi.org/project/openpyxl/ |
+| XlsxWriter (DOCS-OUT: writes xlsx deliverables with formulas, cached values and native charts; already installed through python-pptx, now a declared `tilo-render` dependency) | BSD-2-Clause | https://pypi.org/project/XlsxWriter/ |
 | pypdf | BSD-3-Clause | https://pypi.org/project/pypdf/ |
 
 `tilo-providers` (LW-06) also uses `pypdf` (listed above) to count the pages of an untrusted PDF part.

@@ -147,6 +147,26 @@ def test_P0_DOCS_OUT_pdf_has_a_cover_page_then_the_report_with_page_numbers():
     assert render_pdf(spec()) == data
 
 
+def test_P0_DOCS_OUT_one_page_layout_has_no_cover_and_fits_a_flyer_on_one_page():
+    s = spec(
+        layout="one_page",
+        tables=[],
+        charts=[],
+        sections=[
+            {"heading": "Come along", "blocks": [{"type": "bullets", "bullets": ["Saturday 10am", "Free entry"]}]}
+        ],
+    )
+    reader = PdfReader(io.BytesIO(render_pdf(s)))
+    assert len(reader.pages) == 1
+    text = reader.pages[0].extract_text()
+    assert "Q3 Sales Review" in text and "Come along" in text and "Free entry" in text
+
+
+def test_P0_DOCS_OUT_unknown_layout_is_refused():
+    with pytest.raises(ValidationError):
+        spec(layout="poster-with-script")
+
+
 def test_P0_DOCS_OUT_pdf_table_numbers_use_thousands_separators():
     s = spec(
         tables=[{"id": "t1", "columns": ["Item", "Cost"], "rows": [["Rig", 1234567]]}],

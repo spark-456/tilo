@@ -248,6 +248,7 @@ class DeliverableSpec(BaseModel):
     title: str = Field(min_length=1)
     subtitle: str | None = None
     date: str = Field(min_length=1)
+    layout: Literal["report", "one_page"] = "report"  # PDF only: a cover page then the report, or a title block on top
     tables: list[Table] = Field(default_factory=list)
     charts: list[Chart] = Field(default_factory=list)
     sections: list[Section] = Field(default_factory=list)

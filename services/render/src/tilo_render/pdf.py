@@ -101,6 +101,8 @@ def _chart(ch: Any, data: ChartData, aw: float, fmt: Callable[[Any], str], th: d
     chart.data = [data.series[c] for c in ch.y_columns]
     chart.categoryAxis.categoryNames = [wrap_long_token(_flat(c)) for c in data.categories]
     chart.categoryAxis.labels.fontSize = chart.valueAxis.labels.fontSize = size
+    if is_bar and all(v >= 0 for c in ch.y_columns for v in data.series[c]):
+        chart.valueAxis.valueMin = 0  # a bar's length is its value: the axis starts at zero
     labels = chart.barLabels if is_bar else chart.lineLabels
     labels.fontSize, labels.fillColor = size, col["chart_label"]
     if is_bar:
@@ -175,16 +177,22 @@ def render_pdf(
     cover_bar = PlTable([[""]], colWidths=[72], rowHeights=[6])
     cover_bar.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), col["title"])]))
     cover_bar.hAlign = "LEFT"
-    story: list[Any] = [
-        Spacer(1, doc.height * 0.3),
-        cover_bar,
-        Spacer(1, 18),
-        Paragraph(_markup(spec.title), cover_title_s),
-    ]
-    if spec.subtitle:
-        story.append(Paragraph(_markup(spec.subtitle), cover_sub_s))
-    story.extend([Spacer(1, 6), Paragraph(_markup(spec.date), date_s), Paragraph("Prepared by Tilo", date_s)])
-    story.append(PageBreak())
+    if spec.layout == "one_page":  # a flyer, poster or one-pager: the title block opens the first page, no cover
+        story: list[Any] = [cover_bar, Spacer(1, 10), Paragraph(_markup(spec.title), title_s)]
+        if spec.subtitle:
+            story.append(Paragraph(_markup(spec.subtitle), sub_s))
+        story.append(Paragraph(_markup(spec.date), date_s))
+    else:
+        story = [
+            Spacer(1, doc.height * 0.3),
+            cover_bar,
+            Spacer(1, 18),
+            Paragraph(_markup(spec.title), cover_title_s),
+        ]
+        if spec.subtitle:
+            story.append(Paragraph(_markup(spec.subtitle), cover_sub_s))
+        story.extend([Spacer(1, 6), Paragraph(_markup(spec.date), date_s), Paragraph("Prepared by Tilo", date_s)])
+        story.append(PageBreak())
     footer_text = _flat(spec.title)[:80]
 
     def footer(canvas: Any, document: Any) -> None:
