@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import re
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
@@ -626,11 +627,33 @@ class Brain:
         A failed step leaves `_analysed` alone, so the same transcript is tried again on the next cycle."""
         return seen is not None and (seen != self._analysed or self._pending_question(utterances) is not None)
 
+    def _last_reply_at(self) -> float:
+        sent = self.policy.direct_sent
+        return sent[-1]["elapsed_s"] if sent else -math.inf
+
+    def chat_directed(self, text: str, sender: str, now: float) -> bool:
+        """A typed message is for Tilo one-on-one, or when it calls Tilo or follows Tilo's last reply."""
+        if self.wake_settings is None or self.sole_human:
+            return True
+        return wake_gate(
+            text, sender, now, self._attention, self.wake_settings, bot_spoke_at=self._last_reply_at()
+        ).allowed
+
     def question_in(self, u: Any) -> Question | None:
         if self.wake_settings is not None:
             speaker = u.speaker.removesuffix(CHAT_SUFFIX)
+            typed = u.speaker.endswith(CHAT_SUFFIX)
+            # Owner decision 21 Oct: one-on-one, whatever the one other person asks or types is for Tilo.
+            if self.sole_human and u.text.strip() and (typed or len(u.text.split()) >= SOLE_MIN_WORDS):
+                return Question(u.speaker, u.text.strip(), u.t, True)
             result = wake_gate(
-                u.text, speaker, u.t, self._attention, self.wake_settings, typed_to_bot=u.speaker.endswith(CHAT_SUFFIX)
+                u.text,
+                speaker,
+                u.t,
+                self._attention,
+                self.wake_settings,
+                typed_to_bot=typed,
+                bot_spoke_at=self._last_reply_at(),
             )
             return Question(u.speaker, u.text.strip(), u.t, True) if result.allowed else None
         sent = self.policy.direct_sent
