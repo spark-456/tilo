@@ -39,7 +39,7 @@ from .hybrid import (
 )
 from .knowledge import KnowledgeBase
 from .llm_fast import FastLLM
-from .people import gate_open, missing_required
+from .people import addressed_sentence, gate_open, missing_required
 from .playback import write_playback
 from .providers import ProviderFastClient, ProviderLLM, ProviderSpeech, make_router, make_tts, start_up_check
 from .speaker import NullSpeaker, VoiceSpeaker
@@ -272,8 +272,12 @@ class LiveSession:
         if not self.intro_sent:
             return
         if stop_requested(u.text):
+            ops.warning("stage leave reason=stop_requested_in_caption")
             self.leave_requested = True
             return
+        # One line per heard utterance: its length and whether it names Tilo, never what was said.
+        named = bool(self.brain and addressed_sentence(u.text, getattr(self.brain, "bot_name", "") or "Tilo"))
+        ops.warning("stage heard chars=%d names_tilo=%s question=%s", len(u.text), named, "?" in u.text)
         u.text, u.speaker = remove_meet_links(u.text), remove_meet_links(u.speaker)
         u.t = round(u.t, 1)
         if self.hybrid:  # the audio transcript is the source of truth; captions only supply names and timing
@@ -675,6 +679,7 @@ class LiveSession:
         if turn is not None:
             turn.route = "instant" if self.brain.last_quick_source == "local" else "model"
         if not msg:
+            ops.warning("stage question_no_reply model_s=%.1f", model_s)
             if turn is not None:
                 self.trace.finish(turn, "no_reply")
             self.timeline.record("question_no_reply", question=meta["question"], model_s=round(model_s, 2))
@@ -780,6 +785,12 @@ class LiveSession:
                         log.exception("brain step crashed: %s", e)
                         res = None
                     brain_task = None
+                    ops.warning(
+                        "stage brain ok=%s error=%s chat=%s",
+                        getattr(res, "ok", None),
+                        (getattr(res, "error", None) or "-")[:80],
+                        getattr(getattr(res, "chat", None), "kind", None),
+                    )
                     if res is not None:
                         interval = (
                             min(base_interval * 4, interval * 2)
@@ -846,6 +857,7 @@ class LiveSession:
         now = self.clock.now()
         if await br.meeting_ended():
             log.info("meeting ended")
+            ops.warning("stage leave reason=meeting_ended")
             return True
         # Reading the People panel opens it over the chat, so it waits until nothing is being spoken or typed.
         info = None if self.delivering else await br.participants()
@@ -879,8 +891,10 @@ class LiveSession:
             self.alone_since = self.alone_since or now
             if now - self.alone_since >= cfg.alone_grace_s:
                 log.info("everyone else left; leaving")
+                ops.warning("stage leave reason=everyone_left")
                 return True
         if self._unreadable_too_long(others_count, now):
+            ops.warning("stage leave reason=people_unreadable")
             return True
         if brain:
             brain.present = present
@@ -888,6 +902,7 @@ class LiveSession:
         if self.gate_at is None:
             if gate_open(self.required, present):
                 self.gate_at = self.elapsed()
+                ops.warning("stage listening present=%d others=%s", len(present), others_count)
                 self.next_brain_at = now + cfg.brain_interval_s
                 self.events.emit("meeting.started", present=present, required=self.required)
                 log.info("required people are here (%s): starting", ", ".join(present))
