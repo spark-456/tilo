@@ -32,6 +32,19 @@ def test_DEMO_BROWSER_SERVICE_client_attaches_id_token_and_calls_session_rpc():
     assert request["timeout"] <= 30
 
 
+def test_DEMO_BROWSER_SERVICE_call_timeout_is_config_browser_step_timeout_s():
+    """A cold Chromium on tilo-browser's one browser thread needs the configured step time, not a shorter guess."""
+    from pathlib import Path
+
+    import yaml
+    from tilo_api.browser_rpc import BrowserRpc
+
+    transport = FakeTransport()
+    BrowserRpc("https://browser.example.run.app", token_for=lambda audience: "t", transport=transport).start({})
+    config = yaml.safe_load((Path(__file__).resolve().parents[3] / "config" / "browser.yaml").read_text())
+    assert transport.calls[0][2]["timeout"] == float(config["step_timeout_s"])
+
+
 def test_DEMO_BROWSER_SERVICE_client_rejects_non_https_url():
     from tilo_api.browser_rpc import BrowserRpc
 

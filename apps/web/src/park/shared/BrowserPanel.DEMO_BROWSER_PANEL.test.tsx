@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import type { TiloClient } from "../../api/client";
-import { BrowserPanel, browserView } from "./BrowserPanel";
+import { BrowserPanel, FRAME_UNAVAILABLE, browserView } from "./BrowserPanel";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -128,6 +128,30 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
       node.querySelector('[data-testid="tilo-browser-cursor"]')?.getAttribute("data-event-seq"),
     ).toBe("2");
     expect(node.textContent).toContain("Clicking Search");
+    await act(async () => root.unmount());
+  });
+
+  it("DEMO_BROWSER says a frame the server will not serve could not be shown, never loads forever", async () => {
+    const getBrowserFrame = vi.fn(async () => {
+      throw new Error("404");
+    });
+    const client = { getBrowserFrame } as unknown as TiloClient;
+    const session = "bs_01K7M000000000000000000000";
+    const events = [
+      recorded(1, "browser.started", {
+        session,
+        host: "en.wikipedia.org",
+        frame: { artifact_id: "art_x" },
+      }),
+    ];
+    const node = document.createElement("div");
+    const root = createRoot(node);
+    await act(async () =>
+      root.render(<BrowserPanel client={client} worldId="w_demo" events={events} replay={false} />),
+    );
+    expect(getBrowserFrame).toHaveBeenCalledWith("w_demo", "art_x");
+    expect(node.textContent).toContain(FRAME_UNAVAILABLE);
+    expect(node.textContent).not.toContain("Loading recorded frame");
     await act(async () => root.unmount());
   });
 });

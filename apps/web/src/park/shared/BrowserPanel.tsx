@@ -10,6 +10,9 @@ type FrameClient = TiloClient & {
 };
 
 type Cursor = { seq: number; x: number; y: number; caption: string };
+
+/** The server would not serve a recorded frame (missing, or not screened clean): said once, never a spinner. */
+export const FRAME_UNAVAILABLE = "This frame could not be shown.";
 type BrowserEvent = { seq: number; type: string; data?: unknown; summary?: string };
 
 /** A browser frame or cursor is displayed only when its recorded event exists. */
@@ -85,10 +88,12 @@ export function BrowserPanel({
   const view = browserView(events);
   const reader = client as FrameClient;
   const [image, setImage] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const [size, setSize] = useState({ width: 1200, height: 800 });
   const [request, setRequest] = useState<"idle" | "pausing" | "stopping" | "error">("idle");
   useEffect(() => {
     setImage(null);
+    setFailed(false);
     if (!view.frame || !reader.getBrowserFrame || replay) return;
     let active = true;
     let url: string | null = null;
@@ -100,7 +105,7 @@ export function BrowserPanel({
         setImage(url);
       })
       .catch(() => {
-        if (active) setImage(null);
+        if (active) setFailed(true);
       });
     return () => {
       active = false;
@@ -154,7 +159,13 @@ export function BrowserPanel({
             }
           />
         ) : (
-          <p>{replay ? "Recorded frame unavailable in replay." : "Loading recorded frame…"}</p>
+          <p>
+            {replay
+              ? "Recorded frame unavailable in replay."
+              : failed
+                ? FRAME_UNAVAILABLE
+                : "Loading recorded frame…"}
+          </p>
         )}
         {image && view.cursor ? (
           <div

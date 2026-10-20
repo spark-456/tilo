@@ -8,6 +8,7 @@ import type { User } from "../../api/types";
 import { Button } from "../../components";
 import { cx } from "../../components/cx";
 import { ApiReadState } from "../../shared/ApiReadState";
+import { BROWSER_NOTE } from "../../shared/browserNote";
 import { type ScreenRecording, recordScreen } from "./recorder";
 import { icon, stepBuilding } from "./skillsKit";
 import {
@@ -41,15 +42,15 @@ export const EXAMPLE_OFF =
 const YOUTUBE_LIMIT =
   "YouTube isn't connected, and liking or commenting posts publicly as you. Tilo can watch and summarise a video, or draft a comment for you to post.";
 
+/** DEMO-BROWSER: a browse step the server kept no site for (`no_host`). */
+export const NO_HOST_COPY =
+  "Name the website in this step (for example example.com) so Tilo's browser can open it.";
+
 export function unavailableStepCopy(item: { text: string; reason: string }): string {
   const socialVideo = /\b(?:youtube|videos?)\b/i.test(item.text);
   const publicAction = /\b(?:like|liking|comment|commenting)\b/i.test(item.text);
-  if (
-    /\b(?:open|navigate|click|play|type|fill)\b/i.test(item.text) &&
-    /\b(?:browser|website|webpage|youtube|https?:\/\/|\.com\b)/i.test(item.text)
-  )
-    return `${item.text} · Needs browser control (coming)`;
-  return socialVideo && publicAction ? YOUTUBE_LIMIT : `${item.text} · ${item.reason}`;
+  if (socialVideo && publicAction) return YOUTUBE_LIMIT;
+  return `${item.text} · ${item.reason === "no_host" ? NO_HOST_COPY : item.reason}`;
 }
 
 export interface WizardProps {
@@ -536,12 +537,7 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
     ...(t.live ? [] : [{ key: "team", label: user.org } as const]),
   ] as const;
   const nameId = useId();
-  const browserTask =
-    t.live &&
-    /\b(?:open|navigate|click|play|type|fill)\b/i.test([t.desc, ...t.steps].join(" ")) &&
-    /\b(?:browser|website|webpage|youtube|https?:\/\/|\.com\b)/i.test(
-      [t.desc, ...t.steps].join(" "),
-    );
+  const browserTask = t.live && v?.steps.some((s) => s.action === "browse_web") === true;
   return (
     <section className="park-teach__card" aria-label="Review the steps">
       <div className="park-teach__intro">
@@ -558,9 +554,7 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
           step. Edit the words, move or remove steps, or add your own, then save.
         </output>
       ) : null}
-      {browserTask ? (
-        <output className="park-teach__hint">Needs browser control (coming)</output>
-      ) : null}
+      {browserTask ? <output className="park-teach__hint">{BROWSER_NOTE}</output> : null}
       <div className="park-teach__name">
         <span className="park-teach__nameic" aria-hidden="true">
           {icon("people", 22)}

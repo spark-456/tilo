@@ -6,10 +6,15 @@ import base64
 import hashlib
 import json
 import re
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from threading import RLock
 from typing import Any
 from urllib.parse import urlsplit
+
+import yaml
 
 from tilo_browser.egress import EgressPolicy, sanitise_url
 from tilo_browser.login import is_secure_node, iter_nodes, node_ref, secure_nodes
@@ -23,10 +28,26 @@ class SessionRefused(Exception):
         self.reason, self.status = reason, status
 
 
+_CONFIG = Path(__file__).resolve().parents[4] / "config" / "browser.yaml"
+
+
+def _idle_seconds() -> float:
+    """BR-12: config/browser.yaml `idle_timeout_s`; 120 when the file cannot be read."""
+    try:
+        value = float(yaml.safe_load(_CONFIG.read_text(encoding="utf-8"))["idle_timeout_s"])
+    except Exception:  # noqa: BLE001 - a missing or broken file keeps the contract's default
+        return 120.0
+    return value if 0 < value <= 3600 else 120.0
+
+
+IDLE_SECONDS = _idle_seconds()  # a session no call touched for this long lost its caller (timed out or stopped)
+
+
 @dataclass
 class _Session:
     worker: BrowserWorker
     viewport: dict[str, int]
+    used: float
     step: int = 0
     blocked_seen: int = 0
 
@@ -37,10 +58,28 @@ _COMMIT = re.compile(
 
 
 class BrowserSessions:
-    def __init__(self, engine: Any) -> None:
+    def __init__(self, engine: Any, *, clock: Callable[[], float] = time.monotonic) -> None:
         self.engine = engine
         self.sessions: dict[str, _Session] = {}
         self._lock = RLock()
+        self._clock = clock
+
+    def _close_idle(self) -> None:
+        now = self._clock()
+        for session, state in list(self.sessions.items()):
+            if now - state.used > IDLE_SECONDS:
+                del self.sessions[session]
+                try:
+                    state.worker.close()
+                except Exception:  # noqa: BLE001 - a browser that already died has nothing left to close
+                    pass
+
+    def _touch(self, session: str) -> _Session:
+        state = self.sessions.get(session)
+        if state is None:
+            raise SessionRefused("session_lost", 404)
+        state.used = self._clock()
+        return state
 
     @staticmethod
     def _viewport_box(viewport: dict[str, int]) -> dict[str, int]:
@@ -88,13 +127,14 @@ class BrowserSessions:
 
     def start(self, body: dict) -> dict:
         with self._lock:
+            self._close_idle()
             session = body["session"]
             if session in self.sessions:
                 raise SessionRefused("session_exists")
             policy = EgressPolicy(allow=body["allow_hosts"])
             engine = self.engine.for_viewport(body["viewport"]) if hasattr(self.engine, "for_viewport") else self.engine
             worker = BrowserWorker(engine, policy)
-            state = _Session(worker, body["viewport"])
+            state = _Session(worker, body["viewport"], self._clock())
             try:
                 worker.navigate(body["start_url"])
                 result = self._result(session, 0, "start", state, self._viewport_box(state.viewport))
@@ -106,9 +146,7 @@ class BrowserSessions:
 
     def act(self, session: str, body: dict) -> dict:
         with self._lock:
-            state = self.sessions.get(session)
-            if state is None:
-                raise SessionRefused("session_lost", 404)
+            state = self._touch(session)
             step, action = body["step"], body["action"]
             if step != state.step + 1 or step > 60:
                 raise SessionRefused("step_cap")
@@ -173,9 +211,7 @@ class BrowserSessions:
 
     def inspect(self, session: str, at: dict[str, int]) -> dict:
         with self._lock:
-            state = self.sessions.get(session)
-            if state is None:
-                raise SessionRefused("session_lost", 404)
+            state = self._touch(session)
             _, node, box = self._target(state.worker, at, state.viewport)
             return {
                 "session": session,

@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { stubApp } from "../../../../test-support/park/appHarness";
 import { cleanup, mount } from "../../../../test-support/park/componentsHarness";
 import { skillFromRow } from "../../api/live/skillsFromApi";
+import { BROWSER_NOTE } from "../../shared/browserNote";
 import { SkillDrawer } from "./SkillDrawer";
 
 afterEach(cleanup);
@@ -130,14 +131,20 @@ it("P0_SKILLS_run_collects_required_inputs_and_submits_the_selected_skill", asyn
   expect(run).toHaveBeenCalledWith(skill, { brief: "Build a launch checklist" }, []);
 });
 
-it("P0_SKILLS_browser_tool_step_is_labeled_and_cannot_run", () => {
+function runButton(container: HTMLElement): HTMLButtonElement | undefined {
+  return [...container.querySelectorAll("button")].find(
+    (b) => b.textContent?.trim() === "Run skill", // AG-2 skills polish renamed "Run it"
+  );
+}
+
+function drawerFor(plan: { text: string; tool: string; action: string; ask_first: boolean }[]) {
   const skill = skillFromRow({
     id: "tsk_site",
     name: "Check a supplier",
     scope: { kind: "just_me", team: null },
     status: "learning",
     paused: false,
-    plan: [{ text: "Research suppliers", tool: "browser", action: "navigate", ask_first: false }],
+    plan,
     question: null,
   });
   const run = vi.fn();
@@ -154,13 +161,40 @@ it("P0_SKILLS_browser_tool_step_is_labeled_and_cannot_run", () => {
       onRun={run}
     />,
   );
-  expect(m.container.textContent).toContain("Needs browser control (coming)");
-  const button = [...m.container.querySelectorAll("button")].find(
-    (b) => b.textContent?.trim() === "Run skill", // AG-2 skills polish renamed "Run it"
-  );
-  expect(button?.disabled).toBe(true);
-  act(() => button?.click());
-  expect(run).not.toHaveBeenCalled();
+  return { skill, run, m };
+}
+
+it("DEMO_BROWSER_a_browse_step_runs_in_tilos_browser", async () => {
+  const { skill, run, m } = drawerFor([
+    {
+      text: "Open youtube.com and read the top videos",
+      tool: "web",
+      action: "browse_web",
+      ask_first: false,
+    },
+  ]);
+  expect(m.container.textContent).toContain(BROWSER_NOTE);
+  expect(m.container.textContent).not.toContain("Needs browser control (coming)");
+  const button = runButton(m.container);
+  expect(button?.disabled).toBe(false);
+  await act(async () => {
+    button?.click();
+    await Promise.resolve();
+  });
+  expect(run).toHaveBeenCalledWith(skill, {}, []);
+});
+
+it("DEMO_BROWSER_words_about_a_site_never_block_a_skill", () => {
+  const { m } = drawerFor([
+    {
+      text: "Open youtube.com and click the first video",
+      tool: "web",
+      action: "web_search",
+      ask_first: false,
+    },
+  ]);
+  expect(m.container.textContent).not.toContain(BROWSER_NOTE);
+  expect(runButton(m.container)?.disabled).toBe(false);
 });
 
 it("P0_SKILLS_owner_can_edit_and_delete_from_the_drawer", async () => {

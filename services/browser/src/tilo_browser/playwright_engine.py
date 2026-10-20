@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import io
 from typing import Any, cast
 
-from playwright.sync_api import Error, Route, sync_playwright
+from PIL import Image
+from playwright.sync_api import Error, Request, Route, sync_playwright
 
 _TREE_SCRIPT = """() => {
   const nodes = [...document.querySelectorAll('input,textarea,select,button,a,[role]')].slice(0, 1000);
@@ -42,6 +44,17 @@ _SECURE_SELECTORS = (
 )
 
 
+def compact_png(png: bytes) -> bytes:
+    """The frame as a 256-colour PNG of the same size (masks already painted black). A page screenshot reads the same
+    and is about a third of the bytes, so the run's safety screen accepts it (an estimate over the safety role's input
+    cap is stored unscreened, and the World's Browser panel never gets it)."""
+    with Image.open(io.BytesIO(png)) as image:
+        palette = image.convert("RGB").quantize(colors=256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)
+    out = io.BytesIO()
+    palette.save(out, "PNG", optimize=True)
+    return out.getvalue()
+
+
 class PlaywrightEngine:
     def __init__(self, viewport: dict[str, int] | None = None) -> None:
         self.viewport = viewport or {"width": 1200, "height": 800}
@@ -62,11 +75,27 @@ class PlaywrightDriver:
             self.context = self.browser.new_context(viewport=cast(Any, viewport), accept_downloads=False)
             self.context.route("**/*", self._route)
             self.page = self.context.new_page()
+            self.page.on("request", self._hop)
         except Exception:
             self.runtime.stop()
             raise
         self._chain: list[str] = []
         self._aborted: str | None = None
+
+    def _hop(self, request: Request) -> None:
+        """Playwright calls a route handler only for the first URL of a redirect chain, so each redirect hop of the
+        page's own navigation is gated here (BR-02, SEC-09); a refused hop's page is left once navigation settles."""
+        redirected = request.redirected_from
+        if redirected is None or not request.is_navigation_request():
+            return
+        try:
+            if request.frame != self.page.main_frame:
+                return  # a frame's page is never captured or read: iframes are masked and page text is the body's
+        except Error:
+            return
+        self._chain.append(request.url)
+        if not self.gate(request.url, redirect_from=redirected.url) and self._aborted is None:
+            self._aborted = request.url
 
     def _route(self, route: Route) -> None:
         request = route.request
@@ -82,6 +111,8 @@ class PlaywrightDriver:
             route.abort()
 
     def _outcome(self) -> dict[str, Any]:
+        if self._aborted is not None and self.page.url != "about:blank":
+            self.page.goto("about:blank")  # a page reached through a refused hop is never captured, read or clicked
         return {"chain": self._chain.copy(), "aborted": self._aborted, "final_url": self.page.url}
 
     def goto(self, url: str) -> dict[str, Any]:
@@ -126,7 +157,7 @@ class PlaywrightDriver:
     def screenshot(self, mask_refs: list[str]) -> bytes:
         selectors = [*_SECURE_SELECTORS, *(f'[data-tilo-ref="{ref}"]' for ref in mask_refs)]
         masks = [self.page.locator(selector) for selector in selectors]
-        return self.page.screenshot(type="png", mask=masks, mask_color="#000000")
+        return compact_png(self.page.screenshot(type="png", mask=masks, mask_color="#000000"))
 
     def screenshot_meta(self) -> dict:
         return {}

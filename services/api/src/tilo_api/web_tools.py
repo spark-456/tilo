@@ -20,6 +20,20 @@ from tilo_providers.diagnostics import log_caught
 from tilo_providers.media import MediaPart
 
 _URL = re.compile(r"https://[^\s<>\"'`\)\]}]+", re.IGNORECASE)
+# DEMO-BROWSER: a site named without a scheme ("open wikipedia.org"): dot-separated labels ending in letters, not part
+# of an address, a path or a longer name. A last label that is a common file ending is a file name, not a site.
+_BARE_HOST = re.compile(
+    r"(?<![\w@./:%-])((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24})"
+    r"(?![\w-]|\.[a-z0-9])",
+    re.IGNORECASE,
+)
+_FILE_ENDINGS = frozenset(
+    (
+        "pdf doc docx xls xlsx xlsm ppt pptx csv tsv txt md rtf odt ods json xml yaml yml html htm "
+        "png jpg jpeg gif svg webp heic mp3 mp4 m4a wav mov webm mkv avi zip gz tar rar "
+        "py js ts tsx jsx css sh bat ps exe dll log ini cfg"
+    ).split()
+)
 MAX_TYPED_HOSTS = 20
 # P0-RUNS-FIX: a search engine's page is never read; web research goes through the search provider (web_search).
 _SEARCH_ENGINES = frozenset({"google", "bing", "duckduckgo", "yahoo", "baidu", "yandex", "ecosia", "startpage", "ask"})
@@ -44,18 +58,27 @@ def search_engine_host(host: str) -> bool:
 
 
 def typed_hosts(texts: Iterable[Any]) -> set[str]:
-    """FR-CON-07: the hosts of the https URLs a person typed or attached, found by code in the brief's text. A host the
-    fetch policy would refuse anyway (an IP, localhost, an internal or bare name), userinfo, another port and any
-    other scheme add nothing; the fetch itself still runs every egress, DNS and robots check."""
+    """FR-CON-07: the hosts of the https URLs a person typed or attached, and of the sites they named without a scheme
+    ("open wikipedia.org"), found by code in the brief's text. A host the fetch policy would refuse anyway (an IP,
+    localhost, an internal or bare name), an email address, a file name, userinfo, another port and any other scheme
+    add nothing; the fetch itself still runs every egress, DNS and robots check."""
     found: set[str] = set()
     for text in texts:
-        for match in _URL.finditer(text) if isinstance(text, str) else ():
+        if not isinstance(text, str):
+            continue
+        hosts: list[str | None] = []
+        for match in _URL.finditer(text):
             try:
                 parts = urlsplit(match.group().rstrip(".,;:!?"))
-                host, port = parts.hostname, parts.port
-                if not host or parts.username or parts.password or port not in (None, 443):
-                    continue
-                if is_forbidden_hostname(host):
+                if not parts.username and not parts.password and parts.port in (None, 443):
+                    hosts.append(parts.hostname)
+            except ValueError:
+                continue
+        hosts += [m.group(1).lower() for m in _BARE_HOST.finditer(text) if m.group(1).rsplit(".", 1)[-1].lower()
+                  not in _FILE_ENDINGS]  # fmt: skip
+        for host in hosts:
+            try:
+                if not host or is_forbidden_hostname(host):
                     continue
                 EgressPolicy([host])  # ValueError for an IP literal or anything but a plain DNS name
             except ValueError:
@@ -64,6 +87,14 @@ def typed_hosts(texts: Iterable[Any]) -> set[str]:
             if len(found) >= MAX_TYPED_HOSTS:
                 return found
     return found
+
+
+def allow_entries(hosts: Iterable[str], typed: Iterable[str]) -> list[str]:
+    """BR-02: a run's allowlist. Each host the person typed (or a used taught skill names) also counts as *.<host>, so
+    any page of a site they named opens (wikipedia.org covers en.wikipedia.org); the other known hosts (search results)
+    stay exact. The patterns come first, so a capped list keeps the person's own sites."""
+    named = sorted(set(typed))
+    return list(dict.fromkeys([*(f"*.{host}" for host in named), *named, *sorted(hosts)]))
 
 
 class RunArchiveBridge(RawArchiveStore):
@@ -169,8 +200,9 @@ class FetchTool:
     tier, external_content, side_effect = "T1", True, False
     web_egress = True  # WT-04: a unit that read the person's private data loses it
 
-    def __init__(self, run, service, hosts, unit, context, sources, *, search=None, browser=None):
+    def __init__(self, run, service, hosts, unit, context, sources, *, search=None, browser=None, typed=frozenset()):
         self.owner, self.service, self.hosts = run, service, hosts
+        self.typed = typed  # BR-02: the sites the person named, each also as *.<host>
         self.unit, self.context, self.sources = unit, context, sources
         self.search = search  # P0-RUNS-FIX: a search-engine URL becomes a web_search of its query
         self.browser = browser  # P0-RUNS-FIX: (url, host) -> text read in the visible browser, or None for no browser
@@ -186,7 +218,8 @@ class FetchTool:
                 return self.search.run({"query": query.strip()[:400]})
             return ToolResult(SEARCH_ENGINE_NOTE.format(host=host))
         note = ""
-        if self.browser is not None and self.hosts and EgressPolicy(sorted(self.hosts)).check(url).allowed:
+        allow = allow_entries(self.hosts, self.typed)
+        if self.browser is not None and allow and EgressPolicy(allow).check(url).allowed:
             try:
                 text = self.browser(url, host)
             except Exception as caught_error:  # unavailable, refused or a login wall: read it directly instead
@@ -197,7 +230,7 @@ class FetchTool:
             note = BROWSER_FALLBACK_NOTE
         try:
             got = self.service.fetch(
-                url, allow_hosts=tuple(self.hosts), org_id=run.org_id, run_id=run.run_id, unit_id=self.unit["id"]
+                url, allow_hosts=tuple(allow), org_id=run.org_id, run_id=run.run_id, unit_id=self.unit["id"]
             )
         except FetchBlocked as blocked:  # one source is skipped; the unit goes on with the others
             log_caught(blocked, __name__, locals())
