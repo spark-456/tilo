@@ -156,6 +156,12 @@ def test_FR_MTG_11_PL_02_guest_listens_speaks_and_leaves_on_every_voice_backend(
         async def shot(self, name):
             pass
 
+        async def read_chat(self):  # the real browser's chat read: nothing typed in this meeting
+            return None
+
+        async def show_chat(self):
+            pass
+
         async def enable_captions(self):
             actions.append("listen")
             return True

@@ -39,7 +39,7 @@ from .hybrid import (
 )
 from .knowledge import KnowledgeBase
 from .llm_fast import FastLLM
-from .people import gate_open, missing_required
+from .people import addressed_sentence, gate_open, missing_required
 from .playback import write_playback
 from .providers import ProviderFastClient, ProviderLLM, ProviderSpeech, make_router, make_tts, start_up_check
 from .speaker import NullSpeaker, VoiceSpeaker
@@ -272,8 +272,12 @@ class LiveSession:
         if not self.intro_sent:
             return
         if stop_requested(u.text):
+            ops.warning("stage leave reason=stop_requested_in_caption")
             self.leave_requested = True
             return
+        # One line per heard utterance: its length and whether it names Tilo, never what was said.
+        named = bool(self.brain and addressed_sentence(u.text, getattr(self.brain, "bot_name", "") or "Tilo"))
+        ops.warning("stage heard chars=%d names_tilo=%s question=%s", len(u.text), named, "?" in u.text)
         u.text, u.speaker = remove_meet_links(u.text), remove_meet_links(u.speaker)
         u.t = round(u.t, 1)
         if self.hybrid:  # the audio transcript is the source of truth; captions only supply names and timing
@@ -675,6 +679,7 @@ class LiveSession:
         if turn is not None:
             turn.route = "instant" if self.brain.last_quick_source == "local" else "model"
         if not msg:
+            ops.warning("stage question_no_reply model_s=%.1f", model_s)
             if turn is not None:
                 self.trace.finish(turn, "no_reply")
             self.timeline.record("question_no_reply", question=meta["question"], model_s=round(model_s, 2))
@@ -734,6 +739,17 @@ class LiveSession:
                     if blocks and not getattr(self, "_heard_logged", False):
                         self._heard_logged = True
                         ops.warning("stage first_caption_heard speakers=%d", len({b.speaker for b in blocks}))
+                    # Nobody is required (every cloud attendance): a person's caption means someone is here, so start
+                    # listening without waiting for the People list (live 20 Oct 17:15: it never opened the gate).
+                    heard = [b.speaker for b in blocks if b.speaker and b.speaker.lower() not in self.ignore]
+                    if self.gate_at is None and not self.required and heard:
+                        self.gate_at = self.elapsed()
+                        self.next_brain_at = now + self.cfg.brain_interval_s
+                        self.next_status_at = self.clock.now()  # the status step keeps the mic open from here on
+                        if self.brain and not self.brain.present:
+                            self.brain.present = list(dict.fromkeys(heard))
+                        ops.warning("stage listening via=caption speakers=%d", len(set(heard)))
+                        self.events.emit("meeting.started", present=list(dict.fromkeys(heard)), required=self.required)
                     for b in blocks:
                         self.spans.touch(b.speaker, now - self.start)
                     for u in self.merger.feed(blocks, now):
@@ -780,6 +796,12 @@ class LiveSession:
                         log.exception("brain step crashed: %s", e)
                         res = None
                     brain_task = None
+                    ops.warning(
+                        "stage brain ok=%s error=%s chat=%s",
+                        getattr(res, "ok", None),
+                        (getattr(res, "error", None) or "-")[:80],
+                        getattr(getattr(res, "chat", None), "kind", None),
+                    )
                     if res is not None:
                         interval = (
                             min(base_interval * 4, interval * 2)
@@ -846,6 +868,7 @@ class LiveSession:
         now = self.clock.now()
         if await br.meeting_ended():
             log.info("meeting ended")
+            ops.warning("stage leave reason=meeting_ended")
             return True
         # Reading the People panel opens it over the chat, so it waits until nothing is being spoken or typed.
         info = None if self.delivering else await br.participants()
@@ -870,7 +893,18 @@ class LiveSession:
             others_count = (count - 1) if count is not None else None
             if brain and others_count is not None:
                 brain.sole_human = others_count == 1
-            present = [u.speaker for u in self.store.items if u.speaker.lower() not in self.ignore]
+            # Live 20 Oct 17:15: the People list could not be read and only finished transcript lines counted, so the
+            # bot heard captions for minutes but never started listening. Caption speakers count as present too.
+            heard = [u.speaker for u in list(self.store.items) + list(self.captions_store.items)]
+            present = list(dict.fromkeys(s for s in heard if s.lower() not in self.ignore and not s.endswith("(chat)")))
+        if not getattr(self, "_presence_logged", False) or self.gate_at is None:
+            self._presence_logged = True
+            ops.warning(
+                "stage presence panel=%s others=%s present=%d",
+                "read" if info is not None else "unreadable",
+                others_count,
+                len(present),
+            )
         if self.gate_at is not None:
             await br.show_chat()  # the People read replaced the chat panel
         if others_count:
@@ -879,8 +913,10 @@ class LiveSession:
             self.alone_since = self.alone_since or now
             if now - self.alone_since >= cfg.alone_grace_s:
                 log.info("everyone else left; leaving")
+                ops.warning("stage leave reason=everyone_left")
                 return True
         if self._unreadable_too_long(others_count, now):
+            ops.warning("stage leave reason=people_unreadable")
             return True
         if brain:
             brain.present = present
@@ -888,6 +924,7 @@ class LiveSession:
         if self.gate_at is None:
             if gate_open(self.required, present):
                 self.gate_at = self.elapsed()
+                ops.warning("stage listening present=%d others=%s", len(present), others_count)
                 self.next_brain_at = now + cfg.brain_interval_s
                 self.events.emit("meeting.started", present=present, required=self.required)
                 log.info("required people are here (%s): starting", ", ".join(present))
