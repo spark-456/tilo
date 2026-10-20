@@ -45,11 +45,18 @@ def test_FR_MTG_13_twenty_off_topic_questions_are_declined_without_models_or_pro
             raise AssertionError("project knowledge is outside the answer scope")
 
     b.knowledge = ForbiddenKnowledge()
+    sent = []
     for index, question in enumerate(OFF_TOPIC):
         at = 100.0 * (index + 1)
         msg = b.quick_reply([Utterance("Sam", f"Tilo, {question}?", at)], at)
-        assert msg is not None and msg.text == DECLINE
-        b.commit_chat(msg, at)
+        assert msg is None or msg.text == DECLINE
+        if msg is not None:
+            b.commit_chat(msg, at)
+            sent.append(msg.text)
+        elif not sent:
+            raise AssertionError("the first off-topic question must be declined out loud")
+        b.policy.direct_sent.append({"kind": "probe", "subject": "", "text": f"probe {index}", "elapsed_s": at})
+    assert sent and set(sent) == {DECLINE}  # owner 21 Oct: never twice in a row, so a probe line separates each
     assert llm.calls == []
 
 
@@ -76,12 +83,14 @@ def test_FR_MTG_13_own_items_use_exact_speaker_ownership_and_unknown_speakers_ge
     assert scoped_answer("Tilo, show my tasks", "Tilo", "?", b.state) == DECLINE
 
 
-def test_FR_MTG_13_live_build_installs_scope_guard(monkeypatch, tmp_path):
+def test_FR_MTG_13_live_build_installs_scope_guard_only_when_the_operator_opts_in(monkeypatch, tmp_path):
+    # Owner decision 21 Oct (BQ-MTG-SCOPE-OWNER-1): the meeting-only scope is opt-in, general answers are the default.
     from bot.config import Config
     from bot.knowledge import KnowledgeBase
     from bot.session import build_brain
 
     monkeypatch.setattr("bot.config.load_dotenv", lambda: None)
+    monkeypatch.setenv("MEETING_ANSWER_SCOPE", "1")
     path = tmp_path / "agenda.md"
     path.write_text("# Sync\n1. Roadmap (10 min)")
     b = build_brain(Config.from_env(), path, 30, KnowledgeBase())
