@@ -11,8 +11,9 @@ type FrameClient = TiloClient & {
 
 type Cursor = { seq: number; x: number; y: number; caption: string };
 
-/** The server would not serve a recorded frame (missing, or not screened clean): said once, never a spinner. */
-export const FRAME_UNAVAILABLE = "This frame could not be shown.";
+/** The server would not serve a recorded frame (not screened clean, or missing): said once, never a spinner. */
+export const FRAME_UNAVAILABLE =
+  "This picture is hidden because Tilo's safety check could not clear it, so follow the steps in the line below.";
 
 /** DEMO-BROWSER: why the browser stopped (`browser.stopped` outcome), each one plain sentence with what to try. */
 export const STOP_LINES = {
