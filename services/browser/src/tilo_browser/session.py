@@ -9,9 +9,12 @@ import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from threading import RLock
 from typing import Any
 from urllib.parse import urlsplit
+
+import yaml
 
 from tilo_browser.egress import EgressPolicy, sanitise_url
 from tilo_browser.login import is_secure_node, iter_nodes, node_ref, secure_nodes
@@ -25,7 +28,19 @@ class SessionRefused(Exception):
         self.reason, self.status = reason, status
 
 
-IDLE_SECONDS = 300.0  # a session no call touched for this long lost its caller (timed out or stopped): it is closed
+_CONFIG = Path(__file__).resolve().parents[4] / "config" / "browser.yaml"
+
+
+def _idle_seconds() -> float:
+    """BR-12: config/browser.yaml `idle_timeout_s`; 120 when the file cannot be read."""
+    try:
+        value = float(yaml.safe_load(_CONFIG.read_text(encoding="utf-8"))["idle_timeout_s"])
+    except Exception:  # noqa: BLE001 - a missing or broken file keeps the contract's default
+        return 120.0
+    return value if 0 < value <= 3600 else 120.0
+
+
+IDLE_SECONDS = _idle_seconds()  # a session no call touched for this long lost its caller (timed out or stopped)
 
 
 @dataclass

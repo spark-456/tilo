@@ -53,6 +53,16 @@ def test_DEMO_BROWSER_idle_session_is_closed_when_the_next_one_starts():
         raise AssertionError("an idle session must be gone")
 
 
+def test_DEMO_BROWSER_the_idle_limit_is_config_browser_idle_timeout_s():
+    from pathlib import Path
+
+    import yaml
+    from tilo_browser.session import IDLE_SECONDS
+
+    config = yaml.safe_load((Path(__file__).resolve().parents[3] / "config" / "browser.yaml").read_text())
+    assert IDLE_SECONDS == float(config["idle_timeout_s"])
+
+
 def test_DEMO_BROWSER_a_session_in_use_stays_open():
     from tilo_browser.session import IDLE_SECONDS
 

@@ -3,13 +3,26 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
 import requests
+import yaml
 from tilo_browser.session import SessionRefused
 
 from tilo_api.meeting_host_rpc import metadata_id_token
+
+
+def step_timeout() -> float:
+    """config/browser.yaml `step_timeout_s`: how long one browser call may take (opening a page in a fresh Chromium
+    on a cold instance is the slow one); 30 when the file cannot be read."""
+    try:
+        path = Path(__file__).resolve().parents[4] / "config" / "browser.yaml"
+        value = float(yaml.safe_load(path.read_text(encoding="utf-8"))["step_timeout_s"])
+    except Exception:  # noqa: BLE001 - a missing or broken file keeps the contract's default
+        return 30.0
+    return value if 0 < value <= 120 else 30.0
 
 
 class BrowserRpc:
@@ -35,6 +48,7 @@ class BrowserRpc:
         self.base_url = base_url.rstrip("/")
         self.token_for = token_for
         self.transport = transport or requests.Session()
+        self.timeout = step_timeout()
 
     def _call(self, method: str, path: str, body: dict | None = None) -> dict:
         try:
@@ -43,7 +57,7 @@ class BrowserRpc:
                 self.base_url + path,
                 headers={"Authorization": f"Bearer {self.token_for(self.base_url)}"},
                 json=body,
-                timeout=25,
+                timeout=self.timeout,
             )
             data = response.json()
         except Exception:  # token, transport and malformed replies all fail closed without logging credentials

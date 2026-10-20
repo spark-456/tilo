@@ -35,7 +35,7 @@ from tilo_api.browser_rpc import BrowserRpc
 from tilo_api.browser_step import BrowseStepExecutor
 from tilo_api.quiz_apps import source_loader
 from tilo_api.report_render import render_report
-from tilo_api.web_tools import FetchTool, RunArchiveBridge, SearchTool, fetch_service, typed_hosts
+from tilo_api.web_tools import FetchTool, RunArchiveBridge, SearchTool, allow_entries, fetch_service, typed_hosts
 from tilo_api.workspace_tools import READS_OF, WorkspaceAccess, WorkspaceUnit
 from tilo_api.xlsx_template import attach_template
 
@@ -87,6 +87,17 @@ def taught_browse_step(run: Any, unit: Mapping[str, Any]) -> dict[str, Any] | No
         return None
     step = steps[index]
     return step if (step.get("tool"), step.get("action")) == ("web", "browse_web") else None
+
+
+def browse_hosts(step: Mapping[str, Any], hosts: set[str], typed: frozenset[str]) -> list[str]:
+    """BR-02 for a taught browse step: the session starts on the step's first host (else a site the person named) and
+    may open the step's and the person's sites with their subdomains, then the run's other known hosts; at most 20
+    (browser.schema.json open_request). Empty when there is no site to start on."""
+    own = [h for h in step.get("hosts") or [] if isinstance(h, str)]
+    first = own or sorted(typed) or sorted(hosts)
+    if not first:
+        return []
+    return list(dict.fromkeys([first[0], *allow_entries(hosts, {*own, *typed})]))[:20]
 
 
 def report_day(owner: str, org: str, people: Callable[[], Any], now: datetime) -> date:
@@ -201,7 +212,8 @@ class BoundRunRunner:
         self.router = router
         self.archive = RunArchiveBridge(run, archive)
         self.service = fetch_service(mode, self.archive, fixtures)
-        self.hosts: set[str] = typed_hosts(brief_texts(run))  # FR-CON-07: what the person typed or attached
+        self.typed = frozenset(typed_hosts(brief_texts(run)))  # FR-CON-07: what the person typed or attached
+        self.hosts: set[str] = set(self.typed)  # and, as the run goes, its search results' hosts
         self.sources: dict[str, list[tuple[dict, Any]]] = {}
         self.file_texts: dict[tuple[str, int], str | None] = {}
 
@@ -246,8 +258,8 @@ class BoundRunRunner:
                 reply, charge = model.generate_budgeted(request, self.budget)
                 return cast(dict, json.loads(reply.text or "{}")), charge
 
-            hosts = browse.get("hosts") or sorted(self.hosts)
-            if not isinstance(hosts, list) or not hosts:
+            hosts = browse_hosts(browse, self.hosts, self.typed)
+            if not hosts:
                 return UnitOutcome(False, reason="The browser step has no approved site in this task.")
             browser_url = os.environ.get("TILO_BROWSER_URL") if self.mode == "live" else None
             rpc = BrowserRpc(browser_url) if browser_url else BrowserSessions(PlaywrightEngine())
@@ -320,7 +332,10 @@ class BoundRunRunner:
         models = {role: BoundModel(model, budget) for role, model in self.providers.items()}
         search = SearchTool(self.search, self.hosts)
         reader = self.page_reader(unit, context.agent_id)
-        fetch = FetchTool(owner, self.service, self.hosts, unit, context, self.sources, search=search, browser=reader)
+        fetch = FetchTool(
+            owner, self.service, self.hosts, unit, context, self.sources, search=search, browser=reader,
+            typed=self.typed,
+        )  # fmt: skip
         tools: list[Any] = [search, fetch]
         defaults: Mapping[str, tuple[str, ...]] = DEFAULT_TOOLS
         on_call: Callable[[Any], None] | None = None
@@ -361,7 +376,7 @@ class BoundRunRunner:
         building, plain = self.building_of(unit), dict(unit)
 
         def read(url: str, host: str) -> str:
-            also = tuple(sorted(self.hosts))  # a search result's redirect host leads to another known host
+            also = tuple(allow_entries(self.hosts, self.typed))  # BR-02; a result may redirect to another known host
             return executor.read_page(unit=plain, agent=agent, building=building, url=url, host=host, also=also)
 
         return read
