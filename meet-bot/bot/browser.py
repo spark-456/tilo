@@ -334,6 +334,7 @@ class MeetBrowser:
         while time.monotonic() < deadline:
             if await self.in_call():
                 self.stage("in_call")
+                await self.ops_snapshot("in_call")
                 await self._after_join()
                 return
             if await self.visible(S.DENIED_TEXT):
@@ -396,15 +397,18 @@ class MeetBrowser:
         """In the call once the call's Leave control exists. Meet hides its toolbar while the mouse is idle (live
         20 Oct: the bot was admitted but timed out waiting for a *visible* Leave button), so nudge the mouse and
         also accept the control when it is attached but hidden, unless the lobby's waiting text is showing."""
+        # Live 20 Oct: a Leave control alone also matched the waiting room, the bot "joined" while still waiting, and
+        # left when its intro could not be posted. Now: a meeting address, no lobby text, and a control that only a
+        # joined call has (chat, people, hand, reactions).
+        if not S.MEETING_URL_RE.match(self.page.url):
+            return False
         try:
             await self.page.mouse.move(random.randint(300, 900), random.randint(500, 700))
         except Exception:
             pass
-        if await self.visible(S.LEAVE_CALL):
-            return True
         if await self.visible(S.WAITING_TEXT):
             return False
-        for strat in S.LEAVE_CALL.strategies + S.IN_CALL_MARK.strategies:
+        for strat in S.IN_CALL_MARK.strategies:
             try:
                 if await locate(self.page, strat).count() > 0:
                     return True

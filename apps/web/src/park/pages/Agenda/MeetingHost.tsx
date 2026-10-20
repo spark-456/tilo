@@ -186,7 +186,8 @@ export function HostMeeting({
         {flow.phase === "starting" ? <output>Starting…</output> : null}
         {flow.phase === "joining" ? (
           <output>
-            Tilo is joining… Admit Tilo notetaker in Meet if it asks. Keep this tab open.
+            Tilo is joining… In Meet, admit Tilo Test. If it sits under "With potential risks", open
+            the ⋮ beside it and choose Admit. Keep this tab open.
           </output>
         ) : null}
         {flow.phase === "joining" ? (
@@ -485,7 +486,10 @@ export function MeetingAttend({
         </button>
       ) : null}
       {held.phase === "held" ? (
-        <output>Tilo is joining… Admit Tilo notetaker in Meet. Keep this tab open.</output>
+        <output>
+          Tilo is joining… In Meet, admit Tilo Test. If it sits under "With potential risks", open
+          the ⋮ beside it and choose Admit. Keep this tab open.
+        </output>
       ) : null}
       {held.phase === "ended" ? <output>{held.text}</output> : null}
       {held.phase === "refused" ? (

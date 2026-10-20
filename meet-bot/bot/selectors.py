@@ -66,7 +66,11 @@ GUEST_NAME = _s("guest_name", ("role", "textbox", r"your name"), ("placeholder",
 # --- waiting / ended states ------------------------------------------------------------------------------------
 WAITING_TEXT = _s(
     "waiting_text",
-    ("text", r"asking to be let in|someone will let you in|waiting for (the host|someone)|let you in soon"),
+    (
+        "text",
+        r"asking to be let in|someone will let you in|waiting for (the host|someone)|let you in soon"
+        r"|brings? you into the call|wait until (a|the) (meeting )?host|when someone lets you in",
+    ),
 )
 DENIED_TEXT = _s("denied_text", ("text", r"denied your request|no one responded|can.?t join this (video )?call"))
 ENDED_TEXT = _s(
@@ -96,9 +100,6 @@ IN_CALL_MARK = _s(
     ("aria", "Show everyone"),
     ("aria", "Raise hand"),
     ("aria", "Send a reaction"),
-    ("aria", "Turn on captions"),
-    ("aria", "Turn off captions"),
-    ("aria", "Meeting details"),
 )
 CAPTIONS_ON = _s("captions_turn_on", ("role", "button", r"turn on captions"), ("aria", "Turn on captions"))
 CAPTIONS_OFF = _s("captions_turn_off", ("role", "button", r"turn off captions"), ("aria", "Turn off captions"))
