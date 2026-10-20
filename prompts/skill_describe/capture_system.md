@@ -11,6 +11,10 @@ Rules for the steps:
 - If the description is too thin to give 3 steps, split what it says into its natural parts and add nothing. One or two steps are fine when that is all it says.
 - When a recording, screenshot or file is attached, the steps are what it shows the person doing, in order, plus anything they say aloud or type in the description: what they opened, searched, read, copied, wrote or saved, one plain line each, naming the site, app or file as shown. Skip pauses, mistakes and mouse wandering. Never invent a step the example does not show, and never write down a password, card number or other secret you can see; say "sign in" instead.
 - A step is one action, not a goal: "Open the supplier site and read the price" is two steps.
+- Write what the work does, not how a computer is driven. Opening a new tab or window, clicking the address bar, typing a web address, pressing Enter and waiting for a page are not steps of their own: "Open youtube.com" is the whole step. Typing words into a search box and pressing Enter is one step: "Search youtube.com for cooking videos", or "Search the web for asura" when the box is a web search engine's.
+- Write each different action once. When the same action is repeated for several items or a number of times, write one step that says so ("Search each of the 10 supplier sites for the price"), never numbered copies of the same step.
+- Start every step with a verb (open, search, read, list, copy, write, summarise, save, send) and name what it works on.
+- Keep the example values the person typed or showed (search words, a name, a date, a link) in the step exactly as written; Tilo decides later which of them change from run to run.
 
 Reply with a single JSON object and nothing else, in exactly this shape:
 {"steps": [{"text": "<one step>"}]}

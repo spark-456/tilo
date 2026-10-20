@@ -26,6 +26,16 @@ _SPLIT = re.compile(r"(?<=[.!?;])\s+|\s*;\s*|,\s*then\s+|\s+(?:and\s+)?then\s+|\
 _WHEN = re.compile(r"^(?:every|each|on|at|daily|weekly|monthly|when|whenever)\b[^,]*,\s*", re.I)
 _CLAUSE = re.compile(r",\s*(?:and\s+)?|\s+and\s+", re.I)
 _VERBS = ("read", "draft", "write", "send", "post", "pay", "delete", "share", "book")
+# the kinds of an input slot (taught_skill.schema.json#/$defs/input), and the names a model gives them
+_KINDS = {
+    **{k: k for k in ("text", "file", "date", "person", "url", "number")},
+    **dict.fromkeys(("string", "words", "query", "topic", "paragraph"), "text"),
+    **dict.fromkeys(("document", "attachment", "upload", "pdf", "image"), "file"),
+    **dict.fromkeys(("datetime", "time", "period", "date_range", "day"), "date"),
+    **dict.fromkeys(("email", "contact", "name", "recipient"), "person"),
+    **dict.fromkeys(("link", "uri", "website", "site", "web_address"), "url"),
+    **dict.fromkeys(("integer", "count", "amount", "int", "float"), "number"),
+}
 STEP_CHARS = 200
 MAX_STEPS = 12
 NO_EXAMPLE_WORDS = "Repeat the work shown in the example"
@@ -94,8 +104,26 @@ def _question(raw: Any) -> dict[str, Any] | None:
     return {"text": text, "options": kept} if len(kept) >= 2 else None
 
 
+def _slot(raw: dict[str, Any]) -> dict[str, Any]:
+    """SKILLS-E2E: an input slot as a model often writes it, a field left out (no label, no `required`) or a kind under
+    another common name ("string", "link"), filled in; anything it did write is kept as written, so the route's
+    contract check (TS-19) still drops a bad name, an unknown kind or a label of two lines."""
+    name, kind, required = raw.get("name"), raw.get("kind", raw.get("type")), raw.get("required")
+    label = raw.get("label")
+    if label is None and isinstance(name, str):
+        label = name.replace("_", " ").strip().capitalize()
+    folded = kind.strip().lower() if isinstance(kind, str) else kind
+    return {
+        "name": name,
+        "label": label,
+        "kind": _KINDS.get(folded, kind) if isinstance(folded, str) else kind,
+        "required": False if required is None else required,
+    }
+
+
 def tidy_version(doc: Any) -> dict[str, Any]:
     rows: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
     for item in _items(doc):
         text = _step_text(item)
         if text is None:
@@ -103,11 +131,15 @@ def tidy_version(doc: Any) -> dict[str, Any]:
         data = item if isinstance(item, dict) else {}
         tool = str(data.get("tool") or "none").strip()[:64] or "none"
         action = str(data.get("action") or "none").strip()[:64] or "none"
+        key = (tool.lower(), action.lower(), text.casefold())
+        if key in seen:  # SKILLS-E2E: the same step twice is one step
+            continue
+        seen.add(key)
         rows.append({"text": text, "tool": tool, "action": action, "verb": _verb(data.get("verb"), tool.lower())})
     body = doc if isinstance(doc, dict) else {}
     out: dict[str, Any] = {"steps": rows[:MAX_STEPS], "question": _question(body.get("question"))}
     if isinstance(body.get("inputs"), list):
-        out["inputs"] = [i for i in body["inputs"] if isinstance(i, dict)][:8]
+        out["inputs"] = [_slot(i) for i in body["inputs"] if isinstance(i, dict)][:8]
     if isinstance(body.get("hosts"), list):
         out["hosts"] = [h for h in body["hosts"] if isinstance(h, str)][:10]
     return out
