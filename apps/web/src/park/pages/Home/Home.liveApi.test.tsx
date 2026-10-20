@@ -35,6 +35,7 @@ import type { Api } from "../../api/index";
 import { createLiveApi } from "../../api/liveApi";
 import { carryOneStep } from "../../api/oneStep";
 import { handDraft } from "../../chat/handoff";
+import { BROWSER_NOTE } from "../../shared/browserNote";
 
 afterEach(() => {
   cleanup();
@@ -99,7 +100,7 @@ function serverWith(intake: () => Response | Promise<Response>, catalog?: unknow
 }
 
 describe("FR_UX_13 live composer over the real live Api", () => {
-  it("P0_SKILLS_home_browser_skill_states_the_limit_and_does_not_start", async () => {
+  it("DEMO_BROWSER_home_browser_skill_says_it_runs_in_tilos_browser_and_starts", async () => {
     const { api, intakes, fetchSpy } = serverWith(() => json(INTAKE), {
       skills: [
         {
@@ -123,12 +124,13 @@ describe("FR_UX_13 live composer over the real live Api", () => {
     await settle();
     clickEl(q(rig.el, '[role="option"]'));
     await settle();
-    expect(rig.el.textContent).toContain("Needs browser control (coming)");
+    expect(rig.el.textContent).toContain(BROWSER_NOTE);
+    expect(rig.el.textContent).not.toContain("Needs browser control (coming)");
     const start = control(rig.el, "Start task") as HTMLButtonElement;
-    expect(start.disabled).toBe(true);
-    taskInput(rig.el).dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(start.disabled).toBe(false);
+    clickEl(start);
     await settle();
-    expect(intakes()).toHaveLength(0);
+    expect(intakes()).toHaveLength(1);
   });
 
   it("P0_SKILLS_home_mention_alone_starts_the_tagged_skill", async () => {

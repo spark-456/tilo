@@ -8,6 +8,7 @@ import { RECORDED_RUN_PATH } from "../../app/router";
 import { type SegmentOption, SegmentedControl } from "../../components";
 import { type MentionInputProps, SkillMention } from "../../shared/SkillMention";
 import { ThinkingTilo } from "../../shared/ThinkingTilo";
+import { BROWSER_NOTE } from "../../shared/browserNote";
 import type { CatalogSkill, HttpClient } from "../../shared/skillRoute";
 import { Buddy, type BuddyMood } from "../../studio/Buddy";
 import { type IntakeClient, IntakeControl } from "./IntakeControl";
@@ -141,14 +142,8 @@ export interface ComposerProps {
 
 export function ComposerPanel(p: ComposerProps) {
   const { mode, phase } = p;
-  const needsBrowser = Boolean(
-    p.selectedSkill?.needs_browser_control === true ||
-      p.selectedSkill?.tools.some((tool) => /browser|browse_web/i.test(tool)) ||
-      (/\b(?:open|navigate|click|play|type|fill)\b/i.test(p.selectedSkill?.purpose ?? "") &&
-        /\b(?:browser|website|webpage|youtube|https?:\/\/|\.com\b)/i.test(
-          p.selectedSkill?.purpose ?? "",
-        )),
-  );
+  // DEMO-BROWSER: the server's flag means the skill has a browse_web step; it runs, in Tilo's own browser.
+  const usesBrowser = p.selectedSkill?.needs_browser_control === true;
   const effort = p.effort ?? "thinking";
   const quick = p.quick ?? QUICK_IDLE;
   const quickMode = effort === "quick";
@@ -179,7 +174,7 @@ export function ComposerPanel(p: ComposerProps) {
           onChange={(e) => p.onQuery(e.target.value)}
           onKeyDown={(e) => {
             mentionInput?.onKeyDown(e);
-            if (e.key === "Enter" && !e.defaultPrevented && !needsBrowser) p.onDraft();
+            if (e.key === "Enter" && !e.defaultPrevented) p.onDraft();
           }}
         />
       </div>
@@ -200,9 +195,7 @@ export function ComposerPanel(p: ComposerProps) {
         ) : (
           renderInput()
         )}
-        {needsBrowser ? (
-          <output className="park-home-browser-note">Needs browser control (coming)</output>
-        ) : null}
+        {usesBrowser ? <output className="park-home-browser-note">{BROWSER_NOTE}</output> : null}
         <div className="park-home-mode-row">
           <div className="park-home-effort">
             <SegmentedControl
@@ -239,12 +232,7 @@ export function ComposerPanel(p: ComposerProps) {
             </details>
           )}
           <div className="park-home-hint">{quickMode ? effortNote : mode.hint}</div>
-          <button
-            type="button"
-            className="park-home-start"
-            onClick={p.onDraft}
-            disabled={needsBrowser}
-          >
+          <button type="button" className="park-home-start" onClick={p.onDraft}>
             {quickMode ? "Ask" : mode.start}
           </button>
         </div>

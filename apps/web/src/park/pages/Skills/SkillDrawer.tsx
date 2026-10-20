@@ -9,6 +9,7 @@ import { type CurrencyCode, runMoney } from "../../app/ledgerKpis";
 import { handDraft } from "../../chat/handoff";
 import { Button } from "../../components";
 import { cx } from "../../components/cx";
+import { BROWSER_NOTE } from "../../shared/browserNote";
 import { BookOpen, Globe2, Mail, PenLine } from "../../shared/icons";
 import { agent, icon } from "./skillsKit";
 
@@ -154,16 +155,8 @@ export function SkillDrawer({
   const runInputs = inputs.length
     ? inputs
     : [{ name: "task", label: "Anything to add for this run", kind: "text", required: false }];
-  const needsBrowser =
-    skill.steps.some(
-      (step) =>
-        /\b(?:open|navigate|click|play|type|fill)\b/i.test(step) &&
-        /\b(?:browser|website|webpage|youtube|https?:\/\/|\.com\b)/i.test(step),
-    ) ||
-    skill.details?.steps.some(
-      (step) => /browser|browse_web/i.test(step.tool) || step.action === "browse_web",
-    ) === true ||
-    skill.catalog?.tools.some((tool) => /browser|browse_web/i.test(tool)) === true;
+  // DEMO-BROWSER: a browse_web step runs in Tilo's own browser; the drawer says so and never refuses the run.
+  const usesBrowser = skill.details?.steps.some((step) => step.action === "browse_web") === true;
   const readyToRun = runInputs.every(
     (input) =>
       !input.required ||
@@ -325,7 +318,7 @@ export function SkillDrawer({
             className="park-skill-run"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!onRun || running || !readyToRun || needsBrowser || isPaused) return;
+              if (!onRun || running || !readyToRun || isPaused) return;
               setRunning(true);
               setRunError("");
               Promise.resolve(onRun(skill, values, Object.values(files)))
@@ -392,13 +385,11 @@ export function SkillDrawer({
                 )}
               </label>
             ))}
-            {needsBrowser ? (
-              <p className="park-teach__hint">Needs browser control (coming)</p>
-            ) : null}
+            {usesBrowser ? <p className="park-teach__hint">{BROWSER_NOTE}</p> : null}
             <Button
               variant="primary"
               type="submit"
-              disabled={!onRun || !readyToRun || needsBrowser || isPaused || running}
+              disabled={!onRun || !readyToRun || isPaused || running}
             >
               Run skill
             </Button>
