@@ -289,6 +289,8 @@ class MeetBrowser:
         timeout = self.cfg.ask_to_join_timeout_s if asked else self.cfg.join_timeout_s
         deadline = time.monotonic() + timeout
         waiting_shot = False
+        rejoined = False
+        next_snapshot = time.monotonic() + 15
         while time.monotonic() < deadline:
             if await self.in_call():
                 await self._after_join()
@@ -296,6 +298,17 @@ class MeetBrowser:
             if await self.visible(S.DENIED_TEXT):
                 await self.shot("join_denied")
                 raise JoinFailed("the host denied the request to join")
+            # Meet dropped the bot after it got in (live 20 Oct: the rating screen at the timeout): say why, rejoin once.
+            if not rejoined and (await self.visible(S.REJOIN) or await self.visible(S.ENDED_TEXT)):
+                await self.ops_snapshot("dropped_before_ready")
+                rejoined = True
+                if await self.click(S.REJOIN):
+                    await asyncio.sleep(2)
+                    await self.click(S.JOIN_NOW, timeout_s=8)
+                    continue
+            if time.monotonic() >= next_snapshot:
+                await self.ops_snapshot("join_wait")
+                next_snapshot = time.monotonic() + 30
             if not waiting_shot and await self.visible(S.WAITING_TEXT):
                 waiting_shot = True
                 log.info("waiting to be let in (timeout %.0fs)", timeout)
@@ -313,8 +326,19 @@ class MeetBrowser:
                 "[...document.querySelectorAll('button,[role=button]')]"
                 ".map(b => (b.getAttribute('aria-label') || '').trim()).filter(Boolean).slice(0, 40)"
             )
+            body = (await self.page.evaluate("document.body ? document.body.innerText.length : -1")) or 0
+            text = (await self.page.evaluate("document.body ? document.body.innerText : ''")) or ""
+            status = [name for name, rx in S.STATUS_PHRASES if re.search(rx, text, re.I)]
             path = re.sub(r"[a-z]{3}-[a-z]{4}-[a-z]{3}", "<code>", self.page.url.split("?")[0])
-            logging.getLogger("bot.cloud_run").warning("bot ui %s url=%s buttons=%s", where, path, " | ".join(labels))
+            logging.getLogger("bot.cloud_run").warning(
+                "bot ui %s url=%s pages=%d text_len=%s status=%s buttons=%s",
+                where,
+                path,
+                len(self.page.context.pages),
+                body,
+                ",".join(status) or "-",
+                " | ".join(labels),
+            )
         except Exception as exc:  # the snapshot must never break the caller
             logging.getLogger("bot.cloud_run").warning("bot ui %s unavailable: %s", where, type(exc).__name__)
 
@@ -330,7 +354,7 @@ class MeetBrowser:
             return True
         if await self.visible(S.WAITING_TEXT):
             return False
-        for strat in S.LEAVE_CALL.strategies:
+        for strat in S.LEAVE_CALL.strategies + S.IN_CALL_MARK.strategies:
             try:
                 if await locate(self.page, strat).count() > 0:
                     return True

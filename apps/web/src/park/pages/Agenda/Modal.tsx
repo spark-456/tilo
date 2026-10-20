@@ -2,7 +2,22 @@
 // calendar header, hour label or now-line can paint over it, the page behind is inert, and Escape asks to close it.
 // Where showModal is missing (older engines, test DOMs) it falls back to a fixed, high z-index box. Tab stays inside
 // either way, and focus goes back to what opened it. Styles: `.park-agenda-modal` in Agenda.css.
-import { type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
+import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
+
+const MODAL_BOX: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 2147483000,
+  boxSizing: "border-box",
+  width: "min(560px, calc(100vw - 32px))",
+  maxWidth: "none",
+  height: "fit-content",
+  maxHeight: "calc(100dvh - 32px)",
+  margin: "auto",
+  padding: 0,
+  overflow: "auto",
+  borderRadius: 20,
+};
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -19,9 +34,11 @@ export function Modal({
     const dialog = ref.current;
     if (!dialog) return undefined;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (typeof dialog.showModal === "function") {
+    try {
       if (!dialog.open) dialog.showModal();
-    } else dialog.setAttribute("open", "");
+    } catch {
+      dialog.setAttribute("open", "");
+    }
     return () => {
       if (typeof dialog.close === "function" && dialog.open) dialog.close();
       opener?.focus?.();
@@ -50,6 +67,8 @@ export function Modal({
     <dialog
       ref={ref}
       className="park-agenda-modal"
+      // Layout inline as well, so the card stays a centred box above the calendar even before Agenda.css loads.
+      style={MODAL_BOX}
       aria-label={label}
       onKeyDown={onKeyDown}
       onCancel={(event) => {

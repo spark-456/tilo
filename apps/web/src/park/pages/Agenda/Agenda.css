@@ -527,7 +527,8 @@
   z-index: 6;
   left: 6px;
   display: flex;
-  width: min(240px, calc(100% - 12px));
+  box-sizing: border-box;
+  width: 248px; /* wider than a day column, like Google Calendar's quick-add card */
   min-width: 0;
   margin: 0;
   flex-direction: column;

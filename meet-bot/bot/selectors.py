@@ -74,8 +74,32 @@ ENDED_TEXT = _s(
     ("text", r"you.ve been removed|the meeting has ended|you left the meeting|call ended|return to home screen"),
 )
 
+REJOIN = _s("rejoin", ("role", "button", r"^rejoin$"), ("text", r"^rejoin$"))
+# Meet's own status lines, matched by name only in ops logs (never the page text itself) to say why a join stopped.
+STATUS_PHRASES = (
+    ("removed", r"you.ve been removed"),
+    ("left", r"you left the meeting"),
+    ("ended", r"the meeting has ended|call ended"),
+    ("another_device", r"another device|joined from another|switched to another"),
+    ("connection", r"lost (your )?(network )?connection|trouble connecting|reconnecting"),
+    ("cant_join", r"can.?t join this (video )?call"),
+    ("waiting", r"asking to be let in|someone will let you in"),
+    ("rate", r"rate the meeting|how was the (audio|video|call)"),
+)
+
 # --- in call ---------------------------------------------------------------------------------------------------
 LEAVE_CALL = _s("leave_call", ("role", "button", r"leave call"), ("aria", "Leave call"))
+# Controls that exist only inside a call (attached even while Meet auto-hides its toolbar); the pre-join screen has none.
+IN_CALL_MARK = _s(
+    "in_call_mark",
+    ("aria", "Chat with everyone"),
+    ("aria", "Show everyone"),
+    ("aria", "Raise hand"),
+    ("aria", "Send a reaction"),
+    ("aria", "Turn on captions"),
+    ("aria", "Turn off captions"),
+    ("aria", "Meeting details"),
+)
 CAPTIONS_ON = _s("captions_turn_on", ("role", "button", r"turn on captions"), ("aria", "Turn on captions"))
 CAPTIONS_OFF = _s("captions_turn_off", ("role", "button", r"turn off captions"), ("aria", "Turn off captions"))
 MORE_OPTIONS = _s("more_options", ("role", "button", r"more options"), ("aria", "More options"))
