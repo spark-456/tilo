@@ -24,19 +24,21 @@ const FILE_EXTENSIONS: Readonly<Record<string, string>> = {
   [OFFICE_TYPES.XLSX ?? ""]: ".xlsx",
   [OFFICE_TYPES.PPTX ?? ""]: ".pptx",
   "application/pdf": ".pdf",
+  "text/csv": ".csv",
 };
 
-/** DOCS-OUT: the extension a delivered Word, Excel, PowerPoint or PDF file is saved with, from its type, else its format. */
+/** DOCS-OUT: the extension a delivered Word, Excel, PowerPoint, PDF or CSV file is saved with, from its type, else its format. */
 function fileExtension(blob: Blob, format: string): string | undefined {
   const type = blob.type.split(";")[0]?.toLowerCase() ?? "";
   if (FILE_EXTENSIONS[type]) return FILE_EXTENSIONS[type];
-  return /^(DOCX|XLSX|PPTX|PDF)$/.test(format) ? `.${format.toLowerCase()}` : undefined;
+  return /^(DOCX|XLSX|PPTX|PDF|CSV)$/.test(format) ? `.${format.toLowerCase()}` : undefined;
 }
 
 const readableMath = (text: string): string =>
   text.replace(/\$\\to\$/g, "→").replace(/\$([^$\n]+)\$/g, "$1");
 
-function csvRows(text: string): string[][] {
+function csvRows(raw: string): string[][] {
+  const text = raw.replace(/^\uFEFF/, ""); // a CSV made for Excel starts with a byte-order mark
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
@@ -267,11 +269,21 @@ function safeDeliverableName(raw: string): string | null {
   return cleaned.slice(0, 255) || null;
 }
 
+/** DEMO-DELIVER: the unit the Lead gave the agent that recorded a version ("The Lead gave it: <title>"), from events. */
+function unitTitle(events: readonly RunEvent[], made: RunEvent | undefined): string | null {
+  if (!made?.actor) return null;
+  const assigned = [...events]
+    .reverse()
+    .find((e) => e.type === "agent.assigned" && e.target === made.actor && e.seq < made.seq);
+  const title = assigned?.summary.match(/^The Lead gave it:\s*(.+?)\s*$/i)?.[1];
+  return title ? safeDeliverableName(title) : null;
+}
+
 function recordedArtifact(
   events: readonly RunEvent[],
   id: string,
   version?: number,
-): { label: string | null; mediaType: string | null } {
+): { label: string | null; mediaType: string | null; unit: string | null } {
   const recorded = [...events].reverse();
   const matches = (event: RunEvent, exactVersion: boolean) => {
     const data = event.data as
@@ -291,6 +303,7 @@ function recordedArtifact(
   return {
     label: typeof item?.item?.label === "string" ? safeDeliverableName(item.item.label) : null,
     mediaType: typeof data?.media_type === "string" ? data.media_type : null,
+    unit: unitTitle(events, made),
   };
 }
 
@@ -306,8 +319,8 @@ function deliveredName(event: RunEvent, id: string, events: readonly RunEvent[])
   const cleanLabel = typeof label === "string" ? safeDeliverableName(label) : null;
   if (cleanLabel && cleanLabel !== id) return cleanLabel;
   const version = typeof data?.artifact?.version === "number" ? data.artifact.version : undefined;
-  const recordedLabel = recordedArtifact(events, id, version).label;
-  if (recordedLabel) return recordedLabel;
+  const recorded = recordedArtifact(events, id, version);
+  if (recorded.label) return recorded.label;
   const fromSummary = event.summary.match(
     /^(?:The |Your )?(.+?) (?:is ready|was delivered)(?: in Tilo)?\.?$/i,
   );
@@ -316,7 +329,10 @@ function deliveredName(event: RunEvent, id: string, events: readonly RunEvent[])
   const summary = /^The item was delivered\.?$/i.test(event.summary)
     ? null
     : safeDeliverableName(event.summary.replace(/[.!]+$/, ""));
-  return (typeof data?.format === "string" && FORMAT_NAMES[data.format]) || summary || id;
+  return (
+    recorded.unit ??
+    ((typeof data?.format === "string" && FORMAT_NAMES[data.format]) || summary || id)
+  );
 }
 
 function extractDeliveredFiles(events: readonly RunEvent[]): DeliveredFile[] {

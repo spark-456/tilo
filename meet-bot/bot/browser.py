@@ -105,7 +105,9 @@ class MeetBrowser:
         # Meet serves Google Chrome the layout the bot is verified against (live 20 Oct); the cloud image installs it.
         if channel := os.environ.get("BOT_BROWSER_CHANNEL", "").strip():
             launch["channel"] = channel
-        context = {"viewport": {"width": 1280, "height": 720}, "locale": "en-US"}
+        context: dict[str, Any] = {"viewport": {"width": 1280, "height": 720}, "locale": "en-US"}
+        if self.voice:  # the voice needs Meet's mic: grant it, or Meet asks "Do you want people to hear you?"
+            context["permissions"] = ["microphone", "camera"]
         try:
             if self.guest or self.session_file:
                 self._browser = await self._pw.chromium.launch(**launch)
@@ -187,11 +189,12 @@ class MeetBrowser:
 
     async def _click_attached(self, sel: S.Sel) -> bool:
         """Last resort for a toolbar control that stays hidden: click the attached element itself."""
+        # A real (forced) mouse click: Meet ignores script-dispatched clicks on its controls (local run 20 Oct).
         for strat in sel.strategies:
             try:
                 loc = locate(self.page, strat).first
                 if await loc.count() > 0:
-                    await loc.evaluate("e => e.click()")
+                    await loc.click(force=True, timeout=3000)
                     return True
             except Exception:
                 continue
@@ -209,7 +212,9 @@ class MeetBrowser:
             await loc.click(timeout=5000)
             return True
         except Exception as e:
-            log.warning("click on %s failed: %s", sel.name, e)
+            log.warning("click on %s failed: %s", sel.name, str(e)[:200])
+            if "intercepts pointer events" in str(e):  # a tip card covers the page: close it for the next try
+                await self.dismiss_tips()
             await self.selector_miss(sel)
             return False
 
@@ -265,6 +270,7 @@ class MeetBrowser:
         if not S.MEETING_URL_RE.fullmatch(url):
             raise JoinFailed("The meeting link does not have the required Meet shape.")
         await self.page.goto(url, wait_until="domcontentloaded")
+        self._meeting_url = url
         self.stage("opened_meeting_page")
         self._check_url_login()
 
@@ -280,7 +286,11 @@ class MeetBrowser:
                 await self._after_join()
                 return False
             await self.click(S.CONTINUE_WITHOUT_MEDIA)
-            await self.click(S.GOT_IT)
+            await self.dismiss_tips()
+            # The bot account already in this call: join beside it, never "Switch here" (that ends the other session).
+            if await self.click(S.JOIN_HERE_TOO_BUTTON):
+                self.stage("pressed_join_here_too")
+                break
             await self.click(S.MIC_TURN_OFF)  # only visible when the mic is on
             await self.click(S.CAM_TURN_OFF)
             if self.guest and (name := await self.find(S.GUEST_NAME)) is not None:
@@ -341,16 +351,24 @@ class MeetBrowser:
                 await self.shot("join_denied")
                 raise JoinFailed("the host denied the request to join")
             # Meet dropped the bot after it got in (live 20 Oct: the rating screen at the timeout): say why, rejoin once.
-            if not rejoined and (await self.visible(S.REJOIN) or await self.visible(S.ENDED_TEXT)):
+            # Live 20 Oct 16:27 the page went straight to "Rate the meeting", which has no Rejoin button: go back to the
+            # meeting's own address and ask again, and give the host a fresh wait.
+            if not rejoined and (
+                await self.visible(S.REJOIN) or await self.visible(S.ENDED_TEXT) or await self.rated()
+            ):
                 await self.ops_snapshot("dropped_before_ready")
                 rejoined = True
-                if await self.click(S.REJOIN):
-                    await asyncio.sleep(2)
-                    await self.click(S.JOIN_NOW, timeout_s=8)
-                    continue
+                if not await self.click(S.REJOIN) and getattr(self, "_meeting_url", None):
+                    await self.page.goto(self._meeting_url, wait_until="domcontentloaded")
+                await asyncio.sleep(3)
+                await self.dismiss_tips()
+                if await self.click(S.JOIN_NOW, timeout_s=10) or await self.click(S.ASK_TO_JOIN, timeout_s=5):
+                    self.stage("asked_again_after_drop")
+                    deadline = max(deadline, time.monotonic() + self.cfg.ask_to_join_timeout_s)
+                continue
             if time.monotonic() >= next_snapshot:
                 await self.ops_snapshot("join_wait")
-                next_snapshot = time.monotonic() + 30
+                next_snapshot = time.monotonic() + 10
             if not waiting_shot and await self.visible(S.WAITING_TEXT):
                 waiting_shot = True
                 # "Join now" can still land in the lobby (Meet files the bot under "With potential risks", where the
@@ -363,6 +381,36 @@ class MeetBrowser:
         await self.shot("join_timeout")
         await self.ops_snapshot("join_timeout")
         raise JoinFailed(f"not in the call after {timeout:.0f}s (waiting for admission?)")
+
+    async def dismiss_tips(self) -> None:
+        """Meet's one-off tip cards ("Switch the call here ... Got it") cover the pre-join screen and swallow every click
+        (local run 20 Oct: each click timed out until the 90 s join deadline). Press their own Got it / Dismiss."""
+        # A real click: Meet ignores a script-dispatched click on these cards (local run 20 Oct).
+        try:
+            dialogs = self.page.locator(S.DIALOG_CSS)
+            open_dialogs = [d for d in [dialogs.nth(i) for i in range(await dialogs.count())] if await d.is_visible()]
+            if not open_dialogs:
+                return
+            labels = [(await d.get_attribute("aria-label")) or "?" for d in open_dialogs]
+            self.stage("tip_dialog", "|".join(labels)[:120])
+            pressed = False
+            for dialog in open_dialogs:
+                button = locate(dialog, S.TIP_BUTTON.strategies[0]).first
+                if await button.count() and await button.is_visible():
+                    await button.click(timeout=3000)
+                    pressed = True
+            if not pressed:
+                await self.page.keyboard.press("Escape")
+            await asyncio.sleep(0.5)
+        except Exception:
+            pass
+
+    async def rated(self) -> bool:
+        """Meet's after-call page ("Rate the meeting"): the bot is out of the call, whatever the reason."""
+        try:
+            return await locate(self.page, S.RATE_MEETING.strategies[0]).count() > 0
+        except Exception:
+            return False
 
     def stage(self, name: str, detail: str = "") -> None:
         """One 'stage' line per step of the bot's life in the cloud log (no participant content), so a failed call can
@@ -402,12 +450,10 @@ class MeetBrowser:
         # joined call has (chat, people, hand, reactions).
         if not S.MEETING_URL_RE.match(self.page.url):
             return False
-        try:
-            await self.page.mouse.move(random.randint(300, 900), random.randint(500, 700))
-        except Exception:
-            pass
         if await self.visible(S.WAITING_TEXT):
             return False
+        # Live 20 Oct 16:27: admitted, but the toolbar was not in the page until the mouse reached its band.
+        await self.reveal_toolbar()
         for strat in S.IN_CALL_MARK.strategies:
             try:
                 if await locate(self.page, strat).count() > 0:

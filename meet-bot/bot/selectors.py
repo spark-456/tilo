@@ -48,7 +48,12 @@ MIC_TURN_ON = _s("mic_turn_on", ("role", "button", r"turn on microphone"), ("ari
 MIC_TURN_OFF = _s("mic_turn_off", ("role", "button", r"turn off microphone"), ("aria", "Turn off microphone"))
 CAM_TURN_OFF = _s("cam_turn_off", ("role", "button", r"turn off camera"), ("aria", "Turn off camera"))
 CAM_TURN_ON = _s("cam_turn_on", ("role", "button", r"turn on camera"), ("aria", "Turn on camera"))
-JOIN_NOW = _s("join_now", ("role", "button", r"^(join now|switch here)$"), ("text", r"^join now$"))
+JOIN_NOW = _s("join_now", ("role", "button", r"^join now$"), ("text", r"^join now$"))
+# Shown straight on the pre-join screen when the same account is already in the call (Meet Oct 2026).
+JOIN_HERE_TOO_BUTTON = _s("join_here_too_button", ("role", "button", r"join here too$"))
+# The close button of Meet's tip cards ("Switch the call here ... Got it").
+DIALOG_CSS = "[role=dialog]"
+TIP_BUTTON = _s("tip_button", ("role", "button", r"^(got it|dismiss|no thanks)$"))
 ASK_TO_JOIN = _s("ask_to_join", ("role", "button", r"ask to join"), ("text", r"^ask to join$"))
 OTHER_WAYS_TO_JOIN = _s("other_ways_to_join", ("role", "button", r"other ways to join"))
 JOIN_HERE_TOO = _s(
@@ -79,6 +84,7 @@ ENDED_TEXT = _s(
 )
 
 REJOIN = _s("rejoin", ("role", "button", r"^rejoin$"), ("text", r"^rejoin$"))
+RATE_MEETING = _s("rate_meeting", ("aria", "Rate the meeting"))
 # Meet's own status lines, matched by name only in ops logs (never the page text itself) to say why a join stopped.
 STATUS_PHRASES = (
     ("removed", r"you.ve been removed"),
@@ -89,6 +95,10 @@ STATUS_PHRASES = (
     ("cant_join", r"can.?t join this (video )?call"),
     ("waiting", r"asking to be let in|someone will let you in"),
     ("rate", r"rate the meeting|how was the (audio|video|call)"),
+    ("denied", r"denied your request|no one responded|request to join was"),
+    ("error", r"something went wrong|couldn.?t (connect|start|join)|an error occurred"),
+    ("reconnect", r"reconnect"),
+    ("removed_by_host", r"removed you|host removed|you were removed"),
 )
 
 # --- in call ---------------------------------------------------------------------------------------------------
@@ -100,6 +110,8 @@ IN_CALL_MARK = _s(
     ("aria", "Show everyone"),
     ("aria", "Raise hand"),
     ("aria", "Send a reaction"),
+    # Top-bar control of a joined call, present even while the bottom toolbar is not rendered (live 20 Oct 16:27).
+    ("aria", "More activities in this meeting"),
 )
 CAPTIONS_ON = _s("captions_turn_on", ("role", "button", r"turn on captions"), ("aria", "Turn on captions"))
 CAPTIONS_OFF = _s("captions_turn_off", ("role", "button", r"turn off captions"), ("aria", "Turn off captions"))
