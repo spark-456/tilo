@@ -434,6 +434,10 @@ class LiveSession:
 
     async def _read_chat(self) -> None:
         msgs = await self.br.read_chat()
+        panel = "unreadable" if msgs is None else "open"
+        if panel != getattr(self, "_chat_panel_logged", None):  # one line per change, never the messages
+            self._chat_panel_logged = panel
+            ops.warning("stage chat_panel %s", panel)
         if not msgs:
             return
         seen_now: Counter = Counter()
@@ -469,6 +473,7 @@ class LiveSession:
                 or self.brain.wake_settings is None
                 or wake_gate(text, sender, self.brain_elapsed(), Attention(), self.brain.wake_settings).allowed
             )
+            ops.warning("stage chat_read chars=%d names_tilo=%s directed=%s", len(text), addressed, directed)
             line = chat_utterance(sender, text, self.elapsed()) if directed else Utterance(sender, text, self.elapsed())
             self.record(line, heard_at=self.clock.now())
 

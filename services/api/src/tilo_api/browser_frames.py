@@ -12,10 +12,6 @@ from tilo_api.results import result_store
 
 router = APIRouter()
 _MISSING = HTTPException(status_code=404, detail="Tilo could not find that.")
-# DEMO-BROWSER: Model Armor answers FAILURE for an image, so a frame is `clean` or, with no verdict, `unscreened`. The
-# owner sees their own recorded, masked frame either way; it never leaves Tilo (AR-11; leaving is T3 when not clean,
-# AR-07). A `flagged` frame is never served.
-_SHOWN = frozenset({"clean", "unscreened"})
 
 
 @router.get("/worlds/{world_id}/browser/frames/{artifact_id}")
@@ -56,7 +52,7 @@ def get_browser_frame(
             record["run_id"] != world.run_id
             or record["origin"]["kind"] != "browser"
             or record["media_type"] != "image/png"
-            or record["screening"] not in _SHOWN
+            or record["screening"] != "clean"
             or record["size_bytes"] > 4_000_000
         ):
             raise ValueError("frame record mismatch")
