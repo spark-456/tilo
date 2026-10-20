@@ -3,7 +3,7 @@
 // others" is one small dialog whose Confirm button is the person's approval. The person's own click is the explicit
 // human action; the API records it as the approval and sends exactly the people shown. Every line is one the API's
 // reply supports; nothing retries by itself except the API's own wait for a cold bot, and there is no progress bar (HR-1).
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 import type { HostState } from "../../../api/connect";
 import { displayApiError } from "../../../api/http";
 import { ENDED_TEXT, MEET, type MeetingHostApi } from "../../api/live/meetingHost";
@@ -23,6 +23,7 @@ import {
   openMeetTab,
   refusedBeforeSend,
 } from "../../shared/hostMeetingRules";
+import { Modal } from "./Modal";
 
 type Flow =
   | { phase: "idle" }
@@ -56,6 +57,7 @@ export function HostMeeting({
   const [dialog, setDialog] = useState(false);
   const [link, setLink] = useState<string | null>(null);
   const [wrap, setWrap] = useState(false);
+  const headId = useId();
   // One failed or unconfirmed read must not stick: "Check again" reads it afresh (the same read the Connectors page makes).
   const read = useCallback(() => {
     hostState().then(setConn, () => setConn("unknown"));
@@ -150,67 +152,74 @@ export function HostMeeting({
 
   const busy = flow.phase === "starting" || flow.phase === "joining";
   return (
-    <div className="park-agenda-hostbox" aria-label="Meet with Tilo">
-      <GuestJoin busy={busy} onSend={(url) => void guestMeet(url)} />
-      {hosted ? (
-        <>
-          <div className="park-agenda-hostactions">
-            <button
-              type="button"
-              className="secondary"
-              disabled={busy}
-              onClick={() => void meetNow()}
-            >
-              Meet with Tilo now
+    <>
+      <section
+        className="park-agenda-card park-agenda-hostbox"
+        aria-labelledby={headId}
+        data-testid="agenda-bring"
+      >
+        <h2 id={headId}>Bring Tilo to a meeting</h2>
+        <GuestJoin busy={busy} onSend={(url) => void guestMeet(url)} />
+        {hosted ? (
+          <div className="park-agenda-hostmore">
+            <div className="park-agenda-hostactions">
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy}
+                onClick={() => void meetNow()}
+              >
+                Meet with Tilo now
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy}
+                onClick={() => setDialog(true)}
+              >
+                Schedule with others
+              </button>
+            </div>
+            <small>{MEET_NOW_NOTICE}</small>
+          </div>
+        ) : null}
+        {flow.phase === "starting" ? <output>Starting…</output> : null}
+        {flow.phase === "joining" ? (
+          <output>
+            Tilo is joining… Admit Tilo notetaker in Meet if it asks. Keep this tab open.
+          </output>
+        ) : null}
+        {flow.phase === "joining" ? (
+          <div>
+            <button type="button" className="secondary" onClick={() => setWrap(true)}>
+              Wrap up
             </button>
-            <button
-              type="button"
-              className="secondary"
-              disabled={busy}
-              onClick={() => setDialog(true)}
-            >
-              Schedule with others
+            {wrap ? <p>{WRAP_UP}</p> : null}
+          </div>
+        ) : null}
+        {link && busy ? (
+          <a href={link} target="_blank" rel="noopener noreferrer">
+            Open the call in Meet
+          </a>
+        ) : null}
+        {flow.phase === "retry" ? (
+          <div role="alert">
+            <p>{JOIN_FAILED}</p>
+            <button type="button" onClick={() => void attend(flow.id, flow.url)}>
+              Try again
             </button>
           </div>
-          <small>{MEET_NOW_NOTICE}</small>
-        </>
-      ) : null}
-      {flow.phase === "starting" ? <output>Starting…</output> : null}
-      {flow.phase === "joining" ? (
-        <output>
-          Tilo is joining… Admit Tilo notetaker in Meet if it asks. Keep this tab open.
-        </output>
-      ) : null}
-      {flow.phase === "joining" ? (
-        <div>
-          <button type="button" className="secondary" onClick={() => setWrap(true)}>
-            Wrap up
-          </button>
-          {wrap ? <p>{WRAP_UP}</p> : null}
-        </div>
-      ) : null}
-      {link && busy ? (
-        <a href={link} target="_blank" rel="noopener noreferrer">
-          Open the call in Meet
-        </a>
-      ) : null}
-      {flow.phase === "retry" ? (
-        <div role="alert">
-          <p>{JOIN_FAILED}</p>
-          <button type="button" onClick={() => void attend(flow.id, flow.url)}>
-            Try again
-          </button>
-        </div>
-      ) : null}
-      {flow.phase === "failed" ? <p role="alert">{flow.text}</p> : null}
-      {flow.phase === "ended" ? (
-        <output>{`${flow.text} Your minutes can be made from the meeting below.`}</output>
-      ) : null}
-      {flow.phase === "scheduled" ? (
-        <output>
-          {`Scheduled. Invitations went to you${flow.names.length ? `, ${flow.names.join(", ")}` : ""}. Bring Tilo in from the meeting below when it starts.`}
-        </output>
-      ) : null}
+        ) : null}
+        {flow.phase === "failed" ? <p role="alert">{flow.text}</p> : null}
+        {flow.phase === "ended" ? (
+          <output>{`${flow.text} Your minutes can be made from the meeting below.`}</output>
+        ) : null}
+        {flow.phase === "scheduled" ? (
+          <output>
+            {`Scheduled. Invitations went to you${flow.names.length ? `, ${flow.names.join(", ")}` : ""}. Bring Tilo in from the meeting below when it starts.`}
+          </output>
+        ) : null}
+      </section>
       {dialog ? (
         <ScheduleDialog
           api={api}
@@ -219,7 +228,7 @@ export function HostMeeting({
           onConfirm={scheduled}
         />
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -229,15 +238,22 @@ const GUEST_HELP = "Paste a Google Meet link like https://meet.google.com/abc-de
 function GuestJoin({ busy, onSend }: { busy: boolean; onSend: (url: string) => void }) {
   const [url, setUrl] = useState("");
   const [err, setErr] = useState("");
+  const errId = useId();
   const send = () => {
-    const u = url.trim();
+    // Meet (Oct 2026) shows calls as meet.google.com/meet/<code>, often with ?authuser=…: keep only the canonical link.
+    const u = url
+      .trim()
+      .replace(/[?#].*$/, "")
+      .replace(/^(https:\/\/meet\.google\.com\/)meet\//i, "$1")
+      .replace(/\/$/, "")
+      .toLowerCase();
     if (!MEET.test(u)) return setErr(GUEST_HELP);
     setErr("");
     onSend(u);
   };
   return (
-    <div className="park-agenda-hostactions">
-      <label className="park-agenda-hostfield">
+    <div className="park-agenda-bring">
+      <label className="park-agenda-hostfield park-agenda-bring__field">
         <span>Your Google Meet link</span>
         <input
           type="url"
@@ -245,19 +261,28 @@ function GuestJoin({ busy, onSend }: { busy: boolean; onSend: (url: string) => v
           placeholder="https://meet.google.com/abc-defg-hij"
           value={url}
           disabled={busy}
-          onChange={(e) => setUrl(e.target.value)}
+          aria-invalid={err ? true : undefined}
+          aria-describedby={err ? errId : undefined}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            if (err) setErr("");
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") send();
           }}
         />
       </label>
-      <button type="button" disabled={busy} onClick={send}>
+      <button type="button" className="park-agenda-primary" disabled={busy} onClick={send}>
         Send Tilo to my call
       </button>
-      <small>
+      {err ? (
+        <p id={errId} role="alert" className="park-agenda-bring__error">
+          {err}
+        </p>
+      ) : null}
+      <small className="park-agenda-bring__help">
         Tilo joins as a guest named Tilo notetaker. Admit it in Meet. No sign-in needed.
       </small>
-      {err ? <p role="alert">{err}</p> : null}
     </div>
   );
 }
@@ -315,87 +340,89 @@ function ScheduleDialog({
     </label>
   );
   return (
-    <form
-      className="park-agenda-hostform"
-      aria-label="Schedule with others"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void submit();
-      }}
-      onKeyDown={(e) => e.key === "Escape" && onCancel()}
-    >
-      {field(
-        "Title",
-        <input
-          name="title"
-          value={f.title}
-          maxLength={120}
-          onChange={(e) => setF({ ...f, title: e.target.value })}
-        />,
-      )}
-      {field(
-        "Starts (your local time)",
-        <input
-          name="start"
-          type="datetime-local"
-          value={f.start}
-          onChange={(e) => setF({ ...f, start: e.target.value })}
-        />,
-      )}
-      {field(
-        "Length",
-        <span className="park-agenda-hostselect">
-          <select
-            value={f.minutes}
-            onChange={(e) => setF({ ...f, minutes: Number(e.target.value) })}
-          >
-            {LENGTHS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </span>,
-      )}
-      <fieldset className="park-agenda-hostpeople">
-        <legend>Invite</legend>
-        {people === null && !err ? <output>Loading…</output> : null}
-        {people?.length === 0 ? <p>No one else is on your team yet.</p> : null}
-        {(people ?? []).map((p) => (
-          <label key={p.id} className="park-agenda-hostnotice">
-            <input
-              type="checkbox"
-              checked={chosen.includes(p.id)}
-              onChange={(e) =>
-                setChosen(e.target.checked ? [...chosen, p.id] : chosen.filter((c) => c !== p.id))
-              }
-            />
-            <span>{p.name}</span>
-          </label>
-        ))}
-      </fieldset>
-      <p data-testid="host-invite-list">
-        {`Invitations will go to: you${picked.length ? `, ${picked.map((p) => p.name).join(", ")}` : ""}. No one else.`}
-      </p>
-      <label className="park-agenda-hostnotice">
-        <input
-          type="checkbox"
-          checked={f.attested}
-          onChange={(e) => setF({ ...f, attested: e.target.checked })}
-        />
-        <span>{NOTICE_TEXT}</span>
-      </label>
-      {err ? <p role="alert">{err}</p> : null}
-      <div className="park-agenda-hostactions">
-        <button type="submit" disabled={busy || people === null || !you}>
-          Confirm and send invitations
-        </button>
-        <button type="button" className="secondary" onClick={onCancel}>
-          Cancel
-        </button>
-      </div>
-      {busy ? <output>Working…</output> : null}
-    </form>
+    <Modal label="Schedule with others" onClose={onCancel}>
+      <form
+        className="park-agenda-hostform"
+        aria-label="Schedule with others"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
+        <h2>Schedule with others</h2>
+        {field(
+          "Title",
+          <input
+            name="title"
+            value={f.title}
+            maxLength={120}
+            onChange={(e) => setF({ ...f, title: e.target.value })}
+          />,
+        )}
+        {field(
+          "Starts (your local time)",
+          <input
+            name="start"
+            type="datetime-local"
+            value={f.start}
+            onChange={(e) => setF({ ...f, start: e.target.value })}
+          />,
+        )}
+        {field(
+          "Length",
+          <span className="park-agenda-hostselect">
+            <select
+              value={f.minutes}
+              onChange={(e) => setF({ ...f, minutes: Number(e.target.value) })}
+            >
+              {LENGTHS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </span>,
+        )}
+        <fieldset className="park-agenda-hostpeople">
+          <legend>Invite</legend>
+          {people === null && !err ? <output>Loading…</output> : null}
+          {people?.length === 0 ? <p>No one else is on your team yet.</p> : null}
+          {(people ?? []).map((p) => (
+            <label key={p.id} className="park-agenda-hostnotice">
+              <input
+                type="checkbox"
+                checked={chosen.includes(p.id)}
+                onChange={(e) =>
+                  setChosen(e.target.checked ? [...chosen, p.id] : chosen.filter((c) => c !== p.id))
+                }
+              />
+              <span>{p.name}</span>
+            </label>
+          ))}
+        </fieldset>
+        <p data-testid="host-invite-list">
+          {`Invitations will go to: you${picked.length ? `, ${picked.map((p) => p.name).join(", ")}` : ""}. No one else.`}
+        </p>
+        <label className="park-agenda-hostnotice">
+          <input
+            type="checkbox"
+            checked={f.attested}
+            onChange={(e) => setF({ ...f, attested: e.target.checked })}
+          />
+          <span>{NOTICE_TEXT}</span>
+        </label>
+        {err ? <p role="alert">{err}</p> : null}
+        <div className="park-agenda-hostactions">
+          <button type="submit" disabled={busy || people === null || !you}>
+            Confirm and send invitations
+          </button>
+          <button type="button" className="secondary" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+        {busy ? <output>Working…</output> : null}
+      </form>
+    </Modal>
   );
 }
 
@@ -451,7 +478,7 @@ export function MeetingAttend({
     }
   };
   return (
-    <div aria-label="Tilo in the meeting">
+    <fieldset aria-label="Tilo in the meeting" className="park-agenda-attend">
       {held.phase === "idle" ? (
         <button type="button" onClick={() => void send()}>
           Bring Tilo in
@@ -478,6 +505,6 @@ export function MeetingAttend({
         </a>
       ) : null}
       {linkErr ? <p role="alert">{linkErr}</p> : null}
-    </div>
+    </fieldset>
   );
 }

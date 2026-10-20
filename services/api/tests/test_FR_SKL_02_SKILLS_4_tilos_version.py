@@ -84,14 +84,18 @@ def test_FR_SKL_02_SKILLS_4_any_send_step_asks_first_even_for_a_hostile_descript
 
 
 def test_FR_SKL_02_SKILLS_4_the_model_cannot_set_ask_first_must_ask_or_the_estimates(skills4):
-    capture_id = skills4.made(CLEAR)
     for extra in ({"ask_first": False}, {"must_ask": False}):
+        capture_id = skills4.made(CLEAR)
         rows = [{**row, **extra} for row in VERSIONS[CLEAR]["steps"]]
         skills4.model.override["version"] = json.dumps({"steps": rows, "question": None})
-        assert skills4.version(capture_id).status_code == 502
+        response = skills4.version(capture_id)  # P0-SKILLS-TEACH: a draft from the captured words, never the reply
+        body = response.json()
+        assert response.status_code == 200 and body["fallback"] is True
+        assert not any(s["action"] == "send_email" for s in body["plan_steps"])
+    capture_id = skills4.made(CLEAR)
     skills4.model.override["version"] = json.dumps({**VERSIONS[CLEAR], "estimates": {"credits_per_run": 0}})
-    assert skills4.version(capture_id).status_code == 502
-    assert skills4.store.get(ORG, capture_id)["plan"] == []
+    body = skills4.version(capture_id).json()
+    assert body["fallback"] is True and body["estimates"]["credits_per_run"] != 0
 
 
 def test_FR_SKL_02_SKILLS_4_an_ambiguous_description_gets_exactly_one_question_and_a_clear_one_none(skills4):
@@ -119,12 +123,22 @@ def test_FR_SKL_02_SKILLS_4_a_compound_question_is_dropped_never_passed_on(skill
     assert skills4.all_events()[-1]["data"]["question"] is False
 
 
-def test_FR_SKL_02_SKILLS_4_two_questions_or_a_bad_question_shape_is_draft_failed(skills4):
-    capture_id = skills4.made(COMPOUND)
+def test_FR_SKL_02_SKILLS_4_two_questions_or_a_bad_question_shape_is_dropped_and_the_steps_stay(skills4):
     one = {"text": "Which folder?", "options": ["a", "b"]}
-    for question in ([one, one], {"text": "Which?", "options": ["only"]}, {"text": "Which?", "options": list("abcde")}):
-        skills4.model.override["version"] = json.dumps({**VERSIONS[COMPOUND], "question": question})
-        assert skills4.version(capture_id).status_code == 502
+    capture_id = skills4.made(COMPOUND)
+    skills4.model.override["version"] = json.dumps({**VERSIONS[COMPOUND], "question": [one, one]})
+    body = skills4.version(capture_id).json()  # two questions is not the reply's shape: a draft, no question
+    assert body["fallback"] is True and body["clarifying_question"] is None
+    capture_id = skills4.made(COMPOUND)
+    skills4.model.override["version"] = json.dumps(
+        {**VERSIONS[COMPOUND], "question": {"text": "Which?", "options": ["a"]}}
+    )
+    body = skills4.version(capture_id).json()
+    assert body["clarifying_question"] is None and len(body["plan_steps"]) == 3 and "fallback" not in body
+    capture_id = skills4.made(COMPOUND)
+    five = {"text": "Which?", "options": list("abcde")}
+    skills4.model.override["version"] = json.dumps({**VERSIONS[COMPOUND], "question": five})
+    assert len(skills4.version(capture_id).json()["clarifying_question"]["options"]) == 4  # cut to four
 
 
 def test_FR_SKL_02_SKILLS_4_a_description_naming_no_channel_gets_no_invented_channel(skills4):
@@ -133,31 +147,36 @@ def test_FR_SKL_02_SKILLS_4_a_description_naming_no_channel_gets_no_invented_cha
     assert [s["action"] for s in body["plan_steps"]] == ["read_email", "save_file"]  # the unknown step is dropped
 
 
-def test_FR_SKL_02_SKILLS_4_an_unknown_action_of_a_known_tool_is_dropped_and_none_left_is_422(skills4):
+def test_FR_SKL_02_SKILLS_4_an_unknown_action_of_a_known_tool_is_dropped_and_none_left_is_a_draft(skills4):
     capture_id = skills4.made(CLEAR)
     skills4.model.override["version"] = json.dumps({"steps": plan(("x", "slack", "post", "post")), "question": None})
     response = skills4.version(capture_id)
-    assert response.status_code == 422 and response.json() == {"detail": "not_understood"}
-    skills4.model.override["version"] = json.dumps(
-        {"steps": plan(("x", "gmail", "delete_everything", "send")), "question": None}
-    )
-    assert skills4.version(capture_id).status_code == 422
-    assert skills4.store.get(ORG, capture_id)["plan"] == []
+    body = response.json()
+    assert response.status_code == 200 and body["fallback"] is True  # P0-SKILLS-TEACH: an editable draft, never a 422
+    assert [c["text"] for c in body["cannot"]] == ["x"]  # what Tilo cannot do stays listed
+    assert not any(s["tool"] == "slack" for s in body["plan_steps"])
+    assert skills4.store.get(ORG, capture_id)["plan"] != []
 
 
-def test_FR_SKL_02_SKILLS_4_a_verb_outside_the_enum_is_draft_failed(skills4):
+def test_FR_SKL_02_SKILLS_4_a_verb_outside_the_enum_is_read_as_the_steps_default_verb(skills4):
     capture_id = skills4.made(CLEAR)
     skills4.model.override["version"] = json.dumps(
         {"steps": plan(("x", "gmail", "read_email", "wipe")), "question": None}
     )
-    assert skills4.version(capture_id).status_code == 502
-    skills4.model.override["version"] = "{not json"
-    assert skills4.version(capture_id).json() == {"detail": "draft_failed"}
-    skills4.model.override["version"] = RuntimeError("provider detail")
     response = skills4.version(capture_id)
-    assert response.status_code == 502 and "provider" not in response.text
-    assert skills4.store.get(ORG, capture_id)["plan"] == []
-    assert [e["type"] for e in skills4.all_events()] == ["skill.captured"] * 3
+    assert response.status_code == 200 and "fallback" not in response.json()
+    assert [(s["action"], s["verb"]) for s in response.json()["plan_steps"]] == [("read_email", "read")]
+
+
+def test_FR_SKL_02_SKILLS_4_a_reply_that_cannot_be_used_gives_a_draft_and_never_echoes_the_provider(skills4):
+    for reply in ("{not json", RuntimeError("provider detail")):
+        capture_id = skills4.made(CLEAR)
+        skills4.model.override["version"] = reply
+        response = skills4.version(capture_id)
+        assert response.status_code == 200 and response.json()["fallback"] is True
+        assert "provider" not in response.text
+        assert skills4.store.get(ORG, capture_id)["plan"] != []
+    assert [e["type"] for e in skills4.all_events()].count("skill.version_proposed") == 2
 
 
 def test_FR_SKL_02_SKILLS_4_the_captured_steps_reach_the_model_only_inside_a_block_they_cannot_close(skills4):

@@ -57,7 +57,7 @@ def test_FR_MTG_03_docx_door_preserves_text_tables_and_native_chart_data():
         table = document.find(".//{*}tbl")
         assert table is not None and len(table.findall("./{*}tblGrid/{*}gridCol")) == 2
         relationships = ET.fromstring(package.read("word/_rels/document.xml.rels"))
-        for rel in relationships:
+        for rel in (r for r in relationships if r.attrib["Type"].endswith("/chart")):  # styles, footer: not charts
             target = posixpath.normpath(posixpath.join("word", rel.attrib["Target"]))
             chart = ET.fromstring(package.read(target))
             assert "APAC" in list(chart.itertext()) and "12.0" in list(chart.itertext())

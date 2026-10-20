@@ -102,6 +102,9 @@ class MeetBrowser:
             "ignore_default_args": ["--enable-automation", "--mute-audio"],
             "chromium_sandbox": not (self.guest or self.session_file),
         }
+        # Meet serves Google Chrome the layout the bot is verified against (live 20 Oct); the cloud image installs it.
+        if channel := os.environ.get("BOT_BROWSER_CHANNEL", "").strip():
+            launch["channel"] = channel
         context = {"viewport": {"width": 1280, "height": 720}, "locale": "en-US"}
         try:
             if self.guest or self.session_file:
@@ -254,6 +257,11 @@ class MeetBrowser:
             if await self.click(S.ASK_TO_JOIN):
                 asked = True
                 break
+            # Same account already in the call (the host is the bot account): "Other ways to join" > "Join here too".
+            if await self.click(S.OTHER_WAYS_TO_JOIN):
+                await asyncio.sleep(0.8)
+                if await self.click(S.JOIN_HERE_TOO):
+                    break
             await asyncio.sleep(1)
         else:
             await self.selector_miss(S.JOIN_NOW)
@@ -294,7 +302,21 @@ class MeetBrowser:
                 await self.shot("02b_waiting_to_be_admitted")
             await asyncio.sleep(1)
         await self.shot("join_timeout")
+        await self.ops_snapshot("join_timeout")
         raise JoinFailed(f"not in the call after {timeout:.0f}s (waiting for admission?)")
+
+    async def ops_snapshot(self, where: str) -> None:
+        """An operational line for the cloud log: the page's address form and its button labels (Meet's own UI text,
+        never transcript or chat content), so a selector or layout change can be seen without a screenshot."""
+        try:
+            labels = await self.page.evaluate(
+                "[...document.querySelectorAll('button,[role=button]')]"
+                ".map(b => (b.getAttribute('aria-label') || '').trim()).filter(Boolean).slice(0, 40)"
+            )
+            path = re.sub(r"[a-z]{3}-[a-z]{4}-[a-z]{3}", "<code>", self.page.url.split("?")[0])
+            logging.getLogger("bot.cloud_run").warning("bot ui %s url=%s buttons=%s", where, path, " | ".join(labels))
+        except Exception as exc:  # the snapshot must never break the caller
+            logging.getLogger("bot.cloud_run").warning("bot ui %s unavailable: %s", where, type(exc).__name__)
 
     async def in_call(self) -> bool:
         """In the call once the call's Leave control exists. Meet hides its toolbar while the mouse is idle (live
@@ -453,8 +475,12 @@ class MeetBrowser:
         """Make the chat panel the visible side panel (reading the People panel replaces it)."""
         if await self.visible(S.CHAT_INPUT):
             return
+        # Opening the panel takes Meet several seconds; a second click while it loads would close it again.
+        if time.monotonic() - getattr(self, "_chat_clicked_at", -1e9) < 20.0:
+            return
         async with self.ui.section(CHAT_READ):
             await self.click(S.CHAT_OPEN)
+        self._chat_clicked_at = time.monotonic()
         await asyncio.sleep(0.6)
 
     async def read_chat(self) -> list[tuple[str, str]] | None:

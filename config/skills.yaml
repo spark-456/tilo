@@ -37,6 +37,13 @@ capture:
   max_recording_seconds: 300
   max_file_bytes: 30000000
   max_read_bytes: 10485760
+  # P0-SKILLS-TEACH: when the model gives nothing usable, a step of the person's own words is bound to a read pair of a
+  # connected tool by these words (else it is a text step). Reads only; a send, post or save is never chosen by code.
+  fallback:
+    gmail: {action: search_email, words: [email, emails, mail, gmail, inbox, unread, messages]}
+    google_calendar: {action: read_events, words: [calendar, meeting, meetings, events, agenda, schedule]}
+    google_drive: {action: list_files, words: [drive, folder, files, documents, spreadsheet]}
+    web: {action: web_search, words: [web, website, search, news, online, internet, research, google]}
   tools:
     gmail: [read_email, search_email, create_draft, send_email]
     google_drive: [read_file, list_files, save_file, save_as_google_file]

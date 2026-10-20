@@ -26,7 +26,7 @@ categories:
     alternative: Ask Tilo for a plan, checklist or schedule you can follow, or the messages you need to arrange it.
   - id: desktop_apps # PRD 3.4 and 12.5: desktop control and the browser extension are roadmap
     reason: Tilo cannot control your computer, the apps installed on it or your own browser.
-    alternative: Upload the file or an export, and Tilo works on that copy and gives you the result.
+    alternative: Ask Tilo to do it in its own browser, which you watch live, or upload the file and Tilo works on that copy.
   - id: unconnected_service # PRD 12.2 and 3.4: only the connectors in config/connectors.yaml
     reason: Tilo has no connection to that service yet.
     alternative: Ask Tilo to prepare the content or file for you to add there yourself, or upload an export for Tilo to work from.

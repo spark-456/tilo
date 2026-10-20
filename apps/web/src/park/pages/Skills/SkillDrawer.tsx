@@ -153,7 +153,7 @@ export function SkillDrawer({
     : (skill.catalog?.inputs ?? []);
   const runInputs = inputs.length
     ? inputs
-    : [{ name: "task", label: "Task details", kind: "text", required: true }];
+    : [{ name: "task", label: "Anything to add for this run", kind: "text", required: false }];
   const needsBrowser =
     skill.steps.some(
       (step) =>

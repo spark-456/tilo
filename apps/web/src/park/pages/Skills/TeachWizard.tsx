@@ -65,7 +65,8 @@ export interface WizardProps {
 }
 
 export function TeachWizard({ t, user, night, onClose, onView, retryRead }: WizardProps) {
-  const [example, setExample] = useState(false);
+  // true from the start: a description handed over from Home is read at once and lands on the steps it read.
+  const [example, setExample] = useState(true);
   const ready = t.live ? t.steps.length > 0 : t.cap >= CAPTURE_STEPS;
   const step: 1 | 2 | 3 = t.saved || t.stage >= 1 ? 3 : example && ready ? 2 : 1;
   const heading = useRef<HTMLHeadingElement>(null);
@@ -327,6 +328,14 @@ export function ScreenExample({
           Start recording
         </Button>
       )}
+      {capturing ? <output>Recording. Tilo stops by itself after five minutes.</output> : null}
+      {file && t.uploading ? (
+        <output>
+          {t.readingUploaded
+            ? "Tilo is reading your recording. This can take a minute."
+            : "Sending your recording…"}
+        </output>
+      ) : null}
       {file && t.fileError ? <span role="alert">{t.fileError}</span> : null}
       {error ? <span role="alert">{error}</span> : null}
     </section>
@@ -441,9 +450,11 @@ function Example({ t, heading, onBack }: { t: Teach; onBack: () => void } & Head
           Show Tilo a good example
         </h2>
         <p className="park-teach__lede">
-          {t.usedFile
-            ? "Here is what Tilo read from your file. Check it before Tilo writes its steps."
-            : "Here is what Tilo read from your description. Check it before Tilo writes its steps."}
+          {t.capturedFallback
+            ? "Tilo could not read this automatically, so these are your own words as steps. Check them; you can edit every step on the next page."
+            : t.usedFile
+              ? "Here is what Tilo read from your file. Check it before Tilo writes its steps."
+              : "Here is what Tilo read from your description. Check it before Tilo writes its steps."}
         </p>
       </div>
       <div className="park-teach__read">
@@ -542,13 +553,10 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
         </p>
       </div>
       {v?.fallback ? (
-        <div className="park-teach__read">
-          <p>
-            Tilo could not draft steps from your example. Your example is still here; describe the
-            step below.
-          </p>
-          <p>{t.steps.join(" · ")}</p>
-        </div>
+        <output className="park-teach__read" data-testid="skills-teach-fallback">
+          Tilo could not turn these into actions on its own, so each step below is a plain writing
+          step. Edit the words, move or remove steps, or add your own, then save.
+        </output>
       ) : null}
       {browserTask ? (
         <output className="park-teach__hint">Needs browser control (coming)</output>
@@ -575,12 +583,37 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
           const on = t.ask[i] === true || p.locked;
           return (
             <li
-              key={`${i}:${p.text}`}
+              // The index, not the words: the words change on every keystroke and would drop the cursor.
+              // biome-ignore lint/suspicious/noArrayIndexKey: a step has no id of its own; its position is its identity
+              key={i}
               className="park-teach__row park-teach__row--step park-teach__step-card"
             >
-              <span className="park-teach__drag-handle" aria-hidden="true" title="Drag step">
-                ⋮⋮
-              </span>
+              {t.live && v ? (
+                <span className="park-teach__reorder">
+                  <button
+                    type="button"
+                    className="park-teach__move"
+                    aria-label={`Move step ${i + 1} up`}
+                    disabled={i === 0}
+                    onClick={() => t.moveStep(i, -1)}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="park-teach__move"
+                    aria-label={`Move step ${i + 1} down`}
+                    disabled={i === rows.length - 1}
+                    onClick={() => t.moveStep(i, 1)}
+                  >
+                    ↓
+                  </button>
+                </span>
+              ) : (
+                <span className="park-teach__drag-handle" aria-hidden="true">
+                  ⋮⋮
+                </span>
+              )}
               <span className="park-teach__num">{i + 1}</span>
               <span className="park-teach__steptext">
                 {t.live ? (
@@ -599,24 +632,47 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
                 )}
                 <span className="park-teach__tool">{p.tool}</span>
               </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={on}
-                disabled={p.locked}
-                title={p.locked ? "Tilo always asks before this step." : undefined}
-                className={cx("park-teach__ask", on && "park-teach__ask--on")}
-                onClick={() => t.toggleAsk(i)}
-              >
-                Ask me first
-                <span className="park-teach__track" aria-hidden="true">
-                  <span className="park-teach__knob" />
-                </span>
-              </button>
+              <span className="park-teach__stepbar">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={on}
+                  disabled={p.locked}
+                  title={p.locked ? "Tilo always asks before this step." : undefined}
+                  className={cx("park-teach__ask", on && "park-teach__ask--on")}
+                  onClick={() => t.toggleAsk(i)}
+                >
+                  Ask me first
+                  <span className="park-teach__track" aria-hidden="true">
+                    <span className="park-teach__knob" />
+                  </span>
+                </button>
+                {t.live && v ? (
+                  <button
+                    type="button"
+                    className="park-teach__quiet"
+                    aria-label={`Remove step ${i + 1}`}
+                    disabled={rows.length <= 1}
+                    onClick={() => t.removeStep(i)}
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </span>
             </li>
           );
         })}
       </ol>
+      {t.live && v ? (
+        <button
+          type="button"
+          className="park-teach__quiet park-teach__add"
+          disabled={rows.length >= 12}
+          onClick={t.addStep}
+        >
+          + Add a step
+        </button>
+      ) : null}
       {v?.inputs.length ? (
         <section aria-label="Inputs" className="park-teach__read">
           <h3>Inputs for each run</h3>
@@ -772,14 +828,23 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
           Back
         </button>
         <span className="park-teach__why">
-          {t.name.trim() ? "" : "Give the skill a name first."}
+          {!t.name.trim()
+            ? "Give the skill a name first."
+            : t.live && !t.stepsReady
+              ? "Every step needs words."
+              : ""}
         </span>
         <Button variant="secondary" disabled aria-describedby={`${nameId}-try`}>
           Try it once
         </Button>
         <Button
           variant="primary"
-          disabled={t.busy || !t.name.trim() || (t.scope === "team" && !t.teamId)}
+          disabled={
+            t.busy ||
+            !t.name.trim() ||
+            (t.scope === "team" && !t.teamId) ||
+            (t.live && !t.stepsReady)
+          }
           onClick={t.save}
         >
           Save skill

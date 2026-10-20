@@ -61,20 +61,27 @@ class ChatPoster:
         await self.b.selector_miss(S.CHAT_INPUT)
         return False
 
+    OPEN_WAIT_S = 30.0  # Meet's chat panel can take 5-12 s to show its box (live 20 Oct)
+
     async def _open_box(self):
-        """The chat box, opening the panel first if it is closed. Polls between short sections, never inside one."""
-        opened = False
-        for _ in range(14):
+        """The chat box, opening the panel first if it is closed. Polls between short sections, never inside one.
+        The panel is opened once and given time to load: clicking 'Chat with everyone' again while it loads closes it
+        (live 20 Oct: three short attempts toggled it shut, the intro was never posted and the bot left)."""
+        deadline = time.monotonic() + self.OPEN_WAIT_S
+        while True:
             async with self.b.ui.section(CHAT_POST):
                 box = await self.b.find(S.CHAT_INPUT)
-                if box is None and not opened:
+                opened_at = getattr(self, "_opened_at", None)
+                stale = opened_at is not None and time.monotonic() - opened_at > self.OPEN_WAIT_S
+                if box is None and (opened_at is None or stale):
                     await self.b.click(S.CHAT_OPEN)
                     await self.b.click(S.GOT_IT)  # first-open info dialog
-                    opened = True
+                    self._opened_at = time.monotonic()
             if box is not None:
                 return box
-            await asyncio.sleep(0.3)
-        return None
+            if time.monotonic() >= deadline:
+                return None
+            await asyncio.sleep(0.5)
 
     async def _box_cleared(self, box) -> bool:
         deadline = time.monotonic() + self.SETTLE_S

@@ -1432,6 +1432,57 @@
 [data-park] .park-teach__row--step.park-teach__step-card:hover {
   border-color: var(--lineStrong);
 }
+[data-park] .park-teach__row--step.park-teach__step-card {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+}
+[data-park] .park-teach__step-card .park-teach__steptext {
+  grid-column: 3;
+  min-width: 0;
+}
+[data-park] .park-teach__step-card .park-teach__input {
+  width: 100%;
+  box-sizing: border-box;
+}
+[data-park] .park-teach__stepbar {
+  grid-column: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+[data-park] .park-teach__reorder {
+  display: inline-flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+[data-park] .park-teach__move {
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink2);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+[data-park] .park-teach__move:disabled {
+  color: var(--ink3);
+  cursor: default;
+  opacity: 0.4;
+}
+[data-park] .park-teach__move:focus-visible {
+  outline: 3px solid var(--focus, var(--hero));
+  outline-offset: 2px;
+}
+[data-park] .park-teach__add {
+  align-self: flex-start;
+  color: var(--hero);
+}
 [data-park] .park-teach__drag-handle {
   display: inline-flex;
   align-items: center;

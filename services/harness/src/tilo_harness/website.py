@@ -18,7 +18,7 @@ from tilo_harness.deliverable import DeliverableRefused
 from tilo_harness.outputs import WebsiteHtml
 
 WEBSITE_FORMAT = "website"
-REPAIR_REPLY_CHARS = 40_000  # how much of the failed reply the repair call is shown
+REPAIR_REPLY_CHARS = 100_000  # how much of the failed reply the repair call is shown (a 48k-char page was cut, 20 Oct)
 
 
 def wants_website(unit: Mapping[str, Any], brief: Mapping[str, Any] | None) -> bool:

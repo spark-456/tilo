@@ -50,6 +50,20 @@ def capture_tools(root: Path = _ROOT) -> dict[str, frozenset[str]]:
         return {}
 
 
+def capture_hints(root: Path = _ROOT) -> dict[str, dict[str, Any]]:
+    """`config/skills.yaml` `capture.fallback`: tool -> {action, words}, used only when the model gave nothing."""
+    try:
+        raw = yaml.safe_load((root / "skills.yaml").read_text(encoding="utf-8"))["capture"]["fallback"]
+        return {
+            t: {"action": h["action"], "words": [w for w in h["words"] if isinstance(w, str)]}
+            for t, h in raw.items()
+            if isinstance(h, dict) and isinstance(h.get("action"), str) and isinstance(h.get("words"), list)
+        }
+    except Exception:
+        logger.warning("config/skills.yaml capture.fallback not read; fallback steps are text steps")
+        return {}
+
+
 def _fold(name: str) -> str:
     return re.sub(r"[\s\-]+", "_", name.strip().lower())
 

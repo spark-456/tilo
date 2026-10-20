@@ -33,3 +33,5 @@ docs/open-questions.md merge=union
 # Generated contract types: collapse in diffs, still tracked (CI fails on drift).
 packages/contracts-py/src/** linguist-generated=true
 packages/contracts-ts/src/** linguist-generated=true
+*.docx binary
+*.xlsx binary

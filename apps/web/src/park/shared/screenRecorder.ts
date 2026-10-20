@@ -4,6 +4,10 @@ export interface ScreenRecording {
   discard(): void;
 }
 
+/** Tilo reads at most 10 MiB of a recording (skills.yaml capture.max_read_bytes): the recorder stops itself a little
+ * under that, so a long or busy screen never makes a file the server will not read. */
+export const RECORDING_BYTES = 9_500_000;
+
 export async function recordScreen(
   narrate: boolean,
   onStop: (file: File | null) => void,
@@ -23,6 +27,7 @@ export async function recordScreen(
       audioBitsPerSecond: 24_000,
     });
     const chunks: Blob[] = [];
+    let bytes = 0;
     let discarded = false;
     let settled = false;
     const stop = () => {
@@ -34,7 +39,11 @@ export async function recordScreen(
       for (const track of [...display.getTracks(), ...(mic?.getTracks() ?? [])]) track.stop();
     };
     recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) chunks.push(event.data);
+      if (event.data.size > 0) {
+        chunks.push(event.data);
+        bytes += event.data.size;
+        if (bytes >= RECORDING_BYTES) stop();
+      }
     };
     recorder.onstop = () => {
       if (settled) return;
@@ -48,7 +57,7 @@ export async function recordScreen(
       );
     };
     display.getVideoTracks()[0]?.addEventListener("ended", stop, { once: true });
-    recorder.start();
+    recorder.start(1000); // a chunk a second, so the size is known while recording
     return {
       stop,
       discard() {

@@ -449,9 +449,17 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
       captured_steps: unknown[];
     }[];
     if (!saved) throw new Error("The skill was not saved");
+    // P0-SKILLS-TEACH: every captured step becomes an editable writing step, not only the first.
     expect(saved.plan_steps).toEqual([
       {
         text: "Draft an invoice summary",
+        tool: "writer",
+        action: "compose",
+        verb: "draft",
+        ask_first: false,
+      },
+      {
+        text: "Note the total",
         tool: "writer",
         action: "compose",
         verb: "draft",
@@ -549,29 +557,59 @@ describe("SKILLS_5_live_teach: Tilo's version (step 2)", () => {
     expect(text(r)).not.toContain("Link or PDF?");
   });
 
-  it.each([
-    [503, NOT_CONNECTED],
-    [422, ERR_TEACH_UNDERSTOOD],
-  ])("SKILLS_5_live_teach_version_http_%i_says_so_and_stays_on_step_1", async (status, line) => {
+  it("SKILLS_5_live_teach_version_http_503_says_so_and_stays_on_step_1", async () => {
     const r = await rig({
-      "POST /v1/skills/captures/tsk_C1/version": () => json({ detail: "x" }, status),
+      "POST /v1/skills/captures/tsk_C1/version": () => json({ detail: "x" }, 503),
     }).mount();
     await toVersion(r);
     expect(pageText(r.el.querySelector('[data-testid="skills-teach-error"] p') as Element)).toBe(
-      line,
+      NOT_CONNECTED,
     );
     expect(text(r)).toContain("Note the total");
     expect(askSwitches(r.el)).toHaveLength(0);
     for (const l of PLAN.map((p) => p.text)) expect(text(r)).not.toContain(l);
   });
 
-  it("SKILLS_5_live_teach_a_malformed_version_is_an_error_and_does_not_crash", async () => {
-    const r = await rig({
-      "POST /v1/skills/captures/tsk_C1/version": () => json({ plan_steps: "nope" }),
-    }).mount();
+  it.each([
+    ["a 422", () => json({ detail: "not_understood" }, 422)],
+    ["a reply that cannot be read", () => json({ plan_steps: "nope" })],
+  ])("P0_SKILLS_TEACH_%s_opens_an_editable_draft_of_the_captured_steps", async (_label, reply) => {
+    const r = await rig({ "POST /v1/skills/captures/tsk_C1/version": reply }).mount();
     await toVersion(r);
-    expect(r.el.querySelector('[data-testid="skills-teach-error"]')).not.toBeNull();
-    expect(askSwitches(r.el)).toHaveLength(0);
+    expect(currentStep(r.el)).toBe("Review the steps");
+    expect(r.el.querySelector('[data-testid="skills-teach-fallback"]')).not.toBeNull();
+    expect(r.el.querySelector('[data-testid="skills-teach-error"] p')).toBeNull();
+    expect(text(r)).toContain("Note the total");
+  });
+
+  it("P0_SKILLS_TEACH_steps_can_be_moved_added_and_removed_and_save_sends_that_order", async () => {
+    const { server, mount } = rig();
+    const r = await mount();
+    await toVersion(r);
+    const byLabel = (label: string) => r.el.querySelector(`[aria-label="${label}"]`) as HTMLElement;
+    const values = () =>
+      qa<HTMLInputElement>(r.el, 'input[aria-label^="Edit step"]').map((i) => i.value);
+    expect(values()).toEqual(["Read the new invoice mail", "Send the summary"]);
+    clickEl(byLabel("Move step 2 up"));
+    expect(values()).toEqual(["Send the summary", "Read the new invoice mail"]);
+    expect(isDisabled(byLabel("Move step 1 up"))).toBe(true);
+    clickEl(control(r.el, "+ Add a step"));
+    expect(values()).toHaveLength(3);
+    expect(isDisabled(control(r.el, "Save skill"))).toBe(true); // a blank step cannot be saved
+    typeInto(
+      r.el.querySelector<HTMLInputElement>('input[aria-label="Edit step 3"]') as HTMLInputElement,
+      "Write it up",
+    );
+    clickEl(byLabel("Remove step 1"));
+    expect(values()).toEqual(["Read the new invoice mail", "Write it up"]);
+    name(r, "Invoice order");
+    clickEl(control(r.el, "Save skill"));
+    await settle();
+    const [saved] = server.posts("/v1/skills") as { plan_steps: { text: string }[] }[];
+    expect(saved?.plan_steps.map((s) => s.text)).toEqual([
+      "Read the new invoice mail",
+      "Write it up",
+    ]);
   });
 
   it("SKILLS_5_live_teach_there_is_no_practice_run_to_start_live", async () => {

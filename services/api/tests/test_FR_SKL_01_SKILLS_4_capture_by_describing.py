@@ -8,8 +8,9 @@ Pinned interface:
     redactor runs, the safety screen (`deps.get_safety`) screens it (flagged = 422 `not_understood`, no model call),
     and the description reaches the model only inside a DESCRIPTION block that it cannot close.
   * One model call through the Router on role `skills_capture.CAPTURE_ROLE` (a constant in one place). The reply is
-    {"steps": [{"text"}]}, 3..12 steps, closed. A failed call, a reply that is not valid, or an output the safety
-    screen flags is a fixed 502 {"detail": "draft_failed"}; nothing of the model's words is echoed, nothing stored.
+    {"steps": [{"text"}]}, tidied by `skills_reply` (P0-SKILLS-TEACH). A failed call or a reply that cannot be used
+    is a draft of the person's own words (201, `fallback: true`); an output the safety screen flags is a fixed 502
+    {"detail": "draft_failed"}; nothing of the model's words is echoed, nothing stored.
   * 201 {"capture_id", "captured_steps": [{"text"}]}. The capture is a DRAFT taught_skill record in the owner's skill
     store (id `tsk_` + ULID because the events name the skill; status "draft", method "describe", plan [], question
     null, scope just_me). Tilo's version is a separate call (test_FR_SKL_02).
@@ -182,30 +183,37 @@ def test_FR_SKL_01_SKILLS_4_a_flagged_description_is_422_not_understood_with_no_
     "reply",
     [
         "not json at all",
-        json.dumps({"steps": steps("one", "two")}),  # fewer than 3
-        json.dumps({"steps": steps(*[f"step {n}" for n in range(13)])}),  # more than 12
         json.dumps({"steps": steps("a", "b", "c"), "estimates": {"credits_per_run": 0}}),  # closed
         json.dumps({"steps": [{"text": "a", "ask_first": False}, {"text": "b"}, {"text": "c"}]}),  # closed
-        json.dumps({"steps": steps("a", "b", "c" * 201)}),  # step_text is at most 200
-        json.dumps({"steps": steps("a", "b", "line\nbreak")}),  # one line each
-        json.dumps({"steps": steps("a", "b", "FLAG-ME")}),  # an output the screen flags
         json.dumps([steps("a", "b", "c")]),
     ],
-    ids=["text", "two", "thirteen", "estimates", "ask_first", "long", "newline", "flagged", "list"],
+    ids=["text", "estimates", "ask_first", "list"],
 )
-def test_FR_SKL_01_SKILLS_4_a_bad_model_reply_is_a_fixed_502_draft_failed_with_nothing_stored(skills4, reply):
+def test_FR_SKL_01_SKILLS_4_a_reply_the_router_cannot_take_is_a_draft_of_the_persons_own_words(skills4, reply):
+    """P0-SKILLS-TEACH: the model's words are never used or echoed; the person's description is the draft (201)."""
     skills4.model.override["capture"] = reply
     response = skills4.capture(CLEAR)
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["fallback"] is True and 1 <= len(body["captured_steps"]) <= 12
+    assert "estimates" not in response.text and "ask_first" not in response.text
+    draft = skills4.store.get(ORG, body["capture_id"])
+    assert draft is not None and draft["status"] == "draft" and draft["plan"] == []
+
+
+def test_FR_SKL_01_SKILLS_4_a_flagged_model_output_is_a_fixed_502_draft_failed_with_nothing_stored(skills4):
+    skills4.model.override["capture"] = json.dumps({"steps": steps("a", "b", "FLAG-ME")})
+    response = skills4.capture(CLEAR)
     assert response.status_code == 502 and response.json() == {"detail": "draft_failed"}
-    assert "FLAG-ME" not in response.text and "step" not in response.text
+    assert "FLAG-ME" not in response.text
     assert skills4.store.list_for_owner(ORG, PRIYA) == [] and skills4.all_events() == []
 
 
-def test_FR_SKL_01_SKILLS_4_a_failing_model_is_the_same_fixed_502(skills4):
+def test_FR_SKL_01_SKILLS_4_a_failing_model_gives_a_draft_and_never_echoes_the_provider(skills4):
     skills4.model.override["capture"] = RuntimeError("secret provider detail")
     response = skills4.capture(CLEAR)
-    assert response.status_code == 502 and response.json() == {"detail": "draft_failed"}
-    assert "secret" not in response.text and skills4.store.list_for_owner(ORG, PRIYA) == []
+    assert response.status_code == 201 and response.json()["fallback"] is True
+    assert "secret" not in response.text
 
 
 def test_FR_SKL_01_SKILLS_4_a_secret_in_a_model_step_is_redacted_before_it_is_stored(skills4):

@@ -24,7 +24,7 @@ import { BUILD_SHA } from "../../app/buildStamp";
 import { useDemoSession, useParkApi, useParkStore, useSchedule } from "../../app/context";
 import { useWorldClient } from "../../app/context";
 import { DEMO_START } from "../../app/store";
-import { takeDraft, takeDraftSkill } from "../../chat/handoff";
+import { handTeach, takeDraft, takeDraftSkill, teachIntent } from "../../chat/handoff";
 import { FirstRunOverview } from "../../sample/FirstRunOverview";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import {
@@ -586,6 +586,12 @@ export function HomePage({ app }: { app: AppCtx }) {
             toIdle();
           }}
           onDraft={() => {
+            const teaching = teachIntent(query); // "teach Tilo to: ..." opens Teach with the words in it
+            if (teaching !== null && !busy()) {
+              handTeach(teaching);
+              go("skills");
+              return;
+            }
             sendWithSkill(query, selectedSkill, (_text, ref) => {
               if (effort === "quick") ask(ref);
               else if (oneStepLive()) prepare(ref);

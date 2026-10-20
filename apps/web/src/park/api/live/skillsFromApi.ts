@@ -263,7 +263,11 @@ export function captureOfBody(v: unknown): SkillCapture | null {
   const steps = v.captured_steps;
   if (!Array.isArray(steps) || steps.length === 0) return null;
   if (!steps.every((s) => isObject(s) && isText(s.text))) return null;
-  return { id: v.capture_id, steps: steps.map((s) => (s as { text: string }).text) };
+  return {
+    id: v.capture_id,
+    steps: steps.map((s) => (s as { text: string }).text),
+    ...(v.fallback === true ? { fallback: true } : {}),
+  };
 }
 
 const isCount = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0;
@@ -327,6 +331,7 @@ export function versionOfBody(v: unknown): SkillVersion | null {
     needsSetup.push(item as unknown as SkillSetup);
   }
   return {
+    ...(v.fallback === true ? { fallback: true } : {}),
     steps,
     question: q === null ? null : { text: q.text, options: [...q.options] },
     estimates,

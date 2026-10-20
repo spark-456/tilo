@@ -3,7 +3,7 @@
 // Teach wizard. Below the gallery stay "Help your agents get better" and tool access. Data comes only through the Api
 // (`useParkApi`: GET /v1/skills?include_builtin=true, GET /v1/learn); the wizard posts captures, version and save; a live
 // pause posts /v1/skills/{id}/state. A page whose Api is not built says "Skills data is unavailable", never numbers.
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { displayApiError } from "../../api/errorMessage";
 import { isSkillRow, skillFromRow } from "../../api/live/skillsFromApi";
 import type { Learn, Skill, Source, User } from "../../api/types";
@@ -11,6 +11,7 @@ import type { AppCtx } from "../../app/AppCtx";
 import { markPendingWorld } from "../../app/PendingWorldRoute";
 import { useParkApi, useParkStore, useWorldClient } from "../../app/context";
 import type { CurrencyCode } from "../../app/ledgerKpis";
+import { takeTeach } from "../../chat/handoff";
 import { Button } from "../../components";
 import { FirstRunPanels } from "../../sample/FirstRunPanels";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
@@ -179,6 +180,26 @@ function Ready({
 
   const view = teach.on ? "teach" : "gallery";
   const setView = (v: "gallery" | "teach") => teach.set(v === "teach");
+  // P0-SKILLS-TEACH: "teach Tilo to: ..." on Home lands here with the words in the box, read at once.
+  const handed = useRef<string | null>(null);
+  const handedChecked = useRef(false);
+  if (!handedChecked.current) {
+    handedChecked.current = true;
+    handed.current = takeTeach();
+  }
+  const handedStarted = useRef(false);
+  useEffect(() => {
+    if (handedStarted.current || handed.current === null) return;
+    handedStarted.current = true;
+    t.setDesc(handed.current);
+    teach.set(true);
+  }, [t, teach]);
+  const autoRead = useRef(handed.current !== null);
+  useEffect(() => {
+    if (!autoRead.current || !t.desc.trim() || !t.live) return;
+    autoRead.current = false;
+    t.capture();
+  }, [t]);
   const [open, setOpen] = useState<string | null>(
     typeof app.params?.id === "string" ? app.params.id : null,
   );
@@ -349,7 +370,14 @@ function Ready({
           onRun={
             source === "live" && store.oneStep
               ? async (skill, values, files) => {
-                  const detail = Object.entries(values).map(([key, value]) => `${key}: ${value}`);
+                  const labels = new Map(
+                    (skill.details?.inputs ?? []).map((i) => [i.name, i.label]),
+                  );
+                  const detail = Object.entries(values)
+                    .filter(([, value]) => value.trim() !== "")
+                    .map(([key, value]) =>
+                      key === "task" ? value : `${labels.get(key) ?? key}: ${value}`,
+                    );
                   const prompt = [`Run the ${skill.name} skill.`, ...detail].join("\n");
                   const ref = skillRefOf({
                     id: skill.id,
