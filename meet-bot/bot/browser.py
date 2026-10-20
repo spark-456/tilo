@@ -102,6 +102,9 @@ class MeetBrowser:
             "ignore_default_args": ["--enable-automation", "--mute-audio"],
             "chromium_sandbox": not (self.guest or self.session_file),
         }
+        # Meet serves Google Chrome the layout the bot is verified against (live 20 Oct); the cloud image installs it.
+        if channel := os.environ.get("BOT_BROWSER_CHANNEL", "").strip():
+            launch["channel"] = channel
         context = {"viewport": {"width": 1280, "height": 720}, "locale": "en-US"}
         try:
             if self.guest or self.session_file:
