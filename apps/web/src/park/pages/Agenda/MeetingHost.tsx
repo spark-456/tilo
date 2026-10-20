@@ -230,7 +230,13 @@ function GuestJoin({ busy, onSend }: { busy: boolean; onSend: (url: string) => v
   const [url, setUrl] = useState("");
   const [err, setErr] = useState("");
   const send = () => {
-    const u = url.trim();
+    // Meet (Oct 2026) shows calls as meet.google.com/meet/<code>, often with ?authuser=…: keep only the canonical link.
+    const u = url
+      .trim()
+      .replace(/[?#].*$/, "")
+      .replace(/^(https:\/\/meet\.google\.com\/)meet\//i, "$1")
+      .replace(/\/$/, "")
+      .toLowerCase();
     if (!MEET.test(u)) return setErr(GUEST_HELP);
     setErr("");
     onSend(u);

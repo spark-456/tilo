@@ -138,7 +138,7 @@ describe("MEET_SIMPLE one click to a meeting with Tilo", () => {
     await press(m.container, "Send Tilo to my call");
     expect(m.container.querySelector('[role="alert"]')?.textContent).toMatch(/Google Meet link/);
     expect(http.postJson).not.toHaveBeenCalled();
-    await set(input, "  https://meet.google.com/abc-defg-hij ");
+    await set(input, "  https://meet.google.com/meet/abc-defg-hij?authuser=1 "); // Meet's Oct 2026 address form
     await press(m.container, "Send Tilo to my call");
     await flush();
     expect(paths(http)).toEqual([

@@ -47,8 +47,8 @@ def test_CLOUD_GATE_tracked_test_inputs_are_allowed(name):
     assert gate.allowed(name)
 
 
-# The owner raised the gate cap to INR2500 on 16 Oct 2026 and to INR2900 on 19 Oct 2026 (gate_cloud.py STOP_INR/CAP_INR).
-@pytest.mark.parametrize("spent", [2799, 2797.61])  # spent + one INR102.40 reservation reaches the INR2900 cap
+# The owner raised the gate cap to INR2900 on 19 Oct 2026 and to INR3400 on 20 Oct 2026 (gate_cloud.py STOP_INR/CAP_INR).
+@pytest.mark.parametrize("spent", [3299, 3297.61])  # spent + one INR102.40 reservation reaches the INR3400 cap
 def test_CLOUD_GATE_budget_refuses_before_any_cloud_command(tmp_path, monkeypatch, spent):
     (tmp_path / "CLOUD-GATE-SPEND.json").write_text(json.dumps([{"inr": spent}]))
     monkeypatch.setattr(sys, "argv", ["gate-cloud", "HEAD"])
