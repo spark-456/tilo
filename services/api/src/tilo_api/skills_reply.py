@@ -101,9 +101,8 @@ def tidy_version(doc: Any) -> dict[str, Any]:
         if text is None:
             continue
         data = item if isinstance(item, dict) else {}
-        tool = data.get("tool") if isinstance(data.get("tool"), str) else "none"
-        action = data.get("action") if isinstance(data.get("action"), str) else "none"
-        tool, action = tool.strip()[:64] or "none", action.strip()[:64] or "none"
+        tool = str(data.get("tool") or "none").strip()[:64] or "none"
+        action = str(data.get("action") or "none").strip()[:64] or "none"
         rows.append({"text": text, "tool": tool, "action": action, "verb": _verb(data.get("verb"), tool.lower())})
     body = doc if isinstance(doc, dict) else {}
     out: dict[str, Any] = {"steps": rows[:MAX_STEPS], "question": _question(body.get("question"))}

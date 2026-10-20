@@ -40,6 +40,7 @@ from tilo_api.skill_store import SkillStore
 from tilo_api.skills_routes import (
     _SKILL_ID,
     StepIn,
+    Verb,
     _guarded,
     _now,
     _teams,
@@ -560,7 +561,7 @@ def version_route(
         words = [c["text"] for c in draft["captured"] if c["text"] not in skip]
         rows = skills_reply.fallback_plan(words, skills_understand.capture_hints(), usable, allow)
         rows = rows or [{"text": _NOTHING_TO_DO, "tool": "writer", "action": "compose", "verb": "draft"}]
-        kept = [StepIn(**row) for row in rows]
+        kept = [StepIn(text=r["text"], tool=r["tool"], action=r["action"], verb=cast(Verb, r["verb"])) for r in rows]
     typed = " ".join(c["text"] for c in draft["captured"]).casefold() if draft["method"] == "describe" else None
     hosts = skills_understand.clean_hosts(doc.get("hosts"), kept, typed)
     if not hosts:  # TS-18: a browse step names the hosts it may open; with none kept it cannot run
