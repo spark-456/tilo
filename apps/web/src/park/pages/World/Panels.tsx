@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { Skill } from "../../api/types";
+import type { Decision, Skill } from "../../api/types";
 import { cx } from "../../components/cx";
 import { icon } from "../../shell/kit";
 import { type RunStep, clockOf, runSteps, storyOf } from "./runSteps";
@@ -258,16 +258,26 @@ export function activeApprovalOf(events: readonly RunEvent[]): ActiveApproval | 
     typeof d.exact === "string"
       ? d.exact
       : typeof d.action_type === "string"
-        ? `Action: ${d.action_type}`
+        ? `Action: ${d.action_type.replace(/_/g, " ")}`
         : summary;
+  // UX-AUDIT (HR-1): only what the event records; nothing recorded is "Not reported", never a guessed risk or price.
+  const tier = typeof d.risk_tier === "string" ? `Tier ${d.risk_tier.replace(/^T/, "")}` : "";
+  const undoable =
+    d.irreversible === true
+      ? "It can't be undone."
+      : d.irreversible === false
+        ? "It can be undone."
+        : "";
   const risk =
-    typeof d.risk === "string" ? d.risk : "Medium. People will see it and it can't be unsent.";
+    typeof d.risk === "string"
+      ? d.risk
+      : [tier && `${tier}.`, undoable].filter(Boolean).join(" ") || "Not reported";
   const cost =
     typeof d.cost === "string"
       ? d.cost
       : req.credits
         ? `${req.credits} credit${req.credits === 1 ? "" : "s"}`
-        : "1 credit";
+        : "Not reported";
   const gateId = typeof d.gate_id === "string" ? d.gate_id : (req.target ?? "");
   const cardId = typeof d.card_id === "string" ? d.card_id : undefined;
   const id = typeof d.id === "string" ? d.id : `approval-${req.seq}`;
@@ -288,21 +298,40 @@ export function activeApprovalOf(events: readonly RunEvent[]): ActiveApproval | 
 }
 
 /** The Story of a real run: its recorded events in plain words, newest first, with their recorded time of day. */
+/** A plain yes answers this decision (a served gate or consent, or a fixture approval): not a question or a form. */
+export function canTapAnswer(d: Decision): boolean {
+  if (d.provide || d.yes === "") return false;
+  return d.card ? d.card.kind === "gate" || d.card.kind === "consent" : true;
+}
+
+/** UX-AUDIT: the served decision behind an approval card (Needs you), when there is one. */
+export interface ApprovalAnswer {
+  /** The decision is answered (the store's own record, set only once the Api took the answer on a live path). */
+  decided: boolean;
+  /** A plain yes answers it (not a question or a fields form), so Approve can sit on the card. */
+  canTap: boolean;
+}
+
 export function RunStory({
   events,
   skills = [],
+  answer,
   onApprove,
-  onDecline,
-  onEdit,
+  onDetails,
+  onLater,
 }: {
   events: readonly RunEvent[];
   skills?: readonly Skill[];
+  /** The approval's own decision; with none served the card can only send the person to Needs you. */
+  answer?: ApprovalAnswer | undefined;
+  /** Sends the real answer (the same `decide` as Needs you); the card says Approved only once `answer.decided`. */
   onApprove?: (req: ActiveApproval) => void;
-  onDecline?: (req: ActiveApproval) => void;
-  onEdit?: (req: ActiveApproval) => void;
+  /** Opens the decision in Needs you (full item, typed answers). */
+  onDetails?: (req: ActiveApproval) => void;
+  /** Leaves it unanswered: nothing is sent. */
+  onLater?: (req: ActiveApproval) => void;
 }) {
   const [view, setView] = useState<"plain" | "trace">("plain");
-  const [localDecision, setLocalDecision] = useState<"approved" | "declined" | null>(null);
   const approval = activeApprovalOf(events);
   const story = storyOf(events);
   if (story.length === 0)
@@ -387,44 +416,40 @@ export function RunStory({
             <span>{approval.cost}</span>
           </div>
 
-          {localDecision === null ? (
-            <div className="park-world-approval-actions">
-              <button
-                type="button"
-                className="park-world-approval-btn park-world-approval-btn--approve"
-                onClick={() => {
-                  setLocalDecision("approved");
-                  onApprove?.(approval);
-                }}
-              >
-                {icon("check", 16)} Approve
-              </button>
-              <button
-                type="button"
-                className="park-world-approval-btn park-world-approval-btn--edit"
-                onClick={() => onEdit?.(approval)}
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                className="park-world-approval-btn park-world-approval-btn--decline"
-                onClick={() => {
-                  setLocalDecision("declined");
-                  onDecline?.(approval);
-                }}
-              >
-                Decline
-              </button>
-            </div>
-          ) : (
+          {answer?.decided ? (
             <div className="park-world-approval-done">
               {icon("check", 16)}
-              <span>
-                {localDecision === "approved"
-                  ? `Approved. ${approval.who} is continuing.`
-                  : "Declined. Nothing was sent."}
-              </span>
+              <span>{`Approved. ${approval.who} is continuing.`}</span>
+            </div>
+          ) : (
+            <div className="park-world-approval-actions">
+              {answer?.canTap && onApprove ? (
+                <button
+                  type="button"
+                  className="park-world-approval-btn park-world-approval-btn--approve"
+                  onClick={() => onApprove(approval)}
+                >
+                  {icon("check", 16)} Approve
+                </button>
+              ) : null}
+              {onDetails ? (
+                <button
+                  type="button"
+                  className="park-world-approval-btn park-world-approval-btn--edit"
+                  onClick={() => onDetails(approval)}
+                >
+                  {answer?.canTap ? "See details" : "Answer in Needs you"}
+                </button>
+              ) : null}
+              {onLater ? (
+                <button
+                  type="button"
+                  className="park-world-approval-btn park-world-approval-btn--decline"
+                  onClick={() => onLater(approval)}
+                >
+                  Decide later
+                </button>
+              ) : null}
             </div>
           )}
         </section>

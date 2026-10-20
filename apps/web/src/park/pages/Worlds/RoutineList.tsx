@@ -8,6 +8,7 @@ import {
   nextRunWords,
 } from "../../../api/schedules";
 import { Button } from "../../components/Button";
+import { AppLink } from "../../shared/AppLink";
 import "./RoutineList.css";
 
 export function RoutineList({
@@ -119,8 +120,8 @@ export function RoutineList({
     >
       {rows.length === 0 ? (
         <p className="park-worlds-routine-empty" data-testid="routines-empty">
-          No routines yet. <a href="/">Create a routine</a> by starting a run and choosing Repeat
-          weekly.
+          No routines yet. <AppLink to="/">Create a routine</AppLink> by starting a run and choosing
+          Repeat weekly.
         </p>
       ) : (
         <div>

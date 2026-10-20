@@ -67,6 +67,12 @@
 /* A page change (README "Page change"): the old page goes out in 200 ms (opacity 0, up 4px), the swap puts the
    new one at opacity 0 and down 10px with no transition, then it comes in (opacity .24s, transform .38s).
    data-phase is set by the shell (motion.ts); a settled page has no data-phase and no transform. */
+/* UX-AUDIT: while a page's own dialog or side sheet is open, the floating Tilo bubble steps aside: it sat on top of
+   the Skills drawer's footer buttons and the Connectors drawer's "Sync now". */
+[data-park]:has(.park-shell__main [aria-modal="true"], .park-shell__main [role="dialog"])
+  .park-bubble {
+  visibility: hidden;
+}
 [data-park] .park-shell__main {
   position: relative;
   z-index: 1;
