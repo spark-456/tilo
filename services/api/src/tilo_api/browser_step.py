@@ -25,6 +25,7 @@ _SCHEMA = json.loads(
 _ACTION = jsonschema.Draft202012Validator({"$defs": _SCHEMA["$defs"], "$ref": "#/$defs/action"})
 _MAX_TEXT = 30_000
 _MAX_INVALID = 3  # BR-01: an invalid reply counts as a step; this many in a row end the session
+READ_SCROLLS = 2  # DEMO-BROWSER: a page read looks through the page (recorded, read-only) before it extracts
 
 
 class BrowseStepExecutor:
@@ -248,9 +249,10 @@ class BrowseStepExecutor:
         self, *, unit: dict, agent: str, building: str, url: str, host: str, also: tuple[str, ...] = ()
     ) -> str:
         """P0-RUNS-FIX: a research unit reads one allowlisted page in the visible browser, read-only and with no model:
-        open it, extract its text, close. Each step is a recorded browser.* event with its real frame, so the World's
-        browser panel shows exactly what Tilo read. Raises SessionRefused when the browser cannot read it (the caller
-        then fetches the page directly and says so); returns the page text, possibly empty."""
+        open it, look through it (READ_SCROLLS scrolls down), extract its text, close. Each step is a recorded
+        browser.* event with its real frame, so the World's browser panel shows exactly what Tilo read. Raises
+        SessionRefused when the browser cannot read it (the caller then fetches the page directly and says so); returns
+        the page text, possibly empty."""
         session = "bs_" + new_part_id()
         district = unit["district"]
         allow = list(dict.fromkeys((host, *also)))[:20]  # `also`: the known hosts a result link may redirect to
@@ -266,35 +268,39 @@ class BrowseStepExecutor:
             }
         )
         outcome, steps = "error", 0
+        reads: list[dict[str, Any]] = [
+            *({"kind": "scroll", "direction": "down"} for _ in range(READ_SCROLLS)),
+            {"kind": "extract"},
+        ]
         try:
             frame = self._save(session, 0, unit["id"], agent, last)
-            started = {"session": session, "host": host, "hosts": len(allow), "max_steps": 1, "frame": frame}
+            started = {"session": session, "host": host, "hosts": len(allow), "max_steps": len(reads), "frame": frame}
             self.run.put("browser.started", agent, building, "Tilo opened the browser.", started, district=district)
             if last["login_required"]:
                 outcome = "login_wall"
                 raise SessionRefused("login_wall")
-            action = {"kind": "extract"}
-            last = self.rpc.act(
-                session, {"session": session, "step": 1, "action": action, "digest": None, "outbox_id": None}
-            )
-            steps = 1
-            frame = self._save(session, 1, unit["id"], agent, last)
-            caption = f"Reading {host}"[:120]
-            acted = {
-                "session": session,
-                "step": 1,
-                "kind": "extract",
-                "verdict": "done",
-                "reason": None,
-                "host": urlsplit(last["url"]).hostname,
-                "chars": None,
-                "masked": last["masked"],
-                "blocked": last["blocked"],
-                "frame": frame,
-                "target_box": last["target_box"],
-                "caption": caption,
-            }
-            self.run.put("browser.acted", agent, building, caption, acted, district=district)
+            for step, action in enumerate(reads, start=1):
+                last = self.rpc.act(
+                    session, {"session": session, "step": step, "action": action, "digest": None, "outbox_id": None}
+                )
+                steps = step
+                frame = self._save(session, step, unit["id"], agent, last)
+                caption = (f"Reading {host}" if action["kind"] == "extract" else "Scrolling down")[:120]
+                acted = {
+                    "session": session,
+                    "step": step,
+                    "kind": action["kind"],
+                    "verdict": "done",
+                    "reason": None,
+                    "host": urlsplit(last["url"]).hostname,
+                    "chars": None,
+                    "masked": last["masked"],
+                    "blocked": last["blocked"],
+                    "frame": frame,
+                    "target_box": last["target_box"],
+                    "caption": caption,
+                }
+                self.run.put("browser.acted", agent, building, caption, acted, district=district)
             outcome = "done"
             return str(last["text"] or "")[:_MAX_TEXT]
         finally:

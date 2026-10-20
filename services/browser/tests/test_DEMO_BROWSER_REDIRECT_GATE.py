@@ -31,6 +31,10 @@ class _Pages(BaseHTTPRequestHandler):
             self.end_headers()
             return
         body = b"<html><body><p>Landed page text</p></body></html>"
+        if self.path == "/framed":  # YouTube-like: the page loads, then an iframe asks another host (sign-in check)
+            body = f"<html><body><p>Framed page text</p><iframe src='http://localhost:{port}/landed'></iframe>".encode()
+        if self.path == "/leaves":  # the page itself navigates to another host
+            body = f"<html><body><script>location.href='http://localhost:{port}/landed'</script>".encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
         self.send_header("Content-Length", str(len(body)))
@@ -98,6 +102,30 @@ def test_DEMO_BROWSER_allowed_redirect_hop_still_lands(server, driver_for):
     assert out["final_url"] == f"http://127.0.0.1:{server}/landed"
     assert (f"http://127.0.0.1:{server}/landed", f"http://127.0.0.1:{server}/stay") in asked
     assert "Landed page text" in driver.page_text()
+
+
+def test_DEMO_BROWSER_a_blocked_iframe_does_not_refuse_the_page_it_is_on(server, driver_for):
+    """Live 20 Oct 17:09-17:12: every YouTube page loads, then an iframe opens accounts.google.com/ServiceLogin
+    (Google's passive sign-in check); the egress gate blocks that iframe (as it must) and the whole session was
+    refused. The iframe is still asked about and blocked; only the page's own navigation decides the session."""
+    gate, asked = _only("127.0.0.1")
+    driver = driver_for(gate)
+    driver.goto(f"http://127.0.0.1:{server}/framed")
+    driver.page.wait_for_timeout(500)  # the iframe asks after the page is ready
+    out = driver._outcome()
+    assert any(url == f"http://localhost:{server}/landed" for url, _ in asked)  # the iframe was gated and refused
+    assert out["aborted"] is None
+    assert out["final_url"] == f"http://127.0.0.1:{server}/framed"
+    assert "Framed page text" in driver.page_text()
+
+
+def test_DEMO_BROWSER_a_page_that_navigates_itself_off_the_allowlist_is_still_refused(server, driver_for):
+    gate, _asked = _only("127.0.0.1")
+    driver = driver_for(gate)
+    out = driver.goto(f"http://127.0.0.1:{server}/leaves")
+    driver.page.wait_for_timeout(500)  # the page's own script navigates after it loads
+    out = driver._outcome()
+    assert out["aborted"] == f"http://localhost:{server}/landed"
 
 
 def test_DEMO_BROWSER_worker_refuses_a_navigation_whose_redirect_leaves_the_allowlist(server, driver_for):
