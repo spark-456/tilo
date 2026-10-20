@@ -11,8 +11,40 @@ type FrameClient = TiloClient & {
 
 type Cursor = { seq: number; x: number; y: number; caption: string };
 
-/** The server would not serve a recorded frame (missing, or not screened clean): said once, never a spinner. */
-export const FRAME_UNAVAILABLE = "This frame could not be shown.";
+/** The server would not serve a recorded frame (not screened clean, or missing): said once, never a spinner. */
+export const FRAME_UNAVAILABLE =
+  "This picture is hidden because Tilo's safety check could not clear it, so follow the steps in the line below.";
+
+/** DEMO-BROWSER: why the browser stopped (`browser.stopped` outcome), each one plain sentence with what to try. */
+export const STOP_LINES = {
+  done: "Tilo closed the browser.",
+  stopped: "You stopped the browser.",
+  taken_over: "You took over the browser.",
+  needs_person: "This step needs you, so open the site yourself to finish it.",
+  login_wall:
+    "This site wants a sign-in, which Tilo never does, so try a page that is open to everyone.",
+  cap_steps: "The browser used all its steps, so ask for one smaller thing at a time.",
+  cap_credits: "The browser used its credit limit, so ask for one smaller thing at a time.",
+  session_lost: "The browser stopped early, so try the task again.",
+  error: "The browser stopped early, so try the task again.",
+} as const;
+
+/** A refused browser action (`browser.acted` reason), said instead of the stop line when it is the cause. */
+export const REFUSAL_LINES = {
+  offsite_host: "Tilo only opens the sites you named, so add that site to your task.",
+  secure_field: "Tilo never types passwords or codes, so sign in yourself if the site needs it.",
+  secret_text: "Tilo never types passwords or codes, so sign in yourself if the site needs it.",
+  download: "Tilo does not download files, so open the site yourself to get the file.",
+  login_wall: STOP_LINES.login_wall,
+  target_changed: "The page changed while Tilo looked at it, so try the task again.",
+} as const;
+
+const lineOf = (lines: Readonly<Record<string, string>>, key: string | null): string | undefined =>
+  key ? lines[key] : undefined;
+
+/** A commit the browser stopped before (BR-05). */
+export const GATED_LINE =
+  "Tilo stopped before submitting anything, so open the site yourself to finish this step.";
 
 type Frame = { artifactId: string; caption: string; cursor: Cursor | null };
 
@@ -54,6 +86,8 @@ export function browserView(events: readonly BrowserEvent[]): {
   gated: boolean;
   host: string | null;
   paused: boolean;
+  outcome: string | null;
+  refusal: string | null;
 } {
   let frame: string | null = null;
   let cursor: Cursor | null = null;
@@ -62,6 +96,8 @@ export function browserView(events: readonly BrowserEvent[]): {
   let gated = false;
   let host: string | null = null;
   let paused = false;
+  let outcome: string | null = null;
+  let refusal: string | null = null;
   for (const event of events) {
     if (session && event.type === "world.paused") {
       paused = true;
@@ -81,6 +117,8 @@ export function browserView(events: readonly BrowserEvent[]): {
       stopped = false;
       gated = false;
       paused = false;
+      outcome = null;
+      refusal = null;
     } else if (event.type === "browser.acted") {
       const data = event.data as BrowserActedData;
       if (session !== data.session) continue;
@@ -96,12 +134,22 @@ export function browserView(events: readonly BrowserEvent[]): {
         };
       }
       if (data.verdict === "gated") gated = true;
+      if (data.verdict === "refused" && data.reason && data.reason in REFUSAL_LINES)
+        refusal = data.reason;
     } else if (event.type === "browser.stopped") {
       const data = event.data as BrowserStoppedData;
-      if (session === data.session) stopped = true;
+      if (session === data.session) {
+        stopped = true;
+        outcome = data.outcome ?? null;
+      }
     }
   }
-  return { frame, cursor, session, stopped, gated, host, paused };
+  return { frame, cursor, session, stopped, gated, host, paused, outcome, refusal };
+}
+
+/** The one line under the frame: what the browser does now, or why it stopped and what to try. */
+function stopLine(view: ReturnType<typeof browserView>): string {
+  return lineOf(REFUSAL_LINES, view.refusal) ?? lineOf(STOP_LINES, view.outcome) ?? STOP_LINES.done;
 }
 
 export function BrowserPanel({
@@ -109,15 +157,20 @@ export function BrowserPanel({
   worldId,
   events,
   replay,
+  placement = "inline",
 }: {
   client: TiloClient;
   worldId: string;
   events: readonly BrowserEvent[];
   replay: boolean;
+  /** "overlay": a window floating over the World's map, shown on its own once the browser opens (DEMO-BROWSER). */
+  placement?: "inline" | "overlay";
 }) {
   const view = browserView(events);
   const frames = browserFrames(events);
   const reader = client as FrameClient;
+  // Hide is display state for one session: the next session the browser opens shows itself again.
+  const [hiddenFor, setHiddenFor] = useState<string | null>(null);
   // DEMO-BROWSER: which recorded frame is shown (display state only); null follows the newest one.
   const [pick, setPick] = useState<number | null>(null);
   const index = pick === null ? frames.length - 1 : Math.min(pick, frames.length - 1);
@@ -150,6 +203,14 @@ export function BrowserPanel({
   }, [reader, worldId, frameId, replay]);
   const session = view.session;
   if (!session) return null;
+  const overlay = placement === "overlay";
+  if (overlay && hiddenFor === session) {
+    return (
+      <button type="button" className="tilo-browser-chip" onClick={() => setHiddenFor(null)}>
+        Show Tilo browser
+      </button>
+    );
+  }
   const cursor = pick === null ? view.cursor : (shown?.cursor ?? null);
   const step = (to: number) => setPick(to >= frames.length - 1 ? null : Math.max(0, to));
   const available = !replay && !view.stopped && !view.paused;
@@ -164,10 +225,19 @@ export function BrowserPanel({
     call.catch(() => setRequest("error"));
   };
   return (
-    <section className="tilo-browser" aria-label="Tilo browser" data-testid="tilo-browser-panel">
+    <section
+      className={overlay ? "tilo-browser tilo-browser--overlay" : "tilo-browser"}
+      aria-label="Tilo browser"
+      data-testid="tilo-browser-panel"
+    >
       <header className="tilo-browser__header">
         <strong>Tilo browser</strong>
         <div>
+          {overlay ? (
+            <button type="button" onClick={() => setHiddenFor(session)}>
+              Hide
+            </button>
+          ) : null}
           <button
             type="button"
             disabled={!available || !reader.pauseWorld}
@@ -225,9 +295,9 @@ export function BrowserPanel({
           : view.paused
             ? "World paused"
             : view.gated
-              ? "Waiting for you. Tilo stopped before submitting."
+              ? GATED_LINE
               : view.stopped
-                ? "Browser stopped"
+                ? stopLine(view)
                 : request === "pausing"
                   ? "Pausing…"
                   : request === "stopping"
@@ -255,7 +325,7 @@ export function BrowserPanel({
       ) : null}
       {view.gated && handoffHost ? (
         <a href={`https://${handoffHost}/`} target="_blank" rel="noopener noreferrer">
-          Open this site yourself to continue
+          Open this site yourself
         </a>
       ) : null}
       {request === "error" ? <p role="alert">Browser control was not confirmed.</p> : null}

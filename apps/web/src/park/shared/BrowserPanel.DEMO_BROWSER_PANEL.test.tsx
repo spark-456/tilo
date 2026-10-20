@@ -4,7 +4,14 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import type { TiloClient } from "../../api/client";
-import { BrowserPanel, FRAME_UNAVAILABLE, browserView } from "./BrowserPanel";
+import {
+  BrowserPanel,
+  FRAME_UNAVAILABLE,
+  GATED_LINE,
+  REFUSAL_LINES,
+  STOP_LINES,
+  browserView,
+} from "./BrowserPanel";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -66,8 +73,8 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
     );
     await act(async () => stop?.click());
     expect(stopBrowser).toHaveBeenCalledWith("w_demo", session);
-    expect(node.textContent).toContain("Waiting for you");
-    expect(node.textContent).not.toContain("Browser stopped");
+    expect(node.textContent).toContain(GATED_LINE);
+    expect(node.textContent).not.toContain(STOP_LINES.done);
     await act(async () => root.unmount());
   });
 
@@ -92,7 +99,7 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
     );
     await act(async () => stop?.click());
     expect(node.textContent).toContain("Stopping");
-    expect(node.textContent).not.toContain("Browser stopped");
+    expect(node.textContent).not.toContain(STOP_LINES.done);
     await act(async () => root.unmount());
   });
 
@@ -182,7 +189,94 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
     expect(button("Earlier")?.disabled).toBe(true);
     await act(async () => button("Latest")?.click());
     expect(getBrowserFrame).toHaveBeenLastCalledWith("w_demo", "art_2");
-    expect(node.textContent).toContain("Browser stopped");
+    expect(node.textContent).toContain(STOP_LINES.done);
+    await act(async () => root.unmount());
+  });
+
+  it("DEMO_BROWSER says in one plain sentence why the browser stopped and what to try", async () => {
+    const session = "bs_01K7M000000000000000000000";
+    const started = recorded(1, "browser.started", { session, host: "x.example", frame: null });
+    const cases: [object[], string][] = [
+      [
+        [started, recorded(2, "browser.stopped", { session, outcome: "login_wall" })],
+        STOP_LINES.login_wall,
+      ],
+      [
+        [
+          started,
+          recorded(2, "browser.acted", {
+            session,
+            verdict: "refused",
+            reason: "offsite_host",
+            frame: null,
+          }),
+          recorded(3, "browser.stopped", { session, outcome: "error" }),
+        ],
+        REFUSAL_LINES.offsite_host,
+      ],
+      [
+        [started, recorded(2, "browser.stopped", { session, outcome: "cap_steps" })],
+        STOP_LINES.cap_steps,
+      ],
+    ];
+    for (const [events, line] of cases) {
+      const node = document.createElement("div");
+      const root = createRoot(node);
+      await act(async () =>
+        root.render(
+          <BrowserPanel
+            client={{} as TiloClient}
+            worldId="w_demo"
+            events={events as Event[]}
+            replay={false}
+          />,
+        ),
+      );
+      expect(node.textContent).toContain(line);
+      await act(async () => root.unmount());
+    }
+    for (const line of [
+      ...Object.values(STOP_LINES),
+      ...Object.values(REFUSAL_LINES),
+      GATED_LINE,
+    ]) {
+      expect(line.split(". ").length, line).toBe(1);
+      expect(line.endsWith("."), line).toBe(true);
+    }
+  });
+
+  it("DEMO_BROWSER floats over the World on its own, and Hide keeps it out of the way until the next session", async () => {
+    const first = "bs_01K7M000000000000000000001";
+    const second = "bs_01K7M000000000000000000002";
+    const node = document.createElement("div");
+    const root = createRoot(node);
+    const render = (events: Event[]) =>
+      act(async () =>
+        root.render(
+          <BrowserPanel
+            client={{} as TiloClient}
+            worldId="w_demo"
+            events={events}
+            replay={false}
+            placement="overlay"
+          />,
+        ),
+      );
+    const opened = [recorded(1, "browser.started", { session: first, host: "en.wikipedia.org" })];
+    await render(opened);
+    expect(node.querySelector(".tilo-browser--overlay")).not.toBeNull();
+    const button = (name: string) =>
+      Array.from(node.querySelectorAll("button")).find((b) => b.textContent === name);
+    await act(async () => button("Hide")?.click());
+    expect(node.querySelector(".tilo-browser--overlay")).toBeNull();
+    await act(async () => button("Show Tilo browser")?.click());
+    expect(node.querySelector(".tilo-browser--overlay")).not.toBeNull();
+    await act(async () => button("Hide")?.click());
+    await render([
+      ...opened,
+      recorded(2, "browser.started", { session: second, host: "en.wikipedia.org" }),
+    ]);
+    expect(node.querySelector(".tilo-browser--overlay")).not.toBeNull();
     await act(async () => root.unmount());
   });
 

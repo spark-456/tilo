@@ -46,7 +46,6 @@ from .speaker import NullSpeaker, VoiceSpeaker
 from .timing import Timeline
 from .trace import Turn, TurnTrace
 from .tts import STT_END_AT
-from .wake import Attention, wake_gate
 
 log = logging.getLogger("bot.session")
 ops = logging.getLogger("bot.cloud_run")  # operational lines only (no participant text): they pass the capture boundary
@@ -434,6 +433,10 @@ class LiveSession:
 
     async def _read_chat(self) -> None:
         msgs = await self.br.read_chat()
+        panel = "unreadable" if msgs is None else "open"
+        if panel != getattr(self, "_chat_panel_logged", None):  # one line per change, never the messages
+            self._chat_panel_logged = panel
+            ops.warning("stage chat_panel %s", panel)
         if not msgs:
             return
         seen_now: Counter = Counter()
@@ -464,11 +467,9 @@ class LiveSession:
             log.info("chat from %s: %s", sender, text[:120])
             if not asked and len(text) >= 20:
                 self.kb.add_chat(sender, text)  # pasted notes/links become answerable context
-            directed = (
-                self.brain is None
-                or self.brain.wake_settings is None
-                or wake_gate(text, sender, self.brain_elapsed(), Attention(), self.brain.wake_settings).allowed
-            )
+            # One-on-one, a line that calls Tilo (mishearings allowed), or one right after Tilo's reply (owner, 21 Oct).
+            directed = self.brain is None or self.brain.chat_directed(text, sender, self.brain_elapsed())
+            ops.warning("stage chat_read chars=%d names_tilo=%s directed=%s", len(text), addressed, directed)
             line = chat_utterance(sender, text, self.elapsed()) if directed else Utterance(sender, text, self.elapsed())
             self.record(line, heard_at=self.clock.now())
 

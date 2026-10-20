@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 
 from tilo_archive import RunArchive
 from tilo_browser.playwright_engine import PlaywrightEngine
-from tilo_browser.session import BrowserSessions
+from tilo_browser.session import BrowserSessions, SessionRefused
 from tilo_harness.deliverable import render_format
 from tilo_harness.executor import DefaultUnitRunner, UnitContext, UnitOutcome
 from tilo_harness.quiz import validate_spec, verify_answers, wants_quiz
@@ -77,6 +77,14 @@ def parse_action(text: str | None) -> dict:
     except ValueError:
         return {}
     return found if isinstance(found, dict) else {}
+
+
+# DEMO-BROWSER: what the World says when the visible browser cannot open a page (one sentence, what to try instead).
+BROWSER_REFUSED = {
+    "login_wall": "{host} wants a sign-in, which Tilo never does, so try a page that is open to everyone.",
+    "offsite_host": "{host} sent the browser to a site you did not name, so add that site to your task to open it.",
+}
+BROWSER_UNAVAILABLE = "Tilo's browser could not open {host} just now, so it read the page directly; try the task again."
 
 
 def research_browser(mode: Mode) -> BrowserRpc | None:
@@ -392,7 +400,14 @@ class BoundRunRunner:
 
         def read(url: str, host: str) -> str:
             also = tuple(allow_entries(self.hosts, self.typed))  # BR-02; a result may redirect to another known host
-            return executor.read_page(unit=plain, agent=agent, building=building, url=url, host=host, also=also)
+            try:
+                return executor.read_page(unit=plain, agent=agent, building=building, url=url, host=host, also=also)
+            except SessionRefused as refused:  # the fetch tool reads the page directly; the person learns why
+                line = BROWSER_REFUSED.get(refused.reason, BROWSER_UNAVAILABLE).format(host=host)
+                self.run_owner.put(
+                    "agent.working", agent, building, line, {"unit": plain["id"]}, district=plain["district"]
+                )
+                raise
 
         return read
 
