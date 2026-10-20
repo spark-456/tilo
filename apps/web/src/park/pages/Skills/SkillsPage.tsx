@@ -370,7 +370,14 @@ function Ready({
           onRun={
             source === "live" && store.oneStep
               ? async (skill, values, files) => {
-                  const detail = Object.entries(values).map(([key, value]) => `${key}: ${value}`);
+                  const labels = new Map(
+                    (skill.details?.inputs ?? []).map((i) => [i.name, i.label]),
+                  );
+                  const detail = Object.entries(values)
+                    .filter(([, value]) => value.trim() !== "")
+                    .map(([key, value]) =>
+                      key === "task" ? value : `${labels.get(key) ?? key}: ${value}`,
+                    );
                   const prompt = [`Run the ${skill.name} skill.`, ...detail].join("\n");
                   const ref = skillRefOf({
                     id: skill.id,

@@ -419,6 +419,8 @@ export function createLiveApi(options: LiveApiOptions = {}): Api {
   };
   api.captureFile = async (file, onStored, method = "upload") => {
     const media = await http.postFile("/v1/skills/captures/media", file);
+    if (isObject(media) && media.readable === false && media.reason === "too_long_to_read")
+      throw new TiloApiError("too_long_to_read", 422, false, true, "too_long_to_read");
     if (!isObject(media) || media.readable !== true || !isObject(media.artifact))
       throw new TiloApiError("This file could not be read as an example.", 422, false, true);
     const { artifact_id: artifactId, version } = media.artifact;

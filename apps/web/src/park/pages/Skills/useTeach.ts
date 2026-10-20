@@ -26,6 +26,13 @@ import {
 
 export type Stage = 0 | 1;
 
+const FILE_REASONS = new Set([
+  "audio_not_supported",
+  "too_long_to_read",
+  "file_too_large",
+  "unsupported_type",
+  "unreadable_file",
+]);
 const NOTHING_TO_DO = "Answer the request or explain what Tilo cannot do";
 const BLANK_STEP = {
   text: "",
@@ -318,10 +325,14 @@ export function useTeach({
         }
       },
       (e) => {
+        // A refusal with its own reason (narration it cannot hear, a file too long to read) says so; else the general line.
+        const reason = e instanceof TiloApiError && e.code && FILE_REASONS.has(e.code);
         setFileError(
-          method === "record"
-            ? "Tilo could not read your recording. Retry or describe it in words."
-            : "Tilo could not read your example. Retry or describe it in words.",
+          reason
+            ? `${displayApiError(e)} Retry, or describe it in words.`
+            : method === "record"
+              ? "Tilo could not read your recording. Retry or describe it in words."
+              : "Tilo could not read your example. Retry or describe it in words.",
         );
         failed(e);
       },

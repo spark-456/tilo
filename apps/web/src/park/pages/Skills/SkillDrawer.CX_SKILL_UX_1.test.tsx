@@ -211,3 +211,41 @@ it("P0_SKILLS_owner_can_edit_and_delete_from_the_drawer", async () => {
   });
   expect(remove).toHaveBeenCalledWith(skill);
 });
+
+it("P0_SKILLS_TEACH_a_skill_with_no_inputs_runs_without_typing_anything", async () => {
+  const skill = skillFromRow({
+    id: "tsk_monday",
+    name: "Monday mail",
+    scope: { kind: "just_me", team: null },
+    status: "learning",
+    paused: false,
+    version: 1,
+    plan: [
+      { text: "Read my unread mail", tool: "gmail", action: "search_email", ask_first: false },
+    ],
+    question: null,
+  });
+  const run = vi.fn();
+  const m = mount(
+    <SkillDrawer
+      app={stubApp("skills")}
+      skill={skill}
+      paused={false}
+      currency="USD"
+      onPause={null}
+      pauseOff=""
+      onTeach={() => {}}
+      onClose={() => {}}
+      onRun={run}
+    />,
+  );
+  const button = [...m.container.querySelectorAll("button")].find(
+    (b) => b.textContent === "Run skill",
+  );
+  expect(button?.disabled).toBe(false); // the optional note is not a required input
+  await act(async () => {
+    button?.click();
+    await Promise.resolve();
+  });
+  expect(run).toHaveBeenCalledWith(skill, {}, []);
+});
