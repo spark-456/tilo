@@ -5,12 +5,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb pulseaudio pulseaudio-utils fonts-noto-color-emoji \
     && mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix \
     && rm -rf /var/lib/apt/lists/*
-# Google Chrome (stable) beside Playwright's Chromium: Meet's call UI is verified against Chrome (BOT_BROWSER_CHANNEL).
-RUN python3 -m playwright install --with-deps chrome && rm -rf /var/lib/apt/lists/*
 COPY meet-bot/docker/requirements.txt /tmp/requirements.txt
 COPY meet-bot/docker/cloud-requirements.txt /tmp/cloud-requirements.txt
 RUN pip install --break-system-packages --ignore-installed typing_extensions \
     -r /tmp/requirements.txt -r /tmp/cloud-requirements.txt
+# Google Chrome (stable) beside Playwright's Chromium: Meet's call UI is verified against Chrome (BOT_BROWSER_CHANNEL).
+RUN python3 -m playwright install --with-deps chrome && rm -rf /var/lib/apt/lists/*
 COPY packages/contracts-py/src /opt/tilo/packages/contracts-py/src
 COPY packages/providers/src /opt/tilo/packages/providers/src
 COPY packages/redact/src /opt/tilo/packages/redact/src
