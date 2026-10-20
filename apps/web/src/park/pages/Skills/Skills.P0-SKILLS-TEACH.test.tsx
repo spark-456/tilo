@@ -15,6 +15,7 @@ import {
 } from "../../../../test-support/park/homeHarness";
 import { handTeach, takeTeach, teachIntent } from "../../chat/handoff";
 import { RECORDING_BYTES, recordScreen } from "../../shared/screenRecorder";
+import { suggestName } from "./useTeach";
 
 afterEach(() => {
   cleanup();
@@ -98,5 +99,16 @@ describe("P0_SKILLS_TEACH_recorder", () => {
     rec.send(20);
     expect(onStop).toHaveBeenCalledOnce();
     expect((onStop.mock.calls[0]?.[0] as File).size).toBeLessThan(10_485_760);
+  });
+});
+
+describe("P0_SKILLS_TEACH_name", () => {
+  it.each([
+    ["Every Monday, read my unread Gmail and reply", "Read my unread Gmail and"],
+    ["total the revenue column of the Q3 sheet", "Total the revenue column of"],
+    ["   ", ""],
+    ["!!!", ""],
+  ])("starts from the person's own words: %s", (words, name) => {
+    expect(suggestName(words)).toBe(name);
   });
 });

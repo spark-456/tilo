@@ -33,6 +33,17 @@ const FILE_REASONS = new Set([
   "unsupported_type",
   "unreadable_file",
 ]);
+/** A name to start from, in the person's own words: the first few words of the first step, capitalised. */
+export function suggestName(source: string): string {
+  const words = source
+    .replace(/^\s*(?:every|each|on)\b[^,]*,\s*/i, "")
+    .replace(/[^\p{L}\p{N}\s'’-]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 5);
+  const text = words.join(" ").slice(0, 60).trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
+}
 const NOTHING_TO_DO = "Answer the request or explain what Tilo cannot do";
 const BLANK_STEP = {
   text: "",
@@ -216,6 +227,7 @@ export function useTeach({
         };
       }
       setVersion(next);
+      if (!name.trim()) setName(suggestName(next.steps[0]?.text ?? captured.steps[0] ?? ""));
       setHosts(next.hosts);
       setAsk(next.steps.map((s) => s.ask));
       setStage(1);

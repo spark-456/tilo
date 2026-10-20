@@ -632,31 +632,33 @@ function Review({ t, user, heading }: { t: Teach; user: User } & Heading) {
                 )}
                 <span className="park-teach__tool">{p.tool}</span>
               </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={on}
-                disabled={p.locked}
-                title={p.locked ? "Tilo always asks before this step." : undefined}
-                className={cx("park-teach__ask", on && "park-teach__ask--on")}
-                onClick={() => t.toggleAsk(i)}
-              >
-                Ask me first
-                <span className="park-teach__track" aria-hidden="true">
-                  <span className="park-teach__knob" />
-                </span>
-              </button>
-              {t.live && v ? (
+              <span className="park-teach__stepbar">
                 <button
                   type="button"
-                  className="park-teach__quiet"
-                  aria-label={`Remove step ${i + 1}`}
-                  disabled={rows.length <= 1}
-                  onClick={() => t.removeStep(i)}
+                  role="switch"
+                  aria-checked={on}
+                  disabled={p.locked}
+                  title={p.locked ? "Tilo always asks before this step." : undefined}
+                  className={cx("park-teach__ask", on && "park-teach__ask--on")}
+                  onClick={() => t.toggleAsk(i)}
                 >
-                  Remove
+                  Ask me first
+                  <span className="park-teach__track" aria-hidden="true">
+                    <span className="park-teach__knob" />
+                  </span>
                 </button>
-              ) : null}
+                {t.live && v ? (
+                  <button
+                    type="button"
+                    className="park-teach__quiet"
+                    aria-label={`Remove step ${i + 1}`}
+                    disabled={rows.length <= 1}
+                    onClick={() => t.removeStep(i)}
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </span>
             </li>
           );
         })}

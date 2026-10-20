@@ -1432,6 +1432,27 @@
 [data-park] .park-teach__row--step.park-teach__step-card:hover {
   border-color: var(--lineStrong);
 }
+[data-park] .park-teach__row--step.park-teach__step-card {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+}
+[data-park] .park-teach__step-card .park-teach__steptext {
+  grid-column: 3;
+  min-width: 0;
+}
+[data-park] .park-teach__step-card .park-teach__input {
+  width: 100%;
+  box-sizing: border-box;
+}
+[data-park] .park-teach__stepbar {
+  grid-column: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 [data-park] .park-teach__reorder {
   display: inline-flex;
   flex-direction: column;
