@@ -285,7 +285,8 @@ class BrowseStepExecutor:
                 )
                 steps = step
                 frame = self._save(session, step, unit["id"], agent, last)
-                caption = (f"Reading {host}" if action["kind"] == "extract" else "Scrolling down")[:120]
+                read = f"Searching {host}" if urlsplit(url).query else f"Reading {host}"  # host only (BR-13)
+                caption = (read if action["kind"] == "extract" else "Scrolling down")[:120]
                 acted = {
                     "session": session,
                     "step": step,
@@ -317,8 +318,9 @@ class BrowseStepExecutor:
             return f"Clicking {name or 'target'}"[:120]
         if kind == "type":
             return f"Typing in {name or 'field'}"[:120]
-        if kind == "navigate":
-            return f"Opening {host or 'page'}"[:120]
+        if kind == "navigate":  # an address with a query is a search (the words stay out of the event, BR-13)
+            verb = "Searching" if urlsplit(str(action.get("url", ""))).query else "Opening"
+            return f"{verb} {host or 'page'}"[:120]
         if kind == "scroll":
             return f"Scrolling {action['direction']}"
         return "Reading page"
