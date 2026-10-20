@@ -412,9 +412,11 @@ def brief_for_owner(
         doc = build_brief(w, cast(Router, None), cast(SafetyProvider, None), meeting, items, budget)
     else:
         mode = deps.get_work_mode(request, switches)
-        router, safety = deps.router_for_mode(mode), deps.get_safety(mode)
+        router, safety = deps.router_for_mode(mode), deps.safety_for_mode(mode)
         held = store.load_world(meeting["world_id"], settle=False) if meeting.get("world_id") else None
         calls = _Calls(request, w, switches, mode, held.run_id if held is not None else f"r_brief_{meeting_id}")
+        # MINUTES-SCREEN: the stored brief is judged by this request's held screen, not the shared store's unmetered one
+        artifacts = artifacts.with_screener(_Safety(safety, calls))
         with allowance_router(
             _Router(router, calls),
             ledger=allowance,
