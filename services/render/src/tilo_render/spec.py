@@ -10,6 +10,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, StrictStr, field_validator, model_validator
 
+from tilo_render import formula
+
 MAX_SECTIONS = 60
 MAX_TABLE_ROWS = 500
 MAX_CHART_POINTS = 200
@@ -130,11 +132,69 @@ class Section(BaseModel):
         return value
 
 
+class Formula(BaseModel):
+    """A computed column: row arithmetic over this table's numeric columns (see `tilo_render.formula`)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    column: str = Field(min_length=1, max_length=100)
+    expr: str = Field(min_length=1, max_length=formula.MAX_EXPR_CHARS)
+
+    @field_validator("expr")
+    @classmethod
+    def _arithmetic_only(cls, value: str) -> str:
+        formula.parse(value)
+        return value
+
+
+MAX_FORMULAS_PER_TABLE = 5
+
+
+def _computed(data: dict[str, Any]) -> dict[str, Any]:
+    """Appends (or refreshes) each formula's column with the values code computes from the other columns."""
+    columns, rows, found = data.get("columns"), data.get("rows"), data.get("formulas")
+    if not (isinstance(columns, list) and isinstance(rows, list) and isinstance(found, list) and found):
+        return data
+    if len(found) > MAX_FORMULAS_PER_TABLE:
+        raise ValueError(f"At most {MAX_FORMULAS_PER_TABLE} formulas per table allowed")
+    columns, rows = list(columns), [list(r) if isinstance(r, list) else r for r in rows]
+    if any(not isinstance(r, list) or len(r) != len(columns) for r in rows):
+        return data  # the table's own validation names the problem
+    for item in found:
+        item = Formula.model_validate(item) if not isinstance(item, Formula) else item
+        tree = formula.parse(item.expr)
+        used = formula.columns_used(tree)
+        missing = [name for name in used if name not in columns or name == item.column]
+        if missing:
+            raise ValueError(f"Formula for {item.column} uses a column that is not before it: {missing[0]}")
+        slots = {name: columns.index(name) for name in used}
+        values = []
+        for row in rows:
+            for slot in slots.values():
+                if isinstance(row[slot], bool) or not isinstance(row[slot], int | float):
+                    raise ValueError(f"Formula for {item.column} needs numbers in every row")
+            values.append(round(formula.evaluate(tree, lambda n, r=row: r[slots[n]]), 10))
+        if item.column in columns:
+            slot = columns.index(item.column)
+            for row, value in zip(rows, values, strict=True):
+                row[slot] = value
+        else:
+            columns.append(item.column)
+            for row, value in zip(rows, values, strict=True):
+                row.append(value)
+    return {**data, "columns": columns, "rows": rows}
+
+
 class Table(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     id: str = Field(min_length=1)
     columns: list[str]
     rows: list[list[StrictStr | StrictInt | StrictFloat]]
+    formulas: list[Formula] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _formula_columns(cls, data: Any) -> Any:
+        return _computed(data) if isinstance(data, dict) else data
 
     @model_validator(mode="after")
     def _validate_table(self) -> "Table":
