@@ -453,8 +453,12 @@ class MeetBrowser:
         """Make the chat panel the visible side panel (reading the People panel replaces it)."""
         if await self.visible(S.CHAT_INPUT):
             return
+        # Opening the panel takes Meet several seconds; a second click while it loads would close it again.
+        if time.monotonic() - getattr(self, "_chat_clicked_at", -1e9) < 20.0:
+            return
         async with self.ui.section(CHAT_READ):
             await self.click(S.CHAT_OPEN)
+        self._chat_clicked_at = time.monotonic()
         await asyncio.sleep(0.6)
 
     async def read_chat(self) -> list[tuple[str, str]] | None:

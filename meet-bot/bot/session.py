@@ -49,6 +49,7 @@ from .tts import STT_END_AT
 from .wake import Attention, wake_gate
 
 log = logging.getLogger("bot.session")
+ops = logging.getLogger("bot.cloud_run")  # operational lines only (no participant text): they pass the capture boundary
 STATUS_EVERY_S = 3.0  # how often to check who is here before the meeting has started for the bot
 
 
@@ -293,6 +294,7 @@ class LiveSession:
             self.record_audio,
         )
         self._setup_voice()
+        ops.info("session voice=%s tts=%s reply_mode=%s", self.voice, getattr(self.tts, "name", None), self.reply_mode)
         async with MeetBrowser(self.cfg, voice=self.voice, face=True) as br:
             self._face_loop = asyncio.get_running_loop()
             if isinstance(self.speaker, VoiceSpeaker):
@@ -319,8 +321,10 @@ class LiveSession:
                     self.merger.add_ignored(br.account_name)
                 self.chat = ChatPoster(br)
                 if not await self._post(intro_text(self.record_audio, self.hybrid, self.voice), "intro"):
+                    ops.warning("session intro could not be posted; leaving")
                     raise BotRefused("The disclosure could not be posted; leaving without capture.")
                 self.intro_sent = True
+                ops.info("session joined asked=%s intro posted", asked)
                 await self._start_audio()
                 self.events.emit(
                     "meeting.joined",
@@ -329,7 +333,9 @@ class LiveSession:
                     auto_admit=self.auto_admit,
                 )
                 self._prewarm()
-                if not await br.enable_captions():
+                captions_on = await br.enable_captions()
+                ops.info("session captions=%s", captions_on)
+                if not captions_on:
                     log.error("captions could not be enabled: no speaker names, and no transcript without audio")
                 reader = CaptionReader(
                     br.page, lambda blocks, now: self.queue.put_nowait((blocks, now)), self.clock, None
