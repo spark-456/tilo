@@ -390,310 +390,312 @@ export function LiveWeek({
           <AppLink to="/connectors">Check Google Calendar</AppLink>
         </section>
       </div>
-      <div className="cx-agenda-weektitle">
-        <div>
-          <h2>
-            {new Intl.DateTimeFormat(
-              undefined,
-              view === "Day"
-                ? { day: "numeric", month: "long", year: "numeric" }
-                : { month: "long", year: "numeric" },
-            ).format(view === "Day" ? civilDate(selectedDay) : view === "Week" ? days[3] : start)}
-          </h2>
-        </div>
-        <div className="cx-agenda-weekactions">
-          <button
-            type="button"
-            className="cx-agenda-create"
-            onClick={() => {
-              const now = new Date();
-              now.setMinutes(Math.ceil(now.getMinutes() / 15) * 15, 0, 0);
-              onSchedule(now.toISOString(), 15);
-            }}
-          >
-            + Create
-          </button>
-          <button
-            type="button"
-            aria-label="Today"
-            onClick={() => {
-              setStart(monday(new Date()));
-              setSelectedDay(localDate(new Date()));
-            }}
-          >
-            Today
-          </button>
-          <button type="button" aria-label="Previous week" onClick={() => navigate(-1)}>
-            ‹
-          </button>
-          <button type="button" aria-label="Next week" onClick={() => navigate(1)}>
-            ›
-          </button>
-          <fieldset className="cx-agenda-views" aria-label="Calendar view">
-            {(["Day", "Week", "Month"] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                aria-pressed={view === mode}
-                onClick={() => setView(mode)}
-              >
-                {mode}
-              </button>
-            ))}
-          </fieldset>
-        </div>
-      </div>
-      <section className="cx-agenda-month" aria-label="Month calendar" hidden={view !== "Month"}>
-        {view === "Month" ? emptyLine : null}
-        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-          <span aria-hidden="true" className="cx-agenda-monthhead" key={day}>
-            {day}
-          </span>
-        ))}
-        {monthDays.map((day) => {
-          const key = localDate(day);
-          const dayEntries = entries
-            .filter((entry) => localDate(new Date(entry.start)) === key)
-            .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-          return (
-            <div
-              className={`cx-agenda-monthday${key === todayKey ? " is-today" : ""}${day.getMonth() === monthFirst.getMonth() ? "" : " is-outside"}`}
-              key={key}
+      <div className="cx-agenda-main">
+        <div className="cx-agenda-weektitle">
+          <div>
+            <h2>
+              {new Intl.DateTimeFormat(
+                undefined,
+                view === "Day"
+                  ? { day: "numeric", month: "long", year: "numeric" }
+                  : { month: "long", year: "numeric" },
+              ).format(view === "Day" ? civilDate(selectedDay) : view === "Week" ? days[3] : start)}
+            </h2>
+          </div>
+          <div className="cx-agenda-weekactions">
+            <button
+              type="button"
+              className="cx-agenda-create"
+              onClick={() => {
+                const now = new Date();
+                now.setMinutes(Math.ceil(now.getMinutes() / 15) * 15, 0, 0);
+                onSchedule(now.toISOString(), 15);
+              }}
             >
-              <button type="button" onClick={() => chooseDay(day)} aria-label={`Show ${key}`}>
-                {day.getDate()}
-              </button>
-              {dayEntries.slice(0, MONTH_CHIPS).map((entry) => (
+              + Create
+            </button>
+            <button
+              type="button"
+              aria-label="Today"
+              onClick={() => {
+                setStart(monday(new Date()));
+                setSelectedDay(localDate(new Date()));
+              }}
+            >
+              Today
+            </button>
+            <button type="button" aria-label="Previous week" onClick={() => navigate(-1)}>
+              ‹
+            </button>
+            <button type="button" aria-label="Next week" onClick={() => navigate(1)}>
+              ›
+            </button>
+            <fieldset className="cx-agenda-views" aria-label="Calendar view">
+              {(["Day", "Week", "Month"] as const).map((mode) => (
                 <button
-                  key={entry.key}
+                  key={mode}
                   type="button"
-                  className="cx-agenda-monthchip"
-                  data-event-tone={toneOf(entry)}
-                  onClick={(event) => openEntry(entry, event.currentTarget)}
+                  aria-pressed={view === mode}
+                  onClick={() => setView(mode)}
                 >
-                  {entry.title}
+                  {mode}
                 </button>
               ))}
-              {dayEntries.length > MONTH_CHIPS ? (
-                <button
-                  type="button"
-                  className="cx-agenda-monthmore"
-                  onClick={() => chooseDay(day)}
-                >
-                  +{dayEntries.length - MONTH_CHIPS} more
-                </button>
-              ) : null}
-            </div>
-          );
-        })}
-      </section>
-      <section
-        className="cx-agenda-scroll"
-        aria-label="Week time slots"
-        data-view={view.toLowerCase()}
-        hidden={view === "Month"}
-      >
-        {view === "Month" ? null : emptyLine}
-        <div className="cx-agenda-headrow">
-          <span aria-hidden="true" />
-          {days.map((day) => {
-            const dayKey = localDate(day);
-            const due = parked.filter((row) => row.due?.slice(0, 10) === dayKey && row.title);
-            const count = entries.filter(
-              (entry) => localDate(new Date(entry.start)) === dayKey,
-            ).length;
+            </fieldset>
+          </div>
+        </div>
+        {emptyLine}
+        <section className="cx-agenda-month" aria-label="Month calendar" hidden={view !== "Month"}>
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+            <span aria-hidden="true" className="cx-agenda-monthhead" key={day}>
+              {day}
+            </span>
+          ))}
+          {monthDays.map((day) => {
+            const key = localDate(day);
+            const dayEntries = entries
+              .filter((entry) => localDate(new Date(entry.start)) === key)
+              .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
             return (
               <div
-                key={dayKey}
-                className={`${dayKey === localDate(new Date()) ? "is-today" : ""} ${dayKey === selectedDay ? "is-selected" : ""}`}
-                {...(dayKey === localDate(new Date()) ? { "aria-current": "date" as const } : {})}
+                className={`cx-agenda-monthday${key === todayKey ? " is-today" : ""}${day.getMonth() === monthFirst.getMonth() ? "" : " is-outside"}`}
+                key={key}
               >
-                <span className="cx-agenda-dayline">
-                  <span className="cx-agenda-dayname">{weekday(day)}</span>
-                  <span className="cx-agenda-daynum">{day.getDate()}</span>
-                </span>
-                <span className="cx-agenda-dayload">
-                  {dayKey === localDate(new Date()) ? "Today · " : ""}
-                  {count === 0 ? "No events" : count === 1 ? "1 event" : `${count} events`}
-                </span>
-                {due.map((row) => (
-                  <span className="cx-agenda-due" key={`${row.ref.kind}:${row.ref.id}`}>
-                    Due: {row.title}
-                  </span>
+                <button type="button" onClick={() => chooseDay(day)} aria-label={`Show ${key}`}>
+                  {day.getDate()}
+                </button>
+                {dayEntries.slice(0, MONTH_CHIPS).map((entry) => (
+                  <button
+                    key={entry.key}
+                    type="button"
+                    className="cx-agenda-monthchip"
+                    data-event-tone={toneOf(entry)}
+                    onClick={(event) => openEntry(entry, event.currentTarget)}
+                  >
+                    {entry.title}
+                  </button>
                 ))}
+                {dayEntries.length > MONTH_CHIPS ? (
+                  <button
+                    type="button"
+                    className="cx-agenda-monthmore"
+                    onClick={() => chooseDay(day)}
+                  >
+                    +{dayEntries.length - MONTH_CHIPS} more
+                  </button>
+                ) : null}
               </div>
             );
           })}
-        </div>
-        <div className="cx-agenda-grid">
-          <div className="cx-agenda-hours">
-            {Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, hour) => {
-              const label = `${String(START_HOUR + hour).padStart(2, "0")}:00`;
+        </section>
+        <section
+          className="cx-agenda-scroll"
+          aria-label="Week time slots"
+          data-view={view.toLowerCase()}
+          hidden={view === "Month"}
+        >
+          <div className="cx-agenda-headrow">
+            <span aria-hidden="true" />
+            {days.map((day) => {
+              const dayKey = localDate(day);
+              const due = parked.filter((row) => row.due?.slice(0, 10) === dayKey && row.title);
+              const count = entries.filter(
+                (entry) => localDate(new Date(entry.start)) === dayKey,
+              ).length;
               return (
                 <div
-                  key={label}
-                  style={{ height: hour === END_HOUR - START_HOUR ? 24 : SLOT_HEIGHT * 4 }}
+                  key={dayKey}
+                  className={`${dayKey === localDate(new Date()) ? "is-today" : ""} ${dayKey === selectedDay ? "is-selected" : ""}`}
+                  {...(dayKey === localDate(new Date()) ? { "aria-current": "date" as const } : {})}
                 >
-                  <span>{label}</span>
+                  <span className="cx-agenda-dayline">
+                    <span className="cx-agenda-dayname">{weekday(day)}</span>
+                    <span className="cx-agenda-daynum">{day.getDate()}</span>
+                  </span>
+                  <span className="cx-agenda-dayload">
+                    {dayKey === localDate(new Date()) ? "Today · " : ""}
+                    {count === 0 ? "No events" : count === 1 ? "1 event" : `${count} events`}
+                  </span>
+                  {due.map((row) => (
+                    <span className="cx-agenda-due" key={`${row.ref.kind}:${row.ref.id}`}>
+                      Due: {row.title}
+                    </span>
+                  ))}
                 </div>
               );
             })}
           </div>
-          {days.map((day, dayIndex) => {
-            const dayKey = localDate(day);
-            const events = entries.filter((entry) => localDate(new Date(entry.start)) === dayKey);
-            const now = new Date();
-            const nowMinutes = now.getHours() * 60 + now.getMinutes() - START_HOUR * 60;
-            return (
-              <div
-                key={dayKey}
-                className={`cx-agenda-day ${dayKey === localDate(new Date()) ? "is-today" : ""} ${dayKey === selectedDay ? "is-selected" : ""}`}
-                style={{ height: SLOT_HEIGHT * SLOTS_PER_DAY }}
-              >
-                {Array.from({ length: SLOTS_PER_DAY }, (_, slot) => {
-                  const index = dayIndex * SLOTS_PER_DAY + slot;
-                  const date = slotStart(day, slot);
-                  const time = new Intl.DateTimeFormat(undefined, {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }).format(date);
-                  return (
+          <div className="cx-agenda-grid">
+            <div className="cx-agenda-hours">
+              {Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, hour) => {
+                const label = `${String(START_HOUR + hour).padStart(2, "0")}:00`;
+                return (
+                  <div
+                    key={label}
+                    style={{ height: hour === END_HOUR - START_HOUR ? 24 : SLOT_HEIGHT * 4 }}
+                  >
+                    <span>{label}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {days.map((day, dayIndex) => {
+              const dayKey = localDate(day);
+              const events = entries.filter((entry) => localDate(new Date(entry.start)) === dayKey);
+              const now = new Date();
+              const nowMinutes = now.getHours() * 60 + now.getMinutes() - START_HOUR * 60;
+              return (
+                <div
+                  key={dayKey}
+                  className={`cx-agenda-day ${dayKey === localDate(new Date()) ? "is-today" : ""} ${dayKey === selectedDay ? "is-selected" : ""}`}
+                  style={{ height: SLOT_HEIGHT * SLOTS_PER_DAY }}
+                >
+                  {Array.from({ length: SLOTS_PER_DAY }, (_, slot) => {
+                    const index = dayIndex * SLOTS_PER_DAY + slot;
+                    const date = slotStart(day, slot);
+                    const time = new Intl.DateTimeFormat(undefined, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }).format(date);
+                    return (
+                      <button
+                        key={date.toISOString()}
+                        type="button"
+                        data-week-slot={index}
+                        aria-label={`${labelDate(day)}, ${time}, empty slot. Enter to schedule.`}
+                        style={{ top: slot * SLOT_HEIGHT, height: SLOT_HEIGHT }}
+                        onKeyDown={(event) => onSlotKey(event, index)}
+                        onPointerDown={() => {
+                          drag.current = { start: index, end: index };
+                        }}
+                        onPointerMove={() => {
+                          if (drag.current) drag.current.end = index;
+                        }}
+                        onPointerEnter={() => {
+                          if (drag.current) drag.current.end = index;
+                        }}
+                        onPointerUp={() => {
+                          if (drag.current) {
+                            const picked = drag.current;
+                            drag.current = null;
+                            suppressClick.current = true;
+                            schedule(picked.start, Math.max(picked.end, index));
+                          }
+                        }}
+                        onClick={() => {
+                          if (suppressClick.current) {
+                            suppressClick.current = false;
+                            return;
+                          }
+                          schedule(index, index);
+                        }}
+                      />
+                    );
+                  })}
+                  {placeDay(events).map(({ entry, top, height, lane, lanes }) => (
                     <button
-                      key={date.toISOString()}
+                      key={entry.key}
                       type="button"
-                      data-week-slot={index}
-                      aria-label={`${labelDate(day)}, ${time}, empty slot. Enter to schedule.`}
-                      style={{ top: slot * SLOT_HEIGHT, height: SLOT_HEIGHT }}
-                      onKeyDown={(event) => onSlotKey(event, index)}
-                      onPointerDown={() => {
-                        drag.current = { start: index, end: index };
+                      className={`cx-agenda-event${entry.meeting ? "" : " is-calendar-entry"}`}
+                      data-event-tone={toneOf(entry)}
+                      style={{
+                        top,
+                        height,
+                        left: `calc(${(lane / lanes) * 100}% + 3px)`,
+                        width: `calc(${100 / lanes}% - 6px)`,
                       }}
-                      onPointerMove={() => {
-                        if (drag.current) drag.current.end = index;
-                      }}
-                      onPointerEnter={() => {
-                        if (drag.current) drag.current.end = index;
-                      }}
-                      onPointerUp={() => {
-                        if (drag.current) {
-                          const picked = drag.current;
-                          drag.current = null;
-                          suppressClick.current = true;
-                          schedule(picked.start, Math.max(picked.end, index));
-                        }
-                      }}
-                      onClick={() => {
-                        if (suppressClick.current) {
-                          suppressClick.current = false;
-                          return;
-                        }
-                        schedule(index, index);
-                      }}
-                    />
-                  );
-                })}
-                {placeDay(events).map(({ entry, top, height, lane, lanes }) => (
-                  <button
-                    key={entry.key}
-                    type="button"
-                    className={`cx-agenda-event${entry.meeting ? "" : " is-calendar-entry"}`}
-                    data-event-tone={toneOf(entry)}
-                    style={{
-                      top,
-                      height,
-                      left: `calc(${(lane / lanes) * 100}% + 3px)`,
-                      width: `calc(${100 / lanes}% - 6px)`,
-                    }}
-                    onClick={(event) => openEntry(entry, event.currentTarget)}
-                    aria-label={`${entry.title}, ${human(entry.start)}`}
-                  >
-                    <strong>{entry.title}</strong>
-                    <span>{range(entry)}</span>
-                  </button>
-                ))}
-                {slotPick?.day === dayIndex ? (
-                  <fieldset
-                    className={`cx-agenda-slot-popover${dayIndex >= 4 && view !== "Day" ? " is-right" : ""}`}
-                    style={{ top: slotPick.slot * SLOT_HEIGHT + SLOT_HEIGHT }}
-                    aria-label="Schedule at this time"
-                  >
-                    <input
-                      type="text"
-                      className="cx-agenda-addtitle"
-                      aria-label="Add title"
-                      placeholder="Add title"
-                      value={quickTitle}
-                      onChange={(event) => setQuickTitle(event.target.value)}
-                    />
-                    <strong>{human(slotStart(day, slotPick.slot).toISOString())}</strong>
-                    <p>Tilo will join at this time and prepare meeting notes.</p>
-                    {hostConnection === "connected" ? (
+                      onClick={(event) => openEntry(entry, event.currentTarget)}
+                      aria-label={`${entry.title}, ${human(entry.start)}`}
+                    >
+                      <strong>{entry.title}</strong>
+                      <span>{range(entry)}</span>
+                    </button>
+                  ))}
+                  {slotPick?.day === dayIndex ? (
+                    <fieldset
+                      className={`cx-agenda-slot-popover${dayIndex >= 4 && view !== "Day" ? " is-right" : ""}`}
+                      style={{ top: slotPick.slot * SLOT_HEIGHT + SLOT_HEIGHT }}
+                      aria-label="Schedule at this time"
+                    >
+                      <input
+                        type="text"
+                        className="cx-agenda-addtitle"
+                        aria-label="Add title"
+                        placeholder="Add title"
+                        value={quickTitle}
+                        onChange={(event) => setQuickTitle(event.target.value)}
+                      />
+                      <strong>{human(slotStart(day, slotPick.slot).toISOString())}</strong>
+                      <p>Tilo will join at this time and prepare meeting notes.</p>
+                      {hostConnection === "connected" ? (
+                        <button
+                          type="button"
+                          disabled={busy || !onMeetHere}
+                          onClick={() => {
+                            setBusy(true);
+                            setActionError("");
+                            void onMeetHere?.(
+                              slotStart(day, slotPick.slot).toISOString(),
+                              slotPick.minutes,
+                              ...(quickTitle.trim() ? [quickTitle.trim()] : []),
+                            )
+                              .then(() => {
+                                setSlotPick(null);
+                                setQuickTitle("");
+                                onDeleted?.();
+                              })
+                              .catch(() =>
+                                setActionError(
+                                  "Tilo could not start that meeting. Try again or invite others.",
+                                ),
+                              )
+                              .finally(() => setBusy(false));
+                          }}
+                        >
+                          {busy ? "Starting…" : "Meet with Tilo here"}
+                        </button>
+                      ) : (
+                        <p>
+                          Paste your Google Meet link in Meet with Tilo, and Tilo joins it as a
+                          guest.
+                        </p>
+                      )}
                       <button
                         type="button"
-                        disabled={busy || !onMeetHere}
                         onClick={() => {
-                          setBusy(true);
-                          setActionError("");
-                          void onMeetHere?.(
+                          onSchedule(
                             slotStart(day, slotPick.slot).toISOString(),
                             slotPick.minutes,
                             ...(quickTitle.trim() ? [quickTitle.trim()] : []),
-                          )
-                            .then(() => {
-                              setSlotPick(null);
-                              setQuickTitle("");
-                              onDeleted?.();
-                            })
-                            .catch(() =>
-                              setActionError(
-                                "Tilo could not start that meeting. Try again or invite others.",
-                              ),
-                            )
-                            .finally(() => setBusy(false));
+                          );
+                          setSlotPick(null);
+                          setQuickTitle("");
                         }}
                       >
-                        {busy ? "Starting…" : "Meet with Tilo here"}
+                        Invite others...
                       </button>
-                    ) : (
-                      <p>
-                        Paste your Google Meet link in Meet with Tilo, and Tilo joins it as a guest.
-                      </p>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onSchedule(
-                          slotStart(day, slotPick.slot).toISOString(),
-                          slotPick.minutes,
-                          ...(quickTitle.trim() ? [quickTitle.trim()] : []),
-                        );
-                        setSlotPick(null);
-                        setQuickTitle("");
-                      }}
-                    >
-                      Invite others...
-                    </button>
-                    <button type="button" className="secondary" onClick={() => setSlotPick(null)}>
-                      Close
-                    </button>
-                    {actionError ? <p role="alert">{actionError}</p> : null}
-                  </fieldset>
-                ) : null}
-                {dayKey === localDate(now) &&
-                nowMinutes >= 0 &&
-                nowMinutes < (END_HOUR - START_HOUR) * 60 ? (
-                  <span
-                    className="cx-agenda-nowline"
-                    role="img"
-                    aria-label="Current time"
-                    style={{ top: (nowMinutes / 15) * SLOT_HEIGHT }}
-                  />
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      </section>
+                      <button type="button" className="secondary" onClick={() => setSlotPick(null)}>
+                        Close
+                      </button>
+                      {actionError ? <p role="alert">{actionError}</p> : null}
+                    </fieldset>
+                  ) : null}
+                  {dayKey === localDate(now) &&
+                  nowMinutes >= 0 &&
+                  nowMinutes < (END_HOUR - START_HOUR) * 60 ? (
+                    <span
+                      className="cx-agenda-nowline"
+                      role="img"
+                      aria-label="Current time"
+                      style={{ top: (nowMinutes / 15) * SLOT_HEIGHT }}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
       {selected ? (
         <aside
           className="park-agenda-state cx-agenda-selected"

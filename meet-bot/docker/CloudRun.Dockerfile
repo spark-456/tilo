@@ -9,6 +9,8 @@ COPY meet-bot/docker/requirements.txt /tmp/requirements.txt
 COPY meet-bot/docker/cloud-requirements.txt /tmp/cloud-requirements.txt
 RUN pip install --break-system-packages --ignore-installed typing_extensions \
     -r /tmp/requirements.txt -r /tmp/cloud-requirements.txt
+# Google Chrome (stable) beside Playwright's Chromium: Meet's call UI is verified against Chrome (BOT_BROWSER_CHANNEL).
+RUN python3 -m playwright install --with-deps chrome && rm -rf /var/lib/apt/lists/*
 COPY packages/contracts-py/src /opt/tilo/packages/contracts-py/src
 COPY packages/providers/src /opt/tilo/packages/providers/src
 COPY packages/redact/src /opt/tilo/packages/redact/src
@@ -27,7 +29,7 @@ COPY prompts/router /opt/tilo/prompts/router
 COPY prompts/speech /opt/tilo/prompts/speech
 ENV TILO_REPO_ROOT=/opt/tilo \
     PYTHONPATH=/app:/opt/tilo/packages/contracts-py/src:/opt/tilo/packages/providers/src:/opt/tilo/packages/redact/src:/opt/tilo/services/connectors/src \
-    BOT_JOIN_MODE=guest TILO_CLOUD_CAPTURE=1
+    BOT_JOIN_MODE=guest TILO_CLOUD_CAPTURE=1 BOT_BROWSER_CHANNEL=chrome
 WORKDIR /app
 COPY --chown=pwuser:pwuser meet-bot/bot /app/bot
 COPY --chown=pwuser:pwuser meet-bot/docker/cloud_entrypoint.py /cloud_entrypoint.py
