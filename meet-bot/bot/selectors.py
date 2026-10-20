@@ -50,6 +50,13 @@ CAM_TURN_OFF = _s("cam_turn_off", ("role", "button", r"turn off camera"), ("aria
 CAM_TURN_ON = _s("cam_turn_on", ("role", "button", r"turn on camera"), ("aria", "Turn on camera"))
 JOIN_NOW = _s("join_now", ("role", "button", r"^(join now|switch here)$"), ("text", r"^join now$"))
 ASK_TO_JOIN = _s("ask_to_join", ("role", "button", r"ask to join"), ("text", r"^ask to join$"))
+OTHER_WAYS_TO_JOIN = _s("other_ways_to_join", ("role", "button", r"other ways to join"))
+JOIN_HERE_TOO = _s(
+    "join_here_too",
+    ("role", "button", r"join here too"),
+    ("role", "menuitem", r"join here too"),
+    ("text", r"^join here too$"),
+)
 CLOSE_DIALOG = _s("close_dialog", ("role", "button", r"^close$"))
 GOT_IT = _s("got_it", ("role", "button", r"^(got it|dismiss|ok)$"))
 ACCOUNT_BUTTON = _s("account_button", ("aria", "Google Account"))
