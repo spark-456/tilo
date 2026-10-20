@@ -79,7 +79,7 @@ def build_brain(cfg: Config, agenda_path: Path | None, duration: float | None, k
         direct_gap_s=cfg.direct_reply_gap_s,
         knowledge=kb,
         wake_settings=load_wake_settings(),
-        meeting_scope=True,
+        meeting_scope=cfg.meeting_scope,  # off by default since the owner's 21 Oct decision (BQ-MTG-SCOPE-OWNER-1)
     )
     brain.policy.proactive = cfg.voice_nudges  # existing operator opt-in; off by default for chat AND voice
     return brain

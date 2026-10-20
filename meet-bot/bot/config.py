@@ -106,6 +106,9 @@ class Config:
     # Meet refuses automated anonymous guests, so the cloud bot joins as this account in a fresh context.
     session_file: Path | None = None
     unreadable_leave_s: float = 300.0  # People panel and head count unreadable, no captions: leave after this long
+    # FR-MTG-13 meeting-only answers (agenda, minutes, own items). Owner 21 Oct (BQ-MTG-SCOPE-OWNER-1): off by default,
+    # so Tilo answers like a normal assistant; MEETING_ANSWER_SCOPE=1 turns the old scope back on.
+    meeting_scope: bool = False
 
     @classmethod
     def from_env(cls) -> Config:
@@ -145,6 +148,7 @@ class Config:
                 else "both"
             ),
             voice_nudges=e("VOICE_NUDGES", "0") == "1",
+            meeting_scope=e("MEETING_ANSWER_SCOPE", "0") == "1",
             mic_policy=_choice("MIC_POLICY", "open", ("open", "conversation")),
             stt=e("STT_PROVIDER", "").strip().lower()
             or ("gemini" if e("HYBRID_TRANSCRIPT", "0") == "1" else "captions"),
