@@ -153,6 +153,59 @@ describe("FR_MTG_03_08 Park minutes owner flow", () => {
     expect(m.container.querySelector('[role="alert"]')).not.toBeNull();
     expect(button(m.container, "Draft follow-up")).toBeUndefined();
   });
+  it("MINUTES_SCREEN says why minutes could not be made, from the server's refusal word", async () => {
+    const http = mockHttp();
+    http.postJson.mockRejectedValue(
+      new TiloApiError("Conflict", 409, false, true, "transcript_unavailable"),
+    );
+    const m = mount(<MeetingMinutes id="mt_a" status="ended" api={meetingMinutesApi(http)} />);
+    await press(m.container, "Analyze minutes");
+    expect(m.container.querySelector('[role="alert"]')?.textContent).toContain(
+      "has not passed the safety check yet",
+    );
+    expect(button(m.container, "Review stored minutes")).toBeDefined();
+  });
+  it("MINUTES_SCREEN shows the owner's transcript only on a click, with its safety note", async () => {
+    const http = mockHttp();
+    http.getJson.mockImplementation(async (path: string) =>
+      path.endsWith("/transcript")
+        ? ({
+            meeting_id: "mt_a",
+            transcript: { artifact_id: "art_t", version: 2 },
+            screening: "unscreened",
+            utterances: [
+              {
+                id: "u0001",
+                t_ms: 65_000,
+                speaker: "Alex",
+                text: "Ship it on Friday.",
+                truncated: false,
+              },
+              { id: "u0002", t_ms: 70_000, speaker: null, text: "Agreed.", truncated: false },
+            ],
+          } as never)
+        : (doc as never),
+    );
+    const m = mount(<MeetingMinutes id="mt_a" status="ended" api={meetingMinutesApi(http)} />);
+    expect(http.getJson).not.toHaveBeenCalled();
+    await press(m.container, "Show transcript");
+    expect(http.getJson).toHaveBeenCalledWith("/v1/meetings/mt_a/transcript");
+    const view = m.container.querySelector('[aria-label="Transcript"]');
+    expect(view?.textContent).toContain("1:05 Alex: Ship it on Friday.");
+    expect(view?.textContent).toContain("Someone: Agreed.");
+    expect(view?.textContent).toContain("Analyze minutes checks it again");
+    expect(http.postJson).not.toHaveBeenCalled();
+    await press(m.container, "Hide transcript");
+    expect(m.container.querySelector('[aria-label="Transcript"]')).toBeNull();
+  });
+  it("MINUTES_SCREEN a meeting with no kept transcript says so and keeps the minutes controls", async () => {
+    const http = mockHttp();
+    http.getJson.mockRejectedValue(new TiloApiError("Missing", 404, false));
+    const m = mount(<MeetingMinutes id="mt_a" status="ended" api={meetingMinutesApi(http)} />);
+    await press(m.container, "Show transcript");
+    expect(m.container.textContent).toContain("No transcript is kept for this meeting.");
+    expect(button(m.container, "Analyze minutes")).toBeDefined();
+  });
   it("refuses malformed or duplicate recipients before writing", async () => {
     const http = mockHttp();
     const api = meetingMinutesApi(http);

@@ -411,6 +411,15 @@
   display: flex;
   flex-direction: column;
 }
+/* UX-AUDIT: the page outlet sits under the fixed nav, so a full-height sheet hid its own title and close button under
+   the nav. From 641px it is a card below the nav, as the Connectors drawer is (top 90, 16 from the edges). */
+@media (min-width: 641px) {
+  [data-park] .park-skill-drawer {
+    height: auto;
+    margin: 90px 16px 16px 0;
+    border-radius: 28px;
+  }
+}
 [data-park] .park-skill-drawer__head {
   padding: 28px 28px 20px;
   display: flex;
@@ -511,7 +520,8 @@
   font-size: 15px;
   overflow-wrap: anywhere;
 }
-[data-park] .park-skill-drawer__step > span:nth-child(2) {
+/* UX-AUDIT: the tool icon tile is now the second child; it keeps its 28px and the words take the room. */
+[data-park] .park-skill-drawer__step > span:nth-child(2):not(.park-skill-drawer__step-icon) {
   flex: 1;
 }
 [data-park] .park-skill-drawer__n,

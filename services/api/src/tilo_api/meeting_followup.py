@@ -328,7 +328,7 @@ def draft_owner_followup(
     if principal.demo_session or getattr(request.state, "demo_session", False) is True:
         mode = "replay"
     router: Any = deps.router_for_mode(mode)
-    safety = deps.get_safety(mode)
+    safety = deps.safety_for_mode(mode)  # MINUTES-SCREEN: held per call by `calls`, so live when deployed
     calls = _FollowupCalls(request, w, switches, mode, run_id)
     left = budget
 

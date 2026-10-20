@@ -20,6 +20,7 @@ from tilo_people.text import clean_line
 
 MAX_HISTORY = 200  # `work_item.history` has no maxItems: a longer record is unreadable, never run through `decide`
 GONE = ("discarded", "deleted")
+MAX_TRANSCRIPT_LINES = 5000  # utterances one transcript view shows (a two-hour meeting's captions fit)
 _MASK = re.compile(r"[^\s@]+@[^\s@]+|\S+://\S+|www\.\S+|\+?\d[\d ().-]{6,}\d")  # addresses, phone numbers, links
 
 
@@ -37,6 +38,33 @@ class Reader:
 
     def directory(self) -> Directory:
         return Directory.of(s.record for s in self.stores.persons.list(self.org))
+
+
+def meeting_transcript(r: Reader, meeting_id: str) -> dict[str, Any] | None:
+    """MINUTES-SCREEN: the owner's own transcript of an ended or minuted meeting, each line as the owner route shows a
+    quote (PE-24: control and format characters out, the secret redactor, a 240-character cut), with what the screen
+    said of the stored version. Computed per request like a quote, never stored. None is the one 404: not the owner's,
+    gone, swept at `delete_transcript_after`, or no world or transcript."""
+    directory = r.directory()
+    stored = r.stores.meetings.get(r.org, meeting_id)
+    if directory.record(r.actor) is None or stored is None or stored.record["owner"] != r.actor:
+        return None
+    m = stored.record
+    world, ref, until = m.get("world_id"), m["transcript"], m["delete_transcript_after"]
+    if m["status"] not in ("ended", "minuted") or world is None or ref is None or until is None or r.now >= until:
+        return None
+    scope = Scope(m["org_id"], world, m["owner"])
+    head = r.artifacts.head(scope, ref)
+    doc = None if head is None else read_doc(r.artifacts, scope, ref)
+    if head is None or doc is None or doc.get("meeting_id") != m["id"]:
+        return None
+    lines = []
+    for utterance in doc["utterances"][:MAX_TRANSCRIPT_LINES]:
+        text, truncated = _line(r, utterance["text"], True)
+        speaker = r.redact(clean_line(utterance["speaker"]))[:80] or None
+        lines.append({"id": utterance["id"], "t_ms": utterance["t_ms"], "speaker": speaker, "text": text,
+                      "truncated": truncated})  # fmt: skip
+    return {"meeting_id": m["id"], "transcript": dict(ref), "screening": head.doc["screening"], "utterances": lines}
 
 
 def meeting_quotes(r: Reader, meeting_id: str, ids: list[str]) -> dict[str, Any] | None:

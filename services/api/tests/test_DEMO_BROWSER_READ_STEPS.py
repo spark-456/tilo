@@ -49,6 +49,26 @@ def test_DEMO_BROWSER_a_read_scrolls_through_the_page_then_reads_it():
     assert stopped == {"session": started["session"], "outcome": "done", "steps": READ_SCROLLS + 1}
 
 
+def test_DEMO_BROWSER_reading_a_search_address_is_captioned_as_a_search_with_the_host_only():
+    run, rpc = FakeRun(), StrictRpc()
+    BrowseStepExecutor(run, rpc, lambda *_: None).read_page(
+        unit={"id": "U1", "district": "D1"}, agent="A_s1", building="B1",
+        url="https://www.wikipedia.org/search-redirect.php?search=population+of+Japan", host="www.wikipedia.org",
+    )  # fmt: skip
+    read = [data for kind, data in run.events if kind == "browser.acted"][-1]
+    assert read["caption"] == "Searching www.wikipedia.org"
+    assert "Japan" not in str(run.events)  # BR-13: an event never carries the search words
+
+
+def test_DEMO_BROWSER_a_taught_navigate_to_a_search_address_is_a_search():
+    from tilo_api.browser_step import BrowseStepExecutor as Executor
+
+    action = {"kind": "navigate", "url": "https://en.wikipedia.org/w/index.php?search=Ada"}
+    assert Executor._caption("navigate", "", "en.wikipedia.org", action) == "Searching en.wikipedia.org"
+    plain = {"kind": "navigate", "url": "https://en.wikipedia.org/wiki/Ada_Lovelace"}
+    assert Executor._caption("navigate", "", "en.wikipedia.org", plain) == "Opening en.wikipedia.org"
+
+
 def test_DEMO_BROWSER_every_frame_of_a_read_is_kept_under_its_own_id():
     _text, run, _rpc = _read()
     frames = [data["frame"]["artifact_id"] for kind, data in run.events if kind != "browser.stopped"]

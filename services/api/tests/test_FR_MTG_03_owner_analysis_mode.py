@@ -36,7 +36,7 @@ def owner_call(integration, monkeypatch):  # noqa: F811
     monkeypatch.setattr(team_access, "user_cap_minor", lambda *args: caps.uid_lifetime_minor)
     modes = []
     monkeypatch.setattr(deps, "router_for_mode", lambda mode: modes.append(("router", mode)) or router)
-    monkeypatch.setattr(deps, "get_safety", lambda mode: modes.append(("safety", mode)) or FakeSafetyProvider())
+    monkeypatch.setattr(deps, "safety_for_mode", lambda mode: modes.append(("safety", mode)) or FakeSafetyProvider())
     return SimpleNamespace(**locals())
 
 
@@ -142,7 +142,8 @@ def test_FR_MTG_03_owner_live_reserves_each_safety_and_generation_call(owner_cal
     live(c, monkeypatch)
     run(c)
     assert c.modes == [("router", "live"), ("safety", "live")]
-    assert c.ledger.spent_minor(OWNER) == 2 * c.caps.unit_reserve_minor
+    # MINUTES-SCREEN: the transcript screen, the analysis, and the screen of the minutes it stores (three held units)
+    assert c.ledger.spent_minor(OWNER) == 3 * c.caps.unit_reserve_minor
 
 
 @pytest.mark.parametrize("denial", ["unwired", "team", "team_error", "switch"])
@@ -176,7 +177,7 @@ def test_FR_MTG_03_owner_switch_between_screen_and_generation_stops_generation(o
             c.flags.set("replay_only", True, reason="test")
             return {"flagged": False}
 
-    monkeypatch.setattr(deps, "get_safety", lambda mode: Safety())
+    monkeypatch.setattr(deps, "safety_for_mode", lambda mode: Safety())
     with pytest.raises(Refusal):
         run(c)
     assert not c.router.calls and c.ledger.spent_minor(OWNER) == c.caps.unit_reserve_minor
@@ -208,7 +209,7 @@ def test_FR_MTG_03_owner_verifier_uses_remaining_budget_and_another_hold(owner_c
     run(c)
     assert [call[0] for call in script.calls] == ["meeting_analyst", "verifier"]
     assert [call[2] for call in script.calls] == [2, 0.75]
-    assert c.ledger.spent_minor(OWNER) == 3 * c.caps.unit_reserve_minor
+    assert c.ledger.spent_minor(OWNER) == 4 * c.caps.unit_reserve_minor  # and the stored minutes' screen
 
 
 def test_FR_MTG_03_owner_team_remaining_limit_blocks_second_call(owner_call, monkeypatch):

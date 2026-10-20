@@ -243,6 +243,7 @@ export function ChatPage({ app }: { app: AppCtx }) {
               type="button"
               className="park-chat-quiet park-chat-quiet--lg"
               disabled={lastQuestion === ""}
+              title={lastQuestion === "" ? "Ask a question first" : undefined}
               onClick={() => toWorld(lastQuestion)}
             >
               Turn into a world

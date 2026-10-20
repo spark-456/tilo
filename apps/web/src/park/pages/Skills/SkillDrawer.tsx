@@ -162,6 +162,14 @@ export function SkillDrawer({
       !input.required ||
       (input.kind === "file" ? Boolean(files[input.name]) : Boolean(values[input.name]?.trim())),
   );
+  // UX-AUDIT: a Run button that cannot run says why, next to it.
+  const runBlocked = !onRun
+    ? "Running a skill is not connected in this session."
+    : isPaused
+      ? "This skill is paused. Resume it to run it."
+      : !readyToRun
+        ? "Fill in the required fields first."
+        : null;
 
   useEffect(() => {
     close.current?.focus();
@@ -390,9 +398,15 @@ export function SkillDrawer({
               variant="primary"
               type="submit"
               disabled={!onRun || !readyToRun || isPaused || running}
+              aria-describedby={runBlocked ? `${title}-runwhy` : undefined}
             >
-              Run skill
+              {running ? "Starting…" : "Run skill"}
             </Button>
+            {runBlocked ? (
+              <p id={`${title}-runwhy`} className="park-teach__hint">
+                {runBlocked}
+              </p>
+            ) : null}
             {runError ? <p role="alert">{runError}</p> : null}
           </form>
           {skill.details?.hosts.length ? (

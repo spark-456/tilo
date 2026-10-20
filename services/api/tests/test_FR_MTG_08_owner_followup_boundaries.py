@@ -21,7 +21,7 @@ def test_FR_MTG_08_owner_explicit_mode_and_both_demo_sources(followup, monkeypat
     router = deps.router_for_mode("replay")
     monkeypatch.setattr(deps, "get_work_mode", lambda *args: "live" if demo != "none" else "replay")
     monkeypatch.setattr(deps, "router_for_mode", lambda mode: modes.append(("router", mode)) or router)
-    monkeypatch.setattr(deps, "get_safety", lambda mode: modes.append(("safety", mode)) or FakeSafetyProvider())
+    monkeypatch.setattr(deps, "safety_for_mode", lambda mode: modes.append(("safety", mode)) or FakeSafetyProvider())
     c.request.state.demo_session = demo == "request"
     card = draft_owner_followup(
         c.request,
@@ -86,7 +86,7 @@ def test_FR_MTG_08_owner_fake_live_multi_nudge_charges_each_call_and_rereads_swi
             return {"flagged": False}
 
     monkeypatch.setattr(deps, "router_for_mode", lambda mode: modes.append(("router", mode)) or Router())
-    monkeypatch.setattr(deps, "get_safety", lambda mode: modes.append(("safety", mode)) or Safety())
+    monkeypatch.setattr(deps, "safety_for_mode", lambda mode: modes.append(("safety", mode)) or Safety())
     cards = run(c, None)
     expected = 1 if flip else 2
     assert len(cards) == expected and len(c.calls) == expected and len(safety_calls) == 2 * expected

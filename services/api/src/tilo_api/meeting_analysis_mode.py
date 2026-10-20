@@ -17,7 +17,7 @@ from tilo_providers.router import Router
 from tilo_api import deps, spend, team_access, team_store
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.meeting_allowance import allowance_router
-from tilo_api.meeting_minutes import analyze_and_publish_minutes
+from tilo_api.meeting_minutes import analyze_and_publish_minutes, screen_transcript_again
 from tilo_api.people_meetings import _mine
 from tilo_api.people_quotes import GONE
 from tilo_api.people_writes import Refusal, Writer
@@ -140,11 +140,16 @@ def analyze_owner_minutes(
     mode = deps.get_work_mode(request, switches)
     if principal.demo_session or getattr(request.state, "demo_session", False) is True:
         mode = "replay"
-    router, safety = deps.router_for_mode(mode), deps.get_safety(mode)
+    router, safety = deps.router_for_mode(mode), deps.safety_for_mode(mode)
     # Factories must not silently adopt a changed meeting or schedule as this operation's source.
     if _mine(w, meeting_id, "read_full", GONE)[1] != version:
         raise Refusal(409, "version_conflict")
     calls = _Calls(request, w, switches, mode, world.run_id)
+    # MINUTES-SCREEN: the shared store's own screen has no meter (deployed, recordings); this request's held screen
+    # judges what the analysis reads and the minutes it stores. A transcript stored with no verdict is screened again.
+    artifacts = artifacts.with_screener(_Safety(safety, calls))
+    if mode == "live":
+        screen_transcript_again(w, store, artifacts, meeting_id)
     with allowance_router(
         _Router(router, calls),
         ledger=allowance,

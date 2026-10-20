@@ -20,7 +20,7 @@ from tilo_memory.artifacts import ArtifactStore
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, grounding, people_items
-from tilo_api.meeting_bot import attend_meeting
+from tilo_api.meeting_bot import attend_artifacts, attend_meeting
 from tilo_api.meeting_bot_rpc import MeetingBotRpc, get_meeting_bot_client
 from tilo_api.meeting_brief import read_brief
 from tilo_api.meeting_draft_cleanup import get_meeting_draft_cleanup
@@ -34,7 +34,7 @@ from tilo_api.people_limits import idempotent, write_limit
 from tilo_api.people_meetings import MeetingEditIn, edit_meeting, get_meeting, list_meetings, read_minutes, set_world
 from tilo_api.people_pins import PinIn, create_pin, delete_pin, list_pins
 from tilo_api.people_plate import build_plate
-from tilo_api.people_quotes import Reader, item_quote, meeting_quotes
+from tilo_api.people_quotes import Reader, item_quote, meeting_quotes, meeting_transcript
 from tilo_api.people_writes import (
     AttendIn,
     Empty,
@@ -150,6 +150,22 @@ def meeting_quotes_route(
         raise _not_found()
     reader = Reader(stores, artifacts, redact, deps.ORG_ID, principal.user_id, clock())
     return _answer(lambda: meeting_quotes(reader, meeting_id, ids.split(",")))
+
+
+@router.get("/v1/meetings/{meeting_id}/transcript")
+def meeting_transcript_route(
+    meeting_id: str,
+    principal: Annotated[deps.Principal, Depends(deps.get_current_principal)],
+    stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
+    artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
+    redact: Annotated[Callable[[str], str], Depends(deps.get_redactor)],
+    clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
+) -> dict[str, Any]:
+    """MINUTES-SCREEN: the meeting owner reads their meeting's transcript, each line as the owner's quotes show it."""
+    if _MEETING_ID.fullmatch(meeting_id) is None:
+        raise _not_found()
+    reader = Reader(stores, artifacts, redact, deps.ORG_ID, principal.user_id, clock())
+    return _answer(lambda: meeting_transcript(reader, meeting_id))
 
 
 @router.get("/v1/work-items/{work_item_id}/quote")
@@ -342,7 +358,7 @@ async def attend_meeting_route(
     stores: Annotated[PeopleStores, Depends(deps.get_people_stores)],
     _new_work: Annotated[deps.Mode, Depends(deps.get_work_mode)],  # a bot is new live work: refused at a cap
     store: Annotated[deps.Store, Depends(deps.get_store)],
-    artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
+    artifacts: Annotated[ArtifactStore, Depends(attend_artifacts)],  # MINUTES-SCREEN: the request's own screen
     host: Annotated[MeetingHostRpc, Depends(deps.get_meeting_host_client)],
     bot: Annotated[MeetingBotRpc, Depends(get_meeting_bot_client)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],

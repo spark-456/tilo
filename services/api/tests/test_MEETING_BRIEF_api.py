@@ -78,7 +78,7 @@ def case(people_rig, monkeypatch):
     script, ledger = Script(), InMemorySpendLedger()
     monkeypatch.setattr(deps, "get_work_mode", lambda request, switches: "replay")
     monkeypatch.setattr(deps, "router_for_mode", lambda mode: script)
-    monkeypatch.setattr(deps, "get_safety", lambda mode: FakeSafetyProvider())
+    monkeypatch.setattr(deps, "safety_for_mode", lambda mode: FakeSafetyProvider())
     overrides = rig.app.dependency_overrides
     overrides[deps.get_store] = lambda: rig.event_store
     overrides[deps.get_switches] = lambda: InMemoryFlagStore()

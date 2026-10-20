@@ -9,6 +9,12 @@ export interface MinutesView {
   actions: string[];
   recipients: { id: string; name: string }[];
 }
+/** MINUTES-SCREEN: the owner's own transcript, each line as the server's owner quotes show it (cleaned, redacted). */
+export interface TranscriptView {
+  lines: { id: string; speaker: string | null; text: string; atMs: number }[];
+  /** What the safety check said of the stored transcript: clean, flagged or unscreened. */
+  screening: string;
+}
 export interface DraftCard {
   cardId: string;
   subject: string;
@@ -52,6 +58,28 @@ export function meetingMinutesApi(http: Pick<HttpClient, "getJson" | "postJson">
     },
     async analyze(id: string) {
       await http.postJson(path(id, "analyze-minutes"), {});
+    },
+    async transcript(id: string): Promise<TranscriptView> {
+      const doc = await http.getJson(path(id, "transcript"));
+      if (
+        !object(doc) ||
+        doc.meeting_id !== id ||
+        typeof doc.screening !== "string" ||
+        !Array.isArray(doc.utterances)
+      )
+        throw bad();
+      const lines = doc.utterances.map((u) => {
+        if (
+          !object(u) ||
+          typeof u.id !== "string" ||
+          typeof u.text !== "string" ||
+          typeof u.t_ms !== "number" ||
+          !(u.speaker === null || typeof u.speaker === "string")
+        )
+          throw bad();
+        return { id: u.id, speaker: u.speaker as string | null, text: u.text, atMs: u.t_ms };
+      });
+      return { lines, screening: doc.screening };
     },
     async confirm(id: string) {
       const reply = await http.postJson(path(id, "confirm"), {});

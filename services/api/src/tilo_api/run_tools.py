@@ -35,7 +35,16 @@ from tilo_api.browser_rpc import BrowserRpc
 from tilo_api.browser_step import BrowseStepExecutor
 from tilo_api.quiz_apps import source_loader
 from tilo_api.report_render import render_report
-from tilo_api.web_tools import FetchTool, RunArchiveBridge, SearchTool, allow_entries, fetch_service, typed_hosts
+from tilo_api.web_tools import (
+    UNREAD,
+    UNREAD_OTHER,
+    FetchTool,
+    RunArchiveBridge,
+    SearchTool,
+    allow_entries,
+    fetch_service,
+    typed_hosts,
+)
 from tilo_api.workspace_tools import READS_OF, WorkspaceAccess, WorkspaceUnit
 from tilo_api.xlsx_template import attach_template
 
@@ -169,9 +178,13 @@ def report_day(owner: str, org: str, people: Callable[[], Any], now: datetime) -
 
 
 def brief_texts(run: Any) -> list[str]:
-    """Every string the person's task put into the brief and the intake answers, plus the brief's url sources."""
+    """Every string the person's task put into the brief and the intake answers, plus the brief's url sources, and the
+    person's own request as recorded (the brief is the Director's restatement: live 21 Oct it wrote www.wikipedia.org
+    for "open wikipedia.org")."""
     brief = run.brief if isinstance(run.brief, Mapping) else {}
-    texts = [brief.get("goal"), brief.get("audience"), *(brief.get("constraints") or [])]
+    stream = getattr(getattr(run, "store", None), "events", {}).get(getattr(run, "world_id", None), [])
+    asked = [e.get("data", {}).get("title") for e in stream if e.get("type") == "world.requested"]
+    texts = [*asked, brief.get("goal"), brief.get("audience"), *(brief.get("constraints") or [])]
     texts += [d.get("title") for d in brief.get("deliverables") or [] if isinstance(d, Mapping)]
     texts += [s.get("ref") for s in brief.get("sources") or [] if isinstance(s, Mapping) and s.get("kind") == "url"]
     texts += [answer for _question, answer in getattr(run, "intake_answers", ())]
@@ -425,7 +438,13 @@ class BoundRunRunner:
             tool_credit_cap=self.limits.credit_share * owner.cap,  # the rest is for the writer and the verifier
             report_renderer=partial(render_report, fmt=fmt or "pdf", template=template, report_date=day),
         )
-        return await runner.run(unit, context)
+        outcome = await runner.run(unit, context)
+        if outcome.success and fetch.refused and not fetch.read and not search.found and not context.upstream:
+            # DEMO-BROWSER: every page read was refused and the unit had nothing else to work from: a "Done" that only
+            # says it could not read is a failure, said plainly (live 21 Oct, w_02GXQ03ZA2DKY4RAV8R7CAMKD5).
+            host, reason = fetch.refused[-1]
+            return UnitOutcome(False, reason=UNREAD.get(reason, UNREAD_OTHER).format(host=host))
+        return outcome
 
     def page_reader(self, unit: Mapping[str, Any], agent: str) -> Callable[[str, str], str] | None:
         """P0-RUNS-FIX: the visible browser for the pages a research unit reads (read-only, T1, allowlisted hosts only,

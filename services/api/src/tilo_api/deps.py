@@ -1032,6 +1032,20 @@ def get_router(
     return router
 
 
+def safety_for_mode(mode: Mode) -> SafetyProvider:
+    """`router_for_mode`'s twin (MINUTES-SCREEN) for an owner caller that holds every check as its own SEC-16 unit
+    (`meeting_analysis_mode._Calls`: minutes, follow-up, meeting brief): live only when `mode` is "live", else
+    recordings. `get_safety` with no meter replays when deployed, so such a caller never got a live screen there and
+    every deployed minutes request failed (20 Oct). Never a route dependency; nothing here is unmetered by itself."""
+    try:
+        return build_safety_provider(providers_config(), fixtures_dir=FIXTURES_DIR, force_replay=mode != "live")
+    except ProviderConfigError as exc:
+        logger.warning("safety provider unavailable: %s", exc)
+        raise HTTPException(
+            status_code=503, detail="No safety provider is configured; nothing is screened, so nothing is accepted."
+        ) from exc
+
+
 def get_safety(
     mode: Annotated[Mode | None, Depends(get_mode)] = None,
     request: Request = None,  # type: ignore[assignment]
