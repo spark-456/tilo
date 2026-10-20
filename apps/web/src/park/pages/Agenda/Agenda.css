@@ -77,6 +77,55 @@
   color: var(--onPri, var(--inv));
   font-weight: 800;
 }
+[data-park] .park-agenda-root .cx-agenda-mini button.is-selected:not(.is-today) {
+  box-shadow: inset 0 0 0 2px var(--priFill, var(--heroFill));
+}
+/* My calendars: a coloured checkbox per calendar; unticked hides that calendar's events. */
+[data-park] .park-agenda-root .cx-agenda-cals {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+[data-park] .park-agenda-root .cx-agenda-cals h2 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 800;
+}
+[data-park] .park-agenda-root .cx-agenda-calrow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-park] .park-agenda-root .cx-agenda-calrow input {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+[data-park] .park-agenda-root .cx-agenda-calbox {
+  box-sizing: border-box;
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--tone, var(--hero));
+  border-radius: 4px;
+}
+[data-park] .park-agenda-root .cx-agenda-calrow input:checked + .cx-agenda-calbox {
+  background: var(--tone, var(--hero));
+}
+[data-park] .park-agenda-root .cx-agenda-calrow input:focus-visible + .cx-agenda-calbox {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
 [data-park] .park-agenda-root .cx-agenda-today {
   box-sizing: border-box;
   display: flex;
@@ -152,10 +201,44 @@
 [data-park] .park-agenda-root .cx-agenda-weektitle h2 {
   margin: 0;
   font-family: "Nunito", sans-serif;
-  font-size: 24px;
-  font-weight: 900;
-  letter-spacing: -0.4px;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
   line-height: 1.1;
+}
+[data-park] .park-agenda-root .cx-agenda-emptyline {
+  position: absolute;
+  z-index: 7;
+  top: 96px;
+  right: 0;
+  left: 54px;
+  margin: 0;
+  padding: 0 16px;
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+}
+[data-park] .park-agenda-root .cx-agenda-scroll,
+[data-park] .park-agenda-root .cx-agenda-month {
+  position: relative;
+}
+[data-park] .park-agenda-root .cx-agenda-weekactions button.cx-agenda-create {
+  min-height: 48px;
+  padding: 0 24px 0 20px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--priFill, var(--heroFill));
+  color: var(--onPri, var(--inv));
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: var(--shPop);
+}
+[data-park] .park-agenda-root .cx-agenda-weekactions button.cx-agenda-create:hover {
+  background: var(--priFill, var(--heroFill));
+  color: var(--onPri, var(--inv));
+  filter: brightness(1.08);
 }
 [data-park] .park-agenda-root .cx-agenda-weektitle p {
   margin: 4px 0 0;
@@ -171,9 +254,9 @@
 [data-park] .park-agenda-root .cx-agenda-weekactions button {
   min-width: 38px;
   min-height: 38px;
-  padding: 0 12px;
+  padding: 0 14px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 99px;
   background: var(--card);
   color: var(--ink);
   font-weight: 750;
@@ -190,15 +273,15 @@
   margin: 0;
   padding: 3px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 99px;
   background: var(--card);
 }
 [data-park] .park-agenda-root .cx-agenda-views button {
   min-width: 48px;
   min-height: 32px;
-  padding: 0 12px;
+  padding: 0 14px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 99px;
   background: transparent;
   color: var(--ink2);
   font-weight: 700;
@@ -245,23 +328,26 @@
 [data-park] .park-agenda-root .cx-agenda-headrow > div {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 2px;
   min-width: 0;
-  padding: 10px 10px 9px;
+  padding: 8px 6px 6px;
   border-left: 1px solid var(--line2);
 }
-[data-park] .park-agenda-root .cx-agenda-headrow > div.is-today {
-  background: var(--heroSoft);
+[data-park] .park-agenda-root .cx-agenda-headrow > div:first-child {
+  border-left: 0;
 }
 [data-park] .park-agenda-root .cx-agenda-dayline {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 7px;
+  gap: 2px;
 }
 [data-park] .park-agenda-root .cx-agenda-dayname {
   color: var(--ink3);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
+  letter-spacing: 0.4px;
   text-transform: uppercase;
 }
 [data-park] .park-agenda-root .is-today .cx-agenda-dayname {
@@ -272,19 +358,23 @@
   box-sizing: border-box;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  height: 26px;
+  min-width: 44px;
+  height: 44px;
   padding: 0 4px;
   border-radius: 99px;
   color: var(--ink);
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 24px;
+  font-weight: 600;
 }
 [data-park] .park-agenda-root .is-today .cx-agenda-daynum {
   background: var(--priFill, var(--heroFill));
   color: var(--onPri, var(--inv));
 }
 [data-park] .park-agenda-root .cx-agenda-dayload {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
   overflow: hidden;
   color: var(--ink3);
   font-size: 11.5px;
@@ -385,7 +475,7 @@
   overflow: hidden;
   padding: 5px 8px 4px;
   border: 0;
-  border-left: 3px solid var(--tone, var(--hero));
+  border-left: 4px solid var(--tone, var(--hero));
   border-radius: 8px;
   background: var(--tone-soft, var(--heroSoft));
   color: var(--ink);
@@ -445,6 +535,25 @@
   border-radius: 14px;
   background: var(--card);
   box-shadow: var(--shPop);
+}
+[data-park] .park-agenda-root .cx-agenda-slot-popover.is-right {
+  right: 6px;
+  left: auto;
+}
+[data-park] .park-agenda-root .cx-agenda-addtitle {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 2px solid var(--priFill, var(--heroFill));
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px;
+  outline: none;
+}
+[data-park] .park-agenda-root .cx-agenda-addtitle:focus-visible {
+  border-bottom-color: var(--ink);
 }
 [data-park] .park-agenda-root .cx-agenda-slot-popover button {
   min-height: 34px;
@@ -549,21 +658,49 @@
 }
 /* Details of the chosen event */
 [data-park] .park-agenda-root .cx-agenda-selected {
-  position: relative;
+  position: fixed;
+  z-index: 60;
+  top: var(--pop-top, 120px);
+  left: var(--pop-left, 120px);
+  box-sizing: border-box;
+  width: 320px;
+  max-height: calc(100vh - 24px);
+  overflow: auto;
   align-items: stretch;
   gap: 8px;
   padding: 18px;
-  border: 1px solid var(--line2);
-  border-radius: 20px;
+  border: 1px solid var(--lineStrong);
+  border-radius: 16px;
   background: var(--card);
+  box-shadow: var(--shPop);
   text-align: left;
 }
 [data-park] .park-agenda-root .cx-agenda-selected h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin: 0;
   padding-right: 36px;
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.2px;
+}
+[data-park] .park-agenda-root .cx-agenda-popdot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--tone, var(--hero));
+}
+[data-park] .park-agenda-root .cx-agenda-selected > button:not(.cx-agenda-close) {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--heroSoft);
+  color: var(--heroInk);
+  font-weight: 750;
+  cursor: pointer;
 }
 [data-park] .park-agenda-root .cx-agenda-selected p {
   margin: 0;
@@ -623,6 +760,34 @@
   }
   [data-park] .park-agenda-root .cx-agenda-minimonth {
     display: none;
+  }
+  [data-park] .park-agenda-root .cx-agenda-cals {
+    flex-flow: row wrap;
+    gap: 4px 16px;
+  }
+  [data-park] .park-agenda-root .cx-agenda-cals h2 {
+    display: none;
+  }
+  [data-park] .park-agenda-root .cx-agenda-calrow {
+    min-height: 44px;
+  }
+  [data-park] .park-agenda-root .cx-agenda-emptyline {
+    left: 54px;
+    font-size: 13px;
+  }
+  [data-park] .park-agenda-root .cx-agenda-selected {
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    max-height: 70vh;
+  }
+  [data-park] .park-agenda-root .cx-agenda-weektitle h2 {
+    font-size: 24px;
+  }
+  [data-park] .park-agenda-root .cx-agenda-weekactions button.cx-agenda-create {
+    min-height: 48px;
   }
   [data-park] .park-agenda-root .cx-agenda-weektitle,
   [data-park] .park-agenda-root .cx-agenda-scroll,
