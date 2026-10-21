@@ -264,7 +264,13 @@ def validate_output(obj: Any) -> dict[str, Any]:
 def parse_json_reply(text: str) -> Any:
     t = text.strip()
     t = re.sub(r"^```(?:json)?\s*|\s*```$", "", t)
-    return json.loads(t)
+    try:
+        return json.loads(t)
+    except json.JSONDecodeError:  # words around the object ('Sure! {...}'): the first whole JSON object in the text
+        start = t.find("{")
+        if start < 0:
+            raise
+        return json.JSONDecoder().raw_decode(t[start:])[0]
 
 
 def _norm(s: str) -> str:
@@ -284,7 +290,10 @@ CANT_DO_LINE = "I can't do that from a call yet."  # Tilo has no tools in a meet
 CANT_DO_AGAIN_LINE = "That's not something I can do from a call yet, sorry."  # a second request in a row: reworded
 NOT_DONE_LINE = "I haven't done that yet. Ask me and I'll read it back before I do."  # actions on, nothing confirmed
 FOLLOWUP_S = 30.0  # after an exchange with Tilo, what follows needs no name for this long
-FAILED_QUIET_S = 20.0  # live 21 Oct: after a failed action Tilo's fixed line stands alone, no improvised "hiccup"
+SETTLED_QUIET_S = (
+    20.0  # live 21 Oct: after a failed action or a "no", Tilo's fixed line stands alone, nothing improvised
+)
+GOODBYE_LINE = "Okay, I'll leave the call now. Bye!"  # the one line before Tilo leaves when asked to (21 Oct)
 REWORD_S = 8.0  # a reworded copy of a question (live partial vs final) within this long is the same question
 SOLE_MIN_WORDS = 3  # alone with Tilo, a fragment shorter than this ('Yes.') says nothing to answer
 _SENTINEL_LINES = {NO_ANSWER: NO_ANSWER_LINE, UNCLEAR: UNCLEAR_LINE}
@@ -631,6 +640,9 @@ QUICK_PROMPT = (
     "nothing needs a reply (a statement or pasted note that asks nothing). "
     "When addressed_to_assistant is false you overheard people talking: answer ONLY if the meeting information or "
     "project_context answers it, otherwise reply null, and never join small talk. "
+    "When addressed_to_assistant is true and the person asks you to leave, go or drop off the call (however it is "
+    'worded, misheard or misspelled, e.g. "you may leave", "Tilo leaev", "you can go now"), reply '
+    '{"reply": null, "leave": true}; never say you will stay. '
     'Reply ONLY with JSON: {"reply": "<one or two short sentences>" or "[[NO_ANSWER]]" or "[[UNCLEAR]]" or null}.'
 )
 NO_ACTIONS_TEXT = (
@@ -681,7 +693,8 @@ class Brain:
         self.pending_action: PendingAction | None = None  # read back, waiting for the same speaker's yes
         self.done_actions: list[PendingAction] = []  # confirmed by tilo-api this call: the only actions Tilo may claim
         self.action_answer: Answered | None = None  # the last yes or no taken: its other captions are not questions
-        self.action_failed_at = -math.inf  # when tilo-api last refused or failed an action (elapsed seconds)
+        self.action_settled_at = -math.inf  # when an action last failed or was declined (elapsed seconds)
+        self.leave_wanted = False  # the model heard a request to leave: the session leaves once the goodbye is said
         self.last_engaged_at = -1e9  # when the last question put to Tilo was asked
         self.last_quick_source = "model"
         self._attempted: dict[str, float] = {}  # question -> start of the utterance last tried (answered or not)
@@ -876,6 +889,11 @@ class Brain:
 
     def _quick_message(self, raw: str, utterances: list[Any], elapsed_s: float, q: Question) -> ChatMessage | None:
         obj = parse_json_reply(raw)
+        if isinstance(obj, dict) and obj.get("leave") is True and q.addressed:
+            # Owner 21 Oct: "Tilo leaev", "you may leave" were answered "I will remain here". The intent is the model's
+            # (GEN-06, no word list), only from a line put to Tilo; one goodbye, never held back by the reply gap.
+            self.leave_wanted = True
+            return ChatMessage("direct_reply", _norm(q.text), GOODBYE_LINE, q.t)
         if self.actions_enabled and isinstance(obj, dict) and obj.get("action") is not None:
             # The model only proposes; Tilo's own fixed words read it back, and the same speaker's yes sends it.
             pending = proposal(obj.get("action"), q.speaker, one_on_one=self.sole_human)
@@ -884,8 +902,10 @@ class Brain:
                     return None  # the partial and the final caption of one request: one read-back (live 21 Oct)
                 self.pending_action = pending
                 return self._direct(readback(pending), utterances, elapsed_s, q)
-        if elapsed_s - self.action_failed_at <= FAILED_QUIET_S:
-            return None  # the failed action's fixed line is all Tilo says; a new request is still read back above
+        if elapsed_s - self.action_settled_at <= SETTLED_QUIET_S:
+            return (
+                None  # the failure's or the "no"'s fixed line is all Tilo says; a new request is still read back above
+            )
         reply = obj.get("reply") if isinstance(obj, dict) else None
         if isinstance(reply, str) and reply.strip():
             line = next((x for s, x in _SENTINEL_LINES.items() if reply.strip().upper().startswith(s)), None)
@@ -899,6 +919,8 @@ class Brain:
 
     def _quick_failed(self, e: Exception, utterances: list[Any], elapsed_s: float, q: Question) -> ChatMessage | None:
         log.warning("quick reply failed: %s", e)
+        # The cloud keeps only operational lines: the failure's type, never the question or the model's text.
+        logging.getLogger("bot.cloud_run").warning("stage quick_failed reason=%s", type(e).__name__)
         return self._direct(COULD_NOT_GET_LINE if q.addressed else None, utterances, elapsed_s, q)
 
     def quick_reply(self, utterances: list[Any], elapsed_s: float) -> ChatMessage | None:

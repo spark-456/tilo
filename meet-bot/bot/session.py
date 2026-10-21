@@ -349,6 +349,9 @@ class LiveSession:
         brain.mark_handled(u)
         if said == "no":
             ops.warning("stage action name=%s outcome=declined", pending.name)
+            brain.action_settled_at = (
+                self.brain_elapsed()
+            )  # owner 21 Oct: this one line, no "Understood, I will not ..."
             self._say(pending, "Okay, I won't.")
         else:
             asyncio.get_running_loop().create_task(self._run_action(pending))
@@ -360,7 +363,7 @@ class LiveSession:
         )
         line = action_talk.result_line(pending, result.ok, result.outcome, result.info)
         if not result.ok:  # live 21 Oct: one fixed line per failed attempt, never the same words twice in a row
-            self.brain.action_failed_at = self.brain_elapsed()  # and nothing improvised after it (FAILED_QUIET_S)
+            self.brain.action_settled_at = self.brain_elapsed()  # and nothing improvised after it (SETTLED_QUIET_S)
             if line == getattr(self, "_failure_said", None):
                 line = action_talk.FAILED_AGAIN_LINE
         else:
@@ -794,6 +797,20 @@ class LiveSession:
         turn = meta.get("turn")
         if turn is not None:
             turn.route = "instant" if self.brain.last_quick_source == "local" else "model"
+        if getattr(self.brain, "leave_wanted", False):  # asked to leave: the goodbye goes out, then Tilo leaves
+            ops.warning("stage leave reason=asked")
+            if not msg:
+                self.leave_requested = True
+                return
+            self.brain.commit_chat(msg, self.brain_elapsed())
+
+            def gone(ok: bool, info: dict) -> None:
+                if turn is not None:
+                    self.trace.finish(turn, info.get("outcome", "failed"))
+                self.leave_requested = True  # after the goodbye was spoken and posted (or could not be)
+
+            self._queue_delivery(msg, gone, turn)
+            return
         if not msg:
             ops.warning("stage question_no_reply model_s=%.1f", model_s)
             if turn is not None:
