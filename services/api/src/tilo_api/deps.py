@@ -1116,6 +1116,18 @@ def get_layout_builder() -> Callable[..., dict]:
     return build_layout
 
 
+def _call_need(router: Any, role: str, request: Any) -> float:
+    """About the least budget one call of `role` can be sent with (`Router.call_floor`, on the router's own config,
+    the meter's `raw` Router when metered); 0.0 when it cannot be worked out, which leaves the budget's split as is."""
+    try:
+        floor = getattr(router, "raw", router).call_floor  # a stand-in with none: no floor
+        chars = len(getattr(request, "prompt", "") or "") + len(getattr(request, "system", "") or "")
+        need = floor(role, chars, getattr(request, "max_output_tokens", None))
+        return float(need) if isinstance(need, int | float) and math.isfinite(need) and need > 0 else 0.0
+    except Exception:  # noqa: BLE001
+        return 0.0
+
+
 class _RoleModel:
     """A worker role's model, always through the Router (PL-01); the harness runner calls only `generate`. With
     `deadline` (RUN-SPEED: the must-ask check) each `generate` gets a fresh PL-03 deadline, so a hung attempt hands
@@ -1132,7 +1144,8 @@ class _RoleModel:
     def generate_budgeted(self, request: Any, budget: Any, deadline: Any = None) -> Any:
         """`deadline`: the router's PL-03 Deadline for this call (DEMO-BROWSER: a browser step waits seconds)."""
         extra = {"deadline": deadline} if deadline is not None else {}
-        result, credits = budget.call(self._router.generate, self._role, request, **extra)
+        need = _call_need(self._router, self._role, request)  # RUN-SPEED: a split budget never hands it less
+        result, credits = budget.call(self._router.generate, self._role, request, need=need, **extra)
         if result.response is None:
             raise ValueError("no worker response")
         return result.response, credits

@@ -119,6 +119,15 @@ def _replay_only(_: Request, __: Exception) -> JSONResponse:
     return JSONResponse(status_code=503, content={"detail": _deps.REPLAY_ONLY_MESSAGE, "replay_only": True})
 
 
+@app.exception_handler(_spend.SpendCheckUnavailable)
+def _spend_check_unavailable(_: Request, __: Exception) -> JSONResponse:  # RUN-SPEED: retryable, never replay
+    return JSONResponse(
+        status_code=503,
+        content={"detail": _spend.SPEND_CHECK_UNAVAILABLE, "code": "spend_check_unavailable"},
+        headers={"Retry-After": "5"},
+    )
+
+
 @app.exception_handler(_deps.ModelUnavailable)
 def _model_unavailable(_: Request, __: Exception) -> JSONResponse:  # NFR-22: the same labelled replay offer
     return JSONResponse(

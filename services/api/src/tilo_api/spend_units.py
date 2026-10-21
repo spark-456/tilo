@@ -109,9 +109,12 @@ class SpendMeter:
         return result
 
     def _begin(self) -> spend.UnitPlan:
-        if self._guard.uid_capped(self.uid):
+        state = self._guard.live_check(self.uid)
+        if state == "capped":
             raise spend.SpendCapReached
-        if not self._guard.live_allowed(self.uid):
+        if state == "unavailable":  # RUN-SPEED: a check that could not be made is a plain retryable stop, not replay
+            raise spend.SpendCheckUnavailable
+        if state != "live":
             raise deps.ReplayOnly
         plan = self._begin_unit(self.unit_minor)
         if plan.reservation is None and plan.reason == "uid_lifetime":
@@ -120,7 +123,9 @@ class SpendMeter:
             if (room := self._guard.headroom_minor(self.uid)) > 0:
                 plan = self._begin_unit(room)
         if plan.reservation is None:
-            raise spend.SpendCapReached if plan.reason == "uid_lifetime" else deps.ReplayOnly
+            if plan.reason == "uid_lifetime":
+                raise spend.SpendCapReached
+            raise spend.SpendCheckUnavailable if plan.reason == "unavailable" else deps.ReplayOnly
         return plan
 
     def _begin_unit(self, estimate_minor: int) -> spend.UnitPlan:
