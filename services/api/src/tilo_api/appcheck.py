@@ -54,6 +54,8 @@ EXEMPT_ROUTES: frozenset[tuple[str, str]] = frozenset(
         # ADR-0042: the meeting bot's two meter routes; a service has no App Check token, each checks its own token.
         ("POST", "/internal/meeting-voice/reserve"),
         ("POST", "/internal/meeting-voice/close"),
+        # ADR-0042 amendment 1: the bot's actions route; a service has no App Check token, it checks its own token.
+        ("POST", "/internal/meeting-actions/run"),
     }
 )
 
