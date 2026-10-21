@@ -445,6 +445,8 @@ def test_SEC_15_SIGNIN_the_gate_has_the_same_public_routes_as_before():
         # ADR-0042: default-off meter routes check their own OIDC token, audience, caller and nonce.
         ("POST", "/internal/meeting-voice/reserve"),
         ("POST", "/internal/meeting-voice/close"),
+        # ADR-0042 amendment 1 (BQ-MTG-ACTIONS-1, owner-approved 21 Oct; inert until TILO_MEETING_ACTIONS=1).
+        ("POST", "/internal/meeting-actions/run"),
     }, "signing in adds no unreviewed public route: a new one is an owner decision"
 
 

@@ -51,6 +51,8 @@ PINNED_PUBLIC_ROUTES = frozenset(
         # bot's two meter routes, each checking its own Google ID token and the attend's nonce.
         ("POST", "/internal/meeting-voice/reserve"),
         ("POST", "/internal/meeting-voice/close"),
+        # ADR-0042 amendment 1 (BQ-MTG-ACTIONS-1, owner-approved 21 Oct; inert until TILO_MEETING_ACTIONS=1).
+        ("POST", "/internal/meeting-actions/run"),
     }
 )
 

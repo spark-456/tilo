@@ -55,6 +55,8 @@ from google.auth import crypt, jwt
 
 KID = "kid-sec08-one"
 VOICE_SIGNED_ROUTES = {("POST", RESERVE), ("POST", CLOSE)}
+ACTIONS = "/internal/meeting-actions/run"  # ADR-0042 amendment 1 (BQ-MTG-ACTIONS-1): its cases are below
+ACTIONS_SIGNED_ROUTES = {("POST", ACTIONS)}
 PUBLIC_NEEDING_A_SESSION = {("GET", "/access"), ("POST", "/access/declaration")}
 
 
@@ -406,6 +408,88 @@ def test_SEC_08_voice_real_signed_positive_control_and_replay_books_only_one_uni
     assert writes == ["reserve", "settle"]
 
 
+# --- ADR-0042 amendment 1 meeting actions: real signatures, no network -----------------------------------------------
+
+
+@pytest.fixture
+def actions_rig(people_rig: Any, monkeypatch: pytest.MonkeyPatch, keys: Keys) -> Any:
+    from _ppl11a_lib import OWNER
+    from tilo_api import meeting_action_claims, schedules
+
+    rig = people_rig()
+    rig.add_people()
+    verifier = schedules.GoogleOidcVerifier(transport=_CertTransport({KID: keys.cert}))
+    claims = meeting_action_claims.ActionClaims()
+    rig.app.dependency_overrides[schedules.get_oidc_verifier] = lambda: verifier
+    rig.app.dependency_overrides[meeting_action_claims.get_action_claims] = lambda: claims
+    for name, value in {
+        "TILO_MEETING_ACTIONS": "1",
+        "TILO_MEETING_ACTIONS_AUDIENCE": AUDIENCE,
+        "TILO_MEETING_ACTIONS_CALLER": BOT_SA,
+        "TILO_SCHEDULE_TICK_CALLER": SCHEDULE_SA,
+        "TILO_TASKS_CALLER": TASKS_SA,
+        "K_SERVICE": "tilo-api",
+        "TILO_APPCHECK_ENFORCE": "1",
+    }.items():
+        monkeypatch.setenv(name, value)
+    rig.claims, rig.token = claims, keys.token(email=BOT_SA)
+    rig.nonce = claims.open("mt_sec08", uid=OWNER, org_id=rig.org)
+    return rig
+
+
+def _act(rig: Any, token: str | None, raw: bytes | None = None, key: str = "k-sec08") -> Any:
+    headers = {} if token is None else {"Authorization": f"Bearer {token}"}
+    body = {
+        "meeting_id": "mt_sec08",
+        "claim": rig.nonce,
+        "key": key,
+        "speaker": None,
+        "action": "create_pin",
+        "args": {"title": "Signed pin", "board": "personal"},
+    }
+    content = raw if raw is not None else json.dumps(body).encode()
+    return rig.client.post(ACTIONS, content=content, headers={**headers, "Content-Type": "application/json"})
+
+
+@pytest.mark.parametrize("attack", ["forged", "tampered", "missing", "unsigned", "expired"])
+def test_SEC_08_actions_bad_signature_or_expiry_reads_no_body_and_writes_nothing(
+    actions_rig: Any, keys: Keys, monkeypatch: pytest.MonkeyPatch, attack: str
+) -> None:
+    from tilo_api import meeting_actions
+
+    token: str | None = actions_rig.token
+    if attack == "forged":
+        token = keys.token(email=BOT_SA, private=keys.attacker_private)
+    elif attack == "tampered":
+        head, _, signature = keys.token(email=GMAIL_SA).split(".")
+        payload = _b64e(json.dumps(jwt.decode(actions_rig.token, verify=False)).encode())
+        token = f"{head}.{payload}.{signature}"
+    elif attack == "missing":
+        token = None
+    elif attack == "unsigned":
+        token = actions_rig.token.rsplit(".", 1)[0] + "."
+    else:
+        now = int(time.time())
+        token = keys.token(email=BOT_SA, iat=now - 7200, exp=now - 3600)
+
+    async def unread_body(request: Any) -> bytes:
+        pytest.fail("an unverified action request read its body")
+
+    monkeypatch.setattr(meeting_actions, "_read_body", unread_body)
+    response = _act(actions_rig, token, raw=b"not-json")
+    assert (response.status_code, response.json()) == (401, {"error": "unauthenticated"})
+    assert token is None or token not in response.text
+    assert list(actions_rig.real.pins.list(actions_rig.org)) == []
+    assert actions_rig.claims.find("mt_sec08", actions_rig.nonce).done == 0
+
+
+def test_SEC_08_actions_real_signed_positive_control_and_replay_writes_only_once(actions_rig: Any) -> None:
+    answers = [_act(actions_rig, actions_rig.token) for _ in range(3)]
+    assert [(a.status_code, a.json()["outcome"]) for a in answers] == [(200, "done")] * 3
+    assert len(list(actions_rig.real.pins.list(actions_rig.org))) == 1
+    assert actions_rig.claims.find("mt_sec08", actions_rig.nonce).done == 1
+
+
 # --- route guard ----------------------------------------------------------------------------------------------------
 
 
@@ -416,7 +500,7 @@ def test_SEC_08_api_has_only_covered_public_signed_routes_and_every_other_route_
     from tilo_api.access import PUBLIC_ROUTES
 
     health = {("GET", "/health"), ("GET", "/healthz"), ("GET", "/health/deps"), ("GET", "/healthz/deps")}
-    signed = {("POST", TICK)} | VOICE_SIGNED_ROUTES
+    signed = {("POST", TICK)} | VOICE_SIGNED_ROUTES | ACTIONS_SIGNED_ROUTES
 
     assert PUBLIC_ROUTES - health - signed == PUBLIC_NEEDING_A_SESSION, (
         "a new public route needs forged / tampered / missing / expired / replayed cases in this file, or a session"
