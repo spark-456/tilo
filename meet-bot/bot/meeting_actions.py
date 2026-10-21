@@ -28,6 +28,7 @@ _OUTCOMES = frozenset(
         "ambiguous_person",
         "cap_reached",
         "team_unclear",
+        "no_team",
         "agenda_full",
         "refused",
         "not_attending",

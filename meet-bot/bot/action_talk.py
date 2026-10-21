@@ -182,5 +182,6 @@ def result_line(action: PendingAction, ok: bool, outcome: str, info: dict[str, A
         "ambiguous_person": "More than one person in Tilo has that name, so I didn't change anything.",
         "cap_reached": "I've made the five changes I can in one call, so I didn't do that one.",
         "team_unclear": "I couldn't tell which team board to use, so I didn't add it.",
+        "no_team": "You're not on a team in Tilo yet, so there's no team board. I can pin it to your personal board.",
         "agenda_full": "This meeting's agenda is full, so I didn't add it.",
     }.get(outcome, "I couldn't do that just now, so nothing was changed.")
