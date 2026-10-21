@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { TiloApiError } from "../../../api/http";
+import { useSessionAuth } from "../../../api/sessionAuth";
 import type {
   DraftCard,
   MeetingMinutesApi,
   MinutesView,
   TranscriptView,
 } from "../../api/live/meetingMinutes";
+import { type Known, recipientNotes } from "../../shared/recipientNotes";
 import { SendToEveryone } from "./SendToEveryone";
 
 /** MINUTES-SCREEN: the server's stable refusal word, said in plain words; anything else keeps the general sentence. */
@@ -50,6 +52,9 @@ export function MeetingMinutes({
   // MINUTES-ME: the transcript loads on its own, so a long analysis never holds it (21 Oct: 8 minutes of "Working…")
   const [loadingTranscript, setLoadingTranscript] = useState(false);
   const [working, setWorking] = useState("Working…");
+  // MINUTES-ALL review: what the card's To list is checked against (the send list's, else the signed-in address)
+  const signedIn = useSessionAuth()?.user?.email ?? null;
+  const [known, setKnown] = useState<Known | null>(null);
   if (hidden || !["ended", "minuted"].includes(status)) return null;
   const run = async (action: () => Promise<void>, note = "Working…") => {
     setBusy(true);
@@ -175,13 +180,21 @@ export function MeetingMinutes({
                 onClick={() =>
                   void run(async () => {
                     setCards([]);
+                    setKnown(null);
                     setCards(await api.draft(id, recipients));
                   })
                 }
               >
                 Draft follow-up
               </button>
-              <SendToEveryone id={id} api={api} onCards={setCards} />
+              <SendToEveryone
+                id={id}
+                api={api}
+                onCards={(next, list) => {
+                  setKnown(list);
+                  setCards(next);
+                }}
+              />
             </>
           )}
         </>
@@ -236,7 +249,20 @@ export function MeetingMinutes({
         <section key={card.cardId} aria-label="T3 approval card">
           <h3>{card.subject}</h3>
           <p>Needs your approval · nothing sent</p>
-          <p>To: {card.recipients.join(", ")}</p>
+          <p>To, every address in full:</p>
+          <ul aria-label="To">
+            {card.recipients.map((to) => (
+              <li key={to}>
+                {to}
+                {recipientNotes(to, known ?? { ownerEmail: signedIn }).map((n) => (
+                  <span key={n} role="note">
+                    {" "}
+                    <strong>{n}</strong>
+                  </span>
+                ))}
+              </li>
+            ))}
+          </ul>
           <p style={{ whiteSpace: "pre-wrap" }}>{card.body}</p>
           <p>Review this card in Needs you to approve or decline.</p>
         </section>

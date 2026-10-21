@@ -6,12 +6,13 @@ nothing is sent until the Owner approves it in Needs you. Offline doubles, the r
 
 import json
 
-from _ppl11a_lib import OWNER, SAM
+import pytest
+from _ppl11a_lib import OWNER, PRIYA, SAM
 from test_FR_MTG_03_04_08_minutes_chain import analyze_confirm, chain, no_preview, post, rows, stored  # noqa: F401
 from test_FR_MTG_03_analysis_publication import integration  # noqa: F401
 from test_FR_MTG_03_owner_analysis_mode import owner_call  # noqa: F401
 from test_FR_MTG_03_owner_minutes_caller import caller_app  # noqa: F401
-from tilo_api import deps
+from tilo_api import deps, meeting_followup
 from tilo_memory.artifacts import Scope
 
 LIST = "/v1/meetings/mt_q4_plan/followup-recipients"
@@ -98,6 +99,36 @@ def test_MINUTES_ALL_an_address_that_is_not_one_bare_mailbox_is_refused_before_a
         response = post(c, "draft-followup", {"addresses": bad})
         assert response.status_code == 422, (bad, response.text)
     assert post(c, "draft-followup", {"transcript": True}).status_code == 422  # the transcript rides on a mail only
+    no_preview(c)
+
+
+def test_MINUTES_ALL_REVIEW_two_attendees_who_share_a_name_are_both_listed_by_their_own_address(chain):  # noqa: F811
+    """Security review fix 5: attendees are told apart by name AND address, so a shared name never drops a person."""
+    c = chain
+    current = c.rig.real.meetings.get(c.rig.org, "mt_q4_plan")
+    kept = [a for a in current.record["attendees"] if a["user"] == OWNER]
+    twins = [{"name": "Alex Lee", "user": PRIYA}, {"name": "Alex Lee", "user": SAM}]
+    c.rig.real.meetings.replace({**current.record, "attendees": kept + twins}, expected_version=current.version)
+    analyze_confirm(c)
+    mails = {c.rig.real.persons.get(c.rig.org, u).record["email"].lower() for u in (PRIYA, SAM)}
+    assert len(mails) == 2  # setup guard: two people, two addresses
+    rows_ = c.client.get(LIST, headers=c.headers).json()["recipients"]
+    alexes = [r for r in rows_ if r["name"] == "Alex Lee"]
+    assert [r["source"] for r in alexes] == ["invited", "invited"]
+    assert {r["email"] for r in alexes} == mails
+
+
+@pytest.mark.parametrize("screening", ["flagged", "unscreened"])
+def test_MINUTES_ALL_REVIEW_a_transcript_that_is_not_clean_is_never_attached(chain, monkeypatch, screening):  # noqa: F811
+    """Security review fix 2: asking for a flagged (or unscreened) transcript is a 409 and no draft at all."""
+    c = chain
+    analyze_confirm(c)
+    real = meeting_followup.meeting_transcript
+    monkeypatch.setattr(
+        meeting_followup, "meeting_transcript", lambda reader, mid: {**real(reader, mid), "screening": screening}
+    )
+    response = post(c, "draft-followup", {"addresses": ["guest@example.org"], "transcript": True})
+    assert (response.status_code, response.json()["detail"]) == (409, "transcript_unavailable")
     no_preview(c)
 
 

@@ -32,6 +32,7 @@ from typing import Any, Protocol
 
 from tilo_providers.interfaces import GenerateRequest, ModelProvider, SafetyProvider
 from tilo_providers.prompts import load_prompt
+from tilo_redact import redact
 
 from tilo_channels.autopilot import Autopilot, DraftContext, Preview
 from tilo_channels.drafting import (
@@ -60,6 +61,11 @@ TEXT_CAP, MAX_SUMMARY, MAX_DECISIONS, MAX_ACTIONS = 240, 8, 30, 60
 SUBJECT_CAP = 120
 MINUTES_CAP = 40_000  # chars of a minutes body and its answer: a maximal minutes is ~23.5k (BQ-MTG08B-5)
 MAX_TYPED = 50  # MINUTES-ALL: addresses the Owner reviewed on the send list, at most this many
+# MINUTES-ALL: the same strict pattern tilo-api checks (one bare ASCII mailbox, lower case, never a name or a list)
+_MAIL = re.compile(
+    r"(?=.{3,254}$)[a-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}"
+)
+TRANSCRIPT_LEFT_OUT = "\n\n(The transcript was not included: Tilo's safety check flagged it.)"
 TRANSCRIPT_CAP = 12_000  # MINUTES-ALL: chars of transcript lines a minutes email carries; more is cut, said in the mail
 TRANSCRIPT_LINE_CAP = 600  # chars of one transcript line in the mail
 MAX_LABEL_WORDS = 6  # a lead-in that is only a label: this many words, all of LABEL_WORDS (BQ-MTG08C-2)
@@ -114,8 +120,9 @@ def _transcript_block(lines: Sequence[Mapping[str, Any]]) -> str:
             continue
         ms = line.get("t_ms")
         seconds = max(0, int(ms) // 1000) if type(ms) is int else 0
-        speaker = _header(line.get("speaker") if isinstance(line.get("speaker"), str) else "Someone", 80) or "Someone"
-        text = " ".join(_header(line["text"], TRANSCRIPT_LINE_CAP).split())
+        named = line.get("speaker") if isinstance(line.get("speaker"), str) else "Someone"
+        speaker = " ".join(redact(_header(named, 80)).split()) or "Someone"  # the secret redactor again, here too
+        text = " ".join(redact(_header(line["text"], TRANSCRIPT_LINE_CAP)).split())
         row = f"[{seconds // 60}:{seconds % 60:02d}] {speaker}: {text}"
         if used + len(row) > TRANSCRIPT_CAP:
             cut = True
@@ -249,8 +256,12 @@ class MeetingFollowUp:
         attendees = {a.get("user") for a in meeting.get("attendees") or [] if isinstance(a, Mapping)}
         attendees.add(user_id)  # MINUTES-ME (21 Oct): the Owner may always send the minutes to themself
         picks = list(dict.fromkeys(recipients))
-        typed = [_address(a) if isinstance(a, str) else None for a in addresses]
-        if None in typed or len(typed) > MAX_TYPED or not isinstance(transcript, (list, tuple)):
+        typed = [a.strip().lower() if isinstance(a, str) else "" for a in addresses]
+        if (
+            not all(_MAIL.fullmatch(a) for a in typed)
+            or len(typed) > MAX_TYPED
+            or not isinstance(transcript, (list, tuple))
+        ):
             return None
         if not (picks or typed) or not all(isinstance(p, str) and p in attendees for p in picks):
             return None  # nobody picked, or someone who was no attendee: the Owner's audience is never changed
@@ -455,7 +466,7 @@ class MeetingFollowUp:
             room -= len(rest)
         flagged = self._safety.check("\n".join([*screened, subject]))["flagged"] or room < 0 or flagged
         if appendix and self._safety.check(appendix)["flagged"]:
-            flagged = True  # a flagged transcript makes the card say so; the Owner still decides
+            appendix = TRANSCRIPT_LEFT_OUT  # a flagged transcript is never sent: the minutes go alone and say so
         doc: dict[str, Any] = {"drafted_at": self._clock(), "flagged": flagged, "draft": None, "findings": []}
         # The Owner's confirmed text is the only source of facts; no instruction, so no commitment word is granted.
         checker = Checker(instruction="", thread=confirmed, cap=MINUTES_CAP)

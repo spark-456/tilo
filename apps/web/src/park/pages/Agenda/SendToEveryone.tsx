@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { TiloApiError } from "../../../api/http";
 import { type DraftCard, type MeetingMinutesApi, isMailbox } from "../../api/live/meetingMinutes";
+import { type Known, recipientNotes } from "../../shared/recipientNotes";
 
 interface Row {
   readonly key: number;
@@ -15,13 +16,15 @@ export function SendToEveryone({
   id,
   api,
   onCards,
-}: { id: string; api: MeetingMinutesApi; onCards: (cards: DraftCard[]) => void }) {
+}: { id: string; api: MeetingMinutesApi; onCards: (cards: DraftCard[], known: Known) => void }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [transcriptOk, setTranscriptOk] = useState(false);
   const [withTranscript, setWithTranscript] = useState(true);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [nextKey, setNextKey] = useState(0);
+  // The addresses the server has on record (the Owner's and the attendees'): anything else gets a note
+  const [known, setKnown] = useState<Known>({ ownerEmail: null, attendees: new Set() });
 
   const open = async () => {
     setBusy(true);
@@ -31,6 +34,14 @@ export function SendToEveryone({
       setRows(list.people.map((p, key) => ({ key, name: p.name, email: p.email ?? "" })));
       setNextKey(list.people.length);
       setTranscriptOk(list.transcript);
+      setKnown({
+        ownerEmail: list.people.find((p) => p.source === "owner")?.email ?? null,
+        attendees: new Set(
+          list.people.flatMap((p) =>
+            p.source !== "heard" && p.email ? [p.email.toLowerCase()] : [],
+          ),
+        ),
+      });
     } catch {
       setNote("The send list could not be loaded. Try again.");
     } finally {
@@ -62,7 +73,7 @@ export function SendToEveryone({
     setBusy(true);
     setNote("");
     try {
-      onCards(await api.draftToAll(id, addresses, transcriptOk && withTranscript));
+      onCards(await api.draftToAll(id, addresses, transcriptOk && withTranscript), known);
     } catch (e) {
       setNote(
         e instanceof TiloApiError && e.code === "transcript_unavailable"
@@ -101,7 +112,12 @@ export function SendToEveryone({
                     onChange={(e) => edit(row.key, e.target.value)}
                   />
                 </label>
-                {!row.email.trim() ? <span> no email on file</span> : null}{" "}
+                {!row.email.trim() ? <span> no email on file</span> : null}
+                {row.email.trim() && isMailbox(row.email.trim().toLowerCase())
+                  ? recipientNotes(row.email.trim().toLowerCase(), known).map((n) => (
+                      <strong key={n}> {n}</strong>
+                    ))
+                  : null}{" "}
                 <button
                   type="button"
                   aria-label={`Remove ${row.name || "this address"}`}
@@ -127,7 +143,12 @@ export function SendToEveryone({
           {!transcriptOk ? (
             <p>The transcript has not passed the safety check, so it cannot go with this email.</p>
           ) : null}
-          {missing.length ? <p>Left out, no email on file: {missing.join(", ")}.</p> : null}
+          {missing.length ? (
+            <p>
+              Left out, no email on file: {missing.join(", ")}. Meet gives Tilo names only, so add
+              emails for anyone who should get the minutes.
+            </p>
+          ) : null}
           <button type="button" disabled={busy} onClick={() => void draft()}>
             Draft one email
           </button>

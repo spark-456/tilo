@@ -66,13 +66,17 @@ def followup_recipients(w: Writer, artifacts: ArtifactStore, meeting_id: str) ->
 
     rows: list[dict[str, Any]] = [{"name": "Me", "email": email_of(w.actor), "source": "owner"}]
     me = w.stores.persons.get(w.org, w.actor)
-    seen = set(_BOT_NAMES) | {"me"}
+    seen = set(_BOT_NAMES) | {"me"}  # names already listed, for the people heard (a caption gives a name only)
     if me is not None and isinstance(me.record.get("display_name"), str):
         seen.add(me.record["display_name"].casefold())  # the Owner heard in their own call is already "Me"
+    listed: set[tuple[str, str | None]] = set()  # two attendees may share a name: they are told apart by address
     for attendee in meeting["attendees"]:
-        if attendee["user"] != w.actor and attendee["name"].casefold() not in seen:
-            seen.add(attendee["name"].casefold())
-            rows.append({"name": attendee["name"], "email": email_of(attendee["user"]), "source": "invited"})
+        email = email_of(attendee["user"])
+        key = (attendee["name"].casefold(), email)
+        if attendee["user"] != w.actor and key not in listed:
+            listed.add(key)
+            seen.add(key[0])
+            rows.append({"name": attendee["name"], "email": email, "source": "invited"})
     view = meeting_transcript(Reader(w.stores, artifacts, w.redact, w.org, w.actor, w.now), meeting_id)
     for line in view["utterances"] if view is not None else []:
         name = line["speaker"]
