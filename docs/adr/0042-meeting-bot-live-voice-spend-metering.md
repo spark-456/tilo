@@ -377,3 +377,9 @@ Acceptance tests are written first (`tests/MV-*`), names carry `FR_MTG_11_SEC_16
   bound it; the owner accepted it on 21 Oct 2026 rather than requiring each person to approve in Tilo while signed in.
 - **Time zone.** Spoken times are resolved in `TILO_MEETING_TZ` (default `Asia/Kolkata`) from the payload's
   `now_local`; the read-back says the resolved day and time before anything is written.
+- **Reads (21 Oct evening, owner via supervisor).** Two reads on the same route, claim and OIDC, never counted toward
+  the writes: `context` (meeting_context.py: the owner's compact workspace, titles and names only; one-on-one their
+  own items, a group only what their teams share, and the bot narrows it to what the people present may hear) and
+  `find_times` (meeting_times.py: up to three free starts from the owner's own Google Calendar, WT-05 recorded, their
+  Tilo calendar and meetings, and teammates' Tilo busy time by PE-04; at most five per attend). A teammate's Google
+  account is never read (WT-01; BQ-MTG-TIMES-TEAM). Booking a time is an ordinary create_meeting with its read-back.

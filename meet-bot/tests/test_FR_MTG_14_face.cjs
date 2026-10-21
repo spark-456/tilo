@@ -57,8 +57,29 @@ test("FR_MTG_14_six_distinct_drawings_and_no_thinking_without_model", () => {
   assert.equal(new Set(hashes).size, 6);
   rig.face.event("thinking");
   assert.notEqual(rig.face.state, "thinking");
-  assert.equal(rig.canvas.width, 320);
-  assert.equal(rig.canvas.height, 240);
+  // Owner 21 Oct: "very blurry". The frame is what Meet sends (16:9, 1280 x 720), the scene drawn 3x, never upscaled.
+  assert.equal(rig.canvas.width, 1280);
+  assert.equal(rig.canvas.height, 720);
+});
+test("FR_MTG_14_sharp_frame_and_every_label_inside_the_safe_area_of_every_tile", () => {
+  for (const event of ["idle", "heard", "model_start", "audio_start", "success", "failure"]) {
+    const rig = face();
+    rig.face.event(event);
+    rig.operations.length = 0;
+    rig.face.tick(1000);
+    const scale = rig.operations.find((op) => op[0] === "setTransform" && op[1] === 3);
+    assert.deepEqual(scale, ["setTransform", 3, 0, 0, 3, 160, 0]); // the 320 x 240 scene, 3x, centred in 1280 x 720
+    const label = rig.operations.find((op) => op[0] === "fillText");
+    const pill = rig.operations.filter((op) => op[0] === "roundRect").at(-1);
+    // A square (720 x 720) or 9:16 tile keeps only the middle of the frame: scene x 93..227 holds the label.
+    for (const x of [pill[1], pill[1] + pill[3], label[2]]) assert.ok(x >= 93 && x <= 227, `${event}: ${x}`);
+    assert.ok(pill[2] >= 4 && pill[2] + pill[4] <= 236, `${event}: label inside the frame vertically`);
+  }
+});
+test("FR_MTG_14_the_camera_stays_at_15_fps", async () => {
+  const rig = face();
+  const stream = await rig.sandbox.navigator.mediaDevices.getUserMedia({ video: true });
+  assert.equal(stream.fps, 15); // the bot's CPU is shared with Chrome and the voice: a mostly still scene needs no more
 });
 test("FR_MTG_14_audio_events_change_state_immediately_and_idle_blinks_within_eight_seconds", () => {
   const rig = face();

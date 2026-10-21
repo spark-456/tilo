@@ -103,14 +103,19 @@ def _sender_name(ctx: Ctx, sender: Any) -> str | None:
 
 
 def _record(ctx: Ctx, world: str, tool: str, connected_at: str) -> None:
-    """WT-05: one `data.transfer` (in) for an ok read, fixed text only, in the person's own Desk world."""
+    record_read(ctx.events, ctx.user, world, tool, connected_at)
+
+
+def record_read(events: Any, user: str, world: str, tool: str, connected_at: str) -> None:
+    """WT-05: one `data.transfer` (in) for an ok read, fixed text only, in the person's own Desk world (the morning
+    brief's reads and the meeting bot's free-time read of the meeting owner's calendar)."""
     connector = CONNECTOR_OF[tool]
-    ctx.events.append(
+    events.append(
         world,
         {
-            "id": event_parts.new_part_id(), "type": "data.transfer", "actor": ctx.user, "target": world,
+            "id": event_parts.new_part_id(), "type": "data.transfer", "actor": user, "target": world,
             "summary": SUMMARIES[connector], "vis": [], "severity": "info",
-            "authz": {"by": "person", "ref": ctx.user, "at": connected_at},
+            "authz": {"by": "person", "ref": user, "at": connected_at},
             "data": {"connector": connector, "action_type": tool, "direction": "in", "artifact": None,
                      "outbox_id": None, "risk_tier": "T1"},
         },
