@@ -199,3 +199,14 @@ def test_MTG_ACTIONS_1_deployed_create_pin_and_create_meeting_write_through_the_
     assert made.status_code == 200, made.text
     assert len(list(deployed.real.pins.list(deployed.org))) == 2
     assert len([m for m in deployed.real.meetings.list(deployed.org) if m.record["id"] != MEETING]) == 1
+
+
+def test_MTG_ACTIONS_1_a_team_pin_for_someone_on_no_team_says_so_and_writes_nothing(rig):
+    """Live 21 Oct 19:17: the owner is on no team in the org; Tilo said "I couldn't tell which team board to use"."""
+    me = rig.stored("persons", OWNER)
+    rig.real.persons.replace({**me, "memberships": []}, expected_version=rig.version_of("persons", OWNER))
+    answer = _run(rig, "create_pin", {"title": "Unfinished demo video", "board": "team"})
+    assert answer.status_code == 409 and answer.json()["outcome"] == "no_team"
+    assert list(rig.real.pins.list(rig.org)) == []
+    personal = _run(rig, "create_pin", {"title": "Unfinished demo video", "board": "personal"})
+    assert personal.status_code == 200, personal.text

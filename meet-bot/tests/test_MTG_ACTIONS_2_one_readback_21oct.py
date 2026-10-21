@@ -13,7 +13,7 @@ import json
 from test_MTG_ACTIONS_1_bot_actions import _brain, _session
 
 from bot import action_talk
-from bot.brain import FAILED_QUIET_S, QUICK_PROMPT
+from bot.brain import QUICK_PROMPT, SETTLED_QUIET_S
 from bot.captions import Utterance
 from bot.meeting_actions import ActionResult
 from bot.mock_llm import ScriptedLLM
@@ -59,12 +59,12 @@ def test_ONE_READBACK_the_same_proposal_from_the_partial_and_the_final_caption_i
 
 def test_ONE_READBACK_after_a_failed_action_the_model_does_not_improvise_but_a_new_request_is_read_back():
     b, _ = _brain({"reply": "I had a technical hiccup there, shall we try again?"}, PROPOSE)
-    b.action_failed_at = 30.0
+    b.action_settled_at = 30.0
     assert b.quick_reply([Utterance("Asha Rao", "what happened with that one", 33.0)], 33.0) is None
     retry = b.quick_reply([Utterance("Asha Rao", "please try adding demo video again", 36.0)], 36.0)
     assert retry is not None and retry.text.startswith('Add "Demo video"')
     b.llm = ScriptedLLM([json.dumps({"reply": "It's a quarter past three."})])
-    later = 30.0 + FAILED_QUIET_S + 1
+    later = 30.0 + SETTLED_QUIET_S + 1
     assert b.quick_reply([Utterance("Asha Rao", "what time is it right now", later)], later) is not None
 
 
@@ -89,7 +89,7 @@ def test_ONE_READBACK_one_failure_line_per_attempt_never_the_same_words_twice_in
     assert len(calls) == 3 and len(s.said) == 3  # one line per attempt
     assert all(a != b for a, b in zip(s.said, s.said[1:], strict=False))
     assert all("nothing was changed" in line.lower() or "didn't go through" in line.lower() for line in s.said)
-    assert s.brain.action_failed_at > -1e9  # the quiet window after a failure is open
+    assert s.brain.action_settled_at > -1e9  # the quiet window after a failure is open
 
 
 def test_ONE_READBACK_a_reply_mentions_the_agenda_only_when_the_question_did():
