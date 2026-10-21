@@ -150,3 +150,52 @@ def test_MTG_ACTIONS_1_off_by_default_is_a_plain_404(rig, monkeypatch):
     monkeypatch.delenv("TILO_MEETING_ACTIONS")
     assert _run(rig, "create_pin", {"title": "x", "board": "personal"}).status_code == 404
     assert list(rig.real.pins.list(rig.org)) == []
+
+
+# -- the deployed wiring (live failure 21 Oct 15:22 IST): the bot's call carries no sign-in --------------------------
+
+
+@pytest.fixture()
+def deployed(rig, monkeypatch):
+    """The rig as a Cloud Run revision has it: NO principal, store, event writer, Desk or redactor override, so every
+    seam resolves the way production does (`deps._people_stores`, `durable_store.deployed`, the real redactor). The
+    meeting is mid-call (`joining`), as it was when the owner asked. Only the clock, the verifier and the claim
+    registry stay faked."""
+    from tilo_api import deps, durable_store  # noqa: PLC0415
+
+    monkeypatch.setenv("K_SERVICE", "tilo-api")
+    for seam in (
+        deps.get_current_principal,
+        deps.get_people_stores,
+        deps.get_event_writer,
+        deps.get_desk_worlds,
+        deps.get_redactor,
+        deps.get_store,
+    ):
+        rig.app.dependency_overrides.pop(seam, None)
+    store = rig.event_store
+    monkeypatch.setattr(store, "load_path", lambda params: store, raising=False)
+    monkeypatch.setattr(deps, "_people_stores", rig.stores)
+    monkeypatch.setattr(durable_store, "deployed", lambda: (store, rig.events))
+    stored = rig.stored("meetings", MEETING)
+    rig.real.meetings.replace({**stored, "status": "joining"}, expected_version=rig.version_of("meetings", MEETING))
+    return rig
+
+
+def test_MTG_ACTIONS_1_deployed_add_agenda_item_mid_call_writes_through_the_real_seams(deployed):
+    answer = _run(deployed, "add_agenda_item", {"title": "Finish up the demo video"})
+    assert answer.status_code == 200, answer.text
+    agenda = deployed.stored("meetings", MEETING)["agenda"]
+    assert [a["title"] for a in agenda] == ["Kick-off", "Finish up the demo video"]
+
+
+def test_MTG_ACTIONS_1_deployed_create_pin_and_create_meeting_write_through_the_real_seams(deployed):
+    pinned = _run(deployed, "create_pin", {"title": "Submission checklist", "board": "personal"})
+    assert pinned.status_code == 200, pinned.text
+    team = _run(deployed, "create_pin", {"title": "Launch date moved", "board": "team"}, speaker="Priya Nair")
+    assert team.status_code == 200, team.text
+    args = {"title": "Follow-up", "start": "2026-10-23T09:30:00.000Z", "minutes": 30, "recording_attested": True}
+    made = _run(deployed, "create_meeting", args)
+    assert made.status_code == 200, made.text
+    assert len(list(deployed.real.pins.list(deployed.org))) == 2
+    assert len([m for m in deployed.real.meetings.list(deployed.org) if m.record["id"] != MEETING]) == 1
