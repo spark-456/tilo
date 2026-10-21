@@ -23,6 +23,7 @@ from datetime import UTC, date, datetime
 from typing import Annotated, Any
 
 import tilo_planning.budget as budget
+import tilo_planning.grant as plan_grant
 import tilo_policy
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -41,9 +42,9 @@ from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import ProviderError
 from tilo_providers.interfaces import SafetyProvider
 from tilo_providers.replay import ReplayMissError
-from tilo_providers.router import Deadline, Router, RouterDeadlineError
+from tilo_providers.router import Deadline, Router, RouterDeadlineError, call_floor
 
-from tilo_api import deps, makers, runs
+from tilo_api import deps, makers, runs, spend, spend_units
 from tilo_api.intake_deadline import INTAKE_DEADLINE_DETAIL, load_intake_deadline
 from tilo_api.people_writes import _capped_body
 from tilo_api.skills_route import SkillContext, get_skill_context
@@ -491,7 +492,8 @@ def get_approaches(
     task = _owned(store, task_id, principal)
     deps.refuse_if_replay_only(flags)  # NFR-24: this reaches the Director
     try:
-        credit_usd = deps.providers_config().prices.credit_usd  # before any model call is spent
+        config = deps.providers_config()
+        credit_usd = config.prices.credit_usd  # before any model call is spent
     except ProviderConfigError as exc:
         logger.warning("provider config unavailable: %s", exc)
         raise HTTPException(status_code=503, detail="The model configuration is not available.") from exc
@@ -506,7 +508,9 @@ def get_approaches(
     # Default (PRD silent, BQ-83): the cheapest approach is recommended; ties keep the Director's order.
     recommended = min(approaches, key=lambda a: a["credits"]["max"])["id"]
     floor = deps.min_run_grant()
-    shown = [_floored(a, floor) for a in approaches]  # BQ-BUDGET-FLOOR-1: stored as the Director made them
+    # BQ-BUDGET-FLOOR-1 and RUN-SPEED: shown (so granted on Start) at least the floor and what its plan needs; stored
+    # as the Director made them
+    shown = [_floored(a, max(floor, _plan_floor(task.brief, a, config, credit_usd))) for a in approaches]
     return {
         "task_id": task_id,
         "approaches": shown,
@@ -549,6 +553,21 @@ def _matched(
     except Exception as exc:  # noqa: BLE001
         logger.warning("skill match not kept: %s", type(exc).__name__)
         return task
+
+
+def _plan_floor(brief: dict[str, Any], approach: dict[str, Any], config: Any, credit_usd: float) -> float:
+    """RUN-SPEED (live, 21 Oct: a nine-unit run failed on a 60-credit grant): the credits the approach's plan needs so
+    every unit can afford a call (`tilo_planning.grant`), never above one run's ceiling or the per-user lifetime cap.
+    0 when it cannot be priced: the estimate and the floor stand, as before."""
+    try:
+        need = plan_grant.sketch_need(
+            brief, approach, lambda role: call_floor(config, role, plan_grant.NOMINAL_INPUT_CHARS)
+        )
+        user_cap = deps.get_spend_caps().uid_lifetime_minor / spend_units.INR_MINOR_PER_USD / credit_usd
+        return max(0.0, min(need, deps.budget_cap_ceiling(), user_cap))
+    except (spend.SpendConfigError, OSError, ValueError, KeyError, TypeError, ZeroDivisionError) as exc:
+        logger.warning("the plan's need could not be priced: %s", type(exc).__name__)
+        return 0.0
 
 
 def _floored(approach: dict[str, Any], floor: float) -> dict[str, Any]:
