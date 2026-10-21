@@ -20,6 +20,7 @@ from tilo_api import cors as _cors
 from tilo_api import deps as _deps
 from tilo_api import dev as _dev
 from tilo_api import durable_store as _durable_store
+from tilo_api import meeting_actions as _meeting_actions
 from tilo_api import meeting_host_routes as _meeting_host_routes
 from tilo_api import meeting_minutes_flag as _meeting_minutes_flag
 from tilo_api import meeting_voice_meter as _meeting_voice_meter
@@ -189,6 +190,9 @@ app.include_router(_push_router)
 app.include_router(_connectors_list_router)
 app.include_router(_schedules.router)
 app.include_router(_meeting_voice_meter.router)  # ADR-0042: public to the gate, inert until TILO_VOICE_METER=1
+app.include_router(
+    _meeting_actions.router
+)  # ADR-0042 amendment 1: public to the gate, inert until TILO_MEETING_ACTIONS=1
 app.include_router(_nudge_sweep.router)  # FR-PA-15b: GET /v1/nudges, POST /v1/nudges/{id}/snooze
 app.include_router(_team_router)
 app.include_router(_memory_routes.router)
