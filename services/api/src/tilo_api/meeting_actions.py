@@ -16,6 +16,9 @@ person through the same people writes, access oracle and Desk events a signed-in
 At most five writes per call (`MAX_ACTIONS`); a key already answered gets the same answer and writes nothing. The
 accepted risk: a caption name is the identity, so a participant who renames themselves could act as someone else.
 
+One read, `context` (`meeting_context.build`): the meeting OWNER's workspace, compact and titles only; one-on-one their
+own items too, in a group call only what their teams share. It never counts toward the writes and is never replayed.
+
 INERT until the owner sets `TILO_MEETING_ACTIONS=1`: after bearer syntax is checked, anything else is a plain 404."""
 
 from __future__ import annotations
@@ -34,7 +37,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError, 
 from tilo_harness.schedule import tick_caller_ok
 from tilo_people.names import match_name
 
-from tilo_api import deps, ephemeral, meeting_action_claims, schedules
+from tilo_api import deps, ephemeral, meeting_action_claims, meeting_context, schedules, team_store
 from tilo_api.meeting_action_claims import MAX_ACTIONS, ActionClaim, ActionClaims
 from tilo_api.people_events import WorkEvents
 from tilo_api.people_meetings import MeetingEditIn, edit_meeting
@@ -87,16 +90,25 @@ class MeetingArgs(_Closed):
         return value
 
 
+class ContextArgs(_Closed):
+    one_on_one: StrictBool  # the bot's own count of the people in the call: a group gets only what the team shares
+
+
 class ActionRequest(_Closed):
     meeting_id: Annotated[str, Field(pattern=r"^mt_[A-Za-z0-9_]{1,64}$")]
     claim: Annotated[str, Field(min_length=1, max_length=64)]
     key: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
     speaker: Annotated[str, Field(min_length=1, max_length=80)] | None = None
-    action: Literal["create_pin", "add_agenda_item", "create_meeting"]
+    action: Literal["create_pin", "add_agenda_item", "create_meeting", "context"]
     args: dict[str, Any]
 
 
-_ARGS: dict[str, type[_Closed]] = {"create_pin": PinArgs, "add_agenda_item": AgendaArgs, "create_meeting": MeetingArgs}
+_ARGS: dict[str, type[_Closed]] = {
+    "create_pin": PinArgs,
+    "add_agenda_item": AgendaArgs,
+    "create_meeting": MeetingArgs,
+    "context": ContextArgs,
+}
 
 
 def _out(status: int, body: dict[str, Any], action: str, outcome: str) -> JSONResponse:
@@ -174,6 +186,22 @@ def _decide(request: Request, body: ActionRequest, args: _Closed) -> JSONRespons
     claim = registry.find(body.meeting_id, body.claim) if registry is not None else None
     if claim is None:  # absent, wrong nonce, another attend's, expired: one answer
         return _out(409, {"outcome": "not_attending"}, body.action, "not_attending")
+    if isinstance(args, ContextArgs):  # a read: no lock, no cap, no replay; always the owner's, never the speaker's
+        try:
+            context = meeting_context.build(
+                _writer(request, claim.uid, claim.org_id),
+                _seam(request, deps.get_source_owners),
+                _seam(request, deps.get_store),
+                (team_store.team_reader(request.app.dependency_overrides)() or team_store.TeamState()).names,
+                one_on_one=args.one_on_one,
+            )
+        except Refusal as refusal:
+            return _out(404 if refusal.status_code == 404 else 409, {"outcome": "refused"}, body.action, "refused")
+        except Exception as exc:  # a store or seam failure: the type and status only
+            seam = exc.status_code if isinstance(exc, HTTPException) else "-"
+            logger.warning("meeting context failed (%s %s)", type(exc).__name__, seam)
+            return _out(503, {"outcome": "unavailable"}, body.action, "unavailable")
+        return _out(200, {"outcome": "done", "action": "context", "context": context}, body.action, "done")
     with claim.lock:
         if body.key in claim.replies:  # the same request again: the same answer, nothing written twice
             status, answer = claim.replies[body.key]

@@ -79,6 +79,7 @@ _QUESTION_WORDS = frozenset(
     }
 )
 STATUS_EVERY_S = 3.0  # how often to check who is here before the meeting has started for the bot
+WORKSPACE_REFRESH_S = 120.0  # how often the owner's workspace (pins, meetings, team) is read again in a call
 
 
 def build_knowledge(cfg: Config, routes: list[str]) -> KnowledgeBase:
@@ -368,8 +369,31 @@ class LiveSession:
                 line = action_talk.FAILED_AGAIN_LINE
         else:
             self.brain.done_actions.append(pending)  # confirmed: the only action Tilo may later say it did
+            self._workspace_at = 0.0  # the board or agenda changed: read the workspace again
         self._failure_said = None if result.ok else line
         self._say(pending, line)
+
+    # -- the owner's workspace (read-only context for answers) ----------------------------------------------------
+    def _maybe_refresh_workspace(self, now: float) -> None:
+        """Read the owner's workspace in the background: at the start, every `WORKSPACE_REFRESH_S`, after a confirmed
+        action, and whenever the call turns from one-on-one to a group or back (a group never sees personal items)."""
+        if self.actions is None or not hasattr(self.actions, "context"):
+            return
+        task = getattr(self, "_workspace_task", None)
+        if task is not None and not task.done():
+            return
+        sole = self.brain.sole_human
+        if now < getattr(self, "_workspace_at", 0.0) and sole == getattr(self, "_workspace_sole", None):
+            return
+        self._workspace_at, self._workspace_sole = now + WORKSPACE_REFRESH_S, sole
+        self._workspace_task = asyncio.get_running_loop().create_task(self._refresh_workspace(sole))
+
+    async def _refresh_workspace(self, sole: bool) -> None:
+        try:
+            data = await asyncio.to_thread(self.actions.context, sole)
+        except Exception:  # a failed read leaves Tilo answering from the call alone
+            data = None
+        self.brain.workspace = (sole, data) if data is not None else None
 
     def _say(self, pending: action_talk.PendingAction, text: str) -> None:
         msg = ChatMessage("direct_reply", f"action {pending.key}", text, None)
@@ -971,6 +995,8 @@ class LiveSession:
                     await self._read_chat()
                     if self.leave_requested:
                         return
+                if self.gate_at is not None:
+                    self._maybe_refresh_workspace(now)
 
                 # --- admitting (frequent, cheap) -----------------------------------------------------------------
                 if self.auto_admit and now >= next_admit:
@@ -1104,7 +1130,7 @@ class LiveSession:
     async def _shutdown(self) -> None:
         pending = [
             task
-            for name in ("_out_task", "_speech_task", "_speech_waiter", "_preparation_task")
+            for name in ("_out_task", "_speech_task", "_speech_waiter", "_preparation_task", "_workspace_task")
             if (task := getattr(self, name, None)) is not None
         ]
         for task in pending:
