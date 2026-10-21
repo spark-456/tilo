@@ -1,8 +1,13 @@
 // FR-MTG-14: local canvas camera. State comes only from explicit runtime events.
 (() => {
+  // Owner 21 Oct: "very blurry". The frame is what Meet sends (16:9, 1280 x 720); the 320 x 240 scene is vector, drawn
+  // SCALE times and centred, so nothing is upscaled. Meet crops small tiles to a square or 9:16 middle: labels stay in it.
+  const W = 1280;
+  const H = 720;
+  const SCALE = H / 240;
   const canvas = document.createElement("canvas");
-  canvas.width = 320;
-  canvas.height = 240;
+  canvas.width = W;
+  canvas.height = H;
   const ctx = canvas.getContext("2d");
   let models = 0;
   let audio = false;
@@ -12,6 +17,7 @@
   // Decay: "listening", "happy" and "sad" last FEELING_MS after the event that set them; "thinking" ends with
   // model_end, and THINKING_MS only guards against a lost model_end. Decay only ever returns to idle.
   const FEELING_MS = 4000;
+  const SAFE = 134; // scene units: the middle of the frame a 9:16 tile keeps (720 * 9 / 16 / SCALE)
   const THINKING_MS = 30000;
   const clock = () => (globalThis.performance ? performance.now() : Date.now());
   let feelingAt = 0;
@@ -73,8 +79,10 @@
       ctx.fillStyle = color;
       ctx.fill();
     };
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = "#ECFBC2";
-    ctx.fillRect(0, 0, 320, 240);
+    ctx.fillRect(0, 0, W, H);
+    ctx.setTransform(SCALE, 0, 0, SCALE, (W - 320 * SCALE) / 2, 0);
     ctx.fillStyle = "rgba(11,11,12,.16)";
     ctx.beginPath();
     ctx.ellipse(160, 174, 38, 5, 0, 0, Math.PI * 2);
@@ -161,14 +169,24 @@
     ctx.fillRect(30, 194, 260, 16);
     polygon([[208, 161], [244, 161], [238, 176], [200, 176]], "#F4F4F1");
     box(84, 156, 16, 18, 4, "#C8F23A");
-    box(12, 38, 116, 20, 10, "rgba(11,11,12,.72)");
+    // The status pill: top centre, sized to its text, inside the middle 134 x 240 any Meet tile keeps (SAFE).
+    const text = ({ idle: "Tilo · notetaker", listening: "Listening", thinking: "Thinking", speaking: "Speaking", happy: "All noted", sad: "Lost the audio" })[s];
+    let size = 10;
+    let width = 0;
+    for (; size >= 7; size--) {
+      ctx.font = `600 ${size}px sans-serif`;
+      width = ctx.measureText(text)?.width ?? text.length * size * 0.56;
+      if (width + 22 <= SAFE) break;
+    }
+    const pill = Math.min(SAFE, width + 22);
+    const left = 160 - pill / 2;
+    box(left, 8, pill, 20, 10, "rgba(11,11,12,.72)");
     ctx.fillStyle = "#C8F23A";
     ctx.beginPath();
-    ctx.arc(24, 48, 3, 0, Math.PI * 2);
+    ctx.arc(left + 11, 18, 3, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "#FFFFFF";
-    ctx.font = "600 10px sans-serif";
-    ctx.fillText(({ idle: "Tilo · notetaker", listening: "Listening", thinking: "Thinking", speaking: "Speaking", happy: "All noted", sad: "Lost the audio" })[s], 33, 51);
+    ctx.fillText(text, left + 18, 18 + size * 0.35, pill - 24);
   }
   const face = {
     canvas,
