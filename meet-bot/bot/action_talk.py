@@ -109,6 +109,16 @@ def readback(action: PendingAction) -> str:
     )
 
 
+def done_line(action: PendingAction) -> str:
+    """An action tilo-api confirmed this call, in fixed words: the only way Tilo ever says it did something."""
+    title = action.args["title"]
+    if action.name == "create_pin":
+        return f'Yes, "{title}" is pinned to your {action.args["board"]} board.'
+    if action.name == "add_agenda_item":
+        return f'Yes, "{title}" is on this meeting\'s agenda.'
+    return f'Yes, "{title}" is on your Agenda for {_when(action.args["start"])}.'
+
+
 def _who(speaker: str) -> str:
     return speaker.removesuffix(" (chat)").strip().lower()
 
