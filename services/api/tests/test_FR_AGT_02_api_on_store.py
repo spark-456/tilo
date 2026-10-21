@@ -61,7 +61,16 @@ def test_FR_AGT_02_an_api_run_hands_run_plan_the_store_scope_archive_and_redacto
 
     (kw,) = seen
     rig, world_id = run_flow.rig, run_flow.world_id
-    assert kw.get("artifacts") is rig.store, "run_plan puts outputs on the store the seam gives"
+    store = kw.get("artifacts")
+    # DOCS-OUT / RESULT-LIVE: a run gets a run-local view of the seam's store (`with_upload_text`, `with_screener`), the
+    # same store over the same backends and redactor, so what the run puts is in the seam's store and nowhere else.
+    assert store is rig.store or (
+        type(store) is type(rig.store)
+        and store._meta is rig.meta
+        and store._blobs is rig.blobs
+        and store._redact is rig.store._redact
+    ), "run_plan puts outputs on the store the seam gives (itself, or a view sharing its backends)"
+    assert rig.store.head(run_flow.scope(), run_flow.artifact_of("U1")) is not None, "read back from the seam's store"
     assert kw.get("redact") is rig.redactor, "and passes on the shared secret redactor (MF-06)"
     scope = kw.get("scope")
     assert (scope.org_id, scope.world_id, scope.owner) == (deps.ORG_ID, world_id, FLOW_USER), "the run's Scope"
