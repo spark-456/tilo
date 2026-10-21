@@ -77,8 +77,31 @@ for (const time of ["day", "night"] as const) {
         await expect(tab).toHaveAttribute("rel", "noopener noreferrer");
       }
 
-      // No bleed: the view covers the whole map area inside its 1px border, and is opaque.
+      // The World stays in view (owner, 21 Oct): on a desktop the browser is a solid card in the map's corner with the
+      // map round it; Expand makes it take the map area over, which the rest of this test checks.
       const map = page.locator(".park-world-map");
+      if (size.width > 760) {
+        await expect(view).toHaveClass(/tilo-bv--card/);
+        const [card, area] = [await view.boundingBox(), await map.boundingBox()];
+        expect(card && area).toBeTruthy();
+        if (card && area) {
+          expect(card.x).toBeGreaterThanOrEqual(area.x + 8);
+          expect(card.x + card.width).toBeLessThanOrEqual(area.x + area.width - 8);
+          expect(card.width).toBeLessThanOrEqual(area.width - 120); // the map shows beside it
+          expect(card.y + card.height).toBeLessThanOrEqual(area.y + area.height);
+        }
+        expect(await view.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toMatch(
+          /rgba\(.*,\s*0(\.\d+)?\)$/,
+        );
+        await expect(view.locator(".tilo-bv__shot img")).toBeVisible();
+        await page.screenshot({ path: info.outputPath(`browser-card-${time}-${size.name}.png`) });
+        await view.getByRole("button", { name: "Expand" }).click();
+        await expect(view).toHaveClass(/tilo-bv--takeover/);
+        await expect(view.getByRole("button", { name: "Shrink" })).toBeVisible();
+      } else {
+        await expect(view.getByRole("button", { name: "Expand" })).toHaveCount(0);
+      }
+      // No bleed: expanded, the view covers the whole map area inside its 1px border, and is opaque.
       const [viewBox, mapBox] = [await view.boundingBox(), await map.boundingBox()];
       expect(viewBox && mapBox).toBeTruthy();
       if (viewBox && mapBox) {
@@ -204,7 +227,7 @@ for (const size of SIZES.filter((s) => s.width > 760)) {
     const map = page.locator(".park-world-map");
     const mapBox = await map.boundingBox();
 
-    // Docked by default: over the map, with a grip and no Dock.
+    // In the map's corner by default, with a grip and no Dock.
     await expect(view).toHaveCSS("position", "absolute");
     const grip = view.getByRole("button", { name: "Move the browser" });
     await expect(grip).toBeVisible();
@@ -276,15 +299,16 @@ for (const size of SIZES.filter((s) => s.width > 760)) {
     await page.getByRole("button", { name: /Show Tilo browser/ }).click();
     await expect(view).toHaveCSS("position", "fixed");
 
-    // Dock puts it back over the whole map, and forgets the place.
+    // Dock puts it back in the map's corner, and forgets the place.
     await view.getByRole("button", { name: "Dock" }).click();
     await expect(view).toHaveCSS("position", "absolute");
+    await expect(view).toHaveClass(/tilo-bv--card/);
     const docked = await view.boundingBox();
     expect(docked && mapBox).toBeTruthy();
     if (docked && mapBox) {
-      expect(Math.abs(docked.x - mapBox.x)).toBeLessThanOrEqual(2);
-      expect(Math.abs(docked.width - mapBox.width)).toBeLessThanOrEqual(2);
-      expect(Math.abs(docked.height - mapBox.height)).toBeLessThanOrEqual(2);
+      expect(docked.x).toBeGreaterThanOrEqual(mapBox.x);
+      expect(docked.x + docked.width).toBeLessThanOrEqual(mapBox.x + mapBox.width);
+      expect(docked.width).toBeLessThan(mapBox.width - 100);
     }
     await expect(grip).toBeFocused();
     await page.reload();

@@ -17,6 +17,8 @@ from zoneinfo import ZoneInfo
 
 ACTIONS = ("create_pin", "add_agenda_item", "create_meeting")
 CONFIRM_S = 45.0  # a yes must follow the read-back this soon
+ANSWER_ECHO_S = 8.0  # live 21 Oct: one spoken yes arrives as a partial caption, then its final one
+FAILED_AGAIN_LINE = "That still didn't go through, so nothing was changed."  # a second failure in a row, reworded
 _YES = re.compile(
     r"^\s*(yes|yeah|yep|yup|sure|ok|okay|go ahead|do it|please do|correct|confirm|that's right|right|yes please)\b",
     re.I,
@@ -107,15 +109,51 @@ def readback(action: PendingAction) -> str:
     )
 
 
+def done_line(action: PendingAction) -> str:
+    """An action tilo-api confirmed this call, in fixed words: the only way Tilo ever says it did something."""
+    title = action.args["title"]
+    if action.name == "create_pin":
+        return f'Yes, "{title}" is pinned to your {action.args["board"]} board.'
+    if action.name == "add_agenda_item":
+        return f'Yes, "{title}" is on this meeting\'s agenda.'
+    return f'Yes, "{title}" is on your Agenda for {_when(action.args["start"])}.'
+
+
+def _who(speaker: str) -> str:
+    return speaker.removesuffix(" (chat)").strip().lower()
+
+
 def answer(action: PendingAction | None, speaker: str, text: str, *, one_on_one: bool) -> str | None:
     """'yes', 'no' or None for one heard line: only the person Tilo asked (or anyone one-on-one), only in time."""
     if action is None or time.monotonic() - action.at > CONFIRM_S:
         return None
-    if not one_on_one and speaker.removesuffix(" (chat)").strip().lower() != action.speaker.lower():
+    if not one_on_one and _who(speaker) != action.speaker.lower():
         return None
     if _NO.match(text):
         return "no"
     return "yes" if _YES.match(text) else None
+
+
+@dataclass(frozen=True)
+class Answered:
+    """A yes or no Tilo took, from whom and when."""
+
+    speaker: str
+    at: float = field(default_factory=time.monotonic)
+
+
+def repeats_answer(last: Answered | None, speaker: str, text: str, *, one_on_one: bool) -> bool:
+    """Another caption of a yes or no Tilo already took (the live partial, then the final): never a new question."""
+    if last is None or time.monotonic() - last.at > ANSWER_ECHO_S or not (_YES.match(text) or _NO.match(text)):
+        return False
+    return one_on_one or _who(speaker) == last.speaker.lower()
+
+
+def same_request(a: PendingAction | None, b: PendingAction) -> bool:
+    """The same action and arguments, still waiting for its yes: one read-back, whichever caption asked first."""
+    if a is None or time.monotonic() - a.at > CONFIRM_S or a.name != b.name:
+        return False
+    return {k: str(v).lower() for k, v in a.args.items()} == {k: str(v).lower() for k, v in b.args.items()}
 
 
 def request_args(action: PendingAction) -> dict[str, Any]:

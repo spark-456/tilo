@@ -345,6 +345,7 @@ class LiveSession:
         if said is None:
             return False
         brain.pending_action = None
+        brain.action_answer = action_talk.Answered(pending.speaker)  # its other captions are not questions
         brain.mark_handled(u)
         if said == "no":
             ops.warning("stage action name=%s outcome=declined", pending.name)
@@ -357,7 +358,15 @@ class LiveSession:
         result = await asyncio.to_thread(
             self.actions.run, pending.name, action_talk.request_args(pending), pending.api_speaker, pending.key
         )
-        self._say(pending, action_talk.result_line(pending, result.ok, result.outcome, result.info))
+        line = action_talk.result_line(pending, result.ok, result.outcome, result.info)
+        if not result.ok:  # live 21 Oct: one fixed line per failed attempt, never the same words twice in a row
+            self.brain.action_failed_at = self.brain_elapsed()  # and nothing improvised after it (FAILED_QUIET_S)
+            if line == getattr(self, "_failure_said", None):
+                line = action_talk.FAILED_AGAIN_LINE
+        else:
+            self.brain.done_actions.append(pending)  # confirmed: the only action Tilo may later say it did
+        self._failure_said = None if result.ok else line
+        self._say(pending, line)
 
     def _say(self, pending: action_talk.PendingAction, text: str) -> None:
         msg = ChatMessage("direct_reply", f"action {pending.key}", text, None)

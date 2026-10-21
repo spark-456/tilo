@@ -373,12 +373,15 @@ export function BrowserPanel({
       list.clientHeight,
     );
   }, [stepAt, onMap]);
-  // The window: docked over the map until the person drags it by its header (or moves it with the arrow keys on the
-  // grip); then it is a floating card kept inside the window, at the place saved for this viewer. A phone-wide view has
-  // neither drag nor Dock.
+  // The window on the World page (owner, 21 Oct: "see the world while the browser works"): a solid card in the map's
+  // corner, the map round it; Expand makes it take over the map area and Shrink makes it a card again; dragging its bar
+  // (or the arrow keys on the grip) makes it a floating card anywhere on screen, at the place saved for this viewer, and
+  // Dock puts it back in the corner. A phone-wide view always takes the map area over, with no drag.
   const takeover = placement === "takeover";
   const canDrag = takeover && win.w >= DRAG_MIN_WIDTH;
   const floating = canDrag && place !== null;
+  const [expanded, setExpanded] = useState(false);
+  const inCorner = canDrag && !floating && !expanded;
   const root = useRef<HTMLElement>(null);
   const grip = useRef<HTMLButtonElement>(null);
   // Docking moves the card back into the page, a new element: the grip takes the focus once it is drawn there.
@@ -457,6 +460,7 @@ export function BrowserPanel({
       const [dx, dy] = [ev.clientX - start.x, ev.clientY - start.y];
       if (!to && Math.hypot(dx, dy) < DRAG_FROM) return;
       to = clampPos({ left: from.left + dx, top: from.top + dy }, screen(), card());
+      setExpanded(false);
       setPlace(to);
     };
     const end = () => {
@@ -482,6 +486,7 @@ export function BrowserPanel({
     e.preventDefault();
     const from = at ?? { left: rect.left, top: rect.top };
     const to = clampPos({ left: from.left + d[0], top: from.top + d[1] }, screen(), card());
+    setExpanded(false);
     setPlace(to);
     writePos(to);
   };
@@ -489,6 +494,11 @@ export function BrowserPanel({
     setPlace(null);
     writePos(null);
     setDocked(true);
+  };
+  const expand = (wide: boolean) => {
+    setPlace(null);
+    writePos(null);
+    setExpanded(wide);
   };
   const line =
     phase === "waiting"
@@ -518,11 +528,14 @@ export function BrowserPanel({
       : failed
         ? FRAME_UNAVAILABLE
         : "Loading the picture…";
-  // The page and the takeover share the fill-the-parent layout; the page adds its own border, the floating card its shadow.
+  // The page and the expanded view share the fill-the-parent layout (the page adds its own border); the corner card and
+  // the floating card are windows that size to their content.
   const classes = [
     "tilo-bv",
-    takeover || placement === "page" ? "tilo-bv--takeover" : "",
+    (takeover && !inCorner && !floating) || placement === "page" ? "tilo-bv--takeover" : "",
     placement === "page" ? "tilo-bv--page" : "",
+    inCorner || floating ? "tilo-bv--window" : "",
+    inCorner ? "tilo-bv--card" : "",
     floating ? "tilo-bv--floating" : "",
   ];
   const panel = (
@@ -577,6 +590,11 @@ export function BrowserPanel({
             >
               Open in new tab
             </a>
+          ) : null}
+          {canDrag ? (
+            <button type="button" className="tilo-bv__button" onClick={() => expand(!expanded)}>
+              {expanded ? "Shrink" : "Expand"}
+            </button>
           ) : null}
           {floating ? (
             <button type="button" className="tilo-bv__button" onClick={dock}>

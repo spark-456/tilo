@@ -402,7 +402,7 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
     }
   });
 
-  it("DEMO_BROWSER takes over the map area on its own, and Back to map holds until the next session", async () => {
+  it("DEMO_BROWSER shows itself on its own as a card in the map's corner, Expand takes the map over, and Back to map holds until the next session", async () => {
     const first = "bs_01K7M000000000000000000001";
     const second = "bs_01K7M000000000000000000002";
     const node = document.createElement("div");
@@ -421,20 +421,28 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
       );
     const opened = [recorded(1, "browser.started", { session: first, host: "en.wikipedia.org" })];
     await render(opened);
-    expect(node.querySelector(".tilo-bv--takeover")).not.toBeNull();
+    const panel = () => node.querySelector('[data-testid="tilo-browser-panel"]');
+    // The World stays in view: a solid card in the map's corner, not a takeover.
+    expect(panel()?.className).toContain("tilo-bv--card");
+    expect(panel()?.className).not.toContain("tilo-bv--takeover");
     expect(node.querySelector(".tilo-bv__address")?.textContent).toBe("en.wikipedia.org");
     const button = (name: string) =>
       Array.from(node.querySelectorAll("button")).find((b) => b.textContent?.startsWith(name));
+    await act(async () => button("Expand")?.click());
+    expect(panel()?.className).toContain("tilo-bv--takeover");
+    expect(panel()?.className).not.toContain("tilo-bv--card");
+    await act(async () => button("Shrink")?.click());
+    expect(panel()?.className).toContain("tilo-bv--card");
     await act(async () => button("Back to map")?.click());
-    expect(node.querySelector(".tilo-bv--takeover")).toBeNull();
+    expect(panel()).toBeNull();
     await act(async () => button("Show Tilo browser")?.click());
-    expect(node.querySelector(".tilo-bv--takeover")).not.toBeNull();
+    expect(panel()).not.toBeNull();
     await act(async () => button("Back to map")?.click());
     await render([
       ...opened,
       recorded(2, "browser.started", { session: second, host: "en.wikipedia.org" }),
     ]);
-    expect(node.querySelector(".tilo-bv--takeover")).not.toBeNull();
+    expect(panel()?.className).toContain("tilo-bv--card");
     await act(async () => root.unmount());
   });
 
@@ -518,7 +526,7 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
     window.localStorage.removeItem("tilo.browser.pos");
   });
 
-  it("DEMO_BROWSER_window a phone-wide view has no grip, no drag and no Dock", async () => {
+  it("DEMO_BROWSER_window a phone-wide view takes the map area over, with no grip, drag, Dock or Expand", async () => {
     window.localStorage.setItem("tilo.browser.pos", '{"left":40,"top":60}');
     const wide = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
@@ -540,6 +548,10 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
     const names = Array.from(node.querySelectorAll("button")).map((b) => b.textContent);
     expect(names).toContain("Back to map");
     expect(names).not.toContain("Dock");
+    expect(names).not.toContain("Expand");
+    expect(node.querySelector('[data-testid="tilo-browser-panel"]')?.className).toContain(
+      "tilo-bv--takeover",
+    );
     await act(async () => root.unmount());
     Object.defineProperty(window, "innerWidth", { configurable: true, value: wide });
     window.localStorage.removeItem("tilo.browser.pos");

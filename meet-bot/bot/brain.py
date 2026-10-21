@@ -10,12 +10,24 @@ import json
 import logging
 import math
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, NamedTuple, Protocol
 
-from .action_talk import ACTIONS_TEXT, PendingAction, now_local, proposal, readback
+from .action_talk import (
+    ACTIONS_TEXT,
+    Answered,
+    PendingAction,
+    done_line,
+    now_local,
+    proposal,
+    readback,
+    repeats_answer,
+    same_request,
+)
+from .action_talk import answer as action_answer
 from .answer_scope import DECLINE, scoped_answer
 from .captions import Utterance
 from .events import remove_meet_links
@@ -270,7 +282,9 @@ UNCLEAR_LINE = "Sorry, I didn't catch that. Could you say it again?"
 COULD_NOT_GET_LINE = "I couldn't get that just now."
 CANT_DO_LINE = "I can't do that from a call yet."  # Tilo has no tools in a meeting: it never claims an action
 CANT_DO_AGAIN_LINE = "That's not something I can do from a call yet, sorry."  # a second request in a row: reworded
+NOT_DONE_LINE = "I haven't done that yet. Ask me and I'll read it back before I do."  # actions on, nothing confirmed
 FOLLOWUP_S = 30.0  # after an exchange with Tilo, what follows needs no name for this long
+FAILED_QUIET_S = 20.0  # live 21 Oct: after a failed action Tilo's fixed line stands alone, no improvised "hiccup"
 REWORD_S = 8.0  # a reworded copy of a question (live partial vs final) within this long is the same question
 SOLE_MIN_WORDS = 3  # alone with Tilo, a fragment shorter than this ('Yes.') says nothing to answer
 _SENTINEL_LINES = {NO_ANSWER: NO_ANSWER_LINE, UNCLEAR: UNCLEAR_LINE}
@@ -334,11 +348,33 @@ _ACTION_CLAIM = re.compile(
 )
 
 
-def _first_person(reply: str) -> str:
-    """Tilo speaks as itself: drop a leading "As an AI, ..." clause (live 21 Oct), and never claim an action it has
-    no way to take from a call."""
+_AGENDA_WORD = re.compile(r"\bagenda\b", re.I)
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+
+
+def _unasked_agenda_dropped(reply: str, question: str) -> str:
+    """Owner 21 Oct: "there is no agenda set" only when the agenda was asked about. A reply that is only about the
+    agenda stays (the question may have asked for it in other words)."""
+    if _AGENDA_WORD.search(question):
+        return reply
+    kept = [s for s in _SENTENCE_END.split(reply.strip()) if not _AGENDA_WORD.search(s)]
+    return " ".join(kept) or reply
+
+
+_CHECKING = re.compile(r"^\s*(?:did|have|has|is|was|were|are)\b", re.I)  # "did you add it?", "is it on there?"
+
+
+def _first_person(reply: str, *, actions: bool = False, done: Sequence[PendingAction] = (), question: str = "") -> str:
+    """Tilo speaks as itself: drop a leading "As an AI, ..." clause (live 21 Oct), and never claim an action in the
+    model's words. With meeting actions on, a claim about an action tilo-api confirmed this call is said in that action's
+    fixed words (asked "did you add it?" the model says "Yes, I've added it", 21 Oct); any other claim is not done."""
     if _ACTION_CLAIM.search(reply):
-        return CANT_DO_LINE
+        if not actions:
+            return CANT_DO_LINE
+        named = [a for a in done if a.args["title"].lower() in reply.lower()]
+        if named:
+            return done_line(named[-1])
+        return done_line(done[-1]) if done and _CHECKING.match(question) else NOT_DONE_LINE
     text = _AS_AN_AI.sub("", reply).strip()
     if text and text[0].islower():
         text = text[0].upper() + text[1:]
@@ -581,7 +617,8 @@ QUICK_PROMPT = (
     "questions and answers in this call: use them for follow-ups (after 'what is the capital of France?', 'what about "
     "Germany?' asks for Germany's capital). Mention the agenda only when asked about it; if asked and agenda_set is "
     "false, say there is no agenda yet. Never invent agenda items or talk about how many minutes in unless asked about "
-    "time. Microphones are often poor, so words are "
+    "time. If you cannot do what was asked (you cannot browse the internet, open links or read repositories), say so "
+    "in one short sentence and add nothing else. Microphones are often poor, so words are "
     "frequently misheard as similar-sounding ones ('joke' as 'joy', 'job' or 'John', 'Tilo' as 'Tyler'): work out what "
     "the person most likely meant from the sentence and the recent transcript and answer that (for example 'please "
     "tell me your joy' means 'tell me a joke', so tell one). If only_person_here is true they are talking to you "
@@ -642,6 +679,9 @@ class Brain:
         self.agenda_placeholder = False  # the agenda is a stand-in (cloud attendance): never quote or invent items
         self.actions_enabled = False  # ADR-0042 amendment 1: the session has a tilo-api actions client this call
         self.pending_action: PendingAction | None = None  # read back, waiting for the same speaker's yes
+        self.done_actions: list[PendingAction] = []  # confirmed by tilo-api this call: the only actions Tilo may claim
+        self.action_answer: Answered | None = None  # the last yes or no taken: its other captions are not questions
+        self.action_failed_at = -math.inf  # when tilo-api last refused or failed an action (elapsed seconds)
         self.last_engaged_at = -1e9  # when the last question put to Tilo was asked
         self.last_quick_source = "model"
         self._attempted: dict[str, float] = {}  # question -> start of the utterance last tried (answered or not)
@@ -713,7 +753,18 @@ class Brain:
             text, sender, now, self._attention, self.wake_settings, bot_spoke_at=self._last_reply_at()
         ).allowed
 
+    def _answers_action(self, u: Any) -> bool:
+        """The yes or no to a waiting read-back, or another caption of one already taken (live 21 Oct the partial
+        "yes, add it" went to the model, which read the action back again or improvised)."""
+        if not self.actions_enabled:
+            return False
+        if action_answer(self.pending_action, u.speaker, u.text, one_on_one=self.sole_human) is not None:
+            return True
+        return repeats_answer(self.action_answer, u.speaker, u.text, one_on_one=self.sole_human)
+
     def question_in(self, u: Any) -> Question | None:
+        if self._answers_action(u):  # session.record takes it; it is never a question for the model
+            return None
         if self.wake_settings is not None:
             speaker = u.speaker.removesuffix(CHAT_SUFFIX)
             typed = u.speaker.endswith(CHAT_SUFFIX)
@@ -776,8 +827,15 @@ class Brain:
                 question,
             )
         st = self.state
+        added = [a.args["title"] for a in self.done_actions if a.name == "add_agenda_item"]
         local = instant_answer(
-            question.text, st, elapsed_s, self.duration_s, self.present, agenda_set=not self.agenda_placeholder
+            question.text,
+            st,
+            elapsed_s,
+            self.duration_s,
+            self.present,
+            agenda_set=not self.agenda_placeholder,
+            added=added,
         )
         if local:  # answered from the meeting notes: no model call, no waiting
             self.last_quick_source = "local"
@@ -789,8 +847,11 @@ class Brain:
             "question": question.text,
             "addressed_to_assistant": question.addressed,
             "only_person_here": self.sole_human,
-            "agenda": [] if self.agenda_placeholder else [{"title": i.title, "status": i.status} for i in st.items],
-            "agenda_set": not self.agenda_placeholder,
+            # A stand-in agenda is never shown; what Tilo added in this call is (it would be false to say "no agenda").
+            "agenda": [{"title": t, "status": "added in this call"} for t in added]
+            if self.agenda_placeholder
+            else [{"title": i.title, "status": i.status} for i in st.items],
+            "agenda_set": not self.agenda_placeholder or bool(added),
             "action_items": [{"text": a.text, "owner": a.owner, "due": a.due} for a in st.action_items],
             "context_summary": st.context_summary,
             "elapsed_minutes": round(elapsed_s / 60, 1),
@@ -819,14 +880,19 @@ class Brain:
             # The model only proposes; Tilo's own fixed words read it back, and the same speaker's yes sends it.
             pending = proposal(obj.get("action"), q.speaker, one_on_one=self.sole_human)
             if pending is not None:
+                if same_request(self.pending_action, pending):
+                    return None  # the partial and the final caption of one request: one read-back (live 21 Oct)
                 self.pending_action = pending
                 return self._direct(readback(pending), utterances, elapsed_s, q)
+        if elapsed_s - self.action_failed_at <= FAILED_QUIET_S:
+            return None  # the failed action's fixed line is all Tilo says; a new request is still read back above
         reply = obj.get("reply") if isinstance(obj, dict) else None
         if isinstance(reply, str) and reply.strip():
             line = next((x for s, x in _SENTINEL_LINES.items() if reply.strip().upper().startswith(s)), None)
             if line == UNCLEAR_LINE and not self._called_by_name(q.text):
                 return None  # owner 21 Oct: a fragment gets silence, not "Sorry, I didn't catch that"
-            text = (line if q.addressed else None) if line else _first_person(reply)
+            claim = _first_person(reply, actions=self.actions_enabled, done=self.done_actions, question=q.text)
+            text = (line if q.addressed else None) if line else _unasked_agenda_dropped(claim, q.text)
         else:  # null: a real question put to the assistant that it cannot answer must not be met with silence
             text = NO_ANSWER_LINE if q.addressed and "?" in q.text else None
         return self._direct(text, utterances, elapsed_s, q)

@@ -8,6 +8,7 @@ import json
 import math
 import os
 import threading
+import time
 from collections.abc import Callable, Mapping
 from datetime import UTC, date, datetime
 from functools import partial
@@ -26,9 +27,11 @@ from tilo_harness.tool_limits import load_tool_limits
 from tilo_harness.tools import ToolRegistry
 from tilo_harness.unit_prompt import UpstreamItem
 from tilo_planning.extraction import ExtractionError, stored_text
+from tilo_providers.diagnostics import log_caught
+from tilo_providers.errors import QuotaError, RetryableError
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse
 from tilo_providers.media import ACCEPTED_MIME_TYPES, MediaPart, check_parts
-from tilo_providers.router import Router, RouterResult
+from tilo_providers.router import Router, RouterExhaustedError, RouterResult
 from tilo_providers.safety import SafetyProvider
 
 from tilo_api.access import Mode
@@ -55,6 +58,13 @@ FILE_TEXT_TOTAL = 6000  # all uploads together: the rest of the upstream room st
 # FR-AGT-03: a specialist whose plan pins no skill still gets the two read-only (T1) web tools. They are the registry's
 # own: recorded search and fetch in replay, live only when the router is live (never this map's decision).
 DEFAULT_TOOLS = {"specialist": ("web_search", "fetch_url")}
+# DEMO-BROWSER: a busy or rate-limited browser model gets more tries after these waits (seconds); a research unit
+# browses at most NAMED_SITES_READ of the sites the person named, each in at most SITE_READ_STEPS steps
+# (config/browser.yaml max_steps stays the ceiling).
+BROWSER_RETRY_WAITS = (5.0, 12.0)
+NAMED_SITES_READ = 2
+SITE_READ_STEPS = 10
+pause = time.sleep  # tests replace it
 
 
 def browser_proposal_prompt(goal: str, extracted: str) -> str:
@@ -136,6 +146,11 @@ def taught_reads(run: Any, unit: Mapping[str, Any]) -> tuple[str, ...]:
     the mail, events or files it names."""
     step = taught_step(run, unit)
     return READS_OF.get(str(step.get("tool")), ()) if step is not None else ()
+
+
+def uses_web(context: UnitContext) -> bool:
+    """The unit may read the web: no pinned skill (the role's own tools), or a skill that allows fetch_url."""
+    return not context.skills or any("fetch_url" in skill.tools_allowed for skill in context.skills)
 
 
 def matched_skill_keeps_role_tools(
@@ -291,6 +306,9 @@ class BoundRunRunner:
         self.hosts: set[str] = set(self.typed)  # and, as the run goes, its search results' hosts
         self.sources: dict[str, list[tuple[dict, Any]]] = {}
         self.file_texts: dict[tuple[str, int], str | None] = {}
+        # DEMO-BROWSER: one browser session at a time in a run (config/browser.yaml max_sessions_per_world), so the
+        # World's browser shows one session's steps in order while several units research at once.
+        self.browser_lock = threading.Lock()
 
     def search(self, query: str) -> tuple[Any, float]:
         result, credits = self.budget.call(self.router.search, "search", query)
@@ -329,6 +347,7 @@ class BoundRunRunner:
             rpc = BrowserRpc(browser_url) if browser_url else BrowserSessions(PlaywrightEngine())
             executor = BrowseStepExecutor(owner, rpc, propose)
             return await asyncio.to_thread(
+                self.one_session,
                 executor.execute,
                 unit=dict(unit),
                 agent=context.agent_id,
@@ -415,6 +434,9 @@ class BoundRunRunner:
                     defaults = {**defaults, role: tuple(dict.fromkeys((*defaults.get(role, ()), *step_reads)))}
         if not design:
             context = matched_skill_keeps_role_tools(owner, unit, context, defaults)
+        if not design and unit["role"] in DEFAULT_TOOLS and self.typed and uses_web(context):
+            read = await asyncio.to_thread(self.site_reading, unit, context)  # DEMO-BROWSER: the named site first
+            context = dataclasses.replace(context, upstream=(*context.upstream, *read))
         runner = DefaultUnitRunner(
             models,
             clock=lambda: day,
@@ -440,9 +462,15 @@ class BoundRunRunner:
             return UnitOutcome(False, reason=UNREAD.get(reason, UNREAD_OTHER).format(host=host))
         return outcome
 
+    def one_session(self, act: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+        """Runs one browser session while no other session of this run is open (`browser_lock`)."""
+        with self.browser_lock:
+            return act(*args, **kwargs)
+
     def proposer(self) -> Callable[[str, bytes, str], tuple[dict, float]] | None:
         """BR-01: the computer_use role looks at one masked frame and proposes one action, on the run's budget; code
-        decides. None when the run has no such model."""
+        decides. A busy or rate-limited model (live 21 Oct: 429s and 503s mid-session) gets BROWSER_RETRY_WAITS more
+        tries before the session gives up. None when the run has no such model."""
         model = self.providers.get("computer_use")
         if model is None:
             return None
@@ -454,16 +482,66 @@ class BoundRunRunner:
                 max_output_tokens=512,
                 parts=[MediaPart(mime_type="image/png", data=frame)],
             )
-            reply, charge = model.generate_budgeted(request, self.budget)
-            return parse_action(reply.text), charge
+            for wait in (*BROWSER_RETRY_WAITS, None):
+                try:
+                    reply, charge = model.generate_budgeted(request, self.budget)
+                    return parse_action(reply.text), charge
+                except (RouterExhaustedError, QuotaError, RetryableError):
+                    if wait is None:
+                        raise
+                    pause(wait)
+            raise AssertionError("unreachable")
 
         return propose
+
+    def named_sites(self) -> list[str]:
+        """The sites the person named in the task, www. or not (typed_hosts), sorted."""
+        return sorted({t.lower().removeprefix("www.") if t.count(".") >= 2 else t.lower() for t in self.typed})
 
     def named_site(self, host: str) -> bool:
         """A host the person named in the task (or one of its subdomains, www. or not)."""
         host = host.lower().removeprefix("www.")
-        named = {t.lower().removeprefix("www.") if t.count(".") >= 2 else t.lower() for t in self.typed}
-        return any(host == site or host.endswith("." + site) for site in named)
+        return any(host == site or host.endswith("." + site) for site in self.named_sites())
+
+    def site_reading(self, unit: Mapping[str, Any], context: UnitContext) -> tuple[UpstreamItem, ...]:
+        """DEMO-BROWSER (live 21 Oct: a task naming wikipedia.org was answered from web_search and one opened page, with
+        no search typed in the browser): a research unit of a run whose task names a site uses that site in Tilo's
+        browser first, as a person would: from its front page the computer_use model types the unit's search into the
+        site's own box, presses Enter, clicks a result, scrolls and reads (BR-01 to BR-05, code decides each step).
+        What the browser read reaches the unit as an earlier item, screened like a tool result; web_search and
+        fetch_url stay for any other source. The route is structural (the run's named sites, never the task's words,
+        GEN-06). Nothing for a run with no named site, browser or browser model, for a unit holding the person's
+        private data (WT-04: no web egress), or when a session read nothing safe."""
+        propose = self.proposer()
+        rpc = research_browser(self.mode)
+        if propose is None or rpc is None or any(item.private for item in context.upstream):
+            return ()
+        brief = getattr(self.run_owner, "brief", None)
+        goal = brief.get("goal", "") if isinstance(brief, Mapping) else ""
+        executor = BrowseStepExecutor(self.run_owner, rpc, propose)
+        plain, building, items = dict(unit), self.building_of(unit), []
+        also = allow_entries(self.hosts, self.typed)
+        for site in self.named_sites()[:NAMED_SITES_READ]:
+            start = f"https://{site}/"
+            try:
+                done = self.one_session(
+                    executor.execute,
+                    unit=plain,
+                    agent=context.agent_id,
+                    building=building,
+                    goal=f"{goal}\nStep: {plain.get('title', '')}\nOpened: {start}",
+                    hosts=list(dict.fromkeys([site, *also]))[:20],
+                    max_steps=SITE_READ_STEPS,
+                    start=start,
+                )
+            except Exception as caught_error:  # a lost browser or a model that stayed busy: the unit uses its web tools
+                log_caught(caught_error, __name__, locals())
+                continue
+            text = done.outputs[0].content.decode("utf-8", "replace") if done.success and done.outputs else ""
+            if not text.strip() or self.safety.check(text).get("flagged") is not False:
+                continue  # nothing read, or the screen did not clear it: never given to a model (fail closed)
+            items.append(UpstreamItem("browser", f"What Tilo's browser read on {site}", text, screening="clean"))
+        return tuple(items)
 
     def page_reader(self, unit: Mapping[str, Any], agent: str) -> Callable[[str, str], str] | None:
         """P0-RUNS-FIX: the visible browser for the pages a research unit reads (T1, allowlisted hosts only): every
@@ -471,8 +549,9 @@ class BoundRunRunner:
         is used the way a person would (DEMO-BROWSER, owner 21 Oct: "an agentic browser, not a screenshot playlist"):
         the computer_use model points, types into the site's own search box and presses Enter, clicks a result,
         scrolls and reads, and code decides every step (BR-01 to BR-05); asked for a search address, it starts on the
-        site's front page and searches there. Any other page is read with no model: open, scroll, read. None without a
-        browser service, and the unit then fetches pages directly."""
+        site's front page and searches there. Any other page, or a named one whose session the model could not finish
+        (live 21 Oct: quota errors), is read with no model: open, scroll, read. None without a browser service, and the
+        unit then fetches pages directly."""
         rpc = research_browser(self.mode)
         if rpc is None:
             return None
@@ -489,13 +568,21 @@ class BoundRunRunner:
                     start = f"https://{host}/" if urlsplit(url).query else url
                     hosts = list(dict.fromkeys([host, *also]))[:20]
                     goal = f"{brief.get('goal', '')}\nStep: {plain.get('title', '')}\nOpened: {start}"
-                    done = executor.execute(
-                        unit=plain, agent=agent, building=building, goal=goal, hosts=hosts, start=start
-                    )
-                    if not done.success or not done.outputs:
-                        raise SessionRefused("browser_unavailable")
-                    return done.outputs[0].content.decode("utf-8", "replace")
-                return executor.read_page(unit=plain, agent=agent, building=building, url=url, host=host, also=also)
+                    try:
+                        done = self.one_session(
+                            executor.execute,
+                            unit=plain, agent=agent, building=building, goal=goal, hosts=hosts, start=start,
+                        )  # fmt: skip
+                    except SessionRefused:
+                        raise
+                    except Exception as caught_error:  # the model stayed busy: read the page without it, below
+                        log_caught(caught_error, __name__, locals())
+                    else:
+                        if done.success and done.outputs:
+                            return done.outputs[0].content.decode("utf-8", "replace")
+                return self.one_session(
+                    executor.read_page, unit=plain, agent=agent, building=building, url=url, host=host, also=also
+                )
             except SessionRefused as refused:  # the fetch tool reads the page directly; the person learns why
                 line = BROWSER_REFUSED.get(refused.reason, BROWSER_UNAVAILABLE).format(host=host)
                 self.run_owner.put(
