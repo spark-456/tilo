@@ -137,6 +137,7 @@ export interface ParkStore {
     files?: readonly File[],
     refs?: readonly SkillRef[],
     onStep?: (step: string) => void,
+    inputs?: Readonly<Record<string, string>>,
   ): Promise<RunStep<RunPlan>>;
   reviseRun(plan: RunPlan, field: string, answer: string): Promise<RunStep<RunPlan>>;
   startRun(plan: RunPlan, repeat?: Cadence | null): Promise<RunStep<RunStart>>;
@@ -438,8 +439,8 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
       return starting;
     },
     oneStep: oneStepOf(api) !== null,
-    prepareRun: (text, files, refs, onStep) =>
-      runStep((one) => one.prepare(text, files ?? [], refs, onStep)),
+    prepareRun: (text, files, refs, onStep, inputs) =>
+      runStep((one) => one.prepare(text, files ?? [], refs, onStep, inputs)),
     reviseRun: (plan, field, answer) => runStep((one) => one.revise(plan.taskId, field, answer)),
     startRun: (plan, repeat) => runStep((one) => one.start(plan, repeat)),
     askQuick(mode, query, refs) {

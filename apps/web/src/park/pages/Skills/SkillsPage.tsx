@@ -383,7 +383,20 @@ function Ready({
                     id: skill.id,
                     kind: skill.builtin ? "library" : "taught",
                   });
-                  const prepared = await store.prepareRun(prompt, files, [ref]);
+                  // TS-19: the form's own values by slot, so a required one left empty is asked for in the run
+                  const inputs = skill.builtin
+                    ? undefined
+                    : Object.fromEntries(
+                        (skill.details?.inputs ?? []).map((i) => [
+                          i.name,
+                          i.kind === "file"
+                            ? files.length
+                              ? "attached"
+                              : ""
+                            : (values[i.name] ?? "").trim(),
+                        ]),
+                      );
+                  const prepared = await store.prepareRun(prompt, files, [ref], undefined, inputs);
                   if (!prepared.ok) throw new Error(prepared.message);
                   const started = await store.startRun(prepared.value);
                   if (!started.ok) throw new Error(started.message);

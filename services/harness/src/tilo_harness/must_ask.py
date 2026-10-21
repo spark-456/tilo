@@ -69,6 +69,11 @@ _FAILED = (
     2,
     "Three failures in a row; stopping costs nothing and can be undone.",
 )
+# TS-19: the card for a taught skill's required inputs left empty. Its reason is `ambiguous_brief` (the request lacks
+# something the work needs; agent.escalated's closed enum). Stop is the safe default; a typed value runs the work.
+_INPUTS_OPTIONS = ("Stop this run", "Go on without it")
+_INPUTS_WHY = "The skill was saved with this as a required input, so Tilo asks instead of guessing it."
+_INPUTS_STOP = "Nothing has run yet, so stopping costs nothing."
 _UNREADABLE = (
     "I could not tell whether this step needs your input. Should it go ahead?",
     ("Hold this step", "Go ahead"),
@@ -90,6 +95,12 @@ def load_model_questions(path: Path | None = None) -> str:
     return value if value in ("assume", "ask") else "ask"
 
 
+def typed_answer(answer: Any) -> str | None:
+    """The words a person typed as their answer (the card route has redacted and screened them), or None."""
+    text = getattr(answer, "text", None)
+    return text.strip() if isinstance(text, str) and text.strip() else None
+
+
 def option_index(option: Any, count: int) -> int | None:
     """The 0-based index of a card option id such as "o2", or None when the id names none of the `count` options."""
     found = _OPTION_ID.fullmatch(option) if isinstance(option, str) else None
@@ -104,13 +115,18 @@ class Ask:
     suggested: int
     why: str
     proceed: int | None = None  # a rule's card: the one option that lets the unit run; None: any answer runs it
+    typed_runs: bool = False  # TS-19: a typed answer (the value the card asks for) also lets the unit run
+    matters: str | None = None  # the card's why-it-matters line when the reason's own does not fit
 
     def runs(self, answer: Any) -> bool:
         """Whether this answer lets the unit run (decided here, never by the runner or a model). A rule's card
         (sensitive_step, repeated_failure, an unreadable reply) runs the unit only on its proceed option: Hold, Stop,
         Skip and its safe default at the deadline leave it unrun. A model-written ambiguity or trade-off card runs it on
         any answer, the Director's default included (PRD 10.3, BQ-235). A model-raised sensitive_step card never runs
-        the unit on its own answer: that answer only records a choice (see `confirms`)."""
+        the unit on its own answer: that answer only records a choice (see `confirms`). A missing-input card (TS-19)
+        also runs it on a typed answer, the value it asked for."""
+        if self.typed_runs and typed_answer(answer) is not None:
+            return True
         if self.proceed is not None:
             return answer.option == f"o{self.proceed + 1}"
         return self.reason != "sensitive_step"
@@ -194,10 +210,13 @@ class MustAsk:
         brief: Mapping[str, Any] | None = None,
         intake_answers: Sequence[tuple[str, str]] = (),
         model_questions: str | None = None,
+        missing_inputs: Sequence[str] = (),
     ) -> None:
         self._model_questions = model_questions if model_questions in ("assume", "ask") else load_model_questions()
         self._providers = providers
         self._brief, self._answers = brief, tuple(intake_answers)  # RUN-FAIL-1: the whole task, as data
+        self._missing = tuple(m for m in missing_inputs if isinstance(m, str) and m.strip())  # TS-19, labels
+        self._missing_asked = False
         self._max_attempts = config.retries.max_attempts
         self._card_sink = card_sink
         self._owner = owner
@@ -215,6 +234,31 @@ class MustAsk:
             if tier == "T3" or (tier == "T2" and action not in self._covered):
                 out.append(str(action))
         return out
+
+    def inputs_needed(self, unit: Mapping[str, Any]) -> Ask | None:
+        """TS-19: a run whose required inputs were left empty asks for them once, on one card, before its first unit
+        (one with nothing to wait for) does any work or makes any model call. The labels are the person's own slot
+        names, shown as data. A typed answer runs the work and is kept for every later unit (`answered`); Stop, and
+        the safe default at the deadline, hold it; "Go on without it" is the person's own choice to run as it is."""
+        if not self._missing or self._missing_asked or unit.get("depends_on"):
+            return None
+        self._missing_asked = True
+        names = ", ".join(neutralise(label, limit=40) for label in self._missing[:4])
+        question = _clip(f"This run needs {names}. Type it below to go on.", 140)
+        return Ask(
+            "ambiguous_brief",
+            question,
+            _INPUTS_OPTIONS,
+            0,
+            _INPUTS_STOP,
+            proceed=1,
+            typed_runs=True,
+            matters=_INPUTS_WHY,
+        )
+
+    def answered(self, question: str, value: str) -> None:
+        """A value the person typed for the whole run: later must-ask checks read it as one of the run's answers."""
+        self._answers = (*self._answers, (question, value))
 
     async def assess(self, unit: Mapping[str, Any], *, failures: int = 0) -> Ask | Assumption | None:
         if failures >= self._max_attempts:
@@ -357,7 +401,7 @@ class MustAsk:
             "rung": "needs_you",
             "header": {"building": building, "agent": agent},
             "what_happened": ask.question,
-            "why_it_matters": _WHY_IT_MATTERS[ask.reason],
+            "why_it_matters": ask.matters or _WHY_IT_MATTERS[ask.reason],
             "options": options,
             "add_context": True,
             "actions": ["show_me", "snooze", "delegate"],

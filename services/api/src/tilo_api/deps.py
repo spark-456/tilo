@@ -171,6 +171,7 @@ class TaskRecord:
     )
     skill_plan: list[dict[str, Any]] | None = None  # SKILLS-EXEC: stored taught steps, separate from public metadata
     skill_request: str | None = None  # SKILLS-E2E: what the person typed when running a taught skill (its input values)
+    skill_missing: list[str] | None = None  # TS-19: labels of the taught skill's required inputs the run left empty
 
 
 @dataclass

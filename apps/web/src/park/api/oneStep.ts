@@ -50,6 +50,8 @@ export interface OneStepApi {
     files: readonly File[],
     refs?: readonly SkillRef[],
     onStep?: (step: string) => void,
+    /** TS-19: a skill run form's values (slot name -> text); a required one left empty is asked for in the run. */
+    inputs?: Readonly<Record<string, string>>,
   ): Promise<RunPlan>;
   /** The person changed one assumption: answer that question, then price the new brief again. */
   revise(taskId: string, field: string, answer: string): Promise<RunPlan>;
@@ -177,11 +179,17 @@ export function oneStepOver(http: HttpClient): OneStepApi {
     return planOf(taskId, brief, asked.get(taskId) ?? [], priced);
   };
   return {
-    async prepare(text, files, refs, onStep) {
+    async prepare(text, files, refs, onStep, inputs) {
       onStep?.("Reading your task...");
       let intake: IntakeResult;
       try {
-        intake = (await http.submitIntake(text, [...files], undefined, refs ?? [])) as IntakeResult;
+        intake = (await http.submitIntake(
+          text,
+          [...files],
+          undefined,
+          refs ?? [],
+          inputs,
+        )) as IntakeResult;
       } catch (e) {
         throw said("read this task", e);
       }
