@@ -8,6 +8,7 @@ Matching is deliberately strict: anything that does not clearly fit falls throug
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from typing import Any
 
 _WORDS = re.compile(r"[a-z']+")
@@ -29,7 +30,13 @@ NO_AGENDA_LINE = "There's no agenda set for this meeting yet."  # no offer: Tilo
 
 
 def instant_answer(
-    question: str, state: Any, elapsed_s: float, duration_s: float, present: list[str], agenda_set: bool = True
+    question: str,
+    state: Any,
+    elapsed_s: float,
+    duration_s: float,
+    present: list[str],
+    agenda_set: bool = True,
+    added: Sequence[str] = (),
 ) -> str | None:
     q = " ".join(_WORDS.findall(question.lower()))
     if not q or len(q.split()) > 16:
@@ -88,6 +95,8 @@ def instant_answer(
 
     if "agenda" in q and not _has(q, "add ", "change", "update", "remove"):
         if not agenda_set:  # a stand-in agenda (live 21 Oct): never read it out or invent items
+            if added:  # items tilo-api confirmed in this call: "no agenda" would now be false
+                return "I added " + _join([f'"{t}"' for t in added]) + " to this meeting's agenda in this call."
             return NO_AGENDA_LINE
         items = state.items
         covered = [i for i in items if i.status == "covered"]

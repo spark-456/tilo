@@ -363,6 +363,8 @@ class LiveSession:
             self.brain.action_failed_at = self.brain_elapsed()  # and nothing improvised after it (FAILED_QUIET_S)
             if line == getattr(self, "_failure_said", None):
                 line = action_talk.FAILED_AGAIN_LINE
+        else:
+            self.brain.done_actions.append(pending)  # confirmed: the only action Tilo may later say it did
         self._failure_said = None if result.ok else line
         self._say(pending, line)
 
