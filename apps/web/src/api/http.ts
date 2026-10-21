@@ -615,6 +615,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
         files: File[];
         mode: "quick" | undefined;
         refs?: readonly import("./skillRoute").SkillRef[];
+        inputs?: Readonly<Record<string, string>> | undefined;
         key: string;
         pending?: Promise<IntakeResult | QuickIntakeResult> | undefined;
       }
@@ -907,12 +908,14 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     files: File[],
     mode: "quick" | undefined,
     refs: readonly import("./skillRoute").SkillRef[],
+    inputs?: Readonly<Record<string, string>>,
   ): Promise<IntakeResult | QuickIntakeResult>;
   async submitIntake(
     text: string,
     files: File[],
     mode?: "quick",
     refs: readonly import("./skillRoute").SkillRef[] = [],
+    inputs?: Readonly<Record<string, string>>,
   ): Promise<IntakeResult | QuickIntakeResult> {
     let intent = this.intakeIntent;
     if (
@@ -920,10 +923,11 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       intent.text !== text ||
       intent.mode !== mode ||
       JSON.stringify(intent.refs ?? []) !== JSON.stringify(refs) ||
+      JSON.stringify(intent.inputs ?? null) !== JSON.stringify(inputs ?? null) ||
       intent.files.length !== files.length ||
       !intent.files.every((file, i) => file === files[i])
     ) {
-      intent = { text, files: [...files], mode, refs: [...refs], key: crypto.randomUUID() };
+      intent = { text, files: [...files], mode, refs: [...refs], inputs, key: crypto.randomUUID() };
       this.intakeIntent = intent;
     }
     // QA-11: sharing the key alone still sends two POSTs while the first is pending.
@@ -934,6 +938,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       mode,
       intent.key,
       intent.refs ?? [],
+      intent.inputs,
     );
     intent.pending = pending;
     try {
@@ -960,9 +965,10 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     mode: "quick" | undefined,
     key: string,
     refs: readonly import("./skillRoute").SkillRef[],
+    inputs?: Readonly<Record<string, string>>,
   ): Promise<IntakeResult | QuickIntakeResult> {
     try {
-      return await this.sendIntake(text, files, mode, key, refs);
+      return await this.sendIntake(text, files, mode, key, refs, inputs);
     } catch (error) {
       if (
         mode === "quick" ||
@@ -972,7 +978,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
       ) {
         throw error;
       }
-      return this.sendIntake(text, files, mode, key, refs);
+      return this.sendIntake(text, files, mode, key, refs, inputs);
     }
   }
 
@@ -982,10 +988,13 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     mode: "quick" | undefined,
     key: string,
     refs: readonly import("./skillRoute").SkillRef[],
+    inputs?: Readonly<Record<string, string>>,
   ): Promise<IntakeResult | QuickIntakeResult> {
     const form = new FormData();
     form.append("text", text);
     if (refs.length) form.append("refs", JSON.stringify(refs));
+    // TS-19: a skill run form's values, so the server knows which required inputs were left empty
+    if (inputs && refs.length) form.append("inputs", JSON.stringify(inputs));
     for (const file of files) form.append("files", file);
     const init = { method: "POST", body: form, headers: { "Idempotency-Key": key } };
     if (mode === "quick") {

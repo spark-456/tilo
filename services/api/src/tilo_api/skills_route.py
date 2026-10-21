@@ -18,7 +18,7 @@ import logging
 import math
 import threading
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -199,10 +199,27 @@ class SkillContext:
         """Return the readable version's stored steps for an explicitly tagged taught skill. A browse step carries the
         skill's saved hosts (TS-18), the sites the person approved when they saved it: the run's copy is the only place
         the browser learns which site to open (BR-02), since "Run the skill" names none."""
+        record = self._taught_record(tagged)
+        if record is None:
+            return None
+        hosts = [h for h in record.get("hosts") or [] if isinstance(h, str)]
+        plan: list[dict[str, Any]] = json.loads(json.dumps(record["plan"]))
+        return [{**s, "hosts": hosts} if s.get("action") == "browse_web" and hosts else s for s in plan]
+
+    def taught_missing(self, tagged: dict[str, Any] | None, given: Mapping[str, str] | None) -> list[str]:
+        """TS-19: the labels of the tagged taught skill's required inputs this run gives no value for, in the skill's
+        order. Values come only from the run form (`given`: slot name -> text); a run without it (an @mention, an API
+        call) fills no slot, so each required one is empty and the run asks for it before any work."""
+        record = self._taught_record(tagged)
+        slots = [s for s in (record or {}).get("inputs") or [] if isinstance(s, Mapping) and s.get("required")]
+        return [str(s["label"]) for s in slots if not str((given or {}).get(str(s.get("name"))) or "").strip()]
+
+    def _taught_record(self, tagged: dict[str, Any] | None) -> dict[str, Any] | None:
+        """The readable, unpaused version of an explicitly tagged taught skill, or None (a failed read fails closed)."""
         if tagged is None or tagged.get("kind") != "taught":
             return None
         try:
-            record = next(
+            return next(
                 (
                     row
                     for row in self.read_taught()
@@ -215,11 +232,6 @@ class SkillContext:
         except Exception as exc:  # noqa: BLE001 - intake already resolved visibility; a second read fails closed
             logger.warning("tagged taught skill plan not read: %s", type(exc).__name__)
             return None
-        if record is None:
-            return None
-        hosts = [h for h in record.get("hosts") or [] if isinstance(h, str)]
-        plan: list[dict[str, Any]] = json.loads(json.dumps(record["plan"]))
-        return [{**s, "hosts": hosts} if s.get("action") == "browse_web" and hosts else s for s in plan]
 
     def block(self) -> str:
         """The catalog as fenced data for a prompt: one line per skill, name and purpose only."""
