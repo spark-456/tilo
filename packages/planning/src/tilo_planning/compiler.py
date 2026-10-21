@@ -11,7 +11,7 @@ from __future__ import annotations
 import copy
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from typing import Annotated, Any, Literal
@@ -22,7 +22,7 @@ from tilo_policy import RiskTable
 from tilo_providers.clock import real_today, time_facts
 from tilo_providers.interfaces import Capability, GenerateRequest
 from tilo_providers.prompts import load_prompt
-from tilo_providers.router import Router, RouterError, RouterResult
+from tilo_providers.router import Deadline, Router, RouterError, RouterResult
 
 from tilo_planning.brief import DIRECTOR_ROLE
 from tilo_planning.deliverable_teams import with_design_team
@@ -195,7 +195,7 @@ def _director_schema() -> dict[str, Any]:
     return schema
 
 
-def _ask(router: Router, prompt: str) -> RouterResult:
+def _ask(router: Router, prompt: str, deadline: Deadline | None = None) -> RouterResult:
     request = GenerateRequest(
         system=load_prompt(DIRECTOR_ROLE, "plan_system.md"),
         prompt=prompt,
@@ -204,7 +204,8 @@ def _ask(router: Router, prompt: str) -> RouterResult:
         thinking_level=PLAN_THINKING,
     )
     try:
-        run = router.generate(DIRECTOR_ROLE, request, required_capability=Capability.JSON)
+        extra = {} if deadline is None else {"deadline": deadline}  # RUN-SPEED: a hung candidate hands over in time
+        run = router.generate(DIRECTOR_ROLE, request, required_capability=Capability.JSON, **extra)
     except RouterError as error:
         raise PlanCompileError(f"FR-INT-09: no plan from the Director: {error}") from error
     if run.outcome != "ok" or run.response is None:
@@ -221,9 +222,11 @@ def compile_plan(
     router: Router,
     attempts: int = MAX_ATTEMPTS,
     today: date | None = None,
+    deadline: Callable[[], Deadline] | None = None,
 ) -> PlanResult:
     """The PlanGraph for `approach` (one of `inputs.approaches`) under `budget_cap`, valid by `validate_plan`
-    for `inputs.owner`, or `PlanCompileError`."""
+    for `inputs.owner`, or `PlanCompileError`. `deadline` (RUN-SPEED) makes a fresh PL-03 deadline for each attempt's
+    model call; a call that runs out of time is a `PlanCompileError` like any other failed call."""
     approaches = copy.deepcopy(inputs.approaches)
     offered = next((a for a in approaches if a.get("id") == approach.get("id")), None)
     if offered is None:
@@ -237,7 +240,7 @@ def compile_plan(
     }
     prompt, runs, found = load_prompt(DIRECTOR_ROLE, "plan.md", variables), [], ["none"]
     for attempt in range(attempts):
-        run = _ask(router, prompt)
+        run = _ask(router, prompt, deadline() if deadline is not None else None)
         runs.append(run)
         text = (run.response.text if run.response else None) or ""
         try:

@@ -12,7 +12,8 @@ import os
 import re
 import threading
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from datetime import UTC, date, datetime
 from functools import partial
 from pathlib import Path
@@ -34,7 +35,7 @@ from tilo_providers.diagnostics import log_caught
 from tilo_providers.errors import QuotaError, RetryableError
 from tilo_providers.interfaces import GenerateRequest, GenerateResponse
 from tilo_providers.media import ACCEPTED_MIME_TYPES, MediaPart, check_parts
-from tilo_providers.router import Deadline, Router, RouterExhaustedError, RouterResult
+from tilo_providers.router import BudgetExceededError, Deadline, Router, RouterExhaustedError, RouterResult
 from tilo_providers.safety import SafetyProvider
 from tilo_render.spec import MAX_FIGURE_BYTES, MAX_FIGURES, MAX_FIGURES_BYTES
 
@@ -244,26 +245,119 @@ def brief_texts(run: Any) -> list[str]:
 
 
 class RunBudget:
+    """The run's credits for its model and search calls (a portion, such as the design allowance, draws on its parent
+    too). RUN-SPEED: a call reserves its credits under the lock, calls the model outside it and settles under it, so
+    units that run at the same time no longer wait for each other's model calls. The cap stays exact: a call is handed
+    only credits nobody else holds, the router never reports spending more than it was handed, and what it did not
+    spend goes back. A call alone is handed everything free (as before); with other units running, each unit's call
+    is handed its share, and one whose share was too small for any candidate waits for the others and asks again."""
+
     def __init__(self, cap: float, parent: RunBudget | None = None) -> None:
-        self.left = cap
+        self.left = cap  # credits not spent
+        self.reserved = 0.0  # credits handed to calls that have not returned
         self.parent = parent
-        self.lock: threading.Lock = parent.lock if parent else threading.Lock()
+        self.root: RunBudget = parent.root if parent else self
+        self.lock: threading.Condition = parent.lock if parent else threading.Condition()
+        if parent is None:
+            self.active = 0  # units running now (`unit`)
+            self.ready = 0  # units the plan lets run now (`expect`), some of which may not have started yet
+            self.holding = 0  # calls running now
+            self.version = 0  # bumped on every settle, release and unit end, for a call that waits
 
     def portion(self, share: float) -> RunBudget:
         return RunBudget(self.left * share, self)
 
-    def call(self, method: Callable[..., RouterResult], *args: Any, **kwargs: Any) -> tuple[RouterResult, float]:
+    def expect(self, ready: int) -> None:
+        """How many units the plan lets run now, so the first of them to call does not take what the others need."""
         with self.lock:
-            before = min(self.left, self.parent.left) if self.parent else self.left
-            if before <= 0:
-                raise ValueError("The run budget is exhausted")
-            result = method(*args, budget=before, **kwargs)
-            if result.budget is None or not math.isfinite(result.budget) or not 0 <= result.budget <= before:
+            self.root.ready = max(0, ready)
+            self._changed()
+
+    @contextmanager
+    def unit(self) -> Iterator[None]:
+        """While a unit runs its calls share the free credits with the other running units' calls."""
+        root = self.root
+        with self.lock:
+            root.active += 1
+        try:
+            yield
+        finally:
+            with self.lock:
+                root.active -= 1
+                self._changed()
+
+    def _free(self) -> float:
+        own = self.left - self.reserved
+        return min(own, self.parent.left - self.parent.reserved) if self.parent else own
+
+    def _changed(self) -> None:
+        self.root.version += 1
+        self.lock.notify_all()
+
+    def _hold(self, amount: float, spent: float | None = None) -> None:
+        """Hold `amount` (spent None) or settle a held `amount` of which `spent` was used (spent 0: release it)."""
+        for budget in (self, self.parent):
+            if budget is None:
+                continue
+            if spent is None:
+                budget.reserved += amount
+            else:
+                budget.reserved -= amount
+                budget.left -= spent
+
+    def _reserve(self, everything: bool) -> tuple[float, bool]:
+        """(credits handed to this call, whether it got less than it may get later). `everything`: all that is free,
+        not a share (a call asking again after its share was too small)."""
+        root = self.root
+        with self.lock:
+            while True:
+                free = self._free()
+                if free > 0:
+                    break
+                if root.holding == 0:
+                    raise ValueError("The run budget is exhausted")
+                self.lock.wait()  # everything free is held by calls that are still running: one of them settles
+            amount = free if everything else free / max(1, max(root.active, root.ready) - root.holding)
+            self._hold(amount)
+            root.holding += 1
+            return amount, amount < free or root.holding > 1
+
+    def _settle(self, amount: float, spent: float) -> int:
+        """Settle a call; returns the version after it, so a call that waits waits for someone else."""
+        with self.lock:
+            self._hold(amount, spent)
+            self.root.holding -= 1
+            self._changed()
+            return self.root.version
+
+    def _await_others(self, seen: int) -> None:
+        """Until another call settles or a unit ends (or no call is running, so nothing more can free up)."""
+        with self.lock:
+            while self.root.version == seen and self.root.holding > 0:
+                self.lock.wait(5.0)
+
+    def call(self, method: Callable[..., RouterResult], *args: Any, **kwargs: Any) -> tuple[RouterResult, float]:
+        everything = False
+        while True:
+            amount, more_later = self._reserve(everything)
+            try:
+                result = method(*args, budget=amount, **kwargs)
+            except BudgetExceededError as refused:
+                seen = self._settle(amount, 0.0)
+                if more_later and all(a.error_type == BudgetExceededError.__name__ for a in refused.attempts):
+                    self._await_others(seen)  # nothing was sent: ask again for all that is free once others return
+                    everything = True
+                    continue
+                raise
+            except BaseException:
+                self._settle(amount, 0.0)
+                raise
+            if result.budget is None or not math.isfinite(result.budget) or not 0 <= result.budget <= amount:
+                self._settle(amount, 0.0)
                 raise ValueError("The provider returned an invalid remaining budget")
-            self.left -= before - result.budget
-            if self.parent:
-                self.parent.left -= before - result.budget
-            return result, before - result.budget
+            spent = amount - result.budget
+            self._settle(amount, spent)
+            return result, spent
 
 
 class BoundModel:
@@ -338,6 +432,7 @@ class BoundRunRunner:
         self.hosts: set[str] = set(self.typed)  # and, as the run goes, its search results' hosts
         self.sources: dict[str, list[tuple[dict, Any]]] = {}
         self.file_texts: dict[tuple[str, int], str | None] = {}
+        self.finished: set[str] = set()  # RUN-SPEED: units run to an outcome, for `ready_units`
         # DEMO-BROWSER: one browser session at a time in a run (config/browser.yaml max_sessions_per_world), so the
         # World's browser shows one session's steps in order while several units research at once.
         self.browser_lock = threading.Lock()
@@ -365,6 +460,21 @@ class BoundRunRunner:
         return found
 
     async def run(self, unit: Mapping[str, Any], context: UnitContext) -> UnitOutcome:
+        self.budget.expect(self.ready_units())  # RUN-SPEED: units that may run beside this one share the free credits
+        with self.budget.unit():
+            try:
+                return await self._run(unit, context)
+            finally:
+                self.finished.add(str(unit["id"]))
+                self.budget.expect(self.ready_units())
+
+    def ready_units(self) -> int:
+        """Units the plan lets run now: not finished, every dependency finished (one being run counts too)."""
+        units = (getattr(self.run_owner, "plan", None) or {}).get("units") or []
+        done = self.finished
+        return sum(1 for u in units if u["id"] not in done and all(d in done for d in u.get("depends_on") or ()))
+
+    async def _run(self, unit: Mapping[str, Any], context: UnitContext) -> UnitOutcome:
         owner = self.run_owner
         browse = taught_browse_step(owner, unit)
         if browse and self.mode == "live" and not os.environ.get("TILO_BROWSER_URL"):
