@@ -82,9 +82,11 @@ class BrowseStepExecutor:
         hosts: list[str],
         max_steps: int = 12,
         start: str | None = None,
+        finish_on_read: bool = False,
     ) -> UnitOutcome:
         """BR-01 loop: the model proposes one action per frame, code decides, tilo-browser runs it. The session opens
-        `start` (an allowlisted address; the first host's front page when None)."""
+        `start` (an allowlisted address; the first host's front page when None). `finish_on_read`: the first read that
+        returns text ends the session (a research read needs one page; no model call is spent on saying done)."""
         if not hosts or not 1 <= max_steps <= 60:
             return UnitOutcome(False, reason="The browser has no approved site or step limit.")
         session = "bs_" + new_part_id()
@@ -242,6 +244,7 @@ class BrowseStepExecutor:
                     return UnitOutcome(False, reason="This site needs you to sign in; Tilo never enters credentials.")
                 if kind == "extract" and last["text"]:
                     extracted.append(last["text"])
+                    finishing = finishing or finish_on_read
                 history.append(kind)
                 if finishing:
                     outcome = "done"
@@ -272,7 +275,15 @@ class BrowseStepExecutor:
                     )
 
     def read_page(
-        self, *, unit: dict, agent: str, building: str, url: str, host: str, also: tuple[str, ...] = ()
+        self,
+        *,
+        unit: dict,
+        agent: str,
+        building: str,
+        url: str,
+        host: str,
+        also: tuple[str, ...] = (),
+        scrolls: int = READ_SCROLLS,
     ) -> str:
         """P0-RUNS-FIX: a research unit reads one allowlisted page in the visible browser, read-only and with no model:
         open it, look through it (READ_SCROLLS scrolls down), extract its text, close. Each step is a recorded
@@ -296,7 +307,7 @@ class BrowseStepExecutor:
         )
         outcome, steps = "error", 0
         reads: list[dict[str, Any]] = [
-            *({"kind": "scroll", "direction": "down"} for _ in range(READ_SCROLLS)),
+            *({"kind": "scroll", "direction": "down"} for _ in range(scrolls)),
             {"kind": "extract"},
         ]
         try:

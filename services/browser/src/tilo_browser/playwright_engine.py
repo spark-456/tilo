@@ -191,10 +191,10 @@ class PlaywrightDriver:
         return {"x": left, "y": top, "width": right - left, "height": bottom - top}
 
     def _settle(self) -> None:
-        """After a click or an Enter: the new page's content has loaded (its images may still come, up to 3 s more)."""
+        """After a click or an Enter: the new page's content has loaded (its images may still come, up to 2 s more)."""
         self.page.wait_for_load_state("domcontentloaded", timeout=10000)
         try:
-            self.page.wait_for_load_state("load", timeout=3000)
+            self.page.wait_for_load_state("load", timeout=2000)
         except Error:
             pass
 
@@ -238,7 +238,7 @@ class PlaywrightDriver:
         try:
             self.page.keyboard.press(key)
             try:
-                self.page.wait_for_url(lambda url: url != before, wait_until="domcontentloaded", timeout=5000)
+                self.page.wait_for_url(lambda url: url != before, wait_until="domcontentloaded", timeout=3000)
             except Error:
                 if self._aborted is not None:
                     raise
@@ -255,7 +255,7 @@ class PlaywrightDriver:
         x, y = float(point["x"]), float(point["y"])
         self.page.mouse.move(x, y)
         self.page.mouse.wheel(0, 600 if direction == "down" else -600)
-        self.page.wait_for_timeout(400)  # the wheel scrolls asynchronously: the frame is taken once it has
+        self.page.wait_for_timeout(250)  # the wheel scrolls asynchronously: the frame is taken once it has
         self.last_box = self._box({"x": x - 12, "y": y - 12, "width": 24, "height": 24})
 
     def find(self, selector: str) -> str:
