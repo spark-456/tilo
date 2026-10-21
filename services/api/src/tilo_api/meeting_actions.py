@@ -225,6 +225,8 @@ def _create_pin(w: Writer, args: PinArgs) -> tuple[int, dict[str, Any]]:
     if args.board == "team":
         me = w.stores.persons.get(w.org, w.actor)
         teams = sorted({m["team"] for m in (me.record["memberships"] if me is not None else [])})
+        if not teams:  # live 21 Oct: the owner is on no team, and "which team board?" hid that
+            return 409, {"outcome": "no_team"}
         if len(teams) != 1:
             return 409, {"outcome": "team_unclear"}
         team = teams[0]

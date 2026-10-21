@@ -10,7 +10,7 @@ allowlisted egress and masked secure fields. `BrowserWorker.close()` closes that
 - Image: `Dockerfile` runs `tilo_browser.app:app` (`/health` for Cloud Run smoke checks, `/healthz` for in-container probes; P0-07a, P0-07h); deploy: `docs/deploy-dev.md`.
 
 ## Code (`src/tilo_browser/`)
-- `egress.py` — `EgressPolicy.check`: deterministic allowlist; logs every `Decision`, never a query or userinfo.
+- `egress.py` — `EgressPolicy.check`: deterministic allowlist; logs every `Decision`, never a query or userinfo. `check_asset` (owner 21 Oct, BR-02 amendment, BQ-BROWSER-ASSETS): the first request for a page's image, stylesheet, font or media file may go to any public host (https, not internal, every resolved address public); everything else stays on the allowlist.
 - `masking.py` — `mask_text` / `mask_data`: the one masker for anything that leaves a worker.
 - `login.py` — `detect_login`, `secure_field_refs`, `build_login_card` (needs-you card; FR-CON-08).
 - `worker.py` — `BrowserWorker`, a `HandsProvider` over `engine.new_context(gate)`; one worker = one run. `playwright_engine.py` gates every main-frame redirect hop from the `request` event (a route handler sees only a chain's first URL) and sends frames as same-size 256-colour PNGs (`compact_png`, so a run's safety screen accepts them); `session.py` closes a session idle for config/browser.yaml `idle_timeout_s` (BR-12). DEMO-BROWSER: acts are real mouse and keyboard (click at the element's middle, click into a field and type, the wheel over `main`), each answering the box it acted on (`last_box`, the cursor); Enter only in a text or search field of a GET form (BR-05), a page navigation sent with any other method is refused (`needs_person`); a point picks the control under it before a role container.
@@ -32,7 +32,7 @@ allowlisted egress and masked secure fields. `BrowserWorker.close()` closes that
 - Section 6.2 `tilo-browser` row; FR-CON-07, FR-CON-08, FR-CON-13; LW-08; SEC-09 (egress allowlist).
 
 ## Local rules
-- One isolated browser per session; egress only through the allowlist proxy.
+- One isolated browser per session; egress only through the allowlist proxy (page assets: any public host, BR-02 amendment).
 - Secure fields (passwords, payment) are masked and never persisted or logged.
 - Tilo never types a credential: a login page raises a needs-you card, never a filled field.
 - `tilo-browser` cannot read Firestore or Cloud Storage business data directly.

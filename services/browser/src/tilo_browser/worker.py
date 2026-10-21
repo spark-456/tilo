@@ -67,7 +67,11 @@ class BrowserWorker(HandsProvider):
         self._closed = False
         self._driver = engine.new_context(self._gate)
 
-    def _gate(self, url: str, *, redirect_from: str | None = None) -> bool:
+    def _gate(self, url: str, *, redirect_from: str | None = None, asset: bool = False) -> bool:
+        """`asset`: the first request for an image, stylesheet, font or media file the page asks for (any public host,
+        BR-02 amendment); a redirect hop and every other request are checked against the allowlist."""
+        if asset and redirect_from is None:
+            return self._policy.check_asset(url).allowed
         return self._policy.check(url, redirect_from=redirect_from).allowed
 
     def _alive(self) -> None:

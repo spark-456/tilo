@@ -1,7 +1,10 @@
-"""Egress allowlist for browser workers (PRD 12.3, 16.2, SEC-09). Deterministic, no network.
+"""Egress allowlist for browser workers (PRD 12.3, 16.2, SEC-09). Deterministic, no network, except check_asset,
+which looks a host's addresses up once to keep page assets off private networks.
 
 `EgressPolicy.check` is the one gate every request passes (navigation, each redirect hop,
-subresources, a click's navigation). Anything it cannot parse unambiguously is blocked. A
+subresources, a click's navigation); a page's image, stylesheet, font or media file from another
+host passes `check_asset` instead (BR-02 amendment, owner 21 Oct). Anything it cannot parse
+unambiguously is blocked. A
 `Decision` is built from validated parts only: no userinfo, query or fragment, and anything
 secret-looking in the host or path masked, so the log and `EgressBlocked` messages cannot leak.
 """
@@ -32,7 +35,8 @@ MAX_URL_LENGTH = 8192
 @dataclass(frozen=True)
 class Decision:
     allowed: bool
-    reason: str  # allowed | host_not_allowlisted | scheme_not_allowed | ip_literal | invalid_url | sensitive_query
+    # allowed | public_asset | host_not_allowlisted | scheme_not_allowed | ip_literal | invalid_url | sensitive_query
+    reason: str
     url: str  # sanitised: no userinfo, no query, no fragment, secrets masked
     host: str | None  # lower-case, IDNA A-label form, secrets masked
     scheme: str | None
@@ -94,6 +98,7 @@ class EgressPolicy:
         self._schemes = {s.lower() for s in allow_schemes}
         self.decisions: list[Decision] = []
         self.blocked: list[Decision] = []
+        self._public_hosts: dict[str, bool] = {}
 
     def _add(self, entry: str) -> None:
         wildcard = entry.startswith("*.")
@@ -151,6 +156,37 @@ class EgressPolicy:
         d = self._decide(url)
         if redirect_from is not None:
             d = Decision(d.allowed, d.reason, d.url, d.host, d.scheme, sanitise_url(redirect_from))
+        return self._record(d)
+
+    def check_asset(self, url: str) -> Decision:
+        """Owner decision 21 Oct (BR-02 amendment, docs/open-questions.md BQ-BROWSER-ASSETS): an image, stylesheet,
+        font or media file a page asks for may come from any public host, so pages look as they do to a person. Such a
+        host is a plain DNS name, not an internal one, whose addresses are all public (no private, loopback, link-local
+        or metadata address: SSRF); the query check still holds. Navigations, clicks, searches and every other request
+        stay on the allowlist (`check`)."""
+        d = self._decide(url)
+        if d.reason == "host_not_allowlisted" and d.host and self._public(d.host):
+            d = Decision(True, "public_asset", d.url, d.host, d.scheme)
+            query = url.partition("#")[0].partition("?")[2]
+            decoded = unquote_plus(query)
+            if query and (mask_text(query) != query or mask_text(decoded) != decoded):
+                d = Decision(False, "sensitive_query", d.url, d.host, d.scheme)
+        return self._record(d)
+
+    def _public(self, host: str) -> bool:
+        """The host is a public DNS name: not internal by name, and every address it resolves to is public. Looked up
+        once a session; a name that does not resolve is not public."""
+        if host not in self._public_hosts:
+            from tilo_browser.fetch import default_dns_resolver, is_forbidden_hostname, is_public_ip
+
+            try:
+                addresses = [] if is_forbidden_hostname(host) else default_dns_resolver(host, 443)
+            except OSError:
+                addresses = []
+            self._public_hosts[host] = bool(addresses) and all(is_public_ip(a) for a in addresses)
+        return self._public_hosts[host]
+
+    def _record(self, d: Decision) -> Decision:
         self.decisions.append(d)
         if not d.allowed:
             self.blocked.append(d)
