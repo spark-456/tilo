@@ -12,6 +12,9 @@ const REFUSALS: Readonly<Record<string, string>> = {
   transcript_unavailable:
     "Tilo could not use this meeting's transcript: it has not passed the safety check yet, or it is no longer kept. Try again in a minute.",
   analysis_failed: "Tilo could not write minutes from this transcript. Try again.",
+  // MINUTES-TIME: the server stops waiting for a slow model after about a minute and a half
+  analysis_timed_out:
+    "Tilo could not write the minutes in time: the model service is slow right now. Try again in a minute.",
   allowance_capped: "Today's allowance for meeting minutes is used up. Try again tomorrow.",
   version_conflict: "The meeting changed while Tilo was working. Try again.",
   not_publishable: "Minutes for this meeting were already made. Review the stored minutes.",
@@ -58,6 +61,7 @@ export function MeetingMinutes({
       else
         setError(
           (e instanceof TiloApiError && e.code && REFUSALS[e.code]) ||
+            (e instanceof TiloApiError && e.status === 502 && REFUSALS.analysis_failed) ||
             "This step could not finish. Review the current meeting before trying again.",
         );
     } finally {
@@ -91,24 +95,20 @@ export function MeetingMinutes({
     if (result.minutes.recipients.length === 1 && result.minutes.recipients[0]?.self)
       setRecipients([result.minutes.recipients[0].id]);
   };
+  const analyze = () =>
+    void run(
+      async () => {
+        if (status === "ended") await api.analyze(id);
+        await read();
+      },
+      status === "ended"
+        ? "Writing the minutes. This takes up to a minute and a half; the transcript stays open meanwhile."
+        : "Working…",
+    );
   return (
     <div className="park-agenda-minutes" aria-label="Meeting minutes">
       {!minutes && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() =>
-            void run(
-              async () => {
-                if (status === "ended") await api.analyze(id);
-                await read();
-              },
-              status === "ended"
-                ? "Writing the minutes. This can take a few minutes; the transcript stays open meanwhile."
-                : "Working…",
-            )
-          }
-        >
+        <button type="button" disabled={busy} onClick={analyze}>
           {status === "ended" ? "Analyze minutes" : "Review minutes"}
         </button>
       )}
@@ -218,6 +218,11 @@ export function MeetingMinutes({
       {error && (
         <>
           <p role="alert">{error}</p>
+          {!minutes && status === "ended" && (
+            <button type="button" disabled={busy} onClick={analyze}>
+              Try again
+            </button>
+          )}
           {!minutes && (
             <button type="button" disabled={busy} onClick={() => void run(read)}>
               Review stored minutes

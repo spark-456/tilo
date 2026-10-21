@@ -80,6 +80,32 @@
   opacity: 0.45;
   cursor: default;
 }
+/* "Open in new tab" is a link that looks like the buttons beside it. */
+a.tilo-bv__button {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+/* Moving the window (desktop only): drag the bar, or focus the grip and press the arrow keys. */
+.tilo-bv__chrome[data-draggable="true"] {
+  cursor: grab;
+  touch-action: none;
+  user-select: none; /* a drag never selects the bar's words (selected words would start the browser's own drag) */
+}
+.tilo-bv__grip {
+  flex: none;
+  min-width: 28px;
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink2, #17334c);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: -2px;
+  cursor: grab;
+}
 /* Back on the map: under the map's own name tag, clear of the lens links (top right) and the zoom (bottom right). */
 .tilo-browser-chip {
   position: absolute;
@@ -275,6 +301,35 @@
 .tilo-bv--takeover .tilo-bv__label {
   text-align: center;
 }
+/* On its own page (/world/:id/browser): the same fill-the-parent layout, as a bordered card. */
+.tilo-bv--page {
+  border: 1px solid var(--line, #c7d7e7);
+  border-radius: 20px;
+}
+.tilo-bv-page {
+  position: relative;
+  height: calc(100dvh - 156px);
+  min-height: 460px;
+}
+.tilo-bv-page__title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.tilo-bv-page__empty {
+  display: block;
+  box-sizing: border-box;
+  margin: 0;
+  border: 1px solid var(--line, #c7d7e7);
+  border-radius: 20px;
+  background: var(--card, #f7fbff);
+  color: var(--ink, #17334c);
+  padding: 24px;
+  font-size: 16px;
+}
 /* A view narrower than a side list allows: the steps are a strip under the frame. */
 @container tilo-bv (max-width: 979px) {
   .tilo-bv__body {
@@ -301,15 +356,34 @@
   .tilo-bv__steps button {
     padding: 2px;
   }
-  /* A phone-wide view: the numbered strip is the step control (its last number follows the newest step), so the
-     frame keeps the room Earlier and Later would take. */
-  .tilo-bv__nav {
-    display: none;
-  }
+}
+/* A window the person dragged out of the map area (desktop only): an opaque card above the page content and below
+   dialogs, kept inside the window and below the fixed nav (its max height leaves the space above its top, set inline
+   with its place, and 8px below, so it never runs past the window's bottom even before it is measured). It sizes to its content, so the body is no longer a size container, and the frame keeps its 3:2
+   shape at the card's width. */
+.tilo-bv--floating {
+  position: fixed;
+  inset: auto;
+  z-index: 29; /* over the page and its run bar (25), under the nav (30) and its menus (31) */
+  width: min(720px, 92vw);
+  max-height: calc(100dvh - var(--tilo-bv-top, 84px) - 8px);
+  overflow: auto;
+  border: 1px solid var(--lineStrong, #9bb9ce);
+  border-radius: 20px;
+  padding: 12px;
+  box-shadow: var(--sh, 0 12px 32px rgba(0, 0, 0, 0.25));
+}
+.tilo-bv--floating .tilo-bv__body {
+  container-type: normal;
+  flex: none;
+  overflow: visible;
+}
+.tilo-bv--floating .tilo-bv__shot {
+  max-width: none;
 }
 @media (max-width: 760px) {
   .tilo-bv--takeover {
-    padding: 10px;
+    padding: 8px;
   }
   .tilo-bv {
     gap: 8px;
@@ -330,9 +404,6 @@
   .tilo-bv__stepname {
     display: none;
   }
-  .tilo-bv__bar {
-    flex-wrap: wrap;
-  }
   /* A phone's map stacks the lens links under the name tag: the chip goes under both. */
   .tilo-browser-chip {
     top: 128px;
@@ -350,6 +421,45 @@
     justify-content: center;
     min-width: 44px;
     min-height: 44px;
+  }
+}
+/* A phone-wide view: one row of chrome (a new tab is for a wider screen) and Earlier and Later as arrows beside the
+   line, so the frame keeps the width; the last numbered step follows the newest, as Latest does. The arrows are drawn,
+   the buttons keep their words for a screen reader. */
+@container tilo-bv (max-width: 520px) {
+  a.tilo-bv__newtab,
+  .tilo-bv__latest {
+    display: none;
+  }
+  .tilo-bv__nav {
+    order: -1; /* left of the line: the helper button rests bottom right */
+  }
+  .tilo-bv__nav .tilo-bv__button {
+    min-width: 44px;
+    padding: 0;
+    font-size: 0;
+  }
+  .tilo-bv__earlier::before {
+    content: "‹" / "";
+    font-size: 24px;
+    line-height: 1;
+  }
+  .tilo-bv__later::before {
+    content: "›" / "";
+    font-size: 24px;
+    line-height: 1;
+  }
+  .tilo-bv {
+    gap: 6px;
+  }
+  .tilo-bv__body {
+    gap: 8px;
+  }
+  .tilo-bv__frame {
+    gap: 4px;
+  }
+  .tilo-bv--takeover .tilo-bv__shot {
+    max-width: calc((100cqh - 74px) * 1.5);
   }
 }
 .tilo-browser__cursor {

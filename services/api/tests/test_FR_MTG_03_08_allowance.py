@@ -54,7 +54,7 @@ class Script:
     def __init__(self, left=0, during=None):
         self.left, self.during, self.calls = left, during, []
 
-    def generate(self, role, request, *, budget):
+    def generate(self, role, request, *, budget, deadline=None):  # the real Router takes a PL-03 deadline
         self.calls.append((role, request, budget))
         if self.during:
             self.during()

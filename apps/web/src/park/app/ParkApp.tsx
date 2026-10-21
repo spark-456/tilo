@@ -30,10 +30,14 @@ import { PendingWorldRoute } from "./PendingWorldRoute";
 import { ParkProvider, usePageApp, useSessionAuth, useWorldClient } from "./context";
 import { PageTitleContext } from "./pageTitle";
 import { PAGES } from "./pages";
-import { isHomeAddress, useParkRoute, useQuizAppRoute } from "./router";
+import { isHomeAddress, useBrowserRoute, useParkRoute, useQuizAppRoute } from "./router";
 
 const QuizPlayerPage = lazy(() =>
   import("../pages/QuizPlayer/QuizPlayerPage").then((m) => ({ default: m.QuizPlayerPage })),
+);
+// DEMO-BROWSER: Tilo's browser as a page of its own (/world/:id/browser), the "Open in new tab" address.
+const BrowserPage = lazy(() =>
+  import("../pages/World/BrowserPage").then((m) => ({ default: m.BrowserPage })),
 );
 
 // The landing visit (`/`) is the Home page: its chunk request starts when the shell module is evaluated, not
@@ -96,10 +100,19 @@ function Shell({ routed }: { routed?: RoutedView | undefined }) {
   const worldClient = useWorldClient();
   const route = useParkRoute();
   const quizRoute = useQuizAppRoute();
+  const browserRoute = useBrowserRoute();
   const [named, setNamed] = useState<string | null>(null);
   const title =
     named ??
-    (routed ? routed.title : route ? PAGE_LABEL[route.page] : quizRoute ? "Quiz" : "Not found");
+    (routed
+      ? routed.title
+      : route
+        ? PAGE_LABEL[route.page]
+        : quizRoute
+          ? "Quiz"
+          : browserRoute
+            ? "Tilo browser"
+            : "Not found");
   // A world is a different page per id; the other pages keep focus where it is when only a query changes.
   const routeKey = routed
     ? routed.routeKey
@@ -109,7 +122,9 @@ function Shell({ routed }: { routed?: RoutedView | undefined }) {
         : route.page
       : quizRoute
         ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
-        : "none";
+        : browserRoute
+          ? `world/${browserRoute.worldId}/browser`
+          : "none";
   useLayoutEffect(() => {
     const before = document.title;
     document.title = `${title} · Tilo`;
@@ -162,6 +177,8 @@ function Shell({ routed }: { routed?: RoutedView | undefined }) {
                 worldId={quizRoute.worldId}
                 artifactId={quizRoute.artifactId}
               />
+            ) : browserRoute ? (
+              <BrowserPage app={app} worldId={browserRoute.worldId} />
             ) : (
               <NotFound go={app.go} />
             )}
