@@ -27,7 +27,9 @@ _NO = re.compile(r"^\s*(no|nope|cancel|don't|do not|stop|never mind|nevermind|wa
 
 ACTIONS_TEXT = (
     "You can do exactly three things for the person speaking, and only when they clearly ask: create_pin "
-    '{"title", optional "body", "board": "personal" or "team"}, add_agenda_item {"title", optional "minutes"} to this '
+    '{"title", optional "body", "board": "personal" or "team"} (the board they named, now or in recent_exchanges, '
+    'e.g. your own question "what should I pin to the team board?"; "personal" only if no board was named), '
+    'add_agenda_item {"title", optional "minutes"} to this '
     'meeting\'s agenda, and create_meeting {"title", "start" (ISO 8601 with time zone, resolved from now_local), '
     '"minutes"}. To do one, reply {"reply": null, "action": {"name": ..., "args": {...}}} and nothing else; Tilo reads '
     "it back and acts only after the person says yes. Never say you have done anything, and you cannot send messages, "
@@ -72,7 +74,9 @@ def proposal(raw: Any, speaker: str, *, one_on_one: bool) -> PendingAction | Non
         return None
     clean: dict[str, Any] = {"title": title}
     if name == "create_pin":
-        clean["board"] = "team" if args.get("board") == "team" else "personal"
+        # Live 21 Oct the model wrote "Team"/"team board" and Tilo read back "your personal board": its value, normalised.
+        board = " ".join(str(args.get("board") or "").lower().split()).removeprefix("the ").removesuffix(" board")
+        clean["board"] = "team" if board == "team" else "personal"
         body = _title(args.get("body"))
         if body:
             clean["body"] = body
