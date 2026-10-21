@@ -10,11 +10,12 @@ import type { Decision, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { DecisionFields } from "../../app/DecisionFields";
 import { QuestionAnswer } from "../../app/QuestionAnswer";
-import { useParkApi } from "../../app/context";
+import { useParkApi, useSessionAuth } from "../../app/context";
 import { useFieldsFor } from "../../app/fieldsContext";
 import { Button } from "../../components";
 import { SampleBadge } from "../../sample/SampleBadge";
 import { SAMPLE_WORLD_ID } from "../../sample/sampleChoice";
+import { recipientNotes } from "../../shared/recipientNotes";
 import { EmptyState, ErrorState, Skeleton } from "../../studio/States";
 import "./Needs.css";
 import { ShowMe } from "./ShowMe";
@@ -251,6 +252,8 @@ function OneDecision({
 }) {
   const v = needView(d);
   const fieldsFor = useFieldsFor();
+  // MINUTES-ALL review: an address outside the signed-in person's own domain gets a note on the card they approve
+  const ownerEmail = useSessionAuth()?.user?.email ?? null;
   const item = useMemo(() => {
     const a = fieldsFor?.(d.world) ?? null;
     return a && isItemApi(a) ? a : null;
@@ -362,6 +365,13 @@ function OneDecision({
                   </span>
                 </div>
               ) : null}
+              {v.sent.to.flatMap((p) =>
+                recipientNotes(p, { ownerEmail }).map((n) => (
+                  <p key={`${p} ${n}`} className="park-needs__flag" role="note">
+                    {p}: {n}
+                  </p>
+                )),
+              )}
               {v.sent.item ? (
                 <div className="park-needs__sentrow">
                   <span className="park-needs__sentk">Item</span>

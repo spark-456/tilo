@@ -16,9 +16,15 @@ MINUTES_FLAG = "meeting.minutes.enabled"
 PersonId = Annotated[str, Field(pattern=r"^u_[0-9A-Za-z_]{1,48}$", max_length=50)]
 
 
+Address = Annotated[str, Field(min_length=3, max_length=254)]  # the format is checked by the follow-up adapter
+
+
 class FollowupIn(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    recipients: Annotated[list[PersonId] | None, Field(min_length=1, max_length=50)] = None
+    recipients: Annotated[list[PersonId] | None, Field(min_length=0, max_length=50)] = None
+    # MINUTES-ALL (owner, 21 Oct): addresses the Owner reviewed on the send list, and whether the transcript goes too
+    addresses: Annotated[list[Address] | None, Field(min_length=1, max_length=50)] = None
+    transcript: bool = False
 
     @field_validator("recipients")
     @classmethod
@@ -65,7 +71,16 @@ def followup(
     body: Annotated[FollowupIn, Depends(json_body(FollowupIn))],
     caller: Annotated[OwnerFollowupCaller, Depends(get_owner_followup_caller)],
 ) -> Any:
-    return caller.draft(meeting_id, recipients=body.recipients)
+    return caller.draft(meeting_id, recipients=body.recipients, addresses=body.addresses, transcript=body.transcript)
+
+
+@router.get("/v1/meetings/{meeting_id}/followup-recipients")
+def followup_recipients(
+    meeting_id: str,
+    caller: Annotated[OwnerFollowupCaller, Depends(get_owner_followup_caller)],
+) -> dict[str, Any]:
+    """MINUTES-ALL: the Owner's send list for "Send to everyone who joined": names and addresses on record only."""
+    return caller.recipients(meeting_id)
 
 
 def install_owner_minutes_routes(app: FastAPI, flags: FlagStore) -> bool:
