@@ -61,7 +61,16 @@ def test_FR_AGT_02_an_api_run_hands_run_plan_the_store_scope_archive_and_redacto
 
     (kw,) = seen
     rig, world_id = run_flow.rig, run_flow.world_id
-    assert kw.get("artifacts") is rig.store, "run_plan puts outputs on the store the seam gives"
+    store = kw.get("artifacts")
+    # DOCS-OUT / RESULT-LIVE: a run gets a run-local view of the seam's store (`with_upload_text`, `with_screener`), the
+    # same store over the same backends and redactor, so what the run puts is in the seam's store and nowhere else.
+    assert store is rig.store or (
+        type(store) is type(rig.store)
+        and store._meta is rig.meta
+        and store._blobs is rig.blobs
+        and store._redact is rig.store._redact
+    ), "run_plan puts outputs on the store the seam gives (itself, or a view sharing its backends)"
+    assert rig.store.head(run_flow.scope(), run_flow.artifact_of("U1")) is not None, "read back from the seam's store"
     assert kw.get("redact") is rig.redactor, "and passes on the shared secret redactor (MF-06)"
     scope = kw.get("scope")
     assert (scope.org_id, scope.world_id, scope.owner) == (deps.ORG_ID, world_id, FLOW_USER), "the run's Scope"
@@ -181,7 +190,9 @@ def test_FR_AGT_02_a_run_whose_store_cannot_be_built_starts_no_run_and_stores_no
     assert run_flow.approve().status_code == 200  # the grant is the person's; a run that cannot start never changes it
 
     run_flow.quiet_stream()
-    assert {e["type"] for e in run_flow.after_grant()} <= {"world.failed"}, run_flow.types()
+    assert {e["type"] for e in run_flow.after_approval()} <= {"world.failed"}, (
+        run_flow.types()
+    )  # MK-06 picks are the grant's
     assert run_flow.runner.ran == [], "no unit started without a store to put its work on"
     assert run_flow.rig.meta.paths("") == [] and run_flow.rig.blobs.keys("") == []
     assert run_flow.outbox_store.all_entries() == [] and run_flow.adapter.sent == []

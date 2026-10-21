@@ -11,9 +11,10 @@ Ticket scope (test-writer brief, PROD-WIRE-4):
     `Idempotency-Key` (plus the three
     CORS-safelisted names that Starlette's stock middleware always lists; they grant nothing). Nothing else.
   * Methods: the ones the routers use (GET, POST, PUT, PATCH, DELETE) plus OPTIONS for the preflight.
-  * A preflight is answered before the SEC-15 gate and before `_NoStore`: 200/204, never 401/403/503, and neither the
-    principal nor the access store is called. The gate's own refusals (401, 403, 503) still carry the CORS headers, so
-    the browser can read them.
+  * A preflight is answered before the SEC-15 gate and before `_NoStore`: 200/204, never 401/403/503, and none of the
+    gate's per-person state is touched: the principal is not resolved and the SEC-16 rate limiter is not counted (the
+    access store it read before OPEN-ACCESS no longer exists), and nothing is stored, screened or sent to a model. The
+    gate's own refusals (401, 403, 503) still carry the CORS headers, so the browser can read them.
   * A disallowed origin gets no `Access-Control-Allow-Origin` at all. `Vary: Origin` is on every answer to an allowed
     origin.
   * Not deployed: the production allowlist adds nothing. Dev mode's own CORS (`tilo_api.dev`) is untouched and does
@@ -94,7 +95,7 @@ def tokens(response, name: str) -> set[str]:
 @pytest.fixture()
 def deployed(sec15_factory, monkeypatch):
     """The real app, deployed-style (K_SERVICE set), a visitor signed in, with spies on the principal seam and on the
-    access store so a test can say what a preflight must not touch."""
+    gate's SEC-16 rate limiter so a test can say what a preflight must not touch."""
     monkeypatch.delenv("TILO_API_STORE", raising=False)
     sec = sec15_factory(declarations={VISITOR: "visitor", JUDGE: "judge"})
     sec.as_user(VISITOR)
@@ -107,6 +108,16 @@ def deployed(sec15_factory, monkeypatch):
 
     app.dependency_overrides[deps.get_current_principal] = principal_spy
     sec.principal_calls = calls
+    limiter, checks = app.dependency_overrides[deps.get_rate_limiter](), []
+
+    class LimiterSpy:
+        def check(self, uid):
+            checks.append(uid)
+            return limiter.check(uid)
+
+    spy = LimiterSpy()
+    app.dependency_overrides[deps.get_rate_limiter] = lambda: spy
+    sec.limiter_checks = checks
     return sec
 
 
@@ -128,6 +139,7 @@ def test_PROD_WIRE_4_a_preflight_to_a_gated_route_is_answered_before_the_gate_an
     deployed, method, path, asked
 ):
     deployed.sign_out()  # had the gate run, it would answer 401: the preflight must never reach it
+    before = deployed.snapshot()
     for origin in ALLOWED:
         response = preflight(deployed.client, path, origin, method, asked)
 
@@ -135,7 +147,11 @@ def test_PROD_WIRE_4_a_preflight_to_a_gated_route_is_answered_before_the_gate_an
         assert response.headers.get("access-control-allow-origin") == origin
         assert method.lower() in {m.lower() for m in tokens(response, "access-control-allow-methods")}
     assert deployed.principal_calls == [], "a preflight must not resolve the principal"
-    assert deployed.access.reads == [] and deployed.access.writes == [], "a preflight must not touch the access store"
+    assert deployed.limiter_checks == [], "a preflight must not count against anyone's rate limit"
+    assert deployed.snapshot() == before, "a preflight stores, screens and asks a model nothing"
+    deployed.as_user(VISITOR)  # anchor: the same spies see a real request, so the empty lists above say something
+    deployed.client.get("/worlds", headers={"Origin": WEB_APP})
+    assert deployed.principal_calls and deployed.limiter_checks == [VISITOR]
 
 
 # --- disallowed origins ---------------------------------------------------------------------------------------

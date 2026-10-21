@@ -544,6 +544,21 @@ class RunFlow:
         granted = next((i for i, e in enumerate(events) if e["type"] == "budget.granted"), -1)
         return events[granted + 1 :]
 
+    def after_approval(self) -> list[dict[str, Any]]:
+        """What follows the approval's own save. That save is `budget.granted` and, right after it, one
+        `plan.maker_chosen` per deliverable with a maker choice, caused by that grant (makers.rules.md MK-06: the
+        person's pick, written "in the same save as the budget grant"). Only those are skipped; anything else, a maker
+        event with another cause included, is the run's and stays in."""
+        events = self.stream()
+        granted = next((i for i, e in enumerate(events) if e["type"] == "budget.granted"), None)
+        if granted is None:
+            return events
+        rest = events[granted + 1 :]
+        grant_id, skip = events[granted]["id"], 0
+        while skip < len(rest) and rest[skip]["type"] == "plan.maker_chosen" and rest[skip]["cause"] == grant_id:
+            skip += 1
+        return rest[skip:]
+
     def cards(self):
         return self.flow.client.get(f"/worlds/{self.world_id}/cards")
 
