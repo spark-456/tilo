@@ -357,29 +357,45 @@ a.tilo-bv__button {
     padding: 2px;
   }
 }
-/* A window the person dragged out of the map area (desktop only): an opaque card above the page content and below
-   dialogs, kept inside the window and below the fixed nav (its max height leaves the space above its top, set inline
-   with its place, and 8px below, so it never runs past the window's bottom even before it is measured). It sizes to its content, so the body is no longer a size container, and the frame keeps its 3:2
-   shape at the card's width. */
-.tilo-bv--floating {
-  position: fixed;
-  inset: auto;
-  z-index: 29; /* over the page and its run bar (25), under the nav (30) and its menus (31) */
-  width: min(720px, 92vw);
-  max-height: calc(100dvh - var(--tilo-bv-top, 84px) - 8px);
+/* The window on the World page (desktop): an opaque card that sizes to its content (the frame keeps 3:2 at the card's
+   width), with its own steps strip. In the map's corner by default, the map round it (owner, 21 Oct: "see the world
+   while the browser works"); once dragged, a floating card anywhere on screen, above the page content and below the nav
+   and dialogs, kept on screen (its max height leaves the space above its top, set inline with its place, and 8px below,
+   so it never runs past the window's bottom even before it is measured). */
+.tilo-bv--window {
+  z-index: 4;
   overflow: auto;
   border: 1px solid var(--lineStrong, #9bb9ce);
   border-radius: 20px;
   padding: 12px;
   box-shadow: var(--sh, 0 12px 32px rgba(0, 0, 0, 0.25));
+  container: tilo-bv / inline-size;
 }
-.tilo-bv--floating .tilo-bv__body {
-  container-type: normal;
+.tilo-bv--window .tilo-bv__body {
   flex: none;
   overflow: visible;
 }
-.tilo-bv--floating .tilo-bv__shot {
-  max-width: none;
+/* In the corner its bar takes two rows: the badge and the address, then the buttons. */
+.tilo-bv--card {
+  position: absolute;
+  top: 72px;
+  right: 20px;
+  width: min(480px, calc(100% - 40px));
+  max-height: calc(100% - 92px);
+}
+.tilo-bv--card .tilo-bv__chrome {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+.tilo-bv--card .tilo-bv__actions {
+  flex: 1 1 100%;
+  justify-content: flex-end;
+}
+.tilo-bv--floating {
+  position: fixed;
+  z-index: 29; /* over the page and its run bar (25), under the nav (30) and its menus (31) */
+  width: min(720px, 92vw);
+  max-height: calc(100dvh - var(--tilo-bv-top, 84px) - 8px);
 }
 @media (max-width: 760px) {
   .tilo-bv--takeover {
@@ -427,7 +443,7 @@ a.tilo-bv__button {
    line, so the frame keeps the width; the last numbered step follows the newest, as Latest does. The arrows are drawn,
    the buttons keep their words for a screen reader. */
 @container tilo-bv (max-width: 520px) {
-  a.tilo-bv__newtab,
+  .tilo-bv--takeover a.tilo-bv__newtab,
   .tilo-bv__latest {
     display: none;
   }

@@ -14,6 +14,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -142,6 +143,7 @@ def _reader(monkeypatch, steps=STEPS, typed=("wikipedia.org",)):
     model = FakeModel(steps)
     runner.run_owner, runner.mode, runner.budget = run, "live", None
     runner.providers, runner.typed, runner.hosts = {"computer_use": model}, frozenset(typed), set(typed)
+    runner.browser_lock, runner.safety = threading.Lock(), FakeSafety()
     return runner.page_reader({"id": "U2", "district": "D1", "title": "Find the figure"}, "A_s2"), rpc, run, model
 
 
@@ -187,10 +189,116 @@ def test_DEMO_BROWSER_a_named_site_covers_its_subdomains_only(monkeypatch, host,
     assert runner.named_site(host) is named
 
 
-def test_DEMO_BROWSER_a_failed_session_falls_back_like_an_unavailable_browser(monkeypatch):
-    from tilo_browser.session import SessionRefused
+class FakeSafety:
+    """The run's safety screen, recorded: flags text that holds `flag`."""
 
-    read, _rpc, run, _model = _reader(monkeypatch, steps=[{"kind": "fly"}] * 3)
-    with pytest.raises(SessionRefused):
-        read("https://en.wikipedia.org/wiki/Japan", "en.wikipedia.org")
-    assert run.events[-1][0] == "agent.working"  # the person is told the page was read directly
+    def __init__(self, flag: str = "<<flag>>"):
+        self.flag, self.screened = flag, []
+
+    def check(self, text):
+        self.screened.append(text)
+        return {"flagged": self.flag in text}
+
+
+def test_DEMO_BROWSER_a_session_the_model_cannot_finish_is_read_in_the_browser_without_it(monkeypatch):
+    read, rpc, run, _model = _reader(monkeypatch, steps=[{"kind": "fly"}] * 3)
+    assert read("https://en.wikipedia.org/wiki/Japan", "en.wikipedia.org") == "First. Second. Third."
+    assert rpc.calls == ["start", "end", "start", *["scroll"] * READ_SCROLLS, "extract", "end"]
+    assert [kind for kind, _ in run.events].count("browser.started") == 2
+
+
+def test_DEMO_BROWSER_a_model_that_stays_busy_is_read_in_the_browser_without_it(monkeypatch):
+    """Live 21 Oct: every computer_use call hit a quota or 503, the read fell to a direct fetch, which Wikipedia's
+    list pages are too large for. Now the model gets two more tries, then the page is read in the browser anyway."""
+    from tilo_api import run_tools
+    from tilo_providers.errors import QuotaError
+
+    waits: list[float] = []
+    monkeypatch.setattr(run_tools, "pause", waits.append)
+    read, rpc, _run, model = _reader(monkeypatch)
+
+    def busy(request, budget):
+        model.prompts.append(request.prompt)
+        raise QuotaError("rate limited")
+
+    model.generate_budgeted = busy
+    assert read("https://en.wikipedia.org/wiki/Japan", "en.wikipedia.org") == "First. Second. Third."
+    assert waits == list(run_tools.BROWSER_RETRY_WAITS) and len(model.prompts) == 3
+    assert rpc.calls[-(READ_SCROLLS + 3) :] == ["start", *["scroll"] * READ_SCROLLS, "extract", "end"]
+
+
+def test_DEMO_BROWSER_a_busy_model_that_comes_back_carries_on(monkeypatch):
+    from tilo_api import run_tools
+    from tilo_providers.errors import RetryableError
+
+    monkeypatch.setattr(run_tools, "pause", lambda _seconds: None)
+    read, rpc, _run, model = _reader(monkeypatch, steps=[{"kind": "extract"}, {"kind": "done"}])
+    real, failures = model.generate_budgeted, iter([RetryableError("503")])
+
+    def flaky(request, budget):
+        error = next(failures, None)
+        if error:
+            raise error
+        return real(request, budget)
+
+    model.generate_budgeted = flaky
+    assert read("https://en.wikipedia.org/wiki/Japan", "en.wikipedia.org") == "First. Second. Third."
+    assert rpc.calls == ["start", "extract", "end"]
+
+
+# --- a run whose task names a site: each research unit uses that site in the browser first ---
+
+
+def _site_reader(monkeypatch, steps=STEPS, *, typed=("wikipedia.org",), safety=None, upstream=()):
+    from tilo_api import run_tools
+
+    _read, rpc, run, model = _reader(monkeypatch, steps=steps, typed=typed)  # its browser and model, a fresh runner
+
+    runner = object.__new__(run_tools.BoundRunRunner)
+    runner.run_owner, runner.mode, runner.budget = run, "live", None
+    runner.providers, runner.typed, runner.hosts = {"computer_use": model}, frozenset(typed), set(typed)
+    runner.browser_lock, runner.safety = threading.Lock(), safety or FakeSafety()
+    context = SimpleNamespace(agent_id="A_s2", upstream=tuple(upstream), skills=())
+    unit = {"id": "U2", "district": "D1", "title": "Find the tallest building in India", "role": "specialist"}
+    return runner.site_reading(unit, context), rpc, run, model, runner
+
+
+def test_DEMO_BROWSER_a_named_site_is_searched_from_its_front_page_for_the_units_step(monkeypatch):
+    items, rpc, _run, model, runner = _site_reader(monkeypatch)
+    assert rpc.starts[0]["start_url"] == "https://wikipedia.org/"
+    assert rpc.calls == ["start", "inspect", "type", "inspect", "click", "scroll", "extract", "end"]
+    assert "Find the tallest building in India" in model.prompts[0]
+    assert [(i.unit_id, i.title, i.text, i.screening) for i in items] == [
+        ("browser", "What Tilo's browser read on wikipedia.org", "First. Second. Third.", "clean")
+    ]
+    assert runner.safety.screened == ["First. Second. Third."], "screened like a tool result before any model sees it"
+
+
+def test_DEMO_BROWSER_what_the_screen_does_not_clear_never_reaches_the_unit(monkeypatch):
+    items, _rpc, _run, _model, _runner = _site_reader(monkeypatch, safety=FakeSafety(flag="Second"))
+    assert items == ()
+
+
+def test_DEMO_BROWSER_no_named_site_no_model_or_private_data_means_no_session(monkeypatch):
+    from tilo_harness.unit_prompt import UpstreamItem
+
+    items, rpc, *_ = _site_reader(monkeypatch, typed=())
+    assert items == () and rpc.calls == []
+    private = UpstreamItem("U1", "Mail", "text", screening="clean", private=True)
+    items, rpc, *_ = _site_reader(monkeypatch, upstream=(private,))
+    assert items == () and rpc.calls == [], "WT-04: a unit holding the person's private data has no web egress"
+
+
+def test_DEMO_BROWSER_a_unit_reads_the_web_unless_its_skill_says_otherwise():
+    from tilo_api.run_tools import uses_web
+
+    assert uses_web(SimpleNamespace(skills=()))
+    assert uses_web(SimpleNamespace(skills=(SimpleNamespace(tools_allowed=("web_search", "fetch_url")),)))
+    assert not uses_web(SimpleNamespace(skills=(SimpleNamespace(tools_allowed=("read_email",)),)))
+
+
+def test_DEMO_BROWSER_one_browser_session_at_a_time_in_a_run(monkeypatch):
+    _items, _rpc, _run, _model, runner = _site_reader(monkeypatch, typed=())
+    inside: list[bool] = []
+    runner.one_session(lambda: inside.append(runner.browser_lock.locked()))
+    assert inside == [True] and not runner.browser_lock.locked()
