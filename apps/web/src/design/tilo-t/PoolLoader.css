@@ -39,3 +39,5 @@
 .tt-plan-card__text{display:flex;flex-direction:column;gap:2px;min-width:0}
 .tt-plan-card__text strong{font-size:14px;letter-spacing:-.2px}
 .tt-plan-card__text span{color:var(--ink2,#46464a);font-family:var(--mono,monospace);font-size:12px;overflow-wrap:anywhere}
+/* UX-SMOOTH: the task's own words, two lines at most (the whole text is the hover title). */
+.tt-plan-card__text .tt-plan-card__goal{font-family:inherit;color:var(--ink,#0b0b0c);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}

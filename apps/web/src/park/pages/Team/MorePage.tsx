@@ -1,6 +1,7 @@
 import type { AppCtx, PageId } from "../../app/AppCtx";
 import { Button, PageSheet } from "../../components";
 import { AppLink } from "../../shared/AppLink";
+import "./More.css";
 export function MorePage({ app }: { app: AppCtx }) {
   const links: [string, PageId, string?][] = [
     ["Email Autopilot", "team", "mail"],
@@ -17,7 +18,7 @@ export function MorePage({ app }: { app: AppCtx }) {
     <div data-testid="park-page-more">
       <PageSheet>
         <h1>More</h1>
-        <nav aria-label="More pages">
+        <nav aria-label="More pages" className="park-more-nav">
           {(
             [
               ["Library", "/library"],
@@ -30,6 +31,7 @@ export function MorePage({ app }: { app: AppCtx }) {
           ).map(([label, path]) => (
             <AppLink
               key={path}
+              className="park-btn park-btn--secondary park-btn--md"
               to={`${path}${app.params.world ? `${path.includes("?") ? "&" : "?"}world=${encodeURIComponent(app.params.world)}` : ""}`}
             >
               {label}

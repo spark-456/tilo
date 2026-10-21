@@ -8,6 +8,7 @@ import { API_METHODS, type Api, type ApiMethod } from "./index";
 // person makes clears it, so a page never shows a decision or setting that was just changed as it was before.
 import { carryOneStep } from "./oneStep";
 import { carryQuizReader } from "./quizApps";
+import { onForgetReads } from "./readCache";
 import { carryResultReader } from "./results";
 import { carrySkillFixer } from "./skillFixes";
 import type { ApiResult } from "./types";
@@ -63,6 +64,7 @@ export function withSwr(
   const out = { ...api } as unknown as Record<ApiMethod, AnyCall>;
   const calls = api as unknown as Record<ApiMethod, AnyCall>;
   const forgetAll = () => cache.clear();
+  onForgetReads(forgetAll); // a started run forgets too (readCache.ts)
 
   for (const method of READS) {
     out[method] = (...args) => {
