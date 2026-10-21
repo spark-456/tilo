@@ -27,14 +27,14 @@ from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError, field_validator, model_validator
 from tilo_harness.schedule import tick_caller_ok
 from tilo_people.names import match_name
 
-from tilo_api import deps, meeting_action_claims, schedules
+from tilo_api import deps, ephemeral, meeting_action_claims, schedules
 from tilo_api.meeting_action_claims import MAX_ACTIONS, ActionClaim, ActionClaims
 from tilo_api.people_events import WorkEvents
 from tilo_api.people_meetings import MeetingEditIn, edit_meeting
@@ -155,6 +155,9 @@ async def run_action(request: Request) -> JSONResponse:
         return _out(401, {"error": "unauthenticated"}, "-", "unauthenticated")
     if not isinstance(claims, Mapping) or not tick_caller_ok(claims, audience=audience, caller=caller):
         return _out(403, {"error": "forbidden"}, "-", "forbidden")
+    # The bot's call carries no Firebase sign-in: after the OIDC check above (and only then) the seams hand out the
+    # durable stores without resolving a principal, the schedule tick's pattern. Without it every seam was a 401.
+    ephemeral.mark_no_person(request)
     raw = await _read_body(request)
     try:
         if raw is None:
@@ -183,7 +186,8 @@ def _decide(request: Request, body: ActionRequest, args: _Closed) -> JSONRespons
             code = refusal.status_code
             status, answer = (code if code in (404, 409) else 409), {"outcome": "refused"}
         except Exception as exc:  # a store or seam failure: never the record's text or the cause
-            logger.warning("meeting action failed (%s)", type(exc).__name__)
+            seam = exc.status_code if isinstance(exc, HTTPException) else "-"
+            logger.warning("meeting action failed (%s %s)", type(exc).__name__, seam)
             return _out(503, {"outcome": "unavailable"}, body.action, "unavailable")
         if status == 200:
             claim.done += 1

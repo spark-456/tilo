@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
+import time
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any, cast
@@ -12,7 +13,7 @@ from fastapi import Request
 from tilo_memory.artifacts import ArtifactStore
 from tilo_metering.flags import FlagStore
 from tilo_providers.interfaces import SafetyProvider
-from tilo_providers.router import Router
+from tilo_providers.router import Deadline, Router
 
 from tilo_api import deps, spend, team_access, team_store
 from tilo_api.assistant.metering import SpendLedger
@@ -21,6 +22,12 @@ from tilo_api.meeting_minutes import analyze_and_publish_minutes, screen_transcr
 from tilo_api.people_meetings import _mine
 from tilo_api.people_quotes import GONE
 from tilo_api.people_writes import Refusal, Writer
+
+# MINUTES-TIME (21 Oct: one analysis took 501 s, each hung Gemini call waiting out its 120 s request timeout): the
+# owner's minutes request finishes or says so within about a minute and a half.
+ANALYSIS_CALL_SECONDS = 60.0  # one model call, its 5xx retries and the role's configured fallback included
+ANALYSIS_TOTAL_SECONDS = 85.0  # the analyst and the verifier together
+FIRST_SHARE = 0.6  # a candidate with a fallback behind it waits at most this share of the time left (intake's value)
 
 
 class _Calls:
@@ -75,11 +82,19 @@ class _Calls:
 
 
 class _Router:
-    def __init__(self, router: Router, calls: _Calls) -> None:
+    """Holds each call as a unit (`_Calls`). With `total_s` (the owner's minutes request, MINUTES-TIME) every call gets
+    the router's own PL-03 deadline: at most `ANALYSIS_CALL_SECONDS` and never past the request's total, and a
+    candidate with a fallback behind it waits only `FIRST_SHARE` of what is left, so a hung primary hands over."""
+
+    def __init__(self, router: Router, calls: _Calls, *, total_s: float | None = None) -> None:
         self.router, self.calls = router, calls
+        self.until = None if total_s is None else time.monotonic() + total_s
 
     def generate(self, role: str, request: Any, *, budget: float) -> Any:
-        return self.calls.invoke(lambda: self.router.generate(role, request, budget=budget))
+        if self.until is None:
+            return self.calls.invoke(lambda: self.router.generate(role, request, budget=budget))
+        deadline = Deadline(min(time.monotonic() + ANALYSIS_CALL_SECONDS, self.until), FIRST_SHARE)
+        return self.calls.invoke(lambda: self.router.generate(role, request, budget=budget, deadline=deadline))
 
 
 class _Safety:
@@ -151,7 +166,7 @@ def analyze_owner_minutes(
     if mode == "live":
         screen_transcript_again(w, store, artifacts, meeting_id)
     with allowance_router(
-        _Router(router, calls),
+        _Router(router, calls, total_s=ANALYSIS_TOTAL_SECONDS),
         ledger=allowance,
         user=w.actor,
         clock=clock or (lambda: w.now),

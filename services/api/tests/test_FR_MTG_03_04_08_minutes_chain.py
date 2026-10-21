@@ -35,7 +35,7 @@ def chain(caller_app, monkeypatch):  # noqa: F811
     original = copy.deepcopy(c.router.doc)
 
     class Router:
-        def generate(self, role, request, *, budget):
+        def generate(self, role, request, *, budget, deadline=None):  # the real Router takes a PL-03 deadline
             c.calls.append(role)
             if c.during is not None:
                 c.during(role)
