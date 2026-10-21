@@ -63,7 +63,7 @@ from tilo_harness.branch import Checkpoint, hit_summary, reusable_units
 from tilo_harness.config import AgentsConfig
 from tilo_harness.context_handoff import context_pct, next_spare, note_is_valid, store_note
 from tilo_harness.failure import crash_reason, error_trail
-from tilo_harness.must_ask import Ask, Assumption, MustAsk
+from tilo_harness.must_ask import Ask, Assumption, MustAsk, typed_answer
 from tilo_harness.outputs import Kept, UnitOutput, existing, keep
 from tilo_harness.question_wait import Answer, QuestionWait
 from tilo_harness.schedule_dates import WindowFail, date_window_fail
@@ -519,8 +519,11 @@ class _Run:
         answer: Answer | None = None
         decision: str | None = None
         intake_answers = self.intake_answers
-        if self.must_ask is not None:
-            ask = await self.must_ask.assess(unit)  # no failure count yet: retries arrive with FR-AGT-13
+        inputs_needed = getattr(self.must_ask, "inputs_needed", None)  # a stand-in must-ask may not have it
+        needed = inputs_needed(unit) if callable(inputs_needed) else None  # TS-19: before any model call
+        while self.must_ask is not None:
+            # no failure count yet: retries arrive with FR-AGT-13
+            ask = needed if needed is not None else await self.must_ask.assess(unit)
             if isinstance(ask, Assumption):
                 # BQ-ASSUME-1: a model-raised ambiguity or trade-off does not stop the run. The assumption is one
                 # visible event, and the unit is told the question with the answer assumed, like an intake answer.
@@ -576,6 +579,15 @@ class _Run:
                     summary = f"The agent left without starting: {why} held this step."
                     self.emit("agent.retired", lead, worker, summary, {}, cause=cause, **at)
                     return UnitOutcome(success=False, summary="The step was held, so it did not run.")
+            if not isinstance(needed, Ask) or ask is not needed:
+                break
+            # TS-19: the value the person typed belongs to the whole run (every later unit is told it, like an intake
+            # answer); then this unit's own checks still run, so a step that acts outside Tilo is still asked about.
+            if (value := typed_answer(answer)) is not None:
+                self.intake_answers = (*self.intake_answers, (needed.question, value))
+                intake_answers = (*intake_answers, (needed.question, value))
+                self.must_ask.answered(needed.question, value)
+            needed = None
         try:
             loaded = tuple(self.skills.load_pinned(skill_id, self.pins) for skill_id in unit["skills"])
         except SkillError as error:

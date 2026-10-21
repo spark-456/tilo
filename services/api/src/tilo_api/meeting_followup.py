@@ -228,7 +228,7 @@ def draft_owner_followup(
         directory, items, addresses = w.org_directory(), {}, {}
         item_versions, people_versions = [], []
         audience = set(picks) | {w.actor}
-        if not set(picks) <= {a["user"] for a in m["attendees"]}:
+        if not set(picks) <= {a["user"] for a in m["attendees"]} | {w.actor}:  # MINUTES-ME: the Owner may pick themself
             raise Refusal(422, "invalid_recipients")
         for action in doc["action_items"]:
             key = action.get("work_item_id")
@@ -328,7 +328,7 @@ def draft_owner_followup(
     if principal.demo_session or getattr(request.state, "demo_session", False) is True:
         mode = "replay"
     router: Any = deps.router_for_mode(mode)
-    safety = deps.get_safety(mode)
+    safety = deps.safety_for_mode(mode)  # MINUTES-SCREEN: held per call by `calls`, so live when deployed
     calls = _FollowupCalls(request, w, switches, mode, run_id)
     left = budget
 

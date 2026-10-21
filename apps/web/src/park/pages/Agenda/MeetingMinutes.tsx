@@ -1,6 +1,32 @@
 import { useState } from "react";
 import { TiloApiError } from "../../../api/http";
-import type { DraftCard, MeetingMinutesApi, MinutesView } from "../../api/live/meetingMinutes";
+import type {
+  DraftCard,
+  MeetingMinutesApi,
+  MinutesView,
+  TranscriptView,
+} from "../../api/live/meetingMinutes";
+
+/** MINUTES-SCREEN: the server's stable refusal word, said in plain words; anything else keeps the general sentence. */
+const REFUSALS: Readonly<Record<string, string>> = {
+  transcript_unavailable:
+    "Tilo could not use this meeting's transcript: it has not passed the safety check yet, or it is no longer kept. Try again in a minute.",
+  analysis_failed: "Tilo could not write minutes from this transcript. Try again.",
+  allowance_capped: "Today's allowance for meeting minutes is used up. Try again tomorrow.",
+  version_conflict: "The meeting changed while Tilo was working. Try again.",
+  not_publishable: "Minutes for this meeting were already made. Review the stored minutes.",
+  analysis_inputs_unavailable:
+    "This meeting has no start time recorded, so Tilo cannot make minutes for it.",
+};
+const SCREENING_NOTES: Readonly<Record<string, string>> = {
+  flagged: "The safety check flagged this transcript, so Tilo makes no minutes from it.",
+  unscreened:
+    "The safety check has not passed this transcript yet. Analyze minutes checks it again.",
+};
+const clock = (ms: number) => {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+};
 
 /** Explicit owner actions only. Confirmation and drafting are separate person decisions. */
 export function MeetingMinutes({
@@ -15,23 +41,55 @@ export function MeetingMinutes({
   const [recipients, setRecipients] = useState<string[]>([]);
   const [cards, setCards] = useState<DraftCard[]>([]);
   const [hidden, setHidden] = useState(false);
+  const [transcript, setTranscript] = useState<TranscriptView | null>(null);
+  const [transcriptNote, setTranscriptNote] = useState("");
+  // MINUTES-ME: the transcript loads on its own, so a long analysis never holds it (21 Oct: 8 minutes of "Working…")
+  const [loadingTranscript, setLoadingTranscript] = useState(false);
+  const [working, setWorking] = useState("Working…");
   if (hidden || !["ended", "minuted"].includes(status)) return null;
-  const run = async (action: () => Promise<void>) => {
+  const run = async (action: () => Promise<void>, note = "Working…") => {
     setBusy(true);
+    setWorking(note);
     setError("");
     try {
       await action();
     } catch (e) {
       if (e instanceof TiloApiError && e.status === 404) setHidden(true);
-      else setError("This step could not finish. Review the current meeting before trying again.");
+      else
+        setError(
+          (e instanceof TiloApiError && e.code && REFUSALS[e.code]) ||
+            "This step could not finish. Review the current meeting before trying again.",
+        );
     } finally {
       setBusy(false);
+    }
+  };
+  const toggleTranscript = async () => {
+    if (transcript) {
+      setTranscript(null);
+      return;
+    }
+    setLoadingTranscript(true);
+    setTranscriptNote("");
+    try {
+      setTranscript(await api.transcript(id));
+    } catch (e) {
+      setTranscriptNote(
+        e instanceof TiloApiError && e.status === 404
+          ? "No transcript is kept for this meeting."
+          : "The transcript could not be loaded. Try again.",
+      );
+    } finally {
+      setLoadingTranscript(false);
     }
   };
   const read = async () => {
     const result = await api.read(id);
     setMinutes(result.minutes);
     setConfirmed(result.confirmed);
+    // MINUTES-ME: with nobody else linked, the Owner's own address ("Me") is the one choice: picked for them
+    if (result.minutes.recipients.length === 1 && result.minutes.recipients[0]?.self)
+      setRecipients([result.minutes.recipients[0].id]);
   };
   return (
     <div className="park-agenda-minutes" aria-label="Meeting minutes">
@@ -40,10 +98,15 @@ export function MeetingMinutes({
           type="button"
           disabled={busy}
           onClick={() =>
-            void run(async () => {
-              if (status === "ended") await api.analyze(id);
-              await read();
-            })
+            void run(
+              async () => {
+                if (status === "ended") await api.analyze(id);
+                await read();
+              },
+              status === "ended"
+                ? "Writing the minutes. This can take a few minutes; the transcript stays open meanwhile."
+                : "Working…",
+            )
           }
         >
           {status === "ended" ? "Analyze minutes" : "Review minutes"}
@@ -121,7 +184,37 @@ export function MeetingMinutes({
           )}
         </>
       )}
-      {busy && <output>Working…</output>}
+      <button
+        type="button"
+        disabled={loadingTranscript}
+        aria-expanded={transcript !== null}
+        onClick={() => void toggleTranscript()}
+      >
+        {transcript ? "Hide transcript" : "Show transcript"}
+      </button>
+      {loadingTranscript && <output>Loading the transcript…</output>}
+      {transcriptNote && <output>{transcriptNote}</output>}
+      {transcript && (
+        <section aria-label="Transcript">
+          <h3>Transcript</h3>
+          {SCREENING_NOTES[transcript.screening] ? (
+            <p>{SCREENING_NOTES[transcript.screening]}</p>
+          ) : null}
+          {transcript.lines.length ? (
+            <ol>
+              {transcript.lines.map((line) => (
+                <li key={line.id}>
+                  <span>{clock(line.atMs)}</span> <strong>{line.speaker ?? "Someone"}</strong>:{" "}
+                  {line.text}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p>Nobody was heard speaking in this meeting.</p>
+          )}
+        </section>
+      )}
+      {busy && <output>{working}</output>}
       {error && (
         <>
           <p role="alert">{error}</p>

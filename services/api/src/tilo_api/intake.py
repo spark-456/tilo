@@ -50,12 +50,13 @@ from tilo_api import deps, ephemeral, grounding, grounding_prompt, intake_reques
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.deps import get_safety  # the dependency key tests and callers override
 from tilo_api.intake_deadline import INTAKE_DEADLINE_DETAIL, load_intake_deadline
-from tilo_api.intake_refs import RefsRefused, parse_refs, tagged_skill
+from tilo_api.intake_refs import RefsRefused, parse_inputs, parse_refs, tagged_skill
 from tilo_api.intake_uploads import FILE_SCREEN_UNAVAILABLE, RunUploads, UploadStorageError
 from tilo_api.skills_route import SkillContext, skill_context_for
 from tilo_api.tasks import create_task
 
 router = APIRouter()
+MAX_SKILL_REQUEST = 2000  # SKILLS-E2E: the characters of a taught skill's run request its steps are shown
 
 _QUIZ_INTENT = re.compile(
     r"\b(?:quiz|interactive\s+(?:test|exam|assessment)|practice\s+test|mock\s+test|self[- ]?test)\b", re.I
@@ -69,11 +70,7 @@ def _website_intent_pattern() -> re.Pattern[str]:
     except Exception:
         kinds = ()
     website_phrases = {
-        alias
-        for kind in kinds
-        if kind.format == "website"
-        for alias in (kind.label, *kind.aliases)
-        if alias.strip()
+        alias for kind in kinds if kind.format == "website" for alias in (kind.label, *kind.aliases) if alias.strip()
     } or {"website", "web app", "app", "questionnaire"}
     sorted_phrases = sorted(website_phrases, key=len, reverse=True)
     parts = [r"(?<![a-z0-9])" + re.escape(p).replace(r"\ ", r"[ -]") + r"(?![a-z0-9])" for p in sorted_phrases]
@@ -86,11 +83,7 @@ def _quiz_intent_pattern() -> re.Pattern[str]:
     except Exception:
         kinds = ()
     quiz_phrases = {
-        alias
-        for kind in kinds
-        if kind.format == "app"
-        for alias in (kind.label, *kind.aliases)
-        if alias.strip()
+        alias for kind in kinds if kind.format == "app" for alias in (kind.label, *kind.aliases) if alias.strip()
     }
     if not quiz_phrases:
         return _QUIZ_INTENT
@@ -162,6 +155,7 @@ async def intake(
     mode: Annotated[str | None, Form()] = None,  # COST-FAST-1: "quick" or "thinking" (read from the form below)
     files: Annotated[list[UploadFile], File()] = [],  # noqa: B006 (FastAPI copies defaults)
     refs: Annotated[str | None, Form()] = None,  # MN-01: a JSON array of mention refs (mentions.schema.json)
+    inputs: Annotated[str | None, Form()] = None,  # TS-19: the run form's values, a JSON object of slot name -> text
 ) -> Any:
     deps.refuse_if_replay_only(flags)  # NFR-24: after sign-in, before any work
     chosen = (await http.form()).getlist("mode")  # exactly one of quick or thinking; two fields are never resolved
@@ -175,8 +169,10 @@ async def intake(
     skills = skill_context_for(http, principal, model_router)
     try:  # MN-02, MN-09: before any world, upload or model call; a ref the person cannot use is one 422
         parsed = parse_refs(refs)
+        given = parse_inputs(inputs)
         tagged = tagged_skill(parsed, skills) if parsed else None
         tagged_plan = skills.taught_plan(tagged)
+        missing = skills.taught_missing(tagged, given) if tagged_plan else None  # TS-19: asked before any work
     except RefsRefused as refused:
         return refused.response()
     if tagged is not None and chosen and chosen[0] == "quick":  # MN-06: Quick keeps no record; refs make it Thinking
@@ -212,11 +208,12 @@ async def intake(
             key,
             tagged,
             tagged_plan,
+            missing,
         )
 
     if key is None or (chosen and chosen[0] == "quick"):
         return await perform()
-    return await intake_requests.once(allowance, principal.user_id, key, request, scenario, perform, parsed)
+    return await intake_requests.once(allowance, principal.user_id, key, request, scenario, perform, parsed, given)
 
 
 async def _thinking(
@@ -237,6 +234,7 @@ async def _thinking(
     key: str | None,
     tagged: dict[str, Any] | None = None,
     tagged_plan: list[dict[str, Any]] | None = None,
+    missing: list[str] | None = None,
 ) -> Any:
     text = request.text
     limit = load_intake_deadline()
@@ -379,6 +377,8 @@ async def _thinking(
             kinds=kinds,
             skill=tagged,
             skill_plan=tagged_plan,
+            skill_request=request.text[:MAX_SKILL_REQUEST] if tagged_plan else None,  # screened above
+            skill_missing=missing,
         )
     except WriterBusy:
         raise  # the existing app handler preserves store_unavailable; retain sources after any ambiguous write

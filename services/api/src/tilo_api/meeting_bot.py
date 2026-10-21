@@ -8,11 +8,13 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Protocol
+from typing import Annotated, Any, Protocol
 
+from fastapi import Depends, Request
 from pydantic import ValidationError
 from tilo_contracts import MeetingJoin, Transcript
 from tilo_memory.artifacts import ArtifactStore, NewVersion, Origin, Scope
+from tilo_metering.flags import FlagStore
 from tilo_people.errors import VersionConflict
 
 from tilo_api import deps
@@ -34,6 +36,22 @@ class BotCapture:
 
 class BotClient(Protocol):
     async def attend(self, meeting_id: str, join: MeetingJoin, claim: str | None = None) -> BotCapture: ...
+
+
+def attend_artifacts(
+    request: Request,
+    artifacts: Annotated[ArtifactStore, Depends(deps.get_artifact_store)],
+    mode: Annotated[deps.Mode, Depends(deps.get_work_mode)],
+    switches: Annotated[FlagStore, Depends(deps.get_switches)],
+) -> ArtifactStore:
+    """MINUTES-SCREEN: the store an attend request keeps its transcript in. The shared store's own screen has no meter
+    and, deployed, reads recordings, so every transcript stayed `unscreened` and no minutes could be made (20 Oct).
+    Live, the transcript is screened by this request's metered screen (SEC-16), as a run screens its outputs; with no
+    meter (replay, a demo, unreadable limits) the shared store is used unchanged and the transcript stays unscreened."""
+    meter = deps.meter_for(request, mode, switches)
+    if mode == "live" and meter is not None:
+        return artifacts.with_screener(deps.get_safety(mode, meter=meter))
+    return artifacts
 
 
 async def attend_meeting(

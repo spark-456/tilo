@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Routine, RoutinesClient } from "../../api/live/routines";
 import { ApiReadState } from "../../shared/ApiReadState";
+import { AppLink } from "../../shared/AppLink";
 import { RoutineList } from "./RoutineList";
 
 /**
@@ -45,7 +46,7 @@ export function RoutinesPanel({ client }: { client: RoutinesClient | null }) {
       </div>
       <p className="park-worlds-routines__how">
         To create a routine, start a world and choose Repeat weekly when approving its approach.{" "}
-        <a href="/">Create a routine</a>
+        <AppLink to="/">Create a routine</AppLink>
       </p>
       {client === null ? (
         <p className="park-worlds-routine-empty" data-testid="routines-empty">

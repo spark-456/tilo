@@ -18,7 +18,8 @@ export function ToolAccess({ skills, tools }: { skills: Skill[]; tools: Learn["t
     <section className="park-skills-access" aria-label="Tool access per skill">
       <h2 className="park-skills-access-h">Tool access per skill</h2>
       <p className="park-skills-access-sub">
-        A skill can use a tool at a lower level than your team’s. It can never use a higher one.
+        A skill can use a tool at a lower level than your team’s. It can never use a higher one. A
+        level you pick here shows on this page only; it is not saved yet.
       </p>
       <ul className="park-skills-access-list">
         {shown.map((r) => {

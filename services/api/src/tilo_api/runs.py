@@ -320,6 +320,8 @@ class Run:
             self.brief["deliverables"][pick["deliverable"]]["make_with"] = pick["make_with"]
         self.skill = task.skill  # SKILL-ROUTE: what the start-plan card named; a library skill is pinned in `_prepare`
         self.skill_plan = copy.deepcopy(task.skill_plan)
+        self.skill_request = getattr(task, "skill_request", None)  # SKILLS-E2E: the run's input values, verbatim
+        self.skill_missing = list(getattr(task, "skill_missing", None) or ())  # TS-19: required inputs left empty
         self.intake_answers = (
             tuple(  # (the Director's question, the person's answer) for the units' prompts (UNIT-PROMPT)
                 (q.text, str(task.answers[q.field]))
@@ -668,6 +670,7 @@ class Run:
             self.seams.must_ask_providers, config=config, card_sink=self._store_card, owner=self.owner,
             covered_actions={p["action_type"] for p in self.store.policies.values() if p.get("owner") == self.owner},
             brief=copy.deepcopy(self.brief), intake_answers=self.intake_answers,  # RUN-FAIL-1: the whole task
+            missing_inputs=tuple(self.skill_missing) if self.skill_plan else (),  # TS-19: one card before any work
         )  # fmt: skip
 
     def _prepare(self) -> Any:
@@ -794,6 +797,7 @@ class Run:
                 brief={
                     **copy.deepcopy(self.brief),
                     **({"taught_skill_steps": [s["text"] for s in self.skill_plan]} if self.skill_plan else {}),
+                    **({"taught_skill_request": self.skill_request} if self.skill_plan and self.skill_request else {}),
                 },
                 intake_answers=self.intake_answers,
             )  # fmt: skip

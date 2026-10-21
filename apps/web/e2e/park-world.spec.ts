@@ -1145,7 +1145,9 @@ test.describe("park world: behaviour in the browser", () => {
     const problems = await openWorld(page, "k1");
     await btn(page, "Ask me later").first().click();
     await expect(
-      page.getByRole("status").filter({ hasText: "Tilo will remind you at 16:00" }),
+      page
+        .getByRole("status")
+        .filter({ hasText: "Nothing was sent. It waits for you in Needs you." }),
     ).toBeVisible();
     await btn(page, "Approve £3,420").click();
     const toast = page.getByRole("status").filter({ hasText: "Approved £3,420 for Laptop Depot" });

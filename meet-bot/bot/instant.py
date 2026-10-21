@@ -25,7 +25,7 @@ def _join(items: list[str]) -> str:
     return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
 
 
-NO_AGENDA_LINE = "There's no agenda set for this meeting yet. Want me to note one?"
+NO_AGENDA_LINE = "There's no agenda set for this meeting yet."  # no offer: Tilo cannot add one from a call (21 Oct)
 
 
 def instant_answer(

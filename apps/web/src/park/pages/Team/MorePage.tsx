@@ -1,5 +1,6 @@
 import type { AppCtx, PageId } from "../../app/AppCtx";
 import { Button, PageSheet } from "../../components";
+import { AppLink } from "../../shared/AppLink";
 export function MorePage({ app }: { app: AppCtx }) {
   const links: [string, PageId, string?][] = [
     ["Email Autopilot", "team", "mail"],
@@ -27,12 +28,12 @@ export function MorePage({ app }: { app: AppCtx }) {
               ["Pilot", "/settings?section=pilot"],
             ] as const
           ).map(([label, path]) => (
-            <a
+            <AppLink
               key={path}
-              href={`${path}${app.params.world ? `${path.includes("?") ? "&" : "?"}world=${encodeURIComponent(app.params.world)}` : ""}`}
+              to={`${path}${app.params.world ? `${path.includes("?") ? "&" : "?"}world=${encodeURIComponent(app.params.world)}` : ""}`}
             >
               {label}
-            </a>
+            </AppLink>
           ))}
           {links.map(([label, page, focus]) => (
             <Button

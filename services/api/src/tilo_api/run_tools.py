@@ -106,8 +106,9 @@ def research_browser(mode: Mode) -> BrowserRpc | None:
         return None
 
 
-def taught_browse_step(run: Any, unit: Mapping[str, Any]) -> dict[str, Any] | None:
-    """Resolve the stored step by its planned position; no model may substitute a browse action."""
+def taught_step(run: Any, unit: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The stored taught step a `taught_step` unit runs, by its planned position (`_taught_outline` numbers them
+    U1..Un in the saved order); None for any other unit."""
     if unit.get("unit_type") != "taught_step":
         return None
     ident = str(unit.get("id", ""))
@@ -115,10 +116,43 @@ def taught_browse_step(run: Any, unit: Mapping[str, Any]) -> dict[str, Any] | No
         return None
     steps = getattr(run, "skill_plan", None) or []
     index = int(ident[1:]) - 1
-    if not 0 <= index < len(steps):
-        return None
-    step = steps[index]
-    return step if (step.get("tool"), step.get("action")) == ("web", "browse_web") else None
+    return steps[index] if 0 <= index < len(steps) and isinstance(steps[index], Mapping) else None
+
+
+def taught_browse_step(run: Any, unit: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Resolve the stored step by its planned position; no model may substitute a browse action."""
+    step = taught_step(run, unit)
+    return step if step is not None and (step.get("tool"), step.get("action")) == ("web", "browse_web") else None
+
+
+def taught_reads(run: Any, unit: Mapping[str, Any]) -> tuple[str, ...]:
+    """SKILLS-E2E: a saved step the person bound to Gmail, Calendar or Drive gets that connector's read tools (ADR-0048
+    WT-01..05 still decide every call), as a brief source of that connector would; otherwise the step could not read
+    the mail, events or files it names."""
+    step = taught_step(run, unit)
+    return READS_OF.get(str(step.get("tool")), ()) if step is not None else ()
+
+
+def matched_skill_keeps_role_tools(
+    run: Any, unit: Mapping[str, Any], context: UnitContext, defaults: Mapping[str, tuple[str, ...]]
+) -> UnitContext:
+    """SKILLS-E2E: a library skill Tilo matched by its score (the person did not tag it, `source` matched or picked)
+    guides the unit with its instructions, and its tools are added to the role's own; it never takes those away. A
+    task that asks for something the skill does not do (the browser, a web search) keeps the means to do it. A skill
+    the person tagged, or one the Director pinned itself, keeps its own tool list (LW-07)."""
+    matched = getattr(run, "skill", None)
+    if not isinstance(matched, Mapping) or matched.get("kind") != "library" or matched.get("source") == "tagged":
+        return context
+    own = tuple(defaults.get(unit["role"], ()))
+    if not own:
+        return context
+    widened = tuple(
+        dataclasses.replace(s, tools_allowed=tuple(dict.fromkeys((*s.tools_allowed, *own))))
+        if s.id == matched.get("id")
+        else s
+        for s in context.skills
+    )
+    return dataclasses.replace(context, skills=widened)
 
 
 def browse_hosts(step: Mapping[str, Any], hosts: set[str], typed: frozenset[str]) -> list[str]:
@@ -382,6 +416,11 @@ class BoundRunRunner:
             if reads.owner() is not None:  # WT-01: not offered in a world shared with a team (and checked per call)
                 tools += reads.tools()
                 defaults, on_call = self.default_tools(), reads.on_call
+                if step_reads := taught_reads(owner, unit):
+                    role = unit["role"]
+                    defaults = {**defaults, role: tuple(dict.fromkeys((*defaults.get(role, ()), *step_reads)))}
+        if not design:
+            context = matched_skill_keeps_role_tools(owner, unit, context, defaults)
         runner = DefaultUnitRunner(
             models,
             clock=lambda: day,

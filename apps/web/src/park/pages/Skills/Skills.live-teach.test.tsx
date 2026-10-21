@@ -662,6 +662,26 @@ describe("SKILLS_5_live_teach: save (step 4)", () => {
     expect(body?.scope).toEqual({ kind: "team", team: "tm_ops" });
   });
 
+  it("UX_AUDIT_teach_team_chips_show_the_served_team_name", async () => {
+    const { mount } = rig({
+      "GET /v1/teams": () =>
+        json({
+          teams: [
+            { team: "tm_ops", name: "Operations", lead: false, state: "member", invited_by: null },
+            { team: "tm_new", lead: false, state: "member", invited_by: null },
+          ],
+          you: "u_me",
+        }),
+    });
+    const r = await mount();
+    await toSave(r);
+    clickEl(control(r.el, "Share with my team"));
+    await settle();
+    expect(hasControl(r.el, "Operations"), "a named team shows its name").toBe(true);
+    expect(hasControl(r.el, "Team tm_ops")).toBe(false);
+    expect(hasControl(r.el, "Team tm_new"), "an unnamed team keeps its id").toBe(true);
+  });
+
   it("SKILLS_5_live_teach_save_offers_just_me_and_when_I_ask_only", async () => {
     const r = await rig().mount();
     const chips = () => qa(teachCard(r.el), "fieldset button").map((e) => pageText(e));

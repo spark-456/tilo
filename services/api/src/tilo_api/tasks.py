@@ -146,6 +146,8 @@ def create_task(
     kinds: Sequence[DeliverableKind] | None = None,
     skill: dict[str, Any] | None = None,
     skill_plan: list[dict[str, Any]] | None = None,
+    skill_request: str | None = None,
+    skill_missing: list[str] | None = None,
 ) -> tuple[str, deps.TaskRecord]:
     """FR-INT-03/04: the task from its intake and the Director's brief (extracted first, so a failed extraction
     stores nothing), then the questions, decided in code."""
@@ -161,6 +163,8 @@ def create_task(
     task.scenario, task.gaps = scenario, extraction.gaps
     task.skill = skill  # SKILL-TAG: a tagged skill (source `tagged`) is never replaced by the matcher
     task.skill_plan = copy.deepcopy(skill_plan)
+    task.skill_request = skill_request if skill_plan else None
+    task.skill_missing = list(skill_missing) if skill_plan and skill_missing else None
     asked = generate_questions(
         draft,
         extraction.ambiguous_fields,

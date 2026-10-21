@@ -25,6 +25,7 @@ import { themeFor } from "../tokens/themes";
 import { PAGE_LABEL } from "./AppCtx";
 import { NotFound } from "./NotFound";
 import "./park-app.css";
+import "./mobile.css";
 import { PendingWorldRoute } from "./PendingWorldRoute";
 import { ParkProvider, usePageApp, useSessionAuth, useWorldClient } from "./context";
 import { PageTitleContext } from "./pageTitle";
@@ -116,11 +117,25 @@ function Shell({ routed }: { routed?: RoutedView | undefined }) {
       document.title = before;
     };
   }, [title]);
+  // MOBILE: a phone's status bar takes the nav's colour (the theme's `--card`) for the time the person chose here,
+  // not only the system's (index.html names the system's two as the first paint's).
+  const root = useRef<HTMLDivElement>(null);
+  const theme = themeFor(app.prefs.theme);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the token is re-read when the time or the theme changes
+  useEffect(() => {
+    const card = root.current
+      ? getComputedStyle(root.current).getPropertyValue("--card").trim()
+      : "";
+    if (!/^#[0-9a-f]{6}$/i.test(card)) return;
+    for (const meta of document.querySelectorAll('meta[name="theme-color"]'))
+      meta.setAttribute("content", card);
+  }, [app.time, theme]);
   const Page = routed ? null : route ? PAGES[route.page] : null;
   const Tour = useParkTour()?.Layer; // ONBOARD-1: the first-run welcome and tour, when the Root provides them
   return (
     <PageTitleContext.Provider value={setNamed}>
       <div
+        ref={root}
         data-park
         data-time={app.time}
         data-motion={app.motion}

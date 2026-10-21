@@ -77,6 +77,38 @@ def _source_guard(
     return w
 
 
+def screen_transcript_again(w: Writer, store: deps.Store, artifacts: ArtifactStore, meeting_id: str) -> None:
+    """MINUTES-SCREEN: a transcript stored with no verdict (`unscreened`: the screen gave none when the bot left) is
+    screened now by `artifacts`' own screen, the caller's live one. The same bytes become the next version of the same
+    artifact and the meeting points at it, whatever the verdict, so the record says what the screen found and a later
+    request can try again. Only a `clean` verdict lets the analysis read it; nothing else is relaxed. Any other state,
+    a moved meeting or a store that cannot answer leaves everything as it is, and the analysis refuses as before."""
+    w = _fresh(w)
+    meeting, version, _ = _mine(w, meeting_id, "read_full", GONE)
+    world_id, ref = meeting.get("world_id"), meeting["transcript"]
+    if meeting["status"] != "ended" or meeting["minutes"] is not None or world_id is None or ref is None:
+        return
+    world = store.load_world(world_id, settle=False)
+    if world is None or world.owner != w.actor:
+        return
+    scope = Scope(w.org, world_id, w.actor)
+    try:
+        head = artifacts.head(scope, ref)
+        if head is None or head.doc["screening"] != "unscreened" or head.doc["run_id"] != world.run_id:
+            return
+        data = artifacts.read(scope, ref)  # hash and size checked: exactly the bytes the bot path stored
+        latest = artifacts.versions(scope, ref["artifact_id"])[-1]  # a lost race may have left a newer version
+        made = artifacts.put(
+            scope, NewVersion(head.doc["media_type"], data, world.run_id, Origin(kind="upload"), parent=latest.ref)
+        )
+    except (ArtifactError, ValueError):
+        return
+    try:
+        w.stores.meetings.replace({**meeting, "transcript": made.ref}, expected_version=version)
+    except VersionConflict:
+        raise Refusal(409, "version_conflict") from None
+
+
 def analyze_and_publish_minutes(
     w: Writer,
     store: deps.Store,

@@ -29,7 +29,7 @@ def test_X_SEC37_FU_screen_cap_returns_429_without_publication(request, monkeypa
                 raise spend.SpendCapReached
             raise Refusal(429, "allowance_capped")
 
-    monkeypatch.setattr(deps, "get_safety", lambda mode: CappedSafety())
+    monkeypatch.setattr(deps, "safety_for_mode", lambda mode: CappedSafety())
     before = c.rig.snapshot()
     response = minutes_call(c)
     assert response.status_code == 429

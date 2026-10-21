@@ -171,8 +171,9 @@ export function SkillGrid({
                           ? "No runs recorded"
                           : `Run ${s.runs} ${s.runs === 1 ? "time" : "times"}`}
                     </span>
+                    {/* UX-AUDIT: the card opens the skill (Run is inside), so its chip says Open, not Run. */}
                     <span className="park-skills-card2__run-btn" aria-hidden="true">
-                      Run
+                      Open
                     </span>
                   </span>
                 </button>

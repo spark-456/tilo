@@ -5,6 +5,7 @@ import { memoryApi } from "../../api/live/memory";
 import type { AppCtx } from "../../app/AppCtx";
 import { useWorldClient } from "../../app/context";
 import { PageSheet } from "../../components";
+import { AppLink } from "../../shared/AppLink";
 import { SettingsAppearance } from "../../shell/SettingsAppearance";
 import { MemoryPanel } from "./MemoryPanel";
 import { type RunSection, RunSectionView } from "./RunSections";
@@ -49,8 +50,8 @@ export function SettingsSection({ memoryClient = null }: { memoryClient?: HttpCl
       <Block title="Consent">
         <p>Every opt-in is explicit and revocable.</p>
         <p className="park-admin-links">
-          <a href="/connectors">Review Gmail access</a>
-          <a href="/profile?tab=notifications">Review Email</a>
+          <AppLink to="/connectors">Review Gmail access</AppLink>
+          <AppLink to="/profile?tab=notifications">Review Email</AppLink>
         </p>
         <p>Style profile settings and the pilot diary are not available yet.</p>
       </Block>

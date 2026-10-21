@@ -9,6 +9,7 @@ the skill kinds (a library skill, a taught skill the person may use); the other 
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from fastapi.responses import JSONResponse
@@ -18,6 +19,8 @@ from tilo_api.skills_route import SkillContext
 
 _SKILLS = ("skill", "taught_skill")
 _MAX_CHARS = 4096
+_SLOT = re.compile(r"[a-z][a-z0-9_]{0,31}")  # taught_skill.schema.json#/$defs/input name
+_BAD_INPUTS = "The inputs are not valid."
 
 
 class RefsRefused(Exception):
@@ -48,6 +51,26 @@ def parse_refs(raw: str | None) -> list[dict[str, Any]]:
     for index, ref in enumerate(parsed):
         if not conforms("mentions.schema.json#/$defs/ref", ref):
             raise RefsRefused(index)
+    return parsed
+
+
+def parse_inputs(raw: str | None) -> dict[str, str] | None:
+    """TS-19: the run form's values (the `inputs` field, a JSON object of slot name -> text), or None when the run sent
+    none. Closed: at most 8 slots, names as the contract's slot names, values text of at most 300 characters. Only
+    whether a value is there is read; the values themselves reach the run in the request text, screened with it."""
+    if raw is None or not raw.strip():
+        return None
+    if len(raw) > _MAX_CHARS:
+        raise RefsRefused(reason=_BAD_INPUTS)
+    try:
+        parsed = json.loads(raw)
+    except Exception:  # noqa: BLE001 - one refusal, never a 500
+        raise RefsRefused(reason=_BAD_INPUTS) from None
+    if not isinstance(parsed, dict) or len(parsed) > 8:
+        raise RefsRefused(reason=_BAD_INPUTS)
+    for name, value in parsed.items():
+        if _SLOT.fullmatch(name) is None or not isinstance(value, str) or len(value) > 300:
+            raise RefsRefused(reason=_BAD_INPUTS)
     return parsed
 
 

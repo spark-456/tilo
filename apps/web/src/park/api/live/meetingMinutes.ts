@@ -7,7 +7,16 @@ export interface MinutesView {
   summary: string[];
   decisions: string[];
   actions: string[];
-  recipients: { id: string; name: string }[];
+  /** MINUTES-ME: the Owner first as "Me" (`self`), then the attendees with a linked person record. */
+  recipients: { id: string; name: string; self?: boolean }[];
+}
+/** MINUTES-ME: a transcript read that has not answered by then says so instead of waiting for ever. */
+export const TRANSCRIPT_WAIT_MS = 20_000;
+/** MINUTES-SCREEN: the owner's own transcript, each line as the server's owner quotes show it (cleaned, redacted). */
+export interface TranscriptView {
+  lines: { id: string; speaker: string | null; text: string; atMs: number }[];
+  /** What the safety check said of the stored transcript: clean, flagged or unscreened. */
+  screening: string;
 }
 export interface DraftCard {
   cardId: string;
@@ -32,14 +41,22 @@ export function meetingMinutesApi(http: Pick<HttpClient, "getJson" | "postJson">
       if (!object(meeting) || meeting.id !== id || !object(doc) || doc.meeting_id !== id)
         throw bad();
       if (!Array.isArray(meeting.attendees)) throw bad();
-      const recipients = meeting.attendees.flatMap((a) =>
-        object(a) &&
-        typeof a.user === "string" &&
-        /^u_[A-Za-z0-9_]{1,48}$/.test(a.user) &&
-        typeof a.name === "string"
-          ? [{ id: a.user, name: a.name }]
-          : [],
-      );
+      const owner =
+        typeof meeting.owner === "string" && /^u_[A-Za-z0-9_]{1,48}$/.test(meeting.owner)
+          ? meeting.owner
+          : null;
+      const recipients: MinutesView["recipients"] = [
+        ...(owner ? [{ id: owner, name: "Me", self: true }] : []),
+        ...meeting.attendees.flatMap((a) =>
+          object(a) &&
+          typeof a.user === "string" &&
+          /^u_[A-Za-z0-9_]{1,48}$/.test(a.user) &&
+          a.user !== owner &&
+          typeof a.name === "string"
+            ? [{ id: a.user, name: a.name }]
+            : [],
+        ),
+      ];
       return {
         minutes: {
           summary: texts(doc.summary),
@@ -52,6 +69,37 @@ export function meetingMinutesApi(http: Pick<HttpClient, "getJson" | "postJson">
     },
     async analyze(id: string) {
       await http.postJson(path(id, "analyze-minutes"), {});
+    },
+    async transcript(id: string): Promise<TranscriptView> {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const late = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new TiloApiError("The transcript took too long.", null, true)),
+          TRANSCRIPT_WAIT_MS,
+        );
+      });
+      const doc = await Promise.race([http.getJson(path(id, "transcript")), late]).finally(() =>
+        clearTimeout(timer),
+      );
+      if (
+        !object(doc) ||
+        doc.meeting_id !== id ||
+        typeof doc.screening !== "string" ||
+        !Array.isArray(doc.utterances)
+      )
+        throw bad();
+      const lines = doc.utterances.map((u) => {
+        if (
+          !object(u) ||
+          typeof u.id !== "string" ||
+          typeof u.text !== "string" ||
+          typeof u.t_ms !== "number" ||
+          !(u.speaker === null || typeof u.speaker === "string")
+        )
+          throw bad();
+        return { id: u.id, speaker: u.speaker as string | null, text: u.text, atMs: u.t_ms };
+      });
+      return { lines, screening: doc.screening };
     },
     async confirm(id: string) {
       const reply = await http.postJson(path(id, "confirm"), {});
