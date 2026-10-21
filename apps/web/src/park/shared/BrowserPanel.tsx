@@ -112,6 +112,11 @@ export const REFUSAL_LINES = {
   target_changed: "The page changed while Tilo looked at it, so try the task again.",
 } as const;
 
+/** DEMO-BROWSER (live 21 Oct): while a session is open between steps, Tilo is deciding the next one; when the run
+ * records that the browser's model is busy (tilo-api `BROWSER_BUSY_LINE`, an agent.working line), the panel says so. */
+export const DECIDING_LINE = "Tilo is deciding the next step…";
+export const BUSY_LINE = "The model is busy, so Tilo's browser is trying again.";
+
 /** A commit the browser stopped before (BR-05). */
 export const GATED_LINE =
   "Tilo stopped before submitting anything, so open the site yourself to finish this step.";
@@ -204,6 +209,7 @@ export function browserView(events: readonly BrowserEvent[]): {
   paused: boolean;
   outcome: string | null;
   refusal: string | null;
+  busy: boolean;
 } {
   let session: string | null = null;
   let stopped = false;
@@ -212,7 +218,12 @@ export function browserView(events: readonly BrowserEvent[]): {
   let paused = false;
   let outcome: string | null = null;
   let refusal: string | null = null;
+  let busy = false; // the newest event after the session's last step is the browser's busy line
   for (const event of events) {
+    if (session && event.type === "agent.working") {
+      busy = event.summary === BUSY_LINE;
+      continue;
+    }
     if (session && event.type === "world.paused") {
       paused = true;
       continue;
@@ -231,9 +242,11 @@ export function browserView(events: readonly BrowserEvent[]): {
       paused = false;
       outcome = null;
       refusal = null;
+      busy = false;
     } else if (event.type === "browser.acted") {
       const data = event.data as BrowserActedData;
       if (session !== data.session) continue;
+      busy = false;
       host = data.host ?? host;
       if (data.verdict === "gated") gated = true;
       if (data.verdict === "refused" && data.reason && data.reason in REFUSAL_LINES)
@@ -246,7 +259,7 @@ export function browserView(events: readonly BrowserEvent[]): {
       }
     }
   }
-  return { session, stopped, gated, host, paused, outcome, refusal };
+  return { session, stopped, gated, host, paused, outcome, refusal, busy };
 }
 
 type Phase = "live" | "paused" | "waiting" | "finished" | "stopped";
@@ -513,7 +526,9 @@ export function BrowserPanel({
               ? (lineOf(REFUSAL_LINES, view.refusal) ??
                 lineOf(STOP_LINES, view.outcome) ??
                 STOP_LINES.error)
-              : "Tilo is using the browser now.";
+              : view.busy
+                ? BUSY_LINE
+                : DECIDING_LINE;
   const stop = () => {
     if (!canStop) return;
     const call = reader.stopBrowser?.(worldId, session);

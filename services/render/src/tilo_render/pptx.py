@@ -21,6 +21,7 @@ from tilo_render.spec import (
     ChartBlock,
     ChartKind,
     DeliverableSpec,
+    FigureBlock,
     ParagraphBlock,
     SlideBlock,
     Table,
@@ -263,6 +264,14 @@ def render_pptx(
             elif isinstance(b, ChartBlock):
                 c = next(ch for ch in spec.charts if ch.id == b.chart_id)
                 _add_chart_slide(prs, spec, sec.heading, c, colors, typo)
+            elif isinstance(b, FigureBlock):  # a recorded picture: an image slide, its caption and source beside it
+                figure = next(f for f in spec.figures if f.id == b.figure_id)
+                left = b.caption + (f"\nSource: {figure.source}" if figure.source else "")
+                image = SlideBlock.model_construct(
+                    type="slide", layout="image", title=b.caption[:120], left=left, right="", notes="",
+                    image_base64=figure.image_base64,
+                )  # fmt: skip
+                _add_design(prs, image, colors, typo)
 
     if manifest is not None:
         prov = provenance_lines(manifest)

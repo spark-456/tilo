@@ -1120,8 +1120,10 @@ class _RoleModel:
     def generate(self, request: Any) -> Any:
         return self._router.generate(self._role, request).response
 
-    def generate_budgeted(self, request: Any, budget: Any) -> Any:
-        result, credits = budget.call(self._router.generate, self._role, request)
+    def generate_budgeted(self, request: Any, budget: Any, deadline: Any = None) -> Any:
+        """`deadline`: the router's PL-03 Deadline for this call (DEMO-BROWSER: a browser step waits seconds)."""
+        extra = {"deadline": deadline} if deadline is not None else {}
+        result, credits = budget.call(self._router.generate, self._role, request, **extra)
         if result.response is None:
             raise ValueError("no worker response")
         return result.response, credits

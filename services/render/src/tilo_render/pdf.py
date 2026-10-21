@@ -19,7 +19,8 @@ from reportlab.graphics.shapes import Drawing, String
 from reportlab.lib import colors, pagesizes
 from reportlab.lib.enums import TA_RIGHT
 from reportlab.lib.styles import ParagraphStyle
-from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, TableStyle
+from reportlab.platypus import Image as PlImage
+from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, TableStyle
 from reportlab.platypus import Table as PlTable
 from tilo_contracts import Manifest
 
@@ -29,6 +30,8 @@ from tilo_render.spec import (
     ChartBlock,
     ChartKind,
     DeliverableSpec,
+    Figure,
+    FigureBlock,
     ParagraphBlock,
     TableBlock,
 )
@@ -118,6 +121,19 @@ def _chart(ch: Any, data: ChartData, aw: float, fmt: Callable[[Any], str], th: d
     return drawing
 
 
+def _figure(figure: Figure, width: float, height: float) -> PlImage:
+    """The recorded picture at the text width, never taller than `height`, keeping its shape."""
+    from PIL import Image
+
+    raw = figure.raw
+    with Image.open(io.BytesIO(raw)) as image:
+        w, h = image.size
+    scale = min(width / w, height / h)
+    flow = PlImage(io.BytesIO(raw), width=w * scale, height=h * scale)
+    flow.hAlign = "CENTER"
+    return flow
+
+
 def render_pdf(
     spec: DeliverableSpec,
     *,
@@ -165,6 +181,8 @@ def render_pdf(
     th_s = style("TH", "Helvetica-Bold", "table_header_size_pt", "table_header_fg")
     td_s = style("TD", "Helvetica", "table_body_size_pt", "table_row_fg")
     th_num_s = ParagraphStyle("THN", parent=th_s, alignment=TA_RIGHT)
+    caption_s = style("FC", "Helvetica-Oblique", "table_body_size_pt", "body", spaceBefore=4)
+    source_s = style("FS", "Helvetica", "table_body_size_pt", "date", spaceAfter=10)
     td_num_s = ParagraphStyle("TDN", parent=td_s, alignment=TA_RIGHT)
     cover_title_s = ParagraphStyle(
         "CT", parent=title_s, fontSize=typo["title_size_pt"] * 1.7, leading=typo["title_size_pt"] * 2
@@ -206,6 +224,8 @@ def render_pdf(
     zebra = colors.Color(*(0.5 * a + 0.5 for a in col["table_grid"].rgb()))  # the grid colour, half way to white
     tables = {t.id: t for t in spec.tables}
     charts = {c.id: c for c in spec.charts}
+    figures = {f.id: f for f in spec.figures}
+    figure_number = 0
     for section in spec.sections:
         story.append(Paragraph(_markup(section.heading), head_s))
         for block in section.blocks:
@@ -249,6 +269,15 @@ def render_pdf(
             elif isinstance(block, ChartBlock):
                 chart = charts[block.chart_id]
                 story.extend([_chart(chart, ChartData.from_spec(spec, chart.id), doc.width, fmt, theme), Spacer(1, 8)])
+            elif isinstance(block, FigureBlock):  # a recorded picture, its caption and the page it shows
+                figure, figure_number = figures[block.figure_id], figure_number + 1
+                parts: list[Any] = [
+                    _figure(figure, doc.width, doc.height * 0.6),
+                    Paragraph(_markup(f"Figure {figure_number}: {block.caption}"), caption_s),
+                ]
+                if figure.source:
+                    parts.append(Paragraph(_markup(f"Source: {figure.source}"), source_s))
+                story.append(KeepTogether(parts))
 
     if manifest is not None:
         story.append(Paragraph(_markup(PROVENANCE_HEADING), head_s))

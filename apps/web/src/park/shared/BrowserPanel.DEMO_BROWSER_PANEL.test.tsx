@@ -5,7 +5,9 @@ import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import type { TiloClient } from "../../api/client";
 import {
+  BUSY_LINE,
   BrowserPanel,
+  DECIDING_LINE,
   FRAME_UNAVAILABLE,
   GATED_LINE,
   REFUSAL_LINES,
@@ -677,5 +679,47 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
     expect(node.textContent).toContain(FRAME_UNAVAILABLE);
     expect(node.textContent).not.toContain("Loading recorded frame");
     await act(async () => root.unmount());
+  });
+
+  it("DEMO_BROWSER_live a step that waits says why: deciding the next step, or the model is busy (live 21 Oct)", () => {
+    const busy = {
+      seq: 3,
+      type: "agent.working",
+      summary: BUSY_LINE,
+      data: { unit: "U1" },
+    } as unknown as Event;
+    const other = {
+      seq: 4,
+      type: "agent.working",
+      summary: "The agent is searching the web.",
+      data: {},
+    } as Event;
+    const step = acted(5, "scroll", "Scrolling down", "art_5", BOX);
+    expect(browserView([started()]).busy).toBe(false);
+    expect(browserView([started(), busy]).busy).toBe(true);
+    expect(browserView([started(), busy, other]).busy).toBe(false);
+    expect(browserView([started(), busy, step]).busy).toBe(false); // the next recorded step: deciding again
+    expect(DECIDING_LINE).toBe("Tilo is deciding the next step…");
+    const node = document.createElement("div");
+    const root = createRoot(node);
+    const line = () => node.querySelector(".tilo-bv__line")?.textContent;
+    const render = (events: Event[]) =>
+      act(async () =>
+        root.render(
+          <BrowserPanel
+            client={{} as TiloClient}
+            worldId="w_demo"
+            events={events}
+            replay={false}
+          />,
+        ),
+      );
+    return (async () => {
+      await render([started()]);
+      expect(line()).toBe(DECIDING_LINE);
+      await render([started(), busy]);
+      expect(line()).toBe(BUSY_LINE);
+      await act(async () => root.unmount());
+    })();
   });
 });

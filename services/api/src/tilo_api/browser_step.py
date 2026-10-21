@@ -37,8 +37,13 @@ def _pointer(kind: str, result: dict) -> dict:
 
 
 class BrowseStepExecutor:
-    def __init__(self, run: Any, rpc: Any, propose: Callable[[str, bytes, str], Any]) -> None:
+    def __init__(
+        self, run: Any, rpc: Any, propose: Callable[[str, bytes, str], Any], pages: dict[str, dict] | None = None
+    ) -> None:
         self.run, self.rpc, self.propose = run, rpc, propose
+        # DEMO-BROWSER: each saved frame's page address (tilo-browser's, no query) and the unit's step, kept in memory
+        # for the run's own deliverable (figure sources); never in an event (BR-13).
+        self.pages, self.step_title = pages, ""
 
     def _save(self, session: str, step: int, unit: str, agent: str, result: dict) -> dict:
         artifact = result["screenshot_artifact"]
@@ -47,6 +52,8 @@ class BrowseStepExecutor:
             raise ValueError("the browser frame did not match its digest")
         ident = f"art_bs{session[3:]}_{step}"
         ref = {"artifact_id": ident, "version": 1}
+        if self.pages is not None:
+            self.pages[ident] = {"url": str(result.get("url") or ""), "step": self.step_title}
         store, scope = self.run.seams.artifacts, self.run.scope
         existing = store.head(scope, ref)
         if existing is not None:
@@ -75,12 +82,15 @@ class BrowseStepExecutor:
         hosts: list[str],
         max_steps: int = 12,
         start: str | None = None,
+        finish_on_read: bool = False,
     ) -> UnitOutcome:
         """BR-01 loop: the model proposes one action per frame, code decides, tilo-browser runs it. The session opens
-        `start` (an allowlisted address; the first host's front page when None)."""
+        `start` (an allowlisted address; the first host's front page when None). `finish_on_read`: the first read that
+        returns text ends the session (a research read needs one page; no model call is spent on saying done)."""
         if not hosts or not 1 <= max_steps <= 60:
             return UnitOutcome(False, reason="The browser has no approved site or step limit.")
         session = "bs_" + new_part_id()
+        self.step_title = str(unit.get("title") or "")
         opened, step, outcome = False, 0, "error"
         stop_charge = 0.0
         extracted: list[str] = []
@@ -234,6 +244,7 @@ class BrowseStepExecutor:
                     return UnitOutcome(False, reason="This site needs you to sign in; Tilo never enters credentials.")
                 if kind == "extract" and last["text"]:
                     extracted.append(last["text"])
+                    finishing = finishing or finish_on_read
                 history.append(kind)
                 if finishing:
                     outcome = "done"
@@ -264,7 +275,15 @@ class BrowseStepExecutor:
                     )
 
     def read_page(
-        self, *, unit: dict, agent: str, building: str, url: str, host: str, also: tuple[str, ...] = ()
+        self,
+        *,
+        unit: dict,
+        agent: str,
+        building: str,
+        url: str,
+        host: str,
+        also: tuple[str, ...] = (),
+        scrolls: int = READ_SCROLLS,
     ) -> str:
         """P0-RUNS-FIX: a research unit reads one allowlisted page in the visible browser, read-only and with no model:
         open it, look through it (READ_SCROLLS scrolls down), extract its text, close. Each step is a recorded
@@ -272,6 +291,7 @@ class BrowseStepExecutor:
         SessionRefused when the browser cannot read it (the caller then fetches the page directly and says so); returns
         the page text, possibly empty."""
         session = "bs_" + new_part_id()
+        self.step_title = str(unit.get("title") or "")
         district = unit["district"]
         allow = list(dict.fromkeys((host, *also)))[:20]  # `also`: the known hosts a result link may redirect to
         last = self.rpc.start(
@@ -287,7 +307,7 @@ class BrowseStepExecutor:
         )
         outcome, steps = "error", 0
         reads: list[dict[str, Any]] = [
-            *({"kind": "scroll", "direction": "down"} for _ in range(READ_SCROLLS)),
+            *({"kind": "scroll", "direction": "down"} for _ in range(scrolls)),
             {"kind": "extract"},
         ]
         try:
