@@ -23,7 +23,7 @@ from tilo_api.people_meetings import _mine
 from tilo_api.people_quotes import GONE
 from tilo_api.people_writes import Refusal, Writer
 
-# MINUTES-TIME (21 Oct: one analysis took 501 s, each hung Gemini call waiting out its 120 s request timeout): the
+# MINUTES-TIME (21 Oct: one analysis took 501 s, each hung model call waiting out its 120 s request timeout): the
 # owner's minutes request finishes or says so within about a minute and a half.
 ANALYSIS_CALL_SECONDS = 60.0  # one model call, its 5xx retries and the role's configured fallback included
 ANALYSIS_TOTAL_SECONDS = 85.0  # the analyst and the verifier together
