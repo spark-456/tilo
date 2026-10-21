@@ -19,7 +19,7 @@ class Script:
         self.outputs, self.calls = list(outputs), []
         self.budget, self.outcome = 0.75, "ok"
 
-    def generate(self, role, request, *, budget):
+    def generate(self, role, request, *, budget, deadline=None):  # the real Router takes a PL-03 deadline
         self.calls.append((role, request, budget))
         assert isinstance(request, GenerateRequest)
         output = self.outputs.pop(0)

@@ -7,6 +7,8 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
+from tilo_providers.router import RouterDeadlineError
+
 from tilo_api.assistant.metering import SpendLedger
 from tilo_api.people_writes import Refusal
 
@@ -47,6 +49,8 @@ class AllowanceRouter:
         self.left -= sent  # conservatively consumed before invocation
         try:
             result = self.inner.generate(role, request, budget=sent)
+        except RouterDeadlineError:
+            raise  # MINUTES-TIME: out of time is the caller's plain timeout, never "allowance used up"
         except Exception:
             raise Refusal(429, "allowance_capped") from None
         remaining: Any = getattr(result, "budget", None)

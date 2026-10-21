@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import re
 from typing import Any
@@ -14,14 +15,24 @@ from tilo_people.names import match_name
 from tilo_policy.schemas import conforms
 from tilo_providers.interfaces import GenerateRequest, SafetyProvider
 from tilo_providers.prompts import load_prompt, neutralise_marker
-from tilo_providers.router import Router
+from tilo_providers.router import Router, RouterDeadlineError
 
 from tilo_api import spend
 from tilo_api.people_writes import Refusal
 
+logger = logging.getLogger("tilo_api.meeting_analysis")
+
 
 class _ScreenCap(Refusal):
     """Preserve only safety-screen budget refusals across the analysis error boundary."""
+
+
+class _TimedOut(Refusal):
+    """MINUTES-TIME: a model call ran out of the caller's deadline (PL-03). A plain retryable refusal, never a 502."""
+
+    def __init__(self, attempts: int) -> None:
+        logger.warning("minutes analysis ran out of time (attempts=%d)", attempts)  # counts only, never content
+        super().__init__(503, "analysis_timed_out", headers={"Cache-Control": "no-store"})
 
 
 def _call(router: Router, role: str, data: dict, budget: float, schema: dict | None = None) -> tuple[Any, float]:
@@ -60,7 +71,9 @@ def analyze_minutes(
 
     Router retains replay/spend/redaction controls. No item is created or confirmed here. An unknown assignment
     remains unresolved. Verifier outages keep failed checks visible as unverified, never silently remove a claim.
+    A model call that runs out of the caller's deadline is `analysis_timed_out` (503) when the minutes needed it.
     """
+    late: RouterDeadlineError | None = None
     try:
         if not math.isfinite(budget) or budget <= 0 or not conforms("transcript.schema.json", transcript):
             raise ValueError
@@ -166,6 +179,8 @@ def analyze_minutes(
                     raise ValueError
                 for row, good in zip(pending, supported, strict=True):
                     row["state"] = "verified" if good else "unverified"
+            except RouterDeadlineError as error:
+                late = error  # no verdict in time is no verification; a summary that needed one is a timeout
             except Exception:
                 pass  # no verdict is no verification
         for row in doc["summary"]:
@@ -179,5 +194,9 @@ def analyze_minutes(
         return doc
     except _ScreenCap:
         raise
+    except RouterDeadlineError as error:
+        raise _TimedOut(len(error.attempts or ())) from None
     except Exception:
+        if late is not None:
+            raise _TimedOut(len(late.attempts or ())) from None
         raise ValueError("analysis_failed") from None
