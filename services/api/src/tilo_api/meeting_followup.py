@@ -228,7 +228,7 @@ def draft_owner_followup(
         directory, items, addresses = w.org_directory(), {}, {}
         item_versions, people_versions = [], []
         audience = set(picks) | {w.actor}
-        if not set(picks) <= {a["user"] for a in m["attendees"]}:
+        if not set(picks) <= {a["user"] for a in m["attendees"]} | {w.actor}:  # MINUTES-ME: the Owner may pick themself
             raise Refusal(422, "invalid_recipients")
         for action in doc["action_items"]:
             key = action.get("work_item_id")

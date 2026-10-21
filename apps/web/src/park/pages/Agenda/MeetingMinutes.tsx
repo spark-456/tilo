@@ -43,9 +43,13 @@ export function MeetingMinutes({
   const [hidden, setHidden] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptView | null>(null);
   const [transcriptNote, setTranscriptNote] = useState("");
+  // MINUTES-ME: the transcript loads on its own, so a long analysis never holds it (21 Oct: 8 minutes of "Working…")
+  const [loadingTranscript, setLoadingTranscript] = useState(false);
+  const [working, setWorking] = useState("Working…");
   if (hidden || !["ended", "minuted"].includes(status)) return null;
-  const run = async (action: () => Promise<void>) => {
+  const run = async (action: () => Promise<void>, note = "Working…") => {
     setBusy(true);
+    setWorking(note);
     setError("");
     try {
       await action();
@@ -65,7 +69,7 @@ export function MeetingMinutes({
       setTranscript(null);
       return;
     }
-    setBusy(true);
+    setLoadingTranscript(true);
     setTranscriptNote("");
     try {
       setTranscript(await api.transcript(id));
@@ -76,13 +80,16 @@ export function MeetingMinutes({
           : "The transcript could not be loaded. Try again.",
       );
     } finally {
-      setBusy(false);
+      setLoadingTranscript(false);
     }
   };
   const read = async () => {
     const result = await api.read(id);
     setMinutes(result.minutes);
     setConfirmed(result.confirmed);
+    // MINUTES-ME: with nobody else linked, the Owner's own address ("Me") is the one choice: picked for them
+    if (result.minutes.recipients.length === 1 && result.minutes.recipients[0]?.self)
+      setRecipients([result.minutes.recipients[0].id]);
   };
   return (
     <div className="park-agenda-minutes" aria-label="Meeting minutes">
@@ -91,10 +98,15 @@ export function MeetingMinutes({
           type="button"
           disabled={busy}
           onClick={() =>
-            void run(async () => {
-              if (status === "ended") await api.analyze(id);
-              await read();
-            })
+            void run(
+              async () => {
+                if (status === "ended") await api.analyze(id);
+                await read();
+              },
+              status === "ended"
+                ? "Writing the minutes. This can take a few minutes; the transcript stays open meanwhile."
+                : "Working…",
+            )
           }
         >
           {status === "ended" ? "Analyze minutes" : "Review minutes"}
@@ -174,12 +186,13 @@ export function MeetingMinutes({
       )}
       <button
         type="button"
-        disabled={busy}
+        disabled={loadingTranscript}
         aria-expanded={transcript !== null}
         onClick={() => void toggleTranscript()}
       >
         {transcript ? "Hide transcript" : "Show transcript"}
       </button>
+      {loadingTranscript && <output>Loading the transcript…</output>}
       {transcriptNote && <output>{transcriptNote}</output>}
       {transcript && (
         <section aria-label="Transcript">
@@ -201,7 +214,7 @@ export function MeetingMinutes({
           )}
         </section>
       )}
-      {busy && <output>Working…</output>}
+      {busy && <output>{working}</output>}
       {error && (
         <>
           <p role="alert">{error}</p>
