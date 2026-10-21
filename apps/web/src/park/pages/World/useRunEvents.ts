@@ -1,6 +1,7 @@
 // UI-10 B8: the recorded events of one world, as the client's subscription delivers them (GET /worlds/{id}/events,
 // polled by the HTTP client). In seq order, a repeat ignored; none, and no subscription, for no client or no world.
 import { useEffect, useState } from "react";
+import { watchWorldEvents } from "../../shared/sharedRunFeed";
 
 /** The part of a recorded event the page reads. */
 export interface RunEvent {
@@ -28,7 +29,8 @@ export function useRunEvents(
   useEffect(() => {
     setEvents([]);
     if (source === null || worldId === null) return undefined;
-    return source.subscribeEvents(worldId, (event) => {
+    // UX-SMOOTH: one shared subscription per world for this page and the live stage (sharedRunFeed.ts).
+    return watchWorldEvents(source, worldId, (event) => {
       setEvents((have) => {
         const last = have[have.length - 1];
         return last && event.seq <= last.seq ? have : [...have, event];

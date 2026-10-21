@@ -37,6 +37,7 @@ import { useAppearance } from "./cityMotion";
 import { loadShellFonts } from "./fonts";
 import { type Bar, useLeavingCard, useMotionOff, usePageSwap } from "./motion";
 import { useParkTour } from "./tour";
+import { useTruncationTitles } from "./truncationTitles";
 import "./park.shell.css";
 import { themeFor } from "../tokens/themes";
 import { TiloBubble } from "./TiloBubble";
@@ -67,6 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const route = useParkRoute();
   const quizRoute = useQuizAppRoute();
   const browserRoute = useBrowserRoute();
+  useTruncationTitles();
   const state = useSyncExternalStore(store.subscribe, store.getState);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationStatus, setNotificationStatus] = useState<"loading" | "ready" | "failed">(

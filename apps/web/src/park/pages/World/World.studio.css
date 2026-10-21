@@ -412,14 +412,14 @@
   }
 }
 
-/* Desktop 60px header (>= 1280px) */
+/* Desktop header (>= 1280px): one 60px row, taller only when a long title needs its two lines (UX-SMOOTH). */
 @media (min-width: 1280px) {
   [data-park] .park-world-head {
-    height: 60px;
+    height: auto;
     min-height: 60px;
-    max-height: 60px;
+    max-height: none;
     box-sizing: border-box;
-    padding: 0 16px 0 14px;
+    padding: 8px 16px 8px 14px;
     display: flex;
     align-items: center;
     gap: 16px;
@@ -457,11 +457,12 @@
   [data-park] .park-world-eyebrowrow {
     display: none;
   }
+  /* The size and state chips move under a long title instead of squeezing it to a few words (owner, 21 Oct). */
   [data-park] .park-world-titleline {
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex-wrap: nowrap;
+    gap: 4px 8px;
+    flex-wrap: wrap;
   }
   [data-park] .park-world-h1 {
     font-size: 18px;
@@ -474,6 +475,8 @@
     overflow: hidden;
     margin: 0;
     line-height: 1.2;
+    flex: 0 1 auto;
+    min-width: min(260px, 100%);
   }
   [data-park] .park-world-metalist {
     display: flex;
@@ -487,9 +490,9 @@
     white-space: nowrap;
     margin: 0;
   }
+  /* The title takes the free width; an empty spacer used to take a share of it. */
   [data-park] .park-world-headspacer {
-    flex: 1;
-    display: block;
+    display: none;
   }
   [data-park] .park-world-headstepbar {
     width: 150px;
@@ -544,6 +547,16 @@
     background: var(--card);
     box-shadow: var(--sh);
     position: relative;
+  }
+}
+
+/* 1280-1439: slimmer progress bars leave the title more room (UX-SMOOTH). */
+@media (min-width: 1280px) and (max-width: 1439px) {
+  [data-park] .park-world-headstepbar {
+    width: 124px;
+  }
+  [data-park] .park-world-headcreditsbar {
+    width: 132px;
   }
 }
 

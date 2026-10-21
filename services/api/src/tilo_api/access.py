@@ -57,6 +57,9 @@ PUBLIC_ROUTES: frozenset[tuple[str, str]] = frozenset(
         # route checks its own Google ID token and the attend's nonce.
         ("POST", "/internal/meeting-voice/reserve"),
         ("POST", "/internal/meeting-voice/close"),
+        # ADR-0042 amendment 1 (inert until `TILO_MEETING_ACTIONS=1`): the bot's actions route checks its own Google ID
+        # token and the attend's action nonce.
+        ("POST", "/internal/meeting-actions/run"),
     }
 )
 

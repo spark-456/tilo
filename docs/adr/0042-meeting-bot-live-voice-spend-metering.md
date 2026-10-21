@@ -345,3 +345,35 @@ Acceptance tests are written first (`tests/MV-*`), names carry `FR_MTG_11_SEC_16
   `FirestoreSpendLedger` (PR #938's module, after it merges), emulator suite (MV-17(b)). Not a precondition of T2/T3.
 - **Then the user:** BQ-M2-5, the env, the price approval and flip, the X4 probe, one live meeting with
   `tilotesting@gmail.com`.
+
+## Amendment 1 (21 Oct 2026): meeting actions (owner decision, BQ-MTG-ACTIONS-1)
+
+- Status: **Accepted by the owner** (21 Oct 2026, in their words: Tilo must "understand who is saying what" and act on
+  "their pinboards, meetings"; then "no it should do it directly"). Built behind its own switch,
+  `TILO_MEETING_ACTIONS=1` on tilo-api, which only the owner sets; unset, nothing below exists.
+- **What.** The meeting bot may make three writes, through a new public-to-the-gate route of tilo-api,
+  `POST /internal/meeting-actions/run` (`tilo_api/meeting_actions.py`): `create_pin` (the speaker's own personal board,
+  or their one team's board), `add_agenda_item` (this meeting's agenda, as its owner, at most 20 items) and
+  `create_meeting` (a Tilo meeting on the speaker's own Agenda, owned by them, no attendees). No Google Calendar event,
+  no invite, no email, no other action, ever.
+- **Who.** The route checks its own caller like the meter routes (decisions 3, 14): a Google ID token for
+  `TILO_MEETING_ACTIONS_AUDIENCE` from `TILO_MEETING_ACTIONS_CALLER` (the meter's pair when unset; never the tick's or
+  the Tasks account). The attend route opens a separate **action claim** (`tilo_api/meeting_action_claims.py`) from the
+  verified principal, hands its nonce to the bot as `X-Tilo-Meeting-Actions` (never the body, never logged) and closes
+  it when the attend ends. The claim names the meeting owner; a body never carries a uid or an org.
+- **As whom.** With no speaker (one-on-one, exactly one other person in the call) the write runs as the owner. With a
+  speaker, the caption display name is matched **exactly** (`tilo_people.names.match_name`, no fuzzy match) to one
+  person the owner can see; the write runs as that person through the same people writes, access oracle and Desk
+  events a signed-in request uses. Unknown or ambiguous: nothing is written and Tilo says it cannot find them.
+- **Confirmation.** The model only proposes (`{"action": {"name", "args"}}`); Tilo reads it back in fixed words and
+  sends it only after the same speaker says yes within 45 s (anyone, one-on-one). A meeting's read-back asks whether
+  they have the right to record it; that spoken yes is the meeting's attestation (PE-18's attest step, by voice), sent
+  as `recording_attested: true`. Tilo says what it did only after tilo-api answered 200 `done`, in one line naming the
+  board or the time; a refusal or failure is said as such and never as a success.
+- **Bounds.** At most five writes per call (`MAX_ACTIONS`); a key already answered gets the same answer and writes
+  nothing again; 4 KiB closed bodies. Logs carry the action name, status and outcome word only, never speech.
+- **Accepted risk (owner).** A caption display name is the identity: a participant who renames themselves in Meet to
+  a teammate's name could add a pin, an agenda item or a meeting as that teammate. The read-back and the five-write cap
+  bound it; the owner accepted it on 21 Oct 2026 rather than requiring each person to approve in Tilo while signed in.
+- **Time zone.** Spoken times are resolved in `TILO_MEETING_TZ` (default `Asia/Kolkata`) from the payload's
+  `now_local`; the read-back says the resolved day and time before anything is written.

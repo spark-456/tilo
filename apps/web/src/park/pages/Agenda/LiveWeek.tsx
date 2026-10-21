@@ -606,6 +606,7 @@ export function LiveWeek({
                     <button
                       key={entry.key}
                       type="button"
+                      title={entry.title}
                       className={`cx-agenda-event${entry.meeting ? "" : " is-calendar-entry"}`}
                       data-event-tone={toneOf(entry)}
                       style={{

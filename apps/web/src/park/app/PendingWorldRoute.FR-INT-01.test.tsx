@@ -6,7 +6,8 @@ import { PendingWorldRoute, markPendingWorld, pendingWorld } from "./PendingWorl
 
 afterEach(() => cleanup());
 
-it("test_FR_INT_01_run_opens_world_only_after_a_recorded_plan_or_start", async () => {
+// UX-SMOOTH (owner, 21 Oct): the run opens its world at once; only the planning card waits for the recorded plan.
+it("test_FR_INT_01_run_opens_world_at_once_and_the_card_waits_for_a_recorded_plan", async () => {
   let receive: ((event: { type: string }) => void) | undefined;
   const stop = vi.fn();
   const client = {
@@ -22,17 +23,18 @@ it("test_FR_INT_01_run_opens_world_only_after_a_recorded_plan_or_start", async (
       <p>World loaded</p>
     </PendingWorldRoute>,
   );
-  expect(rig.container.textContent).toContain("Tilo is planning your world");
-  expect(rig.container.textContent).not.toContain("World loaded");
+  expect(rig.container.textContent).toContain("Director is planning");
+  expect(rig.container.textContent).toContain("World loaded");
   expect(client.subscribeEvents).toHaveBeenCalledWith(
     "new-world",
     expect.any(Function),
     expect.any(Function),
   );
   await act(async () => receive?.({ type: "world.requested" }));
-  expect(rig.container.textContent).toContain("Tilo is planning your world");
+  expect(rig.container.textContent).toContain("Director is planning");
   await act(async () => receive?.({ type: "world.planned" }));
   expect(rig.container.textContent).toContain("World loaded");
+  expect(rig.container.textContent).not.toContain("Director is planning");
   expect(pendingWorld("new-world")).toBe(false);
   expect(stop).toHaveBeenCalledOnce();
 });

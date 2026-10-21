@@ -18,6 +18,7 @@ from tilo_metering.flags import FlagStore
 from tilo_people.errors import VersionConflict
 
 from tilo_api import deps
+from tilo_api.meeting_action_claims import ActionClaims
 from tilo_api.meeting_host_rpc import HostRpcError, MeetingHostRpc
 from tilo_api.meeting_join import owned_receipt
 from tilo_api.meeting_voice_claims import AttendClaims
@@ -35,7 +36,9 @@ class BotCapture:
 
 
 class BotClient(Protocol):
-    async def attend(self, meeting_id: str, join: MeetingJoin, claim: str | None = None) -> BotCapture: ...
+    async def attend(
+        self, meeting_id: str, join: MeetingJoin, claim: str | None = None, action_claim: str | None = None
+    ) -> BotCapture: ...
 
 
 def attend_artifacts(
@@ -64,6 +67,7 @@ async def attend_meeting(
     clock: Callable[[], str],
     claims: AttendClaims | None = None,
     join_url: str | None = None,
+    action_claims: ActionClaims | None = None,
 ) -> dict[str, Any]:
     # MEET-GUEST: with `join_url` Tilo's guest bot goes to the person's own Google Meet and the host admits it; no
     # meeting host account is involved. The link is checked like a MeetingJoin, used once and stored nowhere (MJ rules).
@@ -97,8 +101,14 @@ async def attend_meeting(
     made = None
     # ADR-0042: the voice meter's claim, from the verified principal and only here; off (None) the call is unchanged.
     nonce = claims.open(meeting_id, uid=w.actor, org_id=w.org) if claims is not None else None
+    # ADR-0042 amendment 1: the action claim, from the verified principal (the meeting owner) and only here; off
+    # (None, the default) the bot is called exactly as before.
+    acts = action_claims.open(meeting_id, uid=w.actor, org_id=w.org) if action_claims is not None else None
+    extra = {} if acts is None else {"action_claim": acts}
     try:
-        capture = await (bot.attend(meeting_id, join) if nonce is None else bot.attend(meeting_id, join, nonce))
+        capture = await (
+            bot.attend(meeting_id, join, **extra) if nonce is None else bot.attend(meeting_id, join, nonce, **extra)
+        )
         if capture.transcript.meeting_id != meeting_id or capture.reason not in (
             "completed",
             "left_on_request",
@@ -161,6 +171,8 @@ async def attend_meeting(
     finally:
         if claims is not None and nonce is not None:
             claims.end(meeting_id, nonce)
+        if action_claims is not None and acts is not None:
+            action_claims.end(meeting_id, acts)
 
 
 def _guest_world(w: Writer, store: deps.Store, meeting: dict[str, Any]) -> str:

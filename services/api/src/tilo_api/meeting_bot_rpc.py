@@ -72,7 +72,9 @@ class MeetingBotRpc:
             spent.slept += pause
         return False
 
-    async def attend(self, meeting_id: str, join: MeetingJoin, claim: str | None = None) -> BotCapture:
+    async def attend(
+        self, meeting_id: str, join: MeetingJoin, claim: str | None = None, action_claim: str | None = None
+    ) -> BotCapture:
         if os.environ.get("LIVE") != "1":
             raise HTTPException(503, "bot_not_enabled")
         try:
@@ -80,7 +82,7 @@ class MeetingBotRpc:
             spent = _Spent()
             for attempt in range(1000):
                 try:
-                    return await self._launch(meeting_id, join, claim, token)
+                    return await self._launch(meeting_id, join, claim, token, action_claim)
                 except _NotStarted:
                     pause = _BACKOFF_S[min(attempt, len(_BACKOFF_S) - 1)]
                     if spent.after(pause) >= ATTEND_BUDGET_S:
@@ -93,7 +95,9 @@ class MeetingBotRpc:
         except Exception:
             raise HTTPException(503, "bot_unavailable") from None
 
-    async def _launch(self, meeting_id: str, join: MeetingJoin, claim: str | None, token: str) -> BotCapture:
+    async def _launch(
+        self, meeting_id: str, join: MeetingJoin, claim: str | None, token: str, action_claim: str | None = None
+    ) -> BotCapture:
         timeout = httpx.Timeout(connect=5, read=3500, write=20, pool=5)
         try:
             async with httpx.AsyncClient(transport=self._transport, timeout=timeout, follow_redirects=False) as client:
@@ -102,7 +106,9 @@ class MeetingBotRpc:
                     f"{self._base}/internal/meetings/{meeting_id}/attend",
                     json=join.model_dump(mode="json"),
                     headers={"Authorization": f"Bearer {token}"}
-                    | ({"X-Tilo-Meeting-Claim": claim} if claim else {}),  # ADR-0042 MV-16: the bot never logs it
+                    | ({"X-Tilo-Meeting-Claim": claim} if claim else {})  # ADR-0042 MV-16: the bot never logs it
+                    # ADR-0042 amendment 1: the attend's action nonce, only while TILO_MEETING_ACTIONS=1; never logged
+                    | ({"X-Tilo-Meeting-Actions": action_claim} if action_claim else {}),
                 ) as response:
                     if response.status_code != 200:
                         detail = await _bot_detail(response)

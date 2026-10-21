@@ -26,7 +26,13 @@ PUBLIC = frozenset(
 )
 # ADR-0042 (BQ-M2-5, the user's decision pending; inert until TILO_VOICE_METER=1): the meeting bot's own two routes.
 # They are not part of the schedule hand-off: this test still pins that the hand-off added nothing of its own.
-METER = frozenset({("POST", "/internal/meeting-voice/reserve"), ("POST", "/internal/meeting-voice/close")})
+METER = frozenset(
+    {
+        ("POST", "/internal/meeting-voice/reserve"),
+        ("POST", "/internal/meeting-voice/close"),
+        ("POST", "/internal/meeting-actions/run"),  # ADR-0042 amendment 1 (BQ-MTG-ACTIONS-1, owner 21 Oct)
+    }
+)
 SCHEDULE_ROUTES = frozenset(
     {
         ("POST", "/internal/schedules/tick"),

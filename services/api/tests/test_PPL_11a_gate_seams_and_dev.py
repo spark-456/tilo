@@ -97,6 +97,8 @@ def test_PPL_11a_SEC_15_the_people_routes_exist_and_none_of_them_is_public(peopl
                 # ADR-0042 (BQ-M2-5): the meeting bot's two meter routes, inert until TILO_VOICE_METER=1.
                 ("POST", "/internal/meeting-voice/reserve"),
                 ("POST", "/internal/meeting-voice/close"),
+                # ADR-0042 amendment 1 (BQ-MTG-ACTIONS-1, owner-approved 21 Oct; inert until TILO_MEETING_ACTIONS=1).
+                ("POST", "/internal/meeting-actions/run"),
             }
         )
     ), "a people route is never public (a new public route is the owner's decision)"
