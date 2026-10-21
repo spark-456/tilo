@@ -936,7 +936,7 @@ def router_for_mode(mode: Mode, *, org: OrgBinding | None = None) -> Router:
             live_permitted=live,
             force_replay=not live,
             org=org,
-            retry_delays=SERVER_RETRY_DELAYS if live else (),  # P0-RUNS-FIX: a Gemini 5xx/429 waits, then retries
+            retry_delays=SERVER_RETRY_DELAYS if live else (),  # P0-RUNS-FIX: a provider 5xx/429 waits, then retries
         )
     except ProviderConfigError as exc:
         logger.warning("model router unavailable: %s", exc)

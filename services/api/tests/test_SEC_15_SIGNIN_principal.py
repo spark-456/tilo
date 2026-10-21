@@ -361,9 +361,16 @@ def real_app(signer, monkeypatch):
     """`tilo_api.app` as deployed: K_SERVICE set, sign-in via the verifier seam and an in-memory Store."""
     monkeypatch.setenv("K_SERVICE", "tilo-api")
     tilo_app.dependency_overrides[deps.get_firebase_verifier] = lambda: verifier_for(signer)
-    tilo_app.dependency_overrides[deps.get_store] = lambda: deps.Store()
+    store = deps.Store()  # one store, so a test can say what a request recorded
+    tilo_app.dependency_overrides[deps.get_store] = lambda: store
     with TestClient(tilo_app, raise_server_exceptions=False) as client:
+        client.tilo_store = store  # type: ignore[attr-defined]
         yield client
+
+
+def _recorded(client: TestClient) -> tuple[object, ...]:
+    s = client.tilo_store  # type: ignore[attr-defined]
+    return (sorted(s.worlds), sorted(s.tasks), {k: len(v) for k, v in s.events.items()}, sorted(s.policies))
 
 
 def test_SEC_15_SIGNIN_signed_out_requests_to_the_real_app_are_401_and_the_probes_stay_open(real_app):
@@ -392,20 +399,26 @@ def test_SEC_15_SIGNIN_an_anonymous_demo_session_is_let_in_by_the_same_rules(rea
 
 
 def test_SEC_15_SIGNIN_the_old_sign_up_answer_changes_nothing_for_anyone_else(real_app, signer):
+    """OPEN-ACCESS removed the access store: the old sign-up answer records nothing for anyone, and a header naming
+    another uid never makes it act for them (the answer is the token's own view)."""
     mine = bearer(_token(signer))
-    real_app.post(
+    before = _recorded(real_app)
+    answer = real_app.post(
         "/access/declaration",
         json={"declaration": "judge"},
         headers={**mine, "X-User-Id": "u_victim", "X-Tilo-User": "u_victim"},
     )
-    assert real_app.store.get("u_victim") is None
-    assert real_app.store.get(firebase_auth.user_id_for(GOOGLE_SUB)) is None
+    assert answer.status_code == 200, answer.text
+    assert answer.json() == real_app.get("/access", headers=mine).json()  # the caller's own view, never u_victim's
+    assert _recorded(real_app) == before  # nothing stored for the caller or the uid the headers name
     someone_else = bearer(_token(signer, sub="someone" + "Z" * 10))
     assert real_app.get("/worlds", headers=someone_else).status_code == 200
 
 
 def test_SEC_15_SIGNIN_an_expired_token_is_a_401_at_the_real_app_even_for_a_declared_judge(real_app, signer):
-    real_app.store.declare(firebase_auth.user_id_for(GOOGLE_SUB), "judge")
+    """OPEN-ACCESS: every Google sign-in now gets what a declared judge got, so the control is the same uid with a
+    fresh token: it is let in, and its expired token is still refused."""
+    assert real_app.get("/worlds", headers=bearer(_token(signer))).status_code == 200
     reply = real_app.get("/worlds", headers=bearer(_token(signer, exp=NOW - 3600)))
     assert reply.status_code == 401
 

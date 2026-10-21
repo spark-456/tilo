@@ -181,7 +181,9 @@ def test_FR_AGT_02_a_run_whose_store_cannot_be_built_starts_no_run_and_stores_no
     assert run_flow.approve().status_code == 200  # the grant is the person's; a run that cannot start never changes it
 
     run_flow.quiet_stream()
-    assert {e["type"] for e in run_flow.after_grant()} <= {"world.failed"}, run_flow.types()
+    assert {e["type"] for e in run_flow.after_approval()} <= {"world.failed"}, (
+        run_flow.types()
+    )  # MK-06 picks are the grant's
     assert run_flow.runner.ran == [], "no unit started without a store to put its work on"
     assert run_flow.rig.meta.paths("") == [] and run_flow.rig.blobs.keys("") == []
     assert run_flow.outbox_store.all_entries() == [] and run_flow.adapter.sent == []
