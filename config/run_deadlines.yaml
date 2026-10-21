@@ -1,0 +1,23 @@
+# RUN-SPEED (owner, 21 Oct 2026: "the entire agentic process is too slow"): per-call time limits on a run's model
+# calls, read by tilo_api.run_deadlines. Each is handed to Router.generate as its PL-03 deadline: no attempt starts after
+# `seconds`, and a candidate with another behind it waits at most `first_attempt_share` of the time left, so a hung
+# primary hands over to the fallback instead of blocking the run. No model id here: config/models*.yaml names them.
+#
+# Live evidence (21 Oct): the Director's plan call at run start took 86 to 206 s (13 to 30 s on 19 and 20 Oct)
+# because one attempt hung about 120 s before the provider answered 5xx; the fallback then answered in about 30 s.
+
+version: 1
+
+# The Director's plan at run start (FR-INT-09), each attempt of compile_plan on its own. A good plan takes 13 to 30 s
+# on the primary, so it keeps up to 54 s; the fallback keeps the rest. A plan that misses the whole limit fails the run
+# with its plain reason ("the Director could not plan this task"), as any other Director failure does.
+plan:
+  seconds: 180
+  first_attempt_share: 0.3
+
+# The per-unit must-ask check (FR-AGT-05, a short JSON verdict). A check that runs out of time is the same as one the
+# model could not answer: config/must_ask.yaml decides (assume: the unit goes on; ask: the person is asked). The
+# deterministic rules (repeated failure, an action above T1, T3) never depend on it.
+must_ask:
+  seconds: 45
+  first_attempt_share: 0.5

@@ -1097,9 +1097,14 @@ def get_plan_compiler(mode: Mode = "replay", today: Clock = real_today, meter: A
     if "director" not in providers_config().roles:
         return _no_plan_compiler
     router = _seam_router(mode, meter)
+    from tilo_api.run_deadlines import load_run_deadlines  # noqa: PLC0415
+
+    limit = load_run_deadlines().plan  # RUN-SPEED: a hung Director attempt hands over to the fallback in time
 
     def compile_with_director(*, brief: dict, approach: dict, budget_cap: float, context: PlanInputs) -> dict:
-        return compile_plan(brief, approach, budget_cap, context, router=router, today=today()).plan
+        return compile_plan(
+            brief, approach, budget_cap, context, router=router, today=today(), deadline=limit.start
+        ).plan
 
     return compile_with_director
 
@@ -1112,13 +1117,17 @@ def get_layout_builder() -> Callable[..., dict]:
 
 
 class _RoleModel:
-    """A worker role's model, always through the Router (PL-01); the harness runner calls only `generate`."""
+    """A worker role's model, always through the Router (PL-01); the harness runner calls only `generate`. With
+    `deadline` (RUN-SPEED: the must-ask check) each `generate` gets a fresh PL-03 deadline, so a hung attempt hands
+    over to the fallback and a check that runs out of time fails like any provider error."""
 
-    def __init__(self, router: Router, role: str) -> None:
-        self._router, self._role = router, role
+    def __init__(self, router: Router, role: str, deadline: Any = None) -> None:
+        self._router, self._role, self._deadline = router, role, deadline
 
     def generate(self, request: Any) -> Any:
-        return self._router.generate(self._role, request).response
+        if self._deadline is None:
+            return self._router.generate(self._role, request).response
+        return self._router.generate(self._role, request, deadline=self._deadline.start()).response
 
     def generate_budgeted(self, request: Any, budget: Any, deadline: Any = None) -> Any:
         """`deadline`: the router's PL-03 Deadline for this call (DEMO-BROWSER: a browser step waits seconds)."""
@@ -1144,8 +1153,17 @@ def get_unit_runner(mode: Mode = "replay", today: Clock = real_today, meter: Any
 
 
 def get_must_ask_providers(mode: Mode = "replay", meter: Any = None) -> Mapping[str, Any]:
-    """The models `MustAsk` judges a unit with (FR-AGT-05), keyed by the unit's role; always the Router's roles."""
-    return _worker_models(mode, meter) if meter is not None else _worker_models(mode)
+    """The models `MustAsk` judges a unit with (FR-AGT-05), keyed by the unit's role; always the Router's roles. Each
+    check has the RUN-SPEED must-ask deadline: one that runs out of time is a check the model could not answer, which
+    config/must_ask.yaml already decides (the deterministic rules never depend on it)."""
+    from tilo_api.run_deadlines import load_run_deadlines  # noqa: PLC0415
+
+    limit = load_run_deadlines().must_ask
+    models = _worker_models(mode, meter) if meter is not None else _worker_models(mode)
+    return {
+        role: _RoleModel(model._router, model._role, limit) if isinstance(model, _RoleModel) else model
+        for role, model in models.items()
+    }
 
 
 def get_action_resolver() -> Callable[..., dict]:

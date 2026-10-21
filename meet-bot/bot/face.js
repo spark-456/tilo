@@ -1,9 +1,10 @@
 // FR-MTG-14: local canvas camera. State comes only from explicit runtime events.
 (() => {
-  // Owner 21 Oct: "very blurry". The frame is what Meet sends (16:9, 1280 x 720); the 320 x 240 scene is vector, drawn
-  // SCALE times and centred, so nothing is upscaled. Meet crops small tiles to a square or 9:16 middle: labels stay in it.
-  const W = 1280;
-  const H = 720;
+  // Owner 21 Oct: "very blurry". The frame is 16:9, 960 x 540 (live 21 Oct 22:10 1280 x 720 was followed by Meet's
+  // "Others may see your video differently" card; this keeps the bot's two vCPUs free); the 320 x 240 scene is vector,
+  // drawn SCALE times and centred, so nothing is upscaled. Small tiles keep a square or 9:16 middle: labels stay in it.
+  const W = 960;
+  const H = 540;
   const SCALE = H / 240;
   const canvas = document.createElement("canvas");
   canvas.width = W;
@@ -17,7 +18,7 @@
   // Decay: "listening", "happy" and "sad" last FEELING_MS after the event that set them; "thinking" ends with
   // model_end, and THINKING_MS only guards against a lost model_end. Decay only ever returns to idle.
   const FEELING_MS = 4000;
-  const SAFE = 134; // scene units: the middle of the frame a 9:16 tile keeps (720 * 9 / 16 / SCALE)
+  const SAFE = 134; // scene units: the middle of the frame a 9:16 tile keeps (H * 9 / 16 / SCALE = 135)
   const THINKING_MS = 30000;
   const clock = () => (globalThis.performance ? performance.now() : Date.now());
   let feelingAt = 0;
