@@ -102,3 +102,12 @@ def test_JSON_a_failed_quick_reply_leaves_a_stage_line_with_the_failure_type_onl
         b.quick_reply([chat_utterance("Sacheev", "Can you pin up the secret plan to the team board?", 10.0)], 10.0)
     lines = [r.getMessage() for r in caplog.records if r.name == "bot.cloud_run"]
     assert lines == ["stage quick_failed reason=JSONDecodeError"]
+
+
+def test_BOARD_no_team_is_said_plainly_and_the_client_accepts_the_word():
+    from bot.meeting_actions import _OUTCOMES  # noqa: PLC0415
+
+    pending = action_talk.PendingAction("Sacheev", None, "create_pin", {"title": "x", "board": "team"})
+    line = action_talk.result_line(pending, False, "no_team", {})
+    assert "not on a team" in line and "personal board" in line and not line.lower().startswith("done")
+    assert "no_team" in _OUTCOMES
