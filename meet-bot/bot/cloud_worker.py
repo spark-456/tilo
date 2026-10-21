@@ -14,6 +14,7 @@ from tilo_contracts import Transcript
 
 from .config import Config
 from .events import remove_meet_links
+from .meeting_actions import actions_from_env
 from .providers import reset_call_counter
 from .session import LiveSession
 from .voice_meter import meter_from_env
@@ -91,11 +92,15 @@ def quiet_capture():
             logger.disabled = disabled
 
 
-async def attend_meeting(meeting_id: str, join_url: str, claim: str | None = None) -> dict:
+async def attend_meeting(
+    meeting_id: str, join_url: str, claim: str | None = None, action_claim: str | None = None
+) -> dict:
     reset_call_counter()
     # ADR-0042 (BQ-M2-4): the Live voice's SEC-16 hook, or None (the Live voice then stays unbuilt and the local voice
     # speaks). Only with LIVE=1, TILO_API_URL and the attend's claim; the claim goes nowhere else.
     meter = meter_from_env(meeting_id, claim, os.environ)
+    # ADR-0042 amendment 1: the meeting actions client, or None (Tilo then says it cannot act from a call).
+    actions = actions_from_env(meeting_id, action_claim, os.environ)
     with quiet_capture(), TemporaryDirectory(prefix="tilo-meet-") as directory:
         root = Path(directory)
         agenda = root / "agenda.md"
@@ -129,6 +134,8 @@ async def attend_meeting(meeting_id: str, join_url: str, claim: str | None = Non
             context_urls=[],
         )
         extra = {"voice_meter": meter} if meter is not None else {}  # off: the session is built exactly as before
+        if actions is not None:
+            extra["actions"] = actions
         session = LiveSession(
             cfg, "join", join_url, agenda, 45, False, [], False, False, [], "captions", "both", **extra
         )

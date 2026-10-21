@@ -20,8 +20,9 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
+from . import action_talk
 from .audio_out import Player, WavTap, setup_virtual_mic
-from .brain import CHAT_SUFFIX, Agenda, Brain, _norm, chat_utterance
+from .brain import CHAT_SUFFIX, Agenda, Brain, ChatMessage, _norm, chat_utterance
 from .browser import MeetBrowser
 from .captions import CaptionMerger, CaptionReader, TranscriptStore, Utterance
 from .chat import ChatPoster, intro_text
@@ -160,9 +161,11 @@ class LiveSession:
         reply: str | None = None,
         *,
         voice_meter: Any = None,  # ADR-0042: the SEC-16 hook of the Live voice (`LiveVoiceMeter`); None = local voice
+        actions: Any = None,  # ADR-0042 amendment 1: tilo-api's meeting actions client (`MeetingActions`); None = off
     ) -> None:
         self.cfg, self.mode, self.url = cfg, mode, url
         self.voice_meter = voice_meter
+        self.actions = actions
         self.clock = SystemClock()
         self.run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
         self.out_dir = cfg.out_dir / self.run_id
@@ -172,6 +175,8 @@ class LiveSession:
         self.timeline = Timeline(self.out_dir / "latency.jsonl")
         self.kb = build_knowledge(cfg, context)
         self.brain = build_brain(cfg, agenda_path, duration, self.kb)
+        if self.brain is not None and actions is not None:
+            self.brain.actions_enabled = True
         self.fast = self._build_fast()
         if self.brain:
             self.brain.fast = self.fast
@@ -318,6 +323,8 @@ class LiveSession:
             first_visible_at_s=u.t,
             finalized_after_s=round(self.elapsed() - u.t, 1),
         )
+        if self.brain and self._answers_pending_action(u):
+            return
         if self.brain:
             q = self.brain.question_in(u)
             if q and self.brain.is_fresh(q):
@@ -325,6 +332,37 @@ class LiveSession:
                 if stt_final_at is not None:
                     self.stt_final.setdefault(_norm(q.text), stt_final_at)
                 self._prewarm()
+
+    # -- meeting actions (ADR-0042 amendment 1) ----------------------------------------------------------------------
+    def _answers_pending_action(self, u: Utterance) -> bool:
+        """The yes or no to a read-back, from the person Tilo asked (anyone one-on-one), consumed here: a yes sends the
+        action to tilo-api, a no drops it. Anything else leaves the read-back waiting until it expires."""
+        brain = self.brain
+        pending = getattr(brain, "pending_action", None)
+        if pending is None or self.actions is None:
+            return False
+        said = action_talk.answer(pending, u.speaker, u.text, one_on_one=brain.sole_human)
+        if said is None:
+            return False
+        brain.pending_action = None
+        brain.mark_handled(u)
+        if said == "no":
+            ops.warning("stage action name=%s outcome=declined", pending.name)
+            self._say(pending, "Okay, I won't.")
+        else:
+            asyncio.get_running_loop().create_task(self._run_action(pending))
+        return True
+
+    async def _run_action(self, pending: action_talk.PendingAction) -> None:
+        result = await asyncio.to_thread(
+            self.actions.run, pending.name, action_talk.request_args(pending), pending.api_speaker, pending.key
+        )
+        self._say(pending, action_talk.result_line(pending, result.ok, result.outcome, result.info))
+
+    def _say(self, pending: action_talk.PendingAction, text: str) -> None:
+        msg = ChatMessage("direct_reply", f"action {pending.key}", text, None)
+        self.brain.commit_chat(msg, self.brain_elapsed())
+        self._queue_delivery(msg)
 
     def record_caption(self, u: Utterance) -> None:
         if not self.intro_sent:

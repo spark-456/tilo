@@ -15,6 +15,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, NamedTuple, Protocol
 
+from .action_talk import ACTIONS_TEXT, PendingAction, now_local, proposal, readback
 from .answer_scope import DECLINE, scoped_answer
 from .captions import Utterance
 from .events import remove_meet_links
@@ -595,6 +596,12 @@ QUICK_PROMPT = (
     "project_context answers it, otherwise reply null, and never join small talk. "
     'Reply ONLY with JSON: {"reply": "<one or two short sentences>" or "[[NO_ANSWER]]" or "[[UNCLEAR]]" or null}.'
 )
+NO_ACTIONS_TEXT = (
+    "You cannot take actions in this call: you cannot add agenda items, create pins or boards, schedule meetings, "
+    "send messages or change anything, so never say you did or will; if asked, say you can't do that from a call yet. "
+)
+# ADR-0042 amendment 1: with meeting actions on, the three actions replace the "you cannot act" sentence.
+QUICK_PROMPT_ACTIONS = QUICK_PROMPT.replace(NO_ACTIONS_TEXT, ACTIONS_TEXT)
 
 
 @dataclass
@@ -633,6 +640,8 @@ class Brain:
         self.present: list[str] = []
         self.sole_human = False  # exactly one other person is in the meeting: whatever they say is for Tilo
         self.agenda_placeholder = False  # the agenda is a stand-in (cloud attendance): never quote or invent items
+        self.actions_enabled = False  # ADR-0042 amendment 1: the session has a tilo-api actions client this call
+        self.pending_action: PendingAction | None = None  # read back, waiting for the same speaker's yes
         self.last_engaged_at = -1e9  # when the last question put to Tilo was asked
         self.last_quick_source = "model"
         self._attempted: dict[str, float] = {}  # question -> start of the utterance last tried (answered or not)
@@ -793,10 +802,25 @@ class Brain:
             ],
             "project_context": self.knowledge.retrieve(question.text) if self.knowledge else [],
         }
+        if self.actions_enabled:  # "Friday at 3" needs today's date and the zone it is said in
+            payload["now_local"] = now_local()
         return "INPUT_JSON:\n" + json.dumps(payload), question
+
+    def _quick_system(self) -> str:
+        return QUICK_PROMPT_ACTIONS if self.actions_enabled else QUICK_PROMPT
+
+    def mark_handled(self, u: Any) -> None:
+        """A line already answered another way (a yes or no to a read-back): never asked of the model too."""
+        self._attempted[_norm(u.text)] = u.t
 
     def _quick_message(self, raw: str, utterances: list[Any], elapsed_s: float, q: Question) -> ChatMessage | None:
         obj = parse_json_reply(raw)
+        if self.actions_enabled and isinstance(obj, dict) and obj.get("action") is not None:
+            # The model only proposes; Tilo's own fixed words read it back, and the same speaker's yes sends it.
+            pending = proposal(obj.get("action"), q.speaker, one_on_one=self.sole_human)
+            if pending is not None:
+                self.pending_action = pending
+                return self._direct(readback(pending), utterances, elapsed_s, q)
         reply = obj.get("reply") if isinstance(obj, dict) else None
         if isinstance(reply, str) and reply.strip():
             line = next((x for s, x in _SENTINEL_LINES.items() if reply.strip().upper().startswith(s)), None)
@@ -827,7 +851,7 @@ class Brain:
         try:
             if self.model_event:
                 self.model_event("model_start")
-            raw = await self.fast.generate(QUICK_PROMPT, prompt, json_mode=True)
+            raw = await self.fast.generate(self._quick_system(), prompt, json_mode=True)
             return self._quick_message(raw, utterances, elapsed_s, q)
         except (LLMUnavailable, json.JSONDecodeError) as e:  # Busy is an LLMUnavailable
             return self._quick_failed(e, utterances, elapsed_s, q)
@@ -837,7 +861,7 @@ class Brain:
 
     def _ask_quick_sync(self, prompt: str, q: Question, utterances: list[Any], elapsed_s: float) -> ChatMessage | None:
         try:
-            return self._quick_message(self._model_generate(QUICK_PROMPT, prompt), utterances, elapsed_s, q)
+            return self._quick_message(self._model_generate(self._quick_system(), prompt), utterances, elapsed_s, q)
         except (LLMUnavailable, json.JSONDecodeError) as e:
             return self._quick_failed(e, utterances, elapsed_s, q)
 
