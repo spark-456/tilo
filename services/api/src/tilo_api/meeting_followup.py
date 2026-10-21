@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -32,8 +33,54 @@ from tilo_api.meeting_allowance import allowance_router
 from tilo_api.meeting_analysis_mode import _Calls, _Safety
 from tilo_api.people_limits import limits_of
 from tilo_api.people_meetings import _mine
-from tilo_api.people_quotes import GONE, read_doc
+from tilo_api.people_quotes import GONE, Reader, meeting_transcript, read_doc
 from tilo_api.people_writes import Refusal, Writer
+
+# MINUTES-ALL: an address the Owner reviewed on the send list: one bare ASCII mailbox, never a display name or a list
+_MAIL = re.compile(
+    r"(?=.{3,254}$)[a-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}"
+)
+
+
+_BOT_NAMES = frozenset({"tilo", "tilo notetaker"})  # the meeting bot's own speaker names: never a recipient
+MAX_SEND_LIST = 60
+
+
+def followup_recipients(w: Writer, artifacts: ArtifactStore, meeting_id: str) -> dict[str, Any]:
+    """MINUTES-ALL (owner, 21 Oct): the send list the Owner reviews before "Send to everyone who joined": themself
+    ("Me"), every attendee on the meeting record with the address on their person record or none ("no email on file"),
+    and each other person heard in the call by the name the captions gave, with no address. An address is never
+    guessed from a name; Meet gives display names only. Owner only (the one 404); nothing is written."""
+    meeting, _, _ = _mine(w, meeting_id, "read_full", GONE)
+    if meeting["owner"] != w.actor:
+        raise Refusal(404, "not_found")
+    directory = w.org_directory()
+
+    def email_of(uid: str | None) -> str | None:
+        person = w.stores.persons.get(w.org, uid) if uid else None
+        request = AccessRequest(w.actor, "read_directory", "person", person.record, w.now) if person else None
+        if person is None or request is None or read(request, directory) is None:
+            return None
+        value = person.record.get("email")
+        return value.lower() if isinstance(value, str) and _MAIL.fullmatch(value.lower()) else None
+
+    rows: list[dict[str, Any]] = [{"name": "Me", "email": email_of(w.actor), "source": "owner"}]
+    me = w.stores.persons.get(w.org, w.actor)
+    seen = set(_BOT_NAMES) | {"me"}
+    if me is not None and isinstance(me.record.get("display_name"), str):
+        seen.add(me.record["display_name"].casefold())  # the Owner heard in their own call is already "Me"
+    for attendee in meeting["attendees"]:
+        if attendee["user"] != w.actor and attendee["name"].casefold() not in seen:
+            seen.add(attendee["name"].casefold())
+            rows.append({"name": attendee["name"], "email": email_of(attendee["user"]), "source": "invited"})
+    view = meeting_transcript(Reader(w.stores, artifacts, w.redact, w.org, w.actor, w.now), meeting_id)
+    for line in view["utterances"] if view is not None else []:
+        name = line["speaker"]
+        if isinstance(name, str) and name.casefold() not in seen:
+            seen.add(name.casefold())
+            rows.append({"name": name, "email": None, "source": "heard"})
+    clean = view is not None and view["screening"] == "clean"
+    return {"meeting_id": meeting_id, "recipients": rows[:MAX_SEND_LIST], "transcript": clean}
 
 
 @dataclass(frozen=True)
@@ -150,6 +197,8 @@ def draft_owner_followup(
     allowance: SpendLedger,
     allowance_cap: float,
     clock: Callable[[], str] | None = None,
+    addresses: Sequence[str] | None = None,
+    transcript: bool = False,
 ) -> Preview | None | list[Preview]:
     """Server-only wiring: None picks means nudges; person-id picks mean one minutes email.
     Factory supplies scoped cards/outbox; scope check rejects another world/run or bench evidence.
@@ -181,12 +230,19 @@ def draft_owner_followup(
     limits_of(w.stores).attempt(w.actor, now)
     if type(budget) not in (int, float) or not math.isfinite(budget) or budget <= 0:
         raise Refusal(409, "followup_unavailable")
+    # MINUTES-ALL (owner, 21 Oct): addresses the Owner reviewed on the send list, and whether the transcript goes too
+    typed = sorted({a.lower() for a in addresses or []}) if isinstance(addresses, (list, tuple)) else None
+    if addresses is not None and (typed is None or len(typed) > 50 or not all(_MAIL.fullmatch(a) for a in typed)):
+        raise Refusal(422, "invalid_addresses")
+    minutes_mail = recipients is not None or bool(typed)
     if recipients is not None and (
         not isinstance(recipients, (list, tuple))
-        or not 1 <= len(recipients) <= 50
+        or not (1 if not typed else 0) <= len(recipients) <= 50
         or any(not isinstance(p, str) for p in recipients)
     ):
         raise Refusal(422, "invalid_recipients")
+    if transcript and not minutes_mail:
+        raise Refusal(422, "invalid_recipients")  # the transcript only ever rides on a minutes email
     picks = sorted(set(recipients or []))
     scope = Scope(w.org, world_id, w.actor)
 
@@ -264,6 +320,7 @@ def draft_owner_followup(
         # record still pins confirmation, minutes, retention and all other meeting edits.
         identity = [w.org, w.actor, world_id, run_id, meeting_id, m, ref, stamp]
         identity += [item_versions, people_versions, picks, [head.doc["created_at"], deadline]]
+        identity += [[typed or [], transcript]] if typed or transcript else []  # earlier drafts keep their identity
         return m, doc, items, addresses, identity, deadline
 
     original = snapshot()
@@ -345,7 +402,14 @@ def draft_owner_followup(
         check()
         return result.response if result.outcome == "ok" else None
 
-    m, doc, items, addresses, _, _ = original
+    m, doc, items, mailboxes, _, _ = original
+    lines: list[dict[str, Any]] = []
+    if transcript:  # MINUTES-ALL: the Owner's own transcript, cleaned like their quotes; only a clean one goes out
+        view = meeting_transcript(Reader(w.stores, artifacts, w.redact, w.org, w.actor, w.now), meeting_id)
+        pinned = {k: doc["transcript"][k] for k in ("artifact_id", "version")}
+        if view is None or view["screening"] != "clean" or view["transcript"] != pinned:
+            raise Refusal(409, "transcript_unavailable")
+        lines = [{"speaker": u["speaker"], "text": u["text"], "t_ms": u["t_ms"]} for u in view["utterances"]]
     followup = MeetingFollowUp(
         meetings=SimpleNamespace(get=lambda uid, key: m if uid == w.actor and key == meeting_id else None),
         minutes=SimpleNamespace(
@@ -354,12 +418,12 @@ def draft_owner_followup(
             )
         ),
         work_items=SimpleNamespace(get=lambda uid, key: items.get(key) if uid == w.actor else None),
-        directory=SimpleNamespace(address=addresses.get),
+        directory=SimpleNamespace(address=mailboxes.get),
         model=cast(ModelProvider, SimpleNamespace(generate=generate)),
         safety=cast(SafetyProvider, _Guarded(_Safety(safety, calls), check)),
         drafts=cast(DraftStore, _Guarded(drafts, check)),
         autopilot=cast(Autopilot, _PublishedPreview(ap, check, emit, fence)),
-        mailbox=lambda uid: addresses.get(uid),
+        mailbox=lambda uid: mailboxes.get(uid),
         clock=fresh_time,
         emit=emit,
     )
@@ -372,8 +436,9 @@ def draft_owner_followup(
         budget=budget,
     ) as router:
         result = (
-            followup.draft_minutes_email(w.actor, meeting_id, recipients=picks, request_id=identity)
-            if recipients is not None else followup.draft_nudges(w.actor, meeting_id, request_id=identity)
+            followup.draft_minutes_email(w.actor, meeting_id, recipients=picks, request_id=identity,
+                                         addresses=typed or [], transcript=lines)
+            if minutes_mail else followup.draft_nudges(w.actor, meeting_id, request_id=identity)
         )  # fmt: skip
         if not result:
             calls.check_budget()

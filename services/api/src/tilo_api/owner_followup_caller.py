@@ -9,14 +9,14 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends
 from tilo_channels.autopilot import Autopilot, Preview
 from tilo_channels.drafting import DraftStore
 
 from tilo_api import deps
-from tilo_api.meeting_followup import draft_owner_followup
+from tilo_api.meeting_followup import draft_owner_followup, followup_recipients
 from tilo_api.owner_minutes_caller import OwnerMinutesCaller, get_owner_minutes_caller
 from tilo_api.people_writes import Refusal, Writer
 
@@ -41,8 +41,14 @@ class OwnerFollowupCaller:
     drafts: DraftStore
     autopilot_factory: AutopilotFactory
 
-    def draft(self, meeting_id: str, recipients: Sequence[str] | None = None) -> Preview | None | list[Preview]:
-        """Explicit person-id picks draft minutes mail; no picks draft confirmed-item nudges."""
+    def draft(
+        self,
+        meeting_id: str,
+        recipients: Sequence[str] | None = None,
+        addresses: Sequence[str] | None = None,
+        transcript: bool = False,
+    ) -> Preview | None | list[Preview]:
+        """Explicit person-id picks or reviewed addresses draft minutes mail; neither drafts confirmed-item nudges."""
         if re.fullmatch(r"mt_[0-9A-Za-z_]{1,48}", meeting_id) is None:
             raise Refusal(404, "not_found")
         c = self.owner
@@ -63,7 +69,17 @@ class OwnerFollowupCaller:
             allowance=c.allowance,
             allowance_cap=c.allowance_cap,
             clock=c.clock,
+            addresses=addresses,
+            transcript=transcript,
         )
+
+    def recipients(self, meeting_id: str) -> dict[str, Any]:
+        """MINUTES-ALL: the send list the Owner reviews; reads only."""
+        if re.fullmatch(r"mt_[0-9A-Za-z_]{1,48}", meeting_id) is None:
+            raise Refusal(404, "not_found")
+        c = self.owner
+        return followup_recipients(Writer(c.stores, deps.ORG_ID, c.principal.user_id, c.clock(), c.redact),
+                                   c.artifacts, meeting_id)  # fmt: skip
 
 
 def get_owner_followup_caller(

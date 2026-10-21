@@ -6,6 +6,7 @@ import type {
   MinutesView,
   TranscriptView,
 } from "../../api/live/meetingMinutes";
+import { SendToEveryone } from "./SendToEveryone";
 
 /** MINUTES-SCREEN: the server's stable refusal word, said in plain words; anything else keeps the general sentence. */
 const REFUSALS: Readonly<Record<string, string>> = {
@@ -180,6 +181,7 @@ export function MeetingMinutes({
               >
                 Draft follow-up
               </button>
+              <SendToEveryone id={id} api={api} onCards={setCards} />
             </>
           )}
         </>

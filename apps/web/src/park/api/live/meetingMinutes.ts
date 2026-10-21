@@ -105,6 +105,28 @@ export function meetingMinutesApi(http: Pick<HttpClient, "getJson" | "postJson">
       const reply = await http.postJson(path(id, "confirm"), {});
       if (!object(reply) || reply.id !== id || !object(reply.minutes_confirmed_by)) throw bad();
     },
+    /** MINUTES-ALL: the Owner's send list: names, the address on record or none, and whether the transcript can go. */
+    async sendList(id: string): Promise<SendList> {
+      const doc = await http.getJson(path(id, "followup-recipients"));
+      if (!object(doc) || doc.meeting_id !== id || !Array.isArray(doc.recipients)) throw bad();
+      const people = doc.recipients.map((r) => {
+        if (
+          !object(r) ||
+          typeof r.name !== "string" ||
+          !(r.email === null || typeof r.email === "string") ||
+          !["owner", "invited", "heard"].includes(String(r.source))
+        )
+          throw bad();
+        return { name: r.name, email: r.email as string | null, source: r.source as SendSource };
+      });
+      return { people, transcript: doc.transcript === true };
+    },
+    /** MINUTES-ALL: one email with the minutes (and the transcript when asked) to the addresses the Owner reviewed. */
+    async draftToAll(id: string, addresses: string[], transcript: boolean): Promise<DraftCard[]> {
+      if (!addresses.length || addresses.length > 50 || addresses.some((a) => !isMailbox(a)))
+        throw bad();
+      return cards(await http.postJson(path(id, "draft-followup"), { addresses, transcript }));
+    },
     async draft(id: string, recipients: string[]): Promise<DraftCard[]> {
       if (
         !recipients.length ||
@@ -113,27 +135,38 @@ export function meetingMinutesApi(http: Pick<HttpClient, "getJson" | "postJson">
         recipients.length > 50
       )
         throw bad();
-      const reply = await http.postJson(path(id, "draft-followup"), { recipients });
-      const rows = reply === null ? [] : Array.isArray(reply) ? reply : [reply];
-      return rows.map((r) => {
-        if (
-          !object(r) ||
-          typeof r.card_id !== "string" ||
-          typeof r.subject !== "string" ||
-          typeof r.body !== "string" ||
-          r.tier !== "T3" ||
-          !Array.isArray(r.to) ||
-          !r.to.every((v) => typeof v === "string")
-        )
-          throw bad();
-        return {
-          cardId: r.card_id,
-          subject: r.subject,
-          body: r.body,
-          recipients: r.to as string[],
-        };
-      });
+      return cards(await http.postJson(path(id, "draft-followup"), { recipients }));
     },
   };
 }
 export type MeetingMinutesApi = ReturnType<typeof meetingMinutesApi>;
+export type SendSource = "owner" | "invited" | "heard";
+export interface SendList {
+  people: { name: string; email: string | null; source: SendSource }[];
+  transcript: boolean;
+}
+/** One bare mailbox: no display name, no list, no spaces (the server checks it again, strictly). */
+export const isMailbox = (value: string): boolean =>
+  value.length <= 254 && /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>".]{2,}$/.test(value);
+
+function cards(reply: unknown): DraftCard[] {
+  const rows = reply === null ? [] : Array.isArray(reply) ? reply : [reply];
+  return rows.map((r) => {
+    if (
+      !object(r) ||
+      typeof r.card_id !== "string" ||
+      typeof r.subject !== "string" ||
+      typeof r.body !== "string" ||
+      r.tier !== "T3" ||
+      !Array.isArray(r.to) ||
+      !r.to.every((v) => typeof v === "string")
+    )
+      throw bad();
+    return {
+      cardId: r.card_id,
+      subject: r.subject,
+      body: r.body,
+      recipients: r.to as string[],
+    };
+  });
+}
