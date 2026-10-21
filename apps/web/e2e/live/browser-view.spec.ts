@@ -119,7 +119,7 @@ for (const time of ["day", "night"] as const) {
       // The line says the state (the step is in the label). Every target on a phone is 44 px, Earlier and Later
       // included (a step has a before and an after picture, so the numbered strip alone cannot reach both: on a phone
       // they are arrows beside the line), and the window has no grip and no Dock there; wider, they sit inside the view.
-      await expect(view.locator(".tilo-bv__line")).toHaveText("Tilo is using the browser now.");
+      await expect(view.locator(".tilo-bv__line")).toHaveText("Tilo is deciding the next step…");
       if (size.width < 600) {
         await expect(view.getByRole("button", { name: "Move the browser" })).toHaveCount(0);
         await expect(view.getByRole("button", { name: "Dock" })).toHaveCount(0);

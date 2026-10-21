@@ -62,12 +62,13 @@ class ChatPoster:
         return False
 
     OPEN_WAIT_S = 30.0  # Meet's chat panel can take 5-12 s to show its box (live 20 Oct)
+    REOPENS = 2  # a tip card that took the open click: open again at once, this many times per attempt
 
     async def _open_box(self):
         """The chat box, opening the panel first if it is closed. Polls between short sections, never inside one.
         The panel is opened once and given time to load: clicking 'Chat with everyone' again while it loads closes it
         (live 20 Oct: three short attempts toggled it shut, the intro was never posted and the bot left)."""
-        deadline = time.monotonic() + self.OPEN_WAIT_S
+        deadline, reopened = time.monotonic() + self.OPEN_WAIT_S, 0
         while True:
             async with self.b.ui.section(CHAT_POST):
                 box = await self.b.find(S.CHAT_INPUT)
@@ -79,6 +80,13 @@ class ChatPoster:
                     self._opened_at = time.monotonic()
             if box is not None:
                 return box
+            # Live 21 Oct 22:10: a tip card ("Others may see your video differently") took the open click and the
+            # intro waited the full 30 s. A card dismissed now means the click never landed: open the panel again, at
+            # most REOPENS times (a card that keeps coming back must not toggle the panel shut in a loop).
+            dismiss = getattr(self.b, "dismiss_tips", None)
+            if dismiss is not None and reopened < self.REOPENS and await dismiss():
+                reopened += 1
+                self._opened_at = None
             if time.monotonic() >= deadline:
                 return None
             await asyncio.sleep(0.5)

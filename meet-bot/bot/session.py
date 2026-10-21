@@ -145,6 +145,18 @@ class _MicSwitch:
         return await self.b.set_mic(on)
 
 
+async def enable_captions_with_retry(br: Any, attempts: int = 3) -> bool:
+    """Captions give Tilo every speaker's words: a tip card over the toolbar is dismissed and the toggle tried again,
+    each retry a stage line (live 21 Oct a card covered the page after the join), never a silent failure."""
+    for attempt in range(1, attempts + 1):
+        if attempt > 1:
+            ops.warning("stage captions_retry attempt=%d", attempt)
+            await br.dismiss_tips()
+        if await br.enable_captions():
+            return True
+    return False
+
+
 class LiveSession:
     def __init__(
         self,
@@ -508,7 +520,7 @@ class LiveSession:
                     auto_admit=self.auto_admit,
                 )
                 self._prewarm()
-                captions_on = await br.enable_captions()
+                captions_on = await enable_captions_with_retry(br)
                 ops.warning("session captions=%s", captions_on)
                 if not captions_on:
                     log.error("captions could not be enabled: no speaker names, and no transcript without audio")

@@ -382,15 +382,16 @@ class MeetBrowser:
         await self.ops_snapshot("join_timeout")
         raise JoinFailed(f"not in the call after {timeout:.0f}s (waiting for admission?)")
 
-    async def dismiss_tips(self) -> None:
-        """Meet's one-off tip cards ("Switch the call here ... Got it") cover the pre-join screen and swallow every click
-        (local run 20 Oct: each click timed out until the 90 s join deadline). Press their own Got it / Dismiss."""
+    async def dismiss_tips(self) -> bool:
+        """Meet's one-off tip cards ("Switch the call here ... Got it", "Others may see your video differently") cover the
+        page and swallow every click (local run 20 Oct; live 21 Oct the chat open). Press their own Got it / Dismiss, else
+        Escape. True when a card was there, so a caller knows its last click may not have landed."""
         # A real click: Meet ignores a script-dispatched click on these cards (local run 20 Oct).
         try:
             dialogs = self.page.locator(S.DIALOG_CSS)
             open_dialogs = [d for d in [dialogs.nth(i) for i in range(await dialogs.count())] if await d.is_visible()]
             if not open_dialogs:
-                return
+                return False
             labels = [(await d.get_attribute("aria-label")) or "?" for d in open_dialogs]
             self.stage("tip_dialog", "|".join(labels)[:120])
             pressed = False
@@ -402,8 +403,9 @@ class MeetBrowser:
             if not pressed:
                 await self.page.keyboard.press("Escape")
             await asyncio.sleep(0.5)
+            return True
         except Exception:
-            pass
+            return False
 
     async def rated(self) -> bool:
         """Meet's after-call page ("Rate the meeting"): the bot is out of the call, whatever the reason."""

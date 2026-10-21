@@ -101,11 +101,38 @@ def _json_object(reply: Any) -> Any:
         raise DeliverableRefused("not_json") from None
 
 
-def parse_spec(reply: Any, *, report_date: date | None = None) -> DeliverableSpec:
-    """The reply as a validated DeliverableSpec, or DeliverableRefused."""
+def _place_figures(data: dict[str, Any], figures: Mapping[str, Mapping[str, str]]) -> None:
+    """DEMO-BROWSER: the pictures a figure block places come from `figures` (the run's own recorded browser frames,
+    given by code), never from the reply: a reply's own `figures` key is dropped, a block naming a picture this run
+    did not record (or one already placed) is left out, and the spec carries exactly the placed pictures."""
+    data.pop("figures", None)
+    placed: list[str] = []
+    for section in data.get("sections") or []:
+        if not isinstance(section, dict) or not isinstance(section.get("blocks"), list):
+            continue
+        kept = []
+        for block in section["blocks"]:
+            if isinstance(block, dict) and block.get("type") == "figure":
+                ident = block.get("figure_id")
+                if not isinstance(ident, str) or ident not in figures or ident in placed:
+                    continue
+                placed.append(ident)
+            kept.append(block)
+        section["blocks"] = kept
+    if placed:
+        data["figures"] = [dict(figures[ident]) for ident in placed]
+
+
+def parse_spec(
+    reply: Any, *, report_date: date | None = None, figures: Mapping[str, Mapping[str, str]] | None = None
+) -> DeliverableSpec:
+    """The reply as a validated DeliverableSpec, or DeliverableRefused. `figures`: the pictures a figure block may
+    place, by id ({id, image_base64, source}), from the run's own recordings."""
     data = _json_object(reply)
     if report_date is not None and isinstance(data, dict):
         data["date"] = report_date.isoformat()  # HR-1: model-written or missing dates are not a fact.
+    if isinstance(data, dict):
+        _place_figures(data, figures or {})
     try:
         return DeliverableSpec.model_validate(data)
     except Exception as caught_error:  # noqa: BLE001 - pydantic's message echoes the input
@@ -138,9 +165,11 @@ def prompt_name(unit: Mapping[str, Any], context: Any) -> str:
     return "unit_xlsx_fill.md" if render_format(unit, brief) == "xlsx" and has_template else "unit_pdf.md"
 
 
-def render_output(reply: Any, *, report_date: date | None = None) -> RenderedPdf:
+def render_output(
+    reply: Any, *, report_date: date | None = None, figures: Mapping[str, Mapping[str, str]] | None = None
+) -> RenderedPdf:
     """The reply as the PDF `keep` stores with origin `render`, or DeliverableRefused (no partial PDF)."""
-    spec = parse_spec(reply, report_date=report_date or datetime.now(UTC).date())
+    spec = parse_spec(reply, report_date=report_date or datetime.now(UTC).date(), figures=figures)
     try:
         pdf = render_pdf(spec)
     except Exception as caught_error:  # noqa: BLE001 - the error text may echo the spec
@@ -148,7 +177,12 @@ def render_output(reply: Any, *, report_date: date | None = None) -> RenderedPdf
         raise DeliverableRefused("render_failed") from None
     if len(pdf) > MAX_PDF:
         raise DeliverableRefused("too_large")
-    return RenderedPdf(media_type="application/pdf", content=pdf, spec_text=spec.model_dump_json())
+    return RenderedPdf(media_type="application/pdf", content=pdf, spec_text=spec_words(spec))
+
+
+def spec_words(spec: DeliverableSpec) -> str:
+    """The text a rendered file says, for the redactor: the spec without its pictures' bytes."""
+    return spec.model_dump_json(exclude={"figures": {"__all__": {"image_base64"}}})
 
 
 def csv_output(reply: Any, *, report_date: date | None = None) -> UnitOutput:

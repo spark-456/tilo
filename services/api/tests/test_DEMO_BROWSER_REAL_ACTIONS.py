@@ -124,10 +124,12 @@ class FakeModel:
     """The computer_use role, recorded: one contract action per call (no paid call)."""
 
     def __init__(self, steps):
-        self.steps, self.prompts = iter(steps), []
+        self.steps, self.prompts, self.deadlines, self.frames = iter(steps), [], [], []
 
-    def generate_budgeted(self, request, budget):
+    def generate_budgeted(self, request, budget, deadline=None):
         self.prompts.append(request.prompt)
+        self.deadlines.append(deadline)
+        self.frames.append(request.parts[0].data)
         return SimpleNamespace(text=json.dumps(next(self.steps))), 0.0
 
 
@@ -143,7 +145,7 @@ def _reader(monkeypatch, steps=STEPS, typed=("wikipedia.org",)):
     model = FakeModel(steps)
     runner.run_owner, runner.mode, runner.budget = run, "live", None
     runner.providers, runner.typed, runner.hosts = {"computer_use": model}, frozenset(typed), set(typed)
-    runner.browser_lock, runner.safety = threading.Lock(), FakeSafety()
+    runner.browser_lock, runner.safety, runner.frame_pages = threading.Lock(), FakeSafety(), {}
     return runner.page_reader({"id": "U2", "district": "D1", "title": "Find the figure"}, "A_s2"), rpc, run, model
 
 
@@ -154,7 +156,8 @@ def test_DEMO_BROWSER_a_named_sites_search_is_typed_on_its_front_page(monkeypatc
     assert rpc.starts[0]["start_url"] == "https://en.wikipedia.org/"
     assert rpc.starts[0]["allow_hosts"][0] == "en.wikipedia.org" and "*.wikipedia.org" in rpc.starts[0]["allow_hosts"]
     assert rpc.calls == ["start", "inspect", "type", "inspect", "click", "scroll", "extract", "end"]
-    assert len(model.prompts) == 5 and "find the population of Japan" in model.prompts[0]
+    assert len(model.prompts) == 4, "the read ends the session: no call is spent on saying done"
+    assert "find the population of Japan" in model.prompts[0]
 
 
 def test_DEMO_BROWSER_a_named_sites_page_opens_where_it_was_asked(monkeypatch):
@@ -209,7 +212,7 @@ def test_DEMO_BROWSER_a_session_the_model_cannot_finish_is_read_in_the_browser_w
 
 def test_DEMO_BROWSER_a_model_that_stays_busy_is_read_in_the_browser_without_it(monkeypatch):
     """Live 21 Oct: every computer_use call hit a quota or 503, the read fell to a direct fetch, which Wikipedia's
-    list pages are too large for. Now the model gets two more tries, then the page is read in the browser anyway."""
+    list pages are too large for. Now the model gets one more try, then the page is read in the browser anyway."""
     from tilo_api import run_tools
     from tilo_providers.errors import QuotaError
 
@@ -217,13 +220,13 @@ def test_DEMO_BROWSER_a_model_that_stays_busy_is_read_in_the_browser_without_it(
     monkeypatch.setattr(run_tools, "pause", waits.append)
     read, rpc, _run, model = _reader(monkeypatch)
 
-    def busy(request, budget):
+    def busy(request, budget, deadline=None):
         model.prompts.append(request.prompt)
         raise QuotaError("rate limited")
 
     model.generate_budgeted = busy
     assert read("https://en.wikipedia.org/wiki/Japan", "en.wikipedia.org") == "First. Second. Third."
-    assert waits == list(run_tools.BROWSER_RETRY_WAITS) and len(model.prompts) == 3
+    assert waits == list(run_tools.BROWSER_RETRY_WAITS) and len(model.prompts) == 1 + len(waits)
     assert rpc.calls[-(READ_SCROLLS + 3) :] == ["start", *["scroll"] * READ_SCROLLS, "extract", "end"]
 
 
@@ -235,11 +238,11 @@ def test_DEMO_BROWSER_a_busy_model_that_comes_back_carries_on(monkeypatch):
     read, rpc, _run, model = _reader(monkeypatch, steps=[{"kind": "extract"}, {"kind": "done"}])
     real, failures = model.generate_budgeted, iter([RetryableError("503")])
 
-    def flaky(request, budget):
+    def flaky(request, budget, deadline=None):
         error = next(failures, None)
         if error:
             raise error
-        return real(request, budget)
+        return real(request, budget, deadline)
 
     model.generate_budgeted = flaky
     assert read("https://en.wikipedia.org/wiki/Japan", "en.wikipedia.org") == "First. Second. Third."
@@ -257,7 +260,7 @@ def _site_reader(monkeypatch, steps=STEPS, *, typed=("wikipedia.org",), safety=N
     runner = object.__new__(run_tools.BoundRunRunner)
     runner.run_owner, runner.mode, runner.budget = run, "live", None
     runner.providers, runner.typed, runner.hosts = {"computer_use": model}, frozenset(typed), set(typed)
-    runner.browser_lock, runner.safety = threading.Lock(), safety or FakeSafety()
+    runner.browser_lock, runner.safety, runner.frame_pages = threading.Lock(), safety or FakeSafety(), {}
     context = SimpleNamespace(agent_id="A_s2", upstream=tuple(upstream), skills=())
     unit = {"id": "U2", "district": "D1", "title": "Find the tallest building in India", "role": "specialist"}
     return runner.site_reading(unit, context), rpc, run, model, runner

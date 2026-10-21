@@ -57,9 +57,9 @@ test("FR_MTG_14_six_distinct_drawings_and_no_thinking_without_model", () => {
   assert.equal(new Set(hashes).size, 6);
   rig.face.event("thinking");
   assert.notEqual(rig.face.state, "thinking");
-  // Owner 21 Oct: "very blurry". The frame is what Meet sends (16:9, 1280 x 720), the scene drawn 3x, never upscaled.
-  assert.equal(rig.canvas.width, 1280);
-  assert.equal(rig.canvas.height, 720);
+  // Owner 21 Oct: "very blurry". A 16:9 frame (960 x 540), the vector scene drawn 2.25x, never upscaled.
+  assert.equal(rig.canvas.width, 960);
+  assert.equal(rig.canvas.height, 540);
 });
 test("FR_MTG_14_sharp_frame_and_every_label_inside_the_safe_area_of_every_tile", () => {
   for (const event of ["idle", "heard", "model_start", "audio_start", "success", "failure"]) {
@@ -67,8 +67,8 @@ test("FR_MTG_14_sharp_frame_and_every_label_inside_the_safe_area_of_every_tile",
     rig.face.event(event);
     rig.operations.length = 0;
     rig.face.tick(1000);
-    const scale = rig.operations.find((op) => op[0] === "setTransform" && op[1] === 3);
-    assert.deepEqual(scale, ["setTransform", 3, 0, 0, 3, 160, 0]); // the 320 x 240 scene, 3x, centred in 1280 x 720
+    const scale = rig.operations.find((op) => op[0] === "setTransform" && op[1] === 2.25);
+    assert.deepEqual(scale, ["setTransform", 2.25, 0, 0, 2.25, 120, 0]); // the 320 x 240 scene, centred in 960 x 540
     const label = rig.operations.find((op) => op[0] === "fillText");
     const pill = rig.operations.filter((op) => op[0] === "roundRect").at(-1);
     // A square (720 x 720) or 9:16 tile keeps only the middle of the frame: scene x 93..227 holds the label.
