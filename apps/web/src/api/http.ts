@@ -1251,8 +1251,11 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
           for (const listener of [...this.missingListeners]) listener();
         note(null);
         // FT-PERF-1: back off only once a run has events; a world waiting to start keeps the fast poll.
+        // UX-SMOOTH: "waiting to start" lasts until world.started (or a stop): the approval's own event used to end
+        // it, so the page noticed the finished plan up to 3 s late.
+        const waitingToStart = !feed.types.has("world.started") && !feed.types.has("world.failed");
         delay =
-          fresh.length > 0 || cursor === 0
+          fresh.length > 0 || cursor === 0 || waitingToStart
             ? this.pollMs
             : this.pollMs >= 1000
               ? 3000

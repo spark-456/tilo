@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useState } from "react";
-import { ErrorState, LoadingState, PoolLoader, type PoolLoaderEvent } from "../shared/tiloT";
+import { PoolLoader, type PoolLoaderEvent } from "../shared/tiloT";
 
 /** An approval reply proves this id exists; it does not prove that planning has finished. */
 const pending = new Set<string>();
@@ -27,13 +27,16 @@ interface EventFeed {
   ): () => void;
 }
 
-/** After `world.started`, the first recorded sign that agents are working. The live run records no `world.planned`
- * (the Director's plan is its layout, written before `world.started`), so a stage waiting for it alone never opened. */
+/** The first recorded sign that agents are working: nothing is pending any more, whatever came before it. */
 const WORK_EVENT = /^(agent|building|unit|artifact|question|approval)\./;
 
-/** The server's start response gives an id; only streamed events advance the visual story. The World page itself is
- * never covered: from `world.started` it is mounted and interactive, with a compact planning card on it until the
- * plan or the first work is recorded (b: the pool overlay used to block live worlds). */
+/**
+ * UX-SMOOTH (owner, 21 Oct: "the world generation stays stuck on the loading screen for too long and by the time we
+ * load in, everything is already complete"): the World page opens the moment Start answers. Nothing covers it. While
+ * the server's reply is all there is (the Director is still planning; `world.planned` and `world.started` are written
+ * together when the plan is done), one compact card on the page says so, with the task's own words, until the plan,
+ * the first work or a stop is recorded. The page itself shows the recorded events as they arrive.
+ */
 export function PendingWorldRoute({
   worldId,
   client,
@@ -43,15 +46,10 @@ export function PendingWorldRoute({
   readonly client: EventFeed | null;
   readonly children: ReactNode;
 }) {
-  const [phase, setPhase] = useState<"waiting" | "started" | "planned">(() =>
-    pendingWorld(worldId) ? "waiting" : "planned",
-  );
+  const [planned, setPlanned] = useState(() => !pendingWorld(worldId));
   const [events, setEvents] = useState<PoolLoaderEvent[]>([]);
   const goal = pendingWorldGoal(worldId);
   const [error, setError] = useState(false);
-  const [worldFailed, setWorldFailed] = useState(false);
-  const planned = phase === "planned";
-  const failed = (error || worldFailed || client === null) && phase === "waiting";
   useEffect(() => {
     if (planned || client === null) return undefined;
     return client.subscribeEvents(
@@ -68,70 +66,34 @@ export function PendingWorldRoute({
             return [...current, recorded];
           });
         }
-        if (event.type === "world.started") {
-          // triggeredBy: world.started. The World page mounts and the planning card appears after this recorded event.
-          setPhase((current) => (current === "planned" ? current : "started"));
-        }
-        if (event.type === "world.planned") {
-          // triggeredBy: world.planned. The planning card goes once the plan is recorded.
+        // triggeredBy: world.planned, world.failed or the first recorded work. The card goes; the page stays.
+        if (
+          event.type === "world.planned" ||
+          event.type === "world.failed" ||
+          WORK_EVENT.test(event.type)
+        ) {
           clearPendingWorld(worldId);
-          setPhase("planned");
-        }
-        if (WORK_EVENT.test(event.type)) {
-          // triggeredBy: a recorded work event after world.started (agents are already running, so nothing is pending).
-          setPhase((current) => {
-            if (current !== "started") return current;
-            clearPendingWorld(worldId);
-            return "planned";
-          });
-        }
-        if (event.type === "world.failed") {
-          clearPendingWorld(worldId);
-          setWorldFailed(true);
-          // A run that had started keeps its World page, which names the stop and offers Start it again.
-          setPhase((current) => (current === "started" ? "planned" : current));
+          setPlanned(true);
         }
       },
       () => setError(true),
     );
   }, [client, planned, worldId]);
 
+  const unavailable = !planned && (error || client === null);
   return (
-    // Once the route has left the pending state (plan or first work recorded) the card has nothing left to wait for.
-    <PoolLoader kind="task" events={planned ? [] : events}>
-      {phase !== "waiting" ? (
-        <div className="park-world-enter">{children}</div>
-      ) : (
-        <section className="park-pending-world" data-testid="pending-world">
-          <h1 tabIndex={-1}>
-            {worldFailed
-              ? "This world stopped"
-              : failed
-                ? "We can't open this world yet"
-                : "Tilo is planning your world"}
-          </h1>
-          {failed ? (
-            <ErrorState
-              title={worldFailed ? "This world stopped" : "World updates are unavailable"}
-              body={
-                worldFailed
-                  ? "Return to your worlds to see what happened."
-                  : "You can return to your worlds and try again."
-              }
-            />
-          ) : (
-            <div>
-              {goal ? (
-                <div className="park-pending-world__blueprint" data-testid="run-blueprint">
-                  BLUEPRINT · {goal}
-                </div>
-              ) : null}
-              <LoadingState layout="world" caption="Waiting for world.started" />
-            </div>
-          )}
-          <a href="/worlds">Your worlds</a>
-        </section>
-      )}
+    <PoolLoader
+      kind="task"
+      events={planned ? [] : events}
+      pending={!planned && !unavailable}
+      goal={planned ? undefined : goal}
+    >
+      {unavailable ? (
+        <output className="park-pending-world__note">
+          World updates are unavailable. Return to your worlds and try again.
+        </output>
+      ) : null}
+      <div className="park-world-enter">{children}</div>
     </PoolLoader>
   );
 }

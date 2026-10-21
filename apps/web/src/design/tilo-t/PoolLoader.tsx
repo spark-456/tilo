@@ -8,7 +8,14 @@ export type PoolLoaderProps = {
   children: ReactNode;
 } & (
   | { kind: "site"; loading: boolean }
-  | { kind: "task"; events: readonly PoolLoaderEvent[] }
+  | {
+      kind: "task";
+      events: readonly PoolLoaderEvent[];
+      /** The start response named this world and nothing is recorded yet: the card shows from the click. */
+      pending?: boolean;
+      /** The task's own words, shown on the card while it is planned. */
+      goal?: string | undefined;
+    }
 );
 
 const MIN_LOAD_MS = 300;
@@ -27,14 +34,17 @@ const SITE_COPY = {
  * remains mounted and aria-busy while active.
  *
  * A task never covers its page: the world stays mounted and clickable, and one compact card sits over its top edge
- * from the recorded `world.started` until `world.planned` or `world.failed` (or the first recorded work).
+ * from the start (a pending world: the server answered Start with its id) or the recorded `world.started`, until
+ * `world.planned` or `world.failed` (or the first recorded work).
  *
  * Task API: <PoolLoader kind="task" events={worldEvents}>…page…</PoolLoader>
  * Site API: <PoolLoader kind="site" loading={isLoading}>…page…</PoolLoader>
  */
 export function PoolLoader(props: PoolLoaderProps) {
   return props.kind === "task" ? (
-    <TaskPlanning events={props.events}>{props.children}</TaskPlanning>
+    <TaskPlanning events={props.events} pending={props.pending === true} goal={props.goal}>
+      {props.children}
+    </TaskPlanning>
   ) : (
     <SitePool loading={props.loading}>{props.children}</SitePool>
   );
@@ -42,11 +52,19 @@ export function PoolLoader(props: PoolLoaderProps) {
 
 function TaskPlanning({
   events,
+  pending,
+  goal,
   children,
-}: { events: readonly PoolLoaderEvent[]; children: ReactNode }) {
+}: {
+  events: readonly PoolLoaderEvent[];
+  pending: boolean;
+  goal: string | undefined;
+  children: ReactNode;
+}) {
   const has = (type: string) => events.some((event) => event.type === type);
-  // triggeredBy: world.started (shown) and world.planned / world.failed (hidden)
-  const active = has("world.started") && !has("world.planned") && !has("world.failed");
+  // triggeredBy: the start response (pending) or world.started (shown); world.planned / world.failed (hidden)
+  const started = has("world.started");
+  const active = (pending || started) && !has("world.planned") && !has("world.failed");
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     if (!active) {
@@ -69,8 +87,15 @@ function TaskPlanning({
             <span>
               {slow
                 ? "Taking longer than usual · waiting for world.planned"
-                : "world.started · waiting for world.planned"}
+                : started
+                  ? "world.started · waiting for world.planned"
+                  : "Waiting for world.planned"}
             </span>
+            {goal ? (
+              <span className="tt-plan-card__goal" data-testid="run-blueprint">
+                BLUEPRINT · {goal}
+              </span>
+            ) : null}
           </div>
         </aside>
       ) : null}

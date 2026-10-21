@@ -15,6 +15,7 @@ import {
   type RunStart,
   oneStepOf,
 } from "../api/oneStep";
+import { forgetReads } from "../api/readCache";
 import type {
   Dec,
   Decision,
@@ -442,7 +443,12 @@ export function createParkStore({ api, navigate, schedule, demo }: ParkStoreDeps
     prepareRun: (text, files, refs, onStep, inputs) =>
       runStep((one) => one.prepare(text, files ?? [], refs, onStep, inputs)),
     reviseRun: (plan, field, answer) => runStep((one) => one.revise(plan.taskId, field, answer)),
-    startRun: (plan, repeat) => runStep((one) => one.start(plan, repeat)),
+    // UX-SMOOTH: a started run makes the cached world list stale; the World page it opens reads the new world fresh.
+    startRun: (plan, repeat) =>
+      runStep((one) => one.start(plan, repeat)).then((step) => {
+        if (step.ok) forgetReads();
+        return step;
+      }),
     askQuick(mode, query, refs) {
       if (asking) return asking;
       asking = askQuick(api, mode, query, refs).then(

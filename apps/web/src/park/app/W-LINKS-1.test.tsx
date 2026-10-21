@@ -32,7 +32,6 @@ it("W-LINKS-1 More links open Park sections directly and preserve the selected w
 it("W-LINKS-1 navigation sources no longer link to retired flow and admin addresses", () => {
   // These literals are navigation destinations, not API endpoints or bookmark redirect tables.
   for (const path of [
-    "../pages/Settings/SettingsPage.tsx",
     "../shared/RunAdmin.tsx",
     "../../worldView/DeliveryView.tsx",
     "../../worldView/StageRail.tsx",

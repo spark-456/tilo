@@ -172,6 +172,7 @@ function Calendar({
                   key={e.id}
                   type="button"
                   className="park-agenda-event"
+                  title={e.t}
                   data-event={e.id}
                   aria-pressed={on}
                   style={style}
