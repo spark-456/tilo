@@ -1,0 +1,189 @@
+/* MOBILE: Tilo on a phone (360 to 430 px wide, portrait), same look, bigger targets and readable words. Selectors start
+   `[data-park][data-time][data-theme]` (the Park root always carries all three) so they sit above the pages' own rules,
+   which load later with each page's chunk. No motion here. The nav at 360 px keeps QA-DEMO-1 B2's 40 px tool widths
+   (the page name needs the room); from 361 px every nav control is 44 px (park.shell.css POLISH-1). The home bar of a
+   phone is cleared by the page column's own bottom reserve (park.shell.css, 56 px + --park-dock-space) and the fixed
+   run bar's safe-area inset. */
+
+/* Touch targets: everything the earlier pass raised to 40 px (studio.css RESPONSIVE) is 44 px on a phone or a touch
+   tablet (PRD 18.1); the look stays, only the box grows. */
+@media (max-width: 599px), (pointer: coarse) and (max-width: 1024px) {
+  [data-park][data-time][data-theme] .park-seg__item,
+  [data-park][data-time][data-theme] .park-chat-quiet,
+  [data-park][data-time][data-theme] .park-worlds-dec__yes,
+  [data-park][data-time][data-theme] .park-worlds-dec__open,
+  [data-park][data-time][data-theme] .park-worlds-scale__btn,
+  [data-park][data-time][data-theme] .park-skills-ask-opt,
+  [data-park][data-time][data-theme] .park-skills-rate-btn,
+  [data-park][data-time][data-theme] .park-skills-review-trust,
+  [data-park][data-time][data-theme] .park-skills-review-keep,
+  [data-park][data-time][data-theme] .park-world-toast__act,
+  [data-park][data-time][data-theme] .park-world-dactions .park-btn,
+  [data-park][data-time][data-theme] .park-connectors-action-btn,
+  [data-park][data-time][data-theme] .park-profile-mopt,
+  [data-park][data-time][data-theme] .park-profile-scene,
+  [data-park][data-time][data-theme] .park-admin nav button,
+  [data-park][data-time][data-theme] .park-agenda-newinput,
+  [data-park][data-time][data-theme] .park-agenda-hostbox button,
+  [data-park][data-time][data-theme] .park-agenda-attend button,
+  [data-park][data-time][data-theme] .park-btn {
+    min-height: 44px;
+  }
+  [data-park][data-time][data-theme] .park-seg__item,
+  [data-park][data-time][data-theme] .park-skills-rate-btn,
+  [data-park][data-time][data-theme] .park-world-back {
+    min-width: 44px;
+  }
+  [data-park][data-time][data-theme] .park-world-back,
+  [data-park][data-time][data-theme] .park-ledger-method {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  /* A link in a footer or a short line gets a taller box, not a bigger look. */
+  [data-park][data-time][data-theme] .park-home-legal a,
+  [data-park][data-time][data-theme] .park-worlds-routines__how a,
+  [data-park][data-time][data-theme] .park-admin-links a,
+  [data-park][data-time][data-theme] .park-team-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  /* iOS zooms the page into any field under 16 px when it takes focus; a phone's fields are 16 px. */
+  [data-park][data-time][data-theme] input:not([type="checkbox"], [type="radio"], [type="range"]),
+  [data-park][data-time][data-theme] textarea,
+  [data-park][data-time][data-theme] select {
+    font-size: 16px;
+  }
+}
+
+/* Readable words on a phone: running text (lines, notes, meta, buttons) is at least the ramp's 14 px, and no label is
+   under its 12 px caption. Chart axes, calendar cells, avatars' initials and chips keep their size: they are drawn to a
+   grid or a pill and would break it. */
+@media (max-width: 599px) {
+  [data-park][data-time][data-theme] [data-testid="park-page-ledger"] .park-seg__item,
+  [data-park][data-time][data-theme] .park-world-dactions .park-btn,
+  [data-park][data-time][data-theme] .park-chat-quiet,
+  [data-park][data-time][data-theme] .park-first-run-banner > span,
+  [data-park][data-time][data-theme] .park-home-hint,
+  [data-park][data-time][data-theme] .park-home-options__help,
+  [data-park][data-time][data-theme] .park-home-attach__note,
+  [data-park][data-time][data-theme] .park-home-tray__sub,
+  [data-park][data-time][data-theme] .park-kpi__label,
+  [data-park][data-time][data-theme] .park-kpi__sub,
+  [data-park][data-time][data-theme] .park-agenda-act,
+  [data-park][data-time][data-theme] .park-agenda-pinnote,
+  [data-park][data-time][data-theme] .park-agenda-togglenote,
+  [data-park][data-time][data-theme] .park-agenda-togglesub,
+  [data-park][data-time][data-theme] .park-agenda-detailcallabel,
+  [data-park][data-time][data-theme] .park-agenda-accept,
+  [data-park][data-time][data-theme] .park-agenda-notnow,
+  [data-park][data-time][data-theme] .park-agenda-filter,
+  [data-park][data-time][data-theme] .park-agenda-boardsub,
+  [data-park][data-time][data-theme] .park-agenda-pinit,
+  [data-park][data-time][data-theme] .park-agenda-detailwhen,
+  [data-park][data-time][data-theme] .park-agenda-synced,
+  [data-park][data-time][data-theme] .park-ledger-method,
+  [data-park][data-time][data-theme] .park-ledger-tilewhat,
+  [data-park][data-time][data-theme] .park-ledger-bucket-label,
+  [data-park][data-time][data-theme] .park-ledger-time,
+  [data-park][data-time][data-theme] .park-ledger-what-sub,
+  [data-park][data-time][data-theme] .park-ledger-detail-value,
+  [data-park][data-time][data-theme] .park-ledger-sub,
+  [data-park][data-time][data-theme] .park-ledger-callout-text,
+  [data-park][data-time][data-theme] .park-skills-ask-skill,
+  [data-park][data-time][data-theme] .park-skills-ask-opt,
+  [data-park][data-time][data-theme] .park-skills-helper-impact,
+  [data-park][data-time][data-theme] .park-skills-who-stat-k,
+  [data-park][data-time][data-theme] .park-skills-banner__sub,
+  [data-park][data-time][data-theme] .park-skills-rate-meta,
+  [data-park][data-time][data-theme] .park-skills-review-meta,
+  [data-park][data-time][data-theme] .park-skills-card2__meta,
+  [data-park][data-time][data-theme] .park-skills-card2__what,
+  [data-park][data-time][data-theme] .park-skills-help-count,
+  [data-park][data-time][data-theme] .park-skills-help-hint,
+  [data-park][data-time][data-theme] .park-world-lovablesummary,
+  [data-park][data-time][data-theme] .park-world-lovablesub,
+  [data-park][data-time][data-theme] .park-world-lovableprompt,
+  [data-park][data-time][data-theme] .park-world-atime,
+  [data-park][data-time][data-theme] .park-world-tab,
+  [data-park][data-time][data-theme] .park-world-toast__act,
+  [data-park][data-time][data-theme] .park-world-toast__meta,
+  [data-park][data-time][data-theme] .park-world-dbody,
+  [data-park][data-time][data-theme] .park-world-nostage,
+  [data-park][data-time][data-theme] .park-world-rowlabel,
+  [data-park][data-time][data-theme] .park-world-sub,
+  [data-park][data-time][data-theme] .park-world-who,
+  [data-park][data-time][data-theme] .park-profile-note,
+  [data-park][data-time][data-theme] .park-profile-help,
+  [data-park][data-time][data-theme] .park-profile-tname,
+  [data-park][data-time][data-theme] .park-profile-motion-help,
+  [data-park][data-time][data-theme] .park-profile-label,
+  [data-park][data-time][data-theme] .park-connectors-manage,
+  [data-park][data-time][data-theme] .park-connectors-sync,
+  [data-park][data-time][data-theme] .park-connectors-used,
+  [data-park][data-time][data-theme] .park-connectors-tile-acct,
+  [data-park][data-time][data-theme] .park-connectors-action-btn,
+  [data-park][data-time][data-theme] .park-connectors-count,
+  [data-park][data-time][data-theme] .park-runconn-label,
+  [data-park][data-time][data-theme] .park-team-ruleby,
+  [data-park][data-time][data-theme] .park-team-sub,
+  [data-park][data-time][data-theme] .park-team-covered,
+  [data-park][data-time][data-theme] .park-team-names,
+  [data-park][data-time][data-theme] .park-team-link,
+  [data-park][data-time][data-theme] .park-team-hint,
+  [data-park][data-time][data-theme] .park-team-active,
+  [data-park][data-time][data-theme] .park-team-wait,
+  [data-park][data-time][data-theme] .park-needs__hint,
+  [data-park][data-time][data-theme] .park-needs__rowworld,
+  [data-park][data-time][data-theme] .park-worlds-spot__paused,
+  [data-park][data-time][data-theme] .park-worlds-dec__body,
+  [data-park][data-time][data-theme] .park-worlds-card__agents {
+    font-size: 14px;
+  }
+  [data-park][data-time][data-theme] .park-sample-badge,
+  [data-park][data-time][data-theme] .park-chat-tag,
+  [data-park][data-time][data-theme] .park-connectors-coming-tag,
+  [data-park][data-time][data-theme] .park-skill-tag,
+  [data-park][data-time][data-theme] .park-team-tag,
+  [data-park][data-time][data-theme] .park-profile-tsub,
+  [data-park][data-time][data-theme] .park-agenda-suggests,
+  [data-park][data-time][data-theme] .park-agenda-pindue,
+  [data-park][data-time][data-theme] .park-agenda-dayload,
+  [data-park][data-time][data-theme] .park-agenda-hour,
+  [data-park][data-time][data-theme] .park-ledger-xlabel,
+  [data-park][data-time][data-theme] .park-ledger-hole-label {
+    font-size: 12px;
+  }
+
+  /* Teach Tilo a skill: "Back to skills" broke over three lines beside the step trail; the trail takes its own line. */
+  [data-park][data-time][data-theme] .park-teach__top {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  [data-park][data-time][data-theme] .park-teach__back {
+    white-space: nowrap;
+  }
+  [data-park][data-time][data-theme] .park-teach__progress-header {
+    order: 3;
+    flex-basis: 100%;
+    box-sizing: border-box;
+    justify-content: center;
+    font-size: 12px;
+  }
+
+  /* The sample week (Agenda Week.tsx, two days or more, so a second day head is the head's third child): five days in
+     300 px broke titles letter by letter. Each day keeps 112 px (LiveWeek's minimum) and the card swipes sideways, head
+     and body together. Week.tsx sets the columns inline, hence !important; the day view keeps its one wide column. */
+  [data-park][data-time][data-theme] .park-agenda-cal:has(.park-agenda-dayhead:nth-child(3)) {
+    overflow-x: auto;
+  }
+  [data-park][data-time][data-theme] .park-agenda-cal:has(.park-agenda-dayhead:nth-child(3)) > * {
+    grid-template-columns: 50px !important;
+    grid-auto-columns: 112px;
+    grid-auto-flow: column;
+    width: max-content;
+  }
+}
