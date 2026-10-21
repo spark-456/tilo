@@ -26,6 +26,14 @@ _ACTION = jsonschema.Draft202012Validator({"$defs": _SCHEMA["$defs"], "$ref": "#
 _MAX_TEXT = 30_000
 _MAX_INVALID = 3  # BR-01: an invalid reply counts as a step; this many in a row end the session
 READ_SCROLLS = 2  # DEMO-BROWSER: a page read looks through the page (recorded, read-only) before it extracts
+# DEMO-BROWSER: the steps where the mouse acts at a point on the page (the clicked element, the field typed into, where
+# the wheel turned); only these carry a target_box, the cursor the person sees. A read or an address opened has none.
+POINTER_KINDS = ("click", "type", "scroll")
+
+
+def _pointer(kind: str, result: dict) -> dict:
+    """The target_box key of a browser.acted for this step: the real point of a pointer step, nothing otherwise."""
+    return {"target_box": result["target_box"]} if kind in POINTER_KINDS else {}
 
 
 class BrowseStepExecutor:
@@ -58,8 +66,18 @@ class BrowseStepExecutor:
         return made.ref
 
     def execute(
-        self, *, unit: dict, agent: str, building: str, goal: str, hosts: list[str], max_steps: int = 12
+        self,
+        *,
+        unit: dict,
+        agent: str,
+        building: str,
+        goal: str,
+        hosts: list[str],
+        max_steps: int = 12,
+        start: str | None = None,
     ) -> UnitOutcome:
+        """BR-01 loop: the model proposes one action per frame, code decides, tilo-browser runs it. The session opens
+        `start` (an allowlisted address; the first host's front page when None)."""
         if not hosts or not 1 <= max_steps <= 60:
             return UnitOutcome(False, reason="The browser has no approved site or step limit.")
         session = "bs_" + new_part_id()
@@ -77,7 +95,7 @@ class BrowseStepExecutor:
                         "run_id": self.run.run_id,
                         "unit_id": unit["id"],
                         "allow_hosts": hosts,
-                        "start_url": f"https://{hosts[0]}/",
+                        "start_url": start or f"https://{hosts[0]}/",
                         "viewport": {"width": 1200, "height": 800},
                     }
                 )
@@ -205,7 +223,7 @@ class BrowseStepExecutor:
                         "masked": last["masked"],
                         "blocked": last["blocked"],
                         "frame": frame,
-                        "target_box": last["target_box"],
+                        **_pointer(kind, last),
                         "caption": caption,
                     },
                     district=unit["district"],
@@ -298,7 +316,7 @@ class BrowseStepExecutor:
                     "masked": last["masked"],
                     "blocked": last["blocked"],
                     "frame": frame,
-                    "target_box": last["target_box"],
+                    **_pointer(action["kind"], last),
                     "caption": caption,
                 }
                 self.run.put("browser.acted", agent, building, caption, acted, district=district)
@@ -316,14 +334,14 @@ class BrowseStepExecutor:
     def _caption(kind: str, name: str, host: str | None, action: dict) -> str:
         if kind == "click":
             return f"Clicking {name or 'target'}"[:120]
-        if kind == "type":
-            return f"Typing in {name or 'field'}"[:120]
+        if kind == "type":  # the words stay out of the event (BR-13); Enter is a GET search the session allowed
+            return f"Typing in {name or 'field'}{' and pressing Enter' if action.get('submit') else ''}"[:120]
         if kind == "navigate":  # an address with a query is a search (the words stay out of the event, BR-13)
             verb = "Searching" if urlsplit(str(action.get("url", ""))).query else "Opening"
             return f"{verb} {host or 'page'}"[:120]
         if kind == "scroll":
             return f"Scrolling {action['direction']}"
-        return "Reading page"
+        return f"Reading {host or 'page'}"[:120]
 
     def _record_refusal(
         self,
