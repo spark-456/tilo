@@ -14,6 +14,8 @@ reads this collection from a client."""
 from __future__ import annotations
 
 import logging
+import random
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -79,7 +81,9 @@ class FirestoreSpendLedger:
         )
 
     def _run(self, transaction_body: Any) -> Any:
-        for _ in range(_ATTEMPTS):
+        for attempt in range(_ATTEMPTS):
+            if attempt:  # RUN-SPEED: units running at once contend for the same counters; spread the retries out
+                time.sleep(random.uniform(0.05, 0.15) * 2**attempt)  # noqa: S311 - jitter, not a secret
             try:
                 return transaction_body(self._client.transaction())
             except gexc.Aborted:
@@ -87,7 +91,7 @@ class FirestoreSpendLedger:
             except ValueError as exc:  # the library's "failed in N attempts" wraps the Aborted it gave up on
                 if not isinstance(exc.__cause__, gexc.Aborted):
                     raise
-        raise gexc.Aborted("the spend ledger is contended")  # not a reservation: the caller replays
+        raise gexc.Aborted("the spend ledger is contended")  # not a reservation: the guard retries, then fails closed
 
     # -- SpendLedger --------------------------------------------------------------------------------------------
     def reserve(

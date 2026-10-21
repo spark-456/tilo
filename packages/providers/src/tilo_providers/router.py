@@ -202,6 +202,28 @@ def _fail(
 SERVER_RETRY_DELAYS = (2.0, 6.0, 15.0)  # seconds before the 2nd, 3rd and 4th try of one profile after a 5xx or 429
 
 
+def call_floor(
+    config: Any, role_id: str, input_chars: int, max_output_tokens: int | None = None, profiles: Sequence[str] = ()
+) -> float:
+    """RUN-SPEED: about the least budget a call of `role_id` can be sent with on its cheapest candidate (`profiles`,
+    else the role's), as `_quote` prices it (PL-03), input over-counted at 3 characters a token; 0.0 when unpriced."""
+    try:
+        role = config.roles[role_id]
+        out = next(n for n in (max_output_tokens, role.max_output_tokens, _DEFAULT_EXPECTED_OUTPUT) if n is not None)
+        expected = min(config.expected_output.get(role_id, _DEFAULT_EXPECTED_OUTPUT), out)
+        tokens_in, units = max(0, input_chars) // 3 + 1, int(getattr(role, "reserve_units", 0) or 0)
+        needs = [
+            max(
+                config.credits(config.cost_usd(profile, tokens_in, expected, units=units)),
+                config.credits(config.cost_usd(profile, tokens_in, out, units=units)) / _CAP_HEADROOM,
+            )
+            for profile in dict.fromkeys(p for p in (profiles or (role.primary, role.fallback)) if p)
+        ]
+        return float(min(needs)) if needs else 0.0
+    except Exception:  # noqa: BLE001 - unpriced or unknown: no floor, the caller splits as it would anyway
+        return 0.0
+
+
 def _busy(error: BaseException | None) -> bool:
     """A provider 5xx or 429: worth waiting for. Not a timeout (the deadline already ran on it) nor anything else."""
     return isinstance(error, (RetryableError, QuotaError)) and not isinstance(error, AttemptTimeoutError)
@@ -345,6 +367,10 @@ class Router:
             return ()
         pair = self._org.bundle.roles.get(role_id)
         return tuple(p for p in pair if p) if pair else ()
+
+    def call_floor(self, role_id: str, input_chars: int, max_output_tokens: int | None = None) -> float:
+        """RUN-SPEED: `call_floor` on this Router's own config and candidates (no file is read, no provider asked)."""
+        return call_floor(self._config, role_id, input_chars, max_output_tokens, self._org_profiles(role_id))
 
     def _provider(self, role_id: str, profile_id: str) -> ModelProvider:
         if self._org is not None and profile_id in self._org_profiles(
