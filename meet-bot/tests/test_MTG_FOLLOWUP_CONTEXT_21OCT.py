@@ -69,7 +69,7 @@ def test_FOLLOWUP_owner_call_replay_gets_one_answer_per_question():
         "Yes, I can hear you.",
         "The capital of France is Paris.",
         "81 plus 81 is 162.",
-        "There's no agenda set for this meeting yet. Want me to note one?",
+        "There's no agenda set for this meeting yet.",
         "Berlin.",
     ]
     assert len(llm.calls) == 4  # the agenda answer needs no model call
