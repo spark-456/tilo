@@ -25,10 +25,12 @@
   outline-offset: 2px;
 }
 
+/* The picture is 170px high from 8px down (Worlds.css .park-worlds-card__art): the tools sit in its bottom corners, clear
+   of the status chip (top left) and the progress (top right). */
 [data-park] .park-worlds-cardtools {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 134px;
+  right: 18px;
   display: flex;
   gap: 6px;
 }
@@ -61,8 +63,8 @@
 
 [data-park] .park-worlds-pick {
   position: absolute;
-  top: 10px;
-  left: 10px;
+  top: 132px;
+  left: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -174,6 +176,12 @@
   [data-park] .park-worlds-pick {
     width: 44px;
     height: 44px;
+  }
+  [data-park] .park-worlds-cardtools {
+    top: 124px;
+  }
+  [data-park] .park-worlds-pick {
+    top: 124px;
   }
   [data-park] .park-worlds-sort__select {
     min-height: 44px;
