@@ -268,7 +268,7 @@ def test_DEMO_BROWSER_the_real_driver_types_presses_enter_clicks_and_scrolls(ser
     from tilo_browser.playwright_engine import PlaywrightDriver
 
     try:
-        driver = PlaywrightDriver(lambda url, redirect_from=None: True, {"width": 1200, "height": 800})
+        driver = PlaywrightDriver(lambda url, **_: True, {"width": 1200, "height": 800})
     except Exception as exc:  # no Chromium in this environment
         pytest.skip(f"headless Chromium is not available: {type(exc).__name__}")
     try:

@@ -70,6 +70,8 @@ _WHEEL_POINT_SCRIPT = """() => {
   return {x: w / 2, y: h / 2};
 }"""
 
+ASSET_TYPES = frozenset({"image", "stylesheet", "font", "media"})  # page assets any public host may serve
+
 _SECURE_SELECTORS = (
     'input[type="password"]',
     'input[autocomplete="one-time-code"]',
@@ -154,7 +156,15 @@ class PlaywrightDriver:
             self.posted = request.url  # BR-05: a posted form is a commit, never sent without a person
             route.abort()
             return
-        if self.gate(request.url, redirect_from=redirected.url if redirected else None):
+        # An image, stylesheet, font or media file may come from any public host (owner, 21 Oct: pages as a person sees
+        # them); everything else, and every navigation, stays on the allowlist.
+        asset = not page and redirected is None and request.resource_type in ASSET_TYPES
+        allowed = (
+            self.gate(request.url, asset=True)
+            if asset
+            else self.gate(request.url, redirect_from=redirected.url if redirected else None)
+        )
+        if allowed:
             if page:
                 self._chain.append(request.url)
             route.continue_()
