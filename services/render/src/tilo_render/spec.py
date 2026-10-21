@@ -23,6 +23,11 @@ MAX_TOTAL_BLOCKS = 120
 MAX_REFERENCED_TABLE_CELLS = 25_000
 MAX_REFERENCED_CHARTS = 20
 MAX_ESTIMATED_SLIDES = 250
+# A figure is a picture the run recorded (a browser frame), supplied by code; the model only places it and captions it.
+MAX_FIGURES = 12
+MAX_FIGURE_BYTES = 1_000_000
+MAX_FIGURES_BYTES = 8_000_000
+MAX_FIGURE_PIXELS = 4_000_000
 
 
 class ParagraphBlock(BaseModel):
@@ -116,7 +121,48 @@ class SlideBlock(BaseModel):
         return max(len(slide_chunks(self.left)), len(slide_chunks(self.right)))
 
 
-Block = Annotated[ParagraphBlock | BulletsBlock | TableBlock | ChartBlock | SlideBlock, Field(discriminator="type")]
+class FigureBlock(BaseModel):
+    """A recorded picture in the document: `figure_id` names one of the spec's `figures`, which code supplies from the
+    run's own recordings; the writer writes only the id and the caption, never image bytes, a path or a URL."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    type: Literal["figure"] = "figure"
+    figure_id: str = Field(min_length=1, max_length=20)
+    caption: str = Field(min_length=1, max_length=300, pattern=r"^[^\r\n]+$")
+
+
+class Figure(BaseModel):
+    """A picture code supplies: recorded PNG or JPEG bytes and the address of the page it shows (`source`)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    id: str = Field(min_length=1, max_length=20)
+    image_base64: str = Field(min_length=8, max_length=1_400_000)
+    source: str = Field(default="", max_length=300, pattern=r"^[^\r\n]*$")
+
+    @model_validator(mode="after")
+    def _image(self) -> "Figure":
+        from PIL import Image
+
+        try:
+            raw = base64.b64decode(self.image_base64, validate=True)
+            if len(raw) > MAX_FIGURE_BYTES:
+                raise ValueError("oversized")
+            with Image.open(io.BytesIO(raw)) as image:
+                if image.format not in {"PNG", "JPEG"} or image.width * image.height > MAX_FIGURE_PIXELS:
+                    raise ValueError("unsupported")
+                image.verify()
+        except Exception as exc:
+            raise ValueError("Invalid figure image") from exc
+        return self
+
+    @property
+    def raw(self) -> bytes:
+        return base64.b64decode(self.image_base64)
+
+
+Block = Annotated[
+    ParagraphBlock | BulletsBlock | TableBlock | ChartBlock | SlideBlock | FigureBlock, Field(discriminator="type")
+]
 
 
 class Section(BaseModel):
@@ -252,6 +298,7 @@ class DeliverableSpec(BaseModel):
     tables: list[Table] = Field(default_factory=list)
     charts: list[Chart] = Field(default_factory=list)
     sections: list[Section] = Field(default_factory=list)
+    figures: list[Figure] = Field(default_factory=list)  # code-supplied pictures a figure block places
 
     @field_validator("date")
     @classmethod
@@ -316,6 +363,17 @@ class DeliverableSpec(BaseModel):
             if chart.kind == ChartKind.PIE and pie_total == 0:
                 raise ValueError("Pie chart total cannot be zero")
 
+        figure_ids = {figure.id for figure in self.figures}
+        if len(figure_ids) != len(self.figures):
+            raise ValueError("Duplicate figure id")
+        if len(self.figures) > MAX_FIGURES or sum(len(f.raw) for f in self.figures) > MAX_FIGURES_BYTES:
+            raise ValueError(f"At most {MAX_FIGURES} figures and {MAX_FIGURES_BYTES} bytes of pictures allowed")
+        placed = [b for s in self.sections for b in s.blocks if isinstance(b, FigureBlock)]
+        if len(placed) > MAX_FIGURES:
+            raise ValueError(f"At most {MAX_FIGURES} figure blocks allowed")
+        if any(block.figure_id not in figure_ids for block in placed):
+            raise ValueError("Unknown figure_id")
+
         total_blocks = sum(len(section.blocks) for section in self.sections)
         if total_blocks > MAX_TOTAL_BLOCKS:
             raise ValueError(f"At most {MAX_TOTAL_BLOCKS} blocks across all sections allowed")
@@ -341,6 +399,8 @@ class DeliverableSpec(BaseModel):
                     if block.chart_id not in chart_ids:
                         raise ValueError(f"Unknown chart_id: {block.chart_id}")
                     referenced_charts += 1
+                    slide_count += 1
+                elif isinstance(block, FigureBlock):
                     slide_count += 1
 
         if referenced_cells > MAX_REFERENCED_TABLE_CELLS:
@@ -435,6 +495,9 @@ class RequestDeliverableSpec(DeliverableSpec):
                     for row in tbl.rows:
                         for value in row:
                             charge(str(value))
+                elif isinstance(block, FigureBlock):
+                    slide_count += 1
+                    charge(block.caption)
 
         if referenced_cells > MAX_REQUEST_TABLE_CELLS:
             raise ValueError(f"At most {MAX_REQUEST_TABLE_CELLS} referenced table cells allowed")

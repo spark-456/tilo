@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import dataclasses
 import json
 import math
@@ -33,6 +34,7 @@ from tilo_providers.interfaces import GenerateRequest, GenerateResponse
 from tilo_providers.media import ACCEPTED_MIME_TYPES, MediaPart, check_parts
 from tilo_providers.router import Router, RouterExhaustedError, RouterResult
 from tilo_providers.safety import SafetyProvider
+from tilo_render.spec import MAX_FIGURE_BYTES, MAX_FIGURES, MAX_FIGURES_BYTES
 
 from tilo_api.access import Mode
 from tilo_api.browser_rpc import BrowserRpc
@@ -64,6 +66,8 @@ DEFAULT_TOOLS = {"specialist": ("web_search", "fetch_url")}
 BROWSER_RETRY_WAITS = (5.0, 12.0)
 NAMED_SITES_READ = 2
 SITE_READ_STEPS = 10
+FIGURE_FORMATS = ("pdf", "docx", "pptx")  # deliverables a recorded browser page may be a figure in
+SHOWN_FRAMES = frozenset({"clean", "unscreened"})  # as the frame route serves them: a flagged frame is never used
 pause = time.sleep  # tests replace it
 
 
@@ -309,6 +313,7 @@ class BoundRunRunner:
         # DEMO-BROWSER: one browser session at a time in a run (config/browser.yaml max_sessions_per_world), so the
         # World's browser shows one session's steps in order while several units research at once.
         self.browser_lock = threading.Lock()
+        self.frame_pages: dict[str, dict] = {}  # each recorded frame's page address and step (BrowseStepExecutor.pages)
 
     def search(self, query: str) -> tuple[Any, float]:
         result, credits = self.budget.call(self.router.search, "search", query)
@@ -346,6 +351,7 @@ class BoundRunRunner:
             browser_url = os.environ.get("TILO_BROWSER_URL") if self.mode == "live" else None
             rpc = BrowserRpc(browser_url) if browser_url else BrowserSessions(PlaywrightEngine())
             executor = BrowseStepExecutor(owner, rpc, propose)
+            executor.pages = self.frame_pages
             return await asyncio.to_thread(
                 self.one_session,
                 executor.execute,
@@ -407,6 +413,10 @@ class BoundRunRunner:
             )
         fmt = render_format(unit, context.brief)  # DOCS-OUT A4: an uploaded workbook is filled, not replaced
         template, context = attach_template(fmt, owner.seams.artifacts, owner.scope, stream, owner.run_id, context)
+        figures, listing = self.browser_figures() if fmt in FIGURE_FORMATS else ({}, "")
+        if figures:  # DEMO-BROWSER: the writer may place the pages Tilo's browser read as figures
+            shots = UpstreamItem("browser_figures", "Screenshots from Tilo's browser", listing, screening="clean")
+            context = dataclasses.replace(context, upstream=(*context.upstream, shots))
         day = (
             report_day(owner.owner, owner.org_id, owner.seams.people or (lambda: None), datetime.now(UTC))
             if fmt and template is None
@@ -452,7 +462,9 @@ class BoundRunRunner:
             credit_cap=budget.left,
             limits=self.limits,
             tool_credit_cap=self.limits.credit_share * owner.cap,  # the rest is for the writer and the verifier
-            report_renderer=partial(render_report, fmt=fmt or "pdf", template=template, report_date=day),
+            report_renderer=partial(
+                render_report, fmt=fmt or "pdf", template=template, report_date=day, figures=figures
+            ),
         )
         outcome = await runner.run(unit, context)
         if outcome.success and fetch.refused and not fetch.read and not search.found and not context.upstream:
@@ -461,6 +473,66 @@ class BoundRunRunner:
             host, reason = fetch.refused[-1]
             return UnitOutcome(False, reason=UNREAD.get(reason, UNREAD_OTHER).format(host=host))
         return outcome
+
+    def browser_figures(self) -> tuple[dict[str, dict[str, str]], str]:
+        """DEMO-BROWSER: the pictures the writer may place in a pdf, docx or pptx deliverable, F1, F2, ... by id, and
+        the listing it is shown. They are the pages Tilo's browser read in this run (each read page as it first came
+        into view, see first_view; a session with no read gives its last frame), in order, taken from the run's own
+        recorded events (structural, never the task's words, GEN-06): masked by tilo-browser and screened (clean or
+        unscreened, never flagged, as the frame route serves them) and within the renderer's caps. The source is the
+        page's address as tilo-browser reported it (no query), kept in memory, else its host."""
+        owner = self.run_owner
+        sessions: dict[str, dict[str, list]] = {}
+        for event in owner.store.events.get(owner.world_id, []):
+            data = event.get("data") or {}
+            frame, session = data.get("frame"), data.get("session")
+            if event.get("type") not in ("browser.started", "browser.acted") or not isinstance(frame, dict):
+                continue
+            seen = sessions.setdefault(str(session), {"reads": [], "last": [], "all": []})
+            seen["last"] = [(frame, data.get("host"))]
+            seen["all"].append(frame)
+            if data.get("kind") == "extract" and data.get("verdict") == "done":
+                seen["reads"].append((frame, data.get("host")))
+        figures: dict[str, dict[str, str]] = {}
+        lines: list[str] = []
+        total = 0
+        for seen in sessions.values():
+            for read, host in seen["reads"] or seen["last"]:
+                frame = self.first_view(read, seen["all"])
+                if len(figures) >= MAX_FIGURES:
+                    break
+                try:
+                    saved = owner.seams.artifacts.head(owner.scope, frame)
+                    record = saved.record if saved is not None else None
+                    usable = (
+                        record is not None
+                        and record["run_id"] == owner.run_id
+                        and record["origin"]["kind"] == "browser"
+                        and record["media_type"] == "image/png"
+                        and record["screening"] in SHOWN_FRAMES
+                        and record["size_bytes"] <= MAX_FIGURE_BYTES
+                    )
+                    raw = owner.seams.artifacts.read(owner.scope, frame) if usable else b""
+                except Exception as caught_error:  # a frame that cannot be read is left out
+                    log_caught(caught_error, __name__, locals())
+                    continue
+                if not raw or total + len(raw) > MAX_FIGURES_BYTES:
+                    continue
+                total += len(raw)
+                page = self.frame_pages.get(str(frame.get("artifact_id")), {})
+                source = page.get("url") or (f"https://{host}/" if isinstance(host, str) and host else "")
+                ident = f"F{len(figures) + 1}"
+                figures[ident] = {"id": ident, "image_base64": base64.b64encode(raw).decode("ascii"), "source": source}
+                step = f" (for the step: {page['step']})" if page.get("step") else ""
+                lines.append(f"{ident}: the page {source or 'Tilo read'}{step}")
+        return figures, "\n".join(lines)
+
+    def first_view(self, read: dict, frames: list[dict]) -> dict:
+        """The session's first frame of the page a read step read (the page's top, its title in view, before the browser
+        scrolled), by the page addresses kept in memory; the read's own frame when they are not known."""
+        url = self.frame_pages.get(str(read.get("artifact_id")), {}).get("url")
+        same = (f for f in frames if url and self.frame_pages.get(str(f.get("artifact_id")), {}).get("url") == url)
+        return next(same, read)
 
     def one_session(self, act: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """Runs one browser session while no other session of this run is open (`browser_lock`)."""
@@ -519,6 +591,7 @@ class BoundRunRunner:
         brief = getattr(self.run_owner, "brief", None)
         goal = brief.get("goal", "") if isinstance(brief, Mapping) else ""
         executor = BrowseStepExecutor(self.run_owner, rpc, propose)
+        executor.pages = self.frame_pages
         plain, building, items = dict(unit), self.building_of(unit), []
         also = allow_entries(self.hosts, self.typed)
         for site in self.named_sites()[:NAMED_SITES_READ]:
@@ -557,6 +630,7 @@ class BoundRunRunner:
             return None
         propose = self.proposer()
         executor = BrowseStepExecutor(self.run_owner, rpc, propose or (lambda *_: None))
+        executor.pages = self.frame_pages
         building, plain = self.building_of(unit), dict(unit)
         brief = getattr(self.run_owner, "brief", None)
         brief = brief if isinstance(brief, Mapping) else {}

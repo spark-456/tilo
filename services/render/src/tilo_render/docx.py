@@ -12,7 +12,7 @@ from xml.etree import ElementTree as ET
 
 from tilo_render.docx_styles import NUMBERING, styles_xml
 from tilo_render.pptx import render_pptx
-from tilo_render.spec import BulletsBlock, ChartBlock, DeliverableSpec, ParagraphBlock, TableBlock
+from tilo_render.spec import BulletsBlock, ChartBlock, DeliverableSpec, Figure, FigureBlock, ParagraphBlock, TableBlock
 from tilo_render.text import brand_color, lines, sanitize_text
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -21,13 +21,24 @@ P = "http://schemas.openxmlformats.org/package/2006/relationships"
 C = "http://schemas.openxmlformats.org/drawingml/2006/chart"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+PIC = "http://schemas.openxmlformats.org/drawingml/2006/picture"
 CT = "http://schemas.openxmlformats.org/package/2006/content-types"
 CP = "http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
 DC = "http://purl.org/dc/elements/1.1/"
 DCTERMS = "http://purl.org/dc/terms/"
 XSI = "http://www.w3.org/2001/XMLSchema-instance"
 XML = "http://www.w3.org/XML/1998/namespace"
-for _prefix, _ns in (("w", W), ("r", R), ("c", C), ("a", A), ("wp", WP), ("cp", CP), ("dc", DC), ("dcterms", DCTERMS)):
+for _prefix, _ns in (
+    ("w", W),
+    ("r", R),
+    ("c", C),
+    ("a", A),
+    ("wp", WP),
+    ("pic", PIC),
+    ("cp", CP),
+    ("dc", DC),
+    ("dcterms", DCTERMS),
+):
     ET.register_namespace(_prefix, _ns)
 
 _MAIN = "application/vnd.openxmlformats-officedocument.wordprocessingml"
@@ -116,6 +127,42 @@ def _table(body: ET.Element, columns: list[str], rows: list[list[object]], brand
     _node(_node(body, W, "p"), W, "pPr")  # an empty paragraph keeps the next block off the table's border
 
 
+_EMU_PER_TWIP, _EMU_PER_PX = 635, 9525
+_FIGURE_MAX_H = 5_400_000  # EMU, about 15 cm: a figure never fills more than most of a page
+
+
+def _figure(body: ET.Element, figure: Figure, number: int, rid: str) -> str:
+    """A recorded picture as an inline drawing at the text width (never taller than _FIGURE_MAX_H); returns the media
+    file's extension."""
+    from PIL import Image
+
+    with Image.open(io.BytesIO(figure.raw)) as image:
+        w, h, kind = image.width, image.height, image.format
+    cx = min(_TEXT_W * _EMU_PER_TWIP, w * _EMU_PER_PX)
+    cy = cx * h // w
+    if cy > _FIGURE_MAX_H:
+        cx, cy = cx * _FIGURE_MAX_H // cy, _FIGURE_MAX_H
+    paragraph = _node(body, W, "p")
+    _node(_node(paragraph, W, "pPr"), W, "jc", val="center")
+    inline = _node(_node(_node(paragraph, W, "r"), W, "drawing"), WP, "inline")
+    _node(inline, WP, "extent", cx=str(cx), cy=str(cy))
+    _node(inline, WP, "docPr", id=str(1000 + number), name=f"Figure {number}")
+    data = _node(_node(inline, A, "graphic"), A, "graphicData", uri=PIC)
+    picture = _node(data, PIC, "pic")
+    names = _node(picture, PIC, "nvPicPr")
+    _node(names, PIC, "cNvPr", id="0", name=f"figure{number}")
+    _node(names, PIC, "cNvPicPr")
+    fill = _node(picture, PIC, "blipFill")
+    _node(fill, A, "blip").set(f"{{{R}}}embed", rid)
+    _node(_node(fill, A, "stretch"), A, "fillRect")
+    shape = _node(picture, PIC, "spPr")
+    frame = _node(shape, A, "xfrm")
+    _node(frame, A, "off", x="0", y="0")
+    _node(frame, A, "ext", cx=str(cx), cy=str(cy))
+    _node(_node(shape, A, "prstGeom", prst="rect"), A, "avLst")
+    return "png" if kind == "PNG" else "jpeg"
+
+
 def _footer(title: str) -> ET.Element:
     root = ET.Element(f"{{{W}}}ftr")
     paragraph = _node(root, W, "p")
@@ -188,6 +235,8 @@ def render_docx(spec: DeliverableSpec) -> bytes:
         _paragraph(body, spec.subtitle, style="Subtitle")
     _paragraph(body, spec.date, style="Subtitle")
     chart_index = 0
+    figures = {f.id: f for f in spec.figures}
+    figure_number = 0
     for section in spec.sections:
         _paragraph(body, section.heading, style="Heading1")
         for block in section.blocks:
@@ -218,6 +267,24 @@ def render_docx(spec: DeliverableSpec) -> bytes:
                 graphic = _node(inline, A, "graphic")
                 data = _node(graphic, A, "graphicData", uri=C)
                 _node(data, C, "chart").set(f"{{{R}}}id", rid)
+            elif isinstance(block, FigureBlock):  # a recorded picture, its caption and the page it shows
+                figure, figure_number = figures[block.figure_id], figure_number + 1
+                rid = f"rIdFigure{figure_number}"
+                ext = _figure(body, figure, figure_number, rid)
+                _node(
+                    relationships,
+                    P,
+                    "Relationship",
+                    Id=rid,
+                    Type=R + "/image",
+                    Target=f"media/figure{figure_number}.{ext}",
+                )
+                parts[f"word/media/figure{figure_number}.{ext}"] = figure.raw
+                _paragraph(body, f"Figure {figure_number}: {block.caption}")
+                if figure.source:
+                    _paragraph(body, f"Source: {figure.source}")
+    for ext in sorted({name.rsplit(".", 1)[1] for name in parts if name.startswith("word/media/")}):
+        _node(types, CT, "Default", Extension=ext, ContentType=f"image/{ext}")
     section_properties = _node(body, W, "sectPr")
     _node(section_properties, W, "footerReference", type="default").set(f"{{{R}}}id", "rIdFooter")
     _node(section_properties, W, "pgSz", w=str(_PAGE_W), h=str(_PAGE_H))

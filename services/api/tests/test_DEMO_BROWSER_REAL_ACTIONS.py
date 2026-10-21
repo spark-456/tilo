@@ -143,7 +143,7 @@ def _reader(monkeypatch, steps=STEPS, typed=("wikipedia.org",)):
     model = FakeModel(steps)
     runner.run_owner, runner.mode, runner.budget = run, "live", None
     runner.providers, runner.typed, runner.hosts = {"computer_use": model}, frozenset(typed), set(typed)
-    runner.browser_lock, runner.safety = threading.Lock(), FakeSafety()
+    runner.browser_lock, runner.safety, runner.frame_pages = threading.Lock(), FakeSafety(), {}
     return runner.page_reader({"id": "U2", "district": "D1", "title": "Find the figure"}, "A_s2"), rpc, run, model
 
 
@@ -257,7 +257,7 @@ def _site_reader(monkeypatch, steps=STEPS, *, typed=("wikipedia.org",), safety=N
     runner = object.__new__(run_tools.BoundRunRunner)
     runner.run_owner, runner.mode, runner.budget = run, "live", None
     runner.providers, runner.typed, runner.hosts = {"computer_use": model}, frozenset(typed), set(typed)
-    runner.browser_lock, runner.safety = threading.Lock(), safety or FakeSafety()
+    runner.browser_lock, runner.safety, runner.frame_pages = threading.Lock(), safety or FakeSafety(), {}
     context = SimpleNamespace(agent_id="A_s2", upstream=tuple(upstream), skills=())
     unit = {"id": "U2", "district": "D1", "title": "Find the tallest building in India", "role": "specialist"}
     return runner.site_reading(unit, context), rpc, run, model, runner

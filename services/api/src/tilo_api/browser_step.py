@@ -37,8 +37,13 @@ def _pointer(kind: str, result: dict) -> dict:
 
 
 class BrowseStepExecutor:
-    def __init__(self, run: Any, rpc: Any, propose: Callable[[str, bytes, str], Any]) -> None:
+    def __init__(
+        self, run: Any, rpc: Any, propose: Callable[[str, bytes, str], Any], pages: dict[str, dict] | None = None
+    ) -> None:
         self.run, self.rpc, self.propose = run, rpc, propose
+        # DEMO-BROWSER: each saved frame's page address (tilo-browser's, no query) and the unit's step, kept in memory
+        # for the run's own deliverable (figure sources); never in an event (BR-13).
+        self.pages, self.step_title = pages, ""
 
     def _save(self, session: str, step: int, unit: str, agent: str, result: dict) -> dict:
         artifact = result["screenshot_artifact"]
@@ -47,6 +52,8 @@ class BrowseStepExecutor:
             raise ValueError("the browser frame did not match its digest")
         ident = f"art_bs{session[3:]}_{step}"
         ref = {"artifact_id": ident, "version": 1}
+        if self.pages is not None:
+            self.pages[ident] = {"url": str(result.get("url") or ""), "step": self.step_title}
         store, scope = self.run.seams.artifacts, self.run.scope
         existing = store.head(scope, ref)
         if existing is not None:
@@ -81,6 +88,7 @@ class BrowseStepExecutor:
         if not hosts or not 1 <= max_steps <= 60:
             return UnitOutcome(False, reason="The browser has no approved site or step limit.")
         session = "bs_" + new_part_id()
+        self.step_title = str(unit.get("title") or "")
         opened, step, outcome = False, 0, "error"
         stop_charge = 0.0
         extracted: list[str] = []
@@ -272,6 +280,7 @@ class BrowseStepExecutor:
         SessionRefused when the browser cannot read it (the caller then fetches the page directly and says so); returns
         the page text, possibly empty."""
         session = "bs_" + new_part_id()
+        self.step_title = str(unit.get("title") or "")
         district = unit["district"]
         allow = list(dict.fromkeys((host, *also)))[:20]  # `also`: the known hosts a result link may redirect to
         last = self.rpc.start(
