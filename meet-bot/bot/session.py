@@ -402,9 +402,34 @@ class LiveSession:
         self.brain.workspace = read
 
     def _say(self, pending: action_talk.PendingAction, text: str) -> None:
-        msg = ChatMessage("direct_reply", f"action {pending.key}", text, None)
+        self._announce(f"action {pending.key}", text)
+
+    def _announce(self, subject: str, text: str) -> None:
+        msg = ChatMessage("direct_reply", subject, text, None)
         self.brain.commit_chat(msg, self.brain_elapsed())
         self._queue_delivery(msg)
+
+    # -- free times (find_times: read-only; the booking is an ordinary create_meeting with its read-back) ---------
+    def _start_times(self) -> None:
+        wanted = getattr(self.brain, "times_wanted", None) if self.brain is not None else None
+        if wanted is None or self.actions is None or not hasattr(self.actions, "find_times"):
+            return
+        self.brain.times_wanted = None
+        self._times_task = asyncio.get_running_loop().create_task(self._run_times(wanted))
+
+    async def _run_times(self, wanted: dict[str, Any]) -> None:
+        try:
+            result = await asyncio.to_thread(
+                self.actions.find_times, wanted["minutes"], wanted["days"], wanted["with_team"]
+            )
+        except Exception:  # nothing was read: Tilo says so in its fixed words
+            result = None
+        if result is not None and result.get("slots"):
+            zone_name = result.get("zone")
+            self.brain.offered_times = [
+                {"start": s, "label": action_talk.time_label(s, zone_name)} for s in result["slots"]
+            ]
+        self._announce("find_times", action_talk.times_line(result, wanted))
 
     def record_caption(self, u: Utterance) -> None:
         if not self.intro_sent:
@@ -878,6 +903,7 @@ class LiveSession:
             )
 
         self._queue_delivery(msg, done, turn)
+        self._start_times()  # "Let me check the calendars" is on its way: the read runs meanwhile
 
     # -- loop -------------------------------------------------------------------------------------------------------
     async def _loop(self) -> None:
@@ -1136,7 +1162,14 @@ class LiveSession:
     async def _shutdown(self) -> None:
         pending = [
             task
-            for name in ("_out_task", "_speech_task", "_speech_waiter", "_preparation_task", "_workspace_task")
+            for name in (
+                "_out_task",
+                "_speech_task",
+                "_speech_waiter",
+                "_preparation_task",
+                "_workspace_task",
+                "_times_task",
+            )
             if (task := getattr(self, name, None)) is not None
         ]
         for task in pending:

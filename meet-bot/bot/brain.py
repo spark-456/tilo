@@ -18,6 +18,7 @@ from typing import Any, NamedTuple, Protocol
 
 from .action_talk import (
     ACTIONS_TEXT,
+    CHECKING_LINE,
     Answered,
     PendingAction,
     done_line,
@@ -26,6 +27,7 @@ from .action_talk import (
     readback,
     repeats_answer,
     same_request,
+    times_request,
 )
 from .action_talk import answer as action_answer
 from .answer_scope import DECLINE, scoped_answer
@@ -724,6 +726,8 @@ class Brain:
         self.leave_wanted = False  # the model heard a request to leave: the session leaves once the goodbye is said
         # the owner's workspace as read for each scope ("group", "one_on_one"); `visible_workspace` picks what is said
         self.workspace: dict[str, dict[str, Any]] = {}
+        self.times_wanted: dict[str, Any] | None = None  # find_times the model asked for: the session reads it
+        self.offered_times: list[dict[str, str]] = []  # the starts Tilo offered last, for "the second one"
         self._sole_seen, self._shared_from = False, 0  # where Tilo's answers stop being one-on-one only
         self.last_engaged_at = -1e9  # when the last question put to Tilo was asked
         self.last_quick_source = "model"
@@ -908,6 +912,8 @@ class Brain:
         }
         if self.actions_enabled:  # "Friday at 3" needs today's date and the zone it is said in
             payload["now_local"] = now_local()
+        if self.offered_times:
+            payload["offered_times"] = self.offered_times
         if question.addressed and (seen := visible_workspace(self.workspace, self.sole_human, self.present)):
             payload["workspace"] = seen  # only for a line put to Tilo, and only what the people present may hear
         return "INPUT_JSON:\n" + json.dumps(payload), question
@@ -934,6 +940,9 @@ class Brain:
             # (GEN-06, no word list), only from a line put to Tilo; one goodbye, never held back by the reply gap.
             self.leave_wanted = True
             return ChatMessage("direct_reply", _norm(q.text), GOODBYE_LINE, q.t)
+        if self.actions_enabled and isinstance(obj, dict) and (wanted := times_request(obj.get("action"))) is not None:
+            self.times_wanted = wanted  # a read, no read-back: the session asks tilo-api and offers the times
+            return self._direct(CHECKING_LINE, utterances, elapsed_s, q)
         if self.actions_enabled and isinstance(obj, dict) and obj.get("action") is not None:
             # The model only proposes; Tilo's own fixed words read it back, and the same speaker's yes sends it.
             pending = proposal(obj.get("action"), q.speaker, one_on_one=self.sole_human)

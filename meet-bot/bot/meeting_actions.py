@@ -105,6 +105,29 @@ class MeetingActions:
         ops.warning("stage workspace scope=%s ok=%s", "one_on_one" if one_on_one else "group", context is not None)
         return context
 
+    def find_times(self, minutes: int, days: int, with_team: bool) -> dict[str, Any] | None:
+        """Free starts for a follow-up (the owner's own Google Calendar and Tilo calendars), or None."""
+        body = {
+            "meeting_id": self._meeting,
+            "claim": self._claim,
+            "key": secrets.token_urlsafe(12),
+            "speaker": None,
+            "action": "find_times",
+            "args": {"minutes": minutes, "days": days, "with_team": with_team},
+        }
+        got = self._exchange(body, MAX_ANSWER)
+        answer = got[1] if got is not None and got[0] == 200 and isinstance(got[1], dict) else None
+        found = None
+        if answer is not None and answer.get("outcome") == "done" and isinstance(answer.get("slots"), list):
+            found = {
+                "slots": [s for s in answer["slots"] if isinstance(s, str)][:3],
+                "zone": answer["zone"] if isinstance(answer.get("zone"), str) else None,
+                "google": answer["google"] if answer.get("google") in ("ok", "not_connected", "unavailable") else None,
+                "teammates": [t[:80] for t in answer.get("teammates") or [] if isinstance(t, str)][:8],
+            }
+        ops.warning("stage find_times ok=%s slots=%d", found is not None, len(found["slots"]) if found else 0)
+        return found
+
     def _post(self, body: dict[str, Any]) -> ActionResult:
         got = self._exchange(body, MAX_ANSWER)
         if got is None:
