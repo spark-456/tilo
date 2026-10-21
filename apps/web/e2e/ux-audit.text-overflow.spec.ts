@@ -28,6 +28,8 @@ const PAGES = [
   "/more",
 ] as const;
 const WIDTHS = [1440, 1280, 1024, 768, 390] as const;
+// Twenty loads per page in one test: no trace (it stalled the browser on a busy laptop).
+test.use({ trace: "off" });
 const THEMES = ["day", "night"] as const;
 const DUMP = process.env.UX_OVERFLOW_DUMP;
 const found: Record<string, TextProblem[]> = {};
