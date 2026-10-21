@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import math
 from typing import Any, cast
 from urllib.parse import quote_plus, urlencode
 
@@ -54,6 +55,21 @@ _SEARCH_SCRIPT = """async () => {
   }
 }"""
 
+# DEMO-BROWSER: where a scroll's mouse wheel goes: over the page's main content (the visible part of main, article or
+# #content), else the middle of the window. The point the wheel turns at is the cursor the person sees.
+_WHEEL_POINT_SCRIPT = """() => {
+  const w = window.innerWidth, h = window.innerHeight;
+  for (const sel of ['main', '[role="main"]', 'article', '#content', '#main']) {
+    const el = document.querySelector(sel);
+    if (!el) continue;
+    const b = el.getBoundingClientRect();
+    const left = Math.max(0, b.left), top = Math.max(0, b.top);
+    const right = Math.min(w, b.right), bottom = Math.min(h, b.bottom);
+    if (right - left > 40 && bottom - top > 40) return {x: (left + right) / 2, y: (top + bottom) / 2};
+  }
+  return {x: w / 2, y: h / 2};
+}"""
+
 _SECURE_SELECTORS = (
     'input[type="password"]',
     'input[autocomplete="one-time-code"]',
@@ -95,6 +111,11 @@ class PlaywrightEngine:
 class PlaywrightDriver:
     def __init__(self, gate: Any, viewport: dict[str, int]) -> None:
         self.gate = gate
+        self.viewport = viewport
+        # DEMO-BROWSER: the box the last click, typing or scroll acted on, where the mouse really was (CSS pixels in the
+        # window); and a page navigation the page tried to send with a method other than GET (a posted form, refused).
+        self.last_box: dict[str, int] | None = None
+        self.posted: str | None = None
         self.runtime = sync_playwright().start()
         try:
             self.browser = self.runtime.chromium.launch(headless=True, args=["--no-sandbox"])
@@ -129,6 +150,10 @@ class PlaywrightDriver:
         request = route.request
         redirected = request.redirected_from
         page = self._page_navigation(request)
+        if page and request.method not in ("GET", "HEAD"):
+            self.posted = request.url  # BR-05: a posted form is a commit, never sent without a person
+            route.abort()
+            return
         if self.gate(request.url, redirect_from=redirected.url if redirected else None):
             if page:
                 self._chain.append(request.url)
@@ -144,8 +169,27 @@ class PlaywrightDriver:
             self.page.goto("about:blank")  # a page reached through a refused hop is never captured, read or clicked
         return {"chain": self._chain.copy(), "aborted": self._aborted, "final_url": self.page.url}
 
+    def _box(self, raw: Any) -> dict[str, int] | None:
+        """A box clipped to the window, in whole CSS pixels (browser.schema.json target_box), or None."""
+        if not isinstance(raw, dict):
+            return None
+        width, height = self.viewport["width"], self.viewport["height"]
+        left = min(max(0, math.floor(raw["x"])), width - 1)
+        top = min(max(0, math.floor(raw["y"])), height - 1)
+        right = min(width, max(left + 1, math.ceil(raw["x"] + raw["width"])))
+        bottom = min(height, max(top + 1, math.ceil(raw["y"] + raw["height"])))
+        return {"x": left, "y": top, "width": right - left, "height": bottom - top}
+
+    def _settle(self) -> None:
+        """After a click or an Enter: the new page's content has loaded (its images may still come, up to 3 s more)."""
+        self.page.wait_for_load_state("domcontentloaded", timeout=10000)
+        try:
+            self.page.wait_for_load_state("load", timeout=3000)
+        except Error:
+            pass
+
     def goto(self, url: str) -> dict[str, Any]:
-        self._chain, self._aborted = [], None
+        self._chain, self._aborted, self.posted, self.last_box = [], None, None, None
         try:
             self.page.goto(url, wait_until="domcontentloaded", timeout=15000)
         except Error:
@@ -154,20 +198,55 @@ class PlaywrightDriver:
         return self._outcome()
 
     def click(self, ref: str) -> dict[str, Any]:
-        self._chain, self._aborted = [], None
+        """A real mouse click at the middle of the element, as it is on the page at that moment."""
+        self._chain, self._aborted, self.posted = [], None, None
+        target = self.page.locator(f'[data-tilo-ref="{ref}"]')
         try:
-            self.page.locator(f'[data-tilo-ref="{ref}"]').click(timeout=10000)
-            self.page.wait_for_load_state("domcontentloaded", timeout=10000)
+            target.scroll_into_view_if_needed(timeout=5000)
+            self.last_box = self._box(target.bounding_box())
+            target.click(timeout=10000)
+            self._settle()
         except Error:
             if self._aborted is None:
                 raise
         return self._outcome()
 
     def type(self, ref: str, text: str) -> None:
-        self.page.locator(f'[data-tilo-ref="{ref}"]').fill(text, timeout=10000)
+        """The mouse clicks into the field, then the keyboard types the words one by one (the page sees each key)."""
+        self.posted = None
+        field = self.page.locator(f'[data-tilo-ref="{ref}"]')
+        field.scroll_into_view_if_needed(timeout=5000)
+        self.last_box = self._box(field.bounding_box())
+        field.click(timeout=10000)
+        field.fill("", timeout=10000)
+        self.page.keyboard.type(text, delay=20)
+
+    def press(self, key: str) -> dict[str, Any]:
+        """A key on the focused element; an Enter that starts a page load waits for the new page (each hop gated)."""
+        self._chain, self._aborted, self.posted = [], None, None
+        before = self.page.url
+        try:
+            self.page.keyboard.press(key)
+            try:
+                self.page.wait_for_url(lambda url: url != before, wait_until="domcontentloaded", timeout=5000)
+            except Error:
+                if self._aborted is not None:
+                    raise
+            else:
+                self._settle()
+        except Error:
+            if self._aborted is None:
+                raise
+        return self._outcome()
 
     def scroll(self, direction: str) -> None:
+        """The mouse wheel turns over the page's main content; the cursor is where it turned."""
+        point = self.page.evaluate(_WHEEL_POINT_SCRIPT)
+        x, y = float(point["x"]), float(point["y"])
+        self.page.mouse.move(x, y)
         self.page.mouse.wheel(0, 600 if direction == "down" else -600)
+        self.page.wait_for_timeout(400)  # the wheel scrolls asynchronously: the frame is taken once it has
+        self.last_box = self._box({"x": x - 12, "y": y - 12, "width": 24, "height": 24})
 
     def find(self, selector: str) -> str:
         element = self.page.locator(selector)

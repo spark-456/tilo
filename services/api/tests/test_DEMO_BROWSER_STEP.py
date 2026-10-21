@@ -97,7 +97,9 @@ def test_DEMO_BROWSER_STEP_records_only_completed_actions_and_returns_extracted_
     assert result.success
     assert "First. Second. Third." in result.outputs[0].content.decode()
     assert [kind for kind, _ in run.events] == ["browser.started", "browser.acted", "browser.stopped"]
-    assert run.events[1][1]["target_box"] == {"x": 10, "y": 20, "width": 100, "height": 30}
+    # A read has no point on the page, so it carries no cursor (owner, 21 Oct: never a decorative dot); pointer steps
+    # carry theirs (test_DEMO_BROWSER_REAL_ACTIONS).
+    assert "target_box" not in run.events[1][1]
     assert len(run.seams.artifacts.saved) == 2
     assert rpc.calls == ["start", "extract", "end"]
 

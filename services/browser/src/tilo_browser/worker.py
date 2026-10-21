@@ -140,6 +140,12 @@ class BrowserWorker(HandsProvider):
             raise CredentialEntryRefused("Tilo never enters credentials; use a connection or an upload instead")
         self._driver.type(ref, text)
 
+    def press(self, key: str) -> dict[str, Any]:
+        """A key on the field Tilo just typed into (the caller decided it may submit); a page it opens is landed like
+        a click's."""
+        self._alive()
+        return self._land(self._driver.press(key))
+
     def _scrubbed_tree(self) -> dict:
         """The tree, masked, with the value of every secure node dropped (keyed on the node, not its ref)."""
 

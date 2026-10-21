@@ -60,6 +60,17 @@ class _Session:
 _COMMIT = re.compile(
     r"\b(submit|post|send|buy|pay|purchase|checkout|sign[ -]?in|log[ -]?in|delete|confirm|book)\b", re.I
 )
+_SEARCHABLE = ("", "text", "search")  # input types an Enter may submit a GET form from (a site's search box)
+_CONTROL_TAGS = frozenset({"input", "textarea", "select", "button", "a"})
+_CONTROL_ROLES = frozenset(
+    {"textbox", "searchbox", "combobox", "button", "link", "checkbox", "radio", "switch", "tab", "menuitem", "option"}
+)
+
+
+def _get_search_field(attrs: dict) -> bool:
+    """BR-05: Enter in this field submits a GET form (a search), which is not a commit: a text or search input whose
+    form's method is get. A field outside a form, in a post or dialog form, or of any other type is never submitted."""
+    return str(attrs.get("form_method", "none")).lower() == "get" and str(attrs.get("type", "")).lower() in _SEARCHABLE
 
 
 class BrowserSessions:
@@ -92,7 +103,10 @@ class BrowserSessions:
 
     @staticmethod
     def _target(worker: BrowserWorker, at: dict[str, int], viewport: dict[str, int]) -> tuple[str, dict, dict]:
-        # Point is the contract's 0..999 grid; boxes are CSS pixels.
+        """The element at the point (the contract's 0..999 grid; boxes are CSS pixels): of the nodes whose box holds it,
+        a control (field, button, link) before a container with a role, then the smallest, as a person's click lands on
+        the innermost thing under the mouse (live 21 Oct: a page's role="search" or role="main" holds every field and
+        link in it). Two candidates alike in both are no one target: refused."""
         px = at["x"] * viewport["width"] / 999
         py = at["y"] * viewport["height"] / 999
         matches = []
@@ -102,7 +116,14 @@ class BrowserSessions:
                 continue
             if box["x"] <= px < box["x"] + box["width"] and box["y"] <= py < box["y"] + box["height"]:
                 matches.append((node_ref(node), node, box))
-        if len(matches) != 1:
+
+        def rank(match: tuple[str, dict, dict]) -> tuple[int, int]:
+            node, box = match[1], match[2]
+            control = node.get("attrs", {}).get("tag") in _CONTROL_TAGS or node.get("role") in _CONTROL_ROLES
+            return (0 if control else 1, box["width"] * box["height"])
+
+        matches.sort(key=rank)
+        if not matches or (len(matches) > 1 and rank(matches[0]) == rank(matches[1])):
             raise SessionRefused("target_changed")
         return matches[0]
 
@@ -169,6 +190,7 @@ class BrowserSessions:
                 raise SessionRefused("step_cap")
             kind = action["kind"]
             box = self._viewport_box(state.viewport)
+            driver = state.worker._driver
             if kind in ("click", "type"):
                 ref, node, box = self._target(state.worker, action["at"], state.viewport)
                 if body.get("digest") != self._digest(state.worker, node):
@@ -177,20 +199,29 @@ class BrowserSessions:
                     raise SessionRefused("secure_field")
                 attrs = node.get("attrs", {})
                 label = f"{node.get('name', '')} {attrs.get('value', '')}"
+                # A click on a form's submit control is the person's; a click into one of its fields only focuses it.
                 form_submit = kind == "click" and (
-                    attrs.get("type") == "submit" or attrs.get("form_method", "none").lower() not in ("none", "")
+                    attrs.get("type") in ("submit", "image")
+                    or (
+                        node.get("role") == "button"
+                        and str(attrs.get("form_method", "none")).lower() not in ("none", "")
+                    )
                 )
                 if _COMMIT.search(label) or form_submit:
                     raise SessionRefused("needs_person")
                 if kind == "type":
-                    if action.get("submit"):
+                    if action.get("submit") and not _get_search_field(attrs):
                         raise SessionRefused("needs_person")
                     value = action["text"]
                     if mask_text(value) != value:
                         raise SessionRefused("secret_text")
                     state.worker.type(ref, value)
+                    if action.get("submit"):  # Enter in a site's search box: a GET search, each hop egress-gated
+                        state.worker.press("Enter")
                 else:
                     state.worker.click(ref)
+                if getattr(driver, "posted", None):  # the page tried to post a form after all: that stays a person's
+                    raise SessionRefused("needs_person")
             elif kind == "navigate":
                 state.worker.navigate(action["url"])
             elif kind == "scroll":
@@ -200,6 +231,8 @@ class BrowserSessions:
                 scroll(action["direction"])
             elif kind != "extract":
                 raise SessionRefused("unsupported_action")
+            if kind in ("click", "type", "scroll"):  # where the mouse really acted, when the driver measured it
+                box = getattr(driver, "last_box", None) or box
             result = self._result(session, step, kind, state, box)
             state.step = step
             return result

@@ -595,6 +595,36 @@ describe("CL-INT-3 / FR-WLD-05: subscribeEvents polls GET /worlds/{id}/events wi
     stop();
   });
 
+  it("DEMO_BROWSER_poll keeps the 1s poll while a browser session is open, and backs off once it stopped", async () => {
+    const recorded = (n: number, type: string) =>
+      view({
+        ...(sample[0] as Event),
+        id: `01HBROWSERPOLL000000000${n}`,
+        seq: 100 + n,
+        type: type as Event["type"],
+        data: { session: "bs_01K7M000000000000000000000" },
+      });
+    const { calls, fetch } = script(
+      json({ events: [recorded(1, "browser.started")] }), // poll 1 -> fresh -> next at 1s
+      json({ events: [] }), // poll 2 -> nothing new, but the browser is open -> next at 1s
+      json({ events: [] }), // poll 3 -> still open -> next at 1s
+      json({ events: [recorded(2, "browser.stopped")] }), // poll 4 -> fresh -> next at 1s
+      json({ events: [] }), // poll 5 -> closed and idle -> next at 3s
+      json({ events: [] }), // poll 6
+    );
+    const stop = client(fetch, 1000).subscribeEvents("w1", () => undefined);
+    await settle(0);
+    for (const polls of [2, 3, 4, 5]) {
+      await settle(1000);
+      expect(calls, `poll ${polls} after one second`).toHaveLength(polls);
+    }
+    await settle(2000);
+    expect(calls).toHaveLength(5);
+    await settle(1000);
+    expect(calls).toHaveLength(6);
+    stop();
+  });
+
   it("FT_PERF_1: pauses polling when document.hidden and resumes when visible", async () => {
     class FakeDocument extends EventTarget {
       hidden = false;

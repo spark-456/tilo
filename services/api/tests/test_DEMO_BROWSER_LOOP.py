@@ -59,12 +59,17 @@ def test_DEMO_BROWSER_done_without_a_read_reads_the_page_it_ends_on():
     assert run.events[-1][1]["outcome"] == "done"
 
 
-def test_DEMO_BROWSER_the_model_is_told_to_search_by_address_not_by_pressing_search():
-    """tilo-browser refuses a click on a form's submit control as needing a person, so a search runs as a navigate."""
+def test_DEMO_BROWSER_the_model_is_told_to_search_with_the_sites_search_box_and_enter():
+    """Owner, 21 Oct: a real browser, not a screenshot playlist. tilo-browser lets Enter in a GET form's search field
+    submit (BR-05: not a commit) and still refuses a click on a form's submit control, so the model types the words with
+    submit true, clicks a result and never makes up a search address."""
     from tilo_api.run_tools import browser_proposal_prompt
 
     prompt = browser_proposal_prompt("Search the site for Ada Lovelace", "")
-    assert "search address" in prompt and "instead of pressing" in prompt
+    assert '"submit":true' in prompt and "search box" in prompt and "presses Enter" in prompt
+    assert "click the result" in prompt and "never to an address you made up" in prompt
+    assert "never click a form's submit button" in prompt
+    assert "search address" not in prompt
 
 
 def test_DEMO_BROWSER_the_model_reply_may_come_fenced():

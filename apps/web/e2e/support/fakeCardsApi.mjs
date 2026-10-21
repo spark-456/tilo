@@ -34,10 +34,15 @@ const FRAME = readFileSync(new URL("./browser-frame.png", import.meta.url));
 let browser = null;
 const BROWSER_HOST = "encyclopedia.example";
 const BROWSER_SESSION = "bs_01K7M00000000000000000BRWS";
+// A session shaped like a real one: the first page (no cursor), words typed into the search field with Enter (one type
+// step with submit), a clicked result, two scrolls and a read. Like the real worker, a box is sent only with a pointer
+// action (click, type, scroll) and never with extract or navigate; boxes are CSS px in a 1200x800 viewport.
+const SEARCH_FIELD = { x: 330, y: 70, width: 400, height: 36 };
+const RESULT_LINK = { x: 180, y: 300, width: 260, height: 28 };
+const SCROLL_POINT = { x: 600, y: 520, width: 24, height: 24 };
 const browserEvents = (world, after) => {
-  const box = { x: 0, y: 0, width: 1200, height: 800 };
   const frame = (n) => ({ artifact_id: `art_bs01K7M00000000000000000BRWS_${n}`, version: 1 });
-  const acted = (n, kind, caption) => [
+  const acted = (n, kind, caption, box, chars = null) => [
     "browser.acted",
     caption,
     {
@@ -47,11 +52,11 @@ const browserEvents = (world, after) => {
       verdict: "done",
       reason: null,
       host: BROWSER_HOST,
-      chars: null,
+      chars,
       masked: 0,
       blocked: 0,
       frame: frame(n),
-      target_box: box,
+      ...(box ? { target_box: box } : {}),
       caption,
     },
   ];
@@ -59,17 +64,19 @@ const browserEvents = (world, after) => {
     [
       "browser.started",
       "Tilo opened the browser.",
-      { session: BROWSER_SESSION, host: BROWSER_HOST, hosts: 2, max_steps: 3, frame: frame(0) },
+      { session: BROWSER_SESSION, host: BROWSER_HOST, hosts: 2, max_steps: 5, frame: frame(0) },
     ],
-    acted(1, "scroll", "Scrolling down"),
-    acted(2, "scroll", "Scrolling down"),
-    acted(3, "extract", `Reading ${BROWSER_HOST}`),
+    acted(1, "type", "Typing in Search and pressing Enter", SEARCH_FIELD, 19),
+    acted(2, "click", "Clicking Example result", RESULT_LINK),
+    acted(3, "scroll", "Scrolling down", SCROLL_POINT),
+    acted(4, "scroll", "Scrolling down", SCROLL_POINT),
+    acted(5, "extract", `Reading ${BROWSER_HOST}`, null),
     ...(browser === "finished"
       ? [
           [
             "browser.stopped",
             "Tilo closed the browser.",
-            { session: BROWSER_SESSION, outcome: "done", steps: 3 },
+            { session: BROWSER_SESSION, outcome: "done", steps: 5 },
           ],
         ]
       : []),
