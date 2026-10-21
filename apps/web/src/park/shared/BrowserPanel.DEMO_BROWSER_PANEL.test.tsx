@@ -11,6 +11,7 @@ import {
   REFUSAL_LINES,
   STOP_LINES,
   browserView,
+  finishedLine,
 } from "./BrowserPanel";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -183,13 +184,14 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
     expect(button("Later")?.disabled).toBe(true);
     await act(async () => button("Earlier")?.click());
     expect(getBrowserFrame).toHaveBeenLastCalledWith("w_demo", "art_1");
-    expect(node.textContent).toContain("Frame 2 of 3: Scrolling down");
+    expect(node.textContent).toContain("Step 2 of 3 · Scrolling down");
     await act(async () => button("Earlier")?.click());
     expect(getBrowserFrame).toHaveBeenLastCalledWith("w_demo", "art_0");
     expect(button("Earlier")?.disabled).toBe(true);
     await act(async () => button("Latest")?.click());
     expect(getBrowserFrame).toHaveBeenLastCalledWith("w_demo", "art_2");
-    expect(node.textContent).toContain(STOP_LINES.done);
+    expect(node.textContent).toContain(finishedLine(3));
+    expect(node.querySelector('[data-phase="finished"]')?.textContent).toContain("Finished");
     await act(async () => root.unmount());
   });
 
@@ -245,7 +247,7 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
     }
   });
 
-  it("DEMO_BROWSER floats over the World on its own, and Hide keeps it out of the way until the next session", async () => {
+  it("DEMO_BROWSER takes over the map area on its own, and Back to map holds until the next session", async () => {
     const first = "bs_01K7M000000000000000000001";
     const second = "bs_01K7M000000000000000000002";
     const node = document.createElement("div");
@@ -258,26 +260,96 @@ describe("DEMO-BROWSER-PANEL: cursor follows only recorded browser actions", () 
             worldId="w_demo"
             events={events}
             replay={false}
-            placement="overlay"
+            placement="takeover"
           />,
         ),
       );
     const opened = [recorded(1, "browser.started", { session: first, host: "en.wikipedia.org" })];
     await render(opened);
-    expect(node.querySelector(".tilo-browser--overlay")).not.toBeNull();
+    expect(node.querySelector(".tilo-bv--takeover")).not.toBeNull();
+    expect(node.querySelector(".tilo-bv__address")?.textContent).toBe("en.wikipedia.org");
     const button = (name: string) =>
-      Array.from(node.querySelectorAll("button")).find((b) => b.textContent === name);
-    await act(async () => button("Hide")?.click());
-    expect(node.querySelector(".tilo-browser--overlay")).toBeNull();
+      Array.from(node.querySelectorAll("button")).find((b) => b.textContent?.startsWith(name));
+    await act(async () => button("Back to map")?.click());
+    expect(node.querySelector(".tilo-bv--takeover")).toBeNull();
     await act(async () => button("Show Tilo browser")?.click());
-    expect(node.querySelector(".tilo-browser--overlay")).not.toBeNull();
-    await act(async () => button("Hide")?.click());
+    expect(node.querySelector(".tilo-bv--takeover")).not.toBeNull();
+    await act(async () => button("Back to map")?.click());
     await render([
       ...opened,
       recorded(2, "browser.started", { session: second, host: "en.wikipedia.org" }),
     ]);
-    expect(node.querySelector(".tilo-browser--overlay")).not.toBeNull();
+    expect(node.querySelector(".tilo-bv--takeover")).not.toBeNull();
     await act(async () => root.unmount());
+  });
+
+  it("DEMO_BROWSER has no control that cannot work: no Pause, and Stop only while the browser is live", async () => {
+    const session = "bs_01K7M000000000000000000003";
+    const client = { stopBrowser: vi.fn(async () => undefined) } as unknown as TiloClient;
+    const started = recorded(1, "browser.started", { session, host: "x.example" });
+    const names = async (events: Event[]) => {
+      const node = document.createElement("div");
+      const root = createRoot(node);
+      await act(async () =>
+        root.render(
+          <BrowserPanel client={client} worldId="w_demo" events={events} replay={false} />,
+        ),
+      );
+      const found = Array.from(node.querySelectorAll("button")).map((b) => b.textContent);
+      const badge = node.querySelector(".tilo-bv__badge")?.textContent;
+      await act(async () => root.unmount());
+      return { found, badge };
+    };
+    const live = await names([started]);
+    expect(live.found).toContain("Stop");
+    expect(live.found).not.toContain("Pause");
+    expect(live.badge).toBe("Live");
+    const done = await names([
+      started,
+      recorded(2, "browser.stopped", { session, outcome: "done" }),
+    ]);
+    expect(done.found).not.toContain("Stop");
+    expect(done.badge).toBe("Finished");
+  });
+
+  it("DEMO_BROWSER a click enlarges the picture to full size, and Escape closes it", async () => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:frame"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+    const getBrowserFrame = vi.fn(async () => new Blob(["masked"], { type: "image/png" }));
+    const session = "bs_01K7M000000000000000000004";
+    const node = document.createElement("div");
+    document.body.append(node);
+    const root = createRoot(node);
+    await act(async () =>
+      root.render(
+        <BrowserPanel
+          client={{ getBrowserFrame } as unknown as TiloClient}
+          worldId="w_demo"
+          events={[
+            recorded(1, "browser.started", {
+              session,
+              host: "x.example",
+              frame: { artifact_id: "a" },
+            }),
+          ]}
+          replay={false}
+        />,
+      ),
+    );
+    const enlarge = node.querySelector<HTMLButtonElement>(
+      'button[aria-label="Enlarge the picture"]',
+    );
+    await act(async () => enlarge?.click());
+    expect(node.querySelector("dialog img")?.getAttribute("src")).toBe("blob:frame");
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(node.querySelector("dialog")).toBeNull();
+    await act(async () => root.unmount());
+    node.remove();
   });
 
   it("DEMO_BROWSER says a frame the server will not serve could not be shown, never loads forever", async () => {

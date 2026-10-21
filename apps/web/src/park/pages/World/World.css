@@ -1635,6 +1635,11 @@
   align-items: stretch;
   justify-content: stretch;
 }
+/* DEMO-BROWSER: Tilo's browser takes over a run's map; where the map is the drawn art (no WebGL) and a phone gives it
+   the art's own height, it is never shorter than a phone's live map. */
+[data-park] .park-world-map--art:has(> .tilo-bv--takeover) {
+  min-height: 400px;
+}
 [data-park] .park-world-map--live .tw-convene {
   top: 68px;
   left: 20px;

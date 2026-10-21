@@ -15,17 +15,14 @@ function rule(selector: string): string {
 
 describe("DEMO_BROWSER panel colours follow the theme", () => {
   it("DEMO_BROWSER the card and its text are the theme's card and ink", () => {
-    const card = rule(".tilo-browser");
+    const card = rule(".tilo-bv");
     expect(card).toMatch(/background: var\(--card,/);
     expect(card).toMatch(/color: var\(--ink,/);
     expect(card).toMatch(/border: 1px solid var\(--line,/);
   });
 
   it("DEMO_BROWSER every button sets its own text colour on a themed surface", () => {
-    for (const selector of [
-      ".tilo-browser__header button,\n.tilo-browser__frames button",
-      ".tilo-browser-chip",
-    ]) {
+    for (const selector of [".tilo-bv__button,\n.tilo-browser-chip"]) {
       const button = rule(selector);
       expect(button, selector).toMatch(/background: var\(--field,/);
       expect(button, selector).toMatch(/color: var\(--ink,/);

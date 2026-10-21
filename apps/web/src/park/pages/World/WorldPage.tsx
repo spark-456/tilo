@@ -908,13 +908,13 @@ export function WorldPage({ app }: { app: AppCtx }) {
               </div>
             ) : null}
             {trackRun && worldClient ? (
-              // DEMO-BROWSER: the live browser floats over the map as soon as its first event is recorded
+              // DEMO-BROWSER: the browser takes over the map area once its first event is recorded (Back to map returns)
               <BrowserPanel
                 client={worldClient}
                 worldId={w.id}
                 events={runEvents}
                 replay={false}
-                placement="overlay"
+                placement="takeover"
               />
             ) : null}
           </div>
