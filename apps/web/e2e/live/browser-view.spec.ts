@@ -48,14 +48,25 @@ for (const time of ["day", "night"] as const) {
       expect(background).not.toMatch(/rgba\(.*,\s*0(\.\d+)?\)$/);
       // The frame is as large as the area allows (fit to width, capped by height), and nothing scrolls inside the view.
       const shot = await view.locator(".tilo-bv__shot").boundingBox();
-      expect(shot?.width ?? 0).toBeGreaterThan(size.width < 761 ? 260 : 560);
+      expect(shot?.width ?? 0).toBeGreaterThan(size.width < 761 ? 300 : 560);
       const body = view.locator(".tilo-bv__body");
       expect(await body.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
-      // The line says the state (the step is in the label), and every footer button sits inside the view.
+      // The line says the state (the step is in the label). On a phone the numbered strip is the step control and every
+      // target is 44 px; wider, Earlier and Later sit inside the view.
       await expect(view.locator(".tilo-bv__line")).toHaveText("Tilo is using the browser now.");
-      for (const name of ["Earlier", "Later"]) {
-        const box = await view.getByRole("button", { name, exact: true }).boundingBox();
-        expect(box && viewBox && box.x + box.width <= viewBox.x + viewBox.width - 8).toBe(true);
+      if (size.width < 600) {
+        await expect(view.getByRole("button", { name: "Earlier", exact: true })).toBeHidden();
+        const targets = view.locator(".tilo-bv__button:visible, .tilo-bv__steps button:visible");
+        expect(await targets.count()).toBeGreaterThanOrEqual(6);
+        for (const target of await targets.all()) {
+          const box = await target.boundingBox();
+          expect(box && box.height >= 44 && box.width >= 44).toBe(true);
+        }
+      } else {
+        for (const name of ["Earlier", "Later"]) {
+          const box = await view.getByRole("button", { name, exact: true }).boundingBox();
+          expect(box && viewBox && box.x + box.width <= viewBox.x + viewBox.width - 8).toBe(true);
+        }
       }
       await page.screenshot({ path: info.outputPath(`browser-live-${time}-${size.name}.png`) });
 
@@ -80,6 +91,12 @@ for (const time of ["day", "night"] as const) {
       await expect(view.getByRole("button", { name: "Stop" })).toHaveCount(0);
       await view.getByRole("button", { name: "Step 2: Scrolling down" }).click();
       await expect(view.locator(".tilo-bv__label")).toContainText("Step 2 of 4");
+      // The strip centres the picked step, so its neighbour before it is whole, not cut at the edge.
+      const [strip, first] = [
+        await view.locator(".tilo-bv__steps").boundingBox(),
+        await view.getByRole("button", { name: /^Step 1:/ }).boundingBox(),
+      ];
+      expect(strip && first && first.x >= strip.x - 1).toBe(true);
       await page.screenshot({ path: info.outputPath(`browser-finished-${time}-${size.name}.png`) });
 
       // Back to map shows the map again, with a way back to the browser that covers none of the map's own controls.

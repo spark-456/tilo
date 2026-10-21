@@ -247,6 +247,18 @@ export function BrowserPanel({
     if (wasEnlarged.current && !enlarged) shot.current?.focus();
     wasEnlarged.current = enlarged;
   }, [enlarged]);
+  // The step list centres the shown step (a jump, never a scroll animation; the browser clamps at either end), so a long
+  // run's newest step and its neighbours are seen. Only a change of step or coming back from the map moves it, never a
+  // poll or the person's own scroll.
+  const strip = useRef<HTMLOListElement>(null);
+  const onMap = mapFor !== null && mapFor === view.session;
+  useLayoutEffect(() => {
+    const list = strip.current;
+    const item = list?.querySelectorAll<HTMLElement>("li > button")[index];
+    if (!list || !item || onMap) return;
+    list.scrollLeft = item.offsetLeft - list.offsetLeft - (list.clientWidth - item.offsetWidth) / 2;
+    list.scrollTop = item.offsetTop - list.offsetTop - (list.clientHeight - item.offsetHeight) / 2;
+  }, [index, onMap]);
   const session = view.session;
   if (!session) return null;
   const takeover = placement === "takeover";
@@ -364,7 +376,7 @@ export function BrowserPanel({
           <figcaption className="tilo-bv__label">{stepLabel}</figcaption>
         </figure>
         {frames.length > 0 ? (
-          <ol className="tilo-bv__steps" aria-label="Browser steps">
+          <ol ref={strip} className="tilo-bv__steps" aria-label="Browser steps">
             {frames.map((frame, i) => (
               <li key={frame.artifactId}>
                 <button

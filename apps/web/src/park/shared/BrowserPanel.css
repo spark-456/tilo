@@ -301,13 +301,10 @@
   .tilo-bv__steps button {
     padding: 2px;
   }
-  /* The line on its own row, the step buttons under it. */
-  .tilo-bv__bar {
-    flex-wrap: wrap;
-    row-gap: 6px;
-  }
-  .tilo-bv__line {
-    flex-basis: 100%;
+  /* A phone-wide view: the numbered strip is the step control (its last number follows the newest step), so the
+     frame keeps the room Earlier and Later would take. */
+  .tilo-bv__nav {
+    display: none;
   }
 }
 @media (max-width: 760px) {
@@ -336,13 +333,23 @@
   .tilo-bv__bar {
     flex-wrap: wrap;
   }
-  .tilo-bv__line {
-    font-size: 13px;
-  }
   /* A phone's map stacks the lens links under the name tag: the chip goes under both. */
   .tilo-browser-chip {
     top: 128px;
     left: 12px;
+  }
+}
+/* A phone or a touch tablet: 44 px targets and 14 px button words (app/mobile.css, PRD 18.1); the look stays. */
+@media (max-width: 599px), (pointer: coarse) and (max-width: 1024px) {
+  .tilo-bv__button,
+  .tilo-browser-chip {
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .tilo-bv__steps button {
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 .tilo-browser__cursor {
