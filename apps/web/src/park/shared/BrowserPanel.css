@@ -1,87 +1,356 @@
-/* Colours are the theme's role tokens (light and dark); the literals are fallbacks for a page with no theme. */
-.tilo-browser {
+/* DEMO-BROWSER: Tilo's browser. Colours are the theme's role tokens (light and dark); the literals are fallbacks for a
+   page with no theme. No transition or animation: every change follows a recorded event or the person's own click. */
+.tilo-bv {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
   border: 1px solid var(--line, #c7d7e7);
-  border-radius: 14px;
+  border-radius: 20px;
   background: var(--card, #f7fbff);
   padding: 12px;
   color: var(--ink, #17334c);
+  min-width: 0;
 }
-/* DEMO-BROWSER: the live browser as a window over the World's map (640px tall; 400px below 760px wide). */
-.tilo-browser--overlay {
+/* On the World page: the whole map area, opaque, above the map's own controls. */
+.tilo-bv--takeover {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 3;
-  box-sizing: border-box;
-  width: min(560px, calc(100% - 24px));
-  max-height: calc(100% - 24px);
-  overflow: auto;
-  box-shadow: 0 12px 32px #17334c33;
+  inset: 0;
+  z-index: 4;
+  border: 0;
+  border-radius: inherit;
+  padding: 14px;
+  container: tilo-bv / inline-size;
 }
-.tilo-browser-chip {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 3;
-  border: 1px solid var(--lineStrong, #9bb9ce);
-  border-radius: 999px;
-  background: var(--field, #ffffff);
-  color: var(--ink, #17334c);
-  padding: 6px 12px;
-  cursor: pointer;
-}
-@media (max-width: 760px) {
-  .tilo-browser--overlay {
-    width: min(380px, calc(100% - 24px));
-  }
-}
-.tilo-browser__header {
+.tilo-bv__chrome {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: 10px;
+  min-width: 0;
 }
-.tilo-browser__header div {
+.tilo-bv__badge {
+  flex: none;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--chip, #e6eef5);
+  color: var(--ink2, #17334c);
+}
+.tilo-bv__badge[data-phase="live"] {
+  background: var(--okSoft, #ddf6e8);
+  color: var(--okInk, #13693f);
+}
+.tilo-bv__badge[data-phase="waiting"],
+.tilo-bv__badge[data-phase="stopped"] {
+  background: var(--amberSoft, #fff1d4);
+  color: var(--ink, #17334c);
+}
+.tilo-bv__address {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--line, #c7d7e7);
+  border-radius: 999px;
+  background: var(--sunk, #eaf1f7);
+  color: var(--ink2, #17334c);
+  padding: 5px 12px;
+  font-size: 13px;
+}
+.tilo-bv__actions,
+.tilo-bv__nav {
   display: flex;
+  flex: none;
   gap: 6px;
 }
-.tilo-browser__frames {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-}
-.tilo-browser__header button,
-.tilo-browser__frames button {
+.tilo-bv__button,
+.tilo-browser-chip {
   border: 1px solid var(--lineStrong, #9bb9ce);
   background: var(--field, #ffffff);
   color: var(--ink, #17334c);
   font: inherit;
-  border-radius: 8px;
-  padding: 5px 10px;
+  font-size: 13px;
+  border-radius: 999px;
+  padding: 5px 12px;
   cursor: pointer;
 }
-.tilo-browser__frames button:disabled,
-.tilo-browser__header button:disabled {
+.tilo-bv__button:disabled {
   opacity: 0.45;
   cursor: default;
 }
-.tilo-browser__screen {
+/* Back on the map: under the map's own name tag, clear of the lens links (top right) and the zoom (bottom right). */
+.tilo-browser-chip {
+  position: absolute;
+  top: 64px;
+  left: 20px;
+  z-index: 4;
+  height: 36px;
+  padding: 0 14px;
+  border-color: var(--line, #c7d7e7);
+  background: var(--card, #f7fbff);
+  box-shadow: var(--sh, none);
+  font-weight: 700;
+}
+.tilo-bv__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.tilo-bv__frame {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  min-width: 0;
+}
+.tilo-bv__shot {
   position: relative;
+  display: block;
   width: 100%;
   aspect-ratio: 3 / 2;
   overflow: hidden;
-  border-radius: 8px;
+  border: 1px solid var(--line, #c7d7e7);
+  border-radius: 12px;
   background: var(--sunk, #eaf1f7);
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: zoom-in;
 }
-.tilo-browser__screen img {
+.tilo-bv__shot img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: fill;
 }
-.tilo-browser__screen p {
-  margin: 12px;
+.tilo-bv__shot--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+.tilo-bv__shot--empty p {
+  margin: 0;
+  padding: 16px;
+  max-width: 36ch;
+  text-align: center;
+  color: var(--ink2, #17334c);
+  font-size: 14px;
+}
+.tilo-bv__label {
+  font-size: 13px;
+  color: var(--ink2, #17334c);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tilo-bv__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-height: 0;
+  overflow: auto;
+}
+.tilo-bv__steps button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink, #17334c);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.tilo-bv__steps button[aria-current="step"] {
+  border-color: var(--lineStrong, #9bb9ce);
+  background: var(--sunk, #eaf1f7);
+}
+.tilo-bv__num {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--chip, #e6eef5);
+  color: var(--ink2, #17334c);
+  font-size: 12px;
+}
+.tilo-bv__stepname {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tilo-bv__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tilo-bv__line {
+  flex: 1 1 auto;
+  margin: 0;
+  min-width: 0;
+  font-size: 14px;
+}
+.tilo-bv__handoff {
+  color: var(--ink, #17334c);
+  font-size: 14px;
+}
+/* Enlarged picture: a modal dialog in the top layer, the frame as large as the window allows over a scrim. */
+.tilo-bv__zoom:not([open]) {
+  display: none;
+}
+.tilo-bv__zoom::backdrop {
+  background: transparent;
+}
+.tilo-bv__zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  background: var(--scrim, rgba(11, 11, 12, 0.4));
+  padding: 16px;
+}
+.tilo-bv__zoombox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(1240px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  border-radius: 16px;
+  background: var(--card, #f7fbff);
+  color: var(--ink, #17334c);
+  padding: 12px;
+}
+.tilo-bv__zoomhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+.tilo-bv__zoombox img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: calc(100dvh - 96px);
+  margin-inline: auto;
+  border-radius: 8px;
+}
+/* Takeover sizing (after the base rules, so it wins): the frame is as large as the area allows, fit to width and
+   never taller than the body has room for. */
+.tilo-bv--takeover .tilo-bv__body {
+  container: tilo-bvbody / size;
+}
+.tilo-bv--takeover .tilo-bv__shot {
+  max-width: calc((100cqh - 34px) * 1.5);
+  margin-inline: auto;
+}
+.tilo-bv--takeover .tilo-bv__label {
+  text-align: center;
+}
+/* A view narrower than a side list allows: the steps are a strip under the frame. */
+@container tilo-bv (max-width: 979px) {
+  .tilo-bv__body {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+  }
+  .tilo-bv__steps {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .tilo-bv__steps button {
+    width: auto;
+    white-space: nowrap;
+  }
+  .tilo-bv--takeover .tilo-bv__shot {
+    max-width: calc((100cqh - 88px) * 1.5);
+  }
+}
+@container tilo-bv (max-width: 520px) {
+  .tilo-bv__stepname {
+    display: none;
+  }
+  .tilo-bv__steps button {
+    padding: 2px;
+  }
+  /* A phone-wide view: the numbered strip is the step control (its last number follows the newest step), so the
+     frame keeps the room Earlier and Later would take. */
+  .tilo-bv__nav {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .tilo-bv--takeover {
+    padding: 10px;
+  }
+  .tilo-bv {
+    gap: 8px;
+  }
+  .tilo-bv__body {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: auto;
+  }
+  /* A numbered strip under the frame: each step's number, its name read by the label. */
+  .tilo-bv__steps {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .tilo-bv__steps button {
+    width: auto;
+    padding: 2px;
+  }
+  .tilo-bv__stepname {
+    display: none;
+  }
+  .tilo-bv__bar {
+    flex-wrap: wrap;
+  }
+  /* A phone's map stacks the lens links under the name tag: the chip goes under both. */
+  .tilo-browser-chip {
+    top: 128px;
+    left: 12px;
+  }
+}
+/* A phone or a touch tablet: 44 px targets and 14 px button words (app/mobile.css, PRD 18.1); the look stays. */
+@media (max-width: 599px), (pointer: coarse) and (max-width: 1024px) {
+  .tilo-bv__button,
+  .tilo-browser-chip {
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .tilo-bv__steps button {
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 .tilo-browser__cursor {
   position: absolute;
@@ -122,9 +391,5 @@
 }
 .tilo-browser-steps p {
   margin: 6px 0 0;
-  font-size: 13px;
-}
-.tilo-browser__caption {
-  margin: 9px 0 0;
   font-size: 13px;
 }

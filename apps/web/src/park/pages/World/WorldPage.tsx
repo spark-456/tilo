@@ -19,6 +19,7 @@ import {
 // recorded run, so the same elements are disabled with the reason (docs/park-designed-not-in-prd/World.md).
 import { HOST_NOT_CONNECTED_TEXT } from "../../api/hostCopy";
 import { createRoomClient } from "../../api/live/meetingHall";
+import { forgetReads } from "../../api/readCache";
 import { downloadResult, hasResultReader } from "../../api/results";
 import type {
   ApiResult,
@@ -32,7 +33,8 @@ import type {
 import type { AppCtx } from "../../app/AppCtx";
 import { NotFound } from "../../app/NotFound";
 import { markPendingWorld } from "../../app/PendingWorldRoute";
-import { useDemoSession, useParkApi, useWorldClient } from "../../app/context";
+import { pendingWorld } from "../../app/PendingWorldRoute";
+import { useDemoSession, useParkApi, useSchedule, useWorldClient } from "../../app/context";
 import { PageTitle } from "../../app/pageTitle";
 import { RECORDED_RUN_PATH, stagePath } from "../../app/router";
 import {
@@ -226,6 +228,9 @@ const LATER_TOAST = "Nothing was sent. It waits for you in Needs you.";
 export function WorldPage({ app }: { app: AppCtx }) {
   const api = useParkApi();
   const worldClient = useWorldClient();
+  const schedule = useSchedule();
+  // UX-SMOOTH: a world opened the moment Start answered may not be in the first list read yet: read it again.
+  const [reread, setReread] = useState(0);
   const demo = useDemoSession(); // QA-DEMO-1: the sample company: labelled, and approving records nothing
   const [roomClient] = useState(createRoomClient);
   const [canDraw] = useState(canDrawStage);
@@ -289,6 +294,7 @@ export function WorldPage({ app }: { app: AppCtx }) {
     }
   }, [runEvents]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `reread` re-runs the read for a world that was just started
   useEffect(() => {
     let live = true;
     const handoffRead =
@@ -340,7 +346,22 @@ export function WorldPage({ app }: { app: AppCtx }) {
     return () => {
       live = false;
     };
-  }, [api, dec, added]);
+  }, [api, dec, added, reread]);
+
+  const waitingForList =
+    loaded !== null &&
+    loaded !== "failed" &&
+    loaded.live &&
+    Boolean(app.params.id) &&
+    pendingWorld(app.params.id ?? "") &&
+    !loaded.worlds.some((x) => x.id === app.params.id);
+  useEffect(() => {
+    if (!waitingForList || reread >= 20) return undefined;
+    return schedule(() => {
+      forgetReads(); // the cached list is the one without the new world
+      setReread((n) => n + 1);
+    }, 1500);
+  }, [waitingForList, reread, schedule]);
 
   useEffect(() => {
     if (!slackOpen) return;
@@ -357,6 +378,14 @@ export function WorldPage({ app }: { app: AppCtx }) {
     const listed = loaded.worlds.find((x) => x.id === wanted);
     if (listed?.access === "team")
       return <TeamWorld client={worldClient} worldId={wanted} app={app} />;
+    if (!listed && waitingForList)
+      return (
+        <Frame>
+          <output className="park-world-meta">
+            Opening your new world. Its first recorded events show here as they arrive.
+          </output>
+        </Frame>
+      );
     if (!listed && !added.some((x) => x.id === wanted))
       return <MissingWorld worldId={wanted} app={app} />;
   }
@@ -565,9 +594,14 @@ export function WorldPage({ app }: { app: AppCtx }) {
     ? live.credits
     : w.spendV || (w.spend ? Number.parseInt(w.spend.replace(/\D/g, "") || "0", 10) : 0);
   const creditsUsed = Math.round(rawCredits * 10) / 10;
-  const creditsCap = typeof w.budget === "number" ? Math.round(w.budget * 10) / 10 : 120;
+  // UX-SMOOTH: a live run with no recorded plan or budget shows no invented totals (it said "0 of 7", "of 120").
+  const planning = trackRun && steps === null;
+  const creditsCap =
+    typeof w.budget === "number" ? Math.round(w.budget * 10) / 10 : trackRun ? null : 120;
   const creditsPct =
-    creditsCap > 0 ? Math.min(100, Math.round((creditsUsed / creditsCap) * 100)) : 0;
+    creditsCap !== null && creditsCap > 0
+      ? Math.min(100, Math.round((creditsUsed / creditsCap) * 100))
+      : 0;
   // WORLD-DESIGN: the artboard's card on the map says the newest recorded line, or nothing.
   const toastLine = latestLine(trackRun ? runEvents : null, w.activity);
   const shown: WorldTab = tab ?? (view?.deliverable ? "result" : "story");
@@ -676,7 +710,8 @@ export function WorldPage({ app }: { app: AppCtx }) {
         <div className="park-world-headspacer" />
         <div className="park-world-headstepbar">
           <span className="park-world-headsteptext">
-            <strong>{`${stepsDoneCount} of ${stepsTotalCount}`}</strong>{" "}
+            {/* With no recorded plan there is no total to show: none is invented. */}
+            <strong>{planning ? "0" : `${stepsDoneCount} of ${stepsTotalCount}`}</strong>{" "}
             <span className="park-world-headsub">steps done</span>
           </span>
           <div className="park-world-headbar-track">
@@ -686,7 +721,9 @@ export function WorldPage({ app }: { app: AppCtx }) {
         <div className="park-world-headcreditsbar">
           <span className="park-world-headsteptext">
             <strong>{creditsUsed}</strong>{" "}
-            <span className="park-world-headsub">of {creditsCap} credits</span>
+            <span className="park-world-headsub">
+              {creditsCap === null ? "credits used" : `of ${creditsCap} credits`}
+            </span>
           </span>
           <div className="park-world-headbar-track">
             <div className="park-world-headbar-fill" style={{ width: `${creditsPct}%` }} />
@@ -908,13 +945,13 @@ export function WorldPage({ app }: { app: AppCtx }) {
               </div>
             ) : null}
             {trackRun && worldClient ? (
-              // DEMO-BROWSER: the live browser floats over the map as soon as its first event is recorded
+              // DEMO-BROWSER: the browser takes over the map area once its first event is recorded (Back to map returns)
               <BrowserPanel
                 client={worldClient}
                 worldId={w.id}
                 events={runEvents}
                 replay={false}
-                placement="overlay"
+                placement="takeover"
               />
             ) : null}
           </div>

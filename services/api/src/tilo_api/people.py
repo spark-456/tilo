@@ -20,6 +20,7 @@ from tilo_memory.artifacts import ArtifactStore
 from tilo_people.stores import PeopleStores
 
 from tilo_api import deps, grounding, people_items
+from tilo_api.meeting_action_claims import ActionClaims, get_action_claims
 from tilo_api.meeting_bot import attend_artifacts, attend_meeting
 from tilo_api.meeting_bot_rpc import MeetingBotRpc, get_meeting_bot_client
 from tilo_api.meeting_brief import read_brief
@@ -363,6 +364,7 @@ async def attend_meeting_route(
     bot: Annotated[MeetingBotRpc, Depends(get_meeting_bot_client)],
     clock: Annotated[Callable[[], str], Depends(deps.get_clock)],
     claims: Annotated[AttendClaims | None, Depends(get_attend_claims)],
+    action_claims: Annotated[ActionClaims | None, Depends(get_action_claims)],
 ) -> dict[str, Any]:
     work = attend_meeting(
         _writer(principal, stores, clock),
@@ -374,6 +376,7 @@ async def attend_meeting_route(
         clock,
         claims=claims,
         join_url=body.join_url,
+        action_claims=action_claims,
     )
     try:
         return await while_connected(request, work)

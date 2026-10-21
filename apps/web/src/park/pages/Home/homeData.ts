@@ -220,27 +220,6 @@ export function greetingWord(hour: number): string {
   return "Hello"; // JUDGE-FIRST-RUN F5: midnight to 05:00 is not an evening
 }
 
-export function liveRows(worlds: readonly World[], needs: number, served = false): LiveRow[] {
-  return worlds
-    .filter((w) => w.st === "needs" || w.st === "running")
-    .slice(0, 5)
-    .map((w) => {
-      const nd = w.st === "needs";
-      const sub = nd
-        ? needs > 0
-          ? decisionsWaiting(needs)
-          : "Needs you" // no served count: no number (BQ-UX11-1)
-        : w.isNew
-          ? "Starting now"
-          : w.tier === "Village"
-            ? (w.when ?? "")
-            : served && w.prog === undefined
-              ? "Running"
-              : `Running · ${w.prog ?? 0}%`;
-      return { world: w, needs: nd, sub, prog: w.prog ?? 0 };
-    });
-}
-
 /** The newest served worlds for Home, in the Api's order and with their actual terminal or active state. */
 export function recentRows(worlds: readonly World[], needs: number, served = false): LiveRow[] {
   return worlds

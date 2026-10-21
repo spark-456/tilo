@@ -70,6 +70,8 @@ def test_SEC_10_exempt_routes_are_exactly_the_three_pairs_and_the_meeting_meters
         ("POST", "/internal/schedules/tick"),
         ("POST", "/internal/meeting-voice/reserve"),  # ADR-0042 (BQ-M2-5): the bot's own token check, inert until on
         ("POST", "/internal/meeting-voice/close"),
+        # ADR-0042 amendment 1 (BQ-MTG-ACTIONS-1, owner-approved 21 Oct; inert until TILO_MEETING_ACTIONS=1).
+        ("POST", "/internal/meeting-actions/run"),
     }
 
 

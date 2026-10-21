@@ -16,6 +16,7 @@ from tilo_contracts import MeetingJoin, Transcript
 
 from .browser import BrowserStartFailed, JoinFailed, NotLoggedIn
 from .events import remove_meet_links
+from .meeting_actions import ACTIONS_HEADER
 from .voice_meter import CLAIM_HEADER, CLAIM_RE
 
 logger = logging.getLogger(__name__)
@@ -133,6 +134,10 @@ def create_app(*, attend=None, verifier=None, clock=None) -> FastAPI:
         # absent or malformed (an older caller) means no meter: the call is exactly what it was.
         claim = request.headers.get(CLAIM_HEADER, "")
         extra = {"claim": claim} if CLAIM_RE.fullmatch(claim) else {}
+        # ADR-0042 amendment 1: the attend's action nonce (only while tilo-api's TILO_MEETING_ACTIONS=1), never logged.
+        action_claim = request.headers.get(ACTIONS_HEADER, "")
+        if CLAIM_RE.fullmatch(action_claim):
+            extra["action_claim"] = action_claim
         async with busy:
             try:
                 # Leave time for cleanup before Cloud Run's 3600s request deadline.

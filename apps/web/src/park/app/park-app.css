@@ -50,34 +50,9 @@
   color: var(--heroInk);
 }
 
-[data-park] .park-pending-world {
-  max-width: 44rem;
-  margin: clamp(2rem, 8vh, 6rem) auto;
-  padding: 2rem;
-  color: var(--ink);
-}
-
-[data-park] .park-pending-world h1 {
-  margin: 0 0 1rem;
-  font: 900 clamp(1.75rem, 3vw, 2.5rem) / 1.2 "Nunito", sans-serif;
-}
-
-[data-park] .park-pending-world p {
+/* UX-SMOOTH: the World page opens at once after Start; this line shows only when its updates cannot be read. */
+[data-park] .park-pending-world__note {
+  margin: 0 0 12px;
   color: var(--ink2);
-}
-[data-park] .park-pending-world__blueprint {
-  box-sizing: border-box;
-  width: min(100%, 28rem);
-  margin: 0 auto 1rem;
-  padding: 1rem;
-  border: 1px dashed var(--bpInk);
-  border-radius: 14px;
-  background-color: var(--bp);
-  --bp-grid-v: linear-gradient(var(--bpLine) 1px, transparent 1px);
-  --bp-grid-h: linear-gradient(90deg, var(--bpLine) 1px, transparent 1px);
-  background-image: var(--bp-grid-v), var(--bp-grid-h);
-  background-size: 16px 16px;
-  color: var(--bpInk);
-  font: 700 13px / 1.5 var(--mono);
-  overflow-wrap: anywhere;
+  font-size: 14px;
 }

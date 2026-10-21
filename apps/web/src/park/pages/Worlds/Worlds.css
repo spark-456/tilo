@@ -140,6 +140,13 @@
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.8px;
+  /* UX-SMOOTH: a long name takes two lines at most (its whole text is the hover title), so the legend under it in
+     this fixed-height card is never cut off. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  flex: none;
 }
 [data-park] .park-worlds-town__spacer {
   flex: 1;

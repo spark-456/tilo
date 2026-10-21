@@ -192,6 +192,11 @@
     max-width: 100%;
     overflow: hidden;
   }
+  /* UX-SMOOTH: the role matrix scrolls inside its card on a phone (POLISH-1); the rule above had cut its columns. */
+  [data-park][data-theme="studio"] .park-team-card.park-team-matrix {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
   [data-park][data-theme="studio"] .park-team-scroll {
     width: 100%;
     max-width: 100%;

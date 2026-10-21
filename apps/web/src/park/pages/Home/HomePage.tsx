@@ -27,6 +27,7 @@ import { DEMO_START } from "../../app/store";
 import { handTeach, takeDraft, takeDraftSkill, teachIntent } from "../../chat/handoff";
 import { FirstRunOverview } from "../../sample/FirstRunOverview";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
+import { prefetchLiveWorld } from "../../shared/prefetchLiveWorld";
 import {
   type CatalogSkill,
   type SkillRef,
@@ -332,6 +333,7 @@ export function HomePage({ app }: { app: AppCtx }) {
   const startRun = (repeat: Cadence | null, makeChoices = run?.makeChoices ?? []) => {
     if (run === null || runBusy) return;
     // triggeredBy: the person's Start click; the card folds only for an actual start request.
+    prefetchLiveWorld();
     setRunStarting(true);
     setRunBusy(true);
     setRunError(null);

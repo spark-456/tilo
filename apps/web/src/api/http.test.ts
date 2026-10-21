@@ -561,10 +561,29 @@ describe("CL-INT-3 / FR-WLD-05: subscribeEvents polls GET /worlds/{id}/events wi
     stop();
   });
 
+  it("UX_SMOOTH: a world still planning keeps the 1s poll after its first event, until world.started", async () => {
+    const granted = EVENTS_VILLAGE_BASIC.find((e) => e.type !== "world.started") as Event;
+    const { calls, fetch } = script(
+      json({ events: [view(granted)] }), // the approval's own event: the plan is not recorded yet
+      json({ events: [] }), // still planning -> next at 1s, not 3s
+      json({ events: [] }),
+    );
+    const stop = client(fetch, 1000).subscribeEvents("w1", () => undefined);
+    await settle(0);
+    await settle(1000);
+    expect(calls).toHaveLength(2);
+    await settle(1000);
+    expect(calls, "no back-off while waiting for world.started").toHaveLength(3);
+    stop();
+  });
+
   it("FT_PERF_1: sends after_seq cursor and adapts interval (1s active, 3s idle)", async () => {
+    // UX-SMOOTH: the 3s idle poll starts once the run has started; poll 2 records world.started.
+    const started = EVENTS_VILLAGE_BASIC.find((e) => e.type === "world.started") as Event;
+    const sample = [EVENTS_VILLAGE_BASIC.find((e) => e.seq < started.seq) as Event, started];
     const { calls, fetch } = script(
       json({ events: [view(sample[0] as Event)] }), // poll 1 -> fresh -> next at 1s
-      json({ events: [view(sample[1] as Event)] }), // poll 2 -> fresh -> next at 1s
+      json({ events: [view(sample[1] as Event)] }), // poll 2 -> fresh (world.started) -> next at 1s
       json({ events: [] }), // poll 3 -> idle -> next at 3s
       json({ events: [] }), // poll 4
     );

@@ -30,6 +30,9 @@ const PAGES = [
   "/more",
 ] as const;
 
+// Each page is loaded twenty-odd times in one test: a trace of all of it stalled the browser on a busy laptop.
+test.use({ trace: "off" });
+
 /** At most this many distinct controls per page, so one page stays under a minute on a busy laptop. */
 const PER_PAGE = 24;
 const CONTROLS =
