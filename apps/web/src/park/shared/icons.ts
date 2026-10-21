@@ -8,8 +8,11 @@ export {
   type LucideIcon,
   Mail,
   PenLine,
+  Pin,
+  PinOff,
   Shapes,
   Table2,
+  Trash2,
   UsersRound,
 } from "lucide-react";
 export { Buddy, Icon as TiloIcon } from "../../design/tilo-t";

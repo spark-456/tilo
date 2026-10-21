@@ -89,7 +89,14 @@ def _plain(value: Any) -> Any:
 def _world_from(d: Mapping[str, Any]) -> deps.WorldRecord:
     districts = {k: deps.DistrictRecord(**v) if v else None for k, v in d["districts"].items()}
     return deps.WorldRecord(
-        d["owner"], districts, tuple(d["owner_channels"]), d["run_id"], d["paused"], d["prior_world_id"], d["layout"]
+        d["owner"],
+        districts,
+        tuple(d["owner_channels"]),
+        d["run_id"],
+        d["paused"],
+        d["prior_world_id"],
+        d["layout"],
+        bool(d.get("hidden", False)),  # WORLDS-MANAGE: a doc stored before the flag is a listed world
     )
 
 

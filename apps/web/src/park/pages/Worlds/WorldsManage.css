@@ -1,0 +1,190 @@
+/* WORLDS-MANAGE: delete, select, sort and pin on the Worlds page. Role tokens only (Studio and Metropolis), no motion.
+   The card stays one link; its tools sit beside it in the same grid cell, over the picture's top-right corner. */
+
+/* A served stop (`failed`): neutral, never the green of "Done". */
+[data-park] .park-worlds-chip--stop {
+  background: var(--sunk);
+  color: var(--ink2);
+}
+[data-park] .park-worlds-dot--stop,
+[data-park] .park-worlds-fill--stop {
+  background: var(--ink3);
+}
+
+[data-park] .park-worlds-cardwrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+[data-park] .park-worlds-cardwrap > .park-worlds-card {
+  flex: 1;
+}
+[data-park] .park-worlds-cardwrap--picked > .park-worlds-card {
+  outline: 3px solid var(--focus, #5a3fe0);
+  outline-offset: 2px;
+}
+
+[data-park] .park-worlds-cardtools {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+}
+[data-park] .park-worlds-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink2);
+  box-shadow: var(--sh1, none);
+  cursor: pointer;
+}
+[data-park] .park-worlds-tool--on {
+  color: var(--ink);
+  border-color: var(--lineStrong, var(--line));
+}
+[data-park] .park-worlds-tool--delete:hover {
+  color: var(--bad, #c0392b);
+}
+[data-park] .park-worlds-tool:focus-visible,
+[data-park] .park-worlds-pick input:focus-visible {
+  outline: 3px solid var(--focus, #5a3fe0);
+  outline-offset: 2px;
+}
+
+[data-park] .park-worlds-pick {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+[data-park] .park-worlds-pick input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--ink);
+  cursor: pointer;
+}
+
+[data-park] .park-worlds-manage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+[data-park] .park-worlds-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink2);
+  font-size: 14px;
+  font-weight: 600;
+}
+[data-park] .park-worlds-sort__select {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+}
+[data-park] .park-worlds-sort__select:focus-visible {
+  outline: 3px solid var(--focus, #5a3fe0);
+  outline-offset: 2px;
+}
+[data-park] .park-worlds-manage__picking {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+[data-park] .park-worlds-manage__count {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+[data-park] .park-worlds-delete {
+  box-sizing: border-box;
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 24px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shPop, var(--sh));
+}
+[data-park] .park-worlds-delete::backdrop {
+  background: var(--scrim, rgba(10, 10, 14, 0.45));
+}
+[data-park] .park-worlds-delete__title {
+  margin: 0 0 10px;
+  font-size: 20px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-worlds-delete__names {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  color: var(--ink);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+[data-park] .park-worlds-delete__body {
+  margin: 0 0 14px;
+  color: var(--ink2);
+  font-size: 14px;
+  line-height: 1.45;
+}
+[data-park] .park-worlds-delete__error {
+  margin: 0 0 14px;
+  color: var(--bad, #c0392b);
+  font-size: 14px;
+}
+[data-park] .park-worlds-delete__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Phone: 44px targets, the picking row under the sort. */
+@media (max-width: 640px) {
+  [data-park] .park-worlds-tool,
+  [data-park] .park-worlds-pick {
+    width: 44px;
+    height: 44px;
+  }
+  [data-park] .park-worlds-sort__select {
+    min-height: 44px;
+  }
+  [data-park] .park-worlds-manage__picking {
+    flex: 1 1 100%;
+  }
+  [data-park] .park-worlds-delete__actions {
+    flex-direction: column-reverse;
+  }
+  [data-park] .park-worlds-delete__actions > * {
+    width: 100%;
+  }
+}

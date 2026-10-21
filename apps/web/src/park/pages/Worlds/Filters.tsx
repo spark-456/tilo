@@ -13,6 +13,8 @@ interface FiltersProps {
   onStatus: (f: StatusFilter) => void;
   onTier: (t: TierFilter) => void;
   onQuery: (value: string) => void;
+  /** WORLDS-MANAGE: a tab shown after the five (Stopped, only when a served world stopped). */
+  extraTab?: readonly [StatusFilter, string];
 }
 
 export function Filters({
@@ -24,11 +26,13 @@ export function Filters({
   onStatus,
   onTier,
   onQuery,
+  extraTab,
 }: FiltersProps) {
+  const tabs = extraTab ? [...STATUS_TABS, extraTab] : STATUS_TABS;
   return (
     <div className="park-worlds-filters">
       <div role="tablist" aria-label="Status" className="park-worlds-tabs">
-        {STATUS_TABS.map(([f, label]) => (
+        {tabs.map(([f, label]) => (
           <button
             key={f}
             type="button"

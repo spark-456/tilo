@@ -133,12 +133,18 @@ def _item(principal: Principal, store: Store, world_id: str, world: WorldRecord)
     return _summary(world_id, seen, last_seq)
 
 
-def _summary(world_id: str, seen: list[dict], last_seq: int) -> dict[str, Any]:
-    first = _requested(iter(seen))
-    title = first["data"].get("title") if first is not None and isinstance(first["data"], dict) else None
+def world_status(seen: Iterable[dict]) -> str:
+    """The owner-view status of a world: what its latest registered world.* event set, else idle (BQ-S14-2)."""
     status = "idle"
     for event in seen:
         status = _STATUS.get(event["type"], status)
+    return status
+
+
+def _summary(world_id: str, seen: list[dict], last_seq: int) -> dict[str, Any]:
+    first = _requested(iter(seen))
+    title = first["data"].get("title") if first is not None and isinstance(first["data"], dict) else None
+    status = world_status(seen)
     return {
         "world_id": world_id,
         "title": title if isinstance(title, str) else None,
@@ -172,7 +178,9 @@ def list_worlds(
     if principal.role == "owner":
         store.load_owner(principal.user_id, settle=True)
         scope = {
-            w: rec for w, rec in store.worlds.items() if rec.owner == principal.user_id and w != SAMPLE_WORLD_ID
+            w: rec
+            for w, rec in store.worlds.items()
+            if rec.owner == principal.user_id and w != SAMPLE_WORLD_ID and not rec.hidden
         }  # STARTER-1: the sample is never a stored world, whatever a store holds under its id
         own = bool(scope)
         # TSW-4b: the worlds shared with a team of theirs, decided afresh by `team_reader` on every request (a cursor
@@ -185,7 +193,10 @@ def list_worlds(
         named = store.load_world(principal.world_id, settle=True) if principal.world_id is not None else None
         scope = (
             {principal.world_id: named}
-            if principal.world_id is not None and named is not None and principal.world_id != SAMPLE_WORLD_ID
+            if principal.world_id is not None
+            and named is not None
+            and not named.hidden
+            and principal.world_id != SAMPLE_WORLD_ID
             else {}
         )
     positions = [_position(viewers.get(w, principal), store, w, rec) for w, rec in scope.items()]

@@ -2,9 +2,10 @@
 // in which order, what the status pill says and the town counts. No React, no clock.
 import type { TierName, World, WorldState } from "../../api/types";
 
-export type StatusFilter = "all" | WorldState;
+/** WORLDS-MANAGE: "stopped" is a served stop (`failed`): such a world is not "Done". */
+export type StatusFilter = "all" | WorldState | "stopped";
 export type TierFilter = "all" | TierName;
-export type Tone = "needs" | "run" | "sch" | "ok";
+export type Tone = "needs" | "run" | "sch" | "ok" | "stop";
 export interface Status {
   label: string;
   tone: Tone;
@@ -17,6 +18,8 @@ export const STATUS_TABS: ReadonlyArray<readonly [StatusFilter, string]> = [
   ["scheduled", "Scheduled"],
   ["finished", "Done"],
 ];
+/** Shown beside the five tabs only when a served world stopped (WORLDS-MANAGE): an empty tab names nothing. */
+export const STOPPED_TAB: readonly [StatusFilter, string] = ["stopped", "Stopped"];
 export const SCALES: ReadonlyArray<readonly [TierFilter, string]> = [
   ["all", "All sizes"],
   ["City", "Cities"],
@@ -42,7 +45,9 @@ const WORD: Record<WorldState, string> = {
 const inBase = (w: World, q: string, tier: TierFilter): boolean =>
   (!q.trim() || w.name.toLowerCase().includes(q.trim().toLowerCase())) &&
   (tier === "all" || w.tier === tier);
-const inStatus = (w: World, f: StatusFilter): boolean => f === "all" || w.st === f;
+const inStatus = (w: World, f: StatusFilter): boolean =>
+  f === "all" ||
+  (f === "stopped" ? w.stopped === true : w.st === f && !(f === "finished" && w.stopped === true));
 
 export const countFor = (
   all: readonly World[],
@@ -65,6 +70,7 @@ export const plural = (n: number, one: string, many: string): string =>
 
 export function statusOf(w: World, needsLeft: number): Status {
   if (w.isNew) return { label: "Starting", tone: TONE[w.st] };
+  if (w.stopped) return { label: "Stopped", tone: "stop" };
   return {
     // No served count (none loaded, or a failed read) says no number rather than "0 decisions" (BQ-UX11-1)
     label:

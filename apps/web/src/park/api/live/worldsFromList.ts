@@ -44,6 +44,7 @@ function worldOf(item: WorldListItem): World {
     nextV: "",
     owner: "",
     started: item.created_at ?? "",
+    ...(item.status === "failed" ? { stopped: true } : {}),
     ...(item.sample === true ? { sample: true } : {}),
     ...(item.access === "team" ? { access: "team" as const } : {}),
   };

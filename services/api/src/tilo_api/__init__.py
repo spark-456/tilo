@@ -76,6 +76,7 @@ from tilo_api.team_items import router as _team_items_router
 from tilo_api.team_routes import router as _team_router
 from tilo_api.team_shares import router as _team_shares_router
 from tilo_api.user_settings import router as _user_settings_router
+from tilo_api.world_delete import router as _world_delete_router
 from tilo_api.worlds_list import router as _worlds_list_router
 
 # Generated docs only in local dev mode: deployed, the service is public and the route list is not for
@@ -153,6 +154,7 @@ app.include_router(_redaction_router)
 app.include_router(_costs_router)
 app.include_router(_context_panel_router)
 app.include_router(_worlds_list_router)
+app.include_router(_world_delete_router)  # WORLDS-MANAGE: owner-only DELETE /worlds/{id} (after the sample's 409)
 app.include_router(_cards_feed_router)
 app.include_router(_notifications_router)
 app.include_router(_tasks_router)

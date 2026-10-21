@@ -1414,6 +1414,13 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     await this.post(`/worlds/${encodeURIComponent(worldId)}/pause`, {});
   }
 
+  /** WORLDS-MANAGE: `DELETE /worlds/{id}`, owner only. The server stops a world still at work, then takes it off the
+   * person's list; its events, ledger and archive stay. Resolves only on the server's answer; a refusal throws its
+   * own sentence (a 404 for a world that is not theirs). Not on the TiloClient interface. */
+  async deleteWorld(worldId: string): Promise<void> {
+    await this.deleteJson(`/worlds/${encodeURIComponent(worldId)}`);
+  }
+
   /** `POST /v1/meetings/{id}/host` (FR-MTG-09): the owner asks Tilo to host a scheduled bot meeting. The body is
    * always `{}`. The reply is only the meeting's world id; the T3 gate card is then in that world's cards
    * (`listCards`). Nothing is created until the person answers it. Not on the TiloClient interface. */

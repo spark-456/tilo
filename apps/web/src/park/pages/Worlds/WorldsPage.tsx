@@ -6,6 +6,7 @@
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ErrorState, StateAction } from "../../../design/tilo-t";
 import { createRoutinesClient } from "../../api/live/routines";
+import { forgetReads } from "../../api/readCache";
 import type { Connector, Decision, Ledger, Plan, World } from "../../api/types";
 import type { AppCtx } from "../../app/AppCtx";
 import { useParkApi, useWorldClient } from "../../app/context";
@@ -25,8 +26,21 @@ import { SampleControls } from "../../sample/SampleControls";
 import { hideSample, showSample } from "../../sample/sampleChoice";
 import { useFirstRunPreview } from "../../sample/useFirstRunPreview";
 import { WorldCard } from "./Cards";
+import { DeleteWorldsDialog } from "./DeleteWorlds";
 import { Filters } from "./Filters";
 import { Header } from "./Header";
+import { ManageBar } from "./ManageBar";
+import {
+  type SortKey,
+  arrange,
+  deletable,
+  readPinned,
+  readSort,
+  stillWorking,
+  writePinned,
+  writeSort,
+} from "./arrange";
+import "./WorldsManage.css";
 import { RoutinesPanel } from "./RoutinesPanel";
 import { CardSkeleton, EmptyBox, LoadingWorlds, Section, TownHero } from "./Sections";
 import { Spotlight } from "./Spotlight";
@@ -34,6 +48,7 @@ import { makeArt, makeKit } from "./art";
 import "./Worlds.css";
 import {
   STATUS_TABS,
+  STOPPED_TAB,
   type StatusFilter,
   type TierFilter,
   countFor,
@@ -68,6 +83,14 @@ export function WorldsPage({ app }: { app: AppCtx }) {
   const [tier, setTier] = useState<TierFilter>("all");
   const [query, setQuery] = useState("");
   const [reload, setReload] = useState(0); // STARTER-1: Hide / Show sample project read the list again
+  // WORLDS-MANAGE: the order and the pins are this browser's; the picked worlds and the confirm step are page state.
+  const [sort, setSort] = useState<SortKey>(readSort);
+  const [pinned, setPinned] = useState<ReadonlySet<string>>(readPinned);
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
+  const [confirming, setConfirming] = useState<readonly World[] | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [slackOpen, setSlackOpen] = useState(false);
   const [slackWorldId, setSlackWorldId] = useState("");
   const [slackChannel, setSlackChannel] = useState("");
@@ -135,13 +158,104 @@ export function WorldsPage({ app }: { app: AppCtx }) {
     () => (data ? slackConnectorState(data.connectors) : undefined),
     [data],
   );
-  const list = useMemo(() => visibleWorlds(all, query, tier, status), [all, query, tier, status]);
+  const list = useMemo(
+    () => arrange(visibleWorlds(all, query, tier, status), sort, pinned),
+    [all, query, tier, status, sort, pinned],
+  );
   const counts = useMemo(() => townCounts(all), [all]);
   const filterCounts = useMemo(() => {
     const byStatus = {} as Record<StatusFilter, number>;
-    for (const [filter] of STATUS_TABS) byStatus[filter] = countFor(all, query, tier, filter);
+    for (const [filter] of [...STATUS_TABS, STOPPED_TAB])
+      byStatus[filter] = countFor(all, query, tier, filter);
     return byStatus;
   }, [all, query, tier]);
+  const canDelete = all.some(deletable);
+
+  const choose = useCallback((next: SortKey) => {
+    setSort(next);
+    writeSort(next);
+  }, []);
+  const togglePin = useCallback((id: string) => {
+    setPinned((have) => {
+      const next = new Set(have);
+      if (!next.delete(id)) next.add(id);
+      writePinned(next);
+      return next;
+    });
+  }, []);
+  const togglePick = useCallback((id: string) => {
+    setPicked((have) => {
+      const next = new Set(have);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }, []);
+  const byId = useRef(all);
+  byId.current = all;
+  const askDelete = useCallback((id: string) => {
+    const w = byId.current.find((x) => x.id === id);
+    if (!w) return;
+    setDeleteError(null);
+    setConfirming([w]);
+  }, []);
+  const stopSelecting = (on: boolean) => {
+    setSelecting(on);
+    setPicked(new Set());
+  };
+
+  /** WORLDS-MANAGE: pause each picked world still at work, then delete it; a world counts as gone only when the server
+   * answered for it. Sample data deletes nothing and says so. */
+  const confirmDelete = async () => {
+    const worlds = confirming ?? [];
+    if (worlds.length === 0 || deleting) return;
+    if (!data?.live || worldClient === null) {
+      setConfirming(null);
+      app.toast(
+        worlds.length === 1
+          ? `Sample data: “${worlds[0]?.name}” was not deleted.`
+          : "Sample data: no world was deleted.",
+      );
+      return;
+    }
+    setDeleting(true);
+    setDeleteError(null);
+    const gone: World[] = [];
+    let refused: string | null = null;
+    for (const w of worlds) {
+      try {
+        // Stop and delete: the server deletes no world still at work, so it is paused first (Pause, FR-WLD-07).
+        if (stillWorking(w)) await worldClient.pauseWorld(w.id);
+        await worldClient.deleteWorld(w.id);
+        gone.push(w);
+      } catch (e) {
+        refused = `“${w.name}” was not deleted: ${e instanceof Error ? e.message : "try again"}`;
+        break;
+      }
+    }
+    setDeleting(false);
+    if (gone.length > 0) {
+      forgetReads(); // the cached list still has them
+      const goneIds = new Set(gone.map((w) => w.id));
+      setData((d) => (d ? { ...d, worlds: d.worlds.filter((w) => !goneIds.has(w.id)) } : d));
+      setPicked((have) => new Set([...have].filter((id) => !goneIds.has(id))));
+      setPinned((have) => {
+        const next = new Set([...have].filter((id) => !goneIds.has(id)));
+        writePinned(next);
+        return next;
+      });
+    }
+    if (refused) {
+      setConfirming(worlds.filter((w) => !gone.includes(w)));
+      setDeleteError(gone.length > 0 ? `${gone.length} deleted. ${refused}` : refused);
+      return;
+    }
+    setConfirming(null);
+    if (selecting) setSelecting(false);
+    const first = gone[0];
+    app.toast(
+      gone.length === 1 && first ? `Deleted “${first.name}”.` : `Deleted ${gone.length} worlds.`,
+    );
+  };
   // Cards are drawn one per task, in page order (the grid is fixed per width, so a card added later moves none).
   const part = useStaged(2 + list.length);
 
@@ -335,6 +449,21 @@ export function WorldsPage({ app }: { app: AppCtx }) {
                 onStatus={setStatus}
                 onTier={setTier}
                 onQuery={setQuery}
+                {...(filterCounts.stopped > 0 ? { extraTab: STOPPED_TAB } : {})}
+              />
+              <ManageBar
+                sort={sort}
+                onSort={choose}
+                canSelect={canDelete}
+                selecting={selecting}
+                picked={picked.size}
+                shown={list.filter(deletable).length}
+                onSelecting={stopSelecting}
+                onSelectAll={() => setPicked(new Set(list.filter(deletable).map((w) => w.id)))}
+                onDelete={() => {
+                  setDeleteError(null);
+                  setConfirming(all.filter((w) => picked.has(w.id)));
+                }}
               />
               {list.length > 0 ? (
                 <Section count={list.length}>
@@ -348,6 +477,12 @@ export function WorldsPage({ app }: { app: AppCtx }) {
                         client={worldClient}
                         night={night}
                         onOpen={open}
+                        pinned={pinned.has(w.id)}
+                        onPin={togglePin}
+                        {...(deletable(w) ? { onDelete: askDelete } : {})}
+                        selecting={selecting}
+                        selected={picked.has(w.id)}
+                        onPick={togglePick}
                       />
                     ) : (
                       <CardSkeleton key={w.id} />
@@ -366,6 +501,15 @@ export function WorldsPage({ app }: { app: AppCtx }) {
           )}
           <RoutinesPanel client={routines} />
         </div>
+        {confirming && confirming.length > 0 ? (
+          <DeleteWorldsDialog
+            picked={confirming}
+            busy={deleting}
+            error={deleteError}
+            onConfirm={() => void confirmDelete()}
+            onClose={() => setConfirming(null)}
+          />
+        ) : null}
       </PageSheet>
     </div>
   );

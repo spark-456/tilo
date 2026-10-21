@@ -143,6 +143,10 @@ class WorldRecord:
     prior_world_id: str | None = None  # a scheduled run's previous world (FR-AGT-14b): offered, never silently reused
     layout: dict | None = None  # the run's built layout (PRD 15.1 World), None until the run commits it (ADR-0026);
     # the event writer reads it, with `run_id`, from here, never from a part
+    hidden: bool = (
+        False  # WORLDS-MANAGE: the owner deleted it from their Worlds list (DELETE /worlds/{id}); the record,
+    )
+    # its events, ledger and archive stay, but no list, team read or cards feed shows it again
 
 
 @dataclass
@@ -449,7 +453,7 @@ def team_reader(
     never stored on the request and is handed to read routes only. Every other case, a people store that cannot be
     opened included, is the one unknown-world 404. No cache: each request reads the shares and the directory."""
     world = store.worlds.get(world_id)
-    if world is None or not _team_session(principal):
+    if world is None or world.hidden or not _team_session(principal):
         raise HTTPException(status_code=404, detail="Tilo could not find that.")
     try:
         stores = people()
