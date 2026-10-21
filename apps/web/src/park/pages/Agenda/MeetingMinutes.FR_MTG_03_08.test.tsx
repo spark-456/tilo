@@ -3,7 +3,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, click, mount } from "../../../../test-support/park/componentsHarness";
 import { TiloApiError } from "../../../api/http";
-import { meetingMinutesApi } from "../../api/live/meetingMinutes";
+import { TRANSCRIPT_WAIT_MS, meetingMinutesApi } from "../../api/live/meetingMinutes";
 import { MeetingMinutes } from "./MeetingMinutes";
 import { PeopleLists } from "./PeopleLists";
 
@@ -205,6 +205,75 @@ describe("FR_MTG_03_08 Park minutes owner flow", () => {
     await press(m.container, "Show transcript");
     expect(m.container.textContent).toContain("No transcript is kept for this meeting.");
     expect(button(m.container, "Analyze minutes")).toBeDefined();
+  });
+  it("MINUTES_ME the transcript opens while a long analysis is still writing the minutes", async () => {
+    const http = mockHttp();
+    let finish: (value: unknown) => void = () => undefined;
+    http.postJson.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }) as never,
+    );
+    http.getJson.mockImplementation(async (path: string) =>
+      path.endsWith("/transcript")
+        ? ({
+            meeting_id: "mt_a",
+            transcript: { artifact_id: "art_t", version: 1 },
+            screening: "clean",
+            utterances: [
+              { id: "u0001", t_ms: 0, speaker: "Tilo", text: "Paris.", truncated: false },
+            ],
+          } as never)
+        : (doc as never),
+    );
+    const m = mount(<MeetingMinutes id="mt_a" status="ended" api={meetingMinutesApi(http)} />);
+    await press(m.container, "Analyze minutes");
+    expect(m.container.textContent).toContain("This can take a few minutes");
+    await press(m.container, "Show transcript");
+    expect(m.container.querySelector('[aria-label="Transcript"]')?.textContent).toContain(
+      "Tilo: Paris.",
+    );
+    await act(async () => finish({ id: "mt_a" }));
+  });
+  it("MINUTES_ME a transcript read that never answers says so instead of waiting for ever", async () => {
+    vi.useFakeTimers();
+    try {
+      const http = mockHttp();
+      http.getJson.mockImplementation(() => new Promise(() => undefined) as never);
+      const m = mount(<MeetingMinutes id="mt_a" status="ended" api={meetingMinutesApi(http)} />);
+      await press(m.container, "Show transcript");
+      expect(m.container.textContent).toContain("Loading the transcript…");
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(TRANSCRIPT_WAIT_MS);
+      });
+      expect(m.container.textContent).toContain("The transcript could not be loaded. Try again.");
+      expect(m.container.textContent).not.toContain("Loading the transcript…");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("MINUTES_ME with no linked attendee the Owner is offered as Me, picked, and drafting waits for approval", async () => {
+    const http = mockHttp();
+    const meeting = { id: "mt_a", owner: "u_owner", minutes_confirmed_by: stamp, attendees: [] };
+    http.getJson.mockImplementation(async (p: string) =>
+      p.endsWith("/minutes") ? (doc as never) : (meeting as never),
+    );
+    const m = mount(<MeetingMinutes id="mt_a" status="minuted" api={meetingMinutesApi(http)} />);
+    await press(m.container, "Review minutes");
+    const me = m.container.querySelector("fieldset label");
+    expect(me?.textContent).toBe("Me");
+    expect((me?.querySelector("input") as HTMLInputElement).checked).toBe(true);
+    expect(m.container.textContent).not.toContain(
+      "No meeting attendees have a linked person record",
+    );
+    await press(m.container, "Draft follow-up");
+    expect(http.postJson).toHaveBeenCalledWith("/v1/meetings/mt_a/draft-followup", {
+      recipients: ["u_owner"],
+    });
+    expect(m.container.querySelector('[aria-label="T3 approval card"]')?.textContent).toContain(
+      "Needs your approval · nothing sent",
+    );
   });
   it("refuses malformed or duplicate recipients before writing", async () => {
     const http = mockHttp();

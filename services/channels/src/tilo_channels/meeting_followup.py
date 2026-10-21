@@ -208,6 +208,7 @@ class MeetingFollowUp:
         if lists is None:
             return None  # too large to write safely: nothing read, screened or drafted
         attendees = {a.get("user") for a in meeting.get("attendees") or [] if isinstance(a, Mapping)}
+        attendees.add(user_id)  # MINUTES-ME (21 Oct): the Owner may always send the minutes to themself
         picks = list(dict.fromkeys(recipients))
         if not picks or not all(isinstance(p, str) and p in attendees for p in picks):
             return None  # nobody picked, or someone who was no attendee: the Owner's audience is never changed
