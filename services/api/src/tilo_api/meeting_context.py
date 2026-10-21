@@ -2,7 +2,8 @@
 
 Read-only and compact: the meeting OWNER's own view (the attend's claim names them; a caption name never picks whose).
 One-on-one: their teams and teammates, pins (personal and team), upcoming meetings and recent worlds. In a group call
-only what their teams share: team names, teammates and team pins, never a personal item, because others are listening.
+only what their teams share: team names, teammates and ACTIVE team pins, never a personal item, because others are
+listening (the bot narrows it further unless everyone present is the owner or a teammate). Flagged pins never.
 Titles and names only, each cut to `MAX_TEXT`; no body, link, attendee, id or record text beyond them. Every list goes
 through the same functions and access rules a signed-in request uses (`list_pins`, `list_meetings`, the worlds list's
 `_item`), and world loads never settle runs."""
@@ -46,15 +47,18 @@ def build(
             if uid != w.actor and d.is_member(uid, team["team"], w.now):
                 seen = mates.setdefault(uid, {"name": _text(person.get("display_name")), "lead": False})
                 seen["lead"] = seen["lead"] or d.is_lead(uid, team["team"], w.now)
-    shared = [p for p in pins if _board(p) == "team"]
+    # A flagged pin (screened text from mail or minutes) never reaches the model; a group hears only ACTIVE team pins,
+    # never one Tilo proposed that the owner has not confirmed (only they can read it yet).
+    pins = [p for p in pins if not p.get("flagged")]
+    shared = [p for p in pins if _board(p) == "team" and p.get("status") == "active"]
     context: dict[str, Any] = {
+        "you": _text(me.get("display_name")),  # the bot checks who is present against the owner and the teammates
         "teams": [{"name": _text(t["name"]), "lead": t["lead"]} for t in teams],
         "teammates": sorted(mates.values(), key=lambda m: m["name"] or "")[:MAX_TEAMMATES],
         "pins": _pins(pins if one_on_one else shared),
     }
     if not one_on_one:
         return context
-    context["you"] = _text(me.get("display_name"))
     context["role"] = me.get("org_role")
     context["meetings"] = _meetings(list_meetings(w)["items"], w.now)
     context["worlds"] = _worlds(w.actor, store)

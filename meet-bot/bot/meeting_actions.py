@@ -21,7 +21,7 @@ from .voice_meter import _API_URL, CLAIM_RE, IdentityToken
 ACTIONS_HEADER = "X-Tilo-Meeting-Actions"
 ROUTE = "/internal/meeting-actions/run"
 ACTIONS = ("create_pin", "add_agenda_item", "create_meeting")
-TIMEOUT_S, MAX_ANSWER, MAX_CONTEXT = 6.0, 2048, 16384
+TIMEOUT_S, MAX_ANSWER, MAX_CONTEXT = 6.0, 2048, 32768  # the context: about 56 rows of 80 characters, any script
 # The context read's fields (meeting_context on tilo-api), each list bounded; anything else in an answer is dropped.
 _CONTEXT_LISTS = {
     "teams": (10, {"name": str, "lead": bool}),

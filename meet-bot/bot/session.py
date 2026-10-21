@@ -377,7 +377,7 @@ class LiveSession:
     def _maybe_refresh_workspace(self, now: float) -> None:
         """Read the owner's workspace in the background: at the start, every `WORKSPACE_REFRESH_S`, after a confirmed
         action, and whenever the call turns from one-on-one to a group or back (a group never sees personal items)."""
-        if self.actions is None or not hasattr(self.actions, "context"):
+        if self.brain is None or self.actions is None or not hasattr(self.actions, "context"):
             return
         task = getattr(self, "_workspace_task", None)
         if task is not None and not task.done():
@@ -389,11 +389,17 @@ class LiveSession:
         self._workspace_task = asyncio.get_running_loop().create_task(self._refresh_workspace(sole))
 
     async def _refresh_workspace(self, sole: bool) -> None:
-        try:
-            data = await asyncio.to_thread(self.actions.context, sole)
-        except Exception:  # a failed read leaves Tilo answering from the call alone
-            data = None
-        self.brain.workspace = (sole, data) if data is not None else None
+        """The group read always; the one-on-one read (personal items) only while the call is one-on-one, and it is
+        dropped as soon as it is not. `brain.visible_workspace` then picks what the people present may hear."""
+        read: dict[str, dict] = {}
+        for one_on_one in (False, True) if sole else (False,):
+            try:
+                data = await asyncio.to_thread(self.actions.context, one_on_one)
+            except Exception:  # a failed read leaves Tilo answering from the call alone
+                data = None
+            if data is not None:
+                read["one_on_one" if one_on_one else "group"] = data
+        self.brain.workspace = read
 
     def _say(self, pending: action_talk.PendingAction, text: str) -> None:
         msg = ChatMessage("direct_reply", f"action {pending.key}", text, None)

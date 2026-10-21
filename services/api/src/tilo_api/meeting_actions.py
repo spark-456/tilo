@@ -26,6 +26,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import time
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
@@ -50,6 +51,7 @@ ROUTE = "/internal/meeting-actions/run"
 ENV_AUDIENCE, ENV_CALLER = "TILO_MEETING_ACTIONS_AUDIENCE", "TILO_MEETING_ACTIONS_CALLER"
 _METER_AUDIENCE, _METER_CALLER = "TILO_VOICE_METER_AUDIENCE", "TILO_VOICE_METER_CALLER"
 MAX_BODY = 4096
+CONTEXT_TTL_S = 60.0  # one context build per scope per minute at most, whatever the bot asks
 _AUDIENCE = re.compile(r"https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?")
 Line = Annotated[str, Field(min_length=1, max_length=120)]
 
@@ -187,6 +189,9 @@ def _decide(request: Request, body: ActionRequest, args: _Closed) -> JSONRespons
     if claim is None:  # absent, wrong nonce, another attend's, expired: one answer
         return _out(409, {"outcome": "not_attending"}, body.action, "not_attending")
     if isinstance(args, ContextArgs):  # a read: no lock, no cap, no replay; always the owner's, never the speaker's
+        kept = claim.contexts.get(args.one_on_one)
+        if kept is not None and time.monotonic() - kept[0] < CONTEXT_TTL_S:  # the bot asks every 120 s and on changes
+            return _out(200, {"outcome": "done", "action": "context", "context": kept[1]}, body.action, "done")
         try:
             context = meeting_context.build(
                 _writer(request, claim.uid, claim.org_id),
@@ -201,6 +206,7 @@ def _decide(request: Request, body: ActionRequest, args: _Closed) -> JSONRespons
             seam = exc.status_code if isinstance(exc, HTTPException) else "-"
             logger.warning("meeting context failed (%s %s)", type(exc).__name__, seam)
             return _out(503, {"outcome": "unavailable"}, body.action, "unavailable")
+        claim.contexts[args.one_on_one] = (time.monotonic(), context)
         return _out(200, {"outcome": "done", "action": "context", "context": context}, body.action, "done")
     with claim.lock:
         if body.key in claim.replies:  # the same request again: the same answer, nothing written twice
@@ -219,6 +225,7 @@ def _decide(request: Request, body: ActionRequest, args: _Closed) -> JSONRespons
             return _out(503, {"outcome": "unavailable"}, body.action, "unavailable")
         if status == 200:
             claim.done += 1
+            claim.contexts.clear()  # the board or agenda changed: the next context read is built again
         claim.replies[body.key] = (status, answer)
         return _out(status, answer, body.action, str(answer.get("outcome")))
 
