@@ -229,7 +229,7 @@ describe("FR_MTG_03_08 Park minutes owner flow", () => {
     );
     const m = mount(<MeetingMinutes id="mt_a" status="ended" api={meetingMinutesApi(http)} />);
     await press(m.container, "Analyze minutes");
-    expect(m.container.textContent).toContain("This can take a few minutes");
+    expect(m.container.textContent).toContain("This takes up to a minute and a half");
     await press(m.container, "Show transcript");
     expect(m.container.querySelector('[aria-label="Transcript"]')?.textContent).toContain(
       "Tilo: Paris.",
@@ -273,6 +273,30 @@ describe("FR_MTG_03_08 Park minutes owner flow", () => {
     });
     expect(m.container.querySelector('[aria-label="T3 approval card"]')?.textContent).toContain(
       "Needs your approval · nothing sent",
+    );
+  });
+  it("MINUTES_TIME a slow model is one plain sentence and Try again runs the analysis again", async () => {
+    const http = mockHttp();
+    http.postJson.mockRejectedValueOnce(
+      new TiloApiError("Unavailable", 503, true, true, "analysis_timed_out"),
+    );
+    const m = mount(<MeetingMinutes id="mt_a" status="ended" api={meetingMinutesApi(http)} />);
+    await press(m.container, "Analyze minutes");
+    expect(m.container.querySelector('[role="alert"]')?.textContent).toBe(
+      "Tilo could not write the minutes in time: the model service is slow right now. Try again in a minute.",
+    );
+    await press(m.container, "Try again");
+    expect(http.postJson).toHaveBeenCalledTimes(2);
+    expect(m.container.textContent).toContain("Agreed scope");
+    expect(m.container.querySelector('[role="alert"]')).toBeNull();
+  });
+  it("MINUTES_TIME a 502 from the analysis says so plainly", async () => {
+    const http = mockHttp();
+    http.postJson.mockRejectedValueOnce(new TiloApiError("Server trouble", 502, true, true));
+    const m = mount(<MeetingMinutes id="mt_a" status="ended" api={meetingMinutesApi(http)} />);
+    await press(m.container, "Analyze minutes");
+    expect(m.container.querySelector('[role="alert"]')?.textContent).toBe(
+      "Tilo could not write minutes from this transcript. Try again.",
     );
   });
   it("refuses malformed or duplicate recipients before writing", async () => {
