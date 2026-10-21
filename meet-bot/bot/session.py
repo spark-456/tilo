@@ -193,6 +193,9 @@ class LiveSession:
         self.first_seen: dict[str, float] = {}
         self.stt_final: dict[str, float] = {}  # FR-MTG-11: question -> clock time its STT result came back
         self.own_texts: set[str] = set()
+        # Tilo's delivered replies, for the exported transcript only (21 Oct: the minutes saw only the questions). Kept
+        # out of `store` on purpose: the brain and question detection must never read Tilo's own words back.
+        self.replies: list[Utterance] = []
         self.spans = CaptionSpans()
         self.buffer = AudioBuffer()
         self.seg_q: asyncio.Queue = asyncio.Queue()
@@ -641,6 +644,8 @@ class LiveSession:
             bool(res and res.spoken),
             str(res.error)[:80] if res is not None and res.error else "-",
         )
+        if msg.kind == "direct_reply" and (chat_ok or (res is not None and res.spoken)):
+            self.replies.append(Utterance("Tilo", msg.text, round(max(0.0, t0 - self.start), 1)))
         if res is not None:
             self.timeline.record(
                 "speech",

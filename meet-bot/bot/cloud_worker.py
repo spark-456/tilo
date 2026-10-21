@@ -135,6 +135,7 @@ async def attend_meeting(meeting_id: str, join_url: str, claim: str | None = Non
         session.events.echo = False
         await session.run()
         return CapturedTranscript(
-            transcript_from_items(meeting_id, session.store.items),
+            # What people said and what Tilo answered, in time order (21 Oct: the minutes saw only the questions).
+            transcript_from_items(meeting_id, [*session.store.items, *getattr(session, "replies", [])]),
             "left_on_request" if getattr(session, "leave_requested", False) else "completed",
         )

@@ -261,11 +261,11 @@ def test_FR_MTG_11_PL_02_guest_listens_speaks_and_leaves_on_every_voice_backend(
 
     result = asyncio.run(run())
     assert result.reason == "left_on_request"
-    assert [(u["id"], u["speaker"], u["text"]) for u in result["utterances"]] == [
-        ("u0001", "Alice", "Release Friday"),
-        ("u0002", "Bob", "Agreed"),
-    ]
-    assert result["utterances"][0]["t_ms"] < result["utterances"][1]["t_ms"]
+    people = [u for u in result["utterances"] if u["speaker"] != "Tilo"]
+    assert [(u["speaker"], u["text"]) for u in people] == [("Alice", "Release Friday"), ("Bob", "Agreed")]
+    assert people[0]["t_ms"] < people[1]["t_ms"]
+    # 21 Oct: the delivered reply is in the exported transcript too, under Tilo
+    assert ("Tilo", "The release is Friday.") in [(u["speaker"], u["text"]) for u in result["utterances"]]
     assert b"".join(played) == backend.expected
     backend.check_request()
     assert actions.index("join") < actions.index("disclosure") < actions.index("capture") < actions.index("listen")
