@@ -37,7 +37,10 @@ class ActionClaim:
     nonce: str
     expires_at: float
     done: int = 0  # writes made under this claim
+    times: int = 0  # free-time reads made under this claim (each reads the owner's Google Calendar once)
     replies: dict[str, tuple[int, dict[str, Any]]] = field(default_factory=dict)  # key -> the answer it got
+    # the context read per scope (one-on-one?): (monotonic time it was built, the answer), reused for CONTEXT_TTL_S
+    contexts: dict[bool, tuple[float, dict[str, Any]]] = field(default_factory=dict)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 

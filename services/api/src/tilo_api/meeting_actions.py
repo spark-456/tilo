@@ -16,6 +16,9 @@ person through the same people writes, access oracle and Desk events a signed-in
 At most five writes per call (`MAX_ACTIONS`); a key already answered gets the same answer and writes nothing. The
 accepted risk: a caption name is the identity, so a participant who renames themselves could act as someone else.
 
+One read, `context` (`meeting_context.build`): the meeting OWNER's workspace, compact and titles only; one-on-one their
+own items too, in a group call only what their teams share. It never counts toward the writes and is never replayed.
+
 INERT until the owner sets `TILO_MEETING_ACTIONS=1`: after bearer syntax is checked, anything else is a plain 404."""
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import time
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
@@ -34,8 +38,9 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError, 
 from tilo_harness.schedule import tick_caller_ok
 from tilo_people.names import match_name
 
-from tilo_api import deps, ephemeral, meeting_action_claims, schedules
+from tilo_api import deps, ephemeral, meeting_action_claims, meeting_context, meeting_times, schedules, team_store
 from tilo_api.meeting_action_claims import MAX_ACTIONS, ActionClaim, ActionClaims
+from tilo_api.morning_brief import record_read
 from tilo_api.people_events import WorkEvents
 from tilo_api.people_meetings import MeetingEditIn, edit_meeting
 from tilo_api.people_pins import PinIn, create_pin
@@ -47,6 +52,8 @@ ROUTE = "/internal/meeting-actions/run"
 ENV_AUDIENCE, ENV_CALLER = "TILO_MEETING_ACTIONS_AUDIENCE", "TILO_MEETING_ACTIONS_CALLER"
 _METER_AUDIENCE, _METER_CALLER = "TILO_VOICE_METER_AUDIENCE", "TILO_VOICE_METER_CALLER"
 MAX_BODY = 4096
+MAX_TIME_READS = 5  # free-time reads per attend: each one reads the owner's Google Calendar
+CONTEXT_TTL_S = 60.0  # one context build per scope per minute at most, whatever the bot asks
 _AUDIENCE = re.compile(r"https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?")
 Line = Annotated[str, Field(min_length=1, max_length=120)]
 
@@ -87,16 +94,32 @@ class MeetingArgs(_Closed):
         return value
 
 
+class TimesArgs(_Closed):
+    minutes: Annotated[int, Field(ge=15, le=240)]
+    days: Annotated[int, Field(ge=1, le=14)] = 7
+    with_team: StrictBool = False
+
+
+class ContextArgs(_Closed):
+    one_on_one: StrictBool  # the bot's own count of the people in the call: a group gets only what the team shares
+
+
 class ActionRequest(_Closed):
     meeting_id: Annotated[str, Field(pattern=r"^mt_[A-Za-z0-9_]{1,64}$")]
     claim: Annotated[str, Field(min_length=1, max_length=64)]
     key: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
     speaker: Annotated[str, Field(min_length=1, max_length=80)] | None = None
-    action: Literal["create_pin", "add_agenda_item", "create_meeting"]
+    action: Literal["create_pin", "add_agenda_item", "create_meeting", "context", "find_times"]
     args: dict[str, Any]
 
 
-_ARGS: dict[str, type[_Closed]] = {"create_pin": PinArgs, "add_agenda_item": AgendaArgs, "create_meeting": MeetingArgs}
+_ARGS: dict[str, type[_Closed]] = {
+    "create_pin": PinArgs,
+    "add_agenda_item": AgendaArgs,
+    "create_meeting": MeetingArgs,
+    "context": ContextArgs,
+    "find_times": TimesArgs,
+}
 
 
 def _out(status: int, body: dict[str, Any], action: str, outcome: str) -> JSONResponse:
@@ -174,6 +197,28 @@ def _decide(request: Request, body: ActionRequest, args: _Closed) -> JSONRespons
     claim = registry.find(body.meeting_id, body.claim) if registry is not None else None
     if claim is None:  # absent, wrong nonce, another attend's, expired: one answer
         return _out(409, {"outcome": "not_attending"}, body.action, "not_attending")
+    if isinstance(args, TimesArgs):
+        return _times(request, claim, body, args)
+    if isinstance(args, ContextArgs):  # a read: no lock, no cap, no replay; always the owner's, never the speaker's
+        kept = claim.contexts.get(args.one_on_one)
+        if kept is not None and time.monotonic() - kept[0] < CONTEXT_TTL_S:  # the bot asks every 120 s and on changes
+            return _out(200, {"outcome": "done", "action": "context", "context": kept[1]}, body.action, "done")
+        try:
+            context = meeting_context.build(
+                _writer(request, claim.uid, claim.org_id),
+                _seam(request, deps.get_source_owners),
+                _seam(request, deps.get_store),
+                (team_store.team_reader(request.app.dependency_overrides)() or team_store.TeamState()).names,
+                one_on_one=args.one_on_one,
+            )
+        except Refusal as refusal:
+            return _out(404 if refusal.status_code == 404 else 409, {"outcome": "refused"}, body.action, "refused")
+        except Exception as exc:  # a store or seam failure: the type and status only
+            seam = exc.status_code if isinstance(exc, HTTPException) else "-"
+            logger.warning("meeting context failed (%s %s)", type(exc).__name__, seam)
+            return _out(503, {"outcome": "unavailable"}, body.action, "unavailable")
+        claim.contexts[args.one_on_one] = (time.monotonic(), context)
+        return _out(200, {"outcome": "done", "action": "context", "context": context}, body.action, "done")
     with claim.lock:
         if body.key in claim.replies:  # the same request again: the same answer, nothing written twice
             status, answer = claim.replies[body.key]
@@ -191,6 +236,7 @@ def _decide(request: Request, body: ActionRequest, args: _Closed) -> JSONRespons
             return _out(503, {"outcome": "unavailable"}, body.action, "unavailable")
         if status == 200:
             claim.done += 1
+            claim.contexts.clear()  # the board or agenda changed: the next context read is built again
         claim.replies[body.key] = (status, answer)
         return _out(status, answer, body.action, str(answer.get("outcome")))
 
@@ -263,3 +309,41 @@ def _create_meeting(w: Writer, args: MeetingArgs) -> tuple[int, dict[str, Any]]:
         ),
     )
     return 200, {"outcome": "done", "action": "create_meeting", "start": window.start}
+
+
+def _times(request: Request, claim: ActionClaim, body: ActionRequest, args: TimesArgs) -> JSONResponse:
+    """Free starts for a follow-up (`meeting_times`): the owner's own Google Calendar only (WT-01), at most
+    `MAX_TIME_READS` per attend, never counted toward the writes."""
+    with claim.lock:
+        if claim.times >= MAX_TIME_READS:
+            return _out(409, {"outcome": "cap_reached"}, body.action, "cap_reached")
+        claim.times += 1
+    try:
+        w = _writer(request, claim.uid, claim.org_id)
+        rpc = _seam(request, deps.get_meeting_host_client, takes_request=False)
+        events, desks = _seam(request, deps.get_event_writer), _seam(request, deps.get_desk_worlds)
+
+        def read_events(user: str, window: dict[str, str]) -> Any:
+            if user != claim.uid:  # WT-01: only the person's own account, for their own feature
+                raise ValueError("not the owner")
+            return rpc.read(user, "read_events", window)
+
+        def record(user: str, connected_at: str) -> None:
+            record_read(events, user, desks.desk_world(claim.org_id, user), "read_events", connected_at)
+
+        found = meeting_times.find_times(
+            w,
+            _seam(request, deps.get_source_owners),
+            read_events,
+            record,
+            minutes=args.minutes,
+            days=args.days,
+            with_team=args.with_team,
+        )
+    except Refusal as refusal:
+        return _out(404 if refusal.status_code == 404 else 409, {"outcome": "refused"}, body.action, "refused")
+    except Exception as exc:  # a store or seam failure: the type and status only
+        seam = exc.status_code if isinstance(exc, HTTPException) else "-"
+        logger.warning("meeting times failed (%s %s)", type(exc).__name__, seam)
+        return _out(503, {"outcome": "unavailable"}, body.action, "unavailable")
+    return _out(200, {"outcome": "done", "action": "find_times", **found}, body.action, "done")

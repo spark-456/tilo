@@ -33,7 +33,10 @@ ACTIONS_TEXT = (
     'meeting\'s agenda, and create_meeting {"title", "start" (ISO 8601 with time zone, resolved from now_local), '
     '"minutes"}. To do one, reply {"reply": null, "action": {"name": ..., "args": {...}}} and nothing else; Tilo reads '
     "it back and acts only after the person says yes. Never say you have done anything, and you cannot send messages, "
-    "emails or invites. "
+    "emails or invites. To find a free time for a meeting, reply with the action find_times "
+    '{"minutes", optional "days" (1-14), "with_team": true when their teammates should be free too}; Tilo checks the '
+    'calendars and offers times. offered_times, when given, are the times Tilo offered last, in order: "the second '
+    'one" is offered_times[1]; to book one, propose create_meeting with that start. '
 )
 
 
@@ -96,9 +99,60 @@ def proposal(raw: Any, speaker: str, *, one_on_one: bool) -> PendingAction | Non
     return PendingAction(speaker=who, api_speaker=None if one_on_one else who, name=name, args=clean)
 
 
-def _when(start: str) -> str:
-    when = datetime.fromisoformat(start.replace("Z", "+00:00")).astimezone(zone())
+def _when(start: str, zone_name: str | None = None) -> str:
+    try:
+        tz = ZoneInfo(zone_name) if zone_name else zone()
+    except Exception:
+        tz = zone()
+    when = datetime.fromisoformat(start.replace("Z", "+00:00")).astimezone(tz)
     return when.strftime("%a %d %b at %I:%M %p").replace(" 0", " ")
+
+
+# -- free times (find_times: a read, so no read-back; the booking is an ordinary create_meeting) ----------------------
+CHECKING_LINE = "Let me check the calendars."
+
+
+def times_request(raw: Any) -> dict[str, Any] | None:
+    """The model's find_times as tilo-api's arguments (30 minutes over the next 7 days unless it said otherwise)."""
+    if not isinstance(raw, dict) or raw.get("name") != "find_times":
+        return None
+    args = raw.get("args") if isinstance(raw.get("args"), dict) else {}
+
+    def number(key: str, low: int, high: int, default: int) -> int:
+        value = args.get(key)
+        return value if isinstance(value, int) and not isinstance(value, bool) and low <= value <= high else default
+
+    return {
+        "minutes": number("minutes", 15, 240, 30),
+        "days": number("days", 1, 14, 7),
+        "with_team": args.get("with_team") is True,
+    }
+
+
+def time_label(start: str, zone_name: str | None) -> str:
+    return _when(start, zone_name)
+
+
+def times_line(result: dict[str, Any] | None, request: dict[str, Any]) -> str:
+    """What Tilo says with tilo-api's answer: the offered starts, and plainly what it could not check."""
+    if result is None:
+        return "I couldn't check calendars just now."
+    slots = [s for s in result.get("slots") or [] if isinstance(s, str)]
+    if not slots:
+        return f"I couldn't find a free {request['minutes']}-minute slot in the next {request['days']} days."
+    labels = [_when(s, result.get("zone")) for s in slots]
+    text = "I can do " + (", ".join(labels[:-1]) + " or " + labels[-1] if len(labels) > 1 else labels[0]) + "."
+    if result.get("google") == "not_connected":
+        text += " Your Google Calendar isn't connected to Tilo, so I only checked your Tilo calendar."
+    elif result.get("google") != "ok":
+        text += " I couldn't read your Google Calendar just now, so I only checked your Tilo calendar."
+    if request.get("with_team"):
+        text += (
+            " For your teammates I can only see their Tilo calendars."
+            if result.get("teammates")
+            else " You're not on a team in Tilo, so I only checked yours."
+        )
+    return text + " Which one should I schedule?"
 
 
 def readback(action: PendingAction) -> str:
