@@ -34,7 +34,7 @@ completed, failed, or no run yet. Lenses and Stage mode are presentation only;
 use them only if available in the hosted build. No completion or approval event
 alone proves an email/message was sent or a connector is activated.
 
-**Recorded fallback:** choose **Explore a demo session** from sign-in, then the
+**Recorded fallback:** choose **Explore a demo town** from sign-in, then the
 Home recording link if present. The bundled reference is
 `/world/w_village_basic/stage?fixture=village-basic`. Point to its recorded
 sequence/timestamps and say “recorded replay” throughout. This does not start

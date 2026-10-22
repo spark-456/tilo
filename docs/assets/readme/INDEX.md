@@ -2,6 +2,10 @@
 
 This directory contains live application screenshots captured directly from the local running web application using sample and fixture datasets. No mock-ups are used; every capture demonstrates real functionality and views rendered by the Tilo Park frontend.
 
+## Images the README uses
+
+The README shows `landing-*`, `home-*`, `agenda-*`, `worlds-desktop.jpg`, `skills-desktop.png`, `team-desktop.png`, `ledger-desktop.png` and `world-desktop.png`. They were captured from the live demo town (sample data) at 1440 × 900 and 390 wide. `skills-desktop.png` and `world-desktop.png` were re-captured on 19 October 2026 from the deployed build. The `1440-*` and `390-*` files below were captured from a local run and are kept for reference.
+
 ## Desktop Views (1440 × 900)
 
 | Screenshot | Screen / View | Description |

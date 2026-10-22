@@ -1,7 +1,7 @@
 # services/channels — `tilo-channels`
 ## Purpose
 Cloud Run service (PRD 6.2): email notifications, web push, Email Autopilot (triage, drafting, send), signed email
-links. Public ingress for signature-verified webhooks only. WhatsApp is out of scope (SD-01, ADR-0019): no code here emits or reads it.
+links. Mostly library code that tilo-api imports; the one mounted route is OIDC-checked `POST /internal/push/send` (no webhook route is mounted). WhatsApp is out of scope (SD-01, ADR-0019): no code here emits or reads it.
 
 ## Commands
 - `uv run --package tilo-channels pytest services/channels`; `just check` from the repo root. Image: `Dockerfile` runs `tilo_channels.app:app` (`/health` for Cloud Run smoke checks, `/healthz` for in-container probes; P0-07a, P0-07h).

@@ -1,9 +1,9 @@
 # apps/web/src/park
 ## Purpose
-The Park City web app (design handoff of 6 Oct 2026, `docs/web-app-rebuild-plan.md`), built beside the
-old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures and the `api/` layer.
+The Park City web app (design handoff of 6 Oct 2026, `docs/web-app-rebuild-plan.md`); it is now the whole app, the old
+screens are deleted. WEB-1a holds the tokens, fonts, typed fixtures and the `api/` layer.
 ## Contracts
-- `api/index.ts`: `Api` (26 methods, one list `API_METHODS`), each returning `Promise<{ data, source }>`
+- `api/index.ts`: `Api` (32 methods, one list `API_METHODS`), each returning `Promise<{ data, source }>`
   `parkApi(env)` (`api/select.ts`): no `VITE_TILO_API_URL` = fixture Api (`source: "fixture"`), a url =
   live Api, whose methods reject with `NotBuilt` until each endpoint exists. Never sample data as live.
 - `api/fixtures/`: the prototype's data, typed (`api/types.ts`). `worlds.ts` and `index.ts` are
@@ -24,7 +24,7 @@ old screens until the cutover PR. WEB-1a holds the tokens, fonts, typed fixtures
 - Studio (UI-STUDIO-1, design/studio-v2): the DEFAULT theme. Colours are role tokens in `config/themes/studio.json` (day = light, night = dark; extra roles `priFill`/`onPri`/`priLip` = the primary button, `lime`, `lineStrong`, `focus`, `lilacSoft`/`lilacInk`; `heroFill` stays safe under the pages' white text); shape, Geist type and shadows in `studio/studio.css`, scoped `[data-park][data-theme="studio"]` (Metropolis keeps park.components.css). `time` pref: day | night | system (`store.timeFor`, follows prefers-color-scheme live); `studio/ThemeSwitch` (account menu) and Profile Appearance write it. Shared states `studio/States.tsx` (`EmptyState`, `Skeleton` still, `ErrorState`), styles in `studio/studio.components.css`. No motion in either file. UI-STUDIO-2 (BQ-STUDIO-2): `studio/Buddy.tsx` is the helper in STILL poses (idle, reading, talking, done) chosen by the caller from real request state; `chat/useQuickChat.ts` is one conversation over the real Quick path (`askQuick`, reading = call out, talking = new answer shown for `talkMs`, done after; nothing stored: the server keeps no Quick answers); `pages/Chat/` (route `/chat`, nav tab) puts the helper in a scene (`chat/Scene.tsx`, scene in `chat/displayPrefs.ts` storage with try/catch); `shell/TiloBubble.tsx` (every page but Chat) drags anywhere, arrow keys move it, place in storage; "Make it a world" hands the question to Home in memory (`chat/handoff.ts`), never the address.
 - STUDIO-4: `pages/Needs/` (`/needs`, nav tab Needs you with the waiting count) shows one decision at a time from `getDecisions` (`Decision.card` = the served card fields): question, if yes / if no, cost ("Not reported" when none is served), exactly what is sent, Show me (`GET .../item` via `fieldsContext`); answers go through `app.decide` (typed answers and fields forms kept). `pages/Skills/`: gallery (`Gallery.tsx`), side sheet (`SkillDrawer.tsx`, live pause = `POST /v1/skills/{id}/state` on the world client), 3-step `TeachWizard.tsx` over `useTeach` (captures, version, save); Try run and examples have no route and stay disabled.
 ## App (WEB-3a, `app/`)
-- `src/Root.tsx` shows the old app, or the lazy `app/ParkApp.tsx` under `/park` (`isParkPath`).
+- `src/Root.tsx` always loads the lazy `app/ParkApp.tsx`; `/park/<page>` is an alias of the root paths.
 - `AppCtx.ts` is the `app` prop. `store.ts` (framework-free, injected `schedule`) holds decisions, started
   worlds, prefs and the toast. `context.tsx`: `ParkProvider`, `useApp`, `useParkApi` (notes each result's
   `source`), `useSchedule` (the injected timer: pages never call setTimeout). `router.ts` alone reads the address bar.

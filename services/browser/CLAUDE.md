@@ -1,7 +1,7 @@
 # services/browser — `tilo-browser`
 
 ## Purpose
-Cloud Run service with a proxy sidecar (PRD 6.2): one isolated headless browser per session,
+Cloud Run service (PRD 6.2; egress is checked in-process, no proxy sidecar): one isolated headless browser per session,
 allowlisted egress and masked secure fields. `BrowserWorker.close()` closes that run's context; the separate LW-08 fetch path archives accepted output for the run.
 
 ## Commands
@@ -25,7 +25,7 @@ allowlisted egress and masked secure fields. `BrowserWorker.close()` closes that
 ## Config
 - `config/connectors.yaml` exists as the connector catalogue; this service does not load it as an egress allowlist. Callers construct `EgressPolicy(allow=...)`; `FetchService(base_allow=...)`
   combines its base list with the request's `allow_hosts` and `task_allowlist`. Tests use literals.
-- `POST /fetch` requires an explicitly configured `create_app(oidc_verifier=..., audience=..., allowed_callers=...)`. The module-level `app = create_app()` is unconfigured: missing Bearer
+- Routes `POST /sessions`, `/sessions/{s}/act|inspect`, `DELETE /sessions/{s}` (ADR-0052) and `POST /fetch` need a configured verifier. The module-level `app = _configured_app()` reads `TILO_BROWSER_AUDIENCE` and `TILO_BROWSER_CALLERS`; unset, missing Bearer
   tokens receive 401 and Bearer requests receive 403 before the body is read or a fetch runs.
 
 ## Requirement IDs
