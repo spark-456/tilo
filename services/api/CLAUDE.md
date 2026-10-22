@@ -1,6 +1,6 @@
 # services/api â€” `tilo-api`
 ## Purpose
-Cloud Run service (PRD 6.2): sessions, tasks, cards, approvals, policies, downloads, sharing, RBAC. The only service the web client and channels write through; the client reads live state from Firestore under rules.
+Cloud Run service (PRD 6.2): sessions, tasks, cards, approvals, policies, downloads, sharing, RBAC. The only service the web client and channels write through; the client reads by polling this API (Firestore rules deny every client). Runs execute in this process (`runs.start_run` imports `tilo_harness`); see README.md.
 
 ## Commands
 - `uv run --package tilo-api pytest` â€” tests; `just check` â€” gate; `just dev-api` â€” dev mode on 127.0.0.1:8080 (fake Director); `Dockerfile` runs `tilo_api:app`, deploy `docs/deploy-dev.md`

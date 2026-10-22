@@ -7,11 +7,11 @@
 [![Live demo](https://img.shields.io/badge/Live%20demo-open-22c55e?style=for-the-badge&logo=firebase&logoColor=white)](https://essential-wares-510320-f0.web.app)
 ![Google Cloud AI Builder Cup 2026](https://img.shields.io/badge/Google%20Cloud-AI%20Builder%20Cup%202026-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)
 
-![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
-![React](https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black)
+![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![PixiJS](https://img.shields.io/badge/PixiJS-v8-E72264?style=flat-square)
-![Google ADK](https://img.shields.io/badge/Google%20ADK-agents-4285F4?style=flat-square)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![Cloud Run](https://img.shields.io/badge/Cloud%20Run-asia--southeast1-4285F4?style=flat-square&logo=googlecloud&logoColor=white)
 ![Firestore](https://img.shields.io/badge/Firestore-FFCA28?style=flat-square&logo=firebase&logoColor=black)
 ![License](https://img.shields.io/badge/License-Apache--2.0-green?style=flat-square)
@@ -19,53 +19,67 @@
 <img src="docs/assets/readme/landing-desktop.png" alt="Tilo landing page: Describe the work. Watch your team do it." width="92%"/>
 
 <p align="center">
-<a href="#-what-is-tilo">What</a> ·
-<a href="#-try-it">Try it</a> ·
-<a href="#%EF%B8%8F-tour">Tour</a> ·
-<a href="#-how-it-works">How it works</a> ·
-<a href="#%EF%B8%8F-the-world">World</a> ·
-<a href="#-the-agent-team">Agents</a> ·
-<a href="#-you-stay-in-charge">Control</a> ·
-<a href="#-meetings">Meetings</a> ·
-<a href="#%EF%B8%8F-architecture">Architecture</a> ·
-<a href="#-genai-map">GenAI map</a> ·
-<a href="#%EF%B8%8F-security-notes">Security</a> ·
-<a href="#-honest-notes">Honest notes</a> ·
-<a href="#-how-to-run">How to run</a>
+<a href="#what-is-tilo">What</a> ·
+<a href="#features">Features</a> ·
+<a href="#try-it">Try it</a> ·
+<a href="#tour">Tour</a> ·
+<a href="#how-it-works">How it works</a> ·
+<a href="#architecture">Architecture</a> ·
+<a href="#repository-map">Repo map</a> ·
+<a href="#how-to-run">How to run</a> ·
+<a href="#deploys">Deploys</a> ·
+<a href="#genai-map">GenAI map</a> ·
+<a href="#security-notes">Security</a> ·
+<a href="#honest-notes">Honest notes</a> ·
+<a href="#documentation">Docs</a>
 </p>
 
 </div>
 
 ---
 
-## ✨ What is Tilo?
+## What is Tilo?
 
-Organisations are starting to hand real work to AI agents, but that work is invisible: hard to steer, harder to trust. Most tools give you a chat box and a wall of text.
-
-**Tilo** turns one sentence into a priced plan, runs it with a team of specialised agents, and shows the work as a tiny isometric city you can read at a glance. Helpers walk between buildings as they work. Anything that touches the outside world stops at a gate until a person says yes. Every line on screen traces back to something that actually happened.
-
-| 🗣️ **Plain words in** | 🧾 **Price first** | 🏙️ **A world you can read** | 🛡️ **You stay in charge** |
-|---|---|---|---|
-| One sentence, plus files if they help | Plan and cost shown before anything starts | A map, a Story and a Trace for every job | Risky steps wait at a gate for a person |
+Tilo turns one plain-language sentence into a priced plan, then runs it with a team of AI agents that make real deliverables (websites, PDFs, Word, Excel and PowerPoint files, browser research).
+The work is drawn as a tiny isometric city you can read at a glance, with a plain-language **Story** and a technical **Trace** of the same recorded events.
+Anything that sends, shares, saves or spends stops at a gate until a person says yes; a model never decides authorisation.
 
 Tilo is built around three ideas:
 
 - **Inspectable.** Every animation, Story line and meter change comes from a recorded event. Nothing moves unless it happened.
-- **Controllable.** Gates, risk tiers and autonomy levels decide what may run, in deterministic code. A model never decides authorisation.
-- **Accountable.** An append-only ledger, a raw archive and provenance on every output answer "why is this here?".
+- **Controllable.** Risk tiers, autonomy levels and gates decide what may run, in deterministic code.
+- **Accountable.** An append-only credits ledger, a raw run archive and provenance on every output answer "why is this here?".
 
-## 🎮 Try it
+## Features
 
-**👉 [Open the live demo](https://essential-wares-510320-f0.web.app)**, then pick **Explore a demo town**. No sign-in is needed.
+| | |
+| --- | --- |
+| **Describe, price, approve** | One sentence (plus files) becomes a brief, ranked questions and two or three priced approaches. One confirmation card shows scope, assumptions and the credit estimate before anything starts |
+| **Agent teams that run the work** | A Director plans; Leads own districts; Specialists execute units with expert skills and tools; a Verifier and a Writer check and deliver. Context handoff to a successor agent at 70% of a window |
+| **A world you can read** | Worlds are drawn from events: levels, districts, buildings, gates. Switch between the map, **Story**, **Steps**, **Result** and **Trace**; replay a finished run |
+| **Real deliverables** | PDF, PowerPoint, Word, Excel, CSV, a website, and a small quiz app, each versioned with a provenance manifest; Drive saves convert to native Google files |
+| **You stay in charge** | Side effects pass the policy engine and the outbox. Level L1 asks every time; higher levels need your own typed instruction or a standing rule; anything risky (T3) always needs a person |
+| **Skills, taught in plain words** | A library of 18 expert skills, plus skills you teach from a description or a recording, with ratings and fixes |
+| **Gmail, Drive and Calendar** | OAuth with least-privilege scopes; tokens sealed with Cloud KMS; reads for agents, and drafts, sends, saves and events through the outbox |
+| **Browser research** | An isolated Chromium with an egress allowlist and masked secure fields. The World's browser panel replays each step as a masked screenshot with a cursor drawn from the recorded action; Tilo never types a password |
+| **Agenda and the Meet bot** | Pinboards, a calendar, meeting briefs. A bot joins a Google Meet you invite it to, answers, pins, finds free times and can draft follow-ups for your approval |
+| **Teams and sharing** | Self-serve teams with roles and limits, team-shared worlds, approver links, a Team Lead question console |
+| **Spend you can see** | Credit grants per run, hard live-spend caps, and a Ledger page fed by an append-only Treasury ledger |
+| **Routines and memory** | Scheduled runs, memory notes, a morning brief, push notices |
 
-- The demo town is **sample data** (a made-up company with 11 worlds). It is labelled as sample throughout.
-- **Demo sessions replay recorded runs.** The landing page shows a recorded example (a 44-event run: triage an inbox, answer a supplier) replayed faster than it happened, with a banner saying so. Nothing in the demo sends real email.
-- Look around: **Home** (what needs you today), **Chat**, **Worlds** (your town of jobs), open a world and switch between **Story**, **Steps** and **Result**, then **Skills**, **Needs you**, and under **More** the **Ledger**, **Agenda** and **Team** pages (on a wide screen they sit in the top bar).
-- In the demo, **approving records nothing** and **uploads are off**. Signing in with Google is optional and is how you run your own work.
+## Try it
 
-## 🖼️ Tour
+**[Open the live site](https://essential-wares-510320-f0.web.app)** (Firebase Hosting, project `essential-wares-510320-f0`).
 
-> Screenshots are taken from the live demo town at 1440 px and 390 px wide. The data is sample data.
+- **Explore a demo town** needs no account. It opens a made-up company with sample worlds and replays recorded runs, labelled as such; approving records nothing and uploads are off.
+- **Continue with Google** signs in to your own workspace and starts real runs. The Google app is in testing mode, so only listed test users can sign in. A signed-in run is live only where the deployment has switched live models on, and it is bounded by the spend caps below.
+- The [three-minute walkthrough](docs/demo.md) says what each step proves, and what a recording does not prove.
+
+To try a task: sign in, type "Draft a one-page plan for a community garden" in the Home composer, review the confirmation card, choose **Start**, then follow the world and answer any **Needs you** card. Open **Story** or **Trace** for the account of what happened.
+
+## Tour
+
+> Screenshots are taken from the demo town (sample data) at 1440 px and 390 px wide.
 
 <p align="center">
 <img src="docs/assets/readme/world-desktop.png" alt="A world: an isometric map with a gate waiting for approval, and Story, Steps and Result tabs beside it" width="92%"/>
@@ -82,7 +96,7 @@ Tilo is built around three ideas:
 | <img src="docs/assets/readme/team-desktop.png" alt="Team page"/> | <img src="docs/assets/readme/ledger-desktop.png" alt="Ledger page"/> |
 
 <details>
-<summary><b>📱 Mobile (390 px wide)</b></summary>
+<summary><b>Mobile (390 px wide)</b></summary>
 
 <p align="center">
 <img src="docs/assets/readme/landing-mobile.png" alt="Mobile landing" width="30%"/>
@@ -92,51 +106,26 @@ Tilo is built around three ideas:
 
 </details>
 
-## 🧭 How it works
+## How it works
 
-1. **Describe it.** One sentence, plus any files that help. Tilo asks only questions that change the outcome, ranked by impact; agents never ask what they can find out themselves.
-2. **Check the plan.** The Director proposes priced approaches (for example "quick" or "careful"), the assumptions it made, and a budget in credits. You edit in place and approve.
-3. **Agent teams run it.** The Director picks only the agents the job needs: a quick question gets one, a launch gets the whole crew. Each agent loads the expert skill it needs and uses tools through the connectors layer.
-4. **See it, steer it.** The work is drawn as a world and narrated in plain sentences. Anything that sends, shares or deletes goes through a gate. When it finishes you get the result, the cost and the trail behind it.
-
-A step that only reads and thinks just produces a result. A step that would send, share, delete or spend takes this path:
+1. **Describe it.** One sentence, plus files. Tilo screens the text, then asks only the questions that change the outcome.
+2. **Check the plan.** The Director proposes priced approaches and the assumptions it made. One confirmation card; you approve it.
+3. **Agent teams run it.** The plan is compiled and validated, laid out as a world, and executed as units: concurrent Specialists (at most six), Leads reviewing at milestones, a Verifier and a Writer. Skills are pinned by hash for the run.
+4. **See it, steer it.** The web app polls the recorded events about once a second, draws the world and narrates it. A step that reads and thinks just produces a result. A step that would send, share, delete or spend takes this path:
 
 ```mermaid
 flowchart TB
     A["Agent proposes a side effect"] --> P{"Policy engine:<br/>risk tier and autonomy level"}
-    P -->|"needs a person"| G["Gate: you approve<br/>web, phone or email"]
-    P -->|"allowed"| O["Outbox releases it<br/>through a connector"]
+    P -->|"needs a person"| G["Gate: you approve in the web app"]
+    P -->|"allowed"| O["Outbox releases it once<br/>through a connector"]
     G --> O
 ```
 
-The World, Story and Trace views show every one of these steps as it is recorded.
+### The world
 
-## 🏙️ The world
+Each job is its own world, drawn from events. Its size follows the agent count: Outpost (1 to 2), Village (3 to 6), Town (7 to 15), City (16+). A **level** is a phase of the work, a **district** a workstream with one Lead, a **building** a capability or sub-task. Common buildings include the Town Hall, Browser Station, Connector Post, Memory Vault, Treasury, Delivery Dock, Mail Room and Expert Office. A **gate** marks an authorisation point; it opens by a person's approval or by a policy, and the two look different.
 
-Each job is its own world, drawn as an isometric map. The shape of the map carries meaning.
-
-| Element | Represents | Rule |
-|---|---|---|
-| **World** | One task or routine | Sized by agent count: Outpost (1 to 2), Village (3 to 6), Town (7 to 15), City (16+) |
-| **Level** | A phase of the work | Stacked plates; handoffs between phases ride the lift |
-| **District** | A workstream | Up to 6 per level, one Lead each |
-| **Building** | A capability or sub-task | Up to 5 per district |
-| **Common buildings** | Platform functions | Town Hall, Library, Browser Station, Workshop, Meeting Hall, Connector Post, Memory Vault, Treasury, Delivery Dock, Mail Room, Expert Office and more |
-| **Island and bridge** | An external system and its connection | Road = API, rail = MCP, footpath = browser |
-| **Gate** | An authorisation point before a side effect | Opens by a person's approval or by a policy, and the two look different |
-| **Cloud cover** | No access yet | A lock glyph that lifts when you consent |
-
-**Three views on the same recorded events:**
-
-- **World:** the isometric map with zoom and level switching.
-- **Story:** a plain-language timeline of what happened, narrated from the events. Next to it, **Steps** shows the plan in order with progress, and **Result** holds the delivered output.
-- **Trace:** a switch inside Story that lists every recorded event with its type, actor, model role, tokens, latency and credits. It names the raw archive record for each event; opening that record from the Trace is not built yet.
-
-You can **inspect** any agent, building, gate or artifact, **replay** any finished run (the reducer is deterministic), and switch to a **professional density mode** (smaller characters, labels on, no decorative motion) or a **stage mode** for presentations.
-
-### Honesty rules
-
-The world is a display of facts, not a screensaver. These rules are enforced by tests.
+**Honesty rules**, enforced by tests (PRD 9.4):
 
 | # | Rule |
 |---|---|
@@ -146,422 +135,244 @@ The world is a display of facts, not a screensaver. These rules are enforced by 
 | 4 | Replays carry a permanent "Replay of run, recorded on a date" banner |
 | 5 | Unknown event types appear in the Trace only |
 | 6 | Any time compression shows a visible speed badge |
-| 7 | Actions authorised by a policy look different from actions a person approved, and both link to the authorisation |
+| 7 | Actions authorised by a policy look different from actions a person approved |
 
-> Background motion on the Home screen is decoration and is the one exception; motion inside a world is always real.
+Background motion on the Home screen is decoration and the one exception; motion inside a world is always real.
 
-## 🤖 The agent team
-
-```mermaid
-flowchart TD
-    O["Owner"] --- D["Director"]
-    D --> L1["Lead: district A"]
-    D --> L2["Lead: district B"]
-    TL["Human<br/>Team Lead"] -.-> L2
-    L1 --> S1["Specialists"]
-    L2 --> S2["Specialists"]
-    V["Verifier"] -.-> L1
-    V -.-> L2
-    W["Writer"] --> DD["Deliverables"]
-```
-
-| Role | Job |
-|---|---|
-| **Director** | Plans, assigns, arbitrates between districts and talks to the owner. One per world. |
-| **Lead** | Owns a district: decomposes units, reviews Specialist output at milestones, routes questions, runs handoffs. |
-| **Specialist** | Executes one unit with its skill and tools. A capped number run at once per world. |
-| **Verifier** | Checks claims, numbers and formats independently of the author. |
-| **Writer** | Produces deliverables from verified material. |
-| **Narrator** | Turns events into Story lines. |
-
-Supervision runs Specialist, Lead, Director, then a human Team Lead or the owner. Supervisors review at milestones rather than every step to bound cost, and the hierarchy is capped at three agent levels.
-
-<details>
-<summary><b>🧠 Expert skills</b> (versioned, signed-off ways of working)</summary>
-
-<br/>
-
-A skill is a folder an expert writes and signs off. Agents load it only when the plan needs it.
-
-```text
-skills/<domain>/<skill-id>/
-  SKILL.md        when to use, steps, quality bar, checklists, pitfalls
-  skill.yaml      id, version, domain, author, reviewer, tools allowed, input and output schemas
-  examples/       worked inputs and outputs
-  tests/          golden cases with expected results
-```
-
-- The planner sees only each skill's name and one-line description, so planning context stays small.
-- A run pins skill versions, and the Trace shows which version produced which output.
-- New or changed skills need the domain expert's approval; per-skill success rates are tracked.
-- The first library covers web research with citations, table extraction, price comparison, deck writing, executive summaries, email triage and reply drafting, invoice-to-PO matching, verification checklists and quote comparison.
-
-</details>
-
-<details>
-<summary><b>🧑‍🏫 Human Team Leads and question routing</b></summary>
-
-<br/>
-
-- **Team Leads** are people assigned to a domain (for example Security, Finance, Research), configured in `config/teams.yaml`.
-- Agents must ask their supervisor, and the supervisor must ask a person, when the brief is ambiguous in a way that changes the output, a choice has trade-offs outside policy, or a step touches money, personal data, legal terms or outside communication.
-- The Lead classifies the question's domain and sends it to the matching Team Lead, otherwise to the owner. Each question carries context, options, a suggested answer, a deadline and a safe default.
-- **No repeats.** Answers become stored decisions; a similar later question is answered from the decision with a citation.
-- **Load control.** Questions to one person are batched, with an hourly cap and a digest for overflow.
-
-</details>
-
-<details>
-<summary><b>♻️ Context handoff and crash recovery</b></summary>
-
-<br/>
-
-Long jobs outlive a single agent's context window, so Tilo hands work over deliberately.
-
-```mermaid
-sequenceDiagram
-    participant A as Agent (old)
-    participant L as Lead
-    participant B as Agent (new)
-    A->>A: Context at 70%: checkpoint
-    A->>L: Handoff note
-    L->>L: Validate required fields
-    L->>B: Spawn with note and references
-    B->>B: Re-run the verification step
-    B->>L: Ready, continuing
-    L->>A: Retire
-```
-
-- At 60% of context an agent compacts tool output; at 70% it hands off.
-- The note follows `contracts/handoff.schema.json`: goal, unit ids, done, in progress, decisions, open questions, next steps, verification to re-run, gotchas.
-- The successor proves it understood the state by re-running the verification step before it continues.
-- Crash recovery uses the same path: checkpoints after every unit, a heartbeat, and a sweeper that restarts any silent agent from its last checkpoint. Side effects go through an outbox, so they happen exactly once.
-
-</details>
-
-## 🚦 You stay in charge
-
-### Escalation ladder
-
-When agents need a person, the request rises through a fixed ladder, and the world shows it.
-
-| Rung | World signal | Effect on work |
-|---|---|---|
-| **FYI** | Small dot on the building | None |
-| **Nudge** | Speech bubble | None |
-| **Needs you** | Yellow flag; the agent raises a hand | That branch waits |
-| **Blocked** | Red marker | That branch stops |
-| **Meeting invite** | Meeting Hall lights up | The decision branch waits |
-| **Approval gate** | The agent waits at the gate with the item | The action waits |
-| **Connection consent** | A bridge under construction | That connection waits |
-
-Every request uses the same **card**: what happened (140 characters or fewer), why it matters, two or three options with one marked "Suggested" and a reason, an add-context field, and Show me, Snooze and Delegate. The same card works on the web app, mobile web and email. Cards have timeouts with safe defaults, a suggested option is never irreversible, and **gates default to hold and never time out to go**.
-
-### Autonomy levels and risk tiers
-
-```mermaid
-flowchart TB
-    A["Side effect proposed"] --> T{"Risk tier"}
-    T -->|"T3 high"| G["Gate: ask a person"]
-    T -->|"T1 or T2"| P{"Matching policy?"}
-    P -->|"none or L1"| G
-    P -->|"L2"| U["Run with an undo window"]
-    P -->|"L3"| R["Run and add to<br/>the daily digest"]
-```
+### Autonomy and risk
 
 | Level | Name | Behaviour |
 |---|---|---|
 | **L0** | Observe | Agents may only draft; nothing leaves Tilo |
 | **L1** | Ask each time (default) | Every side effect waits at a gate |
-| **L2** | Instruction is approval | If your own instruction explicitly asks for the action, Tilo acts, with an undo window |
+| **L2** | Your instruction is approval | If your own typed instruction asks for the action, Tilo acts, with an undo window |
 | **L3** | Standing rules | Pre-authorised classes of action run within limits and appear in a daily digest |
 
-| Tier | Examples | Highest level allowed |
-|---|---|---|
-| **T1** | Create a draft; save a file to your own Drive; spend credits under the run budget | L3 |
-| **T2** | Reply in an existing thread to a known contact | L3 |
-| **T3** | New recipients, attachments, external sharing, deleting anything, money or legal terms, content flagged by injection detection | L1 only: **always a person** |
+Actions have a risk tier from `config/autonomy.yaml`: **T1** (reads, a draft, a save to your own Drive, spend under the run budget) and **T2** (sending an email, such as a reply in an existing thread) can reach L3; **T3** (sharing, deleting, a new calendar guest, a meeting host event) is limited to L1 and always needs a person. An action not in the table is T3, and six modifiers raise any action to T3: new recipients, attachments, external sharing, deletion, money or legal terms, and a safety flag. Gates hold; they never time out into "go".
 
-Risk tiers are assigned deterministically by action type and context. Policies are objects with scope, limits, conditions, expiry and an undo window (`contracts/policy.schema.json`). Every side-effect event records who or what authorised it, and a kill switch sets every policy back to L1 instantly.
+## Architecture
 
-## 🎥 Meetings
-
-Tilo can join a Google Meet to take minutes and draft the follow-ups.
-
-- **A guest, not a login.** The bot joins as a named guest and waits to be let in: **the host admits it**. It never creates a call and never admits anyone else.
-- **It says who it is first.** It posts a disclosure in the Meet chat before it reads anything, and any participant can say or type "Tilo leave" to stop it.
-- **Minutes as you talk.** It reads the live captions and every 45 seconds sends the last few minutes to a model (through the providers layer) to track the agenda, decisions, action items and open questions. Code, not the model, decides whether it may speak: at most four short chat nudges per meeting, at least five minutes apart.
-- **Follow-ups wait for your yes.** Anything it would send goes through a gate like every other side effect.
-- **Test meetings only for now.** The bot lives in `meet-bot/` and is still a prototype. Do not use it for sensitive meetings until Google's data terms for that use are reviewed.
-
-## 🏗️ Architecture
+A Firebase-hosted web client over a handful of Cloud Run services. The full description is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ```mermaid
 flowchart TB
-    subgraph Client["People"]
+    subgraph People
         WEB["Web app<br/>React and PixiJS<br/>Firebase Hosting"]
-        MAIL["Email approvals"]
+        MEET["Google Meet"]
     end
 
-    subgraph CR["Cloud Run: asia-southeast1"]
-        API["tilo-api<br/>FastAPI"]
-        HARN["Director and agent harness<br/>Google ADK"]
-        CONN["tilo-connectors<br/>Gmail, Drive, Calendar"]
-        REND["tilo-render<br/>PDF and PPTX"]
+    subgraph CR["Cloud Run, asia-southeast1"]
+        API["tilo-api<br/>FastAPI: auth, intake, planning, runs,<br/>cards, policy, outbox, ledger<br/>(the harness library runs in-process)"]
+        CONN["tilo-connectors<br/>OAuth broker, Gmail, Drive, Calendar"]
+        BROW["tilo-browser<br/>isolated Chromium"]
+        REND["tilo-render<br/>deliverable files"]
+        CHAN["tilo-channels<br/>web push"]
+        BOT["tilo-meet-bot<br/>optional"]
     end
 
-    subgraph Core["Trust core"]
-        POL["Deterministic policy engine<br/>risk tiers and autonomy"]
-        OUT["Outbox<br/>every side effect"]
-    end
-
-    PROV["Providers layer<br/>models, search, safety, speech, render<br/>chosen by configuration"]
-    LLM["Gemini and other models"]
+    PROV["Provider layer<br/>models, search, safety, speech<br/>chosen by configuration"]
+    LLM["Gemini on Vertex AI<br/>Model Armor"]
     FS[("Firestore")]
-    PS[("Pub/Sub")]
-    G["Google Workspace APIs"]
+    GCS[("Cloud Storage")]
+    G["Gmail, Drive, Calendar"]
 
-    WEB --> API
-    MAIL --> API
-    API --> HARN
-    HARN --> PROV --> LLM
-    HARN --> REND
-    HARN --> POL --> OUT --> CONN --> G
-    API --- FS
-    HARN --- PS
-    PS --> API
-    API -- "recorded events" --> WEB
+    WEB -- "HTTPS + Firebase ID token,<br/>polls recorded events" --> API
+    API --> PROV --> LLM
+    API --> FS
+    API --> GCS
+    API -- "OIDC" --> CONN --> G
+    API -- "OIDC" --> BROW
+    API -- "OIDC" --> CHAN
+    API -- "OIDC" --> REND
+    API <-- "OIDC" --> BOT --> MEET
 ```
 
-### Services
+Points worth knowing before you read the code:
 
-| Service | Job |
-|---|---|
-| **Web client** (`apps/web`, Firebase Hosting) | React UI, PixiJS world, lenses, cards and settings |
-| **tilo-api** (`services/api`) | Sessions, tasks, cards, approvals, policies, downloads, sharing, access control |
-| **tilo-harness** (`services/harness`) | Runs the work: one single-writer process per world for planning, agents, handoff and events (Google ADK, Python) |
-| **tilo-channels** (`services/channels`) | Notifications and approval links, channel identity binding |
-| **tilo-connectors** (`services/connectors`) | OAuth token broker, Gmail, Drive and Calendar adapters, and the outbox for side effects |
-| **tilo-browser** (`services/browser`) | Groundwork for browser work: one isolated headless browser per instance, with allowlisted egress and masking. Browser control you can watch (with a visible AI cursor) is coming, not live yet |
-| **tilo-render** (`services/render`) | Deliverables: PDF and PPTX rendered from templates; charts drawn by code from data, never by a model |
-| **tilo-sandbox-web** (`services/sandbox-web`) | Fictional websites used by scenarios and evals, so tests never touch the real web |
+- **Runs execute inside `tilo-api`.** It imports `tilo_harness` as a library and runs each approved plan on a thread. The deployed `tilo-harness` service is only a health check and a schedule-tick stub.
+- **The browser never reads Firestore.** It polls the API for a world's events about once a second; Firestore rules deny all client access.
+- **Every model, search, safety and speech call goes through `packages/providers`**, by role, driven by `config/`. No model id appears outside `config/` and `packages/providers`.
+- **Events are the source of truth.** The world, Story and Trace are views of one ordered stream of schema-validated events (101 registered types), and the single writer per world validates each one before it is stored.
 
-<details>
-<summary><b>☁️ Google Cloud service map (one job each)</b></summary>
+### Repository map
 
-<br/>
+| Path | What it is |
+| --- | --- |
+| [`apps/web`](apps/web/README.md) | the React web client: Park shell and pages, the PixiJS world, Story and Trace lenses |
+| [`services/api`](services/api/README.md) | `tilo-api`: sign-in, intake, planning, run execution, cards, policy and outbox, spend, people and teams, meetings |
+| [`services/harness`](services/harness/README.md) | the run engine library (`run_plan`, single-writer event store, tool loop) and its stub service |
+| [`services/connectors`](services/connectors/README.md) | `tilo-connectors`: OAuth token broker, Gmail, Drive and Calendar adapters, outbox execution |
+| [`services/browser`](services/browser/README.md) | `tilo-browser`: isolated Chromium sessions and an SSRF-guarded fetch |
+| [`services/render`](services/render/README.md) | `tilo-render`: PDF, PPTX, DOCX, XLSX and CSV from a deliverable spec |
+| [`services/channels`](services/channels/README.md) | `tilo-channels`: web push sender; links, digests and Email Autopilot libraries |
+| [`services/sandbox-web`](services/sandbox-web/README.md) | `tilo-sandbox-web`: fictional websites for scenarios and evals |
+| [`meet-bot`](meet-bot/README.md) | the Google Meet bot (a separate Python project with its own Docker images) |
+| [`packages`](packages/README.md) | providers, policy, planning, world, memory, archive, metering, people, redact, logging, generated contract types |
+| [`contracts`](contracts/README.md) | JSON Schemas, the event registry and fixtures: the source of truth |
+| `config` | models, prices, autonomy, spend caps, connectors, teams, rate limits, themes and other configuration |
+| `prompts`, `skills`, `templates` | prompt templates by role; the expert skill library; report and deck templates |
+| [`evals`](evals/README.md) | the replay eval harness, 160 cases and a 38-case generality bank |
+| [`infra`](infra/README.md) | Terraform for the Cloud project (applied by the project owner only) |
+| `scripts` | contract codegen, lint and secret scans, smoke tests, the web build wrapper, the cloud test gate |
+| `tests` | repository guards (`repo`), contract tests, whole-stack tests (`system`) |
+| [`docs`](docs/ARCHITECTURE.md) | architecture, reviewer guide, the PRD, ADRs, runbooks, connector status, open questions |
+| `design`, `design_handoff_tilo_web_app` | design tokens and read-only design exports used as references |
+| `.claude`, `.github` | coding-agent hooks and guards; CI and deploy workflow definitions |
 
-| Service | Job in Tilo |
-|---|---|
-| Gemini (Agent Platform) | Default model profiles |
-| Agent Development Kit | Agent definitions, tools, callbacks, tracing |
-| Model Armor | Screens intake, model output, tool output and inbound mail |
-| Cloud Run | All services, scale to zero |
-| Firestore | Worlds, events, cards, policies, checkpoints, grants |
-| Cloud Storage | Artifacts and versions, raw archive, snapshots |
-| Pub/Sub, Cloud Tasks, Cloud Scheduler | Events, rate-limited run starts, schedules and sweepers |
-| BigQuery | Ledger, audit log, eval results, analytics |
-| Firebase Authentication and App Check | Google sign-in and anonymous demo sessions; abuse control |
-| Secret Manager and Cloud KMS | Platform secrets; envelope encryption of user OAuth tokens |
-| Cloud Logging, Monitoring, Trace | Logs, alerts and spans |
-| Cloud Build and Artifact Registry | CI/CD into Cloud Run |
+Root files: `justfile` (task runner), `cloudbuild.yaml` and `cloudbuild.tests.yaml` (Cloud Build), `firebase.json`, `firestore.rules`, `pyproject.toml` and `uv.lock` (Python workspace), `package.json` and `pnpm-workspace.yaml` (JavaScript workspace).
 
-Infrastructure is Terraform in `infra/` (modules for services, IAM, KMS, storage, events, monitoring, budget and workload identity).
+## How to run
 
-</details>
+Prerequisites: Python 3.12 with [`uv`](https://docs.astral.sh/uv/), Node 22 or newer with `pnpm` 10, and [`just`](https://github.com/casey/just). Local runs use fake and record-and-replay providers: no paid call, no cloud credentials. Live calls happen only on a deployment whose owner has switched them on.
 
-### Events are the source of truth
+**Windows (PowerShell, native, no WSL; ADR-0001)**
 
-Everything in Tilo is an event: a typed, schema-validated record with a cause, a visibility scope and a short plain-language summary. The reducer turns events into world state; the Story and Trace lenses are views of the same stream. Events are registered in `contracts/` with fixtures, and an unregistered event type fails the build.
+```powershell
+winget install Casey.Just          # once; uv: winget install astral-sh.uv; Node 22 and pnpm 10 as usual
+git clone https://github.com/spark-456/tilo.git
+cd tilo
+just setup                          # uv sync, pnpm install, git hooks
+just dev                            # web dev server (a fixture world: works with no backend)
+just dev-api                        # second terminal: tilo-api in dev mode on 127.0.0.1:8080
+just check                          # format, lint, types, contract drift and all tests (the full gate)
+```
 
-## 🧬 GenAI map
+**Linux or macOS**
 
-Business code never names a model. It asks for a **role**, and configuration decides which model serves it.
+```sh
+git clone https://github.com/spark-456/tilo.git && cd tilo
+just setup
+just dev            # web dev server
+just dev-api        # in a second terminal
+just check
+```
 
-| Role | What it does | Model need |
-|---|---|---|
-| `director` | Plans, prices, arbitrates | Strongest reasoning, high thinking |
-| `lead` | Runs a district, reviews milestones | Strong reasoning, medium thinking |
-| `specialist` | Executes one unit with a skill and tools | Fast, tool-calling |
-| `verifier` | Independent checks of claims and numbers | Strong reasoning, high thinking |
-| `writer` | Drafts deliverables from verified material | Strong writing |
-| `narrator` | Turns events into Story lines | Smallest, cheapest model |
-| `autopilot` | Email triage and reply drafting | Fast, tool-calling |
+To point the web app at your local API, set `VITE_TILO_API_URL` before starting it:
 
-- **One interface per concern** in `packages/providers`: `ModelProvider` (generate, stream, embed, count tokens, capabilities, price), plus `SearchProvider`, `SafetyProvider`, `SpeechProvider` and `RenderProvider`.
-- **Two adapters ship:** `google` (Gemini through Google's Agent Platform, the default) and a generic OpenAI-compatible adapter used for live tests against other providers during development.
-- **A router** picks by role, capability and budget, and falls back on errors, quota or a missing capability; the Trace records both attempts.
-- **Config, not code:** profiles and roles live in `config/models*.yaml`, prices in `config/prices.yaml` with a date and source, prompts as templates in `prompts/`. A lint check fails the build on any model id outside `config/` and `packages/providers`, and denylisted models refuse to load.
-- **Efficiency by design:** dev and CI use record-and-replay or fake providers and make no paid calls; cheaper models handle cheaper roles; results are cached by request and source fingerprint.
+```powershell
+$env:VITE_TILO_API_URL = "http://127.0.0.1:8080"; just dev
+```
 
-## 🧱 Memory, records and provenance
+```sh
+VITE_TILO_API_URL=http://127.0.0.1:8080 just dev
+```
 
-| Layer | Holds | Reuse rule |
-|---|---|---|
-| Working memory | The run's plan graph, artifact registry and blackboard | This run only |
-| Result cache | Tool results and extracted tables, with their original cost | Web results stay fresh for a limited time; email bodies are never cached |
-| Artifact memory | Past deliverables and their manifests | Offered as a starting point, never silently reused |
-| Decisions | Answers from owners and Team Leads, with scope and expiry | Repeat questions are answered from them |
-| Preferences | User and org preferences, triage corrections, style | Applied in planning and drafting |
-| Skills | Expert skills and versions, kept in Git | Pinned per run |
+Dev mode uses an in-memory store, a fixed owner and a fake Director, and refuses to start on Cloud Run or with `LIVE=1`. Other recipes:
 
-- **Provenance:** every output links to the agent, skill version, model profile, inputs, sources, causing events, and the person or policy that authorised it. "Why is this here?" on any claim or number opens the Trace at its cause, and exports carry a provenance manifest so the trail survives outside Tilo.
-- **Records:** an append-only ledger and audit log, plus a raw archive of what agents saw and did.
-- **Rollback:** deliverables are versioned and can be restored.
+| Command | What it does |
+| --- | --- |
+| `just check-fast` | format, lint and tests, without the type checks |
+| `just test` | all Python and web unit tests (skips emulator and whole-stack tests) |
+| `just system-test` | the real API and services as processes, driven over HTTP (about 3 minutes) |
+| `just meet-bot-test` | the meeting bot's offline tests |
+| `just eval` | replay the 160 eval cases with no paid calls |
+| `just tokens` | regenerate web design tokens |
+| `just contracts-gen` | regenerate Python and TypeScript types from `contracts/` |
+| `just e2e-cp2` | a browser walk against the dev API (local only) |
 
-## 💳 Budget and credits
+The [reviewer guide](docs/REVIEWER-GUIDE.md) says how the tests are organised and where to start reading.
 
-- **1 credit = US$0.005** at standard list prices, covering model tokens, tools and compute. The unit stays stable when providers run promotions.
-- **Reserve, then commit.** Each step reserves its estimated cost plus a margin before it runs and commits the actual cost afterwards; a step that cannot reserve waits.
-- **Budget requests.** At 80% of the approved budget the Director asks for more, with the remaining plan and a new estimate.
-- **Caps** per run, per user per day and per organisation per day, all from configuration; a hard daily cap trips a kill switch.
-- **Ledger.** The Ledger page shows what was spent and what it bought, and the meter reconciles against the same price file the router uses.
+## Deploys
 
-## 🔌 Connectors and deliverables
+Deploys go to one Google Cloud project, `essential-wares-510320-f0`, in `asia-southeast1`, and are run by the project owner after `gcloud auth login` and `firebase login`. Nothing in CI or development deploys.
 
-| Connector | What it can do | Scopes |
-|---|---|---|
-| **Gmail** | Read, search, create drafts, send in an existing thread | Least privilege: readonly, compose, send; never full mailbox access |
-| **Google Drive** | Read the files you pick; write deliverables to a Tilo folder. Importing a CSV from Drive is coming | `drive.file` only |
-| **Google Calendar** | Read availability for scheduling | Read-only |
+| What | How |
+| --- | --- |
+| **Cloud Run services** (`api`, `harness`, `channels`, `connectors`, `browser`, `render`, `sandbox-web`) | `just deploy-dev-cloudbuild api`, then `just deploy-dev-cloudbuild` (or `just deploy dev` for both). [`cloudbuild.yaml`](cloudbuild.yaml) builds `services/<name>/Dockerfile` with the repository root as context, pushes to Artifact Registry repo `tilo`, and switches each service to the new image **by digest**. Only the image and instance limits change; ingress, IAM, environment and secrets stay with Terraform and `gcloud` |
+| **Web app** | `just deploy-web` builds the fixture / replay app; `just deploy-web-live` builds against the deployed `tilo-api`. Both run `scripts/web_build_env.py` and then `firebase deploy --only hosting` to Firebase Hosting |
+| **Meet bot** | its own image, `meet-bot/docker/cloudbuild.yaml`; the service is optional (Terraform `meet_bot_enabled`) |
+| **Infrastructure** | Terraform in `infra/envs/dev` (`just tf-validate` checks it offline). The owner runs `terraform apply`; repository hooks refuse it |
+| **Checks** | `just smoke-dev <api-url>` and `just smoke-hosted <hosting origin>` for the deployed pieces; `just gate-cloud <ref>` runs a capped test subset on Cloud Build |
 
-Every connector action is declared in `config/connectors.yaml` with a risk tier, limits, and a data class that says what is redacted. User OAuth tokens are envelope-encrypted with Cloud KMS and decryptable only by the connectors service.
+The full runbook is [docs/deploy-dev.md](docs/deploy-dev.md). GitHub Actions workflow files exist (`.github/workflows`), but the runbook records them as unused under the current policy; Cloud Build and local runs gate merges.
 
-**Deliverables:** PDF and PPTX are rendered from templates (`templates/`) with brand tokens; every deliverable is versioned and carries a provenance manifest.
+## GenAI map
 
-## 🛡️ Security notes
+Business code never names a model. It asks for a **role**, and `config/models.yaml` decides which profile serves it. The shipped profiles are Gemini models on Vertex AI and are marked `example: true`; changing them is a configuration change.
 
-**Credential policy (hard rules)**
+| Role | What it does |
+| --- | --- |
+| `director` | intake brief and questions, approaches and estimate, the plan |
+| `lead`, `lead_review` | run a district and review at milestones |
+| `specialist` | execute one unit with a skill and tools |
+| `verifier` | independent checks of claims and numbers |
+| `writer` | draft deliverables from verified material |
+| `assistant`, `skill_capture` | the assistant panel and skill routing; turning a person's words into a skill |
+| `embed`, `search` | skill matching and retrieval vectors; grounded web search |
+| `meeting`, `meeting_fast`, `meeting_analyst`, `meeting_room` | the Meet bot's answers, minutes analysis and the Meeting Hall in a world |
+| `autopilot` | Email Autopilot triage and drafts |
+| `safety` | screening with Model Armor (`armor-default`); a fake only in dev |
+| `autorater`, `generator` | evals |
 
-1. No password fields anywhere in Tilo; agents never type passwords.
-2. Third-party access only through OAuth with least-privilege, incremental scopes.
-3. Browser sessions are ephemeral; nothing is stored between runs.
-4. Secrets never enter prompts, logs, traces, the raw archive or analytics.
-5. Automation authenticates with Workload Identity Federation: no service-account keys in the repo.
+- **One interface per concern** in `packages/providers`: models, search, safety, speech. Adapters: Google (Vertex AI, global endpoint), Model Armor, Google Search grounding, Cloud Speech and Chirp 3 HD voice, and an OpenAI-compatible adapter used in development against NVIDIA NIM or the Gemini compatibility endpoint. Fake and record-and-replay providers serve dev and CI.
+- **The router** picks candidates by role and capability, reserves cost against a budget, retries once after a truncation, repairs schema failures once, escalates on a failed check and falls back on provider errors, keeping a record of each attempt. Prompts and tool output are redacted before they leave.
+- **Live is opt-in.** Only the owner sets `LIVE`; a deployment can also switch live models on for signed-in Google people (`TILO_JUDGE_LIVE`). Every live call is a metered unit under the caps below, and a call that cannot be metered runs in replay.
+- **Efficiency by design:** dev and CI make no paid calls, cheaper models take cheaper roles, prices live in `config/prices.yaml` (1 credit = US$0.005 at list prices), and a run's grant is floored at 60 credits and capped at 300.
 
-**Prompt-injection defence in depth**
+Google Cloud pieces in use: Cloud Run, Firebase Hosting, Authentication and App Check, Firestore, Cloud Storage, Cloud KMS, Secret Manager, Model Armor, Vertex AI, Cloud Tasks and Scheduler, Cloud Build and Artifact Registry. Pub/Sub and BigQuery are provisioned by Terraform for the event ledger but nothing publishes to them yet.
 
-1. External content reaches models only as delimited data, never as instructions.
-2. A safety provider screens intake, tool output, inbound mail and model output.
-3. Privilege separation: agents that read untrusted content have no side-effect tools; they return structured data to a privileged agent.
-4. Every side effect passes the deterministic policy engine and risk tiers, and T3 always needs a person.
-5. Recipient, domain and egress allowlists.
-6. Gates and undo windows before anything leaves Tilo.
-7. Red-team cases are part of every eval pass; a failure blocks deploys.
+## Security notes
 
-**Engineering guards:** a secret scanner runs on every change, fake secrets in tests are assembled at runtime, and repository hooks block edits to protected paths, `.env` files and secret-looking content.
+- **Identity.** Firebase sign-in is verified by `tilo-api` itself; App Check (reCAPTCHA Enterprise) is logged until enforcement is switched on. Internal calls use Google OIDC ID tokens, and each service accepts only its named callers. Firestore denies every client read and write. There are no service-account keys: CI and deploys use Workload Identity Federation or Cloud Build's service account.
+- **No passwords.** Tilo never handles one. Third-party access is OAuth with least-privilege, incremental scopes; user tokens are sealed with a per-record AES-GCM key wrapped by Cloud KMS in a separate Firestore database that no client can read. Secrets live in Secret Manager and never enter prompts, logs, traces or the archive.
+- **Prompt-injection defence.** External content reaches models only as delimited data. Intake text, uploads, tool output and stored outputs are screened by Model Armor. Side-effect tools never run inline: they become outbox entries behind the policy engine, idempotent and exactly-once, and T3 always needs a person's recorded approval.
+- **Egress.** The browser service checks every request and redirect hop against an allowlist, masks secure fields and refuses form submits; its file fetch pins DNS to public addresses, honours `robots.txt` and caps size and redirects.
+- **Spend.** Rate limits per IP and person, a per-run grant, and live-model caps in `config/spend_caps.yaml` (500 INR per person over their lifetime, 150 INR per run, 5,000 INR per day for the whole deployment; reaching the daily cap switches the deployment to replay).
+- **Engineering guards.** A secret scanner runs on every change, fake secrets in tests are assembled at runtime, and repository hooks block edits to protected paths, `.env` files and secret-looking content, force pushes and `LIVE=1`.
 
-## 📊 Eval results
+Details: [Security model](docs/ARCHITECTURE.md#security-model), PRD section 16 and [docs/licences.md](docs/licences.md).
 
-Tilo ships a **160-case eval bank** (`evals/cases/`, schema in `evals/case.schema.json`) in eight groups:
+## Eval results
 
-| Group | What it measures |
-|---|---|
-| E-PLAN | Brief validity, question ranking, approach distinctness, estimate accuracy |
-| E-RES | Research task success and groundedness, against the Sandbox Web |
-| E-DOC | Required sections present, chart values equal sources, files open cleanly |
-| E-MAIL | Triage agreement with ground truth, no invented commitments, style, threading and recipient rules |
-| E-CHN | Correct redirection of off-topic messages |
-| E-ROUTE | Team Lead routing accuracy and repeat detection |
-| E-HAND | Forced handoffs that finish without rework |
-| E-RED | Red-team: hidden-text, document and email injections, exfiltration bait, link smuggling, obfuscated characters; target is 100% blocked or flagged with zero side effects |
+`evals/` holds the replay harness: 160 recorded cases (E-MAIL 50, E-CHN 30, E-HAND 20, E-ROUTE 20, E-RED 14, E-PLAN 10, E-RES 10, E-DOC 6) and a 38-case generality bank that runs the real API end to end on fakes. `just eval` replays the cases with no paid calls and writes `evals/results.local.md` (git-ignored).
 
-Run the harness with `just eval`. Scores are not claimed here; measured results are published from `evals/` only after a run, so this README never quotes a number it did not measure.
+**No committed pass record exists:** `evals/results.md` is not in the repository, so this README claims no score. The numbers above are file counts, not results. See [evals/README.md](evals/README.md).
 
-## 🧰 Tech stack
+## Honest notes
+
+- **The demo is sample data.** Demo sessions replay recorded runs and say so; approving there records nothing.
+- **Live access depends on the deployment.** Live models, Gmail, Drive and Calendar work only where the owner has set the live switches and configured the token store; they are off in dev and CI. The repository cannot show the current state of a deployment.
+- **Connectors in scope:** Gmail, Drive and Calendar. Other connectors (Slack, Teams, Outlook, Lovable, Canva, MCP servers, Docs/Sheets/Slides creation through their own APIs) are prepared or future work, and no MCP server can connect today.
+- **Notifications:** approvals are answered in the web app, desktop or phone. Web push and the daily digest email are opt-in and behind owner switches; answering a card by email is designed but not wired. WhatsApp is out of scope.
+- **Meetings:** the bot joins as a guest the host must admit, and posts a disclosure before it listens. Its live behaviour is tested only with fakes and saved caption pages; minutes analysis and follow-ups are behind a flag that is off in the shipped config. Do not use it for sensitive meetings until Google's data terms for that use are reviewed.
+- **Not finished:** browser work shows masked step screenshots, not a live video stream, and a person cannot take over the browser; several built libraries (run export/import, reuse of verified units) are not yet called by the API. The [reviewer guide](docs/REVIEWER-GUIDE.md#known-gaps) lists the known gaps, and [docs/open-questions.md](docs/open-questions.md) the questions and defaults taken.
+- **Roadmap (PRD 3.4), not shipped:** desktop control, Build mode, workforce orchestration, native mobile apps.
+- **Where prose and code differ**, the contracts, the code and the tests are the sources of truth. Google sign-in and Email Autopilot run in testing mode for listed test users until Google's app verification is complete.
+
+## Tech stack
 
 | Layer | Technology |
-|---|---|
-| Frontend | React 18, TypeScript, Vite, PixiJS v8, Playwright end-to-end tests |
-| Backend | Python, FastAPI, Pydantic v2 models generated from JSON Schema contracts |
-| Agents | Google ADK, Google GenAI SDK |
-| Models | Gemini by default; other providers selectable by configuration |
-| Data and events | Firestore, Pub/Sub |
-| Hosting | Firebase Hosting (web), Cloud Run in `asia-southeast1` (services) |
-| Infrastructure | Terraform modules in `infra/` |
-| Tooling | `uv`, `pnpm`, `just`, Biome, Ruff, mypy |
+| --- | --- |
+| Frontend | React 18, TypeScript 5, Vite 6, PixiJS 8, Firebase Auth and App Check, Vitest, Playwright |
+| Backend | Python 3.12, FastAPI, Pydantic v2 models generated from JSON Schema, uvicorn |
+| Models | Gemini on Vertex AI by default via the google-genai SDK; Model Armor; OpenAI-compatible adapter for development |
+| Browser and files | Playwright and Chromium; reportlab, hand-built OOXML, xlsxwriter |
+| Data | Firestore (two databases), Cloud Storage, Cloud KMS, Secret Manager |
+| Hosting and delivery | Cloud Run in `asia-southeast1`, Firebase Hosting, Cloud Build, Artifact Registry, Cloud Tasks and Scheduler |
+| Infrastructure | Terraform (`infra/`) |
+| Tooling | `uv`, `pnpm`, `just`, Ruff, mypy, Biome, pytest, pre-commit |
 
-## 🗂️ Repo layout
+Contracts first: JSON Schemas and the event registry in `contracts/` generate the Python and TypeScript types, and drift fails the build. Every requirement in the PRD is a ticket id and its acceptance test, named after the id, is the definition of done. Decisions are written down in [`docs/adr/`](docs/adr).
 
-```
-apps/web            React and PixiJS web app
-services/           api, harness, connectors, channels, browser, render, sandbox-web
-meet-bot/           Google Meet guest bot (prototype)
-packages/           providers, policy, planning, memory, archive, metering, people, world,
-                    logging, redact, contracts-py, contracts-ts
-contracts/          JSON Schemas, event registry and fixtures (the source of truth)
-config/             models, prices, autonomy, connectors, teams, scenarios and other configuration
-prompts/ skills/    prompt templates and teachable skills
-templates/          deliverable templates
-evals/              eval harness and the 160-case bank
-infra/              Terraform
-docs/               PRD, architecture decision records, notes
-design/             design tokens and design source
-tests/              acceptance tests named after requirement IDs
-```
-
-### How it is built
-
-- **Contracts first.** JSON Schemas and the event registry in `contracts/` win over prose; Python and TypeScript types are generated from them, and drift fails the build.
-- **Spec-driven.** The product spec is `docs/prd/tilo-prd-v2.md`. Every requirement has an ID that doubles as its ticket, and each acceptance test is the definition of done, with the ID in the test name.
-- **Decisions are written down** as architecture decision records in `docs/adr/`.
-- **Models are configuration**, side effects go through the outbox and policy engine, and nothing animates without a recorded event.
-- **Local-first.** Development uses the Firestore and Pub/Sub emulators with a `demo-` project id, and makes no paid calls.
-
-## 🚀 How to run
-
-Prerequisites: Python 3.12 with [`uv`](https://docs.astral.sh/uv/), Node 22 or newer with `pnpm` 10, and [`just`](https://github.com/casey/just).
-
-```bash
-just setup   # uv sync, pnpm install and git hooks for every workspace member
-just dev     # web dev server
-just dev-api # tilo-api dev server
-just check   # format, lint, typecheck and all tests (the full gate)
-```
-
-On Windows install `just` with `winget install Casey.Just`; the repo runs natively without WSL.
-
-Local development uses fake and record-and-replay providers, so it makes no paid calls and needs no cloud credentials. Live model calls happen only when you opt in with `LIVE=1`.
-
-## 📝 Honest notes
-
-- **The demo is sample data.** The demo town and its worlds are a made-up company. Demo sessions replay recorded runs and say so; approving in the demo records nothing.
-- **Google connectors:** Gmail, Drive and Calendar are the connectors in scope for this release. Other connectors (for example Microsoft 365, MCP servers, Slides, Docs and Sheets creation, and Lovable) are future scope.
-- **Channels:** approvals work from the web app, mobile web and email. WhatsApp is not part of this release.
-- **Email Autopilot** is limited to a small test group until Google's app verification is complete.
-- **Meetings:** the Meet bot joins as a guest the host admits. It is a prototype for test meetings only.
-- **Coming, not live yet:** browser control you can watch, with a visible AI cursor; public app pages for small apps Tilo builds; importing a CSV from Drive. The `tilo-browser` service and the app-page contracts exist, but these experiences are not available on the live site.
-- **Roadmap items, not shipped:** desktop control, Build mode, workforce orchestration, scoped contributors who talk to agents directly.
-- **Evals:** the bank and harness exist; this README quotes no scores (see above).
-- **Models:** the default build routes every role through Google's Agent Platform; other adapters are for development and tests, and recordings made on them are not claimed as evidence for the default.
-- **Design and spec:** parts of this README describe the design in the PRD. The PRD, the contracts and the tests are the sources of truth where they differ from prose.
-
-## 🗺️ Roadmap
-
-- ✅ Describe, plan, run, approve; isometric worlds with World, Story and Trace lenses
-- ✅ Gmail, Drive and Calendar connectors
-- ✅ Agenda with team and personal pinboards, Team page, Skills, Ledger
-- ✅ Meet bot that joins as a guest (prototype, test meetings)
-- 🔜 Browser control you can watch, with a visible AI cursor
-- 🔜 Public app pages
-- 🔜 Importing a CSV from Drive
-- 🔜 More connectors for other work tools
-- 🔜 Native Google Slides, Docs and Sheets deliverables
-- 🔜 Desktop control and Build mode
-
-## 📚 Documentation
+## Documentation
 
 | Doc | What is in it |
-|---|---|
-| [`docs/prd/tilo-prd-v2.md`](docs/prd/tilo-prd-v2.md) | The full product spec: pillars, requirements, acceptance tests |
-| [`docs/adr/`](docs/adr) | Architecture decision records |
-| [`contracts/`](contracts) | Schemas, event registry and fixtures |
-| [`docs/licences.md`](docs/licences.md) | Licence of every dependency |
-| [`CLAUDE.md`](CLAUDE.md) | Engineering rules for contributors and coding agents |
+| --- | --- |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | services, data stores, the run flow, the meeting bot, connectors, the security model |
+| [`docs/REVIEWER-GUIDE.md`](docs/REVIEWER-GUIDE.md) | where to start reading, entry points, how the tests are organised, known gaps |
+| [`docs/prd/tilo-prd-v2.md`](docs/prd/tilo-prd-v2.md) | the product spec: pillars, requirements, acceptance tests (read-only) |
+| [`contracts/`](contracts/README.md) | schemas, event registry and fixtures |
+| [`docs/adr/`](docs/adr) | architecture decision records |
+| [`docs/deploy-dev.md`](docs/deploy-dev.md) | the deploy runbook, including live connectors and durable stores |
+| [`docs/connectors/README.md`](docs/connectors/README.md) | connector status and owner activation |
+| [`docs/open-questions.md`](docs/open-questions.md) | questions found while building and the defaults taken |
+| [`docs/schedules.md`](docs/schedules.md), [`docs/minutes.md`](docs/minutes.md), [`docs/live-e2e.md`](docs/live-e2e.md) | scheduled runs, meeting minutes, running one case live |
+| [`docs/licences.md`](docs/licences.md) | the licence of every dependency |
+| [`CLAUDE.md`](CLAUDE.md) | engineering rules for contributors and coding agents |
 
-## 🙌 Credits
+## Credits
 
-Built by [@spark-456](https://github.com/spark-456) for the Google Cloud AI Builder Cup 2026, with AI coding agents in the loop. Characters, buildings and the isometric kit are Tilo's own design. Licensed under [Apache-2.0](LICENSE) (see the **License** section below).
+Built by [@spark-456](https://github.com/spark-456) for the Google Cloud AI Builder Cup 2026, with AI coding agents in the loop. Characters, buildings and the isometric kit are Tilo's own design.
 
 ## License
 

@@ -32,6 +32,7 @@ from typing import Any, Protocol
 
 from tilo_providers.interfaces import GenerateRequest, ModelProvider, SafetyProvider
 from tilo_providers.prompts import load_prompt
+from tilo_redact import redact
 
 from tilo_channels.autopilot import Autopilot, DraftContext, Preview
 from tilo_channels.drafting import (
@@ -59,6 +60,14 @@ __all__ = ["MeetingFollowUp"]
 TEXT_CAP, MAX_SUMMARY, MAX_DECISIONS, MAX_ACTIONS = 240, 8, 30, 60
 SUBJECT_CAP = 120
 MINUTES_CAP = 40_000  # chars of a minutes body and its answer: a maximal minutes is ~23.5k (BQ-MTG08B-5)
+MAX_TYPED = 50  # MINUTES-ALL: addresses the Owner reviewed on the send list, at most this many
+# MINUTES-ALL: the same strict pattern tilo-api checks (one bare ASCII mailbox, lower case, never a name or a list)
+_MAIL = re.compile(
+    r"(?=.{3,254}$)[a-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}"
+)
+TRANSCRIPT_LEFT_OUT = "\n\n(The transcript was not included: Tilo's safety check flagged it.)"
+TRANSCRIPT_CAP = 12_000  # MINUTES-ALL: chars of transcript lines a minutes email carries; more is cut, said in the mail
+TRANSCRIPT_LINE_CAP = 600  # chars of one transcript line in the mail
 MAX_LABEL_WORDS = 6  # a lead-in that is only a label: this many words, all of LABEL_WORDS (BQ-MTG08C-2)
 LABEL_WORDS = frozenset(
     "a an the this that item items reminder reminders about for on of from action actions decision decisions summary "
@@ -99,6 +108,32 @@ def _text(value: Any, cap: int, rests: list[str]) -> str:
 
 def _norm(text: str) -> str:
     return " ".join(clean(text).split())
+
+
+def _transcript_block(lines: Sequence[Mapping[str, Any]]) -> str:
+    """MINUTES-ALL: the Owner's recorded transcript as plain mail text after the minutes, labelled as not checked, each
+    line `[m:ss] Speaker: words` on one line, at most TRANSCRIPT_CAP characters (a cut says where the rest is)."""
+    out: list[str] = []
+    used, cut = 0, False
+    for line in lines if isinstance(lines, (list, tuple)) else ():
+        if not isinstance(line, Mapping) or not isinstance(line.get("text"), str):
+            continue
+        ms = line.get("t_ms")
+        seconds = max(0, int(ms) // 1000) if type(ms) is int else 0
+        named = line.get("speaker") if isinstance(line.get("speaker"), str) else "Someone"
+        speaker = " ".join(redact(_header(named, 80)).split()) or "Someone"  # the secret redactor again, here too
+        text = " ".join(redact(_header(line["text"], TRANSCRIPT_LINE_CAP)).split())
+        row = f"[{seconds // 60}:{seconds % 60:02d}] {speaker}: {text}"
+        if used + len(row) > TRANSCRIPT_CAP:
+            cut = True
+            break
+        out.append(row)
+        used += len(row) + 1
+    if not out:
+        return ""
+    tail = ["", "(The transcript is cut here; the full transcript is in Tilo.)"] if cut else []
+    head = ["", "", "Transcript, as Tilo captured it in the meeting (not checked):", ""]
+    return "\n".join([*head, *out, *tail])
 
 
 def _lists(minutes: Mapping[str, Any]) -> tuple[list[Mapping], list[Mapping], list[Mapping]] | None:
@@ -197,9 +232,20 @@ class MeetingFollowUp:
         self._system = load_prompt(ROLE, "followup_system.md")
 
     def draft_minutes_email(
-        self, user_id: str, meeting_id: str, *, recipients: Sequence[str], request_id: str
+        self,
+        user_id: str,
+        meeting_id: str,
+        *,
+        recipients: Sequence[str],
+        request_id: str,
+        addresses: Sequence[str] = (),
+        transcript: Sequence[Mapping[str, Any]] = (),
     ) -> Preview | None:
-        """The T3 card of a new email with the confirmed minutes to the attendees the Owner picked, or None."""
+        """The T3 card of a new email with the confirmed minutes to the attendees the Owner picked, or None.
+
+        MINUTES-ALL (owner, 21 Oct): `addresses` are ones the Owner reviewed on the send list (each a bare address, at
+        most MAX_TYPED; never one a model, the minutes or the meeting text named), and `transcript` the recorded lines
+        the Owner chose to include: appended in code after the checked body, labelled, screened and capped."""
         found = self._confirmed(user_id, meeting_id)
         if found is None or not request_id or not isinstance(recipients, (list, tuple)):
             return None
@@ -210,12 +256,19 @@ class MeetingFollowUp:
         attendees = {a.get("user") for a in meeting.get("attendees") or [] if isinstance(a, Mapping)}
         attendees.add(user_id)  # MINUTES-ME (21 Oct): the Owner may always send the minutes to themself
         picks = list(dict.fromkeys(recipients))
-        if not picks or not all(isinstance(p, str) and p in attendees for p in picks):
-            return None  # nobody picked, or someone who was no attendee: the Owner's audience is never changed
-        addresses = [_address(self._directory.address(p) or "") for p in picks]
-        if None in addresses:
+        typed = [a.strip().lower() if isinstance(a, str) else "" for a in addresses]
+        if (
+            not all(_MAIL.fullmatch(a) for a in typed)
+            or len(typed) > MAX_TYPED
+            or not isinstance(transcript, (list, tuple))
+        ):
             return None
-        to = tuple(dict.fromkeys(a for a in addresses if a))
+        if not (picks or typed) or not all(isinstance(p, str) and p in attendees for p in picks):
+            return None  # nobody picked, or someone who was no attendee: the Owner's audience is never changed
+        directory = [_address(self._directory.address(p) or "") for p in picks]
+        if None in directory:
+            return None
+        to = tuple(dict.fromkeys(a for a in [*directory, *typed] if a))
         rests: list[str] = []
         summary = [t for s in lists[0] if (t := _text(s.get("text"), TEXT_CAP, rests))]
         decisions, unconfirmed = list[str](), list[str]()
@@ -232,11 +285,13 @@ class MeetingFollowUp:
         }
         title = _header(meeting.get("title"), SUBJECT_CAP)
         subject = f"Minutes: {title}" if self._title_is_clear(title, confirmed) else "Meeting minutes"
-        key = self._key("minutes", meeting_id, request_id, *sorted(to))
+        appendix = _transcript_block(transcript)
+        key = self._key("minutes", meeting_id, request_id, *sorted(to), *(["transcript"] if appendix else []))
         flagged = any(i["flagged"] for i in items) or minutes.get("flagged") is not False
         return self._run(
-            user_id, key, "minutes_task.md", fields, confirmed, unconfirmed, rests, flagged, to, subject, owner_mailbox
-        )
+            user_id, key, "minutes_task.md", fields, confirmed, unconfirmed, rests, flagged, to, subject, owner_mailbox,
+            appendix=appendix,
+        )  # fmt: skip
 
     @staticmethod
     def _title_is_clear(title: str, confirmed: Sequence[str]) -> bool:
@@ -361,10 +416,12 @@ class MeetingFollowUp:
         to: tuple[str, ...],
         subject: str,
         mailbox: str,
+        *,
+        appendix: str = "",
     ) -> Preview | None:
         doc = self._drafts.get(user_id, instruction_id)
         if doc is None:
-            made = self._make(template, fields, confirmed, unconfirmed, rests, flagged, to, subject)
+            made = self._make(template, fields, confirmed, unconfirmed, rests, flagged, to, subject, appendix)
             if self._drafts.create(user_id, instruction_id, made):  # atomic: the first writer's draft is the result
                 _LOG.info("meeting follow-up %s: %s", instruction_id, made["status"])
             doc = self._drafts.get(user_id, instruction_id) or made
@@ -396,15 +453,20 @@ class MeetingFollowUp:
         flagged: bool,
         to: tuple[str, ...],
         subject: str,
+        appendix: str = "",
     ) -> dict[str, Any]:
         """The model writes the body from the confirmed text only; the screen sees exactly the prompt plus the raw rest
-        of any cut text (up to SCREEN_CAP, more is flagged) and the subject. Raises: nothing stored or emitted."""
+        of any cut text (up to SCREEN_CAP, more is flagged) and the subject. Raises: nothing stored or emitted.
+        `appendix` (MINUTES-ALL, the Owner's recorded transcript) is screened on its own and joined to the body only
+        after the body passed every check, so the checker still judges exactly what the model wrote."""
         prompt = load_prompt(ROLE, template, {**fields, "problems": "none"})
         screened, room = [prompt], SCREEN_CAP
         for rest in rests:
             screened.append(rest[: max(0, room)])
             room -= len(rest)
         flagged = self._safety.check("\n".join([*screened, subject]))["flagged"] or room < 0 or flagged
+        if appendix and self._safety.check(appendix)["flagged"]:
+            appendix = TRANSCRIPT_LEFT_OUT  # a flagged transcript is never sent: the minutes go alone and say so
         doc: dict[str, Any] = {"drafted_at": self._clock(), "flagged": flagged, "draft": None, "findings": []}
         # The Owner's confirmed text is the only source of facts; no instruction, so no commitment word is granted.
         checker = Checker(instruction="", thread=confirmed, cap=MINUTES_CAP)
@@ -429,7 +491,7 @@ class MeetingFollowUp:
             if not findings:
                 draft = {"artifact_id": "art_" + secrets.token_hex(12), "version": 1, "thread_id": None, "mode": "new"}
                 draft |= {"to": list(to), "cc": [], "bcc": [], "subject": subject, "in_reply_to": "", "references": ""}
-                draft |= {"body": body, "attachments": [], "safety_flag": flagged}
+                draft |= {"body": body + appendix, "attachments": [], "safety_flag": flagged}
                 return {**doc, "status": "ready", "draft": draft, "questions": []}
             prompt = load_prompt(ROLE, template, {**fields, "problems": ", ".join(sorted({f.kind for f in findings}))})
         return {

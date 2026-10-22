@@ -228,11 +228,14 @@ def test_SEC_16_the_runs_cap_never_reaches_the_provider():
 def test_SEC_16_an_unreadable_ledger_never_reaches_the_provider():
     from _sec16_lib import DeadLedger
     from tilo_api.deps import ReplayOnly
+    from tilo_api.spend import SpendCheckUnavailable
 
     dead = DeadLedger()
     router = FakeRouter(make_ledger(**BIG_LIMIT))
-    with pytest.raises(ReplayOnly):
+    # RUN-SPEED (live, 21 Oct): fail closed as a plain retryable stop, never a fall-through to replay
+    with pytest.raises(SpendCheckUnavailable) as caught:
         metered(router, dead).generate("director", object())
+    assert not isinstance(caught.value, ReplayOnly)
     assert router.calls == []
 
 

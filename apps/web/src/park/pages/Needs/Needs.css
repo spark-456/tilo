@@ -425,6 +425,15 @@
   align-items: center;
   overflow-wrap: anywhere;
 }
+[data-park] .park-needs__flag {
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: var(--amberSoft);
+  color: var(--amberInk);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
 [data-park] .park-needs__exact {
   margin: 0;
   padding: 16px 18px 18px;

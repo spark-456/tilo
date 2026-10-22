@@ -42,6 +42,9 @@ def crash_reason(error: BaseException) -> str:
             break
         if isinstance(seen, OutputTruncatedError):
             return "a step's model reply was cut off before it finished"
+        plain = getattr(type(seen), "plain_reason", None)  # a class's own code-written line, never instance text
+        if isinstance(plain, str) and plain:
+            return plain[:REASON_CAP]
         seen = seen.__cause__ or seen.__context__
     for kind, reason in _REASONS:
         if isinstance(error, kind):

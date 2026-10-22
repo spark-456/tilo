@@ -204,7 +204,7 @@ def _ask(router: Router, prompt: str, deadline: Deadline | None = None) -> Route
         thinking_level=PLAN_THINKING,
     )
     try:
-        extra = {} if deadline is None else {"deadline": deadline}  # RUN-SPEED: a hung candidate hands over in time
+        extra: dict[str, Any] = {} if deadline is None else {"deadline": deadline}  # RUN-SPEED: hands over in time
         run = router.generate(DIRECTOR_ROLE, request, required_capability=Capability.JSON, **extra)
     except RouterError as error:
         raise PlanCompileError(f"FR-INT-09: no plan from the Director: {error}") from error

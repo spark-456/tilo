@@ -7,7 +7,7 @@ configuration, not code: no kind or subject is named here, and a bad file fails 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -46,7 +46,9 @@ class DeliverableKind:
     id: str
     label: str  # the deliverable's title when chosen
     format: str
-    aliases: tuple[str, ...] = ()
+    # other names of the kind; keyword-only, so `UnavailableKind(id, label, format, needs)` still sets `needs` (a
+    # positional string here was read as one-letter aliases and the refusal lost what the kind needs)
+    aliases: tuple[str, ...] = field(default=(), kw_only=True)
 
 
 @dataclass(frozen=True)
@@ -91,7 +93,7 @@ def _kind(entry: Any, index: int) -> tuple[DeliverableKind, bool, str | None]:
     ):
         raise DeliverableKindsError(f"{where}.aliases must be a list of plain text strings")
     aliases = tuple(" ".join(a.strip().split()) for a in raw_aliases)
-    return DeliverableKind(ident, label, fmt, aliases), available, needs
+    return DeliverableKind(ident, label, fmt, aliases=aliases), available, needs
 
 
 _CACHE: dict[Path, tuple[tuple[int, int], KindsConfig]] = {}  # path -> ((mtime, size), parsed): a good parse only
@@ -131,7 +133,7 @@ def _parse(path: Path) -> KindsConfig:
     if len(offered) > MAX_CHOICES:
         raise DeliverableKindsError(f"at most {MAX_CHOICES} kinds may be available")
     withheld = tuple(
-        UnavailableKind(kind.id, kind.label, kind.format, kind.aliases, needs=str(needs))
+        UnavailableKind(kind.id, kind.label, kind.format, aliases=kind.aliases, needs=str(needs))
         for kind, available, needs in read
         if not available
     )

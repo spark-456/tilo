@@ -16,10 +16,13 @@ The signed-in path requires `BOT_GOOGLE_EMAIL` to match the dedicated bot accoun
 environment; replace the old account example when preparing your configuration. An unreadable or different account
 refuses to join. Sign in manually; the bot never types credentials. Signed-in Chromium runs with its sandbox enabled.
 
-`BOT_JOIN_MODE=guest` uses a fresh ephemeral browser context with no stored profile or account. Set
-`BOT_DISPLAY_NAME` for the name shown when requesting admission; a human host admits it. Cloud Run refuses
-signed-in mode before launching Chromium. Guest mode disables the Chromium sandbox for the Cloud Run runtime;
-it never holds a signed-in browser session. The dedicated signed-in profile remains the local fallback.
+On Cloud Run (`bot/cloud_worker.py`) the bot joins as a guest named "Tilo notetaker" in a fresh ephemeral browser
+context with no stored profile, and a human host admits it. Meet refused automated anonymous guests on 20 October, so
+if a file exists at `BOT_SESSION_FILE` (a Playwright storage state for the dedicated bot account, mounted by the
+operator) the cloud bot joins signed in as that account instead, still in an ephemeral context; `BOT_GOOGLE_EMAIL`
+must match it. The code never types a password. `BOT_JOIN_MODE=guest` is the local equivalent: set `BOT_DISPLAY_NAME`
+for the name shown when requesting admission. The persistent signed-in profile (`python -m bot.main login`) remains the
+local fallback. Guest mode disables the Chromium sandbox for the Cloud Run runtime.
 
 The bot joins an existing approved meeting and never creates a call or admits participants. It posts its disclosure
 before starting audio or captions; a failed disclosure leaves without capture. Any participant can say or type
@@ -35,11 +38,11 @@ or the Meet capability. Meet links are removed from local transcript text, event
 Think of a spare laptop in a cupboard that only this bot uses:
 
 - **Docker container = the laptop.** Inside it: a virtual screen (Xvfb), virtual sound (PulseAudio) and a real, visible Chromium browser driven by Playwright.
-- **The dedicated bot Google account** (currently `tilotesting@gmail.com`; confirm before login) is signed in once, by you, by hand for the local fallback. Never reuse the owner's profile. The browser remembers it in a Docker volume. Cloud guest mode has no signed-in profile. The code never sees or stores a password.
-- **The script does what a person would**: opens Meet, joins with camera and mic off, turns on captions, reads them, and every 45 seconds sends the last few minutes to the model. The model fills in a small JSON form (agenda status, decisions, action items, open questions). The code, not the model, decides whether the bot may speak.
+- **The dedicated bot Google account** (the one named in `BOT_GOOGLE_EMAIL`; confirm it before login) is signed in once, by you, by hand for the local fallback. Never reuse the owner's profile. The browser remembers it in a Docker volume. Cloud guest mode has no signed-in profile unless a `BOT_SESSION_FILE` is mounted. The code never sees or stores a password.
+- **The script does what a person would**: opens Meet, joins with camera and mic off, turns on captions, reads them, and every `BRAIN_INTERVAL_SECONDS` (default 20, minimum 10) sends the last few minutes to the model. The model fills in a small JSON form (agenda status, decisions, action items, open questions). The code, not the model, decides whether the bot may speak.
 - **noVNC** lets you watch and click inside that browser from a normal tab at http://localhost:6080. Used for the one-time login and for debugging.
 
-Proactive chat nudges are limited to at most 4 messages per meeting, at least 5 minutes apart. Direct replies can also use configured voice with a chat mirror. Disclosure must succeed before capture starts.
+Proactive chat nudges are off by default (`VOICE_NUDGES=1` turns them on); when on they are limited to at most 4 messages per meeting, at least 5 minutes apart. Direct replies use the configured voice with a chat mirror (`reply_mode` both on Cloud Run). Disclosure must succeed before capture starts.
 
 ## Setup
 
@@ -57,7 +60,7 @@ Run from the `meet-bot/` folder. On Windows use `python`, on Mac/Linux `python3`
 |---|---|
 | `python -m bot.main doctor [--watch]` | Checks Docker, `.env`, login state; prints container CPU/RAM while a meeting runs |
 | `python -m bot.main login` | Starts the container with a plain browser for the one-time manual sign-in |
-| `python -m bot.main start [--agenda FILE] [--duration MIN]` | Not used with the bot account until MTG09-c (ADR-0024 decision 7 and amendment 3(c)/(d): the bot never hosts or admits, and `start` is disabled for the persistent profile) |
+| `python -m bot.main start [--agenda FILE] [--duration MIN]` | Refused in code (`BotRefused`): not used with the bot account until MTG09-c (ADR-0024 decision 7 and amendment 3(c)/(d): the bot never hosts or admits, and `start` is disabled for the persistent profile) |
 | `python -m bot.main join URL` | Joins an existing meeting |
 | `python -m bot.main run-mock` | Replays a recorded 30-minute transcript through the brain, offline, no key needed |
 
@@ -81,7 +84,7 @@ Start with `--record-audio` (or `RECORD_AUDIO=1`). The bot then says in chat tha
 - `connections.jsonl`: model attempts (outcome, code, first-token time), and prewarms, so a slow answer can be explained.
 - `bot.wav` (voice replies on): what the bot actually sent into the meeting, recorded next to `audio.wav` (`audio_clock.json` holds both start times). `python -m bot.main audit [out/<time>]` measures end of question to first bot sound from the recordings, to about 10 ms, and compares it with the log.
 
-Talking to Tilo: address it by name or type in the chat. Replies are limited to the recorded meeting agenda, minutes so far and your own recorded meeting items; unrelated requests receive a scope refusal. For example, ask "Tilo, meeting agenda" or "Tilo, minutes so far". Wake/follow-up behavior is controlled by meeting configuration.
+Talking to Tilo: address it by name or type in the chat. By default (owner decision of 21 October, BQ-MTG-SCOPE-OWNER-1) Tilo answers like a normal assistant; set `MEETING_ANSWER_SCOPE=1` to limit replies to the recorded meeting agenda, minutes so far and your own recorded meeting items, with a scope refusal for anything else. Agenda, time and who-is-here questions are answered locally with no model call. In a one-to-one every line of three or more words is for Tilo; in a group it needs the name or a mishearing alias (`config/meeting-wake.json`). In a call, when the API has `TILO_MEETING_ACTIONS=1`, Tilo can also pin to a personal or team Tilo pinboard, add an agenda item, offer up to three free times and create a Tilo Agenda record, each after a spoken read-back and the same speaker's "yes", and says "done" only once the API confirms.
 
 Tuning: `DIRECT_REPLY_GAP_SECONDS` (default 6), `MAX_DIRECT_REPLIES` (40), `BRAIN_INTERVAL_SECONDS` (20), `ANSWER_MODE` (`questions` or `addressed`). A throttled project hits quota errors if these are pushed too hard.
 
@@ -120,7 +123,7 @@ The bot names no model, vendor or key. `bot/providers.py` is the one module that
   the prototype's model key (Gemini or AI Studio) and its third-party voice key. Nothing reads them now, but
   `env_file: .env` in `docker-compose.yml` loads the whole file into the container. Remove every `*_API_KEY` line from
   `.env`, then revoke each key in the console of the service that issued it.
-- **Credentials for a live meeting (BQ-MTG11-4).** The local signed-in fallback uses a dedicated bot identity and sandboxed Chromium. Guest mode disables Chromium's sandbox and uses an ephemeral context; Cloud Run refuses signed-in mode. Never mount the owner's profile or gcloud credentials into either image. The cloud service uses its reviewed service identity; local noVNC/profile use still needs separate hardening review.
+- **Credentials for a live meeting (BQ-MTG11-4).** The local signed-in fallback uses a dedicated bot identity and sandboxed Chromium. Guest mode disables Chromium's sandbox and uses an ephemeral context; on Cloud Run the only signed-in path is a mounted `BOT_SESSION_FILE` for the dedicated bot account. Never mount the owner's profile or gcloud credentials into either image. The cloud service uses its reviewed service identity; local noVNC/profile use still needs separate hardening review.
 - **A cap per meeting.** `config/meeting.yaml` bounds the provider calls of one meeting (200 model calls, 400 speech
   calls; one model call is one router call, so a call that tries the primary and then the fallback counts once). At the
   cap the bot logs one warning and carries on without them: no more answers, the local voice (for the rest of that
@@ -142,7 +145,7 @@ The bot names no model, vendor or key. `bot/providers.py` is the one module that
 
 ## Meeting events (for later use inside a bigger system)
 
-`events.jsonl` holds one JSON object per line: `{"v":1,"type":...,"ts":...,"meeting_id":...}` with types `meeting.joined`, `transcript.utterance`, `agenda.update`, `chat.posted`, `summary.ready`, `meeting.ended`. Input is a meeting URL plus an agenda file. Voice (`speaker.py`) and co-host control (`cohost.py`) are interfaces only.
+`events.jsonl` holds one JSON object per line: `{"v":1,"type":...,"ts":...,"meeting_id":...}` with types `meeting.joined`, `transcript.utterance`, `agenda.update`, `chat.posted`, `summary.ready`, `meeting.ended`. Input is a meeting URL plus an agenda file. Voice (`speaker.py`, `VoiceSpeaker`) is implemented; co-host control (`cohost.py`) is an interface only.
 
 ## Debugging with noVNC
 

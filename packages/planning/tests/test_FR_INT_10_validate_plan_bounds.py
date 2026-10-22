@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 from _plan_validator_lib import make_gate, make_plan, make_unit, rule_ids
-from tilo_api import skills_capture
+from tilo_api import meeting_brief, morning_brief_model, skills_capture, skills_route
 from tilo_contracts import Minutes
 from tilo_planning import approaches, brief, compiler, plangraph, revision
 from tilo_planning.plangraph import MAX_PLAN_BYTES, MAX_PLAN_DEPTH, Violation, validate_plan
@@ -152,6 +152,9 @@ _ROUTER_SCHEMAS = {
     "services/api/src/tilo_api/skills_capture.py": {
         "oneOf": [skills_capture._CAPTURE_SCHEMA, skills_capture._VERSION_SCHEMA],
     },
+    "services/api/src/tilo_api/brief_routes.py": morning_brief_model._REPLY_SCHEMA,  # the morning brief's reply
+    "services/api/src/tilo_api/meeting_brief.py": meeting_brief._REPLY_SCHEMA,
+    "services/api/src/tilo_api/skills_route.py": skills_route._PICK,  # SKILL-ROUTE's tie-break
 }
 
 

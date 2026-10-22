@@ -32,6 +32,38 @@ class SpendCapReached(Exception):
     """New live work for a uid at its lifetime cap: tilo_api.app answers 403 `spend_cap_reached`."""
 
 
+SPEND_CHECK_UNAVAILABLE = "Tilo could not check the spend allowance just now, so that step did not run; try it again."
+
+
+class SpendCheckUnavailable(Exception):
+    """RUN-SPEED (live, 21 Oct): the ledger stayed contended or unreachable after its retries. Fail closed (nothing
+    reaches a model), retryable, never replay: tilo_api.app answers 503 `spend_check_unavailable`."""
+
+    plain_reason = "the spend check could not be made just now; start the run again"  # world.failed data.reason
+
+    def __init__(self) -> None:
+        super().__init__(SPEND_CHECK_UNAVAILABLE)
+
+
+# RUN-SPEED: a contended spend check (Firestore aborts a transaction that lost a race: nothing was written) or a store
+# that is briefly busy is tried again after these pauses before the check is called unavailable. A reserve is retried
+# only after `Aborted`; any other error may have written, and doubt still means no live call.
+STORE_RETRY_DELAYS_S = (0.1, 0.3, 0.8)
+_BUSY = frozenset({"Aborted", "ServiceUnavailable", "ResourceExhausted", "TooManyRequests"})
+
+
+def _retried(read: Callable[[], Any], busy: frozenset[str] = _BUSY) -> Any:
+    for delay in (*STORE_RETRY_DELAYS_S, None):
+        try:
+            return read()
+        except Exception as exc:
+            if delay is None or type(exc).__name__ not in busy:
+                raise
+            logger.warning("the spend check is busy (%s); trying again", type(exc).__name__)
+            time.sleep(delay)
+    raise AssertionError("unreachable")
+
+
 def _int(value: object, name: str, minimum: int) -> int:
     if type(value) is not int:
         raise TypeError(f"{name} must be an integer (minor units for money)")
@@ -259,10 +291,13 @@ class SpendGuard:
         if mode != "live":
             return UnitPlan("replay", None, None)
         try:
-            if self._switch():
+            if _retried(self._switch):
                 return UnitPlan("replay", None, "replay_only")
             estimate = _int(estimate_minor, "estimate_minor", 0)
-            result = self._ledger.reserve(uid=uid, run_id=run_id, org_id=org_id, amount_minor=estimate, at=at)
+            result = _retried(
+                lambda: self._ledger.reserve(uid=uid, run_id=run_id, org_id=org_id, amount_minor=estimate, at=at),
+                frozenset({"Aborted"}),
+            )
         except Exception as exc:
             logger.warning("live denied, the spend check failed: %s", type(exc).__name__)
             return UnitPlan("replay", None, "unavailable")
@@ -281,10 +316,26 @@ class SpendGuard:
             _quiet(lambda: close(cast(Reservation, plan.reservation)))
 
     def uid_capped(self, uid: str) -> bool:  # unknown is not capped; live_allowed still says no
-        return _quiet(lambda: self._ledger.spent_minor(uid) >= self._caps.uid_lifetime_minor)
+        return _quiet(lambda: _retried(lambda: self._ledger.spent_minor(uid)) >= self._caps.uid_lifetime_minor)
 
-    def live_allowed(self, uid: str) -> bool:
-        return _quiet(lambda: not self._switch() and self._ledger.spent_minor(uid) < self._caps.uid_lifetime_minor)
+    def live_allowed(self, uid: str) -> bool:  # RUN-SPEED: a busy store is asked again before live is denied
+        return _quiet(
+            lambda: (
+                not _retried(self._switch)
+                and _retried(lambda: self._ledger.spent_minor(uid)) < self._caps.uid_lifetime_minor
+            )
+        )
+
+    def live_check(self, uid: str) -> Literal["live", "capped", "replay_only", "unavailable"]:
+        """RUN-SPEED: `capped` first, then the durable switch (`replay_only`), else `live`; `unavailable` when a store
+        could not be read even after a busy store's retries. Never raises; anything but `live` sends nothing."""
+        try:
+            if _retried(lambda: self._ledger.spent_minor(uid)) >= self._caps.uid_lifetime_minor:
+                return "capped"
+            return "replay_only" if _retried(self._switch) else "live"
+        except Exception as exc:
+            logger.warning("live denied, the spend check failed: %s", type(exc).__name__)
+            return "unavailable"
 
     def replay_only(self) -> bool:
         return _quiet(self._switch)

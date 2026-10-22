@@ -216,10 +216,31 @@ def test_RUN_FAIL_1_tool_unit_runs_after_its_answer_on_the_google_adapter(tmp_pa
     assert set(names) == {"web_search", "fetch_url"}
 
 
+def _between_research_and_writer() -> float:
+    """A grant the research step fits and the writer's step does not, from the shipped config. The live grant of this
+    defect was 3 credits; since 18 Oct a research step at its 32768-token cap needs about 5.6 (PL-03: a call whose cap
+    costs over twice what is left is never sent) and a live grant is at least 60 (config/run_grant.yaml), so the same
+    case is now a grant between the two needs. A config that moves them past each other fails here, plainly."""
+    config = load_providers_config(ROOT / "config" / "models.yaml", ROOT / "config" / "prices.yaml")
+
+    def need(role: str, tokens_in: int) -> float:  # the least budget any candidate of the role is sent with
+        spec = config.roles[role]
+        expected = min(config.expected_output.get(role, 1024), spec.max_output_tokens)
+        return min(
+            max(config.credits(config.cost_usd(p, tokens_in, expected)),
+                config.credits(config.cost_usd(p, tokens_in, spec.max_output_tokens)) / 2)
+            for p in (spec.primary, spec.fallback)
+        )  # fmt: skip
+
+    research, writer = need("specialist", 8000), need("writer", 0)  # a generous research prompt, an empty writer one
+    assert research + 2 < writer, (research, writer)
+    return (research + writer) / 2
+
+
 def test_RUN_FAIL_1_a_failed_unit_says_why_in_world_failed_and_an_error_line(tmp_path, monkeypatch, caplog):
-    """The live grant was 3 credits: the research unit now works, and the writer's call (flash at its 16384-token cap,
-    about 14 credits) cannot fit; the run stops with that reason in plain words, never the generic line."""
-    run, state, _asking, _models = _run(tmp_path, monkeypatch, cap=3)
+    """A grant the research unit fits and the writer's call (flash at its output cap) does not: the research unit
+    works, then the run stops with that reason in plain words, never the generic line."""
+    run, state, _asking, _models = _run(tmp_path, monkeypatch, cap=_between_research_and_writer())
     caplog.set_level(logging.ERROR)
 
     asyncio.run(_answer_and_finish(run, state))

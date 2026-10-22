@@ -1,8 +1,7 @@
 # services/harness — `tilo-harness`
 
 ## Purpose
-Cloud Run service (PRD 6.2), built on ADK (Python): the single-writer process per world —
-planning, agents, handoff, events. Calls the model provider layer for every model interaction.
+Run-engine library (PRD 6.2) that tilo-api imports and runs in-process: single-writer events, `run_plan`, tools, handoff. The deployed Cloud Run service is `/health` plus an unwired schedule tick; ADK is used only by the skeleton. Every model call goes through the provider layer.
 
 ## Commands
 - `uv run pytest services/harness/tests -m "not emulator"` — fast suite
@@ -13,7 +12,7 @@ planning, agents, handoff, events. Calls the model provider layer for every mode
 - Reads (read-only): `contracts/event*`, `common`, `events/{registry.yaml,data/*}`, `layout`, `plan`,
   `envelope`, `skill`, `agents`, `manifest` schemas. `EventValidator` is a fresh EV-01..EV-16 implementation
   (never imports `scripts/`); `contract_problems(name, x)` checks any other contract.
-- Writes: Firestore (worlds, events, views, checkpoints); Pub/Sub to BigQuery (later ticket). Own fixtures: `fixtures/three_agent/`, `tests/fixtures/skills*/`.
+- Writes: Firestore (events, views, `_head`); no Pub/Sub or BigQuery writer exists yet. Own fixtures: `fixtures/three_agent/`, `tests/fixtures/skills*/`.
 
 ## Config
 - `config/agents.yaml` via `config.load_agents_config()` (invalid or missing: `AgentsConfigError`, start-up stops).

@@ -1,8 +1,7 @@
 # services/render — `tilo-render`
 
 ## Purpose
-Cloud Run service (PRD 6.2): deliverables — PPTX, PDF, charts; Google Slides and Docs via
-`tilo-connectors`. Priority "Must" covers PPTX and PDF for the hackathon build.
+Cloud Run service (PRD 6.2): deliverables — PDF, PPTX, DOCX (HTTP), XLSX and CSV (in-process), charts; native Google Slides/Docs/Sheets come from `tilo-connectors` converting these files, not from this service. See README.md.
 
 ## Commands
 - `uv run pytest "services/render" -q` — render tests (built by the AG-RENDER lane, `docs/lanes.md`).
@@ -11,13 +10,13 @@ Cloud Run service (PRD 6.2): deliverables — PPTX, PDF, charts; Google Slides a
 
 ## Contracts
 - Reads: `packages/contracts-py` deliverable-spec types; `templates/`; `design/tokens.json`.
-- HTTP (`POST /render`, LW-11): service-to-service Google OIDC Bearer auth before body read (`create_app(oidc_verifier=..., audience=..., allowed_callers=...)`; fails closed with 401/403 when missing or unconfigured). Accepts JSON `{"format": "pdf" | "pptx", "spec": DeliverableSpec}` (`extra="forbid"`; `manifest` is omitted from JSON because `tilo-harness` attaches provenance in `outputs.keep`). Returns deterministic file bytes with `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`.
+- HTTP (`POST /render`, LW-11): service-to-service Google OIDC Bearer auth before body read (`create_app(oidc_verifier=..., audience=..., allowed_callers=...)`; fails closed with 401/403 when missing or unconfigured). Accepts JSON `{"format": "pdf" | "pptx" | "docx", "spec": DeliverableSpec}` (`extra="forbid"`; `manifest` is omitted from JSON because `tilo-harness` attaches provenance in `outputs.keep`). Returns deterministic file bytes with `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`.
 - P0_DOCS_OUT: one `DeliverableSpec` makes every file. PDF (`pdf.py`): a cover page then the report with zebra tables, right-aligned numbers and a page footer; spec `layout: "one_page"` drops the cover (flyer, poster, one-pager). Word (`docx.py`, `docx_styles.py`): real Title, Subtitle, Heading 1, List Bullet and Table Grid styles, a shaded repeating header row, a page-number footer, core properties, native charts. Excel (`xlsx.py`, `xlsxwriter`): branded header, typed cells, row formulas with cached values, SUM totals, native charts. CSV (`csv_table.py`, DEMO-DELIVER): the first table plus later tables with the same columns, UTF-8 with a BOM, CRLF, plain numbers, text starting with = + - @ or a tab gets a leading apostrophe. A table may carry `formulas: [{column, expr}]` (`formula.py`: `[Column]` names, numbers, `+ - * /` and brackets only); the spec validator computes the column for every format and Excel gets the same expression as a real formula. Model text never reaches a formula cell. DEMO-BROWSER: a `figure` block (`figure_id`, `caption`) places one of the spec's `figures` (recorded PNG/JPEG bytes and the page's address, supplied by code: `tilo_harness.deliverable` drops a reply's own and any id the run did not record; at most 12, 1 MB and 4 MP each, 8 MB in all); PDF and Word print it at the text width with "Figure n: caption" and "Source: <address>", slides get an image slide.
 - `tilo_render.xlsx.render_xlsx` (DOCS-OUT A4) turns a spec's tables into a workbook and `fill_workbook` writes the writer's cells into a copy of an uploaded template (values only, no formulas, no sheet creation); both run in process in `tilo-api` (not on the HTTP door), capped at 7000 and 2000 cells.
-- Writes: PDF/PPTX bytes to the HTTP response; this service does not persist artifacts or write to Cloud Storage. The harness attaches provenance and stores accepted outputs through `outputs.keep`.
+- Writes: PDF/PPTX/DOCX bytes to the HTTP response; this service does not persist artifacts or write to Cloud Storage. The harness attaches provenance and stores accepted outputs through `outputs.keep`.
 
 ## Config
-- `templates/` (deliverable templates), `config/themes/` (chart styling), `design/tokens.json`.
+- `templates/` (deliverable templates), `design/tokens.json` (`config/themes/` is not read by this service).
 - `TILO_RENDER_AUDIENCE` and comma-separated `TILO_RENDER_ALLOWED_CALLERS` configure the expected Google OIDC audience and caller service-account allowlist when not passed explicitly to `create_app()`.
 - A trusted Google OIDC verifier must also be supplied to `create_app(oidc_verifier=...)`. The module-level `app = create_app()` does not install one: `/health` and `/healthz` work, but `/render` returns 401 without a valid Bearer header and 403 with a well-formed Bearer header, before reading the body. Setting the audience and caller environment variables alone does not enable rendering.
 

@@ -12,11 +12,13 @@ import os
 import re
 import threading
 import time
+from collections import deque
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import UTC, date, datetime
 from functools import partial
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 from urllib.parse import quote_plus, urlsplit
 from zoneinfo import ZoneInfo
@@ -249,8 +251,9 @@ class RunBudget:
     too). RUN-SPEED: a call reserves its credits under the lock, calls the model outside it and settles under it, so
     units that run at the same time no longer wait for each other's model calls. The cap stays exact: a call is handed
     only credits nobody else holds, the router never reports spending more than it was handed, and what it did not
-    spend goes back. A call alone is handed everything free (as before); with other units running, each unit's call
-    is handed its share, and one whose share was too small for any candidate waits for the others and asks again."""
+    spend goes back. A call alone is handed everything free (as before); with other units running, each call is handed
+    its share but never less than its `need`, else it queues (first come, first served): a split never fails a call
+    that the units run one after another would have fitted (live, 21 Oct: three units split too thin, one failed)."""
 
     def __init__(self, cap: float, parent: RunBudget | None = None) -> None:
         self.left = cap  # credits not spent
@@ -263,6 +266,7 @@ class RunBudget:
             self.ready = 0  # units the plan lets run now (`expect`), some of which may not have started yet
             self.holding = 0  # calls running now
             self.version = 0  # bumped on every settle, release and unit end, for a call that waits
+            self.queue: deque[object] = deque()  # calls waiting for credits, served in order
 
     def portion(self, share: float) -> RunBudget:
         return RunBudget(self.left * share, self)
@@ -305,48 +309,52 @@ class RunBudget:
                 budget.reserved -= amount
                 budget.left -= spent
 
-    def _reserve(self, everything: bool) -> tuple[float, bool]:
-        """(credits handed to this call, whether it got less than it may get later). `everything`: all that is free,
-        not a share (a call asking again after its share was too small)."""
-        root = self.root
+    def _reserve(self, need: float, first: bool = False) -> tuple[float, bool]:
+        """(credits handed to this call, whether it could get more alone: it was handed a share, or others held
+        credits). Served in turn (`first`: at the front, a call asking again). Waits while the free credits cannot give
+        it `need` and other calls hold credits that come back; with none held it gets at least `need`, at most all."""
+        root, ticket = self.root, object()
         with self.lock:
-            while True:
-                free = self._free()
-                if free > 0:
-                    break
-                if root.holding == 0:
-                    raise ValueError("The run budget is exhausted")
-                self.lock.wait()  # everything free is held by calls that are still running: one of them settles
-            amount = free if everything else free / max(1, max(root.active, root.ready) - root.holding)
-            self._hold(amount)
-            root.holding += 1
-            return amount, amount < free or root.holding > 1
+            root.queue.appendleft(ticket) if first else root.queue.append(ticket)
+            try:
+                while True:
+                    free = self._free()
+                    if root.queue[0] is ticket:
+                        if free <= 0 and root.holding == 0:
+                            raise ValueError("The run budget is exhausted")
+                        if free > 0 and (free >= need or root.holding == 0):
+                            break
+                    self.lock.wait(5.0)  # its turn, or credits held by calls still running, come back
+                share = free / max(1, max(root.active, root.ready) - root.holding)
+                amount = min(free, max(share, need))
+                self._hold(amount)
+                root.holding += 1
+                return amount, amount < free or root.holding > 1
+            finally:
+                root.queue.remove(ticket)
+                self.lock.notify_all()  # the next call in line looks again
 
-    def _settle(self, amount: float, spent: float) -> int:
-        """Settle a call; returns the version after it, so a call that waits waits for someone else."""
+    def _settle(self, amount: float, spent: float) -> None:
         with self.lock:
             self._hold(amount, spent)
             self.root.holding -= 1
             self._changed()
-            return self.root.version
 
-    def _await_others(self, seen: int) -> None:
-        """Until another call settles or a unit ends (or no call is running, so nothing more can free up)."""
-        with self.lock:
-            while self.root.version == seen and self.root.holding > 0:
-                self.lock.wait(5.0)
-
-    def call(self, method: Callable[..., RouterResult], *args: Any, **kwargs: Any) -> tuple[RouterResult, float]:
-        everything = False
+    def call(
+        self, method: Callable[..., RouterResult], *args: Any, need: float = 0.0, **kwargs: Any
+    ) -> tuple[RouterResult, float]:
+        """`need`: about the least the call can be sent with (`Router.call_floor`), never forwarded. Refused for budget
+        with nothing sent after a share or while others held credits, it asks again at the front of the line for
+        everything free once no other call holds any: it fails only where running alone would."""
+        first, want = False, max(0.0, need)
         while True:
-            amount, more_later = self._reserve(everything)
+            amount, more = self._reserve(want, first)
             try:
                 result = method(*args, budget=amount, **kwargs)
             except BudgetExceededError as refused:
-                seen = self._settle(amount, 0.0)
-                if more_later and all(a.error_type == BudgetExceededError.__name__ for a in refused.attempts):
-                    self._await_others(seen)  # nothing was sent: ask again for all that is free once others return
-                    everything = True
+                self._settle(amount, 0.0)
+                if more and all(a.error_type == BudgetExceededError.__name__ for a in refused.attempts):
+                    first, want = True, math.inf  # nothing was sent: wait until no other call holds credits
                     continue
                 raise
             except BaseException:
@@ -439,7 +447,10 @@ class BoundRunRunner:
         self.frame_pages: dict[str, dict] = {}  # each recorded frame's page address and step (BrowseStepExecutor.pages)
 
     def search(self, query: str) -> tuple[Any, float]:
-        result, credits = self.budget.call(self.router.search, "search", query)
+        from tilo_api.deps import _call_need  # noqa: PLC0415 - deps imports this module
+
+        need = _call_need(self.router, "search", SimpleNamespace(prompt=query, system=None, max_output_tokens=None))
+        result, credits = self.budget.call(self.router.search, "search", query, need=need)
         if result.search_result is None:
             raise ValueError("no search result")
         return result.search_result, credits
