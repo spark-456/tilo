@@ -19,6 +19,7 @@
 <img src="docs/assets/readme/landing-desktop.png" alt="Tilo landing page: Describe the work. Watch your team do it." width="92%"/>
 
 <p align="center">
+<a href="#results-and-impact"><b>Results</b></a> ·
 <a href="#what-is-tilo">What</a> ·
 <a href="#features">Features</a> ·
 <a href="#try-it">Try it</a> ·
@@ -37,6 +38,79 @@
 </div>
 
 ---
+
+## Results and impact
+
+<div align="center">
+
+![Hours of work](https://img.shields.io/badge/One%20sentence-hours%20of%20work%20in%20minutes-c8f23a?style=for-the-badge&labelColor=0a0a0b)
+![Cost per task](https://img.shields.io/badge/A%20real%20world%20run-about%20US%240.14%E2%80%930.30-c8f23a?style=for-the-badge&labelColor=0a0a0b)
+![Tests](https://img.shields.io/badge/Automated%20tests-%E2%89%8819%2C300-22c55e?style=for-the-badge&labelColor=0a0a0b)
+
+![Browser](https://img.shields.io/badge/Agentic%20browser-41%25%20faster-5ab8ff?style=flat-square)
+![Model calls](https://img.shields.io/badge/Model%20calls-61%25%20fewer-5ab8ff?style=flat-square)
+![Home load](https://img.shields.io/badge/Home%20reveal-3.8%C3%97%20faster-5ab8ff?style=flat-square)
+![Meet replies](https://img.shields.io/badge/Meet%20replies-~3%20s-a78bfa?style=flat-square)
+![Minutes](https://img.shields.io/badge/Minutes-%E2%89%A490%20s-a78bfa?style=flat-square)
+![Services](https://img.shields.io/badge/Cloud%20Run%20services-8-4285F4?style=flat-square)
+![Contracts](https://img.shields.io/badge/JSON%20Schema%20contracts-156-ff7a59?style=flat-square)
+![ADRs](https://img.shields.io/badge/Design%20decisions%20(ADRs)-51-ff7a59?style=flat-square)
+
+</div>
+
+**Tilo turns a sentence into finished, checked work, at the price of a coffee sip, while you watch and stay in charge.** Every number below was measured on the live service or in the repo's test and proof runs; estimates are labelled as estimates.
+
+### Tested results
+
+| What we measured | Result | How it was measured |
+| --- | --- | --- |
+| 🌐 Agentic browser task (real Chromium, live web) | **76.8 s → 45.1 s** (41% faster), model calls **18 → 7** | Same research task before and after the stall fix and speed-up, on real Chromium; build `ea15c9f`, live on tilo-browser 00029 |
+| 🖼️ Screenshot sent to the model | **323 KB → 74 KB** per frame (77% smaller) | Frames capped at 768 px and 256 colours; measured on recorded runs |
+| ⚡ Home page reveal (desktop) | **4,883 ms → 1,274 ms** (3.8× faster) | Lazy thumbnails, WebP art, capped boot cover; Home is 176 KB gzipped with no layout shift |
+| 🏙️ World artwork payload | **1,133 KB → 143 KB** (87% smaller) | Slimmed world art, studio SVG and loader images |
+| 📡 Live event feed | **up to 174 KB per poll → new events only** | Cursor-based feed (`?after_seq`) and one shared subscription per world |
+| 📝 Meeting minutes | **501 s worst case → ≤ 90 s** | Per-call and total deadlines with fallback |
+| 🎥 Meet bot answer after it is named | **≈ 3 s** | Live Google Meet calls, bot log timings (named at 16:42:22, reply at 16:42:25) |
+| 🧭 One sentence → priced plan | **13–30 s** for a plan, approaches in **7–58 s** | Live runs on tilo-api |
+| 💸 A real 6-agent website world | **27.9 credits ≈ US$0.14** | Live run: one-page event website, built, checked and opened inside Tilo |
+| 💸 A real 12-agent research world | **39.7 credits ≈ US$0.20** at 4 of 8 steps | Live run: Bengaluru vs Hyderabad vs Pune comparison with launch plan |
+| ❓ Quick answers | **≤ 0.5 credit** each, one helper, a few seconds | Quick mode on Home |
+| ✅ Automated tests | **≈ 19,300** (≈13,900 Python, 5,423 web, 149 Playwright specs) | Counted across the repo's suites |
+| 🧪 Evaluation cases | **160 recorded cases in 8 groups**, plus a nightly replay job | `evals/` |
+
+### Time saved for users
+
+| Task, as you'd type it on Home | Doing it by hand *(our estimate)* | With Tilo *(measured or quoted)* | Saved per task |
+| --- | --- | --- | --- |
+| "Build a one-page event website for our meetup" | 2–4 hours | One sentence + a few minutes of agent time; about US$0.14 | **~2–4 hours** |
+| "Compare three cities as tech hubs and give me a launch plan and budget" | 3–5 hours of reading and writing | 90–180 s quoted on the plan card; about US$0.20–0.30 | **~3–5 hours** |
+| "Run my Event budget pack skill: product launch, Bengaluru, 150 guests" (PDF brief + Excel budget) | 2–3 hours | One line with @skill; 4.6 credits used mid-run | **~2–3 hours** |
+| Meeting notes, transcript and minutes | 20–30 minutes per meeting | Automatic; minutes in ≤ 90 s | **~20–30 min per meeting** |
+| "Find us a free slot next week and book the follow-up" | 5–10 minutes of back-and-forth | Asked out loud in the call; Tilo checks calendars, reads back, books | **~5–10 min per meeting** |
+| A routine you do every week | The full time, every week | Teach it once in plain words, then run it with @ | **The whole routine, every time** |
+
+> **Example:** a small team that runs one research report, one budget pack and four meetings a week saves roughly **6–10 hours a week**, for a few US dollars of model spend.
+>
+> *Method: manual times are our own estimates for a skilled person doing the same task by hand (research, writing, formatting, scheduling). Tilo's figures are the measured credits and quoted or measured times from live runs on 21–22 October 2026; 60 credits ≈ US$0.30. Your numbers will vary with the task.*
+
+### Why Tilo stands out
+
+- 🙋 **You stay in charge.** Spending, sending, sharing and anything that can't be undone waits for a person's yes. A model never decides authorisation; deterministic code does.
+- 🏷️ **Price before work.** Every run shows its plan, assumptions and cost in credits and US$ before a single agent starts, with caps per call, per run, per person and per day.
+- 🏙️ **Work you can see.** The animated world only moves for events that really happened. No fake progress bars, and a full **Trace** for engineers.
+- 📦 **Real deliverables, not chat.** Websites, PDF, Word, Excel, slides, CSV and quiz apps, each versioned with a provenance manifest.
+- 🎥 **A meeting teammate that acts.** Tilo joins Google Meet, answers out loud and in chat, pins notes, finds free times, reads the plan back and books it after your yes, then leaves when asked.
+- 🧑‍🏫 **Teach once, reuse forever.** Describe a routine in plain words; Tilo writes the steps, asks only what it needs, and anyone on the team runs it with @.
+- 🛡️ **Safe by design.** Model Armor screening, OIDC between services, KMS-sealed OAuth tokens, an egress allowlist for the browser, masked secure fields, and an automatic replay-only switch at the daily cap.
+- 💡 **Right-sized AI.** Gemini 3.8 Flash where thinking pays off, 3.1 Flash-Lite for fast, frequent work, with a fallback for every role.
+- ☁️ **All Google Cloud.** Eight Cloud Run services, Gemini on Vertex AI, Agent Development Kit, Firestore, Cloud Storage, Cloud KMS, Model Armor, Cloud Build and Firebase Hosting.
+
+### Built and verified
+
+- **≈19,300 automated tests**, 156 shared JSON Schema contracts (Python and TypeScript), 51 architecture decision records and 160 evaluation cases.
+- **Every deploy passes a cloud test gate** against the exact commit, and the environment is checked to be identical before and after.
+- **Security reviews** on every feature that touches tokens, money, sharing or outside content.
+- **Honest by default:** what is live, behind a switch, or built but not yet deployed is listed in [Honest notes](#honest-notes) and [docs/REVIEWER-GUIDE.md](docs/REVIEWER-GUIDE.md).
 
 ## What is Tilo?
 
