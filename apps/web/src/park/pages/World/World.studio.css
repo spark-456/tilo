@@ -1094,11 +1094,11 @@
 }
 @media (min-width: 761px) {
   [data-park] .park-world-toast {
-    max-width: min(440px, calc(100% - 40px));
+    max-width: min(360px, calc(100% - 40px));
   }
   [data-park] .park-world-tag {
     display: block;
-    max-width: calc(100% - 492px);
+    max-width: calc(100% - 396px);
     overflow: hidden;
     line-height: 36px;
     text-overflow: ellipsis;

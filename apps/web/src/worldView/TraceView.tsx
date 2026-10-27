@@ -6,8 +6,24 @@ import { useRemote } from "../park/shared/remote";
 import { isKnownType } from "../world/registry";
 import { useReplayedLog } from "../world/replay";
 import { elapsed } from "../world/runLog";
+import { agentNames } from "../world/runSummary";
 import { involves, objectIds, useSelection } from "../world/selection";
 import { LensFrame } from "./LensFrame";
+
+function friendlyActorTarget(id: string, worldId: string): string {
+  if (id === "u_owner") return "Owner";
+  if (id.startsWith("u_")) {
+    const raw = id.slice(2).replace(/[_-]/g, " ").trim();
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
+  if (id === worldId || id.startsWith("w_")) return "World";
+  if (id === "tilo") return "Tilo";
+  if (id.startsWith("tm_")) {
+    const raw = id.slice(3).replace(/[_-]/g, " ").trim();
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
+  return id;
+}
 
 export function TraceView({ worldId }: { worldId: string }) {
   const client = useClient();
@@ -15,10 +31,12 @@ export function TraceView({ worldId }: { worldId: string }) {
   const [selected, , toggle] = useSelection(worldId);
   const [layout] = useRemote("load the world", (signal) => client.getLayout(worldId, signal));
   const ids = layout.status === "ready" ? objectIds(layout.value, events) : null;
+  const names = layout.status === "ready" ? agentNames(layout.value) : null;
   // An actor or target that is an object of the world can be selected; any other id is just text in a box of the
   // same size, so the layout arriving moves nothing (CLS).
-  const pick = (id: string) =>
-    ids?.has(id) ? (
+  const pick = (id: string) => {
+    const label = names?.get(id) ?? friendlyActorTarget(id, worldId);
+    return ids?.has(id) ? (
       <button
         type="button"
         className="park-view-pick"
@@ -26,11 +44,12 @@ export function TraceView({ worldId }: { worldId: string }) {
         aria-pressed={selected === id}
         onClick={() => toggle(id)}
       >
-        {id}
+        {label}
       </button>
     ) : (
-      <span className="park-view-pickbox">{id}</span>
+      <span className="park-view-pickbox">{label}</span>
     );
+  };
   return (
     <LensFrame worldId={worldId} current="trace" title="Trace">
       <div data-testid="trace-lens" className="park-view-body">
