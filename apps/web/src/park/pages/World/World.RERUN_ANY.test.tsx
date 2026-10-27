@@ -49,6 +49,42 @@ function clientWith(startAgain: HttpClient["startAgain"], events = UNIT_FAILED):
 }
 
 describe("RERUN_ANY Try again for any stopped run", () => {
+  it("RUN_RESILIENCE Resume on a paused world opens the continued world", async () => {
+    const start = vi.fn(async () => ({ world_id: "w_resumed", task_id: "t_resumed" }));
+    const events = [
+      ev(1, "budget.granted", { cap: 40 }),
+      ev(2, "world.started"),
+      ev(3, "world.paused"),
+    ];
+    const rig = await mountWorld({
+      id: "hires",
+      api: liveWorldsApi(),
+      client: clientWith(start, events),
+    });
+    click(control(rig.el, "Resume"));
+    await settle();
+    expect(start).toHaveBeenCalledWith("hires");
+    expect(rig.app.go).toHaveBeenCalledWith("world", { id: "w_resumed" });
+  });
+
+  it("RUN_RESILIENCE Start again after provider exhaustion opens the new world", async () => {
+    const start = vi.fn(async () => ({ world_id: "w_restarted", task_id: "t_restarted" }));
+    const events = [
+      ev(1, "budget.granted", { cap: 40 }),
+      ev(2, "world.started"),
+      ev(3, "world.failed", { reason: "no model could answer a step", unit: "U2" }),
+    ];
+    const rig = await mountWorld({
+      id: "hires",
+      api: liveWorldsApi(),
+      client: clientWith(start, events),
+    });
+    click(control(rig.el, "Try again"));
+    await settle();
+    expect(start).toHaveBeenCalledWith("hires");
+    expect(rig.app.go).toHaveBeenCalledWith("world", { id: "w_restarted" });
+  });
+
   it("test_R_RUN_pause_calls_the_api_before_showing_paused", async () => {
     const client = clientWith(
       vi.fn(async () => ({ world_id: "w_new", task_id: "t_new" })),

@@ -929,7 +929,12 @@ def router_for_mode(mode: Mode, *, org: OrgBinding | None = None) -> Router:
     try:
         live = mode == "live"
         return Router(
-            providers_config(), fixtures_dir=FIXTURES_DIR, live_permitted=live, force_replay=not live, org=org
+            providers_config(),
+            fixtures_dir=FIXTURES_DIR,
+            live_permitted=live,
+            force_replay=not live,
+            org=org,
+            retry_transient=live,
         )
     except ProviderConfigError as exc:
         logger.warning("model router unavailable: %s", exc)

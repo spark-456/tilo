@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import contextvars
 import json
+import random
 import threading
 import time
 from collections.abc import Callable, Collection, Iterator
@@ -24,7 +25,9 @@ from tilo_providers.errors import (
     MissingCapabilityError,
     OutputTruncatedError,
     ProviderError,
+    QuotaError,
     RequestError,
+    RetryableError,
     SafetyError,
 )
 from tilo_providers.factory import build_provider
@@ -52,6 +55,8 @@ SearchFor = Callable[[str], SearchProvider]
 _DEFAULT_EXPECTED_OUTPUT = 1024
 _CAP_HEADROOM = 2
 _LOWER_THINKING = {"high": "medium", "medium": "low", "low": "minimal", "minimal": "minimal"}
+_TRANSIENT_BACKOFF = (2, 6, 15)
+_TRANSIENT_WINDOW_S = 45
 
 
 class RouterError(Exception):
@@ -204,7 +209,7 @@ def _exhausted(run: RouterResult) -> RouterError:
         return RouterDeadlineError(f"PL-03: role {run.role_id!r} ran out of time", run.attempts)
     if run.attempts and run.attempts[-1].error_type == "BudgetExceededError":  # the budget ended the run
         message = f"PL-03: role {run.role_id!r} has no candidate left that fits the remaining budget"
-        return BudgetExceededError(message, run.attempts)
+        return BudgetExceededError(message, run.attempts, run.budget)
     if run.attempts and all(a.error_type == "TokenCapExceededError" for a in run.attempts):
         message = f"EFF-03: role {run.role_id!r} is over max_input_tokens for every candidate"
         return TokenCapExceededError(message, run.attempts)
@@ -310,6 +315,7 @@ class Router:
         search_for_profile: SearchFor | None = None,
         role_thinking: bool = True,
         org: OrgBinding | None = None,
+        retry_transient: bool = False,
     ) -> None:
         if provider_for_profile is None and fixtures_dir is None:
             raise RouterError("Router needs either provider_for_profile or fixtures_dir")
@@ -318,6 +324,7 @@ class Router:
         self._role_thinking = role_thinking  # False: never fill a role's `thinking` (the live smoke sends none)
         self._live_permitted = live_permitted  # SEC-15: set by the caller that decided this router may go live
         self._force_replay = force_replay  # SEC-15: set by the caller that decided this router replays, LIVE or not
+        self._retry_transient = retry_transient
         self._org = org  # ADR-0041 BK-10: one org's bundle for this unit; None (the default) changes nothing
         if live_permitted and not force_replay:
             config.check_live()  # ADR-0029 decisions 3 and 4: no live metering at the wrong region or past a promotion
@@ -569,12 +576,16 @@ class Router:
         tool_outputs: list[str] | None = None,
         deadline: Deadline | None = None,
     ) -> RouterResult:
+        if self._retry_transient and deadline is None:
+            deadline = Deadline.after(_TRANSIENT_WINDOW_S, 0.5)
         run = self._start(role_id, request, tool_outputs, required_capability, budget)
         threshold, schema, reason = confidence_threshold or 0.0, run.request.response_schema, None
+        retry_until = time.monotonic() + _TRANSIENT_WINDOW_S
         for profile_id in run.candidates:  # EFF-02: cheapest first
             prompt: str | None = None  # None: the role's own input; else the one schema-repair prompt
             is_repair = False
             retried_truncation = False
+            transient_retries = 0
             while True:
                 wait = None  # no deadline: no limit
                 if deadline is not None:
@@ -593,6 +604,20 @@ class Router:
                 except RouterSafetyError:  # a safety outcome, never a silent fallback
                     return replace(run, outcome="safety_blocked")
                 if attempt.error_type:
+                    if (
+                        self._retry_transient
+                        and isinstance(run.last_error, (QuotaError, RetryableError))
+                        and transient_retries < len(_TRANSIENT_BACKOFF)
+                    ):
+                        remaining = retry_until - time.monotonic()
+                        if deadline is not None:
+                            remaining = min(remaining, deadline.remaining())
+                        if remaining > 0:
+                            delay = min(_TRANSIENT_BACKOFF[transient_retries] * random.uniform(0.8, 1.2), remaining)
+                            time.sleep(delay)
+                            transient_retries += 1
+                            reason = f"retry after {attempt.error_type}"
+                            continue
                     if attempt.error_type == OutputTruncatedError.__name__ and not retried_truncation:
                         self._truncation_retry(run, profile_id, sent)
                         retried_truncation = True

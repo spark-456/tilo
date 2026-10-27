@@ -58,6 +58,7 @@ from typing import Any, Protocol
 from tilo_logging.context import bound
 from tilo_providers.clock import Clock, parse_deadline, real_today
 from tilo_providers.diagnostics import failure_context, log_caught
+from tilo_providers.router import RouterExhaustedError
 
 from tilo_harness.branch import Checkpoint, hit_summary, reusable_units
 from tilo_harness.config import AgentsConfig
@@ -77,6 +78,17 @@ log = logging.getLogger(__name__)
 _WORKER_RANKS = ("specialist", "verifier", "writer")  # ranks that execute units (PRD 8.1)
 _LEVELS = 3  # Director -> Lead -> worker
 _HALLS = ("meeting_hall", "delivery_dock")  # the world's own buildings: planned with the rest, no unit works in them
+_TRANSIENT_WAITS = (60, 120)  # three router attempts take at most about five minutes including their own backoff
+_TRANSIENT_ERRORS = frozenset({"QuotaError", "RetryableError", "AttemptTimeoutError"})
+_transient_wait = asyncio.sleep
+
+
+def _transient_exhaustion(error: Exception) -> bool:
+    return (
+        isinstance(error, RouterExhaustedError)
+        and bool(error.attempts)
+        and all(attempt.error_type in _TRANSIENT_ERRORS for attempt in error.attempts)
+    )
 
 
 class PlanRefused(Exception):
@@ -691,7 +703,7 @@ class _Run:
 
         return say
 
-    async def call(self, work: Awaitable[Any], unit_id: str = "") -> Any:
+    async def call(self, work: Awaitable[Any], unit_id: str = "", *, transient_passthrough: bool = False) -> Any:
         """The runner's result, or a `_Crashed` if it crashed or cancelled its own work (a cancel of the run itself
         goes on). A crash is one ERROR line: class names and profile ids only (RUN-FAIL-1)."""
         try:
@@ -703,6 +715,8 @@ class _Run:
             log_caught(error, __name__, locals())
             return _Crashed("a step's work was cancelled")
         except Exception as error:  # a runner crash fails this unit closed; the run goes on
+            if transient_passthrough and _transient_exhaustion(error):
+                raise
             reason = crash_reason(error)
             log.error(
                 "unit %s failed: %s [%s] run=%s world=%s",
@@ -727,7 +741,25 @@ class _Run:
             reason="a step's context handoff could not be stored or completed",
         )
         while True:
-            ran = await self.call(self.runner.run(unit, context), unit["id"])
+            for retry in range(len(_TRANSIENT_WAITS) + 1):
+                try:
+                    ran = await self.call(
+                        self.runner.run(unit, context),
+                        unit["id"],
+                        transient_passthrough=retry < len(_TRANSIENT_WAITS),
+                    )
+                    break
+                except RouterExhaustedError:
+                    self.emit(
+                        "agent.working",
+                        worker,
+                        site,
+                        "The model is unavailable; this step will retry.",
+                        {"unit": unit["id"]},
+                        cause=cause,
+                        **at,
+                    )
+                    await _transient_wait(_TRANSIENT_WAITS[retry])
             if not isinstance(ran, UnitOutcome):
                 reason = ran.reason if isinstance(ran, _Crashed) else "a step's work returned no result"
                 return UnitOutcome(success=False, summary="The unit's work failed.", reason=reason), worker, cause

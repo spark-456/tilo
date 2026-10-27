@@ -76,6 +76,30 @@ def test_P0_RUN_DIES_try_again_resumes_from_the_failed_unit_and_keeps_completed_
     assert any("U2" in line and "resume" in line.lower() for line in brief["constraints"])
 
 
+def test_RUN_RESILIENCE_api_starts_again_after_transient_exhaustion_and_keeps_finished_unit(flow, monkeypatch):
+    from tilo_api import runs
+
+    started = []
+    monkeypatch.setattr(
+        runs, "start_run", lambda store, task, *, approach, budget_cap, seams: started.append(task.world_id)
+    )
+    flow.app.dependency_overrides[runs.run_seams] = lambda: object()
+    old = _failed_with(flow, "no model could answer a step")
+    stream = flow.store.events[old["world_id"]]
+    stream.insert(
+        -1, {**_event(old["world_id"], len(stream), "unit.completed", {}), "summary": "U1 finished research."}
+    )
+    stream[-1]["data"]["unit"] = "U2"
+
+    response = flow.client.post(f"/worlds/{old['world_id']}/rerun", json={})
+
+    assert response.status_code == 200, response.text
+    assert started[-1:] == [response.json()["world_id"]]
+    brief = flow.store.tasks[response.json()["task_id"]].brief
+    assert any("U1 finished research." in line for line in brief["constraints"])
+    assert any("U2" in line for line in brief["constraints"])
+
+
 def test_RERUN_ANY_a_share_change_after_the_stop_does_not_hide_it(flow):
     old = _failed_with(flow, UNIT_FAILED)
     stream = flow.store.events[old["world_id"]]
