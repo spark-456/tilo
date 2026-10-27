@@ -11,7 +11,9 @@
 //           "already" 400 (the real route maps already_resolved to 400) {"outcome":"rejected","reason":"already_resolved"}
 //   GET  /worlds/:w/events                -> {"events":[...]} the first `events` rows of the recorded village-basic stream
 //        (contracts/fixtures/streams), re-keyed to the asked world; none until /__control {events: n} (UI-10 B8)
-//   POST /__control {hold?:boolean, mode?:string, events?:number, reset?:true} ; POST /__release ; GET /__log -> [{method,path,body}]
+//   POST /__control {hold?:boolean, mode?:string, events?:number, browser?:"live"|"finished"|null, reset?:true} ;
+//        POST /__release ; GET /__log -> [{method,path,body}]
+//   GET  /worlds/:w/browser/frames/:id    -> the drawn test frame (image/png); POST /worlds/:w/browser/:s/stop -> 200
 // CORS: any origin may read (it holds nothing private); the page is a different origin from this server.
 import { readFileSync } from "node:fs";
 import http from "node:http";
@@ -26,6 +28,71 @@ const RECORDED = readFileSync(
   .map((l) => JSON.parse(l));
 let served = 0; // how many recorded events GET /worlds/:w/events returns
 const ulid = (n) => `01${"0".repeat(21)}${String(n).padStart(3, "0")}`;
+// DEMO-BROWSER: an opt-in browser session after the served rows ("live": open; "finished": closed), its frames all one
+// drawn test picture (e2e/support/browser-frame.png, not a real site), the frame and stop routes of tilo-api.
+const FRAME = readFileSync(new URL("./browser-frame.png", import.meta.url));
+let browser = null;
+const BROWSER_HOST = "encyclopedia.example";
+const BROWSER_SESSION = "bs_01K7M00000000000000000BRWS";
+// A session shaped like a real one: the first page (no cursor), a typed search field, Enter in it, a clicked result, a
+// scroll and a read. Like the real worker, a box is sent only with a pointer action (click, type, key, scroll) and
+// never with extract or navigate; boxes are CSS px in a 1200x800 viewport.
+const SEARCH_FIELD = { x: 330, y: 70, width: 400, height: 36 };
+const RESULT_LINK = { x: 180, y: 300, width: 260, height: 28 };
+const SCROLL_POINT = { x: 600, y: 520, width: 24, height: 24 };
+const browserEvents = (world, after) => {
+  const frame = (n) => ({ artifact_id: `art_bs01K7M00000000000000000BRWS_${n}`, version: 1 });
+  const acted = (n, kind, caption, box) => [
+    "browser.acted",
+    caption,
+    {
+      session: BROWSER_SESSION,
+      step: n,
+      kind,
+      verdict: "done",
+      reason: null,
+      host: BROWSER_HOST,
+      chars: null,
+      masked: 0,
+      blocked: 0,
+      frame: frame(n),
+      ...(box ? { target_box: box } : {}),
+      caption,
+    },
+  ];
+  const rows = [
+    [
+      "browser.started",
+      "Tilo opened the browser.",
+      { session: BROWSER_SESSION, host: BROWSER_HOST, hosts: 2, max_steps: 5, frame: frame(0) },
+    ],
+    acted(1, "type", "Typing in Search", SEARCH_FIELD),
+    acted(2, "key", "Pressing Enter", SEARCH_FIELD),
+    acted(3, "click", "Clicking Example result", RESULT_LINK),
+    acted(4, "scroll", "Scrolling down", SCROLL_POINT),
+    acted(5, "extract", `Reading ${BROWSER_HOST}`, null),
+    ...(browser === "finished"
+      ? [
+          [
+            "browser.stopped",
+            "Tilo closed the browser.",
+            { session: BROWSER_SESSION, outcome: "done", steps: 5 },
+          ],
+        ]
+      : []),
+  ];
+  return rows.map(([type, summary, data], i) => ({
+    ...after,
+    id: ulid(900 + i),
+    seq: (after?.seq ?? 0) + i + 1,
+    world_id: world,
+    type,
+    actor: "A_s1",
+    summary,
+    cause: null,
+    data,
+  }));
+};
 
 const baseCard = (n, world, kind, over) => ({
   id: ulid(n),
@@ -145,7 +212,16 @@ http
       const world = decodeURIComponent(feed[1] ?? "");
       log.push({ method: "GET", path: url.pathname });
       const events = RECORDED.slice(0, served).map((e) => ({ ...e, world_id: world }));
+      if (browser) events.push(...browserEvents(world, events.at(-1)));
       return send(res, 200, { events });
+    }
+    if (/^\/worlds\/[^/]+\/browser\/frames\/[^/]+$/.test(url.pathname) && req.method === "GET") {
+      res.writeHead(200, { "content-type": "image/png", "access-control-allow-origin": "*" });
+      return res.end(FRAME);
+    }
+    if (/^\/worlds\/[^/]+\/browser\/[^/]+\/stop$/.test(url.pathname) && req.method === "POST") {
+      log.push({ method: "POST", path: url.pathname });
+      return send(res, 200, { requested: true });
     }
     const answer = url.pathname.match(/^\/worlds\/([^/]+)\/cards\/([^/]+)\/answer$/);
     if (answer && req.method === "POST") {
@@ -169,8 +245,11 @@ http
         hold = false;
         mode = "answer";
         served = 0;
+        browser = null;
       }
       if (typeof b.events === "number") served = Math.max(0, Math.floor(b.events));
+      if (b.browser === "live" || b.browser === "finished" || b.browser === null)
+        browser = b.browser;
       if (typeof b.hold === "boolean") hold = b.hold;
       if (typeof b.mode === "string") mode = b.mode;
       return send(res, 200, { hold, mode });

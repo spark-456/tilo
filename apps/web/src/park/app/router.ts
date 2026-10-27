@@ -43,6 +43,7 @@ const ROOT_PAGES = new Set<string>([
 const ROUTINES_ADDRESS = /^\/(?:park\/)?routines\/?$/;
 const ROOT_WORLD = /^\/world\/[^/]+\/?$/;
 const ROOT_WORLD_APP = /^\/(?:park\/)?world\/([^/]+)\/app\/([^/]+)\/?$/;
+const ROOT_WORLD_BROWSER = /^\/(?:park\/)?world\/([^/]+)\/browser\/?$/;
 
 /**
  * The live stage (S-04) of a world: an old-app address next to the Park pages (`/world/:id` is the Park overview).
@@ -59,6 +60,7 @@ export function isParkPath(pathname: string): boolean {
   if (pathname === "/park" || pathname.startsWith("/park/") || pathname === "/") return true;
   if (ROUTINES_ADDRESS.test(pathname)) return true;
   if (ROOT_WORLD.test(pathname) || ROOT_WORLD_APP.test(pathname)) return true;
+  if (ROOT_WORLD_BROWSER.test(pathname)) return true;
   const m = /^\/([^/]+)\/?$/.exec(pathname);
   return m?.[1] !== undefined && ROOT_PAGES.has(m[1]);
 }
@@ -189,6 +191,24 @@ export function useParkRoute(): ParkRoute | null {
     const q = at.indexOf("?");
     return q < 0 ? parseParkPath(at, "") : parseParkPath(at.slice(0, q), at.slice(q));
   }, [url, legacy]);
+}
+
+/** DEMO-BROWSER: Tilo's browser as a full page of its own, the address the World page's "Open in new tab" opens. */
+export const browserPath = (worldId: string): string =>
+  `/world/${encodeURIComponent(worldId)}/browser`;
+
+export interface BrowserRoute {
+  readonly worldId: string;
+}
+
+export function parseBrowserPath(pathname: string): BrowserRoute | null {
+  const worldId = decodeSegment(ROOT_WORLD_BROWSER.exec(pathname)?.[1] ?? "");
+  return worldId ? { worldId } : null;
+}
+
+export function useBrowserRoute(): BrowserRoute | null {
+  const url = useSyncExternalStore(subscribe, snapshot);
+  return useMemo(() => parseBrowserPath(url.split("?")[0] ?? url), [url]);
 }
 
 export interface QuizAppRoute {

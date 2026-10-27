@@ -17,7 +17,7 @@ import {
   useParkApi,
   useParkStore,
 } from "../app/context";
-import { useParkRoute, useQuizAppRoute } from "../app/router";
+import { useBrowserRoute, useParkRoute, useQuizAppRoute } from "../app/router";
 import { Button, Popover, Toast } from "../components";
 import { FirstRunBanner } from "../sample/FirstRunBanner";
 import { useFirstRun } from "../sample/useFirstRun";
@@ -66,6 +66,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const api = useParkApi();
   const route = useParkRoute();
   const quizRoute = useQuizAppRoute();
+  const browserRoute = useBrowserRoute();
   const state = useSyncExternalStore(store.subscribe, store.getState);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationStatus, setNotificationStatus] = useState<"loading" | "ready" | "failed">(
@@ -165,7 +166,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       : route.page
     : quizRoute
       ? `world/${quizRoute.worldId}/app/${quizRoute.artifactId}`
-      : "none";
+      : browserRoute
+        ? `world/${browserRoute.worldId}/browser`
+        : "none";
   // QA-DEMO-1 m5: the "Mobile app" note belongs to the page it was opened on; going elsewhere closes it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` is the signal (the route changed)
   useEffect(() => setMobileNote(false), [key]);

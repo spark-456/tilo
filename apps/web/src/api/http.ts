@@ -1205,6 +1205,7 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
     let cursor = 0;
     let failures = 0;
     const seen = new Map<string, number>(); // id -> seq, only ids at or after the cursor
+    const browsing = new Set<string>(); // browser sessions opened and not yet stopped
     const path = `/worlds/${encodeURIComponent(worldId)}/events`;
     const feed = this.feed(worldId);
     feed.subs += 1;
@@ -1250,9 +1251,10 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
         if (this.missing.delete(worldId))
           for (const listener of [...this.missingListeners]) listener();
         note(null);
-        // FT-PERF-1: back off only once a run has events; a world waiting to start keeps the fast poll.
+        // FT-PERF-1: back off only once a run has events; a world waiting to start keeps the fast poll. DEMO-BROWSER: so
+        // does a world with an open browser session (started, not yet stopped), so each new frame shows within a second.
         delay =
-          fresh.length > 0 || cursor === 0
+          fresh.length > 0 || cursor === 0 || browsing.size > 0
             ? this.pollMs
             : this.pollMs >= 1000
               ? 3000
@@ -1283,6 +1285,13 @@ export class HttpClient implements TiloClient, SchedulesApi, FieldsApi, ItemApi 
         }
         seen.set(view.id, view.seq);
         cursor = view.seq;
+        if (view.type === "browser.started" || view.type === "browser.stopped") {
+          const session = (view.data as { session?: unknown } | null | undefined)?.session;
+          if (typeof session === "string") {
+            if (view.type === "browser.started") browsing.add(session);
+            else browsing.delete(session);
+          }
+        }
         try {
           // `world_id` is the world this very request asked for (the route's own id, and the API
           // reads only that world's stream) and `v` is the schema's single version, so both are

@@ -1,23 +1,94 @@
+// DEMO-BROWSER: Tilo's browser as the person sees it. Every picture, caption and cursor comes from a recorded
+// browser.started / browser.acted / browser.stopped event (HR-1, BR-09: only frames named by recorded events, in order,
+// no video, nothing in between); which picture is shown, enlarging it, going back to the map and where the window sits
+// are display state only. On the World page it takes over the map area while the run has a browser session
+// ("takeover", and a floating window once the person drags it); on its own page it fills the page ("page", the address
+// "Open in new tab" opens); elsewhere it is a card in the page ("inline").
 import type { BrowserActedData, BrowserStartedData, BrowserStoppedData } from "@tilo/contracts";
-import { useEffect, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { TiloClient } from "../../api/client";
+import { browserPath } from "../app/router";
 import "./BrowserPanel.css";
 
 type FrameClient = TiloClient & {
   getBrowserFrame?: (worldId: string, artifactId: string) => Promise<Blob>;
-  pauseWorld?: (worldId: string) => Promise<void>;
   stopBrowser?: (worldId: string, session: string) => Promise<void>;
 };
 
 type Cursor = { seq: number; x: number; y: number; caption: string };
 
+/** The floating window's top-left corner, in window px. */
+type FloatPos = { left: number; top: number };
+type Size = { w: number; h: number };
+const POS_KEY = "tilo.browser.pos";
+const FLOAT_WIDTH = 720;
+const EDGE = 8;
+const NAV_CLEAR = 84;
+const STEP = 16;
+const DRAG_FROM = 4;
+/** Narrower than this (phone width) the view is full width in the map area: no drag, no Dock. */
+const DRAG_MIN_WIDTH = 761;
+
+const isNum = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
+
+function readPos(): FloatPos | null {
+  try {
+    const saved: unknown = JSON.parse(window.localStorage.getItem(POS_KEY) ?? "null");
+    const { left, top } = (saved ?? {}) as { left?: unknown; top?: unknown };
+    return isNum(left) && isNum(top) ? { left, top } : null;
+  } catch {
+    return null;
+  }
+}
+function writePos(pos: FloatPos | null): void {
+  try {
+    if (pos === null) window.localStorage.removeItem(POS_KEY);
+    else window.localStorage.setItem(POS_KEY, JSON.stringify(pos));
+  } catch {
+    // storage blocked: the place lasts this visit only
+  }
+}
+
+/** Keeps the whole window on screen: EDGE from the sides and the bottom, and below the page's fixed nav (it ends at
+ * 76px) so the window's bar can always be reached. */
+function clampPos(p: FloatPos, win: Size, box: Size): FloatPos {
+  const fit = (n: number, min: number, room: number) =>
+    Math.round(Math.min(Math.max(n, min), Math.max(min, room)));
+  return {
+    left: fit(p.left, EDGE, win.w - box.w - EDGE),
+    top: fit(p.top, NAV_CLEAR, win.h - box.h - EDGE),
+  };
+}
+
+function useWindowSize(): Size {
+  const [size, setSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+  useEffect(() => {
+    const on = () =>
+      setSize((s) =>
+        s.w === window.innerWidth && s.h === window.innerHeight
+          ? s
+          : { w: window.innerWidth, h: window.innerHeight },
+      );
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
+  return size;
+}
+
 /** The server would not serve a recorded frame (not screened clean, or missing): said once, never a spinner. */
 export const FRAME_UNAVAILABLE =
-  "This picture is hidden because Tilo's safety check could not clear it, so follow the steps in the line below.";
+  "This picture is hidden because Tilo's safety check could not clear it, but the steps still show what the browser did.";
 
 /** DEMO-BROWSER: why the browser stopped (`browser.stopped` outcome), each one plain sentence with what to try. */
 export const STOP_LINES = {
-  done: "Tilo closed the browser.",
+  done: "Finished.",
   stopped: "You stopped the browser.",
   taken_over: "You took over the browser.",
   needs_person: "This step needs you, so open the site yourself to finish it.",
@@ -39,48 +110,91 @@ export const REFUSAL_LINES = {
   target_changed: "The page changed while Tilo looked at it, so try the task again.",
 } as const;
 
-const lineOf = (lines: Readonly<Record<string, string>>, key: string | null): string | undefined =>
-  key ? lines[key] : undefined;
-
 /** A commit the browser stopped before (BR-05). */
 export const GATED_LINE =
   "Tilo stopped before submitting anything, so open the site yourself to finish this step.";
 
-type Frame = { artifactId: string; caption: string; cursor: Cursor | null };
+/** The finished state: how many recorded steps there are to replay. */
+export const finishedLine = (steps: number) =>
+  `Finished: ${steps} ${steps === 1 ? "step" : "steps"}; pick any step to see it again.`;
 
-/** DEMO-BROWSER: every recorded frame, oldest first, with its caption and cursor: what the panel can step through. */
+const lineOf = (lines: Readonly<Record<string, string>>, key: string | null): string | undefined =>
+  key ? lines[key] : undefined;
+
+/** One recorded step: its own frame (the page after the step), its caption, where Tilo's mouse was, and, for a step that
+ * changes the page, the frame before it. */
+type Frame = {
+  artifactId: string;
+  caption: string;
+  cursor: Cursor | null;
+  host: string | null;
+  before: string | null;
+};
+
+/** One picture the panel can show; `phase` says which side of a click, typed field or key press it is. */
+type Picture = { step: number; artifactId: string; phase: "before" | "after" | null };
+
+type BrowserEvent = { seq: number; type: string; data?: unknown; summary?: string };
+
+/** Actions that have a real mouse or focus point (the event's target box); extract and navigate have none, so no cursor. */
+const POINTER_KINDS = new Set<string>(["click", "type", "key", "scroll"]);
+/** Actions that change the page where Tilo acted: the picture before them, with the cursor, is shown as well. */
+const TWO_PICTURES = new Set<string>(["click", "type", "key"]);
+
+/** DEMO-BROWSER: every recorded step, oldest first, with its caption and cursor: what the panel can step through. */
 export function browserFrames(events: readonly BrowserEvent[]): Frame[] {
   const frames: Frame[] = [];
+  // The last recorded frame of the session: the page as it was before the next step.
+  let previous: string | null = null;
   for (const event of events) {
     if (!event.data || typeof event.data !== "object") continue;
     if (event.type === "browser.started") {
-      const id = (event.data as BrowserStartedData).frame?.artifact_id;
+      const data = event.data as BrowserStartedData;
+      const id = data.frame?.artifact_id ?? null;
+      previous = id;
       if (id)
         frames.push({
           artifactId: id,
-          caption: event.summary ?? "Tilo opened the browser",
+          caption: `Opened ${data.host ?? "the browser"}`,
           cursor: null,
+          host: data.host ?? null,
+          before: null,
         });
     } else if (event.type === "browser.acted") {
       const data = event.data as BrowserActedData;
       const id = data.frame?.artifact_id;
       if (!id) continue;
       const caption = data.caption ?? event.summary ?? "Browser action";
-      const box = data.verdict === "done" ? data.target_box : null;
+      const box =
+        (data.verdict === "done" || data.verdict === "gated") && POINTER_KINDS.has(data.kind)
+          ? data.target_box
+          : null;
       const cursor = box
         ? { seq: event.seq, x: box.x + box.width / 2, y: box.y + box.height / 2, caption }
         : null;
-      frames.push({ artifactId: id, caption, cursor });
+      const before = cursor && TWO_PICTURES.has(data.kind) ? previous : null;
+      frames.push({ artifactId: id, caption, cursor, host: data.host ?? null, before });
+      previous = id;
     }
   }
   return frames;
 }
-type BrowserEvent = { seq: number; type: string; data?: unknown; summary?: string };
 
-/** A browser frame or cursor is displayed only when its recorded event exists. */
+/** The pictures of the steps in order: a click, typed field or key press has its "before" (the previous frame, the
+ * cursor where Tilo acted) and then its "after" (its own frame, the cursor where the mouse is now); the rest one. */
+export function browserPictures(frames: readonly Frame[]): Picture[] {
+  return frames.flatMap((frame, step): Picture[] =>
+    frame.before
+      ? [
+          { step, artifactId: frame.before, phase: "before" },
+          { step, artifactId: frame.artifactId, phase: "after" },
+        ]
+      : [{ step, artifactId: frame.artifactId, phase: null }],
+  );
+}
+
+/** The session's state, from recorded events only. */
 export function browserView(events: readonly BrowserEvent[]): {
-  frame: string | null;
-  cursor: Cursor | null;
   session: string | null;
   stopped: boolean;
   gated: boolean;
@@ -89,8 +203,6 @@ export function browserView(events: readonly BrowserEvent[]): {
   outcome: string | null;
   refusal: string | null;
 } {
-  let frame: string | null = null;
-  let cursor: Cursor | null = null;
   let session: string | null = null;
   let stopped = false;
   let gated = false;
@@ -112,8 +224,6 @@ export function browserView(events: readonly BrowserEvent[]): {
       const data = event.data as BrowserStartedData;
       session = data.session;
       host = data.host;
-      frame = data.frame?.artifact_id ?? null;
-      cursor = null;
       stopped = false;
       gated = false;
       paused = false;
@@ -123,16 +233,6 @@ export function browserView(events: readonly BrowserEvent[]): {
       const data = event.data as BrowserActedData;
       if (session !== data.session) continue;
       host = data.host ?? host;
-      frame = data.frame?.artifact_id ?? frame;
-      const box = data.target_box;
-      if (data.verdict === "done" && box) {
-        cursor = {
-          seq: event.seq,
-          x: box.x + box.width / 2,
-          y: box.y + box.height / 2,
-          caption: data.caption ?? event.summary ?? "Browser action",
-        };
-      }
       if (data.verdict === "gated") gated = true;
       if (data.verdict === "refused" && data.reason && data.reason in REFUSAL_LINES)
         refusal = data.reason;
@@ -144,13 +244,25 @@ export function browserView(events: readonly BrowserEvent[]): {
       }
     }
   }
-  return { frame, cursor, session, stopped, gated, host, paused, outcome, refusal };
+  return { session, stopped, gated, host, paused, outcome, refusal };
 }
 
-/** The one line under the frame: what the browser does now, or why it stopped and what to try. */
-function stopLine(view: ReturnType<typeof browserView>): string {
-  return lineOf(REFUSAL_LINES, view.refusal) ?? lineOf(STOP_LINES, view.outcome) ?? STOP_LINES.done;
+type Phase = "live" | "paused" | "waiting" | "finished" | "stopped";
+
+function phaseOf(view: ReturnType<typeof browserView>): Phase {
+  if (view.gated) return "waiting";
+  if (view.paused) return "paused";
+  if (!view.stopped) return "live";
+  return view.refusal || (view.outcome && view.outcome !== "done") ? "stopped" : "finished";
 }
+
+const BADGE: Record<Phase, string> = {
+  live: "Live",
+  paused: "Paused",
+  waiting: "Waiting for you",
+  finished: "Finished",
+  stopped: "Stopped",
+};
 
 export function BrowserPanel({
   client,
@@ -163,23 +275,32 @@ export function BrowserPanel({
   worldId: string;
   events: readonly BrowserEvent[];
   replay: boolean;
-  /** "overlay": a window floating over the World's map, shown on its own once the browser opens (DEMO-BROWSER). */
-  placement?: "inline" | "overlay";
+  /** "takeover": fills the World's map area (its parent is positioned), with a way back to the map, and the person can
+   * drag it into a floating window. "page": fills its own page (its parent is positioned and has a height). */
+  placement?: "inline" | "takeover" | "page";
 }) {
   const view = browserView(events);
   const frames = browserFrames(events);
+  const pictures = browserPictures(frames);
   const reader = client as FrameClient;
-  // Hide is display state for one session: the next session the browser opens shows itself again.
-  const [hiddenFor, setHiddenFor] = useState<string | null>(null);
-  // DEMO-BROWSER: which recorded frame is shown (display state only); null follows the newest one.
+  // Display state only: which recorded picture is shown (null follows the newest), the enlarged view, the session the
+  // person went back to the map from (the next session the browser opens shows itself again) and, once dragged, where
+  // the floating window sits (null: docked over the map).
   const [pick, setPick] = useState<number | null>(null);
-  const index = pick === null ? frames.length - 1 : Math.min(pick, frames.length - 1);
-  const shown = index >= 0 ? frames[index] : undefined;
+  const [enlarged, setEnlarged] = useState(false);
+  const [mapFor, setMapFor] = useState<string | null>(null);
+  const [place, setPlace] = useState<FloatPos | null>(readPos);
+  const [box, setBox] = useState<Size>({ w: FLOAT_WIDTH, h: 600 });
+  const win = useWindowSize();
+  const index = pick === null ? pictures.length - 1 : Math.min(pick, pictures.length - 1);
+  const shown = index >= 0 ? pictures[index] : undefined;
+  const stepAt = shown?.step ?? -1;
+  const current = stepAt >= 0 ? frames[stepAt] : undefined;
   const frameId = shown?.artifactId ?? null;
   const [image, setImage] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [size, setSize] = useState({ width: 1200, height: 800 });
-  const [request, setRequest] = useState<"idle" | "pausing" | "stopping" | "error">("idle");
+  const [request, setRequest] = useState<"idle" | "stopping" | "error">("idle");
   useEffect(() => {
     setImage(null);
     setFailed(false);
@@ -201,134 +322,367 @@ export function BrowserPanel({
       if (url) URL.revokeObjectURL(url);
     };
   }, [reader, worldId, frameId, replay]);
+  useEffect(() => {
+    if (!enlarged) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setEnlarged(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [enlarged]);
+  // The enlarged picture is a modal dialog in the top layer, so no map, header or container clips or covers it.
+  // Closing it puts focus back on the picture that opened it.
+  const zoom = useRef<HTMLDialogElement>(null);
+  const shot = useRef<HTMLButtonElement>(null);
+  const wasEnlarged = useRef(false);
+  useLayoutEffect(() => {
+    const el = zoom.current;
+    if (!el || el.open) return;
+    if (typeof el.showModal === "function") el.showModal();
+    else el.setAttribute("open", "");
+  });
+  useEffect(() => {
+    if (wasEnlarged.current && !enlarged) shot.current?.focus();
+    wasEnlarged.current = enlarged;
+  }, [enlarged]);
+  // The step list centres the shown step (a jump, never a scroll animation; the browser clamps at either end), so a long
+  // run's newest step and its neighbours are seen. Only a change of step or coming back from the map moves it, never a
+  // poll or the person's own scroll.
+  const strip = useRef<HTMLOListElement>(null);
+  const onMap = mapFor !== null && mapFor === view.session;
+  useLayoutEffect(() => {
+    const list = strip.current;
+    const item = list?.querySelectorAll<HTMLElement>("li > button")[stepAt];
+    if (!list || !item || onMap) return;
+    list.scrollLeft = item.offsetLeft - list.offsetLeft - (list.clientWidth - item.offsetWidth) / 2;
+    list.scrollTop = item.offsetTop - list.offsetTop - (list.clientHeight - item.offsetHeight) / 2;
+  }, [stepAt, onMap]);
+  // The window: docked over the map until the person drags it by its header (or moves it with the arrow keys on the
+  // grip); then it is a floating card kept inside the window, at the place saved for this viewer. A phone-wide view has
+  // neither drag nor Dock.
+  const takeover = placement === "takeover";
+  const canDrag = takeover && win.w >= DRAG_MIN_WIDTH;
+  const floating = canDrag && place !== null;
+  const root = useRef<HTMLElement>(null);
+  const grip = useRef<HTMLButtonElement>(null);
+  const drag = useRef<{ x: number; y: number; from: FloatPos; moved: boolean } | null>(null);
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el || !floating) return;
+    const [w, h] = [el.offsetWidth, el.offsetHeight];
+    setBox((b) => (b.w === w && b.h === h ? b : { w, h }));
+  });
   const session = view.session;
   if (!session) return null;
-  const overlay = placement === "overlay";
-  if (overlay && hiddenFor === session) {
+  if (takeover && mapFor === session) {
     return (
-      <button type="button" className="tilo-browser-chip" onClick={() => setHiddenFor(null)}>
-        Show Tilo browser
+      <button type="button" className="tilo-browser-chip" onClick={() => setMapFor(null)}>
+        {`Show Tilo browser · ${frames.length} ${frames.length === 1 ? "step" : "steps"}`}
       </button>
     );
   }
-  const cursor = pick === null ? view.cursor : (shown?.cursor ?? null);
-  const step = (to: number) => setPick(to >= frames.length - 1 ? null : Math.max(0, to));
-  const available = !replay && !view.stopped && !view.paused;
+  const phase = phaseOf(view);
+  // The session is still open while it is live or waiting for the person: only then can Stop do anything.
+  const open = (phase === "live" || phase === "waiting") && !replay;
+  const canStop = open && Boolean(reader.stopBrowser) && request === "idle";
+  // The cursor is the shown step's own (none for extract, navigate or the first page): where Tilo's mouse was.
+  const cursor = current?.cursor ?? null;
+  // Following the newest (no pick) shows the newest picture; a pick past the last one goes back to following it.
+  const goTo = (to: number) => setPick(to >= pictures.length - 1 ? null : Math.max(0, to));
+  // A step in the numbered list shows the page after it: its last picture.
+  const goToStep = (step: number) => {
+    const last = pictures.map((p) => p.step).lastIndexOf(step);
+    if (last >= 0) goTo(last);
+  };
   const handoffHost =
     view.host && /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(view.host) ? view.host : null;
-  const control = (kind: "pause" | "stop") => {
-    if (!available || request !== "idle") return;
-    const call =
-      kind === "pause" ? reader.pauseWorld?.(worldId) : reader.stopBrowser?.(worldId, session);
+  const address = current?.host ?? view.host ?? "";
+  const side = shown?.phase ? ` · ${shown.phase}` : "";
+  const stepLabel = current
+    ? `Step ${stepAt + 1} of ${frames.length} · ${current.caption}${side}`
+    : "";
+  const at = floating && place ? clampPos(place, win, box) : null;
+  const startDrag = (e: ReactPointerEvent<HTMLElement>) => {
+    const onControl = (e.target as Element).closest("button:not(.tilo-bv__grip), a");
+    if (!canDrag || e.button !== 0 || onControl) return;
+    const rect = root.current?.getBoundingClientRect();
+    if (!rect) return;
+    // Docked, the window shrinks to its floating width under the pointer, so it starts centred on the pointer.
+    const width = Math.min(FLOAT_WIDTH, win.w * 0.92);
+    const from = at ?? { left: e.clientX - width / 2, top: rect.top };
+    drag.current = { x: e.clientX, y: e.clientY, from, moved: false };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const dragged = (e: ReactPointerEvent<HTMLElement>): FloatPos | null => {
+    const d = drag.current;
+    if (!d) return null;
+    const [dx, dy] = [e.clientX - d.x, e.clientY - d.y];
+    if (!d.moved && Math.hypot(dx, dy) < DRAG_FROM) return null;
+    d.moved = true;
+    return clampPos({ left: d.from.left + dx, top: d.from.top + dy }, win, box);
+  };
+  const moveDrag = (e: ReactPointerEvent<HTMLElement>) => {
+    const to = dragged(e);
+    if (to) setPlace(to);
+  };
+  const endDrag = (e: ReactPointerEvent<HTMLElement>) => {
+    const to = dragged(e);
+    drag.current = null;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    if (!to) return;
+    setPlace(to);
+    writePos(to);
+  };
+  // Arrow keys on the grip move the window 16 px a press; the first press undocks it where it sits.
+  const nudge = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+    const by: Record<string, [number, number]> = {
+      ArrowLeft: [-STEP, 0],
+      ArrowRight: [STEP, 0],
+      ArrowUp: [0, -STEP],
+      ArrowDown: [0, STEP],
+    };
+    const d = by[e.key];
+    const rect = root.current?.getBoundingClientRect();
+    if (!d || !canDrag || !rect) return;
+    e.preventDefault();
+    const from = at ?? { left: rect.left, top: rect.top };
+    const to = clampPos({ left: from.left + d[0], top: from.top + d[1] }, win, box);
+    setPlace(to);
+    writePos(to);
+  };
+  const dock = () => {
+    setPlace(null);
+    writePos(null);
+    grip.current?.focus();
+  };
+  const line =
+    phase === "waiting"
+      ? GATED_LINE
+      : request === "stopping"
+        ? "Stopping…"
+        : phase === "paused"
+          ? "The world is paused."
+          : phase === "finished"
+            ? finishedLine(frames.length)
+            : phase === "stopped"
+              ? (lineOf(REFUSAL_LINES, view.refusal) ??
+                lineOf(STOP_LINES, view.outcome) ??
+                STOP_LINES.error)
+              : "Tilo is using the browser now.";
+  const stop = () => {
+    if (!canStop) return;
+    const call = reader.stopBrowser?.(worldId, session);
     if (!call) return;
-    setRequest(kind === "pause" ? "pausing" : "stopping");
+    setRequest("stopping");
     call.catch(() => setRequest("error"));
   };
+  const placeholder = replay
+    ? "Recorded pictures are not shown in a replay."
+    : !frameId
+      ? `Opening ${view.host ?? "the page"}…`
+      : failed
+        ? FRAME_UNAVAILABLE
+        : "Loading the picture…";
+  // The page and the takeover share the fill-the-parent layout; the page adds its own border, the floating card its shadow.
+  const classes = [
+    "tilo-bv",
+    takeover || placement === "page" ? "tilo-bv--takeover" : "",
+    placement === "page" ? "tilo-bv--page" : "",
+    floating ? "tilo-bv--floating" : "",
+  ];
   return (
     <section
-      className={overlay ? "tilo-browser tilo-browser--overlay" : "tilo-browser"}
+      ref={root}
+      className={classes.filter(Boolean).join(" ")}
+      style={at ? { left: at.left, top: at.top } : undefined}
       aria-label="Tilo browser"
       data-testid="tilo-browser-panel"
+      data-phase={phase}
+      data-floating={floating ? "true" : undefined}
     >
-      <header className="tilo-browser__header">
-        <strong>Tilo browser</strong>
-        <div>
-          {overlay ? (
-            <button type="button" onClick={() => setHiddenFor(session)}>
-              Hide
+      <header
+        className="tilo-bv__chrome"
+        data-draggable={canDrag ? "true" : undefined}
+        onPointerDown={startDrag}
+        onPointerMove={moveDrag}
+        onPointerUp={endDrag}
+        onPointerCancel={() => {
+          drag.current = null;
+        }}
+      >
+        {canDrag ? (
+          <button
+            ref={grip}
+            type="button"
+            className="tilo-bv__grip"
+            aria-label="Move the browser"
+            title="Drag the bar, or press the arrow keys here, to move the browser"
+            onKeyDown={nudge}
+          >
+            <span aria-hidden="true">⋮⋮</span>
+          </button>
+        ) : null}
+        <span className="tilo-bv__badge" data-phase={phase}>
+          {BADGE[phase]}
+        </span>
+        <span className="tilo-bv__address" title={address}>
+          {address || "Tilo browser"}
+        </span>
+        <span className="tilo-bv__actions">
+          {canStop ? (
+            <button type="button" className="tilo-bv__button" onClick={stop}>
+              Stop
             </button>
           ) : null}
-          <button
-            type="button"
-            disabled={!available || !reader.pauseWorld}
-            onClick={() => control("pause")}
-          >
-            Pause
-          </button>
-          <button
-            type="button"
-            disabled={!available || !reader.stopBrowser}
-            onClick={() => control("stop")}
-          >
-            Stop
-          </button>
-        </div>
+          {placement !== "page" && !replay ? (
+            <a
+              className="tilo-bv__button"
+              href={browserPath(worldId)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open in new tab
+            </a>
+          ) : null}
+          {floating ? (
+            <button type="button" className="tilo-bv__button" onClick={dock}>
+              Dock
+            </button>
+          ) : null}
+          {takeover ? (
+            <button type="button" className="tilo-bv__button" onClick={() => setMapFor(session)}>
+              Back to map
+            </button>
+          ) : null}
+        </span>
       </header>
-      <div className="tilo-browser__screen" aria-label="Masked browser screenshot">
-        {image ? (
-          <img
-            src={image}
-            alt="Masked browser page"
-            onLoad={(e) =>
-              setSize({
-                width: e.currentTarget.naturalWidth,
-                height: e.currentTarget.naturalHeight,
-              })
-            }
-          />
-        ) : (
-          <p>
-            {replay
-              ? "Recorded frame unavailable in replay."
-              : failed
-                ? FRAME_UNAVAILABLE
-                : "Loading recorded frame…"}
-          </p>
-        )}
-        {image && cursor ? (
-          <div
-            className="tilo-browser__cursor"
-            data-testid="tilo-browser-cursor"
-            data-event-seq={cursor.seq}
-            style={{
-              left: `${(cursor.x / size.width) * 100}%`,
-              top: `${(cursor.y / size.height) * 100}%`,
-            }}
-          >
-            <span>Tilo</span>
-          </div>
+      <div className="tilo-bv__body">
+        <figure className="tilo-bv__frame">
+          {image ? (
+            <button
+              ref={shot}
+              type="button"
+              className="tilo-bv__shot"
+              aria-label="Enlarge the picture"
+              onClick={() => setEnlarged(true)}
+            >
+              <img
+                src={image}
+                alt={`What Tilo's browser showed: ${current?.caption ?? "page"}`}
+                onLoad={(e) =>
+                  setSize({
+                    width: e.currentTarget.naturalWidth,
+                    height: e.currentTarget.naturalHeight,
+                  })
+                }
+              />
+              {cursor ? (
+                <span
+                  className="tilo-browser__cursor"
+                  data-testid="tilo-browser-cursor"
+                  data-event-seq={cursor.seq}
+                  data-picture={shown?.phase ?? undefined}
+                  style={{
+                    left: `${(cursor.x / size.width) * 100}%`,
+                    top: `${(cursor.y / size.height) * 100}%`,
+                  }}
+                >
+                  <span>Tilo</span>
+                </span>
+              ) : null}
+            </button>
+          ) : (
+            <div className="tilo-bv__shot tilo-bv__shot--empty">
+              <p>{placeholder}</p>
+            </div>
+          )}
+          <figcaption className="tilo-bv__label">{stepLabel}</figcaption>
+        </figure>
+        {frames.length > 0 ? (
+          <ol ref={strip} className="tilo-bv__steps" aria-label="Browser steps">
+            {frames.map((frame, i) => (
+              <li key={frame.artifactId}>
+                <button
+                  type="button"
+                  aria-current={i === stepAt ? "step" : undefined}
+                  aria-label={`Step ${i + 1}: ${frame.caption}`}
+                  onClick={() => goToStep(i)}
+                >
+                  <span className="tilo-bv__num">{i + 1}</span>
+                  <span className="tilo-bv__stepname">{frame.caption}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
         ) : null}
       </div>
-      <p className="tilo-browser__caption" aria-live="polite">
-        {pick !== null && shown
-          ? `Frame ${index + 1} of ${frames.length}: ${shown.caption}`
-          : view.paused
-            ? "World paused"
-            : view.gated
-              ? GATED_LINE
-              : view.stopped
-                ? stopLine(view)
-                : request === "pausing"
-                  ? "Pausing…"
-                  : request === "stopping"
-                    ? "Stopping…"
-                    : (view.cursor?.caption ?? "Tilo opened the browser")}
-      </p>
-      {frames.length > 1 ? (
-        <div className="tilo-browser__frames">
-          <button type="button" disabled={index <= 0} onClick={() => step(index - 1)}>
-            Earlier
-          </button>
-          <button
-            type="button"
-            disabled={index >= frames.length - 1}
-            onClick={() => step(index + 1)}
-          >
-            Later
-          </button>
-          {pick !== null ? (
-            <button type="button" onClick={() => setPick(null)}>
-              Latest
-            </button>
+      <footer className="tilo-bv__bar">
+        <p className="tilo-bv__line" aria-live="polite">
+          {line}
+        </p>
+        <span className="tilo-bv__nav">
+          {pictures.length > 1 ? (
+            <>
+              <button
+                type="button"
+                className="tilo-bv__button"
+                disabled={index <= 0}
+                onClick={() => goTo(index - 1)}
+              >
+                Earlier
+              </button>
+              <button
+                type="button"
+                className="tilo-bv__button"
+                disabled={index >= pictures.length - 1}
+                onClick={() => goTo(index + 1)}
+              >
+                Later
+              </button>
+              {pick !== null ? (
+                <button type="button" className="tilo-bv__button" onClick={() => setPick(null)}>
+                  Latest
+                </button>
+              ) : null}
+            </>
           ) : null}
-        </div>
-      ) : null}
-      {view.gated && handoffHost ? (
-        <a href={`https://${handoffHost}/`} target="_blank" rel="noopener noreferrer">
-          Open this site yourself
+        </span>
+      </footer>
+      {phase === "waiting" && handoffHost ? (
+        <a
+          className="tilo-bv__handoff"
+          href={`https://${handoffHost}/`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {`Open ${handoffHost} yourself`}
         </a>
       ) : null}
-      {request === "error" ? <p role="alert">Browser control was not confirmed.</p> : null}
+      {request === "error" ? (
+        <p role="alert">Tilo could not confirm the stop, so try again.</p>
+      ) : null}
+      {enlarged && image ? (
+        // biome-ignore lint/a11y/useKeyWithClickEvents: a click-away scrim; Escape and the Close button are the keyboard way out
+        <dialog
+          ref={zoom}
+          className="tilo-bv__zoom"
+          aria-label="Enlarged browser picture"
+          onClose={() => setEnlarged(false)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEnlarged(false);
+          }}
+        >
+          <div className="tilo-bv__zoombox">
+            <div className="tilo-bv__zoomhead">
+              <span>{stepLabel}</span>
+              <button type="button" className="tilo-bv__button" onClick={() => setEnlarged(false)}>
+                Close
+              </button>
+            </div>
+            <img src={image} alt={`Full size: ${current?.caption ?? "page"}`} />
+          </div>
+        </dialog>
+      ) : null}
     </section>
   );
 }
