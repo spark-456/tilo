@@ -194,6 +194,8 @@ def _owned(store: deps.Store, task_id: str, principal: deps.Principal) -> deps.T
     task = store.tasks.get(task_id)
     if task is None or task.owner != principal.user_id:  # PRD 10.1: no oracle for another user's task
         raise HTTPException(status_code=404, detail="No such task.")
+    if getattr(store.worlds.get(task.world_id), "hidden", False):  # its world was deleted (WORLDS-MANAGE): gone too
+        raise HTTPException(status_code=404, detail="No such task.")
     return task
 
 

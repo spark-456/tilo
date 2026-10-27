@@ -147,7 +147,7 @@ class StorePlateSources:
             world = store.worlds.get(world_id)
             state = (
                 None
-                if world is None or world.owner != user_id or world.paused
+                if world is None or world.owner != user_id or world.paused or world.hidden  # hidden: deleted
                 else _run_state(store.events.get(world_id, []))
             )
             if state is None:

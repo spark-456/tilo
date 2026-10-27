@@ -99,7 +99,8 @@ async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
 PRODUCTION_ORIGINS = _cors.PRODUCTION_ORIGINS
 
 
-app = FastAPI(title="tilo-api", lifespan=_lifespan, **_DOCS)
+# WORLDS-MANAGE: a deleted world's id in any path is the unknown-world 404 for every signed-in caller
+app = FastAPI(title="tilo-api", lifespan=_lifespan, dependencies=[Depends(_deps.refuse_hidden_world)], **_DOCS)
 app.add_middleware(_LogRunId)  # NFR-26: innermost, so the world is looked up only for a request the gate admitted
 app.add_middleware(_AccessGate)  # SEC-15: deployed, every non-public route needs a verified signed-in person
 app.add_middleware(_AppCheckGate)  # SEC-10: App Check token, logged only until the owner sets TILO_APPCHECK_ENFORCE=1
@@ -139,7 +140,9 @@ def _world_views(store: Annotated[_deps.Store, Depends(_deps.get_store)]) -> Cal
     def view(world_id: str) -> WorldView:
         world = store.worlds.get(world_id)
         return WorldView(
-            _runs.get_card_store(world_id, store), paused=world is None or world.paused
+            _runs.get_card_store(world_id, store),
+            paused=world is None or world.paused,
+            hidden=world is not None and world.hidden,
         )  # no record: closed, like Run.paused
 
     return view

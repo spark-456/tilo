@@ -1,9 +1,10 @@
 // WORLDS-MANAGE: the row under the filters that arranges and clears the list. "Sort" orders the worlds (status, newest,
 // oldest, name); "Select" turns the cards into checkboxes, and then the row says how many are picked and offers
-// "Select all shown", "Delete selected" and "Done". Nothing is deleted from here without the confirm dialog.
+// "Select all shown", "Delete selected" and "Done". Nothing is deleted from here without the confirm dialog. One delete
+// takes at most MAX_PICK worlds: "Select all shown" then picks the first of them and says so.
 import type { ChangeEvent } from "react";
 import { Button } from "../../components";
-import { SORTS, type SortKey } from "./arrange";
+import { MAX_PICK, SORTS, type SortKey } from "./arrange";
 
 export function ManageBar({
   sort,
@@ -46,11 +47,15 @@ export function ManageBar({
       {selecting ? (
         <div className="park-worlds-manage__picking" aria-live="polite">
           <span className="park-worlds-manage__count">
-            {picked === 0 ? "Pick worlds to delete" : `${picked} selected`}
+            {picked === 0
+              ? "Pick worlds to delete"
+              : picked >= MAX_PICK
+                ? `${picked} selected, the most at once`
+                : `${picked} selected`}
           </span>
           {shown > 0 ? (
             <Button variant="secondary" size="sm" onClick={onSelectAll}>
-              Select all shown
+              {shown > MAX_PICK ? `Select the first ${MAX_PICK}` : "Select all shown"}
             </Button>
           ) : null}
           <Button

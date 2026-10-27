@@ -1,7 +1,15 @@
 // WORLDS-MANAGE: the pure rules behind sort, pin and delete on the Worlds page.
 import { describe, expect, it } from "vitest";
 import type { World } from "../../api/types";
-import { arrange, deletable, deleteSummary, stillWorking } from "./arrange";
+import {
+  MAX_PICK,
+  arrange,
+  deletable,
+  deleteSummary,
+  pickAll,
+  stillWorking,
+  togglePicked,
+} from "./arrange";
 import { STATUS_TABS, STOPPED_TAB, countFor, statusOf, visibleWorlds } from "./model";
 
 const world = (id: string, over: Partial<World> = {}): World =>
@@ -71,5 +79,25 @@ describe("WORLDS_MANAGE stopped worlds", () => {
     expect(countFor(all, "", "all", "finished")).toBe(1);
     expect(ids(visibleWorlds(all, "", "all", "stopped"))).toEqual(["stop"]);
     expect(statusOf(all[1] as World, 0)).toEqual({ label: "Stopped", tone: "stop" });
+  });
+});
+
+describe("WORLDS_MANAGE pick cap", () => {
+  const many = Array.from({ length: 60 }, (_, i) => world(`w${i}`));
+
+  it("WORLDS_MANAGE_select_all_takes_the_first_fifty_deletable_worlds", () => {
+    expect(MAX_PICK).toBe(50);
+    const shown = [world("team", { access: "team" }), world("sample", { sample: true }), ...many];
+    const picked = pickAll(shown);
+    expect(picked.size).toBe(50);
+    expect([...picked]).toEqual(ids(many.slice(0, 50))); // list order, never a teammate's or the sample
+  });
+
+  it("WORLDS_MANAGE_a_pick_past_fifty_changes_nothing_and_unpicking_still_works", () => {
+    const full = pickAll(many);
+    expect(togglePicked(full, "w55")).toBe(full);
+    const less = togglePicked(full, "w3");
+    expect(less.size).toBe(49);
+    expect(togglePicked(less, "w55").has("w55")).toBe(true);
   });
 });

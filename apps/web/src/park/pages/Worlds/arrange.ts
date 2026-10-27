@@ -64,6 +64,27 @@ export const deletable = (w: World): boolean => w.access !== "team" && !w.sample
 /** A world still at work (its run is going): the server refuses to delete it until it is paused ("Stop and delete"). */
 export const stillWorking = (w: World): boolean => w.st === "running";
 
+/** The most worlds one delete takes (security review, 21 Oct): one confirm never sends an unbounded batch. */
+export const MAX_PICK = 50;
+
+/** `have` with `id` picked or unpicked; a pick past MAX_PICK changes nothing. */
+export function togglePicked(have: ReadonlySet<string>, id: string): ReadonlySet<string> {
+  const next = new Set(have);
+  if (next.delete(id)) return next;
+  if (next.size >= MAX_PICK) return have;
+  next.add(id);
+  return next;
+}
+
+/** "Select all shown": the deletable worlds in list order, the first MAX_PICK of them. */
+export const pickAll = (list: readonly World[]): ReadonlySet<string> =>
+  new Set(
+    list
+      .filter(deletable)
+      .slice(0, MAX_PICK)
+      .map((w) => w.id),
+  );
+
 /** The stored order, else "status". */
 export const readSort = (): SortKey =>
   readSortPref(

@@ -100,6 +100,9 @@ def _locked(store: Store, world_ids):
             lock.release()
 
 
+locked_worlds = _locked  # the same per-world locks, for a route outside this module (WORLDS-MANAGE delete)
+
+
 def _enqueue(store: Store, world_id: str, part: dict, *, front: bool = False) -> None:
     with _world_locks(store, world_id)["queue"]:
         queue = store.pending_events.get(world_id)

@@ -259,7 +259,8 @@ def start_run(store: deps.Store, task: deps.TaskRecord, *, approach: dict, budge
     store.settle(task.world_id)  # the queued events go out first, so `world.started` follows them
     with store.runs_guard:  # one run per world, in any process: a started world's stream says so (ADR-0026 decision 5)
         started = any(e["type"] == "world.started" for e in store.events.get(task.world_id, []))
-        if task.world_id in store.runs or started:
+        hidden = getattr(store.worlds.get(task.world_id), "hidden", False)  # deleted under this guard: never started
+        if task.world_id in store.runs or started or hidden:
             return
         run = store.runs[task.world_id] = Run(store, task, approach, budget_cap, seams)
     threading.Thread(target=run.main, name=f"run-{task.world_id}", daemon=True).start()
@@ -384,7 +385,7 @@ class Run:
 
     def paused(self) -> bool:
         world = self.store.worlds.get(self.world_id)
-        return world is None or world.paused
+        return world is None or world.paused or world.hidden  # a deleted world (WORLDS-MANAGE) is stopped for good too
 
     def put(self, type_: str, actor: str, target: str, summary: str, data: dict, **kw: Any) -> dict:
         """Builds the event once, with its own id, and appends it through the single writer. A paused world gets

@@ -922,7 +922,8 @@ def _sweep_outbox(request: Request, clock: Callable[[], datetime], store_factory
             world = opened[0].load_world(world_id)
         except Exception:
             return True
-        return world is not None and world.paused  # removed worlds reach the source guard and are abandoned
+        # removed worlds reach the source guard and are abandoned; a deleted one (WORLDS-MANAGE) is held, as if paused
+        return world is not None and (world.paused or world.hidden)
 
     def source_valid(entry: dict) -> bool:
         from tilo_api.followup_outbox_sources import source_valid as valid  # noqa: PLC0415
@@ -1103,7 +1104,10 @@ def _run_task(
         return refused("slot_off_cadence")
     world_id, _run_id = slot_ids(body.slot)
     prior = store.worlds.get(body.prior_world_id) if body.prior_world_id else None
-    offered = body.prior_world_id if prior is not None and prior.owner == record.owner_user_id else None
+    # a deleted prior world (WORLDS-MANAGE) is never offered to the next run
+    offered = (
+        body.prior_world_id if prior is not None and prior.owner == record.owner_user_id and not prior.hidden else None
+    )
     run = RunStart(
         idempotency_key=body.slot, schedule_id=record.schedule_id, owner_user_id=record.owner_user_id,
         title=record.title, approved_brief_ref=record.approved_brief_ref,

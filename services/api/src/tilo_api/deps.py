@@ -370,6 +370,25 @@ def resolve_principal(app: Any, connection: HTTPConnection) -> Principal:
     return resolver(connection) if inspect.signature(resolver).parameters else resolver()
 
 
+def refuse_hidden_world(connection: HTTPConnection) -> None:
+    """WORLDS-MANAGE (security review): every route whose path names a deleted (`hidden`) world answers its signed-in
+    callers the unknown-world 404, whoever they are (owner, a session bound to it, a teammate), so old links read
+    nothing. An app-wide dependency, run before the route's own checks. Someone not signed in, or a store that cannot
+    answer, leaves the answer to the route (its 401 or 503), so nobody learns which ids were deleted."""
+    world_id = connection.path_params.get("world_id")
+    if not isinstance(world_id, str):
+        return
+    try:
+        resolve_principal(connection.app, connection)
+        seam = connection.app.dependency_overrides.get(get_store, get_store)
+        store = seam(connection) if inspect.signature(seam).parameters else seam()
+        world = store.load_world(world_id, settle=False) if hasattr(store, "load_world") else store.worlds.get(world_id)
+    except Exception:
+        return
+    if getattr(world, "hidden", False) is True:
+        raise HTTPException(status_code=404, detail="Tilo could not find that.")
+
+
 def member_world(principal: Principal, store: Store, world_id: str) -> WorldRecord:
     """The world a request may read or act on: the one the session is bound to, or, for a session bound to no world,
     one whose record owner is this person with role owner (a deployed sign-in session is role owner and bound to no
@@ -380,7 +399,7 @@ def member_world(principal: Principal, store: Store, world_id: str) -> WorldReco
     world = store.worlds.get(world_id)
     if world is None and hasattr(store, "load_world"):
         world = store.load_world(world_id)
-    if world is None:
+    if world is None or world.hidden:  # a deleted world (WORLDS-MANAGE) is gone for every session, bound ones too
         raise HTTPException(status_code=404, detail="Tilo could not find that.")
     unbound_owner = (
         principal.world_id is None

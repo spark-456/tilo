@@ -31,12 +31,15 @@ import { Filters } from "./Filters";
 import { Header } from "./Header";
 import { ManageBar } from "./ManageBar";
 import {
+  MAX_PICK,
   type SortKey,
   arrange,
   deletable,
+  pickAll,
   readPinned,
   readSort,
   stillWorking,
+  togglePicked,
   writePinned,
   writeSort,
 } from "./arrange";
@@ -184,11 +187,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
     });
   }, []);
   const togglePick = useCallback((id: string) => {
-    setPicked((have) => {
-      const next = new Set(have);
-      if (!next.delete(id)) next.add(id);
-      return next;
-    });
+    setPicked((have) => togglePicked(have, id));
   }, []);
   const byId = useRef(all);
   byId.current = all;
@@ -459,7 +458,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
                 picked={picked.size}
                 shown={list.filter(deletable).length}
                 onSelecting={stopSelecting}
-                onSelectAll={() => setPicked(new Set(list.filter(deletable).map((w) => w.id)))}
+                onSelectAll={() => setPicked(pickAll(list))}
                 onDelete={() => {
                   setDeleteError(null);
                   setConfirming(all.filter((w) => picked.has(w.id)));
@@ -482,6 +481,7 @@ export function WorldsPage({ app }: { app: AppCtx }) {
                         {...(deletable(w) ? { onDelete: askDelete } : {})}
                         selecting={selecting}
                         selected={picked.has(w.id)}
+                        pickFull={picked.size >= MAX_PICK}
                         onPick={togglePick}
                       />
                     ) : (

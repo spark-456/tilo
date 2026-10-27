@@ -93,10 +93,12 @@ def _digest(token: str) -> str:
 
 @dataclass(frozen=True)
 class WorldView:
-    """What the share routes need of one world: its cards, and whether Pause all has stopped it (BQ-90)."""
+    """What the share routes need of one world: its cards, whether Pause all has stopped it (BQ-90), and whether its
+    owner deleted it (WORLDS-MANAGE: every link into a deleted world is revoked)."""
 
     cards: CardStore
     paused: bool = False
+    hidden: bool = False
 
 
 class _ShareBody(BaseModel):
@@ -149,7 +151,7 @@ def build_router(worlds: CardStore | Callable[..., Callable[[str], WorldView]]) 
         return link if named else None
 
     def usable(link: _Link, view: WorldView) -> bool:
-        return not link.revoked and _parse_ts(view.cards.now()) < link.expires_at
+        return not (link.revoked or view.hidden) and _parse_ts(view.cards.now()) < link.expires_at
 
     @router.post("/worlds/{world_id}/cards/{card_id}/share", status_code=201)
     def create_share(

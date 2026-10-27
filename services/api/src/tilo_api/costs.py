@@ -58,6 +58,11 @@ def credit_usd() -> float:
     return _credit_usd()
 
 
+def _world_runs(store: Store, world_id: str, world: WorldRecord) -> set[str]:
+    """The world's own run id plus any run named on its events."""
+    return {world.run_id} | {e["run_id"] for e in store.events.get(world_id, []) if isinstance(e.get("run_id"), str)}
+
+
 def _report(
     store: Store, ledger: Sequence[LedgerEntry], worlds: Iterable[tuple[str, WorldRecord]], quick_uid: str | None = None
 ) -> dict[str, Any]:
@@ -68,9 +73,8 @@ def _report(
     unit_types: dict[str, dict[str, str]] = {}
     runs: set[str] = set()
     for world_id, world in worlds:
-        world_events = store.events.get(world_id, [])
-        events += world_events
-        runs |= {world.run_id} | {e["run_id"] for e in world_events if isinstance(e.get("run_id"), str)}
+        events += store.events.get(world_id, [])
+        runs |= _world_runs(store, world_id, world)
         unit_types[world.run_id] = _unit_types(store, world_id)
     if quick_uid is not None:
         runs.add(quick_run_id(quick_uid))
@@ -136,4 +140,8 @@ def get_costs(
     store.load_owner(principal.user_id, settle=True)
     mine = sorted((w, rec) for w, rec in store.worlds.items() if rec.owner == principal.user_id)
     report = _report(store, ledger, mine, principal.user_id)
+    # WORLDS-MANAGE: a deleted world's spend was made and still counts; its tasks say the world was deleted
+    deleted = {run for w, rec in mine if rec.hidden for run in _world_runs(store, w, rec)}
+    if deleted and isinstance(report.get("tasks"), list):
+        report["tasks"] = [t | {"world_deleted": True} if t.get("run_id") in deleted else t for t in report["tasks"]]
     return JSONResponse(content=report | _completeness(request, principal, report))

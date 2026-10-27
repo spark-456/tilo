@@ -106,6 +106,47 @@ describe("WORLDS_MANAGE live", () => {
     expect(dialog(m.container)).toBeNull();
   });
 
+  it("WORLDS_MANAGE_one_delete_takes_at_most_fifty_worlds", async () => {
+    const api = createFixtureApi();
+    const base = (await api.getWorlds({}, [])).data[0] as World;
+    api.getWorlds = async () => ({
+      data: Array.from({ length: 55 }, (_, i) => ({
+        ...base,
+        id: `w_${i}`,
+        name: `World ${i}`,
+        st: "finished" as const,
+        sample: false,
+      })),
+      source: "live" as const,
+    });
+    const client = {
+      pauseWorld: vi.fn(),
+      deleteWorld: vi.fn(),
+      getLayout: vi.fn(() => new Promise(() => undefined)),
+    } as unknown as HttpClient;
+    const m = mount(
+      <ParkProvider api={api} worldClient={client}>
+        <WorldsPage app={stubApp("worlds")} />
+      </ParkProvider>,
+    );
+    await flush();
+    click(byLabel(m.container, "Select") as HTMLElement);
+    await flush();
+    click(byLabel(m.container, "Select the first 50") as HTMLElement);
+    await flush();
+    expect(m.container.querySelector(".park-worlds-manage__count")?.textContent).toBe(
+      "50 selected, the most at once",
+    );
+    const boxes = [...m.container.querySelectorAll<HTMLInputElement>(".park-worlds-pick input")];
+    expect(boxes.filter((b) => b.checked)).toHaveLength(50);
+    const left = boxes.filter((b) => !b.checked);
+    expect(left.length).toBeGreaterThan(0);
+    expect(left.every((b) => b.disabled)).toBe(true);
+    click(byLabel(m.container, "Delete selected") as HTMLElement);
+    await flush();
+    expect(dialog(m.container)?.textContent).toContain("Delete 50 worlds?");
+  });
+
   it("WORLDS_MANAGE_a_refused_delete_keeps_the_world_and_says_why", async () => {
     const api = createFixtureApi();
     const base = (await api.getWorlds({}, [])).data[0] as World;

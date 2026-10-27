@@ -27,6 +27,8 @@ export interface CardProps {
   /** Selection mode: a click picks the card instead of opening it. */
   selecting?: boolean;
   selected?: boolean;
+  /** The most worlds one delete takes are picked: an unpicked card cannot join. */
+  pickFull?: boolean;
   onPick?: (worldId: string) => void;
 }
 
@@ -60,8 +62,10 @@ function WorldCardView({
   onDelete,
   selecting = false,
   selected = false,
+  pickFull = false,
   onPick,
 }: CardProps) {
+  const full = pickFull && !selected;
   const pct = w.prog != null ? `${w.prog}%` : "—";
   const pick = selecting && onPick && onDelete ? () => onPick(w.id) : undefined;
   return (
@@ -125,10 +129,14 @@ function WorldCardView({
         </div>
       </a>
       {selecting && onDelete && onPick ? (
-        <label className="park-worlds-pick">
+        <label
+          className="park-worlds-pick"
+          {...(full ? { title: "That is the most worlds one delete takes" } : {})}
+        >
           <input
             type="checkbox"
             checked={selected}
+            disabled={full}
             onChange={() => onPick(w.id)}
             aria-label={`Select ${w.name}`}
           />
