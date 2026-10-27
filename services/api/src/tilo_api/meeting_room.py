@@ -699,6 +699,21 @@ def _turn(ctx: Ctx, room: Room, model: RoomModel, safety: SafetyProvider, body: 
     grounding = ground(ctx.world.layout, stream, to)
     if grounding is None:
         return _refuse(422, "bad_request")
+    if ctx.principal.user_id == ctx.world.owner and {"artifact.delivered", "world.completed"} <= {
+        e["type"] for e in stream
+    }:
+        try:
+            from tilo_api import results  # noqa: PLC0415
+
+            delivered = results.get_result(
+                ctx.world_id, ctx.principal, ctx.store, results.result_store(ctx.request, how.mode)
+            )
+            if delivered.media_type in {"text/plain", "text/markdown", "application/json"}:
+                grounding = dataclasses.replace(
+                    grounding, final_result=delivered.body[:12000].decode("utf-8", errors="replace")[:3000]
+                )
+        except Exception:  # the event record still answers if the delivered bytes are unavailable
+            pass
     redact = _seam(ctx.request, deps.get_redactor)
     archive = _seam(ctx.request, deps.get_run_archive)(org_id=deps.ORG_ID, run_id=room.run_id)
     turn = len(room.turns) + 1

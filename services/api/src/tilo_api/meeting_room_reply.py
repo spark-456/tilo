@@ -5,6 +5,7 @@ proposal that holds anything but unit ids and artifact versions. No tool, no con
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import re
 import time
@@ -51,6 +52,7 @@ class Grounding:
     artifacts: frozenset[tuple[str, int]]
     lines: tuple[tuple[int, str, str, str], ...]  # seq, type, unit, summary: what the agent's record says
     started: bool = True
+    final_result: str = ""
 
 
 @dataclass(frozen=True)
@@ -231,6 +233,8 @@ def _flagged(safety: SafetyProvider, text: str) -> bool:
 
 def _prompt(record: Grounding, question: str, mode: str, note: str, rows: tuple) -> tuple[str, str]:
     lines = "\n".join(f"{s} | {t} | {u} | {m}" for s, t, u, m in rows) or "(nothing recorded)"
+    if record.final_result:
+        lines += f"\nDelivered result excerpt: {record.final_result}"
     variables = {"mode": mode, "agent": record.agent, "question": question, "record": lines, "note": note}
     return load_prompt("meeting_room", "reply_system.md"), load_prompt("meeting_room", "reply_task.md", variables)
 
@@ -308,8 +312,12 @@ def answer(
         if not record.started:
             return Reply("declined", NOT_STARTED)
         rows, note = _screened(safety, tuple((s, t, u, _clean(m)) for s, t, u, m in record.lines))
-        system, prompt = _prompt(record, question, mode, note, rows)
-        got = model.reply(mode, system, prompt, record=record, budget=budget)
+        excerpt = " ".join(neutralise(record.final_result, limit=3000).split()) if record.final_result else ""
+        if excerpt and _flagged(safety, excerpt):
+            excerpt = ""
+        safe_record = dataclasses.replace(record, final_result=excerpt)
+        system, prompt = _prompt(safe_record, question, mode, note, rows)
+        got = model.reply(mode, system, prompt, record=safe_record, budget=budget)
     except RoomCapped:
         raise
     except Exception as exc:  # an outage is never "not flagged" and never a made-up reply (fail closed)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 from _mroom_a1_lib import STREAM, Scripted, layout, make_env, reply_json
+from fastapi.responses import Response
 from tilo_api.meeting_room_reply import answer, ground
 
 
@@ -47,3 +48,20 @@ def test_P0_HALL_ASK_unstarted_world_says_start_without_model_call():
     assert reply.outcome == "declined"
     assert reply.text == "This world has no record yet. Select Start to begin."
     assert model.prompts == []
+
+
+def test_P0_HALL_ASK_director_reads_bounded_final_result_text(monkeypatch, tmp_path):
+    from tilo_api import results
+
+    model = Scripted()
+    env = make_env(tmp_path, model=model)
+    monkeypatch.setattr(
+        results,
+        "get_result",
+        lambda *args, **kwargs: Response(
+            "Final report: the supplier accepted Thursday at 3pm.", media_type="text/plain"
+        ),
+    )
+    room = env.convene(lead="A_dir", agents=[]).json()["room_id"]
+    env.ask(room, "What is in the final result?", to="A_dir")
+    assert "Final report: the supplier accepted Thursday at 3pm." in model.prompts[0]
