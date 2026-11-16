@@ -4,7 +4,7 @@
 
 ### People describe work. A Director plans it. Agent teams run it. The work is shown as a living isometric world.
 
-[![Live demo](https://img.shields.io/badge/Live%20demo-open-22c55e?style=for-the-badge&logo=firebase&logoColor=white)](https://essential-wares-510320-f0.web.app)
+![Hosted demo](https://img.shields.io/badge/Hosted%20demo-retired-6b7280?style=for-the-badge&logo=firebase&logoColor=white)
 ![Google Cloud AI Builder Cup 2026](https://img.shields.io/badge/Google%20Cloud-AI%20Builder%20Cup%202026-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)
@@ -143,7 +143,7 @@ Tilo is built around three ideas:
 
 ## Try it
 
-**[Open the live site](https://essential-wares-510320-f0.web.app)** (Firebase Hosting, project `essential-wares-510320-f0`).
+> **The hosted deployment was retired on 16 Nov 2026.** The Firebase site and all Cloud Run services are offline. The notes below describe how the app worked when it was live; to run it again, deploy it to your own Google Cloud project.
 
 - **Explore a demo town** needs no account. It opens a made-up company with sample worlds and replays recorded runs, labelled as such; approving records nothing and uploads are off.
 - **Continue with Google** signs in to your own workspace and starts real runs. The Google app is in testing mode, so only listed test users can sign in. A signed-in run is live only where the deployment has switched live models on, and it is bounded by the spend caps below.
